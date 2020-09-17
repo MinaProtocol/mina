@@ -134,9 +134,17 @@ module type Inputs_intf = sig
       -> sg:Curve.Affine.Backend.t
       -> evals0:Evaluations_backend.t
       -> evals1:Evaluations_backend.t
+      -> prev_challenges:Scalar_field.Vector.t
+      -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
-    val create : Index.t -> Scalar_field.Vector.t -> Scalar_field.Vector.t -> t
+    val create :
+         Index.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.Vector.t
+      -> Curve.Affine.Backend.Vector.t
+      -> t
 
     val batch_verify : Verifier_index.t -> Vector.t -> bool
 
@@ -158,11 +166,43 @@ end
 
 module type S = sig end
 
+module Challenge_polynomial = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g, 'fq) t = {challenges: 'fq array; commitment: 'g}
+      [@@deriving version, bin_io, sexp, compare, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Backend = Backend
   module Fq = Scalar_field
   module G = Curve
+
+  module Challenge_polynomial = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( G.Affine.Stable.V1.t
+          , Fq.Stable.V1.t )
+          Challenge_polynomial.Stable.V1.t
+        [@@deriving sexp, compare, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
+      {challenges: 'fq array; commitment: 'g}
+  end
+
+  type message = Challenge_polynomial.t list
 
   [%%versioned
   module Stable = struct
@@ -283,7 +323,7 @@ module Make (Inputs : Inputs_intf) = struct
       (module V : Intf.Vector with type t = t and type elt = elt) (v : t) =
     Array.init (V.length v) ~f:(V.get v)
 
-  let to_backend' primary_input
+  let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
       ({ messages= {l_comm; r_comm; o_comm; z_comm; t_comm}
        ; openings= {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1} } :
         t) : Backend.t =
@@ -296,24 +336,50 @@ module Make (Inputs : Inputs_intf) = struct
             (G.Affine.Backend.Pair.make (g l) (g r)) ) ;
       v
     in
+    let challenges =
+      List.map chal_polys
+        ~f:(fun {Challenge_polynomial.challenges; commitment= _} -> challenges)
+      |> Array.concat |> fq_array_to_vec
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun {Challenge_polynomial.commitment; challenges= _} ->
+          G.Affine.to_backend commitment )
+      |> g_array_to_vec
+    in
     Backend.make ~primary_input ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
       ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcwo t_comm) ~lr
       ~z1:z_1 ~z2:z_2 ~delta:(g delta) ~sg:(g sg)
       ~evals0:(eval_to_backend evals0) ~evals1:(eval_to_backend evals1)
+      ~prev_challenges:challenges ~prev_sgs:commitments
 
-  let to_backend primary_input t =
-    to_backend' (field_vector_of_list primary_input) t
+  let to_backend chal_polys primary_input t =
+    to_backend' chal_polys (field_vector_of_list primary_input) t
 
   let create ?message pk ~primary ~auxiliary =
-    let res = Backend.create pk primary auxiliary in
+    let chal_polys =
+      match (message : message option) with Some s -> s | None -> []
+    in
+    let challenges =
+      List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
+          challenges )
+      |> Array.concat |> fq_array_to_vec
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun {Challenge_polynomial.commitment; _} ->
+          G.Affine.to_backend commitment )
+      |> g_array_to_vec
+    in
+    let res = Backend.create pk primary auxiliary challenges commitments in
     let t = of_backend res in
     Backend.delete res ; t
 
-  let batch_verify' (conv : 'a -> Fq.Vector.t) (ts : (t * 'a) list)
-      (vk : Verifier_index.t) =
+  let batch_verify' (conv : 'a -> Fq.Vector.t)
+      (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =
     let v = Backend.Vector.create () in
-    List.iter ts ~f:(fun (t, xs) ->
-        let p = to_backend' (conv xs) t in
+    List.iter ts ~f:(fun (t, xs, m) ->
+        let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
     let res = Backend.batch_verify vk v in
@@ -322,7 +388,7 @@ module Make (Inputs : Inputs_intf) = struct
   let batch_verify =
     batch_verify' (fun xs -> field_vector_of_list (Fq.one :: xs))
 
-  let verify t vk (xs : Fq.Vector.t) : bool =
+  let verify ?message t vk (xs : Fq.Vector.t) : bool =
     batch_verify'
       (fun xs ->
         let v = Fq.Vector.create () in
@@ -331,5 +397,5 @@ module Make (Inputs : Inputs_intf) = struct
           Fq.Vector.emplace_back v (Fq.Vector.get xs i)
         done ;
         v )
-      [(t, xs)] vk
+      [(t, xs, message)] vk
 end
