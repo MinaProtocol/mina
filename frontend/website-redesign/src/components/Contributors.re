@@ -314,7 +314,6 @@ module GenesisMembersGrid = {
 let make = () => {
   <div className=Styles.container>
     /* O1 Labs Section  */
-
       <div className=Styles.headerCopy>
         <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
         <p className=Styles.sectionSubhead>
