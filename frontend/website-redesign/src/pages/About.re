@@ -6,6 +6,6 @@ let make = () => {
     <QuoteSection />
     <SecuredBySection />
     <Contributors />
-    <Investors/>
+    <Investors />
   </Page>;
 };

@@ -60,6 +60,9 @@ let make = (~kind, ~size=1.5) => {
         sizeValue;
       }
       ++ {
+        " ";
+      }
+      ++ {
         sizeValue;
       }
     }
