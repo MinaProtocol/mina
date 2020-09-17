@@ -21,7 +21,10 @@
                     - opam-linux-v1-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
+                command: |
+                    # FIXME: Remove this when it becomes unnecessary
+                    sudo apt-get install -y autoconf
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 {%endset%}
 
 {% set checkout_no_lfs %}
