@@ -1,15 +1,21 @@
 use crate::common::*;
 use algebra::{
-    biginteger::BigInteger384,
+    ToBytes, FromBytes, One, Zero,
+    biginteger::{BigInteger384},
     bn_382::{
-        fp::{Fp, FpParameters as Fp_params},
-        fq::Fq,
-        g1::Bn_382G1Parameters,
         Bn_382, G1Affine, G1Projective, G2Affine,
+        g1::Bn_382G1Parameters,
+        fp::{Fp, FpParameters as Fp_params},
+        fq::{Fq},
     },
-    curves::{AffineCurve, PairingEngine, ProjectiveCurve},
-    fields::{Field, FpParameters, PrimeField, SquareRootField},
-    FromBytes, One, ToBytes, UniformRand, Zero,
+    curves::{
+        PairingEngine,
+        AffineCurve, ProjectiveCurve,
+    },
+    fields::{
+        Field, FpParameters, PrimeField, SquareRootField,
+    },
+    UniformRand,
 };
 use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 use commitment_pairing::urs::URS;
@@ -26,12 +32,10 @@ use marlin_protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracl
 use rand::rngs::StdRng;
 use rand_core;
 
-use std::{
-    ffi::CStr,
-    fs::File,
-    io::{BufReader, BufWriter, Read, Result as IoResult, Write},
-    os::raw::c_char,
-};
+use std::os::raw::c_char;
+use std::ffi::CStr;
+use std::fs::File;
+use std::io::{Read, Result as IoResult, Write, BufReader, BufWriter};
 
 // Fp stubs
 
@@ -301,43 +305,6 @@ pub extern "C" fn zexe_bn382_fp_constraint_matrix_delete(x: *mut Vec<(Vec<usize>
     let _box = unsafe { Box::from_raw(x) };
 }
 
-// Fp triple
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_triple_0(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { *evals })[0].clone();
-    return Box::into_raw(Box::new(x));
-}
-
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_triple_1(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { *evals })[1].clone();
-    return Box::into_raw(Box::new(x));
-}
-
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_triple_2(evals: *const [Fp; 3]) -> *const Fp {
-    let x = (unsafe { *evals })[2].clone();
-    return Box::into_raw(Box::new(x));
-}
-
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_vector_triple_0(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
-    let x = (unsafe { &(*evals) })[0].clone();
-    return Box::into_raw(Box::new(x));
-}
-
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_vector_triple_1(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
-    let x = (unsafe { &(*evals) })[1].clone();
-    return Box::into_raw(Box::new(x));
-}
-
-#[no_mangle]
-pub extern "C" fn zexe_bn382_fp_vector_triple_2(evals: *const [Vec<Fp>; 3]) -> *const Vec<Fp> {
-    let x = (unsafe { &(*evals) })[2].clone();
-    return Box::into_raw(Box::new(x));
-}
-
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_vector_triple_delete(x: *mut [Fp; 3]) {
     let _box = unsafe { Box::from_raw(x) };
@@ -345,29 +312,29 @@ pub extern "C" fn zexe_bn382_fp_vector_triple_delete(x: *mut [Fp; 3]) {
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_batch_pairing_check(
-    // Pardon the tortured encoding. It's this way because we have to add
-    // additional OCaml bindings for each specialized vector type.
-    //
-    // Each haloified proof i contains group elements
-    // s_i
-    // u_{i,j} for j in d
-    // t_i
-    // p_i
-    //
-    // and we must check
-    // e(t_i, H) - e(p_i, beta H) = 0
-    // e(s_i, H) - sum_j e(u_{i,j}, beta^{max-j} H) = 0
-    //
-    // To check this we sample a, b at random and check
-    //
-    // e(sum_i b^i t_i, H) - e(sum_i b^i p_i, beta H) = 0
-    // e(sum_i b^i s_i, H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
-    //
-    // a [ e(sum_i b^i t_i, H) - e(sum_i b^i p_i, beta H) ] +
-    // e(sum_i b^i s_i, H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
-    //
-    // e(-a sum_i b^i p_i, beta H) +
-    // e(sum_i b^i (s_i + a t_i), H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
+// Pardon the tortured encoding. It's this way because we have to add
+// additional OCaml bindings for each specialized vector type.
+//
+// Each haloified proof i contains group elements
+// s_i
+// u_{i,j} for j in d
+// t_i
+// p_i
+//
+// and we must check
+// e(t_i, H) - e(p_i, beta H) = 0
+// e(s_i, H) - sum_j e(u_{i,j}, beta^{max-j} H) = 0 
+//
+// To check this we sample a, b at random and check
+//
+// e(sum_i b^i t_i, H) - e(sum_i b^i p_i, beta H) = 0
+// e(sum_i b^i s_i, H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
+//
+// a [ e(sum_i b^i t_i, H) - e(sum_i b^i p_i, beta H) ] +
+// e(sum_i b^i s_i, H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
+//
+// e(-a sum_i b^i p_i, beta H) +
+// e(sum_i b^i (s_i + a t_i), H) - sum_j e(sum_i b^i u_{i,j}, beta^{max-j} H) = 0
     urs: *const URS<Bn_382>,
     d: *const Vec<usize>,
     s: *const Vec<G1Affine>,
@@ -401,14 +368,13 @@ pub extern "C" fn zexe_bn382_batch_pairing_check(
     // Final value: -a sum_i b^i p_i
     let mut acc_beta_h = G1Projective::zero();
 
-    let u: Vec<Vec<G1Affine>> = (0..n)
-        .map(|i| (0..k).map(|j| u[k * i + j]).collect())
-        .collect();
+    let u : Vec<Vec<G1Affine>> =
+        (0..n).map(|i| (0..k).map(|j| u[k*i + j]).collect()).collect();
 
     // Optimization: Parallelize
     // Optimization:
-    //   Experiment with scalar multiplying the affine point by b^i before adding
-    // into the   accumulator.
+    //   Experiment with scalar multiplying the affine point by b^i before adding into the
+    //   accumulator.
     for ((p_i, (s_i, t_i)), u_i) in p.iter().zip(s.iter().zip(t)).zip(u) {
         acc_beta_h *= b;
         acc_beta_h.add_assign_mixed(p_i);
@@ -428,18 +394,14 @@ pub extern "C" fn zexe_bn382_batch_pairing_check(
     }
 
     let mut table = vec![
-        (
-            acc_h.into_affine().into(),
-            G2Affine::prime_subgroup_generator().into(),
-        ),
-        (acc_beta_h.into_affine().into(), urs.hx.into()),
+        (acc_h.into_affine().into(), G2Affine::prime_subgroup_generator().into()),
+        (acc_beta_h.into_affine().into(), urs.hx.into())
     ];
     for (acc_j, j) in acc_d.iter().zip(d) {
         table.push((acc_j.into_affine().into(), urs.hn[&(urs.depth - j)].into()));
     }
 
-    Bn_382::final_exponentiation(&Bn_382::miller_loop(&table)).unwrap()
-        == <Bn_382 as PairingEngine>::Fqk::one()
+    Bn_382::final_exponentiation(&Bn_382::miller_loop(&table)).unwrap() == <Bn_382 as PairingEngine>::Fqk::one()
 }
 
 // Fp proof
@@ -478,7 +440,7 @@ pub extern "C" fn zexe_bn382_fp_proof_batch_verify(
         &mut rand_core::OsRng,
     ) {
         Ok(_) => true,
-        Err(_) => false,
+        Err(_) => false
     }
 }
 
@@ -487,41 +449,43 @@ pub extern "C" fn zexe_bn382_fp_proof_verify(
     index: *const VerifierIndex<Bn_382>,
     proof: *const ProverProof<Bn_382>,
 ) -> bool {
+
     let index = unsafe { &(*index) };
     let proof = unsafe { (*proof).clone() };
 
     match ProverProof::verify::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
         &[proof].to_vec(),
         &index,
-        &mut rand_core::OsRng,
-    ) {
+        &mut rand_core::OsRng
+    )
+    {
         Ok(status) => status,
-        _ => false,
+        _ => false
     }
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_proof_make(
-    primary_input: *const Vec<Fp>,
+    primary_input : *const Vec<Fp>,
 
-    w_comm: *const G1Affine,
-    za_comm: *const G1Affine,
-    zb_comm: *const G1Affine,
-    h1_comm: *const G1Affine,
-    g1_comm_0: *const G1Affine,
-    g1_comm_1: *const G1Affine,
-    h2_comm: *const G1Affine,
-    g2_comm_0: *const G1Affine,
-    g2_comm_1: *const G1Affine,
-    h3_comm: *const G1Affine,
-    g3_comm_0: *const G1Affine,
-    g3_comm_1: *const G1Affine,
-    proof1: *const G1Affine,
-    proof2: *const G1Affine,
-    proof3: *const G1Affine,
+    w_comm        : *const G1Affine,
+    za_comm       : *const G1Affine,
+    zb_comm       : *const G1Affine,
+    h1_comm       : *const G1Affine,
+    g1_comm_0     : *const G1Affine,
+    g1_comm_1     : *const G1Affine,
+    h2_comm       : *const G1Affine,
+    g2_comm_0     : *const G1Affine,
+    g2_comm_1     : *const G1Affine,
+    h3_comm       : *const G1Affine,
+    g3_comm_0     : *const G1Affine,
+    g3_comm_1     : *const G1Affine,
+    proof1        : *const G1Affine,
+    proof2        : *const G1Affine,
+    proof3        : *const G1Affine,
 
-    sigma2: *const Fp,
-    sigma3: *const Fp,
+    sigma2        : *const Fp,
+    sigma3        : *const Fp,
 
     w: *const Fp,
     za: *const Fp,
@@ -554,60 +518,47 @@ pub extern "C" fn zexe_bn382_fp_proof_make(
 
     let proof = ProverProof {
         w_comm: (unsafe { *w_comm }).clone(),
-        za_comm: (unsafe { *za_comm }).clone(),
-        zb_comm: (unsafe { *zb_comm }).clone(),
-        h1_comm: (unsafe { *h1_comm }).clone(),
-        g1_comm: (
-            (unsafe { *g1_comm_0 }).clone(),
-            (unsafe { *g1_comm_1 }).clone(),
-        ),
-        h2_comm: (unsafe { *h2_comm }).clone(),
-        g2_comm: (
-            (unsafe { *g2_comm_0 }).clone(),
-            (unsafe { *g2_comm_1 }).clone(),
-        ),
-        h3_comm: (unsafe { *h3_comm }).clone(),
-        g3_comm: (
-            (unsafe { *g3_comm_0 }).clone(),
-            (unsafe { *g3_comm_1 }).clone(),
-        ),
-        proof1: (unsafe { *proof1 }).clone(),
-        proof2: (unsafe { *proof2 }).clone(),
-        proof3: (unsafe { *proof3 }).clone(),
+        za_comm: (unsafe { *za_comm }).clone() ,
+        zb_comm: (unsafe { *zb_comm }).clone() ,
+        h1_comm: (unsafe { *h1_comm }).clone() ,
+        g1_comm: ((unsafe { *g1_comm_0 }).clone(),(unsafe { *g1_comm_1 }).clone()),
+        h2_comm: (unsafe { *h2_comm }).clone() ,
+        g2_comm: ((unsafe { *g2_comm_0 }).clone(),(unsafe { *g2_comm_1 }).clone()),
+        h3_comm: (unsafe { *h3_comm }).clone() ,
+        g3_comm: ((unsafe { *g3_comm_0 }).clone(),(unsafe { *g3_comm_1 }).clone()),
+        proof1: (unsafe { *proof1 }).clone() ,
+        proof2: (unsafe { *proof2 }).clone() ,
+        proof3: (unsafe { *proof3 }).clone() ,
         public,
         sigma2: (unsafe { *sigma2 }).clone(),
         sigma3: (unsafe { *sigma3 }).clone(),
         evals: ProofEvaluations {
-            w: (unsafe { *w }).clone(),
-            za: (unsafe { *za }).clone(),
-            zb: (unsafe { *zb }).clone(),
-            h1: (unsafe { *h1 }).clone(),
-            g1: (unsafe { *g1 }).clone(),
-            h2: (unsafe { *h2 }).clone(),
-            g2: (unsafe { *g2 }).clone(),
-            h3: (unsafe { *h3 }).clone(),
-            g3: (unsafe { *g3 }).clone(),
-            row: [
-                (unsafe { *row_0 }).clone(),
-                (unsafe { *row_1 }).clone(),
-                (unsafe { *row_2 }).clone(),
-            ],
-            col: [
-                (unsafe { *col_0 }).clone(),
-                (unsafe { *col_1 }).clone(),
-                (unsafe { *col_2 }).clone(),
-            ],
-            val: [
-                (unsafe { *val_0 }).clone(),
-                (unsafe { *val_1 }).clone(),
-                (unsafe { *val_2 }).clone(),
-            ],
-            rc: [
-                (unsafe { *rc_0 }).clone(),
-                (unsafe { *rc_1 }).clone(),
-                (unsafe { *rc_2 }).clone(),
-            ],
-        },
+            w :(unsafe {*w}).clone(),
+            za:(unsafe {*za}).clone(),
+            zb:(unsafe {*zb}).clone(),
+            h1:(unsafe {*h1}).clone(),
+            g1:(unsafe {*g1}).clone(),
+            h2:(unsafe {*h2}).clone(),
+            g2:(unsafe {*g2}).clone(),
+            h3:(unsafe {*h3}).clone(),
+            g3:(unsafe {*g3}).clone(),
+            row:
+                [ (unsafe {*row_0}).clone(),
+                  (unsafe {*row_1}).clone(),
+                  (unsafe {*row_2}).clone() ],
+            col:
+                [ (unsafe {*col_0}).clone(),
+                  (unsafe {*col_1}).clone(),
+                  (unsafe {*col_2}).clone() ],
+            val:
+                [ (unsafe {*val_0}).clone(),
+                  (unsafe {*val_1}).clone(),
+                  (unsafe {*val_2}).clone() ],
+            rc:
+                [ (unsafe {*rc_0}).clone(),
+                  (unsafe {*rc_1}).clone(),
+                  (unsafe {*rc_2}).clone() ],
+        }
     };
 
     return Box::into_raw(Box::new(proof));
@@ -643,10 +594,8 @@ pub extern "C" fn zexe_bn382_fp_proof_h1_comm(p: *mut ProverProof<Bn_382>) -> *c
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_proof_g1_comm_nocopy(
-    p: *mut ProverProof<Bn_382>,
-) -> *const (G1Affine, G1Affine) {
-    let x = unsafe { (*p).g1_comm };
+pub extern "C" fn zexe_bn382_fp_proof_g1_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+    let x = unsafe {(*p).g1_comm};
     return Box::into_raw(Box::new(x));
 }
 
@@ -657,9 +606,7 @@ pub extern "C" fn zexe_bn382_fp_proof_h2_comm(p: *mut ProverProof<Bn_382>) -> *c
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_proof_g2_comm_nocopy(
-    p: *mut ProverProof<Bn_382>,
-) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_fp_proof_g2_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
     let x = unsafe { (*p).g2_comm };
     return Box::into_raw(Box::new(x));
 }
@@ -671,25 +618,21 @@ pub extern "C" fn zexe_bn382_fp_proof_h3_comm(p: *mut ProverProof<Bn_382>) -> *c
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_proof_g3_comm_nocopy(
-    p: *mut ProverProof<Bn_382>,
-) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
     let x = unsafe { (*p).g3_comm };
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_0(
-    p: *const (G1Affine, G1Affine),
-) -> *const G1Affine {
-    let (x0, _) = unsafe { *p };
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
+    let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_1(
-    p: *const (G1Affine, G1Affine),
-) -> *const G1Affine {
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
     let (_, x1) = unsafe { *p };
     return Box::into_raw(Box::new(x1.clone()));
 }
@@ -852,20 +795,14 @@ pub extern "C" fn zexe_bn382_fp_proof_vector_length(v: *const Vec<ProverProof<Bn
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_proof_vector_emplace_back(
-    v: *mut Vec<ProverProof<Bn_382>>,
-    x: *const ProverProof<Bn_382>,
-) {
+pub extern "C" fn zexe_bn382_fp_proof_vector_emplace_back(v: *mut Vec<ProverProof<Bn_382>>, x: *const ProverProof<Bn_382>) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(x_.clone());
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_proof_vector_get(
-    v: *mut Vec<ProverProof<Bn_382>>,
-    i: u32,
-) -> *mut ProverProof<Bn_382> {
+pub extern "C" fn zexe_bn382_fp_proof_vector_get(v: *mut Vec<ProverProof<Bn_382>>, i: u32) -> *mut ProverProof<Bn_382> {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new(v_[i as usize].clone()));
 }
@@ -898,89 +835,108 @@ pub extern "C" fn zexe_bn382_fp_oracles_create(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_alpha(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).alpha.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_alpha(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).alpha.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_eta_a(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).eta_a.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_eta_a(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_a.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_eta_b(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).eta_b.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_eta_b(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_b.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_eta_c(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).eta_c.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_eta_c(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_c.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_beta1(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).beta[0].0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_beta1(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[0].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_beta2(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).beta[1].0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_beta2(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[1].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_beta3(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).beta[2].0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_beta3(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[2].0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_r_k(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).r_k.0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_r_k(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r_k.0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_batch(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).batch.0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_batch(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).batch.0.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_r(oracles: *const RandomOracles<Fp>) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).r.0.clone()));
+pub extern "C" fn zexe_bn382_fp_oracles_r(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r.0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_oracles_x_hat_beta1(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new((unsafe { &(*oracles) }).x_hat_beta1.clone()));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).x_hat_beta1.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_oracles_digest_before_evaluations(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new(
-        (unsafe { &(*oracles) }).digest_before_evaluations.clone(),
-    ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).digest_before_evaluations.clone() ));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_oracles_delete(x: *mut RandomOracles<Fp>) {
+pub extern "C" fn zexe_bn382_fp_oracles_delete(
+    x: *mut RandomOracles<Fp>) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 // Fp verifier index stubs
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_create(
-    index: *const Index<Bn_382>,
+    index: *const Index<Bn_382>
 ) -> *const VerifierIndex<Bn_382> {
-    Box::into_raw(Box::new(unsafe { &(*index) }.verifier_index()))
+    Box::into_raw(Box::new(unsafe {&(*index)}.verifier_index()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_urs(
-    index: *const VerifierIndex<Bn_382>,
+    index: *const VerifierIndex<Bn_382>
 ) -> *const URS<Bn_382> {
-    let index = unsafe { &*index };
+    let index = unsafe { & *index };
     let urs = index.urs.clone();
     Box::into_raw(Box::new(urs))
 }
@@ -1011,57 +967,39 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_make(
     let urs: URS<Bn_382> = (unsafe { &*urs }).clone();
     let (endo_q, endo_r) = marlin_protocol_pairing::index::endos::<Bn_382>();
     let index = VerifierIndex {
-        domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries)
-            .unwrap(),
+        domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries).unwrap(),
         matrix_commitments: [
-            MatrixValues {
-                row: (unsafe { *row_a }).clone(),
-                col: (unsafe { *col_a }).clone(),
-                val: (unsafe { *val_a }).clone(),
-                rc: (unsafe { *rc_a }).clone(),
-            },
-            MatrixValues {
-                row: (unsafe { *row_b }).clone(),
-                col: (unsafe { *col_b }).clone(),
-                val: (unsafe { *val_b }).clone(),
-                rc: (unsafe { *rc_b }).clone(),
-            },
-            MatrixValues {
-                row: (unsafe { *row_c }).clone(),
-                col: (unsafe { *col_c }).clone(),
-                val: (unsafe { *val_c }).clone(),
-                rc: (unsafe { *rc_c }).clone(),
-            },
+            MatrixValues { row: (unsafe {*row_a}).clone(), col: (unsafe {*col_a}).clone(), val: (unsafe {*val_a}).clone(), rc: (unsafe {*rc_a}).clone() },
+            MatrixValues { row: (unsafe {*row_b}).clone(), col: (unsafe {*col_b}).clone(), val: (unsafe {*val_b}).clone(), rc: (unsafe {*rc_b}).clone() },
+            MatrixValues { row: (unsafe {*row_c}).clone(), col: (unsafe {*col_c}).clone(), val: (unsafe {*val_c}).clone(), rc: (unsafe {*rc_c}).clone() },
         ],
         fq_sponge_params: oracle::bn_382::fq::params(),
         fr_sponge_params: oracle::bn_382::fp::params(),
         max_degree,
         public_inputs,
         urs,
-        endo_q,
-        endo_r,
+        endo_q, endo_r
     };
     Box::into_raw(Box::new(index))
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_verifier_index_delete(x: *mut VerifierIndex<Bn_382>) {
+pub extern "C" fn zexe_bn382_fp_verifier_index_delete(
+    x: *mut VerifierIndex<Bn_382>
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_write<'a>(
-    index: *const VerifierIndex<Bn_382>,
-    path: *const c_char,
-) {
-    let index = unsafe { &*index };
+    index : *const VerifierIndex<Bn_382>,
+    path: *const c_char) {
+    let index = unsafe { & *index };
 
-    let path = (unsafe { CStr::from_ptr(path) })
-        .to_string_lossy()
-        .into_owned();
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let mut w = BufWriter::new(File::create(path).unwrap());
 
-    let t: IoResult<()> = (|| {
+    let t : IoResult<()> = (|| {
         for c in index.matrix_commitments.iter() {
             write_matrix_values(c, &mut w)?;
         }
@@ -1076,14 +1014,11 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_write<'a>(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_read<'a>(
-    path: *const c_char,
-) -> *const VerifierIndex<Bn_382> {
-    let path = (unsafe { CStr::from_ptr(path) })
-        .to_string_lossy()
-        .into_owned();
+    path: *const c_char) -> *const VerifierIndex<Bn_382> {
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let mut r = BufReader::new(File::open(path).unwrap());
 
-    let t: IoResult<_> = (|| {
+    let t : IoResult<_> = (|| {
         let m0 = read_matrix_values(&mut r)?;
         let m1 = read_matrix_values(&mut r)?;
         let m2 = read_matrix_values(&mut r)?;
@@ -1098,8 +1033,7 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_read<'a>(
             public_inputs,
             max_degree,
             urs,
-            endo_q,
-            endo_r,
+            endo_q, endo_r,
             fr_sponge_params: oracle::bn_382::fp::params(),
             fq_sponge_params: oracle::bn_382::fq::params(),
         })
@@ -1111,118 +1045,90 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_read<'a>(
 pub extern "C" fn zexe_bn382_fp_verifier_index_a_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[0].row }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].row }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_a_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[0].col }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].col }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_a_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[0].val }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].val }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_a_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[0].rc }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[0].rc }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_b_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[1].row }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].row }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_b_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[1].col }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].col }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_b_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[1].val }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].val }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_b_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[1].rc }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[1].rc }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_c_row_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[2].row }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].row }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_c_col_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[2].col }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].col }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_c_val_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[2].val }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].val }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_verifier_index_c_rc_comm(
     index: *const VerifierIndex<Bn_382>,
 ) -> *const G1Affine {
-    Box::into_raw(Box::new(
-        (unsafe { (*index).matrix_commitments[2].rc }).clone(),
-    ))
+    Box::into_raw(Box::new((unsafe { (*index).matrix_commitments[2].rc }).clone()))
 }
 
 // Fp URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_urs_create(depth: usize) -> *const URS<Bn_382> {
-    Box::into_raw(Box::new(URS::create(
-        depth,
-        (0..depth).collect(),
-        &mut rand_core::OsRng,
-    )))
+pub extern "C" fn zexe_bn382_fp_urs_create(depth : usize) -> *const URS<Bn_382> {
+    Box::into_raw(Box::new(URS::create(depth, (0..depth).collect(), &mut rand_core::OsRng)))
 }
 
 #[no_mangle]
@@ -1242,9 +1148,7 @@ pub extern "C" fn zexe_bn382_fp_urs_write(urs: *mut URS<Bn_382>, path: *mut c_ch
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_read(path: *mut c_char) -> *const URS<Bn_382> {
-    let path = (unsafe { CStr::from_ptr(path) })
-        .to_string_lossy()
-        .into_owned();
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let file = BufReader::new(File::open(path).unwrap());
     let res = URS::<Bn_382>::read(file).unwrap();
     return Box::into_raw(Box::new(res));
@@ -1252,16 +1156,14 @@ pub extern "C" fn zexe_bn382_fp_urs_read(path: *mut c_char) -> *const URS<Bn_382
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_lagrange_commitment(
-    urs: *const URS<Bn_382>,
-    domain_size: usize,
-    i: usize,
-) -> *const G1Affine {
+    urs : *const URS<Bn_382>,
+    domain_size : usize,
+    i: usize)
+-> *const G1Affine {
     let urs = unsafe { &*urs };
     let x_domain = EvaluationDomain::<Fp>::new(domain_size).unwrap();
 
-    let evals = (0..domain_size)
-        .map(|j| if i == j { Fp::one() } else { Fp::zero() })
-        .collect();
+    let evals = (0..domain_size).map(|j| if i == j { Fp::one() } else { Fp::zero() }).collect();
     let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
     let res = urs.commit(&p).unwrap();
 
@@ -1270,10 +1172,10 @@ pub extern "C" fn zexe_bn382_fp_urs_lagrange_commitment(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_commit_evaluations(
-    urs: *const URS<Bn_382>,
-    domain_size: usize,
-    evals: *const Vec<Fp>,
-) -> *const G1Affine {
+    urs : *const URS<Bn_382>,
+    domain_size : usize,
+    evals : *const Vec<Fp>)
+-> *const G1Affine {
     let urs = unsafe { &*urs };
     let x_domain = EvaluationDomain::<Fp>::new(domain_size).unwrap();
 
@@ -1286,39 +1188,33 @@ pub extern "C" fn zexe_bn382_fp_urs_commit_evaluations(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_dummy_degree_bound_checks(
-    urs: *const URS<Bn_382>,
-    bounds: *const Vec<usize>,
-) -> *const Vec<G1Affine> {
+    urs : *const URS<Bn_382>,
+    bounds : *const Vec<usize>,
+    )
+-> *const Vec<G1Affine> {
     let urs = unsafe { &*urs };
     let bounds = unsafe { &*bounds };
-    let comms: Vec<_> = bounds
-        .iter()
-        .map(|b| {
-            let p = DensePolynomial::<Fp>::from_coefficients_vec(
-                (0..*b)
-                    .map(|i| if i == 0 { Fp::one() } else { Fp::zero() })
-                    .collect(),
-            );
-            urs.commit_with_degree_bound(&p, *b).unwrap()
-        })
-        .collect();
+    let comms : Vec<_> = bounds.iter().map(|b| {
+        let p = DensePolynomial::<Fp>::from_coefficients_vec((0..*b).map(|i| {
+            if i == 0 {
+                Fp::one()
+            } else {
+                Fp::zero()
+            }
+        }).collect());
+        urs.commit_with_degree_bound(&p, *b).unwrap()
+    }).collect();
 
     let cs = comms.iter().map(|(_, c)| *c);
     let ss = comms.iter().map(|(s, _)| *s);
 
-    let rs: Vec<Fp> = bounds
-        .iter()
-        .enumerate()
-        .map(|(_, i)| ((i + 2) as u64).into())
-        .collect();
+    let rs : Vec<Fp> = bounds.iter().enumerate().map(|(_, i)| ((i + 2) as u64).into()).collect();
 
-    let shifted: G1Affine = ss
-        .zip(rs.iter())
-        .map(|(s, r)| s.mul(*r))
-        .fold(G1Projective::zero(), |acc, x| acc + &x)
-        .into_affine();
+    let shifted : G1Affine =
+        ss.zip(rs.iter()).map(|(s, r)| s.mul(*r))
+        .fold(G1Projective::zero(), |acc, x| acc + &x).into_affine();
 
-    let mut res = vec![shifted];
+    let mut res = vec![ shifted ];
     res.extend(cs.zip(rs.iter()).map(|(c, r)| c.mul(*r).into_affine()));
 
     Box::into_raw(Box::new(res))
@@ -1326,13 +1222,15 @@ pub extern "C" fn zexe_bn382_fp_urs_dummy_degree_bound_checks(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_urs_dummy_opening_check(
-    urs: *const URS<Bn_382>,
-) -> *const (G1Affine, G1Affine) {
-    // (f - [v] + z pi, pi)
-    //
-    // for the accumulator for the check
-    //
-    // e(f - [v] + z pi, H) = e(pi, beta*H)
+    urs : *const URS<Bn_382>)
+-> *const (G1Affine, G1Affine) {
+    /*
+       (f - [v] + z pi, pi)
+
+       for the accumulator for the check
+
+       e(f - [v] + z pi, H) = e(pi, beta*H)
+    */
     let urs = unsafe { &*urs };
 
     let z = Fp::one();
@@ -1341,24 +1239,23 @@ pub extern "C" fn zexe_bn382_fp_urs_dummy_opening_check(
     let v = p.evaluate(z);
     let pi = urs.open(vec![&p], Fp::one(), z).unwrap();
 
-    let res = (
-        (f.into_projective() - &(G1Affine::prime_subgroup_generator().mul(v)) + &pi.mul(z))
-            .into_affine(),
-        pi,
-    );
+    let res =
+        ( (f.into_projective() - &(G1Affine::prime_subgroup_generator().mul(v)) + & pi.mul(z))
+          .into_affine()
+        , pi);
 
     Box::into_raw(Box::new(res))
 }
 
 // Fp index stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_domain_h_size<'a>(i: *const Index<'a, Bn_382>) -> usize {
-    (unsafe { &*i }).domains.h.size()
+pub extern "C" fn zexe_bn382_fp_index_domain_h_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
+    (unsafe { & *i }).domains.h.size()
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_domain_k_size<'a>(i: *const Index<'a, Bn_382>) -> usize {
-    (unsafe { &*i }).domains.k.size()
+pub extern "C" fn zexe_bn382_fp_index_domain_k_size<'a>(i : *const Index<'a, Bn_382>) -> usize {
+    (unsafe { & *i }).domains.k.size()
 }
 
 #[no_mangle]
@@ -1368,7 +1265,7 @@ pub extern "C" fn zexe_bn382_fp_index_create<'a>(
     c: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     vars: usize,
     public_inputs: usize,
-    urs: *mut URS<Bn_382>,
+    urs : *mut URS<Bn_382>
 ) -> *mut Index<'a, Bn_382> {
     assert!(public_inputs > 0);
 
@@ -1379,11 +1276,7 @@ pub extern "C" fn zexe_bn382_fp_index_create<'a>(
 
     let num_constraints = a.len();
 
-    let m = if num_constraints > vars {
-        num_constraints
-    } else {
-        vars
-    };
+    let m = if num_constraints > vars { num_constraints } else { vars };
 
     let h_group_size = Domain::<Fp>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
@@ -1411,30 +1304,33 @@ pub extern "C" fn zexe_bn382_fp_index_delete(x: *mut Index<Bn_382>) {
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_nonzero_entries(index: *const Index<Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_nonzero_entries(
+    index: *const Index<Bn_382>,
+) -> usize {
     let index = unsafe { &*index };
-    index
-        .compiled
-        .iter()
-        .map(|x| x.constraints.nnz())
-        .max()
-        .unwrap()
+    index.compiled.iter().map(|x| x.constraints.nnz()).max().unwrap()
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_max_degree(index: *const Index<Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_max_degree(
+    index: *const Index<Bn_382>,
+) -> usize {
     let index = unsafe { &*index };
     index.urs.get_ref().max_degree()
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_num_variables(index: *const Index<Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_num_variables(
+    index: *const Index<Bn_382>,
+) -> usize {
     let index = unsafe { &*index };
     index.compiled[0].constraints.shape().0
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_index_public_inputs(index: *const Index<Bn_382>) -> usize {
+pub extern "C" fn zexe_bn382_fp_index_public_inputs(
+    index: *const Index<Bn_382>,
+) -> usize {
     let index = unsafe { &*index };
     index.public_inputs
 }
@@ -1456,24 +1352,22 @@ pub extern "C" fn zexe_bn382_fp_index_write<'a>(
         write_dense_polynomial(&c.row, &mut w)?;
         write_dense_polynomial(&c.col, &mut w)?;
         write_dense_polynomial(&c.val, &mut w)?;
-        write_evaluations(&c.row_eval_k, &mut w)?;
-        write_evaluations(&c.col_eval_k, &mut w)?;
-        write_evaluations(&c.val_eval_k, &mut w)?;
-        write_evaluations(&c.row_eval_b, &mut w)?;
-        write_evaluations(&c.col_eval_b, &mut w)?;
-        write_evaluations(&c.val_eval_b, &mut w)?;
-        write_evaluations(&c.rc_eval_b, &mut w)?;
+        write_evaluations(& c.row_eval_k, &mut w)?;
+        write_evaluations(& c.col_eval_k, &mut w)?;
+        write_evaluations(& c.val_eval_k, &mut w)?;
+        write_evaluations(& c.row_eval_b, &mut w)?;
+        write_evaluations(& c.col_eval_b, &mut w)?;
+        write_evaluations(& c.val_eval_b, &mut w)?;
+        write_evaluations(& c.rc_eval_b , &mut w)?;
         Ok(())
     }
 
-    let index = unsafe { &*index };
+    let index = unsafe { & *index };
 
-    let path = (unsafe { CStr::from_ptr(path) })
-        .to_string_lossy()
-        .into_owned();
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let mut w = BufWriter::new(File::create(path).unwrap());
 
-    let t: IoResult<()> = (|| {
+    let t : IoResult<()> = (|| {
         write_evaluation_domains(&index.domains, &mut w)?;
 
         for c in index.compiled.iter() {
@@ -1488,7 +1382,7 @@ pub extern "C" fn zexe_bn382_fp_index_write<'a>(
 
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fp_index_read<'a>(
-    srs: *const URS<Bn_382>,
+    srs : *const URS<Bn_382>,
     a: *const Vec<(Vec<usize>, Vec<Fp>)>,
     b: *const Vec<(Vec<usize>, Vec<Fp>)>,
     c: *const Vec<(Vec<usize>, Vec<Fp>)>,
@@ -1512,7 +1406,7 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
         let row_comm = G1Affine::read(&mut r)?;
         let val_comm = G1Affine::read(&mut r)?;
         let rc_comm = G1Affine::read(&mut r)?;
-        let rc = read_dense_polynomial(&mut r)?;
+        let rc  = read_dense_polynomial(&mut r)?;
         let row = read_dense_polynomial(&mut r)?;
         let col = read_dense_polynomial(&mut r)?;
         let val = read_dense_polynomial(&mut r)?;
@@ -1522,36 +1416,33 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
         let row_eval_b = read_evaluations(&mut r)?;
         let col_eval_b = read_evaluations(&mut r)?;
         let val_eval_b = read_evaluations(&mut r)?;
-        let rc_eval_b = read_evaluations(&mut r)?;
+        let rc_eval_b  = read_evaluations(&mut r)?;
 
         Ok(marlin_protocol_pairing::compiled::Compiled {
             constraints,
-            col_comm,
-            row_comm,
-            val_comm,
-            rc_comm,
-            rc,
-            row,
-            col,
-            val,
-            row_eval_k,
-            col_eval_k,
-            val_eval_k,
-            row_eval_b,
-            col_eval_b,
-            val_eval_b,
-            rc_eval_b,
-        })
+            col_comm   ,
+            row_comm   ,
+            val_comm   ,
+            rc_comm    ,
+            rc         ,
+            row        ,
+            col        ,
+            val        ,
+            row_eval_k ,
+            col_eval_k ,
+            val_eval_k ,
+            row_eval_b ,
+            col_eval_b ,
+            val_eval_b ,
+            rc_eval_b   })
     }
 
-    let path = (unsafe { CStr::from_ptr(path) })
-        .to_string_lossy()
-        .into_owned();
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
     let mut r = BufReader::new(File::open(path).unwrap());
 
     let srs = unsafe { &*srs };
 
-    let t: IoResult<_> = (|| {
+    let t : IoResult<_> = (|| {
         let domains = read_evaluation_domains(&mut r)?;
 
         let c0 = read_compiled(public_inputs, domains, a, &mut r)?;
@@ -1568,7 +1459,7 @@ pub extern "C" fn zexe_bn382_fp_index_read<'a>(
             fr_sponge_params: oracle::bn_382::fp::params(),
             fq_sponge_params: oracle::bn_382::fq::params(),
             endo_q,
-            endo_r,
+            endo_r
         })
     })();
     Box::into_raw(Box::new(t.unwrap()))
@@ -1604,14 +1495,19 @@ pub extern "C" fn zexe_bn382_g1_add(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_double(x: *const G1Projective) -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_double(
+    x: *const G1Projective,
+) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let ret = x_.double();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_scale(x: *const G1Projective, s: *const Fp) -> *const G1Projective {
+pub extern "C" fn zexe_bn382_g1_scale(
+    x: *const G1Projective,
+    s: *const Fp,
+) -> *const G1Projective {
     let x_ = unsafe { &(*x) };
     let s_ = unsafe { &(*s) };
     let ret = (*x_).mul(*s_);
@@ -1661,7 +1557,10 @@ pub extern "C" fn zexe_bn382_g1_of_affine_coordinates(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_create(x: *const Fq, y: *const Fq) -> *const G1Affine {
+pub extern "C" fn zexe_bn382_g1_affine_create(
+    x: *const Fq,
+    y: *const Fq
+    ) -> *const G1Affine {
     let x = (unsafe { *x }).clone();
     let y = (unsafe { *y }).clone();
     Box::into_raw(Box::new(G1Affine::new(x, y, false)))
@@ -1704,10 +1603,7 @@ pub extern "C" fn zexe_bn382_g1_affine_vector_length(v: *const Vec<G1Affine>) ->
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_vector_emplace_back(
-    v: *mut Vec<G1Affine>,
-    x: *const G1Affine,
-) {
+pub extern "C" fn zexe_bn382_g1_affine_vector_emplace_back(v: *mut Vec<G1Affine>, x: *const G1Affine) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(*x_);
@@ -1729,14 +1625,16 @@ pub extern "C" fn zexe_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>) {
 // Fq sponge stubs
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_sponge_params_create() -> *mut poseidon::ArithmeticSpongeParams<Fq>
-{
+pub extern "C" fn zexe_bn382_fq_sponge_params_create(
+) -> *mut poseidon::ArithmeticSpongeParams<Fq> {
     let ret = oracle::bn_382::fq::params();
     return Box::into_raw(Box::new(ret));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_sponge_params_delete(x: *mut poseidon::ArithmeticSpongeParams<Fq>) {
+pub extern "C" fn zexe_bn382_fq_sponge_params_delete(
+    x: *mut poseidon::ArithmeticSpongeParams<Fq>,
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 
@@ -1778,22 +1676,22 @@ pub extern "C" fn zexe_bn382_fq_sponge_squeeze(
 
 // G1 affine pair#[no_mangle]
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_0(p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (x0, _) = unsafe { *p };
+pub extern "C" fn zexe_bn382_g1_affine_pair_0(
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
+    let (x0, _) = unsafe { *p};
     return Box::into_raw(Box::new(x0.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_1(p: *const (G1Affine, G1Affine)) -> *const G1Affine {
-    let (_, x1) = unsafe { *p };
+pub extern "C" fn zexe_bn382_g1_affine_pair_1(
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
+    let (_, x1) = unsafe { *p};
     return Box::into_raw(Box::new(x1.clone()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_make(
-    x0: *const G1Affine,
-    x1: *const G1Affine,
-) -> *const (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_make(x0 : *const G1Affine, x1 : *const G1Affine)
+-> *const (G1Affine, G1Affine) {
     let res = ((unsafe { *x0 }), (unsafe { *x1 }));
     return Box::into_raw(Box::new(res));
 }
@@ -1809,28 +1707,20 @@ pub extern "C" fn zexe_bn382_g1_affine_pair_vector_create() -> *mut Vec<(G1Affin
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_vector_length(
-    v: *const Vec<(G1Affine, G1Affine)>,
-) -> i32 {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_length(v: *const Vec<(G1Affine, G1Affine)>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_vector_emplace_back(
-    v: *mut Vec<(G1Affine, G1Affine)>,
-    x: *const (G1Affine, G1Affine),
-) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_emplace_back(v: *mut Vec<(G1Affine, G1Affine)>, x: *const (G1Affine, G1Affine)) {
     let v_ = unsafe { &mut (*v) };
     let x_ = unsafe { &(*x) };
     v_.push(*x_);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_g1_affine_pair_vector_get(
-    v: *mut Vec<(G1Affine, G1Affine)>,
-    i: u32,
-) -> *mut (G1Affine, G1Affine) {
+pub extern "C" fn zexe_bn382_g1_affine_pair_vector_get(v: *mut Vec<(G1Affine, G1Affine)>, i: u32) -> *mut (G1Affine, G1Affine) {
     let v_ = unsafe { &mut (*v) };
     return Box::into_raw(Box::new((*v_)[i as usize]));
 }

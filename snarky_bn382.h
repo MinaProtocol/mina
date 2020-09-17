@@ -338,7 +338,6 @@ void* zexe_bn382_fq_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_bn382_fq_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_bn382_fq_urs_b_poly_commitment(void*, void*);
 void* zexe_bn382_fq_urs_h(void*);
-void* zexe_bn382_fq_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fp index
 
@@ -737,7 +736,6 @@ void* zexe_tweedle_fq_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_tweedle_fq_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_tweedle_fq_urs_b_poly_commitment(void*, void*);
 void* zexe_tweedle_fq_urs_h(void*);
-void* zexe_tweedle_fq_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fq index
 
@@ -1009,7 +1007,6 @@ void* zexe_tweedle_fp_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_tweedle_fp_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_tweedle_fp_urs_b_poly_commitment(void*, void*);
 void* zexe_tweedle_fp_urs_h(void*);
-void* zexe_tweedle_fp_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fq index
 

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 extern crate libc;
 
+mod common;
 pub mod bn382_dlog;
 pub mod bn382_pairing;
 pub mod common;
@@ -10,8 +11,10 @@ pub mod tweedledee_plonk;
 pub mod tweedledum_plonk;
 
 use algebra::{
-    biginteger::{BigInteger, BigInteger256, BigInteger384},
-    bn_382::fp::Fp,
+    biginteger::{BigInteger, BigInteger384, BigInteger256},
+    bn_382::{
+        fp::{Fp, },
+    },
 };
 
 use num_bigint::BigUint;
@@ -21,8 +24,7 @@ use oracle::{self, poseidon, poseidon::{Sponge, MarlinSpongeConstants as SC}};
 
 const BIGINT384_NUM_BITS: i32 = 384;
 const BIGINT384_LIMB_BITS: i32 = 64;
-const BIGINT384_NUM_LIMBS: i32 =
-    (BIGINT384_NUM_BITS + BIGINT384_LIMB_BITS - 1) / BIGINT384_LIMB_BITS;
+const BIGINT384_NUM_LIMBS: i32 = (BIGINT384_NUM_BITS + BIGINT384_LIMB_BITS - 1) / BIGINT384_LIMB_BITS;
 const BIGINT384_NUM_BYTES: usize = (BIGINT384_NUM_LIMBS as usize) * 8;
 
 fn bigint_of_biginteger384(x: &BigInteger384) -> BigUint {
@@ -104,7 +106,10 @@ pub extern "C" fn zexe_bigint384_of_numeral(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bigint384_compare(x: *const BigInteger384, y: *const BigInteger384) -> u8 {
+pub extern "C" fn zexe_bigint384_compare(
+    x: *const BigInteger384,
+    y: *const BigInteger384,
+) -> u8 {
     let _x = unsafe { &(*x) };
     let _y = unsafe { &(*y) };
     if _x < _y {
@@ -153,8 +158,7 @@ pub extern "C" fn zexe_bigint384_find_wnaf(
 
 const BIGINT256_NUM_BITS: i32 = 256;
 const BIGINT256_LIMB_BITS: i32 = 64;
-const BIGINT256_NUM_LIMBS: i32 =
-    (BIGINT256_NUM_BITS + BIGINT256_LIMB_BITS - 1) / BIGINT256_LIMB_BITS;
+const BIGINT256_NUM_LIMBS: i32 = (BIGINT256_NUM_BITS + BIGINT256_LIMB_BITS - 1) / BIGINT256_LIMB_BITS;
 const BIGINT256_NUM_BYTES: usize = (BIGINT256_NUM_LIMBS as usize) * 8;
 
 fn bigint_of_biginteger256(x: &BigInteger256) -> BigUint {
@@ -236,7 +240,10 @@ pub extern "C" fn zexe_bigint256_of_numeral(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bigint256_compare(x: *const BigInteger256, y: *const BigInteger256) -> u8 {
+pub extern "C" fn zexe_bigint256_compare(
+    x: *const BigInteger256,
+    y: *const BigInteger256,
+) -> u8 {
     let _x = unsafe { &(*x) };
     let _y = unsafe { &(*y) };
     if _x < _y {
@@ -334,3 +341,4 @@ pub extern "C" fn camlsnark_bn382_fp_sponge_squeeze(
     let ret = sponge.squeeze(params);
     Box::into_raw(Box::new(ret))
 }
+
