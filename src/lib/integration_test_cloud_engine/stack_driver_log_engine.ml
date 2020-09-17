@@ -37,7 +37,7 @@ module Subscription = struct
     in
     let%bind authorization =
       let%map token =
-        Malleable_error.of_or_error_hard
+        Deferred.bind ~f:Malleable_error.of_or_error_hard
           (Process.run ~prog ~args:["auth"; "print-access-token"] ())
       in
       let token = String.strip token in
@@ -59,7 +59,7 @@ module Subscription = struct
       |> Yojson.Safe.to_string
     in
     let%bind response =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog:"curl"
            ~args:
              [ "--request"
@@ -103,11 +103,11 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ())
     in
     let create_subscription name topic =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -129,7 +129,7 @@ module Subscription = struct
 
   let delete t =
     let delete_subscription () =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"
@@ -141,13 +141,13 @@ module Subscription = struct
            ())
     in
     let delete_sink () =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
            ())
     in
     let delete_topic () =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
@@ -163,7 +163,7 @@ module Subscription = struct
     in
     (* The limit for messages we pull on each interval is currently not configurable. For now, it's set to 5 (which will hopefully be a sane for a while). *)
     let%bind result =
-      Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.run ~prog
            ~args:
              [ "pubsub"

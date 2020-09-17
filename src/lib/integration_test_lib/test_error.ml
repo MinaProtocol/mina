@@ -21,6 +21,8 @@ let raw_internal_error error = {occurrence_time= Time.now (); error}
 
 let internal_error error = Internal_error (raw_internal_error error)
 
+let internal_error_from_raw error = Internal_error error
+
 let to_string = function
   | Remote_error {node_id; error_message} ->
       Printf.sprintf "[%s] %s: %s"
@@ -46,6 +48,20 @@ module Set = struct
   let soft_singleton err = {empty with soft_errors= [err]}
 
   let hard_singleton err = {empty with hard_errors= [err]}
+
+  let from_list_soft err_list = {empty with soft_errors= err_list}
+
+  let from_list_hard err_list = {empty with hard_errors= err_list}
+
+  let add_soft a b =
+    let a_singleton = soft_singleton a in
+    { soft_errors= a_singleton.soft_errors @ b.soft_errors
+    ; hard_errors= a_singleton.hard_errors @ b.hard_errors }
+
+  let add_hard a b =
+    let a_singleton = hard_singleton a in
+    { soft_errors= a_singleton.soft_errors @ b.soft_errors
+    ; hard_errors= a_singleton.hard_errors @ b.hard_errors }
 
   let merge a b =
     { soft_errors= a.soft_errors @ b.soft_errors

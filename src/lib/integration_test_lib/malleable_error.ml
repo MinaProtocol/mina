@@ -91,25 +91,33 @@ let hard_error err =
        { Hard_fail.hard_error= Test_error.raw_internal_error err
        ; soft_errors= [] })
 
-let of_or_error_hard (or_err : 'a Deferred.Or_error.t) : 'a t =
+let hard_error_to_string (err : 'a t) : string Deferred.t =
   let open Deferred.Let_syntax in
-  match%map or_err with
-  | Ok x ->
-      Ok {Accumulator.computation_result= x; soft_errors= []}
-  | Error err ->
-      Error
-        { Hard_fail.hard_error= Test_error.raw_internal_error err
-        ; soft_errors= [] }
+  match%map err with
+  | Ok {Accumulator.computation_result= _; soft_errors= _} ->
+      "<none>"
+  | Error {Hard_fail.hard_error= hard_err; Hard_fail.soft_errors= _} ->
+      Error.to_string_hum hard_err.error
 
-let of_or_error_soft (res : 'a) (or_err : 'a Deferred.Or_error.t) : 'a t =
-  let open Deferred.Let_syntax in
-  match%map or_err with
+let of_or_error_hard (or_err : 'a Or_error.t) : 'a t =
+  match or_err with
   | Ok x ->
-      Ok {Accumulator.computation_result= x; soft_errors= []}
+      Deferred.return (Ok {Accumulator.computation_result= x; soft_errors= []})
   | Error err ->
-      Ok
-        { Accumulator.computation_result= res
-        ; soft_errors= [Test_error.raw_internal_error err] }
+      Deferred.return
+        (Error
+           { Hard_fail.hard_error= Test_error.raw_internal_error err
+           ; soft_errors= [] })
+
+let of_or_error_soft (res : 'a) (or_err : 'a Or_error.t) : 'a t =
+  match or_err with
+  | Ok x ->
+      Deferred.return (Ok {Accumulator.computation_result= x; soft_errors= []})
+  | Error err ->
+      Deferred.return
+        (Ok
+           { Accumulator.computation_result= res
+           ; soft_errors= [Test_error.raw_internal_error err] })
 
 let combine_errors (malleable_errors : 'a t list) : 'a list t =
   let open T.Let_syntax in
@@ -121,21 +129,8 @@ let combine_errors (malleable_errors : 'a t list) : 'a list t =
   in
   List.rev values
 
-let try_with ?(backtrace = false) (f : unit -> 'a) : 'a t =
-  try
-    Deferred.return
-      (Ok {Accumulator.computation_result= f (); soft_errors= []})
-  with exn ->
-    Deferred.return
-      (Error
-         { Hard_fail.hard_error=
-             Test_error.raw_internal_error
-               (Error.of_exn exn
-                  ?backtrace:(if backtrace then Some `Get else None))
-         ; soft_errors= [] })
-
-(* let try_with (type a) ?(backtrace = false) (f : unit -> a) : a t =
-  of_or_error_hard (Deferred.return (Or_error.try_with ?backtrace ~f:f)) *)
+let try_with (type a) ?(backtrace = false) (f : unit -> a) : a t =
+  of_or_error_hard (Or_error.try_with ~backtrace f)
 
 let rec malleable_error_list_iter ls ~f =
   let open T.Let_syntax in
@@ -219,7 +214,8 @@ let compare_inner compare a b =
   | Error _, Ok _ ->
       1
 
-let%test_unit "error_monad_unit_test_1" =
+let%test_unit "malleable error test 1: completes int computation when no errors"
+    =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test1 =
@@ -234,7 +230,8 @@ let%test_unit "error_monad_unit_test_1" =
       [%test_eq: int inner] ~equal:(equal_inner Int.equal) test1
         (Ok {Accumulator.computation_result= 5; soft_errors= []}) )
 
-let%test_unit "error_monad_unit_test_2" =
+let%test_unit "malleable error test 2: completes string computation when no \
+               errors" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test2 =
@@ -249,7 +246,8 @@ let%test_unit "error_monad_unit_test_2" =
       [%test_eq: string inner] ~equal:(equal_inner String.equal) test2
         (Ok {Accumulator.computation_result= "123"; soft_errors= []}) )
 
-let%test_unit "error_monad_unit_test_3" =
+let%test_unit "malleable error test 3: ok result that accumulates soft errors"
+    =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test3 =
@@ -275,7 +273,7 @@ let%test_unit "error_monad_unit_test_3" =
                  ~f:(Fn.compose Test_error.raw_internal_error Error.of_string)
            }) )
 
-let%test_unit "error_monad_unit_test_4" =
+let%test_unit "malleable error test 4: do a basic hard error" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test4 =
@@ -296,7 +294,8 @@ let%test_unit "error_monad_unit_test_4" =
                Test_error.raw_internal_error (Error.of_string "xyz")
            ; soft_errors= [] }) )
 
-let%test_unit "error_monad_unit_test_5" =
+let%test_unit "malleable error test 5: hard error that accumulates a soft error"
+    =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test5 =
@@ -321,7 +320,8 @@ let%test_unit "error_monad_unit_test_5" =
            ; soft_errors= [Test_error.raw_internal_error (Error.of_string "a")]
            }) )
 
-let%test_unit "error_monad_unit_test_6" =
+let%test_unit "malleable error test 6: hard error with multiple soft errors \
+               accumulating" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
       let%map test6 =
