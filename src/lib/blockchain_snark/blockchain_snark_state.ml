@@ -89,7 +89,9 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (t, body)
   in
-  let%bind `Success updated_consensus_state, consensus_state =
+  let%bind ( `Success updated_consensus_state
+           , `Supercharge_coinbase supercharge_coinbase
+           , consensus_state ) =
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
@@ -143,10 +145,8 @@ let%snarkydef step ~(logger : Logger.t)
         with_label __LOC__
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
-             ( Snark_transition.pending_coinbase_action transition
-             , ( Snark_transition.coinbase_receiver transition
-               , Snark_transition.coinbase_amount transition )
-             , previous_state_body_hash ))
+             (Snark_transition.pending_coinbase_update transition)
+             ~supercharge_coinbase previous_state_body_hash)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in

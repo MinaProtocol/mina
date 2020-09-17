@@ -32,6 +32,64 @@ end
 module M =
   Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
+module L = struct
+  type t = M.t ref
+
+  type location = int
+
+  let get : t -> location -> Account.t option =
+   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+
+  let location_of_account : t -> Account_id.t -> location option =
+   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
+
+  let set : t -> location -> Account.t -> unit =
+   fun t loc a -> t := M.set_exn !t loc a
+
+  let get_or_create :
+      t -> Account_id.t -> [`Added | `Existed] * Account.t * location =
+   fun t id ->
+    let loc = M.find_index_exn !t id in
+    let account = M.get_exn !t loc in
+    if Public_key.Compressed.(equal empty account.public_key) then (
+      let public_key = Account_id.public_key id in
+      let account' : Account.t =
+        { account with
+          delegate= Some public_key
+        ; public_key
+        ; token_id= Account_id.token_id id }
+      in
+      set t loc account' ;
+      (`Added, account', loc) )
+    else (`Existed, account, loc)
+
+  let get_or_create_account_exn :
+      t -> Account_id.t -> Account.t -> [`Added | `Existed] * location =
+   fun t id to_set ->
+    let loc = M.find_index_exn !t id in
+    let a = M.get_exn !t loc in
+    if Public_key.Compressed.(equal empty a.public_key) then (
+      set t loc to_set ;
+      (`Added, loc) )
+    else (`Existed, loc)
+
+  let remove_accounts_exn : t -> Account_id.t list -> unit =
+   fun _t _xs -> failwith "remove_accounts_exn: not implemented"
+
+  let merkle_root : t -> Ledger_hash.t = fun t -> M.merkle_root !t
+
+  let with_ledger : depth:int -> f:(t -> 'a) -> 'a =
+   fun ~depth:_ ~f:_ -> failwith "with_ledger: not implemented"
+
+  let next_available_token : t -> Token_id.t =
+   fun t -> M.next_available_token !t
+
+  let set_next_available_token : t -> Token_id.t -> unit =
+   fun t token -> t := {!t with next_available_token= token}
+end
+
+module T = Transaction_logic.Make (L)
+
 [%%define_locally
 M.
   ( of_hash
@@ -186,7 +244,8 @@ let apply_user_command_exn
           Balance.sub_amount account.balance (Amount.of_fee fee)
           |> Option.value_exn ?here:None ?error:None ?message:None
       ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload account.receipt_chain_hash
+          Receipt.Chain_hash.cons (User_command payload)
+            account.receipt_chain_hash
       ; timing } )
   in
   (* Charge the fee. *)
@@ -456,41 +515,71 @@ let apply_user_command_exn
       (* Not able to apply the user command successfully, charge fee only. *)
       t
 
-let apply_fee_transfer_exn ~constraint_constants =
-  let apply_single t (ft : Fee_transfer.Single.t) =
+let _apply_snapp_command_exn
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~txn_state_view t (c : Snapp_command.t) =
+  let t = ref t in
+  T.apply_snapp_command ~constraint_constants ~txn_state_view t c
+  |> Or_error.ok_exn |> ignore ;
+  !t
+
+let update_timing_when_no_deduction ~txn_global_slot account =
+  Transaction_logic.validate_timing ~txn_amount:Currency.Amount.zero
+    ~txn_global_slot ~account
+  |> Or_error.ok_exn
+
+let apply_fee_transfer_exn ~constraint_constants ~txn_global_slot =
+  let apply_single ~update_timing t (ft : Fee_transfer.Single.t) =
     let account_id = Fee_transfer.Single.receiver ft in
     let index = find_index_exn t account_id in
     let action, account = get_or_initialize_exn account_id t index in
     let open Currency in
     let amount = Amount.of_fee ft.fee in
+    let timing =
+      if update_timing then
+        update_timing_when_no_deduction ~txn_global_slot account
+      else account.timing
+    in
     let balance =
       let amount' =
         sub_account_creation_fee ~constraint_constants action amount
       in
       Option.value_exn (Balance.add_amount account.balance amount')
     in
-    set_exn t index {account with balance}
+    set_exn t index {account with balance; timing}
   in
-  fun t transfer -> Fee_transfer.fold transfer ~f:apply_single ~init:t
+  fun t transfer ->
+    match Fee_transfer.to_singles transfer with
+    | `One s ->
+        apply_single ~update_timing:true t s
+    | `Two (s1, s2) ->
+        (*Note: Not updating the timing for s1 to avoid additional check in transactions snark (check_timing for "receiver"). This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account.(#5973)*)
+        let t' = apply_single ~update_timing:false t s1 in
+        apply_single ~update_timing:true t' s2
 
-let apply_coinbase_exn ~constraint_constants t
+let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
     ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
-  let add_to_balance t pk amount =
+  let add_to_balance ~update_timing t pk amount =
     let idx = find_index_exn t pk in
     let action, a = get_or_initialize_exn pk t idx in
+    let timing =
+      if update_timing then update_timing_when_no_deduction ~txn_global_slot a
+      else a.timing
+    in
     let balance =
       let amount' =
         sub_account_creation_fee ~constraint_constants action amount
       in
       Option.value_exn (Balance.add_amount a.balance amount')
     in
-    set_exn t idx {a with balance}
+    set_exn t idx {a with balance; timing}
   in
-  let receiver_reward, t =
+  (* Note: Updating coinbase receiver timing only if there is no fee transfer. This is so as to not add any extra constraints in transaction snark for checking "receiver" timings. This is OK because timing rules will not be violated when balance increases and will be checked whenever an amount is deducted from the account(#5973)*)
+  let receiver_reward, t, update_coinbase_receiver_timing =
     match fee_transfer with
     | None ->
-        (coinbase_amount, t)
+        (coinbase_amount, t, true)
     | Some ({receiver_pk= _; fee} as ft) ->
         let fee = Amount.of_fee fee in
         let reward =
@@ -498,21 +587,29 @@ let apply_coinbase_exn ~constraint_constants t
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
         let transferee_id = Coinbase.Fee_transfer.receiver ft in
-        (reward, add_to_balance t transferee_id fee)
+        (reward, add_to_balance ~update_timing:true t transferee_id fee, false)
   in
   let receiver_id = Account_id.create receiver Token_id.default in
-  add_to_balance t receiver_id receiver_reward
+  add_to_balance ~update_timing:update_coinbase_receiver_timing t receiver_id
+    receiver_reward
 
-let apply_transaction_exn ~constraint_constants ~txn_global_slot t
+let apply_transaction_exn ~constraint_constants
+    ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) t
     (transition : Transaction.t) =
+  let txn_global_slot = txn_state_view.curr_global_slot in
   match transition with
   | Fee_transfer tr ->
-      apply_fee_transfer_exn ~constraint_constants t tr
+      apply_fee_transfer_exn ~constraint_constants ~txn_global_slot t tr
   | User_command cmd ->
       apply_user_command_exn ~constraint_constants ~txn_global_slot t
         (cmd :> User_command.t)
   | Coinbase c ->
-      apply_coinbase_exn ~constraint_constants t c
+      apply_coinbase_exn ~constraint_constants ~txn_global_slot t c
+
+let has_locked_tokens_exn ~global_slot ~account_id t =
+  let idx = find_index_exn t account_id in
+  let _, account = get_or_initialize_exn account_id t idx in
+  Account.has_locked_tokens ~global_slot account
 
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)

@@ -334,7 +334,7 @@ let get_status ~flag t =
     Option.map (Coda_lib.next_producer_timing t) ~f:(function
       | `Produce_now _ ->
           `Produce_now
-      | `Produce (time, _, _) ->
+      | `Produce (time, _, _, _) ->
           `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
@@ -349,6 +349,7 @@ let get_status ~flag t =
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
+  ; chain_id= config.chain_id
   ; consensus_time_best_tip
   ; commit_id
   ; conf_dir

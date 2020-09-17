@@ -37,7 +37,7 @@ val apply_user_command_exn :
 
 val apply_transaction_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
   -> t
@@ -51,3 +51,9 @@ val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
 val handler : t -> Handler.t Staged.t
+
+val has_locked_tokens_exn :
+     global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool

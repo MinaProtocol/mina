@@ -901,7 +901,8 @@ let genesis ~precomputed_values =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
-    ; coinbase_receiver= creator }
+    ; coinbase_receiver= creator
+    ; supercharge_coinbase= false }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -1031,14 +1032,12 @@ module Staged_ledger_validation = struct
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
-             , `Pending_coinbase_data _ ) =
+             , `Pending_coinbase_update _ ) =
       Staged_ledger.apply
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
-        ~current_global_slot:
-          ( Coda_state.Protocol_state.(
-              Body.consensus_state @@ body parent_protocol_state)
-          |> Consensus.Data.Consensus_state.curr_slot )
+        ~current_state_view:
+          Coda_state.Protocol_state.(Body.view @@ body parent_protocol_state)
         ~state_and_body_hash:
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)

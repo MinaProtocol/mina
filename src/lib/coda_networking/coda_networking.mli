@@ -254,8 +254,6 @@ val ip_for_peer :
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
 
-val net2 : t -> Coda_net2.net option
-
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 
