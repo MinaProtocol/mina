@@ -336,7 +336,6 @@ void* zexe_bn382_fq_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_bn382_fq_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_bn382_fq_urs_b_poly_commitment(void*, void*);
 void* zexe_bn382_fq_urs_h(void*);
-void* zexe_bn382_fq_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fp index
 
@@ -587,14 +586,6 @@ void zexe_bn382_g1_affine_pair_vector_emplace_back(void *, void *);
 void *zexe_bn382_g1_affine_pair_vector_get(void *, int);
 void zexe_bn382_g1_affine_pair_vector_delete(void *);
 
-// Fp triple
-void *zexe_bn382_fp_triple_0(void *);
-void *zexe_bn382_fp_triple_1(void *);
-void *zexe_bn382_fp_triple_2(void *);
-void *zexe_bn382_fp_vector_triple_0(void *);
-void *zexe_bn382_fp_vector_triple_1(void *);
-void *zexe_bn382_fp_vector_triple_2(void *);
-
 // Fq triple
 void *zexe_bn382_fq_triple_0(void *);
 void *zexe_bn382_fq_triple_1(void *);
@@ -722,7 +713,6 @@ void* zexe_tweedle_fq_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_tweedle_fq_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_tweedle_fq_urs_b_poly_commitment(void*, void*);
 void* zexe_tweedle_fq_urs_h(void*);
-void* zexe_tweedle_fq_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fq index
 
@@ -986,7 +976,6 @@ void* zexe_tweedle_fp_urs_lagrange_commitment(void*, size_t, size_t);
 void* zexe_tweedle_fp_urs_commit_evaluations(void*, size_t, void*);
 void* zexe_tweedle_fp_urs_b_poly_commitment(void*, void*);
 void* zexe_tweedle_fp_urs_h(void*);
-void* zexe_tweedle_fp_urs_batch_accumulator_check(void*, void*, void*);
 
 // Fq index
 

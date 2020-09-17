@@ -14,23 +14,28 @@ crate-type = ["staticlib"]
 ################################# Dependencies ################################
 
 [dependencies]
+groupmap = { path = "../groupmap" }
 libc = { version = "0.2.0" }
-groupmap = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo" }
-algebra = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo", features = [ "asm", "parallel", "bn_382", "tweedle" ] }
-ff-fft = { git = "https://github.com/o1-labs/zexe/", branch = "dlog-only-clean-cargo" }
+algebra = { path = "../algebra", features = [ "asm", "parallel", "bn_382", "tweedle" ] }
+ff-fft = { path = "../ff-fft" }
 rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
 rayon = { version = "1" }
 
-oracle = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
-evaluation_domains = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+oracle = { path = "../../marlin/oracle" }
+evaluation_domains = { path = "../../marlin/evaluation_domains" }
 
-circuits_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
-commitment_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
-protocol_pairing = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+circuits_pairing = { path = "../../marlin/pairing/circuits" }
+commitment_pairing = { path = "../../marlin/pairing/commitment" }
+protocol_pairing = { path = "../../marlin/pairing/protocol" }
 
-circuits_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
-commitment_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
-protocol_dlog = { git = "https://github.com/o1-labs/marlin/", branch = "dlog-only-clean-cargo" }
+circuits_dlog = { path = "../../marlin/dlog/circuits" }
+commitment_dlog = { path = "../../marlin/dlog/commitment" }
+protocol_dlog = { path = "../../marlin/dlog/protocol" }
+
+#circuits = { git = "https://github.com/o1-labs/marlin/" }
+#oracle = { git = "https://github.com/o1-labs/marlin/" }
+#protocol = { git = "https://github.com/o1-labs/marlin/" }
+#commitment = { git = "https://github.com/o1-labs/marlin/" }
