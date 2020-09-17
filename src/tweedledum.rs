@@ -1320,8 +1320,7 @@ pub extern "C" fn zexe_tweedle_fq_proof_verify(
 
     DlogProof::verify::<DefaultFqSponge<TweedledumParameters, MarlinSpongeConstants>, DefaultFrSponge<Fq, MarlinSpongeConstants>>(
         &group_map,
-        &[proof].to_vec(),
-        &index,
+        &[(index, proof)].to_vec(),
         &mut rand_core::OsRng,
     )
 }
@@ -1335,11 +1334,11 @@ pub extern "C" fn zexe_tweedle_fq_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
+    let v : Vec<_> = proofs.iter().map(|proof| {(index, proof.clone())}).collect();
 
     DlogProof::<GAffine>::verify::<DefaultFqSponge<TweedledumParameters, MarlinSpongeConstants>, DefaultFrSponge<Fq, MarlinSpongeConstants>>(
         &group_map,
-        proofs,
-        index,
+        &v,
         &mut rand_core::OsRng,
     )
 }

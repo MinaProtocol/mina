@@ -8,8 +8,8 @@ use algebra::{
 
 use plonk_circuits::scalars::{ProofEvaluations as DlogProofEvaluations};
 use plonk_circuits::constraints::ConstraintSystem;
-use plonk_circuits::gate::{CircuitGate, GateType, GateType::{*}};
-use plonk_circuits::wires::GateWires;
+use plonk_circuits::gate::{CircuitGate, Gate, GateType, GateType::{*}};
+use plonk_circuits::wires::{GateWires, Wire, Wires, Col};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
@@ -54,18 +54,34 @@ pub extern "C" fn zexe_tweedle_plonk_fq_index_domain_d8_size<'a>(
 
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_index_create<'a>(
-    cs: *mut ConstraintSystem<Fq>,
+    gates: *const Vec<Gate<Fq>>,
     max_poly_size: usize,
     srs: *mut SRS<GAffine>,
 ) -> *mut DlogIndex<'a, GAffine> {
-    let cs = unsafe { &*cs };
+    let gates = unsafe { &*gates };
     let srs = unsafe { &*srs };
+
+    let n = Domain::<Fq>::compute_size_of_domain(gates.len()).unwrap();
+    let gates = gates.iter().map
+    (
+        |gate|
+        CircuitGate
+        {
+            typ: gate.typ.clone(),
+            wires: GateWires
+            {
+                l: (gate.wires.row, gate.wires.row),
+                r: (gate.wires.row + n, gate.wires.row),
+                o: (gate.wires.row + 2*n, gate.wires.row),
+            },
+            c: gate.c.clone()
+        }
+    ).collect();
 
     return Box::into_raw(Box::new(
         DlogIndex::<GAffine>::create(
-            cs.clone(),
+            ConstraintSystem::<Fq>::create(gates, oracle::tweedle::fq::params(), 0).unwrap(),
             max_poly_size,
-            oracle::tweedle::fq::params(),
             oracle::tweedle::fp::params(),
             SRSSpec::Use(srs),
         )
@@ -393,6 +409,8 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_create(
     index: *const DlogIndex<GAffine>,
     primary_input: *const Vec<Fq>,
     auxiliary_input: *const Vec<Fq>,
+    prev_challenges: *const Vec<Fq>,
+    prev_sgs: *const Vec<GAffine>,
 ) -> *const DlogProof<GAffine> {
     let index = unsafe { &(*index) };
     let primary_input = unsafe { &(*primary_input) };
@@ -400,9 +418,35 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_create(
 
     let witness = prepare_plonk_witness(primary_input, auxiliary_input);
 
+    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
+        let prev_challenges = unsafe { &*prev_challenges };
+        let prev_sgs = unsafe { &*prev_sgs };
+        if prev_challenges.len() == 0 {
+            Vec::new()
+        } else {
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+            prev_sgs
+                .iter()
+                .enumerate()
+                .map(|(i, sg)| {
+                    (
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                            .iter()
+                            .map(|x| *x)
+                            .collect(),
+                        PolyComm::<GAffine> {
+                            unshifted: vec![sg.clone()],
+                            shifted: None,
+                        },
+                    )
+                })
+                .collect()
+        }
+    };
+
     let map = <GAffine as CommitmentCurve>::Map::setup();
     let proof = DlogProof::create::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(
-        &map, &witness, &index
+        &map, &witness, &index, prev,
     )
     .unwrap();
 
@@ -460,11 +504,41 @@ pub extern "C" fn zexe_tweedle_plonk_fq_proof_make(
 
     evals0: *const DlogProofEvaluations<Vec<Fq>>,
     evals1: *const DlogProofEvaluations<Vec<Fq>>,
+
+    prev_challenges: *const Vec<Fq>,
+    prev_sgs: *const Vec<GAffine>,
 ) -> *const DlogProof<GAffine> {
     let public = unsafe { &(*primary_input) }.clone();
     // public.resize(ceil_pow2(public.len()), Fq::zero());
 
+    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
+        let prev_challenges = unsafe { &*prev_challenges };
+        let prev_sgs = unsafe { &*prev_sgs };
+        if prev_challenges.len() == 0 {
+            Vec::new()
+        } else {
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+            prev_sgs
+                .iter()
+                .enumerate()
+                .map(|(i, sg)| {
+                    (
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                            .iter()
+                            .map(|x| *x)
+                            .collect(),
+                        PolyComm::<GAffine> {
+                            unshifted: vec![sg.clone()],
+                            shifted: None,
+                        },
+                    )
+                })
+                .collect()
+        }
+    };
+
     let res = DlogProof {
+        prev_challenges: prev,
         proof: OpeningProof {
             lr: (unsafe { &*lr }).clone(),
             z1: (unsafe { *z1 }).clone(),
@@ -753,6 +827,7 @@ pub struct FqOracles {
     o: plonk_circuits::scalars::RandomOracles<Fq>,
     p_eval: [Vec<Fq>; 2],
     opening_prechallenges: Vec<ScalarChallenge<Fq>>,
+    digest_before_evaluations: Fq,
 }
 
 #[no_mangle]
@@ -765,19 +840,14 @@ pub extern "C" fn zexe_tweedle_plonk_fq_oracles_create(
 
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul
       (&index.srs.get_ref().lgr_comm.iter().map(|l| l).collect(), &proof.public.iter().map(|s| -*s).collect());
-    let mut p_eval = [Vec::<Fq>::new(), Vec::<Fq>::new()];
-
-    let (mut sponge, mut o) = proof.setup_oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(index, &p_comm);
-    let cached_values = DlogProof::gen_cached_values(index, &o);
-    proof.p_eval(index, &o, &cached_values, &mut p_eval);
-    proof.finalize_oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(index, &p_eval, &mut sponge, &mut o);
-
-    let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
+    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
+        proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(index, &p_comm);
 
     return Box::into_raw(Box::new(FqOracles {
         o,
-        p_eval: p_eval,
-        opening_prechallenges,
+        p_eval,
+        opening_prechallenges: proof.proof.prechallenges(&mut sponge),
+        digest_before_evaluations,
     }));
 }
 
@@ -791,6 +861,15 @@ pub extern "C" fn zexe_tweedle_plonk_fq_oracles_opening_prechallenges(
             .iter()
             .map(|x| x.0)
             .collect(),
+    ));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fq_oracles_digest_before_evaluations(
+    oracles: *const FqOracles,
+) -> *const Fq {
+    return Box::into_raw(Box::new(
+        (unsafe { &(*oracles) }).digest_before_evaluations.clone(),
     ));
 }
 
@@ -841,212 +920,230 @@ pub extern "C" fn zexe_tweedle_plonk_fq_oracles_delete(x: *mut FqOracles) {
 
 // Fq circuit gate vector
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_create() -> *mut Vec<CircuitGate<Fq>> {
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_create() -> *mut Vec<Gate<Fq>> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_length(v: *const Vec<CircuitGate<Fq>>) -> i32 {
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_length(v: *const Vec<Gate<Fq>>) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
 
-fn push_gate(
+#[no_mangle]
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add(
+    v: *mut Vec<Gate<Fq>>,
     typ: GateType,
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
     let v_ = unsafe { &mut (*v) };
     let c_ = unsafe { &(*c) };
-    v_.push(
-        CircuitGate::<Fq> {
+    v_.push
+    (
+        Gate
+        {
             typ,
-            wires:
-                GateWires {
-                    l: (l_index, l_permutation),
-                    r: (r_index, r_permutation),
-                    o: (o_index, o_permutation),
-                },
+            wires: Wires
+            {
+                row,
+                l: Wire {row: lrow, col: lcol},
+                r: Wire {row: rrow, col: rcol},
+                o: Wire {row: orow, col: ocol},
+            },
             c: c_.clone(),
-        });
+        }
+    )
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_zero(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_zero(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Zero, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Zero, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_generic(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_generic(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Generic, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Generic, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_poseidon(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_poseidon(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Poseidon, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Poseidon, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_add1(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_add1(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Add1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Add1, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_add2(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_add2(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Add2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Add2, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul1(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_vbmul1(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Vbmul1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Vbmul1, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul2(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_vbmul2(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Vbmul2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Vbmul2, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul3(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_vbmul3(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Vbmul3, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Vbmul3, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul1(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_endomul1(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Endomul1, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Endomul1, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul2(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_endomul2(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Endomul2, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Endomul2, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul3(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_endomul3(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Endomul3, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Endomul3, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul4(
-    v: *mut Vec<CircuitGate<Fq>>,
-    l_index: usize,
-    l_permutation: usize,
-    r_index: usize,
-    r_permutation: usize,
-    o_index: usize,
-    o_permutation: usize,
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_add_endomul4(
+    v: *mut Vec<Gate<Fq>>,
+    row: usize,
+    lrow: usize,
+    lcol: Col,
+    rrow: usize,
+    rcol: Col,
+    orow: usize,
+    ocol: Col,
     c: *const Vec<Fq>,
 ) {
-    push_gate(Endomul4, v, l_index, l_permutation, r_index, r_permutation, o_index, o_permutation, c);
+    zexe_tweedle_plonk_fq_gate_vector_add(v, Endomul4, row, lrow, lcol, rrow, rcol, orow, ocol, c);
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_delete(v: *mut Vec<CircuitGate<Fq>>) {
+pub extern "C" fn zexe_tweedle_plonk_fq_gate_vector_delete(v: *mut Vec<CircuitGate<Fq>>) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -1056,7 +1153,7 @@ pub extern "C" fn zexe_tweedle_plonk_fq_circuit_gate_vector_delete(v: *mut Vec<C
 #[no_mangle]
 pub extern "C" fn zexe_tweedle_plonk_fq_constraint_system_create(v: *mut Vec<CircuitGate<Fq>>, public: usize) -> *mut ConstraintSystem<Fq> {
     let v_ = unsafe { &mut (*v) };
-    return Box::into_raw(Box::new(ConstraintSystem::<Fq>::create(v_.clone(), public).unwrap()));
+    return Box::into_raw(Box::new(ConstraintSystem::<Fq>::create(v_.clone(), oracle::tweedle::fq::params(), public).unwrap()));
 }
 
 #[no_mangle]
