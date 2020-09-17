@@ -548,8 +548,7 @@ let update_metrics_with_diff (type mutant) t
       in
       Coda_metrics.(
         let best_tip_user_txns =
-          Int.to_float
-            (List.length (Breadcrumb.user_commands best_tip_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
         in
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
