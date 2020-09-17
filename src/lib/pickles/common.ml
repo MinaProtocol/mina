@@ -100,6 +100,85 @@ let group_map m ~a ~b =
   let params = Group_map.Params.create m {a; b} in
   stage (fun x -> Group_map.to_group m ~params x)
 
+(* The group of units F^× decomposes as
+
+   F^× = < g > ⊕ H
+
+   where g ([two_adic_root_of_unity] below) has order 2^two_adicity.
+*)
+let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
+    ~(two_adic_root_of_unity : f) ~two_adicity
+    ~(det_sqrt_witness :
+       f -> f Zexe_backend_common.Field.Det_sqrt_witness.t option) =
+  let open Impl in
+  (* This maps n (as a bitstring) to g^n *)
+  let inj =
+    (* "double and add" *)
+    let rec go acc bits =
+      match bits with
+      | [] ->
+          acc
+      | b :: bits ->
+          let acc = Field.square acc in
+          let acc =
+            Field.if_ b
+              ~then_:(Field.scale acc two_adic_root_of_unity)
+              ~else_:acc
+          in
+          go acc bits
+    in
+    fun bits -> go Field.one (List.rev bits)
+  in
+  (* This projects onto the H subgroup by the map
+     x -> x^|< g >|
+  *)
+  let project_h =
+    (* Compute x^(2^i) *)
+    let rec pow2_pow x i =
+      if i = 0 then x (* x^(2^0) = x^1 = x *)
+      else
+        (* (x^2)^(2^(i - 1)) = x^(2 * 2^(i - 1)) = x^(2^i) *)
+        pow2_pow (Field.square x) (i - 1)
+    in
+    fun x -> pow2_pow x two_adicity
+  in
+  stage (fun t ->
+      let n = two_adicity - 1 in
+      (* t has two square roots, y and -y.
+
+         Consider how they appear in < g > ⊕ H.
+
+         Note that -1 = g^(2^(two_adicity - 1)) since g^(2^(two_adicity - 1)) != 1 and g^(2^(two_adicity - 1))^2 = 1.
+
+         Say y = g^k h.
+
+         Then
+         -y
+         = g^(2^(two_adicity - 1)) g^n h
+         = g^(2^n + k) h
+
+         What we can conclude from this is one of the square roots of t has the top bit = 1, and the other = 0,
+         and their bit representations are otherwise the same.
+
+         So as a deterministic square root, we choose the one with top bit = 0.
+      *)
+      let c, d =
+        exists
+          Typ.(field * list ~length:n Boolean.typ)
+          ~compute:
+            As_prover.(
+              fun () ->
+                let r = Option.value_exn (det_sqrt_witness (read_var t)) in
+                let bits =
+                  List.init n ~f:(fun i ->
+                      Unsigned.UInt64.(
+                        equal one (logand (shift_right r.d i) one)) )
+                in
+                (r.c, bits))
+      in
+      let res = Field.mul (project_h c) (inj d) in
+      assert_square res t ; res )
+
 module Ipa = struct
   open Backend
 
@@ -111,7 +190,7 @@ module Ipa = struct
     let nonresidue = Field.of_int 5 in
     (* TODO: Don't actually need to transmit the "is_square" bit on the wire *)
     [%test_eq: bool] is_square (Field.is_square x) ;
-    Field.sqrt (if is_square then x else Field.(nonresidue * x))
+    Field.det_sqrt (if is_square then x else Field.(nonresidue * x))
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
