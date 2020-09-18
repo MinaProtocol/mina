@@ -54,6 +54,7 @@ module type S = sig
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type resource_pool_diff_verified := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
@@ -716,13 +717,14 @@ let%test_module "random set test" =
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
       let enveloped_diff = {Envelope.Incoming.data= diff; sender} in
-      let%bind valid_diff =
+      match%bind
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
-      in
-      if valid_diff then
-        Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-          enveloped_diff
-      else Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
+      with
+      | Some _valid_diff ->
+          Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
+            enveloped_diff
+      | None ->
+          Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
@@ -830,7 +832,7 @@ let%test_module "random set test" =
                     let%map res =
                       Mock_snark_pool.Resource_pool.Diff.verify t diff
                     in
-                    assert (not res) )
+                    assert (Option.is_none res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
