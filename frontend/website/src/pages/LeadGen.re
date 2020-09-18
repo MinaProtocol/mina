@@ -279,10 +279,12 @@ module SignupWidget = {
                  {React.string("Good to go!")}
                </span>
                <span>
-                 <button className=Styles.button type_="submit">
-                   {React.string("Continue ")}
-                   <MinaIcon kind=MinaIcon.ArrowRightMedium />
-                 </button>
+                 <Next.Link href="/genesis">
+                   <button className=Styles.button type_="submit">
+                     {React.string("Continue ")}
+                     <MinaIcon kind=MinaIcon.ArrowRightMedium />
+                   </button>
+                 </Next.Link>
                </span>
              </div>
            </div>
@@ -352,7 +354,7 @@ let make = () => {
             <h1> {React.string("Welcome to Testworld")} </h1>
             <p>
               {React.string(
-                 "Get ready to join Coda’s adversarial testnet, ‘Testworld’, starting later this year. In contrast to Coda’s regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
+                 "Get ready to join Coda's adversarial testnet, Testworld, starting later this year. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
                )}
             </p>
           </div>
