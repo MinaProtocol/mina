@@ -392,7 +392,7 @@ let make = () => {
                 </span>
               </Next.Link>
               {React.string(
-                 "before mainnet launches in Q4 of this year. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
+                 "before mainnet launches. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
                )}
               <Next.Link href="/genesis">
                 <span className=Styles.link>
