@@ -14,12 +14,13 @@ module Styles = {
         ],
       ),
     ]);
+  let header = merge([Theme.Type.h2, style([marginBottom(`rem(1.))])]);
 };
 
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-    <h2> {React.string("Work with Mina")} </h2>
+    <h2 className=Styles.header> {React.string("Work with Mina")} </h2>
     <Button bgColor=Theme.Colors.black>
       {React.string("See All Opportunities")}
       <Icon kind=Icon.ArrowRightMedium />
