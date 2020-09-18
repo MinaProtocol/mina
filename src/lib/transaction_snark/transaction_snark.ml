@@ -1736,11 +1736,19 @@ module Base = struct
           (let user_command_excess =
              Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
            in
-           let%bind fee_transfer_excess =
-             let%map magnitude =
-               Checked.(payload.body.amount + of_fee payload.common.fee)
+           let%bind fee_transfer_excess, fee_transfer_excess_overflowed =
+             let%map magnitude, `Overflow overflowed =
+               Checked.(
+                 add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+           in
+           let%bind () =
+             (* TODO: Reject this in txn pool before fees-in-tokens. *)
+             [%with_label "Fee excess does not overflow"]
+               Boolean.(
+                 Assert.any
+                   [not is_fee_transfer; not fee_transfer_excess_overflowed])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
              ~else_:user_command_excess)
