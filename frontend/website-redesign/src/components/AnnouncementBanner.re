@@ -35,7 +35,7 @@ module Styles = {
 
   let announcementText = style([paddingLeft(`rem(2.))]);
 
-  let link = merge([flexCenter, style([cursor(`pointer)])]);
+  let link = merge([flexCenter, style([cursor(`pointer), color(Theme.Colors.orange)])]);
 
   let learnMoreText =
     merge([
