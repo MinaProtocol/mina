@@ -771,13 +771,14 @@ module Base = struct
               (* Note: This logic is dependent upon all failures above, so we
                  have to calculate it separately here. *)
               if
-                source_not_present
-                || (* If there is a failure *)
-                   List.exists ~f:Fn.id (to_list ret)
-                   (* and the receiver account did not exist *)
-                   && (not receiver_exists)
-                   (* and the source account was the receiver account *)
-                   && Account_id.equal source receiver
+                (* If we think the source exists *)
+                (not source_not_present)
+                (* and there is a failure *)
+                && List.exists ~f:Fn.id (to_list ret)
+                (* and the receiver account did not exist *)
+                && (not receiver_exists)
+                (* and the source account was the receiver account *)
+                && Account_id.equal source receiver
               then
                 (* then the receiver account will not be initialized, and so
                    the source (=receiver) account will not be present.
