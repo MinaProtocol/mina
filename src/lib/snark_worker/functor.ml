@@ -172,6 +172,9 @@ module Make (Inputs : Intf.Inputs_intf) :
         | `No | `Unknown ->
             return daemon_address
       in
+      [%log debug]
+        !"Snark worker using daemon $addr"
+        ~metadata:[("addr", `String (Host_and_port.to_string daemon_address))] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
