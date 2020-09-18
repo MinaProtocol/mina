@@ -104,11 +104,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -175,11 +172,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - save_cache:
                 name: Save cache - opam
@@ -235,11 +229,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Check circle CI configuration rendering
@@ -292,11 +283,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Compare versioned types in PR
@@ -335,11 +323,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
@@ -569,11 +554,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                   name: Build client SDK for Javascript
@@ -619,11 +601,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -785,11 +764,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -835,11 +811,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -883,11 +856,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -931,11 +901,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1184,11 +1151,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1226,11 +1190,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1268,11 +1229,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1313,11 +1271,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1355,11 +1310,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1397,11 +1349,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1439,11 +1388,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1486,11 +1432,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
@@ -1531,11 +1474,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- make setup-opam
-                command: |
-                    # FIXME: Remove this when it becomes unnecessary
-                    sudo apt-get install -y autoconf
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
 
             - run:
                 name: Build libp2p_helper
