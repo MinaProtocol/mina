@@ -30,7 +30,7 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
-  val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
+  val staged_transactions : t -> Transaction.t With_status.t list
 
   val staged_transactions_with_protocol_states :
        t
@@ -156,7 +156,7 @@ val create_diff :
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
-  -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
+  -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
   -> supercharge_coinbase:bool
@@ -196,3 +196,10 @@ val all_work_pairs :
      Or_error.t
 
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
+
+val check_commands :
+     Ledger.t
+  -> verifier:Verifier.t
+  -> User_command.t list
+  -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
+     Deferred.Or_error.t

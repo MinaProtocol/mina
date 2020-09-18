@@ -6,6 +6,7 @@ open Rosetta_lib
 open Rosetta_coding
 module Signature = Coda_base.Signature
 module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 
 module Keys = struct
   type t = {keypair: Keypair.t; public_key_hex_bytes: string}
@@ -56,7 +57,7 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
       unsigned_transaction.random_oracle_input
   in
   let signature' =
-    User_command.sign_payload keys.keypair.private_key user_command_payload
+    Signed_command.sign_payload keys.keypair.private_key user_command_payload
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode
@@ -85,7 +86,7 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
       signed_transaction.Transaction.Signed.command
     |> Result.ok |> Option.value_exn
   in
-  let message = User_command.to_input user_command_payload in
+  let message = Signed_command.to_input user_command_payload in
   Schnorr.verify signature
     (Snark_params.Tick.Inner_curve.of_affine public_key)
     message

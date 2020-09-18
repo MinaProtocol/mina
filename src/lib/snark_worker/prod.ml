@@ -50,6 +50,7 @@ module Inputs = struct
   [@@deriving sexp]
 
   let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
+    let open Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->
@@ -85,7 +86,28 @@ module Inputs = struct
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
-                    let snapp_account1, snapp_account2 = (None, None) in
+                    let%bind t =
+                      (* Validate the received transaction *)
+                      match t with
+                      | Command (Signed_command cmd) -> (
+                        match Signed_command.check cmd with
+                        | Some cmd ->
+                            ( Ok (Command (Signed_command cmd))
+                              : Transaction.Valid.t Or_error.t )
+                        | None ->
+                            Or_error.errorf "Command has an invalid signature"
+                        )
+                      | Command (Snapp_command cmd) ->
+                          Ok (Command (Snapp_command cmd))
+                      | Fee_transfer ft ->
+                          Ok (Fee_transfer ft)
+                      | Coinbase cb ->
+                          Ok (Coinbase cb)
+                    in
+                    let snapp_account1, snapp_account2 =
+                      Sparse_ledger.snapp_accounts w.ledger
+                        (Transaction.forget t)
+                    in
                     Or_error.try_with (fun () ->
                         M.of_transaction ~sok_digest ~snapp_account1
                           ~snapp_account2
