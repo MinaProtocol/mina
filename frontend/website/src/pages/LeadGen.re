@@ -287,7 +287,7 @@ module SignupWidget = {
              </div>
            </div>
          : <div>
-             <h2> {React.string("Sign up to participate in Testworld")} </h2>
+             <h2> {React.string("Sign Up to Receive Updates")} </h2>
              <div
                className=Css.(style([display(`flex), alignItems(`center)]))>
                <input
@@ -347,15 +347,15 @@ let make = () => {
           <div>
             <img className=Styles.logo src="/static/img/testworld_logo.png" />
           </div>
+          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h1> {React.string("Welcome to Testworld")} </h1>
             <p>
               {React.string(
-                 "Get ready to join Coda's adversarial testnet, 'Testworld', starting Tuesday, October 13. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
+                 "Get ready to join Coda’s adversarial testnet, ‘Testworld’, starting later this year. In contrast to Coda’s regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
                )}
             </p>
           </div>
-          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h2> {React.string("How Testworld works")} </h2>
             <p>
