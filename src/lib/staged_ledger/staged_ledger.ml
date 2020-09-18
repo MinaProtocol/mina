@@ -1910,7 +1910,7 @@ let%test_module "test" =
         | (cmd : User_command.Valid.t) :: cmds ->
             let%bind _ =
               Ledger.apply_transaction ~constraint_constants test_ledger
-                ~txn_state_view:(failwith "TODO")
+                ~txn_state_view:(dummy_state_view ())
                 (Command (cmd :> User_command.t))
             in
             apply_cmds cmds
