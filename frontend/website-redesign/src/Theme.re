@@ -198,7 +198,9 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.1)),
       lineHeight(`rem(1.1)),
+      cursor(`pointer),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let sidebarLink =
@@ -206,7 +208,9 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
+      cursor(`pointer),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let tooltip =
