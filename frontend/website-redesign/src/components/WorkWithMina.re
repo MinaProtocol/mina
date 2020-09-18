@@ -38,23 +38,6 @@ module FeaturedContent = {
     let header = merge([Theme.Type.h5, style([marginBottom(`rem(1.))])]);
     let subhead =
       merge([Theme.Type.paragraph, style([marginBottom(`rem(1.))])]);
-
-    // contains link including icon
-    let link =
-      style([
-        Theme.Typeface.monumentGrotesk,
-        cursor(`pointer),
-        color(Theme.Colors.orange),
-        display(`flex),
-        marginTop(`rem(1.)),
-      ]);
-
-    let readMoreText =
-      style([
-        marginRight(`rem(0.2)),
-        cursor(`pointer),
-        marginBottom(`rem(2.)),
-      ]);
   };
   [@react.component]
   let make = () => {
@@ -74,21 +57,47 @@ module FeaturedContent = {
            "Calling all block producers, SNARK producers and community leaders. We're looking for 1,000 participants to join the Genesis token program and form the backbone of Mina's decentralized network.",
          )}
       </p>
-      <Next.Link href="/">
-        <div className=Styles.link>
-          <span className=Styles.readMoreText>
-            {React.string("Read More")}
-          </span>
-          <Icon kind=Icon.ArrowRightMedium />
-        </div>
-      </Next.Link>
+      <Link text="Read More" />
+    </div>;
+  };
+};
+
+/** Individual content component */
+type content =
+  | JobOpening
+  | GrantOpportunity;
+
+module Content = {
+  module Styles = {
+    open Css;
+    let h4 = merge([Theme.Type.metadata, style([marginTop(`rem(1.))])]);
+    let h5 = merge([Theme.Type.h5, style([marginTop(`rem(1.))])]);
+  };
+
+  [@react.component]
+  let make = (~title="", ~url, ~label=JobOpening) => {
+    <div>
+      <Rule color=Theme.Colors.black />
+      <h4 className=Styles.h4>
+        {switch (label) {
+         | JobOpening => React.string("Job Opening / O(1) Labs")
+         | GrantOpportunity => React.string("Grant Opportunity / O(1) Labs")
+         }}
+      </h4>
+      <h5 className=Styles.h5> {React.string(title)} </h5>
+      <Link text="Read More" href=url />
     </div>;
   };
 };
 module ContentColumn = {
   [@react.component]
   let make = () => {
-    <div> <Rule color=Theme.Colors.digitalBlack /> </div>;
+    <div>
+      <Rule color=Theme.Colors.digitalBlack />
+      <Content title="Protocol Infrastructure Engineer" url="/" />
+      <Content title="Protocol Infrastructure Engineer" url="/" />
+      <Content title="Protocol Infrastructure Engineer" url="/" />
+    </div>;
   };
 };
 
