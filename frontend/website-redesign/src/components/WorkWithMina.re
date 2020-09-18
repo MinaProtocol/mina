@@ -56,6 +56,10 @@ module FeaturedContent = {
         width(`rem(21.)),
         height(`rem(12.)),
         marginBottom(`rem(1.)),
+        media(
+          Theme.MediaQuery.desktop,
+          [width(`percent(100.)), height(`rem(16.1))],
+        ),
       ]);
     let header = merge([Theme.Type.h5, style([marginBottom(`rem(1.))])]);
     let subhead =
