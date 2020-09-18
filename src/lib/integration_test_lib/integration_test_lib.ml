@@ -83,16 +83,13 @@ module type Engine_intf = sig
   module Node : sig
     type t
 
-    val to_string : t -> string
+    val start : fresh_state:bool -> t -> unit Deferred.Or_error.t
 
-    val start : t -> unit Deferred.t
-
-    val stop : t -> unit Deferred.t
+    val stop : t -> unit Deferred.Or_error.t
 
     val send_payment :
          logger:Logger.t
-      -> namespace:string
-      -> node:string
+      -> t
       -> sender:Signature_lib.Public_key.Compressed.t
       -> receiver:Signature_lib.Public_key.Compressed.t
       -> amount:Currency.Amount.t

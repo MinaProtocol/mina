@@ -18,9 +18,6 @@ module Make (Engine : Engine_intf) = struct
     let open Deferred.Or_error.Let_syntax in
     let block_producer = Caml.List.nth network.Network.block_producers 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
-    (* namespace for this particular testnet *)
-    let namespace = network.Network.namespace in
-    (* node in that namespace *)
     let node = Core_kernel.List.nth_exn network.block_producers 0 in
     let logger = Logger.create () in
     (* wait for initialization *)
@@ -33,9 +30,8 @@ module Make (Engine : Engine_intf) = struct
     let receiver, _sk2 = keypairs.(1) in
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
-    let node = "test-block-producer-1" in
     let%bind () =
-      Node.send_payment ~logger ~namespace ~node ~sender ~receiver ~amount ~fee
+      Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
     in
     (* confirm payment *)
     Log_engine.wait_for_payment log_engine ~logger ~sender ~receiver ~amount ()

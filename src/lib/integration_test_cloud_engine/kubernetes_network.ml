@@ -1,96 +1,77 @@
-open Async
 open Core
+open Async
 
 module Node = struct
-  (* a pod name, e.g., test-block-producer-1 *)
-  type t = string
+  type t = {namespace: string; pod_id: string}
 
-  let to_string t = t
-
-  let full_name_opt : string option ref = ref None
-
-  let set_full_name name = full_name_opt := Some name
-
-  let get_full_name () = !full_name_opt
-
-  let set_name_from_network ~logger ~namespace ~node =
-    let open Deferred.Let_syntax in
-    let args =
-      [ "get"
-      ; "pods"
-      ; "--namespace"
-      ; namespace
-      ; "-o"
-      ; "custom-columns=NAME:.metadata.name"
-      ; "--no-headers" ]
+  let run_in_container node cmd =
+    let kubectl_cmd =
+      Printf.sprintf
+        "kubectl -n %s -c coda exec -i $(kubectl get pod -n %s -l \"app=%s\" \
+         -o name) -- %s"
+        node.namespace node.namespace node.pod_id cmd
     in
-    [%log info] "Running kubectl %s\n" String.(concat args ~sep:" ") ;
-    match%bind Process.run_lines ~prog:"kubectl" ~args () with
-    | Ok lines ->
-        let prefix = to_string node in
-        let re = Str.regexp " +" in
-        let rec go lines =
-          match lines with
-          | line :: rest -> (
-            match Str.split re line with
-            | [name] ->
-                if String.is_prefix name ~prefix then (
-                  [%log info] "Found node $name in $namespace using $prefix"
-                    ~metadata:
-                      [ ("name", `String name)
-                      ; ("namespace", `String namespace)
-                      ; ("prefix", `String prefix) ] ;
-                  set_full_name name ;
-                  return (Ok ()) )
-                else go rest
-            | _ ->
-                return (Error (Error.of_string "Expected node name")) )
-          | [] ->
-              return
-                (Error (Error.of_string "Could not find desired node name"))
-        in
-        go lines
-    | Error err ->
-        return (Error err)
+    let%bind cwd = Unix.getcwd () in
+    Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
 
-  (* run Coda CLI command *)
-  let run_coda ~logger ~name ~namespace ~cmd ~subcmd ~flags =
-    if Option.is_none !full_name_opt then
-      failwith "run_coda: node name has not been set" ;
-    let kubectl_args =
-      ["exec"; name; "--namespace"; namespace; "-c"; "coda"; "--"]
+  let start ~fresh_state node =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind () =
+      if fresh_state then
+        Deferred.map ~f:Or_error.return
+          (run_in_container node "rm -rf .coda-config")
+      else Deferred.Or_error.return ()
     in
-    let coda_args = ["coda"; cmd; subcmd] @ flags in
-    let args = kubectl_args @ coda_args in
-    [%log info] "Running kubectl %s\n" String.(concat args ~sep:" ") ;
-    Process.run_lines_exn ~prog:"kubectl" ~args ()
+    Deferred.map ~f:Or_error.return (run_in_container node "./start.sh")
 
-  let start _ = failwith "TODO"
-
-  let stop _ = failwith "TODO"
+  let stop node = run_in_container node "./stop.sh" >>| Or_error.return
 
   module Decoders = Graphql_lib.Decoders
 
   module Graphql = struct
-    let port = 3085
-
     (* queries on localhost because of port forwarding *)
-    let uri =
+    let uri port =
       Uri.make
         ~host:Unix.Inet_addr.(localhost |> to_string)
-        ~port:3085 ~path:"graphql" ()
+        ~port ~path:"graphql" ()
 
-    let set_port_forwarding ~logger ~name ~namespace =
+    let get_pod_name t : string Deferred.Or_error.t =
       let args =
-        ["port-forward"; name; "--namespace"; namespace; string_of_int port]
+        [ "get"
+        ; "pod"
+        ; "-n"
+        ; t.namespace
+        ; "-l"
+        ; sprintf "app=%s" t.pod_id
+        ; "-o=custom-columns=NAME:.metadata.name"
+        ; "--no-headers" ]
       in
-      [%log info] "Running kubectl %s\n" String.(concat args ~sep:" ") ;
+      match%map Process.run_lines ~prog:"kubectl" ~args () with
+      | Ok [pod_name] ->
+          Ok pod_name
+      | Ok [] ->
+          Error (Error.of_string "get_pod_name: no result")
+      | Ok _ ->
+          Error (Error.of_string "get_pod_name: too many results")
+      | Error e ->
+          Error e
+
+    (* default port is 3085, may need to be explicit if multiple daemons are running *)
+    let set_port_forwarding ~logger t port =
+      let open Deferred.Or_error.Let_syntax in
+      let%bind name = get_pod_name t in
+      let args =
+        ["port-forward"; name; "--namespace"; t.namespace; string_of_int port]
+      in
+      [%log info] "Port forwarding using \"kubectl %s\"\n"
+        String.(concat args ~sep:" ") ;
       let%bind.Deferred.Or_error.Let_syntax proc =
         Process.create ~prog:"kubectl" ~args ()
       in
       Exit_handlers.register_handler ~logger
-        ~description:"Kubectl port forwarder" (fun () ->
-          ignore Signal.(send kill (`Pid (Process.pid proc))) ) ;
+        ~description:
+          (sprintf "Kubectl port forwarder on pod %s, port %d" t.pod_id port)
+        (fun () -> ignore Signal.(send kill (`Pid (Process.pid proc)))) ;
       Process.collect_stdout_and_wait proc
 
     module Client = Graphql_lib.Client.Make (struct
@@ -130,15 +111,15 @@ module Node = struct
   |}]
   end
 
-  let send_payment ~logger ~namespace ~node ~sender ~receiver ~amount ~fee =
+  let send_payment ~logger t ~sender ~receiver ~amount ~fee =
     [%log info] "Running send_payment test"
-      ~metadata:[("namespace", `String namespace); ("node", `String node)] ;
+      ~metadata:
+        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
+    let graphql_port = 3085 in
     let open Deferred.Or_error.Let_syntax in
-    let%bind () = set_name_from_network ~logger ~namespace ~node in
-    let name = Option.value_exn (get_full_name ()) in
     Deferred.don't_wait_for
       ( match%map.Deferred.Let_syntax
-          Graphql.set_port_forwarding ~logger ~name ~namespace
+          Graphql.set_port_forwarding ~logger t graphql_port
         with
       | Ok _ ->
           (* not reachable, port forwarder does not terminate *)
@@ -166,7 +147,10 @@ module Node = struct
           failwith "unlock_sender_account_graphql: too many tries" )
         else
           let open Deferred.Let_syntax in
-          match%bind (Graphql.Client.query unlock_account_obj) Graphql.uri with
+          match%bind
+            (Graphql.Client.query unlock_account_obj)
+              (Graphql.uri graphql_port)
+          with
           | Ok _ ->
               [%log info] "unlock sender account succeeded" ;
               return (Ok ())
@@ -174,12 +158,12 @@ module Node = struct
               [%log warn]
                 "unlock_sender_account_graphql, Failed GraphQL request: %s, \
                  %d tries left"
-                (to_string err) (n - 1) ;
+                err (n - 1) ;
               let%bind () = after (Time.Span.of_sec retry_delay_sec) in
               go (n - 1)
           | Error (`Graphql_error err) ->
               [%log error] "unlock_sender_account_graphql, GraphQL error: %s"
-                (to_string err) ;
+                err ;
               return (Error (Error.of_string err))
       in
       let%bind.Deferred.Let_syntax () =
@@ -209,7 +193,9 @@ module Node = struct
           return
             (Error (Error.of_string "send_payment_graphql: too many tries")) )
         else
-          match%bind (Graphql.Client.query send_payment_obj) Graphql.uri with
+          match%bind
+            (Graphql.Client.query send_payment_obj) (Graphql.uri graphql_port)
+          with
           | Ok result ->
               [%log info] "send payment GraphQL succeeded" ;
               return (Ok result)
@@ -217,14 +203,14 @@ module Node = struct
               [%log warn]
                 "send_payment_graphql, Failed GraphQL request: %s, %d tries \
                  left"
-                (to_string err) (n - 1) ;
+                err (n - 1) ;
               let%bind () = after (Time.Span.of_sec retry_delay_sec) in
               go (n - 1)
           | Error (`Graphql_error err) ->
               (* errors are not fatal here, like "still bootstrapping" *)
               [%log info]
-                "send_payment_graphql, GraphQL error: %s, %d tries left"
-                (to_string err) (n - 1) ;
+                "send_payment_graphql, GraphQL error: %s, %d tries left" err
+                (n - 1) ;
               let%bind () = after (Time.Span.of_sec retry_delay_sec) in
               go (n - 1)
       in

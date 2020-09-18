@@ -239,6 +239,26 @@ module Json_parsing = struct
   let float : float parser =
    fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
 
+  let user_commands_with_statuses :
+      Coda_base.User_command.t Coda_base.With_status.t list parser = function
+    | `List cmds ->
+        let cmd_or_errors =
+          List.map cmds
+            ~f:
+              (Coda_base.With_status.of_yojson Coda_base.User_command.of_yojson)
+        in
+        List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
+            match (accum, cmd_or_err) with
+            | _, Error _ ->
+                (* fail on any error *)
+                failwith
+                  "user_commands_with_statuses: unable to parse JSON for user \
+                   command"
+            | cmds, Ok cmd ->
+                cmd :: cmds )
+    | _ ->
+        failwith "user_commands_with_statuses: expected `List"
+
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
       : 'a Or_error.t =
     let open Or_error.Let_syntax in
@@ -447,23 +467,7 @@ module Breadcrumb_added_query = struct
     let open Or_error.Let_syntax in
     (* JSON path to metadata entry *)
     let path = ["jsonPayload"; "metadata"; "user_commands"] in
-    let parser json =
-      match json with
-      | `List cmds ->
-          let cmd_or_errors =
-            List.map cmds ~f:(With_status.of_yojson User_command.of_yojson)
-          in
-          List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
-              match (accum, cmd_or_err) with
-              | _, Error _ ->
-                  failwith
-                    "Breadcrumb_added_query: unable to parse JSON for user \
-                     command"
-              | cmds, Ok cmd ->
-                  cmd :: cmds )
-      | _ ->
-          failwith "Breadcrumb_added_query: expected `List"
-    in
+    let parser = user_commands_with_statuses in
     let%map user_commands = find parser js path in
     Result.{user_commands}
 end
@@ -587,7 +591,8 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
   in
   let initialization_table =
     Kubernetes_network.all_nodes network
-    |> List.map ~f:(fun node -> (node, Ivar.create ()))
+    |> List.map ~f:(fun (node : Kubernetes_network.Node.t) ->
+           (node.pod_id, Ivar.create ()) )
     |> String.Map.of_alist_exn
   in
   let%map initialization, initialization_task_finished =
@@ -882,12 +887,12 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Deferred.Or_error.Let_syntax in
   [%log' info t.logger]
-    ~metadata:[("node", `String node)]
+    ~metadata:[("node", `String node.pod_id)]
     "Waiting for $node to initialize" ;
   let%bind init =
     Deferred.return
       (or_error_of_option
-         (String.Map.find t.initialization_table node)
+         (String.Map.find t.initialization_table node.pod_id)
          "failed to find node in initialization table")
   in
   if Ivar.is_full init then return ()

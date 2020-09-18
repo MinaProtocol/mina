@@ -253,8 +253,8 @@ module Network_manager = struct
     ; testnet_log_filter: string
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: string list
-    ; snark_coordinator_pod_names: string list
+    ; block_producer_pod_names: Kubernetes_network.Node.t list
+    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
     ; mutable deployed: bool }
 
   let run_cmd' testnet_dir prog args =
@@ -346,12 +346,17 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
+    let cons_node pod_id =
+      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      ; pod_id }
+    in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i -> Printf.sprintf "test-block-producer-%d" (i + 1))
+        ~f:(fun i ->
+          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = ["snark-coordinator-1"] in
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
       { cluster= network_config.cluster_id
       ; namespace= network_config.terraform.testnet_name
