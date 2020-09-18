@@ -17,8 +17,8 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDom
 
 use oracle::{
     self,
+    poseidon::MarlinSpongeConstants as SC,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
-    poseidon::{MarlinSpongeConstants as SC},
 };
 
 use rand::rngs::StdRng;
@@ -32,21 +32,32 @@ use std::{
     os::raw::c_char,
 };
 
-use marlin_protocol_dlog::index::{
-    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
-};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
     srs::SRS,
 };
-use marlin_protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof};
+use marlin_protocol_dlog::index::{
+    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
+};
+use marlin_protocol_dlog::prover::{
+    ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof,
+};
 
 use algebra::bn_382::g::Affine;
 
 // Fq URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_urs_create(depth: usize, public: usize, size: usize) -> *const SRS<GAffine> {
+pub extern "C" fn zexe_bn382_fq_urs_create(
+    depth: usize,
+    public: usize,
+    size: usize,
+) -> *const SRS<GAffine> {
     Box::into_raw(Box::new(SRS::create(depth, public, size)))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_urs_delete(x: *mut SRS<GAffine>) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
@@ -608,12 +619,15 @@ pub extern "C" fn zexe_bn382_fq_verifier_index_c_rc_comm(
 
 // verifier index vector stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_verifier_index_vector_create<'a>() -> *const Vec<*const DlogVerifierIndex<'a, GAffine>> {
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_create<'a>(
+) -> *const Vec<*const DlogVerifierIndex<'a, GAffine>> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_verifier_index_vector_length(v: *const Vec<*const DlogVerifierIndex<GAffine>>) -> i32 {
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_length(
+    v: *const Vec<*const DlogVerifierIndex<GAffine>>,
+) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
@@ -628,14 +642,18 @@ pub extern "C" fn zexe_bn382_fq_verifier_index_vector_emplace_back<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_verifier_index_vector_get<'a>(v: *mut Vec<*const DlogVerifierIndex<'a, GAffine>>, i: u32)
--> *const DlogVerifierIndex<GAffine> {
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_get<'a>(
+    v: *mut Vec<*const DlogVerifierIndex<'a, GAffine>>,
+    i: u32,
+) -> *const DlogVerifierIndex<GAffine> {
     let v_ = unsafe { &mut (*v) };
     return v_[i as usize];
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_verifier_index_vector_delete(v: *mut Vec<*const DlogVerifierIndex<GAffine>>) {
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_delete(
+    v: *mut Vec<*const DlogVerifierIndex<GAffine>>,
+) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -929,6 +947,11 @@ pub extern "C" fn zexe_bn382_fq_triple_2(evals: *const [Fq; 3]) -> *const Fq {
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fq_triple_delete(x: *mut [Fq; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_fq_vector_triple_0(evals: *const [Vec<Fq>; 3]) -> *const Vec<Fq> {
     let x = (unsafe { &(*evals) })[0].clone();
     return Box::into_raw(Box::new(x));
@@ -944,6 +967,11 @@ pub extern "C" fn zexe_bn382_fq_vector_triple_1(evals: *const [Vec<Fq>; 3]) -> *
 pub extern "C" fn zexe_bn382_fq_vector_triple_2(evals: *const [Vec<Fq>; 3]) -> *const Vec<Fq> {
     let x = (unsafe { &(*evals) })[2].clone();
     return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_vector_triple_delete(x: *mut [Fq; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 // G / Fp stubs
@@ -1085,6 +1113,11 @@ pub extern "C" fn zexe_bn382_g_affine_pair_make(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_g_affine_pair_delete(x: *mut (GAffine, GAffine)) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_g_affine_pair_vector_create() -> *mut Vec<(GAffine, GAffine)> {
     return Box::into_raw(Box::new(Vec::new()));
 }
@@ -1171,9 +1204,10 @@ pub extern "C" fn zexe_bn382_fq_oracles_create(
     // TODO: Should have no degree bound when we add the correct degree bound method
     let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
-    let (mut sponge, o) = proof.oracles::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
-        index, x_hat_comm, &x_hat,
-    );
+    let (mut sponge, o) = proof
+        .oracles::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
+            index, x_hat_comm, &x_hat,
+        );
     let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
 
     return Box::into_raw(Box::new(FqOracles {
@@ -1305,10 +1339,11 @@ pub extern "C" fn zexe_bn382_fq_proof_create(
     let rng = &mut rand_core::OsRng;
 
     let map = <Affine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
-        &map, &witness, &index, prev, rng,
-    )
-    .unwrap();
+    let proof =
+        DlogProof::create::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
+            &map, &witness, &index, prev, rng,
+        )
+        .unwrap();
 
     return Box::into_raw(Box::new(proof));
 }
@@ -1338,9 +1373,12 @@ pub extern "C" fn zexe_bn382_fq_proof_batch_verify(
     let indexes = unsafe { &(*indexes) };
     let proofs = unsafe { &(*proofs) };
     let group_map = <Affine as CommitmentCurve>::Map::setup();
-
     // TODO: Don't clone
-    let v : Vec<_> = indexes.iter().zip(proofs.iter()).map(|(&index, p)| (unsafe { &(*index) }, p.clone())).collect();
+    let v: Vec<_> = indexes
+        .iter()
+        .zip(proofs.iter())
+        .map(|(&index, p)| (unsafe { &(*index) }, p.clone()))
+        .collect();
     DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
         &v,
@@ -1758,6 +1796,13 @@ pub extern "C" fn zexe_bn382_fq_proof_evaluations_triple_2(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fq_proof_evaluations_triple_delete(
+    x: *mut [DlogProofEvaluations<Fq>; 3],
+) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_fq_proof_evaluations_make(
     w: *const Vec<Fq>,
     za: *const Vec<Fq>,
@@ -1818,6 +1863,11 @@ pub extern "C" fn zexe_bn382_fq_proof_evaluations_make(
     };
 
     return Box::into_raw(Box::new(res));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_proof_evaluations_delete(x: *mut DlogProofEvaluations<Fq>) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 // fq poly comm

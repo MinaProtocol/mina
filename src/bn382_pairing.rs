@@ -11,18 +11,17 @@ use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FromBytes, One, ToBytes, UniformRand, Zero,
 };
-use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 use commitment_pairing::urs::URS;
-use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
+use marlin_circuits::domains::EvaluationDomains;
+use marlin_protocol_pairing::index::{Index, MatrixValues, URSSpec, VerifierIndex};
 
-use oracle::{
-    self,
-    sponge::{DefaultFqSponge, DefaultFrSponge},
-    poseidon,
-    poseidon::{Sponge, MarlinSpongeConstants as SC},
-};
 use marlin_protocol_pairing::prover::{ProofEvaluations, ProverProof, RandomOracles};
+use oracle::{
+    self, poseidon,
+    poseidon::{MarlinSpongeConstants as SC, Sponge},
+    sponge::{DefaultFqSponge, DefaultFrSponge},
+};
 use rand::rngs::StdRng;
 use rand_core;
 
@@ -339,6 +338,11 @@ pub extern "C" fn zexe_bn382_fp_vector_triple_2(evals: *const [Vec<Fp>; 3]) -> *
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fp_vector_triple_delete(x: *mut [Fp; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_batch_pairing_check(
     // Pardon the tortured encoding. It's this way because we have to add
     // additional OCaml bindings for each specialized vector type.
@@ -450,9 +454,10 @@ pub extern "C" fn zexe_bn382_fp_proof_create(
 
     let witness = prepare_witness(index.domains, primary_input, auxiliary_input);
 
-    let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
-        &witness, &index,
-    )
+    let proof = ProverProof::create::<
+        DefaultFqSponge<Bn_382G1Parameters, SC>,
+        DefaultFrSponge<Fp, SC>,
+    >(&witness, &index)
     .unwrap();
 
     return Box::into_raw(Box::new(proof));
@@ -467,11 +472,11 @@ pub extern "C" fn zexe_bn382_fp_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
 
-    match ProverProof::<Bn_382>::verify::<DefaultFqSponge<Bn_382G1Parameters, SC>, DefaultFrSponge<Fp, SC>>(
-        proofs,
-        index,
-        &mut rand_core::OsRng,
-    ) {
+    match ProverProof::<Bn_382>::verify::<
+        DefaultFqSponge<Bn_382G1Parameters, SC>,
+        DefaultFrSponge<Fp, SC>,
+    >(proofs, index, &mut rand_core::OsRng)
+    {
         Ok(_) => true,
         Err(_) => false,
     }
@@ -690,6 +695,11 @@ pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_1(
 }
 
 #[no_mangle]
+pub extern "C" fn zexe_bn382_fp_proof_commitment_with_degree_bound_delete(x: *mut G1Affine) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+#[no_mangle]
 pub extern "C" fn zexe_bn382_fp_proof_proof1(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
     let x = (unsafe { (*p).proof1 }).clone();
     return Box::into_raw(Box::new(x));
@@ -821,6 +831,11 @@ pub extern "C" fn zexe_bn382_fp_proof_evals_1(evals: *const [Fp; 3]) -> *const F
 pub extern "C" fn zexe_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *const Fp {
     let x = (unsafe { *evals })[2].clone();
     return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_proof_evals_delete(x: *mut [Fp; 3]) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 // Fp proof vector
@@ -1202,12 +1217,15 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_c_rc_comm(
 
 // verifier index vector stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_verifier_index_vector_create<'a>() -> *const Vec<*const VerifierIndex<Bn_382>> {
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_create<'a>(
+) -> *const Vec<*const VerifierIndex<Bn_382>> {
     return Box::into_raw(Box::new(Vec::new()));
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_verifier_index_vector_length(v: *const Vec<*const VerifierIndex<Bn_382>>) -> i32 {
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_length(
+    v: *const Vec<*const VerifierIndex<Bn_382>>,
+) -> i32 {
     let v_ = unsafe { &(*v) };
     return v_.len() as i32;
 }
@@ -1222,14 +1240,18 @@ pub extern "C" fn zexe_bn382_fp_verifier_index_vector_emplace_back<'a>(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_verifier_index_vector_get<'a>(v: *mut Vec<*const VerifierIndex<Bn_382>>, i: u32)
--> *const VerifierIndex<Bn_382> {
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_get<'a>(
+    v: *mut Vec<*const VerifierIndex<Bn_382>>,
+    i: u32,
+) -> *const VerifierIndex<Bn_382> {
     let v_ = unsafe { &mut (*v) };
     return v_[i as usize];
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fp_verifier_index_vector_delete(v: *mut Vec<*const VerifierIndex<Bn_382>>) {
+pub extern "C" fn zexe_bn382_fp_verifier_index_vector_delete(
+    v: *mut Vec<*const VerifierIndex<Bn_382>>,
+) {
     // Deallocation happens automatically when a box variable goes out of
     // scope.
     let _box = unsafe { Box::from_raw(v) };
@@ -1243,6 +1265,11 @@ pub extern "C" fn zexe_bn382_fp_urs_create(depth: usize) -> *const URS<Bn_382> {
         (0..depth).collect(),
         &mut rand_core::OsRng,
     )))
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fp_urs_delete(x: *mut URS<Bn_382>) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
@@ -1811,6 +1838,11 @@ pub extern "C" fn zexe_bn382_g1_affine_pair_make(
 ) -> *const (G1Affine, G1Affine) {
     let res = ((unsafe { *x0 }), (unsafe { *x1 }));
     return Box::into_raw(Box::new(res));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_g1_affine_pair_delete(x: *mut (G1Affine, G1Affine)) {
+    let _box = unsafe { Box::from_raw(x) };
 }
 
 #[no_mangle]
