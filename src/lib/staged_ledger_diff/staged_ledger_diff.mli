@@ -34,7 +34,7 @@ end
 module Pre_diff_two : sig
   type ('a, 'b) t =
     { completed_works: 'a list
-    ; user_commands: 'b list
+    ; commands: 'b list
     ; coinbase: Coinbase.Fee_transfer.t At_most_two.t }
   [@@deriving sexp, to_yojson]
 
@@ -50,7 +50,7 @@ end
 module Pre_diff_one : sig
   type ('a, 'b) t =
     { completed_works: 'a list
-    ; user_commands: 'b list
+    ; commands: 'b list
     ; coinbase: Coinbase.Fee_transfer.t At_most_one.t }
   [@@deriving sexp, to_yojson]
 
@@ -131,13 +131,13 @@ module Stable :
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.Checked.t
-    , User_command.With_valid_signature.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -153,20 +153,19 @@ module With_valid_signatures_and_proofs : sig
     ; supercharge_coinbase: bool }
   [@@deriving sexp, to_yojson]
 
-  val user_commands :
-    t -> User_command.With_valid_signature.t With_status.t list
+  val commands : t -> User_command.Valid.t With_status.t list
 end
 
 module With_valid_signatures : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.t
-    , User_command.With_valid_signature.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -191,14 +190,16 @@ end
 val forget_proof_checks :
   With_valid_signatures_and_proofs.t -> With_valid_signatures.t
 
-val validate_user_commands :
+val validate_commands :
      t
-  -> check:(User_command.t -> User_command.With_valid_signature.t option)
-  -> (With_valid_signatures.t, User_command.t With_status.t) result
+  -> check:(   User_command.t list
+            -> (User_command.Valid.t list, 'e) Result.t
+               Async.Deferred.Or_error.t)
+  -> (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t
 
 val forget : With_valid_signatures_and_proofs.t -> t
 
-val user_commands : t -> User_command.t With_status.t list
+val commands : t -> User_command.t With_status.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
