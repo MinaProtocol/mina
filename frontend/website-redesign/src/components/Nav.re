@@ -3,6 +3,7 @@ module Styles = {
 
   let container =
     style([
+      position(`absolute),
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
@@ -19,14 +20,114 @@ module Styles = {
       ),
     ]);
 
+  let spacer =
+    style([
+      height(`rem(4.25)),
+      media(Theme.MediaQuery.tablet, [height(`rem(6.25))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(7.))]),
+    ]);
+
   let logo = style([cursor(`pointer), height(`rem(2.25))]);
 
-  let nav = style([display(`flex), alignItems(`center)]);
+  let nav =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      position(`absolute),
+      left(`zero),
+      top(`rem(4.25)),
+      width(`percent(100.)),
+      background(Theme.Colors.digitalBlack),
+      media(Theme.MediaQuery.tablet, [top(`rem(6.25))]),
+      media(
+        Theme.MediaQuery.desktop,
+        [
+          position(`relative),
+          top(`zero),
+          width(`auto),
+          flexDirection(`row),
+          alignItems(`center),
+          background(`none),
+        ],
+      ),
+    ]);
 
   let navLink =
-    merge([Theme.Type.navLink, style([position(`relative), marginRight(`rem(1.25))])]);
+    merge([
+      Theme.Type.navLink,
+      style([
+        display(`flex),
+        alignItems(`center),
+        width(`percent(100.)),
+        height(`rem(5.5)),
+        padding2(~v=`zero, ~h=`rem(1.5)),
+        color(white),
+        borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
+        hover([color(Theme.Colors.orange)]),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            position(`relative),
+            marginRight(`rem(1.25)),
+            width(`auto),
+            height(`auto),
+            padding(`zero),
+            color(Theme.Colors.digitalBlack),
+            border(`zero, `none, black),
+          ],
+        ),
+      ]),
+    ]);
 
-  let navGroup = style([position(`absolute)]);
+  let navGroup =
+    style([
+      width(`percent(100.)),
+      top(`rem(2.)),
+      left(`rem(-6.5)),
+      listStyleType(`none),
+      color(white),
+      background(Theme.Colors.digitalBlack),
+      padding2(~h=`rem(1.5), ~v=`zero),
+      selector(
+        "> li",
+        [
+          display(`flex),
+          alignItems(`center),
+          width(`percent(100.)),
+          height(`rem(5.5)),
+          borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
+          hover([color(Theme.Colors.orange)]),
+        ],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [width(`rem(19.)), position(`absolute)],
+      ),
+    ]);
+
+  let navToggle =
+    style([
+      cursor(`pointer),
+      hover([color(Theme.Colors.orange)]),
+      media(Theme.MediaQuery.desktop, [display(`none)]),
+    ]);
+
+  let hiddenToggle =
+    style([
+      display(`none),
+      selector("+ label > #close-nav", [display(`none)]),
+      selector("+ label > #open-nav", [display(`block)]),
+      selector("~ nav", [display(`none)]),
+      checked([
+        selector("~ nav", [display(`flex)]),
+        selector("+ label > #close-nav", [display(`block)]),
+        selector("+ label > #open-nav", [display(`none)]),
+      ]),
+      media(
+        Theme.MediaQuery.desktop,
+        [selector("~ nav", [display(`flex)])],
+      ),
+    ]);
 };
 
 module NavLink = {
@@ -43,7 +144,10 @@ module NavGroup = {
   let make = (~label, ~children) => {
     let (active, setActive) = React.useState(() => false);
     <>
-      <span className=Styles.navLink onMouseOver={_ => setActive(_ => true)}>
+      <span
+        className=Styles.navLink
+        onMouseOver={_ => setActive(_ => true)}
+        onMouseLeave={_ => setActive(_ => false)}>
         {React.string(label)}
         {active ? <ul className=Styles.navGroup> children </ul> : React.null}
       </span>
@@ -54,7 +158,16 @@ module NavGroup = {
 module NavGroupLink = {
   [@react.component]
   let make = (~icon, ~href, ~label) => {
-    <li> <Next.Link href> <span> <Icon kind=icon size=2. /> {React.string(label)} </span> </Next.Link> </li>;
+    <Next.Link href>
+      <li>
+        <Icon kind=icon size=2. />
+        <Spacer width=1. />
+        <span className=Css.(style([flexGrow(1.)]))>
+          {React.string(label)}
+        </span>
+        <Icon kind=Icon.ArrowRightSmall size=1.5 />
+      </li>
+    </Next.Link>;
   };
 };
 
@@ -64,11 +177,16 @@ let make = () => {
     <Next.Link href="/">
       <img src="/static/img/mina-wordmark.svg" className=Styles.logo />
     </Next.Link>
+    <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
+    <label htmlFor="nav_toggle" className=Styles.navToggle>
+      <span id="open-nav"> <Icon kind=Icon.BurgerMenu /> </span>
+      <span id="close-nav"> <Icon kind=Icon.CloseMenu /> </span>
+    </label>
     <nav className=Styles.nav>
       <NavLink label="About" href="/about" />
       <NavLink label="Tech" href="/tech" />
       <NavGroup label="Get Started">
-        <NavGroupLink icon=Icon.Box label="Get Started" href="/get-started" />
+        <NavGroupLink icon=Icon.Box label="Overview" href="/get-started" />
         <NavGroupLink
           icon=Icon.NodeOperators
           label="Node Operators"
@@ -89,8 +207,9 @@ let make = () => {
       <NavLink label="Community" href="/community" />
       <NavLink label="Blog" href="/blog" />
       <Spacer width=1.5 />
-      <Button>
+      <Button href="/genesis" width={`rem(10.75)} paddingX=1.>
         <img src="/static/img/promo-logo.svg" height="40" />
+        <span> {React.string("Join Genesis + Earn Mina")} </span>
       </Button>
     </nav>
   </header>;

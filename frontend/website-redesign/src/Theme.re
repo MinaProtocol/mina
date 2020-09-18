@@ -9,6 +9,7 @@ module Colors = {
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
   let purple = `hex("5362C8");
+  let digitalGray = `hex("575757");
 };
 
 module Typeface = {
