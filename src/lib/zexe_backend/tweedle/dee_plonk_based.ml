@@ -1,6 +1,5 @@
 open Zexe_backend_common
 open Basic_plonk
-open Bigint
 module T = Snarky_bn382.Tweedle
 module Field = Fp
 module B = T.Dee_plonk.Plonk
