@@ -8,12 +8,21 @@ module Styles = {
       justifyContent(`flexStart),
       media(
         Theme.MediaQuery.tablet,
-        [justifyContent(`spaceBetween), flexDirection(`column)],
+        [
+          justifyContent(`spaceBetween),
+          flexDirection(`column),
+          padding2(~v=`rem(4.), ~h=`rem(2.5)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
         [padding2(~v=`rem(7.), ~h=`rem(9.5))],
       ),
+    ]);
+  let headerCopy =
+    style([
+      display(`flex),
+      media(Theme.MediaQuery.tablet, [justifyContent(`spaceBetween)]),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(1.5))])]);
   let content =
@@ -28,6 +37,13 @@ module Styles = {
 module FeaturedContent = {
   module Styles = {
     open Css;
+    let container =
+      style([
+        media(
+          Theme.MediaQuery.tablet,
+          [width(`rem(21.)), marginRight(`rem(1.))],
+        ),
+      ]);
     let label = merge([Theme.Type.metadata, style([marginTop(`rem(1.))])]);
     let blogListImage =
       style([
@@ -42,7 +58,8 @@ module FeaturedContent = {
   };
   [@react.component]
   let make = () => {
-    <div>
+    <div className=Styles.container>
+      <Rule color=Theme.Colors.black />
       <h4 className=Styles.label>
         {React.string("Genesis Program / O(1) Labs")}
       </h4>
@@ -104,17 +121,13 @@ module ContentColumn = {
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-    <>
+    <div className=Styles.headerCopy>
       <h2 className=Styles.header> {React.string("Work with Mina")} </h2>
       <Button bgColor=Theme.Colors.black>
         {React.string("See All Opportunities")}
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
-    </>
-    <div className=Styles.content>
-      <Rule color=Theme.Colors.black />
-      <FeaturedContent />
-      <ContentColumn />
     </div>
+    <div className=Styles.content> <FeaturedContent /> <ContentColumn /> </div>
   </div>;
 };
