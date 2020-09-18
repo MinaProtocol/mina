@@ -476,7 +476,8 @@ let batch_send_payments =
           let signer_pk = Public_key.compress keypair.public_key in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
-            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty ~valid_until
+            ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
+            ~valid_until
             ~body:
               (Payment
                  { source_pk= signer_pk
@@ -514,7 +515,7 @@ let send_payment_graphql =
       (optional token_id)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
       token_flag
   in
   Command.async ~summary:"Send payment to an address"
@@ -545,7 +546,7 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
@@ -572,7 +573,7 @@ let create_new_token_graphql =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
   Command.async ~summary:"Create a new token"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
@@ -609,7 +610,7 @@ let create_new_account_graphql =
       (required token_id)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_owner_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_owner_flag
       token_flag
   in
   Command.async ~summary:"Create a new account for a token"
@@ -680,7 +681,7 @@ let mint_tokens_graphql =
       (required txn_amount)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
       amount_flag
   in
   Command.async ~summary:"Mint more of a token owned by the command's sender"
@@ -715,8 +716,8 @@ let cancel_transaction_graphql =
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
-         let receiver_pk = User_command.receiver_pk user_command in
-         let cancel_sender_pk = User_command.fee_payer_pk user_command in
+         let receiver_pk = Signed_command.receiver_pk user_command in
+         let cancel_sender_pk = Signed_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in
@@ -733,7 +734,8 @@ let cancel_transaction_graphql =
            int_of_string nonce
          in
          let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int (User_command.nonce user_command)
+           Coda_numbers.Account_nonce.to_int
+             (Signed_command.nonce user_command)
          in
          let inferred_nonce =
            Option.value maybe_inferred_nonce ~default:cancelled_nonce
@@ -742,7 +744,9 @@ let cancel_transaction_graphql =
            let diff =
              Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
            in
-           let fee = Currency.Fee.to_uint64 (User_command.fee user_command) in
+           let fee =
+             Currency.Fee.to_uint64 (Signed_command.fee user_command)
+           in
            let replace_fee =
              Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
            in
@@ -761,7 +765,7 @@ let cancel_transaction_graphql =
              ~nonce:
                (uint32
                   (Coda_numbers.Account_nonce.to_uint32
-                     (User_command.nonce user_command)))
+                     (Signed_command.nonce user_command)))
              ()
          in
          let%map cancel_response =
@@ -775,7 +779,7 @@ let get_transaction_status =
     (Cli_lib.Background_daemon.rpc_init
        Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
-         match User_command.of_base58_check serialized_transaction with
+         match Signed_command.of_base58_check serialized_transaction with
          | Ok user_command ->
              Daemon_rpcs.Client.dispatch_with_message
                Daemon_rpcs.Get_transaction_status.rpc user_command port
@@ -925,8 +929,8 @@ let pooled_user_commands =
            `List
              ( List.map
                  ~f:
-                   (Fn.compose Graphql_client.User_command.to_yojson
-                      (Fn.compose Graphql_client.User_command.of_obj
+                   (Fn.compose Graphql_client.Signed_command.to_yojson
+                      (Fn.compose Graphql_client.Signed_command.of_obj
                          unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
          in
@@ -1263,7 +1267,8 @@ let create_account =
 
 let create_hd_account =
   Command.async ~summary:Secrets.Hardware_wallets.create_hd_account_summary
-    (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.User_command.hd_index
+    (Cli_lib.Background_daemon.graphql_init
+       Cli_lib.Flag.Signed_command.hd_index
        ~f:(fun graphql_endpoint hd_index ->
          let%map response =
            Graphql_client.(

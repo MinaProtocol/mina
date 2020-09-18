@@ -306,7 +306,7 @@ include Transaction_logic.Make (Ledger_inner)
 
 type init_state =
   ( Signature_lib.Keypair.t
-  * Currency.Balance.t
+  * Currency.Amount.t
   * Coda_numbers.Account_nonce.t
   * Account_timing.t )
   array
@@ -319,7 +319,7 @@ let gen_initial_ledger_state : init_state Quickcheck.Generator.t =
   let%bind balances =
     let gen_balance =
       let%map whole_balance = Int.gen_incl 500_000_000 1_000_000_000 in
-      Currency.Balance.of_int (whole_balance * 1_000_000_000)
+      Currency.Amount.of_int (whole_balance * 1_000_000_000)
     in
     Quickcheck_lib.replicate_gen gen_balance n_accounts
   in
@@ -346,5 +346,10 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       let pk_compressed = Public_key.compress kp.public_key in
       let account_id = Account_id.create pk_compressed Token_id.default in
       let account = Account.initialize account_id in
-      let account' = {account with balance; nonce; timing} in
+      let account' =
+        { account with
+          balance= Currency.Balance.of_int (Currency.Amount.to_int balance)
+        ; nonce
+        ; timing }
+      in
       create_new_account_exn t account_id account' )

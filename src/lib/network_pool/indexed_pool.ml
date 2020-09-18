@@ -58,28 +58,58 @@ let currency_consumed :
     -> Currency.Amount.t option =
  fun ~constraint_constants cmd ->
   let cmd' = Transaction_hash.User_command_with_valid_signature.command cmd in
-  let fee_amt = Currency.Amount.of_fee @@ User_command.fee cmd' in
-  Currency.Amount.(
-    fee_amt
-    +
-    match cmd'.payload.body with
-    | Payment ({amount; _} as payload) ->
-        if
-          Token_id.equal cmd'.payload.common.fee_token
-            (Payment_payload.token payload)
-        then
-          (* The fee-payer is also the sender account, include the amount. *)
-          amount
-        else (* The payment won't affect the balance of this account. *)
+  let fee_amt = Currency.Amount.of_fee @@ User_command.fee_exn cmd' in
+  let open Currency.Amount in
+  let amt =
+    match cmd' with
+    | Signed_command c -> (
+      match c.payload.body with
+      | Payment ({amount; _} as payload) ->
+          if
+            Token_id.equal c.payload.common.fee_token
+              (Payment_payload.token payload)
+          then
+            (* The fee-payer is also the sender account, include the amount. *)
+            amount
+          else (* The payment won't affect the balance of this account. *)
+            zero
+      | Stake_delegation _ ->
           zero
-    | Stake_delegation _ ->
-        zero
-    | Create_new_token _ ->
-        Currency.Amount.of_fee constraint_constants.account_creation_fee
-    | Create_token_account _ ->
-        Currency.Amount.of_fee constraint_constants.account_creation_fee
-    | Mint_tokens _ ->
-        zero)
+      | Create_new_token _ ->
+          Currency.Amount.of_fee constraint_constants.account_creation_fee
+      | Create_token_account _ ->
+          Currency.Amount.of_fee constraint_constants.account_creation_fee
+      | Mint_tokens _ ->
+          zero )
+    | Snapp_command c -> (
+        let open Snapp_command.Party in
+        let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
+            (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
+            =
+          let ps =
+            x1.data.body
+            :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
+          in
+          List.find_map_exn ps ~f:(fun p ->
+              match p.delta.sgn with
+              | Pos ->
+                  None
+              | Neg ->
+                  Some p.delta.magnitude )
+        in
+        match c with
+        | Proved_proved r ->
+            f r.one (Some r.two)
+        | Proved_signed r ->
+            f r.one (Some r.two)
+        | Signed_signed r ->
+            f r.one (Some r.two)
+        | Proved_empty r ->
+            f r.one r.two
+        | Signed_empty r ->
+            f r.one r.two )
+  in
+  fee_amt + amt
 
 let currency_consumed' :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -105,7 +135,7 @@ module For_tests = struct
         Set.mem
           (Map.find_exn all_by_fee
              ( Transaction_hash.User_command_with_valid_signature.command tx
-             |> User_command.fee ))
+             |> User_command.fee_exn ))
           tx
       then ()
       else
@@ -125,7 +155,7 @@ module For_tests = struct
             let unchecked =
               Transaction_hash.User_command_with_valid_signature.command tx
             in
-            [%test_eq: Currency.Fee.t] key (User_command.fee unchecked) ;
+            [%test_eq: Currency.Fee.t] key (User_command.fee_exn unchecked) ;
             let tx' =
               Map.find_exn all_by_sender (User_command.fee_payer unchecked)
               |> Tuple2.get1 |> F_sequence.head_exn
@@ -155,7 +185,7 @@ module For_tests = struct
         assert (
           Set.mem
             (Map.find_exn applicable_by_fee
-               (User_command.fee applicable_unchecked))
+               (User_command.fee_exn applicable_unchecked))
             applicable ) ;
         let _last_nonce, currency_reserved' =
           F_sequence.foldl
@@ -164,16 +194,16 @@ module For_tests = struct
                 Transaction_hash.User_command_with_valid_signature.command tx
               in
               [%test_eq: Account_nonce.t]
-                (User_command.nonce unchecked)
+                (User_command.nonce_exn unchecked)
                 (Account_nonce.succ prev_nonce) ;
               check_consistent tx ;
-              ( User_command.nonce unchecked
+              ( User_command.nonce_exn unchecked
               , Option.value_exn
                   Currency.Amount.(
                     Option.value_exn
                       (currency_consumed ~constraint_constants tx)
                     + currency_acc) ) )
-            ( User_command.nonce applicable_unchecked
+            ( User_command.nonce_exn applicable_unchecked
             , Option.value_exn
                 (currency_consumed ~constraint_constants applicable) )
             inapplicables
@@ -183,7 +213,7 @@ module For_tests = struct
       let unchecked =
         Transaction_hash.User_command_with_valid_signature.command tx
       in
-      [%test_eq: Currency.Fee.t] fee (User_command.fee unchecked) ;
+      [%test_eq: Currency.Fee.t] fee (User_command.fee_exn unchecked) ;
       let sender_txs, _currency_reserved =
         Map.find_exn all_by_sender (User_command.fee_payer unchecked)
       in
@@ -195,16 +225,17 @@ module For_tests = struct
           (Map.find_exn applicable_by_fee
              ( applicable
              |> Transaction_hash.User_command_with_valid_signature.command
-             |> User_command.fee ))
+             |> User_command.fee_exn ))
           applicable ) ;
       let first_nonce =
         applicable
         |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.nonce |> Account_nonce.to_int
+        |> User_command.nonce_exn |> Account_nonce.to_int
       in
       let _split_l, split_r =
         F_sequence.split_at sender_txs
-          (Account_nonce.to_int (User_command.nonce unchecked) - first_nonce)
+          ( Account_nonce.to_int (User_command.nonce_exn unchecked)
+          - first_nonce )
       in
       let tx' = F_sequence.head_exn split_r in
       [%test_eq: Transaction_hash.User_command_with_valid_signature.t] tx tx'
@@ -215,7 +246,7 @@ module For_tests = struct
             assert_all_by_hash tx ) ) ;
     Map.iter all_by_hash ~f:(fun tx ->
         check_sender_applicable
-          (User_command.fee
+          (User_command.fee_exn
              (Transaction_hash.User_command_with_valid_signature.command tx))
           tx ;
         assert_all_by_fee tx ) ;
@@ -268,7 +299,7 @@ let remove_applicable_exn :
  fun t cmd ->
   let fee =
     Transaction_hash.User_command_with_valid_signature.command cmd
-    |> User_command.fee
+    |> User_command.fee_exn
   in
   {t with applicable_by_fee= Map_set.remove_exn t.applicable_by_fee fee cmd}
 
@@ -279,7 +310,7 @@ let remove_all_by_fee_and_hash_exn :
  fun t cmd ->
   let fee =
     Transaction_hash.User_command_with_valid_signature.command cmd
-    |> User_command.fee
+    |> User_command.fee_exn
   in
   { t with
     all_by_fee= Map_set.remove_exn t.all_by_fee fee cmd
@@ -305,9 +336,9 @@ let remove_with_dependents_exn :
   let first_cmd = F_sequence.head_exn sender_queue in
   let first_nonce =
     Transaction_hash.User_command_with_valid_signature.command first_cmd
-    |> User_command.nonce |> Account_nonce.to_int
+    |> User_command.nonce_exn |> Account_nonce.to_int
   in
-  let cmd_nonce = User_command.nonce unchecked |> Account_nonce.to_int in
+  let cmd_nonce = User_command.nonce_exn unchecked |> Account_nonce.to_int in
   assert (cmd_nonce >= first_nonce) ;
   let index = cmd_nonce - first_nonce in
   let keep_queue, drop_queue = F_sequence.split_at sender_queue index in
@@ -347,7 +378,7 @@ let remove_with_dependents_exn :
             cmd
         then
           Map_set.remove_exn t'.applicable_by_fee
-            (User_command.fee unchecked)
+            (User_command.fee_exn unchecked)
             cmd
         else t'.applicable_by_fee ) } )
 
@@ -399,7 +430,7 @@ let revalidate :
       let first_cmd = F_sequence.head_exn queue in
       let first_nonce =
         first_cmd |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.nonce
+        |> User_command.nonce_exn
       in
       if Account_nonce.(current_nonce < first_nonce) then
         let dropped, t'' = remove_with_dependents_exn t first_cmd in
@@ -459,7 +490,7 @@ let handle_committed_txn :
     Transaction_hash.User_command_with_valid_signature.command committed
   in
   let fee_payer = User_command.fee_payer committed' in
-  let nonce_to_remove = User_command.nonce committed' in
+  let nonce_to_remove = User_command.nonce_exn committed' in
   match Map.find t.all_by_sender fee_payer with
   | None ->
       Ok (t, Sequence.empty)
@@ -467,7 +498,7 @@ let handle_committed_txn :
       let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
       let first_nonce =
         first_cmd |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.nonce
+        |> User_command.nonce_exn
       in
       if Account_nonce.(nonce_to_remove <> first_nonce) then
         Error
@@ -514,7 +545,7 @@ let handle_committed_txn :
                     t.applicable_by_fee
                     ( head_cmd
                     |> Transaction_hash.User_command_with_valid_signature
-                       .command |> User_command.fee )
+                       .command |> User_command.fee_exn )
                     head_cmd }
         in
         let t3 =
@@ -583,9 +614,9 @@ let rec add_from_gossip_exn :
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
-  let fee = User_command.fee unchecked in
+  let fee = User_command.fee_exn unchecked in
   let fee_payer = User_command.fee_payer unchecked in
-  let nonce = User_command.nonce unchecked in
+  let nonce = User_command.nonce_exn unchecked in
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
@@ -641,7 +672,7 @@ let rec add_from_gossip_exn :
       let last_queued_nonce =
         F_sequence.last_exn queued_cmds
         |> Transaction_hash.User_command_with_valid_signature.command
-        |> User_command.nonce
+        |> User_command.nonce_exn
       in
       if Account_nonce.equal (Account_nonce.succ last_queued_nonce) nonce then
         (* this command goes on the end *)
@@ -678,7 +709,7 @@ let rec add_from_gossip_exn :
         let first_queued_nonce =
           F_sequence.head_exn queued_cmds
           |> Transaction_hash.User_command_with_valid_signature.command
-          |> User_command.nonce
+          |> User_command.nonce_exn
         in
         assert (Account_nonce.equal first_queued_nonce current_nonce) ;
         let%bind () =
@@ -704,18 +735,18 @@ let rec add_from_gossip_exn :
           F_sequence.head_exn drop_queue
           |> Transaction_hash.User_command_with_valid_signature.command
         in
-        assert (Account_nonce.equal (User_command.nonce to_drop) nonce) ;
+        assert (Account_nonce.equal (User_command.nonce_exn to_drop) nonce) ;
         (* We check the fee increase twice because we need to be sure the
            subtraction is safe. *)
         let%bind () =
-          let replace_fee = User_command.fee to_drop in
+          let replace_fee = User_command.fee_exn to_drop in
           Result.ok_if_true
             Currency.Fee.(fee >= replace_fee)
             ~error:(`Insufficient_replace_fee (`Replace_fee replace_fee, fee))
           (* C3 *)
         in
         let increment =
-          Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
+          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
         in
         let%bind () =
           let replace_fee =
@@ -753,7 +784,7 @@ let add_from_backtrack :
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
   let fee_payer = User_command.fee_payer unchecked in
-  let fee = User_command.fee unchecked in
+  let fee = User_command.fee_exn unchecked in
   let consumed =
     Option.value_exn (currency_consumed ~constraint_constants cmd)
   in
@@ -784,10 +815,10 @@ let add_from_backtrack :
       if
         not
           (Account_nonce.equal
-             (unchecked |> User_command.nonce |> Account_nonce.succ)
+             (unchecked |> User_command.nonce_exn |> Account_nonce.succ)
              ( first_queued
              |> Transaction_hash.User_command_with_valid_signature.command
-             |> User_command.nonce ))
+             |> User_command.nonce_exn ))
       then
         failwith
         @@ sprintf
@@ -825,9 +856,9 @@ let%test_module _ =
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
     let gen_cmd ?sign_type ?nonce ?fee_token ?payment_token () =
-      User_command.With_valid_signature.Gen.payment_with_random_participants
-        ~keys:test_keys ~max_amount:1000 ~max_fee:10 ?sign_type ?nonce
-        ?fee_token ?payment_token ()
+      User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
+        ~max_amount:1000 ~max_fee:10 ?sign_type ?nonce ?fee_token
+        ?payment_token ()
       |> Quickcheck.Generator.map
            ~f:Transaction_hash.User_command_with_valid_signature.create
 
@@ -879,9 +910,7 @@ let%test_module _ =
           Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger_init = Ledger.gen_initial_ledger_state in
-        let%map cmds =
-          User_command.With_valid_signature.Gen.sequence ledger_init
-        in
+        let%map cmds = User_command.Valid.Gen.sequence ledger_init in
         ( ledger_init
         , List.map ~f:Transaction_hash.User_command_with_valid_signature.create
             cmds )
@@ -907,8 +936,7 @@ let%test_module _ =
           Sequence.iter account_init_states_seq
             ~f:(fun (kp, balance, nonce, _) ->
               let compressed = Public_key.compress kp.public_key in
-              Hashtbl.add_exn balances ~key:compressed
-                ~data:(Currency.Balance.to_amount balance) ;
+              Hashtbl.add_exn balances ~key:compressed ~data:balance ;
               Hashtbl.add_exn nonces ~key:compressed ~data:nonce ) ;
           let pool = ref empty in
           let rec go cmds_acc =
@@ -970,6 +998,21 @@ let%test_module _ =
           go cmds )
 
     let%test_unit "replacement" =
+      let modify_payment (c : User_command.t) ~sender ~common:fc ~body:fb =
+        let modified_payload : Signed_command.Payload.t =
+          match c with
+          | Signed_command {payload= {body= Payment payment_payload; common}; _}
+            ->
+              { common= fc common
+              ; body= Signed_command.Payload.Body.Payment (fb payment_payload)
+              }
+          | _ ->
+              failwith "generated user command that wasn't a payment"
+        in
+        Signed_command
+          (Signed_command.For_tests.fake_sign sender modified_payload)
+        |> Transaction_hash.User_command_with_valid_signature.create
+      in
       let gen :
           ( Account_nonce.t
           * Currency.Amount.t
@@ -1006,20 +1049,10 @@ let%test_module _ =
             let amount =
               Option.value_exn Currency.Amount.(cmd_currency - fee)
             in
-            let modified_payload : User_command.Payload.t =
-              match cmd.payload.body with
-              | Payment payment_payload ->
-                  { common=
-                      {cmd.payload.common with fee= Currency.Amount.to_fee fee}
-                  ; body=
-                      User_command.Payload.Body.Payment
-                        {payment_payload with amount} }
-              | _ ->
-                  failwith "generated user command that wasn't a payment"
-            in
             let cmd' =
-              User_command.For_tests.fake_sign sender modified_payload
-              |> Transaction_hash.User_command_with_valid_signature.create
+              modify_payment cmd ~sender
+                ~common:(fun c -> {c with fee= Currency.Amount.to_fee fee})
+                ~body:(fun b -> {b with amount})
             in
             let consumed =
               Option.value_exn (currency_consumed ~constraint_constants cmd')
@@ -1049,17 +1082,13 @@ let%test_module _ =
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~max_fee:0 ()
         in
-        let replace_cmd_payload =
-          { replace_cmd_skeleton.payload with
-            common=
-              { replace_cmd_skeleton.payload.common with
+        let replace_cmd =
+          modify_payment replace_cmd_skeleton ~sender ~body:Fn.id
+            ~common:(fun c ->
+              { c with
                 fee=
                   Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
-              } }
-        in
-        let replace_cmd =
-          User_command.For_tests.fake_sign sender replace_cmd_payload
-          |> Transaction_hash.User_command_with_valid_signature.create
+              } )
         in
         (init_nonce, init_balance, setup_cmds, replace_cmd)
       in
@@ -1091,11 +1120,11 @@ let%test_module _ =
             Account_nonce.to_int
               ( replace_cmd
               |> Transaction_hash.User_command_with_valid_signature.command
-              |> User_command.nonce )
+              |> User_command.nonce_exn )
             - Account_nonce.to_int
                 ( List.hd_exn setup_cmds
                 |> Transaction_hash.User_command_with_valid_signature.command
-                |> User_command.nonce )
+                |> User_command.nonce_exn )
           in
           let currency_consumed_pre_replace =
             List.fold_left

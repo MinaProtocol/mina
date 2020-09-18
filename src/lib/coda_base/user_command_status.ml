@@ -15,7 +15,7 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
-        | User_command_on_snapp_account
+        | Signed_command_on_snapp_account
         | Snapp_account_not_present
         | Update_not_permitted
         | Incorrect_nonce
@@ -48,8 +48,8 @@ module Failure = struct
         "Mismatched_token_permissions"
     | Overflow ->
         "Overflow"
-    | User_command_on_snapp_account ->
-        "User_command_on_snapp_account"
+    | Signed_command_on_snapp_account ->
+        "Signed_command_on_snapp_account"
     | Snapp_account_not_present ->
         "Snapp_account_not_present"
     | Update_not_permitted ->
@@ -83,7 +83,7 @@ module Failure = struct
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | _ ->
-        Error "User_command_status.Failure.of_string: Unknown value"
+        Error "Signed_command_status.Failure.of_string: Unknown value"
 
   let describe = function
     | Predicate ->
@@ -108,8 +108,8 @@ module Failure = struct
         "The permissions for this token do not match those in the command"
     | Overflow ->
         "The resulting balance is too large to store"
-    | User_command_on_snapp_account ->
-        "The source of a user command cannot be a snapp account"
+    | Signed_command_on_snapp_account ->
+        "The source of a signed command cannot be a snapp account"
     | Snapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted ->

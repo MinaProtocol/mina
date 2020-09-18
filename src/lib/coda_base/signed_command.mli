@@ -1,6 +1,6 @@
 open Core_kernel
 open Import
-module Payload = User_command_payload
+module Payload = Signed_command_payload
 
 module Poly : sig
   [%%versioned:
@@ -36,4 +36,4 @@ module Stable : sig
   end
 end]
 
-include User_command_intf.S with type t = Stable.Latest.t
+include Signed_command_intf.S with type t = Stable.Latest.t
