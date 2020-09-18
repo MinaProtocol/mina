@@ -11,12 +11,14 @@ let top_hash_logging_enabled = ref false
 
 let to_preunion (t : Transaction.t) =
   match t with
-  | User_command x ->
-      `Transaction (Transaction.User_command x)
+  | Command (Signed_command x) ->
+      `Transaction (Transaction.Command x)
   | Fee_transfer x ->
       `Transaction (Fee_transfer x)
   | Coinbase x ->
       `Transaction (Coinbase x)
+  | Command (Snapp_command x) ->
+      `Snapp_command x
 
 let with_top_hash_logging f =
   let old = !top_hash_logging_enabled in
@@ -2235,7 +2237,8 @@ module Base = struct
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
                let%bind r =
-                 Receipt.Chain_hash.Checked.cons (User_command payload) current
+                 Receipt.Chain_hash.Checked.cons (Signed_command payload)
+                   current
                in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
@@ -2896,7 +2899,7 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> snapp_account1:Snapp_account.t option
     -> snapp_account2:Snapp_account.t option
-    -> Transaction.t Transaction_protocol_state.t
+    -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -2908,7 +2911,7 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> User_command.With_valid_signature.t Transaction_protocol_state.t
+    -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -3048,8 +3051,8 @@ let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state
     ~next_available_token_before ~next_available_token_after ~snapp_account1
     ~snapp_account2
-    (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
-    =
+    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
+    handler =
   let transaction =
     Transaction_protocol_state.transaction transaction_in_block
   in
@@ -3076,7 +3079,7 @@ let check_user_command ~constraint_constants ~sok_message ~source ~target
   check_transaction ~constraint_constants ~sok_message ~source ~target
     ~init_stack ~pending_coinbase_stack_state ~next_available_token_before
     ~next_available_token_after ~snapp_account1:None ~snapp_account2:None
-    {t_in_block with transaction= User_command user_command}
+    {t_in_block with transaction= Command (Signed_command user_command)}
     handler
 
 let generate_transaction_union_witness ?(preeval = false) ~constraint_constants
@@ -3175,10 +3178,12 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
     ~source ~target ~init_stack ~pending_coinbase_stack_state
     ~next_available_token_before ~next_available_token_after ~snapp_account1
     ~snapp_account2
-    (transaction_in_block : Transaction.t Transaction_protocol_state.t) handler
-    =
+    (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
+    handler =
   match
-    to_preunion (Transaction_protocol_state.transaction transaction_in_block)
+    to_preunion
+      ( Transaction_protocol_state.transaction transaction_in_block
+        :> Transaction.t )
   with
   | `Snapp_command c ->
       generate_snapp_command_witness ?preeval ~constraint_constants
@@ -3248,19 +3253,48 @@ module Make () = struct
                init_stack)
           s }
 
+  let of_snapp_command ~sok_digest ~source ~target ~init_stack:_
+      ~pending_coinbase_stack_state ~next_available_token_before
+      ~next_available_token_after ~snapp_account1 ~snapp_account2 ~state_body t
+      handler =
+    let _handler =
+      Base.Snapp_command.handler ~state_body ~snapp_account1 ~snapp_account2 t
+        handler
+    in
+    let statement : Statement.With_sok.t =
+      { source
+      ; target
+      ; supply_increase= Currency.Amount.zero
+      ; pending_coinbase_stack_state
+      ; fee_excess= Or_error.ok_exn (Snapp_command.fee_excess t)
+      ; next_available_token_before
+      ; next_available_token_after
+      ; sok_digest }
+    in
+    let proof =
+      match command_to_proofs t with
+      | [] | [_] | [_; _] ->
+          failwith "unimplemented"
+    in
+    {statement; proof}
+
   let of_transaction ~sok_digest ~source ~target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
-      ~next_available_token_after ~snapp_account1:_ ~snapp_account2:_
+      ~next_available_token_after ~snapp_account1 ~snapp_account2
       transaction_in_block handler =
     let transaction : Transaction.t =
-      Transaction_protocol_state.transaction transaction_in_block
+      Transaction.forget
+        (Transaction_protocol_state.transaction transaction_in_block)
     in
     let state_body =
       Transaction_protocol_state.block_data transaction_in_block
     in
     match to_preunion transaction with
-    | `Snapp_command _t ->
-        failwith "Unimplemented"
+    | `Snapp_command t ->
+        of_snapp_command ~sok_digest ~source ~target ~init_stack
+          ~pending_coinbase_stack_state ~next_available_token_before
+          ~next_available_token_after ~snapp_account1 ~snapp_account2
+          ~state_body t handler
     | `Transaction t ->
         of_transaction_union sok_digest source target ~init_stack
           ~pending_coinbase_stack_state ~next_available_token_before
@@ -3276,8 +3310,10 @@ module Make () = struct
       ~next_available_token_after ~snapp_account1:None ~snapp_account2:None
       { user_command_in_block with
         transaction=
-          User_command
-            (Transaction_protocol_state.transaction user_command_in_block) }
+          Command
+            (Signed_command
+               (Transaction_protocol_state.transaction user_command_in_block))
+      }
       handler
 
   let of_fee_transfer ~sok_digest ~source ~target ~init_stack
@@ -3395,8 +3431,8 @@ let%test_module "transaction_snark" =
 
     let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt
         fee nonce memo =
-      let payload : User_command.Payload.t =
-        User_command.Payload.create ~fee ~fee_token
+      let payload : Signed_command.Payload.t =
+        Signed_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
           ~nonce ~memo ~valid_until:None
           ~body:
@@ -3407,10 +3443,10 @@ let%test_module "transaction_snark" =
                ; amount= Amount.of_int amt })
       in
       let signature =
-        User_command.sign_payload fee_payer.private_key payload
+        Signed_command.sign_payload fee_payer.private_key payload
       in
-      User_command.check
-        User_command.Poly.Stable.Latest.
+      Signed_command.check
+        Signed_command.Poly.Stable.Latest.
           { payload
           ; signer= Public_key.of_private_key_exn fee_payer.private_key
           ; signature }
@@ -3438,12 +3474,11 @@ let%test_module "transaction_snark" =
 
     let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
 
-    let stack_with_state state_body_hash stack =
-      Pending_coinbase.Stack.(push_state state_body_hash stack)
-
-    let pending_coinbase_stack_target (t : Transaction.t) state_body_hash stack
-        =
-      let stack_with_state = stack_with_state state_body_hash stack in
+    let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
+        stack =
+      let stack_with_state =
+        Pending_coinbase.Stack.(push_state state_body_hash stack)
+      in
       match t with
       | Coinbase c ->
           Pending_coinbase.(Stack.push_coinbase c stack_with_state)
@@ -3456,7 +3491,7 @@ let%test_module "transaction_snark" =
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
     let of_user_command' sok_digest ledger
-        (user_command : User_command.With_valid_signature.t) init_stack
+        (user_command : Signed_command.With_valid_signature.t) init_stack
         pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
@@ -3580,9 +3615,9 @@ let%test_module "transaction_snark" =
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero
-                  (User_command_memo.create_by_digesting_string_exn
+                  (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_digestible_string_length))
+                        ~len:Signed_command_memo.max_digestible_string_length))
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body
@@ -3596,9 +3631,9 @@ let%test_module "transaction_snark" =
                   ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
-                User_command.accounts_accessed
+                Signed_command.accounts_accessed
                   ~next_available_token:next_available_token_before
-                  (User_command.forget_check t1)
+                  (Signed_command.forget_check t1)
               in
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
@@ -3609,8 +3644,8 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
-                pending_coinbase_stack_target (User_command t1) state_body_hash
-                  pending_coinbase_stack
+                pending_coinbase_stack_target (Command (Signed_command t1))
+                  state_body_hash pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Pending_coinbase_stack_state.source= pending_coinbase_stack
@@ -3623,24 +3658,6 @@ let%test_module "transaction_snark" =
                 ~next_available_token_after
                 {transaction= t1; block_data= state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
-
-    let snapp_accounts ledger c =
-      let token_id = Snapp_command.token_id c in
-      let get pk =
-        Option.try_with (fun () ->
-            ( Sparse_ledger.find_index_exn ledger
-                (Account_id.create pk token_id)
-            |> Sparse_ledger.get_exn ledger )
-              .snapp )
-        |> Option.join
-      in
-      match Snapp_command.to_payload c with
-      | Zero_proved p ->
-          (get p.one.body.pk, get p.two.body.pk)
-      | One_proved p ->
-          (get p.one.body.pk, get p.two.body.pk)
-      | Two_proved p ->
-          (get p.one.body.pk, get p.two.body.pk)
 
     let signed_signed ~wallets i j =
       let full_amount = 8_000_000_000 in
@@ -3740,15 +3757,16 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
-                (* TODO: Use pending_coinbase_stack_target *)
-                stack_with_state state_body_hash pending_coinbase_stack
+                pending_coinbase_stack_target (Command (Snapp_command t1))
+                  state_body_hash pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Pending_coinbase_stack_state.source= pending_coinbase_stack
                 ; target= pending_coinbase_stack_target }
               in
               let snapp_account1, snapp_account2 =
-                snapp_accounts sparse_ledger t1
+                Sparse_ledger.snapp_accounts sparse_ledger
+                  (Command (Snapp_command t1))
               in
               check_snapp_command ~constraint_constants ~sok_message
                 ~state_body
@@ -3805,11 +3823,13 @@ let%test_module "transaction_snark" =
           Pending_coinbase.Stack.push_state state_body_hash
             pending_coinbase_stack
         in
-        match (txn : Transaction.t) with
-        | User_command uc ->
-            ( User_command.accounts_accessed ~next_available_token
-                (uc :> User_command.t)
+        match (txn : Transaction.Valid.t) with
+        | Command (Signed_command uc) ->
+            ( Signed_command.accounts_accessed ~next_available_token
+                (uc :> Signed_command.t)
             , pending_coinbase_stack )
+        | Command (Snapp_command _) ->
+            failwith "Snapp_command not yet supported"
         | Fee_transfer ft ->
             (Fee_transfer.receivers ft, pending_coinbase_stack)
         | Coinbase cb ->
@@ -3854,9 +3874,9 @@ let%test_module "transaction_snark" =
           let amount = 8_000_000_000 in
           let txn_fee = 2_000_000_000 in
           let memo =
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
           in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let _, ucs =
@@ -3882,7 +3902,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ledger
-                      (User_command uc) )
+                      (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
@@ -3997,9 +4017,9 @@ let%test_module "transaction_snark" =
                     (Account.identifier account)
                     account ) ;
               let memo =
-                User_command_memo.create_by_digesting_string_exn
+                Signed_command_memo.create_by_digesting_string_exn
                   (Test_util.arbitrary_string
-                     ~len:User_command_memo.max_digestible_string_length)
+                     ~len:Signed_command_memo.max_digestible_string_length)
               in
               let t1 =
                 user_command_with_wallet wallets ~sender:0 ~receiver:1
@@ -4029,9 +4049,9 @@ let%test_module "transaction_snark" =
                           for each command normally, but we know statically
                           that these are payments in this test.
                        *)
-                       User_command.accounts_accessed
+                       Signed_command.accounts_accessed
                          ~next_available_token:next_available_token1
-                         (User_command.forget_check t) )
+                         (Signed_command.forget_check t) )
                      [t1; t2])
               in
               let init_stack1 = Pending_coinbase.Stack.empty in
@@ -4068,7 +4088,7 @@ let%test_module "transaction_snark" =
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
                   ~txn_global_slot:current_global_slot sparse_ledger
-                  (t1 :> User_command.t)
+                  (t1 :> Signed_command.t)
               in
               let pending_coinbase_stack_state2, state_body2 =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
@@ -4119,7 +4139,7 @@ let%test_module "transaction_snark" =
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
                   ~txn_global_slot:current_global_slot sparse_ledger
-                  (t2 :> User_command.t)
+                  (t2 :> Signed_command.t)
               in
               Ledger.apply_user_command ledger ~constraint_constants
                 ~txn_global_slot:current_global_slot t2
@@ -4198,9 +4218,9 @@ let%test_module "transaction_snark" =
         | Some memo ->
             memo
         | None ->
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
       in
       Array.iter accounts ~f:(fun account ->
           Ledger.create_new_account_exn ledger
@@ -4225,17 +4245,20 @@ let%test_module "transaction_snark" =
                  explicitly" )
       in
       let payload =
-        User_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
+        Signed_command.Payload.create ~fee ~fee_payer_pk ~fee_token ~nonce
           ~valid_until ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = User_command.sign signer payload in
+      let user_command = Signed_command.sign signer payload in
       let next_available_token = Ledger.next_available_token ledger in
-      test_transaction ~constraint_constants ledger (User_command user_command) ;
-      let fee_payer = User_command.Payload.fee_payer payload in
-      let source = User_command.Payload.source ~next_available_token payload in
+      test_transaction ~constraint_constants ledger
+        (Command (Signed_command user_command)) ;
+      let fee_payer = Signed_command.Payload.fee_payer payload in
+      let source =
+        Signed_command.Payload.source ~next_available_token payload
+      in
       let receiver =
-        User_command.Payload.receiver ~next_available_token payload
+        Signed_command.Payload.receiver ~next_available_token payload
       in
       let fee_payer_account = get_account fee_payer in
       let source_account = get_account source in
@@ -4610,9 +4633,9 @@ let%test_module "transaction_snark" =
           let amount = 8_000_000_000 in
           let txn_fee = 2_000_000_000 in
           let memo =
-            User_command_memo.create_by_digesting_string_exn
+            Signed_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
-                 ~len:User_command_memo.max_digestible_string_length)
+                 ~len:Signed_command_memo.max_digestible_string_length)
           in
           let balance = Balance.of_int 100_000_000_000_000 in
           let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
@@ -4654,7 +4677,7 @@ let%test_module "transaction_snark" =
               let () =
                 List.iter ucs ~f:(fun uc ->
                     test_transaction ~constraint_constants ~txn_global_slot
-                      ledger (User_command uc) )
+                      ledger (Transaction.Command (Signed_command uc)) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance
@@ -5549,7 +5572,7 @@ let%test_module "transaction_snark" =
                 ~receiver:receivers.(1) ~fee_transfer:None
               |> Or_error.ok_exn )
           in
-          let transactions : Transaction.t list =
+          let transactions : Transaction.Valid.t list =
             [ Fee_transfer ft1
             ; Fee_transfer ft2
             ; Coinbase coinbase_with_ft

@@ -350,8 +350,7 @@ let verify state proof ~key =
 
 module Make (T : sig
   val tag : Transaction_snark.tag
-end) =
-struct
+end) : S = struct
   let proof_level = Genesis_constants.Proof_level.compiled
 
   let constraint_constants = Genesis_constants.Constraint_constants.compiled
