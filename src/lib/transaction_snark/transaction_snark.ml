@@ -756,16 +756,39 @@ module Base = struct
                           || predicate_result )
                       , true )
               in
-              { predicate_failed= false
-              ; source_not_present
-              ; receiver_not_present= false
-              ; amount_insufficient_to_create= false
-              ; token_cannot_create= false
-              ; source_insufficient_balance= false
-              ; source_bad_timing= false
-              ; receiver_exists
-              ; not_token_owner
-              ; token_auth }
+              let ret =
+                { predicate_failed= false
+                ; source_not_present
+                ; receiver_not_present= false
+                ; amount_insufficient_to_create= false
+                ; token_cannot_create= false
+                ; source_insufficient_balance= false
+                ; source_bad_timing= false
+                ; receiver_exists
+                ; not_token_owner
+                ; token_auth }
+              in
+              (* Note: This logic is dependent upon all failures above, so we
+                 have to calculate it separately here. *)
+              if
+                source_not_present
+                || (* If there is a failure *)
+                   List.exists ~f:Fn.id (to_list ret)
+                   (* and the receiver account did not exist *)
+                   && (not receiver_exists)
+                   (* and the source account was the receiver account *)
+                   && Account_id.equal source receiver
+              then
+                (* then the receiver account will not be initialized, and so
+                   the source (=receiver) account will not be present.
+                *)
+                { ret with
+                  source_not_present= true
+                ; not_token_owner= true
+                ; token_auth=
+                    not ((not payload.body.token_locked) || predicate_result)
+                }
+              else ret
           | Mint_tokens ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
