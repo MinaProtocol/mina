@@ -19,8 +19,8 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDom
 
 use oracle::{
     self,
+    poseidon::MarlinSpongeConstants as SC,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
-    poseidon::{MarlinSpongeConstants as SC},
 };
 
 use rand::rngs::StdRng;
@@ -34,20 +34,26 @@ use std::{
     os::raw::c_char,
 };
 
-use marlin_protocol_dlog::index::{
-    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
-};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
     srs::SRS,
 };
-use marlin_protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof};
+use marlin_protocol_dlog::index::{
+    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
+};
+use marlin_protocol_dlog::prover::{
+    ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof,
+};
 
 use algebra::bn_382::g::Affine;
 
 // Fq URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_urs_create(depth: usize, public: usize, size: usize) -> *const SRS<GAffine> {
+pub extern "C" fn zexe_bn382_fq_urs_create(
+    depth: usize,
+    public: usize,
+    size: usize,
+) -> *const SRS<GAffine> {
     Box::into_raw(Box::new(SRS::create(depth, public, size)))
 }
 
@@ -1196,9 +1202,10 @@ pub extern "C" fn zexe_bn382_fq_oracles_create(
     // TODO: Should have no degree bound when we add the correct degree bound method
     let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
-    let (mut sponge, o) = proof.oracles::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
-        index, x_hat_comm, &x_hat,
-    );
+    let (mut sponge, o) = proof
+        .oracles::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
+            index, x_hat_comm, &x_hat,
+        );
     let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
 
     return Box::into_raw(Box::new(FqOracles {
@@ -1330,10 +1337,11 @@ pub extern "C" fn zexe_bn382_fq_proof_create(
     let rng = &mut rand_core::OsRng;
 
     let map = <Affine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
-        &map, &witness, &index, prev, rng,
-    )
-    .unwrap();
+    let proof =
+        DlogProof::create::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
+            &map, &witness, &index, prev, rng,
+        )
+        .unwrap();
 
     return Box::into_raw(Box::new(proof));
 }
@@ -1349,8 +1357,7 @@ pub extern "C" fn zexe_bn382_fq_proof_verify(
 
     DlogProof::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
-        &[proof].to_vec(),
-        &index,
+        &[(index, proof)].to_vec(),
         &mut rand_core::OsRng,
     )
 }
@@ -1364,11 +1371,11 @@ pub extern "C" fn zexe_bn382_fq_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
     let group_map = <Affine as CommitmentCurve>::Map::setup();
+    let v: Vec<_> = proofs.iter().map(|proof| (index, proof.clone())).collect();
 
     DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
-        proofs,
-        index,
+        &v,
         &mut rand_core::OsRng,
     )
 }
@@ -1783,7 +1790,9 @@ pub extern "C" fn zexe_bn382_fq_proof_evaluations_triple_2(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_bn382_fq_proof_evaluations_triple_delete(x: *mut [DlogProofEvaluations<Fq>; 3]) {
+pub extern "C" fn zexe_bn382_fq_proof_evaluations_triple_delete(
+    x: *mut [DlogProofEvaluations<Fq>; 3],
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 

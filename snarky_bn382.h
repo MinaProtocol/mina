@@ -1266,7 +1266,9 @@ void *zexe_tweedle_plonk_fp_verifier_index_o(void *);
 void *zexe_tweedle_plonk_fp_proof_create(
     void *index,
     void *primary_input,
-    void *auxiliary_input);
+    void *auxiliary_input,
+    void *prev_challenges,
+    void *prev_sgs);
 
 bool zexe_tweedle_plonk_fp_proof_verify(void *index, void *proof);
 
@@ -1288,7 +1290,9 @@ void *zexe_tweedle_plonk_fp_proof_make(
     void *sg,
 
     void *evals0,
-    void *evals1);
+    void *evals1,
+    void *prev_challenges,
+    void *prev_sgs);
 
 void *zexe_tweedle_plonk_fp_proof_delete(void *);
 
@@ -1356,135 +1360,72 @@ void *zexe_tweedle_plonk_fp_oracles_gamma(void *);
 void *zexe_tweedle_plonk_fp_oracles_zeta(void *);
 void *zexe_tweedle_plonk_fp_oracles_v(void *);
 void *zexe_tweedle_plonk_fp_oracles_u(void *);
-
+void* zexe_tweedle_plonk_fp_oracles_digest_before_evaluations(void*);
 void zexe_tweedle_plonk_fp_oracles_delete(void *);
 
-// Fp circuit gate vector
-void *zexe_tweedle_plonk_fp_circuit_gate_vector_create(void);
-
-int zexe_tweedle_plonk_fp_circuit_gate_vector_length(void *);
-
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_zero(
+// Fp gate vector
+void *zexe_tweedle_plonk_fp_gate_vector_create(void);
+int zexe_tweedle_plonk_fp_gate_vector_length(void *);
+void zexe_tweedle_plonk_fp_gate_vector_delete(void *);
+void zexe_tweedle_plonk_fp_gate_vector_add(
     void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
+    int gate_type,
+    size_t row,
+    size_t lrow,
+    int lcol,
+    size_t rrow,
+    int rcol,
+    size_t orow,
+    int ocol,
     void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_generic(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_zero(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_poseidon(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_generic(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_add1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_poseidon(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_add2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_add1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_add2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_vbmul1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_vbmul3(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_vbmul2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_vbmul3(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_endomul1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul3(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_endomul2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_push_endomul4(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fp_gate_vector_add_endomul3(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fp_circuit_gate_vector_delete(void *);
+void zexe_tweedle_plonk_fp_gate_vector_add_endomul4(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
 // Fp constraint system
 void *zexe_tweedle_plonk_fp_constraint_system_create(void *, size_t);
@@ -1558,7 +1499,9 @@ void *zexe_tweedle_plonk_fq_verifier_index_o(void *);
 void *zexe_tweedle_plonk_fq_proof_create(
     void *index,
     void *primary_input,
-    void *auxiliary_input);
+    void *auxiliary_input,
+    void *prev_challenges,
+    void *prev_sgs);
 
 bool zexe_tweedle_plonk_fq_proof_verify(void *index, void *proof);
 
@@ -1580,7 +1523,9 @@ void *zexe_tweedle_plonk_fq_proof_make(
     void *sg,
 
     void *evals0,
-    void *evals1);
+    void *evals1,
+    void *prev_challenges,
+    void *prev_sgs);
 
 void *zexe_tweedle_plonk_fq_proof_delete(void *);
 
@@ -1648,135 +1593,72 @@ void *zexe_tweedle_plonk_fq_oracles_gamma(void *);
 void *zexe_tweedle_plonk_fq_oracles_zeta(void *);
 void *zexe_tweedle_plonk_fq_oracles_v(void *);
 void *zexe_tweedle_plonk_fq_oracles_u(void *);
-
+void* zexe_tweedle_plonk_fq_oracles_digest_before_evaluations(void*);
 void zexe_tweedle_plonk_fq_oracles_delete(void *);
 
-// Fq circuit gate vector
-void *zexe_tweedle_plonk_fq_circuit_gate_vector_create(void);
-
-int zexe_tweedle_plonk_fq_circuit_gate_vector_length(void *);
-
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_zero(
+// Fq gate vector
+void *zexe_tweedle_plonk_fq_gate_vector_create(void);
+int zexe_tweedle_plonk_fq_gate_vector_length(void *);
+void zexe_tweedle_plonk_fq_gate_vector_delete(void *);
+void zexe_tweedle_plonk_fq_gate_vector_add(
     void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
+    int gate_type,
+    size_t row,
+    size_t lrow,
+    int lcol,
+    size_t rrow,
+    int rcol,
+    size_t orow,
+    int ocol,
     void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_generic(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_zero(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_poseidon(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_generic(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_add1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_poseidon(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_add2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_add1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_add2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_vbmul1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_vbmul3(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_vbmul2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul1(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_vbmul3(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul2(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_endomul1(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul3(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_endomul2(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_push_endomul4(
-    void *v,
-    size_t l_index,
-    size_t l_permutation,
-    size_t r_index,
-    size_t r_permutation,
-    size_t o_index,
-    size_t o_permutation,
-    void *c);
+void zexe_tweedle_plonk_fq_gate_vector_add_endomul3(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
-void zexe_tweedle_plonk_fq_circuit_gate_vector_delete(void *);
+void zexe_tweedle_plonk_fq_gate_vector_add_endomul4(
+    void *v, size_t row, size_t lrow, int lcol, size_t rrow, int rcol, size_t orow,
+    int ocol, void *c);
 
 // Fq constraint system
 void *zexe_tweedle_plonk_fq_constraint_system_create(void *, size_t);

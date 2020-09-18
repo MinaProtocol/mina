@@ -5,8 +5,8 @@ pub mod bn382_dlog;
 pub mod bn382_pairing;
 pub mod common;
 pub mod tweedledee;
-pub mod tweedledum;
 pub mod tweedledee_plonk;
+pub mod tweedledum;
 pub mod tweedledum_plonk;
 
 use algebra::{
@@ -15,7 +15,10 @@ use algebra::{
 };
 
 use num_bigint::BigUint;
-use oracle::{self, poseidon, poseidon::{Sponge, MarlinSpongeConstants as SC}};
+use oracle::{
+    self, poseidon,
+    poseidon::{MarlinSpongeConstants as SC, Sponge},
+};
 
 // Bigint stubs
 

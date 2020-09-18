@@ -19,8 +19,8 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDom
 
 use oracle::{
     self,
+    poseidon::MarlinSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
-    poseidon::{MarlinSpongeConstants},
 };
 
 use rand::rngs::StdRng;
@@ -34,18 +34,24 @@ use std::{
     os::raw::c_char,
 };
 
-use marlin_protocol_dlog::index::{
-    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
-};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, product, CommitmentCurve, OpeningProof, PolyComm},
     srs::SRS,
 };
-use marlin_protocol_dlog::prover::{ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof};
+use marlin_protocol_dlog::index::{
+    Index as DlogIndex, SRSSpec, SRSValue, VerifierIndex as DlogVerifierIndex,
+};
+use marlin_protocol_dlog::prover::{
+    ProofEvaluations as DlogProofEvaluations, ProverProof as DlogProof,
+};
 
 // Fp URS stubs
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_fp_urs_create(depth: usize, public: usize, size: usize) -> *const SRS<GAffine> {
+pub extern "C" fn zexe_tweedle_fp_urs_create(
+    depth: usize,
+    public: usize,
+    size: usize,
+) -> *const SRS<GAffine> {
     Box::into_raw(Box::new(SRS::create(depth, public, size)))
 }
 
@@ -1342,9 +1348,10 @@ pub extern "C" fn zexe_tweedle_fp_proof_create(
     let rng = &mut rand_core::OsRng;
 
     let map = <GAffine as CommitmentCurve>::Map::setup();
-    let proof = DlogProof::create::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
-        &map, &witness, &index, prev, rng,
-    )
+    let proof = DlogProof::create::<
+        DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>,
+        DefaultFrSponge<Fp, MarlinSpongeConstants>,
+    >(&map, &witness, &index, prev, rng)
     .unwrap();
 
     return Box::into_raw(Box::new(proof));
@@ -1359,10 +1366,12 @@ pub extern "C" fn zexe_tweedle_fp_proof_verify(
     let proof = unsafe { (*proof).clone() };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
-    DlogProof::verify::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
+    DlogProof::verify::<
+        DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>,
+        DefaultFrSponge<Fp, MarlinSpongeConstants>,
+    >(
         &group_map,
-        &[proof].to_vec(),
-        &index,
+        &[(index, proof)].to_vec(),
         &mut rand_core::OsRng,
     )
 }
@@ -1376,13 +1385,12 @@ pub extern "C" fn zexe_tweedle_fp_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
+    let v: Vec<_> = proofs.iter().map(|proof| (index, proof.clone())).collect();
 
-    DlogProof::<GAffine>::verify::<DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>, DefaultFrSponge<Fp, MarlinSpongeConstants>>(
-        &group_map,
-        proofs,
-        index,
-        &mut rand_core::OsRng,
-    )
+    DlogProof::<GAffine>::verify::<
+        DefaultFqSponge<TweedledeeParameters, MarlinSpongeConstants>,
+        DefaultFrSponge<Fp, MarlinSpongeConstants>,
+    >(&group_map, &v, &mut rand_core::OsRng)
 }
 
 #[no_mangle]
@@ -1795,7 +1803,9 @@ pub extern "C" fn zexe_tweedle_fp_proof_evaluations_triple_2(
 }
 
 #[no_mangle]
-pub extern "C" fn zexe_tweedle_fp_proof_evaluations_triple_delete(x: *mut [DlogProofEvaluations<Fp>; 3]) {
+pub extern "C" fn zexe_tweedle_fp_proof_evaluations_triple_delete(
+    x: *mut [DlogProofEvaluations<Fp>; 3],
+) {
     let _box = unsafe { Box::from_raw(x) };
 }
 

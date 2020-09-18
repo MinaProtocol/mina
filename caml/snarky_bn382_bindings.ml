@@ -488,7 +488,7 @@ end
 module Plonk_index
     (F : Cstubs_applicative.Foreign_applicative)
     (P : Prefix)
-    (Constraint_system : Type)
+    (Plonk_gate_vector : Type)
     (PlolyComm : Type)
     (URS : Type) =
 struct
@@ -527,7 +527,7 @@ struct
   let create =
     let%map create =
       foreign (prefix "create")
-        (Constraint_system.typ @-> size_t @-> URS.typ @-> returning typ)
+        (Plonk_gate_vector.typ @-> size_t @-> URS.typ @-> returning typ)
     and add_finalizer = add_finalizer in
     fun cs sz urs -> add_finalizer (create cs sz urs)
 
@@ -1378,7 +1378,6 @@ module Dlog_plonk_proof
     (ScalarFieldVector : Type_with_finalizer
                          with type 'a result := 'a F.result
                           and type 'a return := 'a F.return)
-    (FieldVectorPair : Type)
     (OpeningProof : Type_with_finalizer
                     with type 'a result := 'a F.result
                      and type 'a return := 'a F.return)
@@ -1440,21 +1439,21 @@ struct
       and add_finalizer = ScalarFieldVector.add_finalizer in
       fun t -> add_finalizer (f t)
 
-    let sigma1 = f "sigma1"
+    let sigma1_eval = f "sigma1"
 
-    let sigma2 = f "sigma2"
+    let sigma2_eval = f "sigma2"
 
-    let l = f "l"
+    let l_eval = f "l"
 
-    let r = f "r"
+    let r_eval = f "r"
 
-    let o = f "o"
+    let o_eval = f "o"
 
-    let z = f "z"
+    let z_eval = f "z"
 
-    let t = f "t"
+    let t_eval = f "t"
 
-    let f = f "f"
+    let f_eval = f "f"
 
     module Pair =
       Pair
@@ -1484,22 +1483,25 @@ struct
         @-> PolyComm.typ @-> PolyComm.typ @-> PolyComm.typ
         @-> AffineCurve.Pair.Vector.typ @-> ScalarField.typ @-> ScalarField.typ
         @-> AffineCurve.typ @-> AffineCurve.typ @-> Evaluations.typ
-        @-> Evaluations.typ @-> returning typ )
+        @-> Evaluations.typ @-> ScalarFieldVector.typ
+        @-> AffineCurve.Vector.typ @-> returning typ )
     and add_finalizer = add_finalizer in
     fun ~primary_input ~l_comm ~r_comm ~o_comm ~z_comm ~t_comm ~lr ~z1 ~z2
-        ~delta ~sg ~evals0 ~evals1 ->
+        ~delta ~sg ~evals0 ~evals1 ~prev_challenges ~prev_sgs ->
       add_finalizer
         (make primary_input l_comm r_comm o_comm z_comm t_comm lr z1 z2 delta
-           sg evals0 evals1)
+           sg evals0 evals1 prev_challenges prev_sgs)
 
   let create =
     let%map create =
       foreign (prefix "create")
         ( Index.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
-        @-> returning typ )
+        @-> ScalarFieldVector.typ @-> AffineCurve.Vector.typ @-> returning typ
+        )
     and add_finalizer = add_finalizer in
-    fun index primary_input auxiliary_input ->
-      add_finalizer (create index primary_input auxiliary_input)
+    fun index primary_input auxiliary_input prev_challenges prev_sgs ->
+      add_finalizer
+        (create index primary_input auxiliary_input prev_challenges prev_sgs)
 
   let verify =
     foreign (prefix "verify") (VerifierIndex.typ @-> typ @-> returning bool)
@@ -1703,8 +1705,7 @@ module Dlog_plonk_oracles
            and type 'a return := 'a F.return
     end)
     (VerifierIndex : Type)
-    (Proof : Type)
-    (FieldVectorTriple : Type) =
+    (Proof : Type) =
 struct
   open F
   open F.Let_syntax
@@ -1742,6 +1743,8 @@ struct
     let%map element = foreign (prefix name) (typ @-> returning Field.typ)
     and add_finalizer = Field.add_finalizer in
     fun t -> add_finalizer (element t)
+
+  let digest_before_evaluations = element "digest_before_evaluations"
 
   let opening_prechallenges =
     let%map opening_prechallenges =
@@ -2027,7 +2030,7 @@ struct
   open F
   open F.Let_syntax
 
-  let prefix = with_prefix (P.prefix "circuit_gate_vector")
+  let prefix = with_prefix (P.prefix "gate_vector")
 
   include (
     struct
@@ -2054,77 +2057,48 @@ struct
 
   let length = foreign (prefix "length") (typ @-> returning int)
 
-  let push_gate gate_name =
-    let%map push_gate =
+  let add_gate gate_name =
+    let%map add_gate =
       foreign
-        (prefix (Printf.sprintf "push_%s" gate_name))
-        ( typ @-> size_t @-> size_t @-> size_t @-> size_t @-> size_t @-> size_t
-        @-> Field_vector.typ @-> returning void )
+        (prefix (Printf.sprintf "add_%s" gate_name))
+        ( typ @-> size_t @-> size_t @-> int @-> size_t @-> int @-> size_t
+        @-> int @-> Field_vector.typ @-> returning void )
     in
-    fun t ~l_index ~l_permutation ~r_index ~r_permutation ~o_index
-        ~o_permutation v ->
-      push_gate t l_index l_permutation r_index r_permutation o_index
-        o_permutation v
+    fun t ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol v ->
+      add_gate t row lrow lcol rrow rcol orow ocol v
 
-  let push_zero = push_gate "zero"
+  let add_zero = add_gate "zero"
 
-  let push_generic = push_gate "generic"
+  let add_generic = add_gate "generic"
 
-  let push_poseidon = push_gate "poseidon"
+  let add_poseidon = add_gate "poseidon"
 
-  let push_add1 = push_gate "add1"
+  let add_add1 = add_gate "add1"
 
-  let push_add2 = push_gate "add2"
+  let add_add2 = add_gate "add2"
 
-  let push_vbmul1 = push_gate "vbmul1"
+  let add_vbmul1 = add_gate "vbmul1"
 
-  let push_vbmul2 = push_gate "vbmul2"
+  let add_vbmul2 = add_gate "vbmul2"
 
-  let push_vbmul3 = push_gate "vbmul3"
+  let add_vbmul3 = add_gate "vbmul3"
 
-  let push_endomul1 = push_gate "endomul1"
+  let add_endomul1 = add_gate "endomul1"
 
-  let push_endomul2 = push_gate "endomul2"
+  let add_endomul2 = add_gate "endomul2"
 
-  let push_endomul3 = push_gate "endomul3"
+  let add_endomul3 = add_gate "endomul3"
 
-  let push_endomul4 = push_gate "endomul4"
-end
+  let add_endomul4 = add_gate "endomul4"
 
-module Plonk_constraint_system
-    (F : Cstubs_applicative.Foreign_applicative)
-    (P : Prefix)
-    (Plonk_gate_vector : Type) =
-struct
-  open F
-  open F.Let_syntax
-
-  include (
-    struct
-        type t = unit ptr
-
-        let typ = ptr void
-      end :
-      Type )
-
-  let prefix = with_prefix (P.prefix "constraint_system")
-
-  let delete = foreign (prefix "delete") (typ @-> returning void)
-
-  let add_finalizer =
-    F.map delete ~f:(fun delete x ->
-        Caml.Gc.finalise (bind_return ~f:delete) x ;
-        x )
-
-  (* Stub out delete to make sure we don't attempt to double-free. *)
-  let delete : t -> unit = ignore
-
-  let create =
-    let%map create =
-      foreign (prefix "create")
-        (Plonk_gate_vector.typ @-> size_t @-> returning typ)
-    and add_finalizer = add_finalizer in
-    fun v public -> add_finalizer (create v public)
+  let add_raw =
+    let%map add_gate =
+      foreign (prefix "add")
+        ( typ @-> int @-> size_t @-> size_t @-> int @-> size_t @-> int
+        @-> size_t @-> int @-> Field_vector.typ @-> returning void )
+    in
+    fun t ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol v ->
+      add_gate t gate_enum row lrow lcol rrow rcol orow ocol v
 end
 
 module Full (F : Cstubs_applicative.Foreign_applicative) = struct
@@ -2487,7 +2461,6 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
     module Field_poly_comm = Common.Field_poly_comm
     module Field_urs = Common.Field_urs
     module Gate_vector = Plonk_gate_vector (F) (P) (Field.Vector)
-    module Constraint_system = Plonk_constraint_system (F) (P) (Gate_vector)
 
     module Field_index =
       Plonk_index
@@ -2495,7 +2468,7 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (struct
           let prefix = with_prefix (P.prefix "index")
         end)
-        (Constraint_system)
+        (Gate_vector)
         (Field_poly_comm)
         (Field_urs)
 
@@ -2521,7 +2494,6 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field_index)
         (Field_verifier_index)
         (Field.Vector)
-        (Field.Vector.Triple)
         (Field_opening_proof)
         (Field_poly_comm)
 
@@ -2534,7 +2506,6 @@ module Full (F : Cstubs_applicative.Foreign_applicative) = struct
         (Field)
         (Field_verifier_index)
         (Field_proof)
-        (Field.Vector.Triple)
   end
 
   module Tweedle = struct

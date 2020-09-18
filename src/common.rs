@@ -4,16 +4,16 @@ use algebra::{
     FromBytes, One, ToBytes, UniformRand, VariableBaseMSM, Zero,
 };
 
-use marlin_protocol_pairing::index::MatrixValues;
 use commitment_dlog::{
     commitment::{b_poly_coefficients, CommitmentCurve, PolyComm},
     srs::SRS,
 };
-use marlin_circuits::domains::EvaluationDomains;
 use ff_fft::{
     DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
     Radix2EvaluationDomain as Domain,
 };
+use marlin_circuits::domains::EvaluationDomains;
+use marlin_protocol_pairing::index::MatrixValues;
 use rayon::prelude::*;
 use sprs::{CsMat, CsVecView, CSR};
 use std::io::{Read, Result as IoResult, Write};
@@ -174,7 +174,7 @@ pub fn write_option<A: ToBytes, W: Write>(a: &Option<A>, mut w: W) -> IoResult<(
         Some(a) => {
             u8::write(&1, &mut w)?;
             A::write(a, &mut w)
-        },
+        }
     }
 }
 
