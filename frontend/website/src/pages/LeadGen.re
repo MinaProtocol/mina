@@ -242,6 +242,13 @@ module SignupWidget = {
       ]);
   };
 
+  type field = {
+    name: string,
+    value: string,
+  };
+
+  type submission = {fields: array(field)};
+
   [@bs.new]
   external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
     "URLSearchParams";
@@ -251,16 +258,26 @@ module SignupWidget = {
     let (successState, showSuccess) = React.useState(() => false);
     let (email, setEmail) = React.useState(() => "");
 
+    let field = Js.Dict.empty();
+    Js.Dict.set(field, "name", Js.Json.string("email"));
+    Js.Dict.set(field, "value", Js.Json.string(email));
+    let payload = Js.Dict.empty();
+    Js.Dict.set(
+      payload,
+      "fields",
+      Js.Json.array([|Js.Json.object_(field)|]),
+    );
+
     <form
       className=Styles.container
       onSubmit={e => {
         ReactEvent.Form.preventDefault(e);
         ReFetch.fetch(
-          "",
+          "https://api.hsforms.com/submissions/v3/integration/submit/8298093/a083a12f-0d40-48ee-b3bb-c2014a36661c",
           ~method_=Post,
           ~body=
-            Fetch.BodyInit.makeWithUrlSearchParams(
-              urlSearchParams({"email": email}),
+            Fetch.BodyInit.make(
+              Js.Json.stringify(Js.Json.object_(payload)),
             ),
           ~mode=NoCORS,
         )
