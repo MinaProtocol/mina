@@ -40,7 +40,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(84.))],
+        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(89.))],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -79,7 +79,10 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [gridTemplateColumns([`repeat((`num(6), `rem(11.)))])],
+        [
+          gridTemplateColumns([`repeat((`num(6), `rem(11.)))]),
+          marginBottom(`rem(7.)),
+        ],
       ),
     ]);
   let advisors =
@@ -183,6 +186,7 @@ let make = () => {
             src="/static/img/headshots/Headshot.jpg"
           />
         </div>
+      <Spacer height=2. />
       <Rule color=Theme.Colors.black />
     </div>
   </div>;

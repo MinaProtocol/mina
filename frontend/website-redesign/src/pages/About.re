@@ -7,5 +7,6 @@ let make = () => {
     <SecuredBySection />
     <Contributors />
     <Investors />
+    <WorkWithMina />
   </Page>;
 };
