@@ -31,6 +31,7 @@ module Styles = {
       flexDirection(`column),
       marginTop(`rem(3.0)),
       media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+      media(Theme.MediaQuery.desktop, [justifyContent(`spaceBetween)]),
     ]);
 };
 
@@ -42,6 +43,10 @@ module FeaturedContent = {
         media(
           Theme.MediaQuery.tablet,
           [width(`rem(21.)), marginRight(`rem(1.))],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [width(`rem(30.8)), marginRight(`rem(7.))],
         ),
       ]);
     let label = merge([Theme.Type.metadata, style([marginTop(`rem(1.))])]);
@@ -108,9 +113,14 @@ module Content = {
   };
 };
 module ContentColumn = {
+  module Styles = {
+    open Css;
+    let container =
+      style([media(Theme.MediaQuery.desktop, [width(`rem(30.8))])]);
+  };
   [@react.component]
   let make = () => {
-    <div>
+    <div className=Styles.container>
       <Content title="Protocol Infrastructure Engineer" url="/" />
       <Content title="Protocol Infrastructure Engineer" url="/" />
       <Content title="Protocol Infrastructure Engineer" url="/" />
