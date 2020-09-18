@@ -15,7 +15,7 @@ module Styles = {
       style([
         position(`relative),
         display(`flex),
-        justifyContent(`center),
+        justifyContent(`spaceBetween),
         alignItems(`center),
         width(buttonWidth),
         height(buttonHeight),

@@ -81,6 +81,7 @@ let make = (~kind, ~size=1.5) => {
      | Forums =>
        <path
          d="M6.34629 22.0893L10.1433 18.3338H15.7429C20.3013 18.3338 24 14.6755 24 10.1669C24 5.65835 20.3062 2 15.7429 2H8.25706C3.69382 2 0 5.65835 0 10.1669C0 13.7767 2.36758 16.8326 5.64879 17.9112V21.8027C5.64879 22.1671 6.08596 22.3468 6.34629 22.0893ZM15.3942 9.15638C15.9591 9.15638 16.4159 9.6082 16.4159 10.1669C16.4159 10.7256 15.9591 11.1775 15.3942 11.1775C14.8293 11.1775 14.3725 10.7256 14.3725 10.1669C14.3725 9.6082 14.8293 9.15638 15.3942 9.15638ZM12 9.15638C12.5649 9.15638 13.0217 9.6082 13.0217 10.1669C13.0217 10.7256 12.5649 11.1775 12 11.1775C11.4351 11.1775 10.9783 10.7256 10.9783 10.1669C10.9783 9.6082 11.4351 9.15638 12 9.15638ZM8.60581 9.15638C9.17069 9.15638 9.62751 9.6082 9.62751 10.1669C9.62751 10.7256 9.17069 11.1775 8.60581 11.1775C8.04093 11.1775 7.58412 10.7256 7.58412 10.1669C7.58412 9.6082 8.04093 9.15638 8.60581 9.15638Z"
+         fill="currentColor"
        />
      | Github =>
        <path
@@ -97,10 +98,12 @@ let make = (~kind, ~size=1.5) => {
      | Email =>
        <path
          d="M1.56785 6.6355C2.17204 6.93961 10.5416 11.1553 10.8536 11.312C11.1656 11.4687 11.5692 11.543 11.9753 11.543C12.3814 11.543 12.785 11.4687 13.097 11.312C13.409 11.1553 21.7785 6.93961 22.3827 6.6355C22.9881 6.33023 23.5601 5.14282 22.4496 5.14282H1.50223C0.391656 5.14282 0.963656 6.33023 1.56785 6.6355ZM22.6637 9.19255C21.9766 9.528 13.5179 13.6601 13.097 13.8668C12.676 14.0734 12.3814 14.0977 11.9753 14.0977C11.5692 14.0977 11.2745 14.0734 10.8536 13.8668C10.4326 13.6601 2.02223 9.52684 1.33508 9.19139C0.852227 8.95461 0.85718 9.23202 0.85718 9.44559C0.85718 9.65916 0.85718 17.9107 0.85718 17.9107C0.85718 18.3982 1.55794 19.0714 2.09527 19.0714H21.9048C22.4421 19.0714 23.1429 18.3982 23.1429 17.9107C23.1429 17.9107 23.1429 9.66032 23.1429 9.44675C23.1429 9.23318 23.1478 8.95577 22.6637 9.19255Z"
+         fill="currentColor"
        />
      | Location =>
        <path
          d="M11.7958 0C7.41843 0 3.85718 3.56125 3.85718 7.93857C3.85718 9.7016 4.983 12.5759 7.29878 16.7259C8.93687 19.6611 10.548 22.1085 10.6157 22.2112L11.7958 24L12.9758 22.2113C13.0436 22.1085 14.6548 19.6612 16.2927 16.726C18.6086 12.5759 19.7343 9.70165 19.7343 7.93862C19.7344 3.56125 16.1731 0 11.7958 0ZM11.7958 12C9.52316 12 7.68076 10.1576 7.68076 7.88497C7.68076 5.61229 9.52316 3.76994 11.7958 3.76994C14.0684 3.76994 15.9108 5.61229 15.9108 7.88497C15.9108 10.1576 14.0684 12 11.7958 12Z"
+         fill="currentColor"
        />
      | ArrowUpMedium =>
        <>
@@ -146,6 +149,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="16"
            transform="rotate(90 20 11)"
+           fill="currentColor"
          />
          <rect
            x="19"
@@ -153,6 +157,15 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(90 19 12)"
+           fill="currentColor"
+         />
+         <rect
+           x="18"
+           y="13"
+           width="1"
+           height="1"
+           transform="rotate(90 18 13)"
+           fill="currentColor"
          />
          <rect
            x="17"
@@ -160,6 +173,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(90 17 14)"
+           fill="currentColor"
          />
          <rect
            x="16"
@@ -167,6 +181,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(90 16 15)"
+           fill="currentColor"
          />
          <rect
            x="15"
@@ -174,6 +189,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(90 15 16)"
+           fill="currentColor"
          />
          <rect x="15" y="6" width="1" height="1" transform="rotate(90 15 6)" />
          <rect x="16" y="7" width="1" height="1" transform="rotate(90 16 7)" />
@@ -185,6 +201,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(90 19 10)"
+           fill="currentColor"
          />
        </>
      | ArrowRightSmall =>
@@ -199,39 +216,39 @@ let make = (~kind, ~size=1.5) => {
        </>
      | ChevronDownLarge =>
        <>
-         <rect x="3" y="8" width="1" height="1" />
-         <rect x="4" y="9" width="1" height="1" />
-         <rect x="5" y="10" width="1" height="1" />
-         <rect x="6" y="11" width="1" height="1" />
-         <rect x="7" y="12" width="1" height="1" />
-         <rect x="8" y="13" width="1" height="1" />
-         <rect x="9" y="14" width="1" height="1" />
-         <rect x="10" y="15" width="1" height="1" />
-         <rect x="11" y="16" width="1" height="1" />
-         <rect x="12" y="17" width="1" height="1" />
-         <rect x="13" y="16" width="1" height="1" />
-         <rect x="14" y="15" width="1" height="1" />
-         <rect x="15" y="14" width="1" height="1" />
-         <rect x="16" y="13" width="1" height="1" />
-         <rect x="17" y="12" width="1" height="1" />
-         <rect x="18" y="11" width="1" height="1" />
-         <rect x="19" y="10" width="1" height="1" />
-         <rect x="20" y="9" width="1" height="1" />
-         <rect x="21" y="8" width="1" height="1" />
+         <rect x="3" y="8" width="1" height="1" fill="currentColor" />
+         <rect x="4" y="9" width="1" height="1" fill="currentColor" />
+         <rect x="5" y="10" width="1" height="1" fill="currentColor" />
+         <rect x="6" y="11" width="1" height="1" fill="currentColor" />
+         <rect x="7" y="12" width="1" height="1" fill="currentColor" />
+         <rect x="8" y="13" width="1" height="1" fill="currentColor" />
+         <rect x="9" y="14" width="1" height="1" fill="currentColor" />
+         <rect x="10" y="15" width="1" height="1" fill="currentColor" />
+         <rect x="11" y="16" width="1" height="1" fill="currentColor" />
+         <rect x="12" y="17" width="1" height="1" fill="currentColor" />
+         <rect x="13" y="16" width="1" height="1" fill="currentColor" />
+         <rect x="14" y="15" width="1" height="1" fill="currentColor" />
+         <rect x="15" y="14" width="1" height="1" fill="currentColor" />
+         <rect x="16" y="13" width="1" height="1" fill="currentColor" />
+         <rect x="17" y="12" width="1" height="1" fill="currentColor" />
+         <rect x="18" y="11" width="1" height="1" fill="currentColor" />
+         <rect x="19" y="10" width="1" height="1" fill="currentColor" />
+         <rect x="20" y="9" width="1" height="1" fill="currentColor" />
+         <rect x="21" y="8" width="1" height="1" fill="currentColor" />
        </>
      | ChevronDown =>
        <>
-         <rect x="14.5" y="11" width="1" height="1" />
-         <rect x="13.5" y="12" width="1" height="1" />
-         <rect x="15.5" y="10" width="1" height="1" />
-         <rect x="8.5" y="11" width="1" height="1" />
-         <rect x="7.5" y="10" width="1" height="1" />
-         <rect x="6.5" y="9" width="1" height="1" />
-         <rect x="16.5" y="9" width="1" height="1" />
-         <rect x="9.5" y="12" width="1" height="1" />
-         <rect x="10.5" y="13" width="1" height="1" />
-         <rect x="12.5" y="13" width="1" height="1" />
-         <rect x="11.5" y="14" width="1" height="1" />
+         <rect x="14.5" y="11" width="1" height="1" fill="currentColor" />
+         <rect x="13.5" y="12" width="1" height="1" fill="currentColor" />
+         <rect x="15.5" y="10" width="1" height="1" fill="currentColor" />
+         <rect x="8.5" y="11" width="1" height="1" fill="currentColor" />
+         <rect x="7.5" y="10" width="1" height="1" fill="currentColor" />
+         <rect x="6.5" y="9" width="1" height="1" fill="currentColor" />
+         <rect x="16.5" y="9" width="1" height="1" fill="currentColor" />
+         <rect x="9.5" y="12" width="1" height="1" fill="currentColor" />
+         <rect x="10.5" y="13" width="1" height="1" fill="currentColor" />
+         <rect x="12.5" y="13" width="1" height="1" fill="currentColor" />
+         <rect x="11.5" y="14" width="1" height="1" fill="currentColor" />
        </>
      | ChevronUp =>
        <>
@@ -241,6 +258,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 9.5 13)"
+           fill="currentColor"
          />
          <rect
            x="10.5"
@@ -248,6 +266,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 10.5 12)"
+           fill="currentColor"
          />
          <rect
            x="8.5"
@@ -255,6 +274,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 8.5 14)"
+           fill="currentColor"
          />
          <rect
            x="15.5"
@@ -262,6 +282,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 15.5 13)"
+           fill="currentColor"
          />
          <rect
            x="16.5"
@@ -269,6 +290,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 16.5 14)"
+           fill="currentColor"
          />
          <rect
            x="17.5"
@@ -276,6 +298,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 17.5 15)"
+           fill="currentColor"
          />
          <rect
            x="7.5"
@@ -283,6 +306,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 7.5 15)"
+           fill="currentColor"
          />
          <rect
            x="14.5"
@@ -290,6 +314,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 14.5 12)"
+           fill="currentColor"
          />
          <rect
            x="13.5"
@@ -297,6 +322,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 13.5 11)"
+           fill="currentColor"
          />
          <rect
            x="11.5"
@@ -304,6 +330,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 11.5 11)"
+           fill="currentColor"
          />
          <rect
            x="12.5"
@@ -311,6 +338,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(180 12.5 10)"
+           fill="currentColor"
          />
        </>
      | ChevronRight =>
@@ -321,6 +349,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 11 9.5)"
+           fill="currentColor"
          />
          <rect
            x="12"
@@ -328,6 +357,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 12 10.5)"
+           fill="currentColor"
          />
          <rect
            x="10"
@@ -335,6 +365,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 10 8.5)"
+           fill="currentColor"
          />
          <rect
            x="11"
@@ -342,6 +373,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 11 15.5)"
+           fill="currentColor"
          />
          <rect
            x="10"
@@ -349,6 +381,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 10 16.5)"
+           fill="currentColor"
          />
          <rect
            x="9"
@@ -356,6 +389,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 9 17.5)"
+           fill="currentColor"
          />
          <rect
            x="9"
@@ -363,6 +397,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 9 7.5)"
+           fill="currentColor"
          />
          <rect
            x="12"
@@ -370,6 +405,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 12 14.5)"
+           fill="currentColor"
          />
          <rect
            x="13"
@@ -377,6 +413,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 13 13.5)"
+           fill="currentColor"
          />
          <rect
            x="13"
@@ -384,6 +421,7 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 13 11.5)"
+           fill="currentColor"
          />
          <rect
            x="14"
@@ -391,48 +429,51 @@ let make = (~kind, ~size=1.5) => {
            width="1"
            height="1"
            transform="rotate(-90 14 12.5)"
+           fill="currentColor"
          />
        </>
      | Info =>
        <>
          <circle cx="12" cy="12" r="11.5" stroke="#2D2D2D" />
-         <rect x="10.5" y="10.5" width="3" height="7.5" />
-         <rect x="10.5" y="6" width="3" height="3" />
+         <rect x="10.5" y="10.5" width="3" height="7.5" fill="currentColor" />
+         <rect x="10.5" y="6" width="3" height="3" fill="currentColor" />
        </>
      | Plus =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M12.5 4.5H11.5V11.5H4.5V12.5H11.5V19.5H12.5V12.5H19.5V11.5H12.5V4.5Z"
+         fill="currentColor"
        />
      | ExternalLink =>
        <path
          fillRule="evenodd"
          clipRule="evenodd"
          d="M17 7H16H15H14H13V8H14H15V9H14V10H13V11H12V12H11V13H10V14H11V13H12V12H13V11H14V10H15V9H16V10V11H17V10V9V8V7ZM7 9H8H11V10H8V16H14V13H15V16V17H14H8H7V16V10V9Z"
+         fill="currentColor"
        />
      | BulletPoint => <rect x="9" y="9" width="6" height="6" rx="3" />
      | ArrowRightLarge =>
        <>
-         <rect y="11" width="24" height="1" />
-         <rect x="22" y="12" width="1" height="1" />
-         <rect x="22" y="10" width="1" height="1" />
-         <rect x="21" y="9" width="1" height="1" />
-         <rect x="20" y="8" width="1" height="1" />
-         <rect x="19" y="7" width="1" height="1" />
-         <rect x="18" y="6" width="1" height="1" />
-         <rect x="17" y="5" width="1" height="1" />
-         <rect x="16" y="4" width="1" height="1" />
-         <rect x="15" y="3" width="1" height="1" />
-         <rect x="14" y="2" width="1" height="1" />
-         <rect x="21" y="13" width="1" height="1" />
-         <rect x="20" y="14" width="1" height="1" />
-         <rect x="19" y="15" width="1" height="1" />
-         <rect x="18" y="16" width="1" height="1" />
-         <rect x="17" y="17" width="1" height="1" />
-         <rect x="16" y="18" width="1" height="1" />
-         <rect x="15" y="19" width="1" height="1" />
-         <rect x="14" y="20" width="1" height="1" />
+         <rect y="11" width="24" height="1" fill="currentColor" />
+         <rect x="22" y="12" width="1" height="1" fill="currentColor" />
+         <rect x="22" y="10" width="1" height="1" fill="currentColor" />
+         <rect x="21" y="9" width="1" height="1" fill="currentColor" />
+         <rect x="20" y="8" width="1" height="1" fill="currentColor" />
+         <rect x="19" y="7" width="1" height="1" fill="currentColor" />
+         <rect x="18" y="6" width="1" height="1" fill="currentColor" />
+         <rect x="17" y="5" width="1" height="1" fill="currentColor" />
+         <rect x="16" y="4" width="1" height="1" fill="currentColor" />
+         <rect x="15" y="3" width="1" height="1" fill="currentColor" />
+         <rect x="14" y="2" width="1" height="1" fill="currentColor" />
+         <rect x="21" y="13" width="1" height="1" fill="currentColor" />
+         <rect x="20" y="14" width="1" height="1" fill="currentColor" />
+         <rect x="19" y="15" width="1" height="1" fill="currentColor" />
+         <rect x="18" y="16" width="1" height="1" fill="currentColor" />
+         <rect x="17" y="17" width="1" height="1" fill="currentColor" />
+         <rect x="16" y="18" width="1" height="1" fill="currentColor" />
+         <rect x="15" y="19" width="1" height="1" fill="currentColor" />
+         <rect x="14" y="20" width="1" height="1" fill="currentColor" />
        </>
      | Copy =>
        <>
@@ -538,6 +579,14 @@ let make = (~kind, ~size=1.5) => {
            <ellipse cx="1.8" cy="6.74116" rx="1.8" ry="1.8" />
            <path
              d="M11.4 1.8C11.4 2.79411 10.5941 3.6 9.59999 3.6C8.60588 3.6 7.79999 2.79411 7.79999 1.8C7.79999 0.805887 8.60588 0 9.59999 0C10.5941 0 11.4 0.805887 11.4 1.8Z"
+             fill="currentColor"
+           />
+           <ellipse
+             cx="13.8"
+             cy="22.2"
+             rx="1.8"
+             ry="1.8"
+             fill="currentColor"
            />
            <ellipse cx="13.8" cy="22.2" rx="1.8" ry="1.8" />
            <ellipse cx="3.00001" cy="18.6" rx="1.8" ry="1.8" />
@@ -561,6 +610,7 @@ let make = (~kind, ~size=1.5) => {
          />
          <path
            d="M12 18.0136C12.1916 18.0246 12.3798 17.959 12.5231 17.8314C12.6664 17.7037 12.7532 17.5243 12.7643 17.3327L12.8842 16.421C12.3024 16.5558 11.6975 16.5558 11.1158 16.421L11.2317 17.3347C11.2461 17.5256 11.3344 17.7034 11.4779 17.8302C11.6214 17.957 11.8087 18.0228 12 18.0136ZM17.1834 17.8171H18.6119V9.66269C18.6119 8.54957 18.0971 7.80192 17.1834 7.51995V17.8171ZM5.38806 17.8171H6.81655V7.51504C5.90876 7.79701 5.38806 8.54466 5.38806 9.65778V17.8171ZM12.8842 16.421C13.8146 16.1882 14.4296 15.524 14.5789 14.3578L15.4759 7.43055C14.4424 7.67715 13.8775 8.46311 13.7114 9.7403L12.8842 16.421ZM11.1158 16.421L10.2895 9.7403C10.1225 8.46311 9.55761 7.67715 8.52799 7.43055L9.42497 14.3578C9.57431 15.5211 10.1726 16.1852 11.1197 16.421H11.1158ZM17.1834 7.51701V6.86859C17.1834 6.30367 16.8514 5.98438 16.4024 5.98438C15.9534 5.98438 15.638 6.25062 15.5555 6.83125L15.472 7.42957C16.0408 7.31775 16.6282 7.34641 17.1834 7.51308V7.51701ZM6.81655 7.51308C7.13864 7.40939 7.47541 7.35862 7.81375 7.36276C8.05359 7.35778 8.29323 7.3802 8.52799 7.42957L8.44547 6.83125C8.36196 6.25062 8.04659 5.98438 7.59761 5.98438C7.14862 5.98438 6.81655 6.29974 6.81655 6.86859V7.51308Z"
+           fill="currentColor"
          />
        </>
      | Testnet =>
@@ -619,10 +669,12 @@ let make = (~kind, ~size=1.5) => {
      | CoreProtocol =>
        <path
          d="M12 20.1614C12.2601 20.1763 12.5154 20.0874 12.7099 19.9141C12.9045 19.7409 13.0222 19.4974 13.0373 19.2374L13.2 18.0001C12.4105 18.1831 11.5895 18.1831 10.8 18.0001L10.9573 19.2401C10.9768 19.4992 11.0967 19.7405 11.2915 19.9126C11.4862 20.0847 11.7404 20.1739 12 20.1614ZM19.0347 19.8947H20.9733V8.82806C20.9733 7.31739 20.2747 6.30273 19.0347 5.92006V19.8947ZM3.02667 19.8947H4.96534V5.91339C3.73334 6.29606 3.02667 7.31073 3.02667 8.82139V19.8947ZM13.2 18.0001C14.4627 17.6841 15.2973 16.7827 15.5 15.2001L16.7173 5.79873C15.3147 6.13339 14.548 7.20006 14.3227 8.93339L13.2 18.0001ZM10.8 18.0001L9.67867 8.93339C9.45201 7.20006 8.68534 6.13339 7.28801 5.79873L8.50534 15.2001C8.70801 16.7787 9.52001 17.6801 10.8053 18.0001H10.8ZM19.0347 5.91606V5.03606C19.0347 4.26939 18.584 3.83606 17.9747 3.83606C17.3653 3.83606 16.9373 4.19739 16.8253 4.98539L16.712 5.79739C17.4839 5.64564 18.2812 5.68454 19.0347 5.91073V5.91606ZM4.96534 5.91073C5.40245 5.77 5.8595 5.70111 6.31867 5.70673C6.64418 5.69997 6.9694 5.73039 7.28801 5.79739L7.17601 4.98539C7.06267 4.19739 6.63467 3.83606 6.02534 3.83606C5.41601 3.83606 4.96534 4.26406 4.96534 5.03606V5.91073Z"
+         fill="currentColor"
        />
      | CoreProtocolLarge =>
        <path
          d="M20.0001 33.9422C19.4837 33.9578 18.981 33.7751 18.595 33.4317C18.2091 33.0883 17.9692 32.6102 17.9246 32.0955L17.7023 30.2667C15.4801 29.6333 14.1779 27.9889 13.8423 25.3778L11.8423 9.96888C11.4126 9.89985 10.9776 9.86861 10.5423 9.87555C9.89996 9.87026 9.25991 9.95326 8.64012 10.1222V33.4911H4.70679V14.7067C4.70679 12.1578 5.84901 10.3578 7.93568 9.60888V8.39777C7.93568 6.99777 8.78457 6.05777 10.049 6.05777C11.3135 6.05777 12.1068 6.84444 12.3112 8.27999L12.4668 9.40221C14.7446 10.0467 16.0935 11.88 16.4801 14.8555L18.3268 29.7089C19.4321 29.9222 20.5681 29.9222 21.6735 29.7089L23.5201 14.8578C23.9068 11.88 25.2557 10.0467 27.5335 9.40221L27.689 8.27999C27.8935 6.8511 28.6957 6.05777 29.9512 6.05777C31.2068 6.05777 32.0646 6.99777 32.0646 8.39777V9.60888C34.1512 10.3578 35.2935 12.1578 35.2935 14.7067V33.4911H31.3646V10.12C30.7448 9.9512 30.1047 9.86821 29.4623 9.87333C29.0271 9.86639 28.5921 9.89762 28.1623 9.96666L26.1623 25.3778C25.8335 27.9422 24.5001 29.6267 22.3023 30.2667L22.0801 32.1C22.0458 32.6191 21.8081 33.1036 21.4187 33.4486C21.0293 33.7935 20.5195 33.9708 20.0001 33.9422V33.9422ZM18.4201 30.4444L18.6201 32.02C18.6441 32.3639 18.8022 32.6847 19.0603 32.9132C19.3183 33.1418 19.6558 33.2599 20.0001 33.2422C20.1721 33.2546 20.3449 33.2323 20.5081 33.1766C20.6713 33.121 20.8217 33.0332 20.9504 32.9184C21.0791 32.8036 21.1834 32.6642 21.2572 32.5083C21.331 32.3525 21.3728 32.1834 21.3801 32.0111L21.5801 30.4333C20.5338 30.6052 19.4664 30.6052 18.4201 30.4333V30.4444ZM32.0646 32.8022H34.5935V14.7067C34.5935 12.5467 33.7223 11.0555 32.0646 10.36V32.8022ZM5.3979 32.8022H7.93568V10.36C6.2779 11.0555 5.40679 12.5467 5.40679 14.7067L5.3979 32.8022ZM12.569 10.16L14.5268 25.2867C14.809 27.4755 15.8401 28.8911 17.5979 29.5089L15.7779 14.9355C15.4512 12.3667 14.3979 10.7978 12.569 10.16ZM27.4312 10.16C25.6023 10.7978 24.5423 12.3667 24.2157 14.9378L22.4046 29.5C24.1601 28.8822 25.1935 27.4667 25.4735 25.2778L27.4312 10.16ZM8.63568 9.38666C9.2583 9.23519 9.89713 9.16056 10.5379 9.16444C10.9398 9.16023 11.3415 9.184 11.7401 9.23555L11.6179 8.36221C11.4646 7.2911 10.9379 6.74888 10.049 6.74888C9.16012 6.74888 8.63568 7.37777 8.63568 8.38888V9.38666ZM29.4623 9.16444C30.1031 9.16056 30.7419 9.23519 31.3646 9.38666V8.39777C31.3646 7.38666 30.8223 6.75777 29.9512 6.75777C29.0801 6.75777 28.5357 7.29999 28.3823 8.3711L28.2601 9.24444C28.6587 9.19288 29.0604 9.16912 29.4623 9.17332V9.16444Z"
+         fill="currentColor"
        />
      | Community =>
        <>
@@ -727,7 +779,7 @@ let make = (~kind, ~size=1.5) => {
            rx="0.5"
            stroke="#2D2D2D"
          />
-         <rect y="4.19995" width="24" height="1" />
+         <rect y="4.19995" width="24" height="1" fill="currentColor" />
          <path
            d="M18.1 14.1C18.1 17.6346 15.2347 20.5 11.7 20.5C8.16543 20.5 5.30005 17.6346 5.30005 14.1C5.30005 10.5653 8.16543 7.69995 11.7 7.69995C15.2347 7.69995 18.1 10.5653 18.1 14.1Z"
            stroke="#2D2D2D"
@@ -750,6 +802,7 @@ let make = (~kind, ~size=1.5) => {
            fillRule="evenodd"
            clipRule="evenodd"
            d="M12.2309 11.3823L7.44854 6.59998L6.74143 7.30708L11.5238 12.0894L6.71545 16.8978L7.42256 17.6049L12.2309 12.7965L16.9238 17.4894L17.6309 16.7823L12.938 12.0894L17.6049 7.42252L16.8978 6.71542L12.2309 11.3823Z"
+           fill="currentColor"
          />
        </>
      | Box =>
