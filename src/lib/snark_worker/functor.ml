@@ -159,9 +159,11 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     let rec go () =
       let daemon_address =
-        Option.value_map
-          (Sys.getenv "SNARK_COORDINATOR")
-          ~default:daemon_address ~f:Host_and_port.of_string
+        match Sys.getenv "SNARK_COORDINATOR" with
+        | None ->
+            daemon_address
+        | Some s -> (
+          try Host_and_port.of_string s with _ -> daemon_address )
       in
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
