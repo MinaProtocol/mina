@@ -22,7 +22,11 @@ module Styles = {
   let headerCopy =
     style([
       display(`flex),
-      media(Theme.MediaQuery.tablet, [justifyContent(`spaceBetween)]),
+      flexDirection(`column),
+      media(
+        Theme.MediaQuery.tablet,
+        [flexDirection(`row), justifyContent(`spaceBetween)],
+      ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(1.5))])]);
   let content =
@@ -137,7 +141,7 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerCopy>
       <h2 className=Styles.header> {React.string("Work with Mina")} </h2>
-      <Button bgColor=Theme.Colors.black>
+      <Button bgColor=Theme.Colors.black width={`rem(14.6)} paddingX=1.3>
         {React.string("See All Opportunities")}
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
