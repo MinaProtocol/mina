@@ -158,6 +158,11 @@ module Make (Inputs : Intf.Inputs_intf) :
       k ()
     in
     let rec go () =
+      let daemon_address =
+        Option.value_map
+          (Sys.getenv "SNARK_COORDINATOR")
+          ~default:daemon_address ~f:Host_and_port.of_string
+      in
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
