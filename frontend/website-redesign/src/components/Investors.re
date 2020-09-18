@@ -158,32 +158,32 @@ let make = () => {
           <TeamMember
             fullName="Jill Carlson"
             title="Co-founder, Open Money Initiative"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/carlson.jpg"
           />
           <TeamMember
             fullName="Paul Davidson"
             title="Co-founder & CEO, Alpha Exploration Co."
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/davidson.jpg"
           />
           <TeamMember
             fullName="Joseph Bonneau"
-            title="Head of Product Engineering, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bonneau.jpg"
           />
           <TeamMember
             fullName="Akis Kattis"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/kattis.jpg"
           />
           <TeamMember
             fullName="Benedikt Bunz"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bunz.jpg"
           />
           <TeamMember
             fullName="Amit Sahai"
             title="Director, Center for Encrypted Functionalities"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/sahai.jpg"
           />
         </div>
       <Spacer height=2. />
