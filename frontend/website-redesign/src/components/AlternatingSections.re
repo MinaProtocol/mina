@@ -116,7 +116,7 @@ let make = (~sections: array(section)) => {
                   <span className=Styles.linkText>
                     <span> {React.string(section.linkCopy)} </span>
                     <span className=Styles.icon>
-                      <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+                      <Icon kind=Icon.ArrowRightMedium />
                     </span>
                   </span>
                 </Next.Link>

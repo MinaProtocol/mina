@@ -13,7 +13,7 @@ module Colors = {
 
 module Typeface = {
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
-  let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
+  let monumentGroteskMono = fontFamily("Monument Grotesk Mono, monospace");
   let ibmplexsans = fontFamily("IBM Plex Sans, sans-serif");
 };
 
@@ -61,6 +61,7 @@ module Type = {
   let h2 =
     style([
       Typeface.monumentGrotesk,
+      fontWeight(`normal),
       fontSize(`rem(1.875)),
       lineHeight(`rem(2.25)),
       color(Colors.digitalBlack),

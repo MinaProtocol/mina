@@ -79,7 +79,12 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon = style([marginTop(`rem(0.65)), marginLeft(`rem(0.5))]);
+  let buttonIcon =
+    style([
+      marginTop(`rem(0.65)),
+      marginLeft(`rem(0.5)),
+      color(Theme.Colors.orange),
+    ]);
 
   let heroText =
     merge([
@@ -129,19 +134,17 @@ let make = () => {
               </p>
             </span>
             <span className=Styles.heroButton>
-              //TODO: Add link to tech
-
-                <Button
-                  href="/"
-                  bgColor=Theme.Colors.white
-                  paddingX=1.
-                  width={`rem(13.5)}>
-                  <span> {React.string("See Behind The Tech")} </span>
-                  <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall currentColor="#FF603B" />
-                  </span>
-                </Button>
-              </span>
+              <Button
+                href="/tech"
+                bgColor=Theme.Colors.white
+                paddingX=1.
+                width={`rem(13.5)}>
+                <span> {React.string("See Behind The Tech")} </span>
+                <span className=Styles.buttonIcon>
+                  <Icon kind=Icon.ArrowRightSmall />
+                </span>
+              </Button>
+            </span>
           </div>
           <div className=Styles.heroImageContainer>
             <img
