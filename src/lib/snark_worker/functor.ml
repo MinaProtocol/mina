@@ -158,12 +158,19 @@ module Make (Inputs : Intf.Inputs_intf) :
       k ()
     in
     let rec go () =
-      let daemon_address =
-        match Sys.getenv "SNARK_COORDINATOR" with
-        | None ->
-            daemon_address
-        | Some s -> (
-          try Host_and_port.of_string s with _ -> daemon_address )
+      let%bind daemon_address =
+        let%bind cwd = Sys.getcwd () in
+        [%log debug]
+          !"Snark worker working directory $dir"
+          ~metadata:[("dir", `String cwd)] ;
+        let path = "snark_coordinator" in
+        match%bind Sys.file_exists path with
+        | `Yes -> (
+            let%map s = Reader.file_contents path in
+            try Host_and_port.of_string (String.strip s)
+            with _ -> daemon_address )
+        | `No | `Unknown ->
+            return daemon_address
       in
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
