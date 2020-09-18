@@ -76,27 +76,27 @@ module type Inputs_intf = sig
     type t
 
     val make :
-         Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
+         w:Scalar_field.Vector.t
+      -> za:Scalar_field.Vector.t
+      -> zb:Scalar_field.Vector.t
+      -> h1:Scalar_field.Vector.t
+      -> g1:Scalar_field.Vector.t
+      -> h2:Scalar_field.Vector.t
+      -> g2:Scalar_field.Vector.t
+      -> h3:Scalar_field.Vector.t
+      -> g3:Scalar_field.Vector.t
+      -> row_0:Scalar_field.Vector.t
+      -> row_1:Scalar_field.Vector.t
+      -> row_2:Scalar_field.Vector.t
+      -> col_0:Scalar_field.Vector.t
+      -> col_1:Scalar_field.Vector.t
+      -> col_2:Scalar_field.Vector.t
+      -> val_0:Scalar_field.Vector.t
+      -> val_1:Scalar_field.Vector.t
+      -> val_2:Scalar_field.Vector.t
+      -> rc_0:Scalar_field.Vector.t
+      -> rc_1:Scalar_field.Vector.t
+      -> rc_2:Scalar_field.Vector.t
       -> t
 
     val w : t -> Scalar_field.Vector.t
@@ -144,36 +144,36 @@ module type Inputs_intf = sig
     module Vector : Vector with type elt := t
 
     val make :
-         Scalar_field.Vector.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Poly_comm.Backend.t
-      -> Scalar_field.t
-      -> Scalar_field.t
-      -> Curve.Affine.Backend.Pair.Vector.t
-      -> Scalar_field.t
-      -> Scalar_field.t
-      -> Curve.Affine.Backend.t
-      -> Curve.Affine.Backend.t
-      -> Evaluations_backend.t
-      -> Evaluations_backend.t
-      -> Evaluations_backend.t
-      -> Scalar_field.Vector.t
-      -> Curve.Affine.Backend.Vector.t
+         primary_input:Scalar_field.Vector.t
+      -> w_comm:Poly_comm.Backend.t
+      -> za_comm:Poly_comm.Backend.t
+      -> zb_comm:Poly_comm.Backend.t
+      -> h1_comm:Poly_comm.Backend.t
+      -> g1_comm:Poly_comm.Backend.t
+      -> h2_comm:Poly_comm.Backend.t
+      -> g2_comm:Poly_comm.Backend.t
+      -> h3_comm:Poly_comm.Backend.t
+      -> g3_comm:Poly_comm.Backend.t
+      -> sigma2:Scalar_field.t
+      -> sigma3:Scalar_field.t
+      -> lr:Curve.Affine.Backend.Pair.Vector.t
+      -> z1:Scalar_field.t
+      -> z2:Scalar_field.t
+      -> delta:Curve.Affine.Backend.t
+      -> sg:Curve.Affine.Backend.t
+      -> evals0:Evaluations_backend.t
+      -> evals1:Evaluations_backend.t
+      -> evals2:Evaluations_backend.t
+      -> prev_challenges:Scalar_field.Vector.t
+      -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
     val create :
-         Index.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Curve.Affine.Backend.Vector.t
+         index:Index.t
+      -> primary_input:Scalar_field.Vector.t
+      -> auxiliary_input:Scalar_field.Vector.t
+      -> prev_challenges:Scalar_field.Vector.t
+      -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
     val batch_verify : Verifier_index.Vector.t -> Vector.t -> bool

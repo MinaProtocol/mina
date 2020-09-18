@@ -1035,12 +1035,12 @@ let create (config : Config.t)
                    {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
-                  if Command_transaction.has_insufficient_fee cmd then (
+                  if User_command.has_insufficient_fee cmd then (
                     [%log debug]
                       "Filtering user command with insufficient fee from \
                        transaction-pool diff $cmd from $sender"
                       ~metadata:
-                        [ ("cmd", Command_transaction.to_yojson cmd)
+                        [ ("cmd", User_command.to_yojson cmd)
                         ; ( "sender"
                           , Envelope.(
                               Sender.to_yojson (Incoming.sender envelope)) ) ] ;
@@ -1170,8 +1170,6 @@ let get_best_tip t peer =
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
   >>| Fn.const (Ok ())
-
-let net2 t = Gossip_net.Any.net2 t.gossip_net
 
 let try_non_preferred_peers (type b) t input peers ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =

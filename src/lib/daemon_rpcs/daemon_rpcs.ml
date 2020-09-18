@@ -6,7 +6,7 @@ module Types = Types
 module Client = Client
 
 module Get_transaction_status = struct
-  type query = User_command.Stable.Latest.t [@@deriving bin_io_unversioned]
+  type query = Signed_command.Stable.Latest.t [@@deriving bin_io_unversioned]
 
   type response = Transaction_status.State.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]
@@ -88,9 +88,8 @@ end
 module Verify_proof = struct
   type query =
     Account_id.Stable.Latest.t
-    * Command_transaction.Stable.Latest.t
-    * ( Receipt.Chain_hash.Stable.Latest.t
-      * Command_transaction.Stable.Latest.t list )
+    * User_command.Stable.Latest.t
+    * (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
   [@@deriving bin_io_unversioned]
 
   type response = unit Or_error.t [@@deriving bin_io_unversioned]
@@ -104,8 +103,7 @@ module Prove_receipt = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Receipt.Chain_hash.Stable.Latest.t
-    * Command_transaction.Stable.Latest.t list )
+    (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
     Or_error.t
   [@@deriving bin_io_unversioned]
 

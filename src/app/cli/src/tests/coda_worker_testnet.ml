@@ -7,8 +7,7 @@ open Pipe_lib
 module Api = struct
   type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
 
-  type user_cmds_under_inspection =
-    (Command_transaction.t, user_cmd_status) Hashtbl.t
+  type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
 
   type restart_type = [`Catchup | `Bootstrap]
 
@@ -34,7 +33,7 @@ module Api = struct
     let status =
       Array.init (Array.length workers) ~f:(fun _ ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module Command_transaction)
+            Hashtbl.create (module User_command)
           in
           `On (`Synced user_cmds_under_inspection) )
     in
@@ -116,7 +115,7 @@ module Api = struct
       , (fun () -> t.status.(i) <- `On `Catchup)
       , fun () ->
           let user_cmds_under_inspection =
-            Hashtbl.create (module Command_transaction)
+            Hashtbl.create (module User_command)
           in
           t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
@@ -160,7 +159,7 @@ module Api = struct
       Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
     in
     run_user_command
-      ~memo:(User_command_memo.create_from_string_exn (sprintf "sd%i" i))
+      ~memo:(Signed_command_memo.create_from_string_exn (sprintf "sd%i" i))
       t i delegator_sk fee valid_until
       ~body:
         (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
@@ -170,7 +169,7 @@ module Api = struct
       Public_key.compress @@ Public_key.of_private_key_exn sender_sk
     in
     run_user_command
-      ~memo:(User_command_memo.create_from_string_exn (sprintf "pay%i" i))
+      ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
       ~body:
         (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
@@ -379,8 +378,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", Command_transaction.to_yojson user_cmd)
-                       ]
+                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
                      "Transaction $user_cmd took too long to get into the \
                       root of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
@@ -392,8 +390,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        Ivar.fill passed_root () ;
                        [%log info]
                          ~metadata:
-                           [ ( "user_cmd"
-                             , Command_transaction.to_yojson user_cmd.data )
+                           [ ("user_cmd", User_command.to_yojson user_cmd.data)
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \
@@ -514,7 +511,7 @@ end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
     let valid_until = None in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
@@ -528,7 +525,7 @@ end = struct
               let%map root_length = Coda_process.root_length_exn worker in
               let passed_root = Ivar.create () in
               Hashtbl.add_exn user_cmds_under_inspection
-                ~key:(User_command user_cmd)
+                ~key:(Signed_command user_cmd)
                 ~data:
                   { expected_deadline=
                       root_length
@@ -561,16 +558,16 @@ module Payments : sig
     -> sender:Private_key.t
     -> keypairs:Keypair.t list
     -> n:int
-    -> User_command.t list Deferred.t
+    -> Signed_command.t list Deferred.t
 
   val assert_retrievable_payments :
-    Api.t -> User_command.t list -> unit Deferred.t
+    Api.t -> Signed_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let valid_until = None in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
@@ -602,7 +599,7 @@ end = struct
                         *)
                         ignore
                           (Hashtbl.add user_cmds_under_inspection
-                             ~key:(User_command user_cmd)
+                             ~key:(Signed_command user_cmd)
                              ~data:
                                { expected_deadline=
                                    root_length
@@ -631,7 +628,7 @@ end = struct
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = User_command.minimum_fee in
+    let fee = Signed_command.minimum_fee in
     let valid_until = None in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
@@ -655,7 +652,7 @@ end = struct
           | `Eof ->
               Deferred.return false
           | `Ok matching_user_command
-            when User_command.equal matching_user_command user_command ->
+            when Signed_command.equal matching_user_command user_command ->
               Deferred.return true
           | `Ok _bad_user_command ->
               read_until_match reader
@@ -672,21 +669,21 @@ end = struct
           Api.get_all_user_commands testnet worker_index public_key
         in
         Option.value_exn payments )
-    >>| User_command.Set.of_list
+    >>| Signed_command.Set.of_list
 
   let check_all_nodes_received_payments (testnet : Api.t) public_keys
-      (expected_payments : User_command.t list) =
+      (expected_payments : Signed_command.t list) =
     Deferred.List.init ~how:`Parallel (Array.length testnet.workers)
       ~f:(fun worker_index ->
         let%map node_payments =
           query_relevant_payments testnet worker_index public_keys
         in
-        List.for_all expected_payments ~f:(User_command.Set.mem node_payments)
-    )
+        List.for_all expected_payments
+          ~f:(Signed_command.Set.mem node_payments) )
     >>| List.for_all ~f:Fn.id
 
   let assert_retrievable_payments (testnet : Api.t)
-      (expected_payments : User_command.t list) =
+      (expected_payments : Signed_command.t list) =
     let senders, receivers =
       List.map expected_payments ~f:(fun user_command ->
           match user_command.payload.body with

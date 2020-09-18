@@ -26,11 +26,11 @@ end
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let open Or_error.Let_syntax in
   let%map check_cmd =
-    Result.of_option (User_command.check cmd)
+    Result.of_option (Signed_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
     |> Result.map ~f:(fun x ->
-           Transaction_hash.Command_transaction_with_valid_signature.create
-             (User_command x) )
+           Transaction_hash.User_command_with_valid_signature.create
+             (Signed_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -47,8 +47,9 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
                 match cmd' with
                 | Snapp_command _ ->
                     false
-                | User_command cmd' ->
-                    User_command.equal cmd (User_command.forget_check cmd') )
+                | Signed_command cmd' ->
+                    Signed_command.equal cmd (Signed_command.forget_check cmd')
+            )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -93,7 +94,7 @@ let%test_module "transaction_status" =
         ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
-      User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
+      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
     let proof_level = Genesis_constants.Proof_level.for_unit_tests
@@ -146,7 +147,7 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([User_command user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
@@ -170,7 +171,7 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([User_command user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -208,7 +209,7 @@ let%test_module "transaction_status" =
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
-                        Command_transaction.User_command x )
+                        User_command.Signed_command x )
                   , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in

@@ -383,10 +383,31 @@ let daemon logger =
              match Sys.getenv "CODA_CONFIG_FILE" with
              | Some config_file ->
                  (config_file, false)
-             | None ->
-                 (conf_dir ^/ "daemon.json", false) )
+             | None -> (
+                 (*Check if the config file is installed as part of the deb before resorting to the default*)
+                 let config_file_installed =
+                   let json =
+                     "config_" ^ Coda_version.commit_id_short ^ ".json"
+                   in
+                   List.fold_until ~init:None
+                     (Cache_dir.possible_paths json)
+                     ~f:(fun _acc f ->
+                       match Core.Sys.file_exists f with
+                       | `Yes ->
+                           Stop (Some f)
+                       | _ ->
+                           Continue None )
+                     ~finish:Fn.id
+                 in
+                 match config_file_installed with
+                 | Some config_file ->
+                     (config_file, false)
+                 | None ->
+                     (conf_dir ^/ "daemon.json", false) ) )
          in
          let%bind config_json =
+           [%log info] "Trying to read runtime config from $config_file"
+             ~metadata:[("config_file", `String config_file)] ;
            match%map Genesis_ledger_helper.load_config_json config_file with
            | Ok config ->
                Some config
@@ -714,14 +735,16 @@ let daemon logger =
          if is_seed then [%log info] "Starting node as a seed node"
          else if List.is_empty initial_peers then
            failwith "no seed or initial peer flags passed" ;
+         let chain_id =
+           chain_id ~genesis_state_hash
+             ~genesis_constants:precomputed_values.genesis_constants
+         in
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id=
-                 chain_id ~genesis_state_hash
-                   ~genesis_constants:precomputed_values.genesis_constants
+             ; chain_id
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -836,8 +859,8 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
-                ~net_config ~gossip_net_params
+                ~chain_id ~is_seed ~disable_telemetry ~demo_mode
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~initial_protocol_version:current_protocol_version
                 ~proposed_protocol_version_opt
                 ~work_selection_method:

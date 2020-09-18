@@ -27,10 +27,10 @@ let typ : (var, t) Typ.t =
     [payload.body.public_key] is interpreted as the recipient of a payment, the new delegate of a stake
     delegation command, and a fee transfer recipient for both coinbases and fee-transfers.
 *)
-let of_transaction : User_command.t Transaction.Poly.t -> t = function
+let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
   | Command cmd ->
-      let User_command.Poly.{payload; signer; signature} =
-        (cmd :> User_command.t)
+      let Signed_command.Poly.{payload; signer; signature} =
+        (cmd :> Signed_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
       ; signer
@@ -49,7 +49,7 @@ let of_transaction : User_command.t Transaction.Poly.t -> t = function
               ; fee_payer_pk= other_pk
               ; nonce= Account.Nonce.zero
               ; valid_until= Coda_numbers.Global_slot.max_value
-              ; memo= User_command_memo.empty }
+              ; memo= Signed_command_memo.empty }
           ; body=
               { source_pk= other_pk
               ; receiver_pk= receiver
@@ -69,9 +69,9 @@ let of_transaction : User_command.t Transaction.Poly.t -> t = function
                 ; fee_payer_pk= pk2
                 ; nonce= Account.Nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
-                ; memo= User_command_memo.empty }
+                ; memo= Signed_command_memo.empty }
             ; body=
-                { source_pk= pk1
+                { source_pk= pk2
                 ; receiver_pk= pk1
                 ; token_id
                 ; amount= Amount.of_fee fee1

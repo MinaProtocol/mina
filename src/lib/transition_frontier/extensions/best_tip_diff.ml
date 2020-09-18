@@ -6,8 +6,8 @@ module T = struct
   type t = {logger: Logger.t}
 
   type view =
-    { new_commands: Command_transaction.Valid.t With_status.t list
-    ; removed_commands: Command_transaction.Valid.t With_status.t list
+    { new_commands: User_command.Valid.t With_status.t list
+    ; removed_commands: User_command.Valid.t With_status.t list
     ; reorg_best_tip: bool }
 
   let create ~logger frontier =

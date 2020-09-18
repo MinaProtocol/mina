@@ -9,7 +9,7 @@ module Transactions = struct
     module V1 = struct
       type t =
         { commands:
-            ( Command_transaction.Stable.V1.t
+            ( User_command.Stable.V1.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             list
@@ -56,11 +56,11 @@ let participants ~next_available_token
   let _next_available_token, user_command_set =
     List.fold commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
-        ( Command_transaction.next_available_token user_command.data
+        ( User_command.next_available_token user_command.data
             next_available_token
         , union set
             ( of_list
-            @@ Command_transaction.accounts_accessed ~next_available_token
+            @@ User_command.accounts_accessed ~next_available_token
                  user_command.data ) ) )
   in
   let fee_transfer_participants =
@@ -77,7 +77,7 @@ let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
-        @@ Command_transaction.accounts_accessed
+        @@ User_command.accounts_accessed
              ~next_available_token:Token_id.invalid user_command.data )
   in
   let fee_transfer_participants =
@@ -119,11 +119,11 @@ let of_transition external_transition tracked_participants
       ~f:(fun (acc_transactions, next_available_token) -> function
         | {data= Command (Snapp_command _); _} -> failwith "Not implemented"
         | {data= Command command; _} -> (
-            let command = (command :> Command_transaction.t) in
+            let command = (command :> User_command.t) in
             let should_include_transaction command participants =
               List.exists
-                (Command_transaction.accounts_accessed ~next_available_token
-                   command) ~f:(fun account_id ->
+                (User_command.accounts_accessed ~next_available_token command)
+                ~f:(fun account_id ->
                   Public_key.Compressed.Set.mem participants
                     (Account_id.public_key account_id) )
             in
@@ -133,7 +133,7 @@ let of_transition external_transition tracked_participants
                      (should_include_transaction command
                         interested_participants) ->
                 ( acc_transactions
-                , Command_transaction.next_available_token command
+                , User_command.next_available_token command
                     next_available_token )
             | `All | `Some _ ->
                 (* Should include this command. *)
@@ -142,7 +142,7 @@ let of_transition external_transition tracked_participants
                       { With_hash.data= command
                       ; hash= Transaction_hash.hash_command command }
                       :: acc_transactions.commands }
-                , Command_transaction.next_available_token command
+                , User_command.next_available_token command
                     next_available_token ) )
         | {data= Fee_transfer fee_transfer; _} ->
             let fee_transfer_list =

@@ -65,9 +65,7 @@ end
 
 module Pre_diff_with_at_most_two_coinbase : sig
   type t =
-    ( Transaction_snark_work.t
-    , Command_transaction.t With_status.t )
-    Pre_diff_two.t
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -81,9 +79,7 @@ end
 
 module Pre_diff_with_at_most_one_coinbase : sig
   type t =
-    ( Transaction_snark_work.t
-    , Command_transaction.t With_status.t )
-    Pre_diff_one.t
+    (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
   module Stable :
@@ -113,7 +109,8 @@ end
 type t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.t }
+  ; coinbase_receiver: Public_key.Compressed.t
+  ; supercharge_coinbase: bool }
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
@@ -122,7 +119,8 @@ module Stable :
       type t =
         { diff: Diff.t
         ; creator: Public_key.Compressed.t
-        ; coinbase_receiver: Public_key.Compressed.t }
+        ; coinbase_receiver: Public_key.Compressed.t
+        ; supercharge_coinbase: bool }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -133,13 +131,13 @@ module Stable :
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.Checked.t
-    , Command_transaction.Valid.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.Checked.t
-    , Command_transaction.Valid.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -151,22 +149,23 @@ module With_valid_signatures_and_proofs : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
+    ; coinbase_receiver: Public_key.Compressed.t
+    ; supercharge_coinbase: bool }
   [@@deriving sexp, to_yojson]
 
-  val commands : t -> Command_transaction.Valid.t With_status.t list
+  val commands : t -> User_command.Valid.t With_status.t list
 end
 
 module With_valid_signatures : sig
   type pre_diff_with_at_most_two_coinbase =
     ( Transaction_snark_work.t
-    , Command_transaction.Valid.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_two.t
   [@@deriving sexp, to_yojson]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.t
-    , Command_transaction.Valid.t With_status.t )
+    , User_command.Valid.t With_status.t )
     Pre_diff_one.t
   [@@deriving sexp, to_yojson]
 
@@ -178,8 +177,14 @@ module With_valid_signatures : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
+    ; coinbase_receiver: Public_key.Compressed.t
+    ; supercharge_coinbase: bool }
   [@@deriving sexp, to_yojson]
+
+  val coinbase :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> Currency.Amount.t option
 end
 
 val forget_proof_checks :
@@ -187,18 +192,18 @@ val forget_proof_checks :
 
 val validate_commands :
      t
-  -> check:(   Command_transaction.t list
-            -> (Command_transaction.Valid.t list, 'e) Result.t
+  -> check:(   User_command.t list
+            -> (User_command.Valid.t list, 'e) Result.t
                Async.Deferred.Or_error.t)
   -> (With_valid_signatures.t, 'e) Result.t Async.Deferred.Or_error.t
 
 val forget : With_valid_signatures_and_proofs.t -> t
 
-val commands : t -> Command_transaction.t With_status.t list
+val commands : t -> User_command.t With_status.t list
 
 val completed_works : t -> Transaction_snark_work.t list
 
 val coinbase :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> Currency.Amount.t
+  -> Currency.Amount.t option

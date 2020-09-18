@@ -4,22 +4,14 @@ module Styles = {
     merge([
       Theme.Type.announcement,
       style([
-        color(Theme.Colors.black),
+        color(Theme.Colors.digitalBlack),
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
         width(`percent(100.)),
         important(backgroundSize(`cover)),
-        backgroundImage(`url("/static/AnnouncementBannerMobile.png")),
+        backgroundImage(`url("/static/img/AnnouncementBanner.png")),
         padding2(~v=`rem(0.5), ~h=`rem(0.5)),
-        media(
-          Theme.MediaQuery.tablet,
-          [background(`url("/static/AnnouncementBannerTablet.png"))],
-        ),
-        media(
-          Theme.MediaQuery.desktop,
-          [background(`url("/static/AnnouncementBannerDesktop.png"))],
-        ),
       ]),
     ]);
 
@@ -73,7 +65,7 @@ let make = (~children) => {
           <span className=Styles.learnMoreText>
             {React.string("Learn More")}
           </span>
-          <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+          <Icon kind=Icon.ArrowRightMedium />
         </div>
       </Next.Link>
     </div>
