@@ -256,7 +256,7 @@ module SignupWidget = {
       onSubmit={e => {
         ReactEvent.Form.preventDefault(e);
         ReFetch.fetch(
-          "",
+          "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
           ~method_=Post,
           ~body=
             Fetch.BodyInit.makeWithUrlSearchParams(

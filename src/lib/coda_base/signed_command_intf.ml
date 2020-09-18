@@ -81,7 +81,7 @@ module type Gen_intf = sig
          ?length:int
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
-         * Currency.Balance.t
+         * Currency.Amount.t
          * Coda_numbers.Account_nonce.t
          * Account_timing.t )
          array
@@ -96,7 +96,7 @@ module type S = sig
 
   include Hashable.S with type t := t
 
-  val payload : t -> User_command_payload.t
+  val payload : t -> Signed_command_payload.t
 
   val fee : t -> Currency.Fee.t
 
@@ -124,7 +124,7 @@ module type S = sig
 
   val amount : t -> Currency.Amount.t option
 
-  val memo : t -> User_command_memo.t
+  val memo : t -> Signed_command_memo.t
 
   val valid_until : t -> Global_slot.t
 
@@ -140,7 +140,7 @@ module type S = sig
   val next_available_token : t -> Token_id.t -> Token_id.t
 
   val to_input :
-    User_command_payload.t -> (Field.t, bool) Random_oracle_input.t
+    Signed_command_payload.t -> (Field.t, bool) Random_oracle_input.t
 
   (** Check that the command is used with compatible tokens. This check is fast
       and cheap, to be used for filtering.
@@ -169,25 +169,30 @@ module type S = sig
   end
 
   val sign_payload :
-    Signature_lib.Private_key.t -> User_command_payload.t -> Signature.t
+    Signature_lib.Private_key.t -> Signed_command_payload.t -> Signature.t
 
   val sign :
-    Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
+    Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
 
   val check_signature : t -> bool
 
   val create_with_signature_checked :
        Signature.t
     -> Public_key.Compressed.t
-    -> User_command_payload.t
+    -> Signed_command_payload.t
     -> With_valid_signature.t option
 
   module For_tests : sig
     val fake_sign :
-      Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
+      Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
   end
 
   val check : t -> With_valid_signature.t option
+
+  val to_valid_unsafe :
+       t
+    -> [ `If_this_is_used_it_should_have_a_comment_justifying_it of
+         With_valid_signature.t ]
 
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t

@@ -74,6 +74,7 @@ module Styles = {
       justifyContent(`center),
       marginLeft(`rem(0.5)),
       marginTop(`rem(0.2)),
+      color(Theme.Colors.orange),
     ]);
 
   let image =
@@ -116,7 +117,7 @@ let make = (~sections: array(section)) => {
                   <span className=Styles.linkText>
                     <span> {React.string(section.linkCopy)} </span>
                     <span className=Styles.icon>
-                      <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+                      <Icon kind=Icon.ArrowRightMedium />
                     </span>
                   </span>
                 </Next.Link>

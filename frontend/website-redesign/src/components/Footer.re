@@ -21,7 +21,7 @@ module Styles = {
         Theme.MediaQuery.desktop,
         [
           padding2(~v=`rem(5.5), ~h=`rem(9.5)),
-          height(`rem(48.)),
+          height(`auto),
           backgroundImage(`url("/static/img/Large.png")),
         ],
       ),
@@ -102,17 +102,18 @@ module LeftSide = {
         width(`rem(11.)),
         marginBottom(`rem(4.)),
       ]);
-    let label = merge([Theme.Type.h4, style([color(white)])]);
-    let connectLabel =
-      merge([
-        Theme.Type.h4,
-        style([color(white), marginTop(`rem(2.12))]),
-      ]);
-    let paragraph = merge([Theme.Type.paragraph, style([color(white)])]);
+    let label =
+      merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);
     let emailSubtext =
       merge([
         Theme.Type.paragraph,
-        style([color(white), marginTop(`zero), marginBottom(`rem(1.))]),
+        style([
+          lineHeight(`rem(1.63)),
+          color(white),
+          opacity(0.7),
+          marginTop(`zero),
+          marginBottom(`rem(1.)),
+        ]),
       ]);
   };
   [@react.component]
@@ -129,7 +130,8 @@ module LeftSide = {
           {React.string("Mina's growing fast! Sign up and stay in the loop.")}
         </p>
         <EmailInput />
-        <div className=Styles.connectLabel> {React.string("Connect")} </div>
+        <Spacer height=2. />
+        <div className=Styles.label> {React.string("Connect")} </div>
         <p className=Styles.emailSubtext>
           {React.string("Join the conversation.")}
         </p>
