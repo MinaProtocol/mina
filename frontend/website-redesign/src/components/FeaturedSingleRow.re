@@ -34,7 +34,7 @@ module SingleRow = {
       style([
         position(`relative),
         width(`percent(100.)),
-        height(`px(658)),
+        height(`rem(41.)),
         display(`flex),
         flexDirection(`column),
         alignItems(`center),
@@ -88,7 +88,7 @@ module SingleRow = {
         position(`absolute),
         width(`percent(100.)),
         height(`percent(60.)),
-        maxWidth(`px(848)),
+        maxWidth(`rem(53.)),
         media(
           Theme.MediaQuery.notMobile,
           [height(`percent(110.)), width(`percent(80.))],
