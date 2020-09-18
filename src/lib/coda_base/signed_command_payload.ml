@@ -21,7 +21,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
-module Memo = User_command_memo
+module Memo = Signed_command_memo
 module Account_nonce = Coda_numbers.Account_nonce
 module Global_slot = Coda_numbers.Global_slot
 

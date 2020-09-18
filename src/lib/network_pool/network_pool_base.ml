@@ -11,6 +11,7 @@ end)
   Intf.Network_pool_base_intf
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
+   and type resource_pool_diff_verified := Resource_pool.Diff.verified
    and type transition_frontier := Transition_frontier.t
    and type transition_frontier_diff := Resource_pool.transition_frontier_diff
    and type config := Resource_pool.Config.t
@@ -26,7 +27,10 @@ end)
 
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
-  let apply_and_broadcast t (pool_diff, valid_cb, result_cb) =
+  let apply_and_broadcast t
+      ( (pool_diff : Resource_pool.Diff.verified Envelope.Incoming.t)
+      , valid_cb
+      , result_cb ) =
     let rebroadcast (diff', rejected) =
       result_cb (Ok (diff', rejected)) ;
       if Resource_pool.Diff.is_empty diff' then (
@@ -68,12 +72,13 @@ end)
         Strict_pipe.create ~name:"verified network pool diffs"
           (Buffered (`Capacity 1024, `Overflow Drop_head))
       in
-      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun ((d, _) as x) ->
+      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun (d, cb) ->
+          let env = f d in
           don't_wait_for
-            ( match%map Resource_pool.Diff.verify resource_pool (f d) with
-            | true ->
-                Strict_pipe.Writer.write w x
-            | false ->
+            ( match%map Resource_pool.Diff.verify resource_pool env with
+            | Some x ->
+                Strict_pipe.Writer.write w (x, cb)
+            | None ->
                 () ) )
       |> don't_wait_for ;
       r
@@ -92,8 +97,7 @@ end)
         | `Incoming (diff, cb) ->
             apply_and_broadcast network_pool (diff, cb, Fn.const ())
         | `Local (diff, result_cb) ->
-            apply_and_broadcast network_pool
-              (Envelope.Incoming.local diff, Fn.const (), result_cb)
+            apply_and_broadcast network_pool (diff, Fn.const (), result_cb)
         | `Transition_frontier_extension diff ->
             Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;

@@ -16,11 +16,14 @@ module type Inputs_intf = sig
   module Proof : sig
     type t
 
+    module Challenge_polynomial : T0
+
     module Backend : sig
       type t
     end
 
-    val to_backend : Field.t list -> t -> Backend.t
+    val to_backend :
+      Challenge_polynomial.t list -> Field.t list -> t -> Backend.t
   end
 
   module Backend : sig
@@ -51,8 +54,8 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
-  let create vk input (pi : Proof.t) =
-    let pi = Proof.to_backend input pi in
+  let create vk prev_challenge input (pi : Proof.t) =
+    let pi = Proof.to_backend prev_challenge input pi in
     let t = Backend.create vk pi in
     Caml.Gc.finalise Backend.delete t ;
     t
