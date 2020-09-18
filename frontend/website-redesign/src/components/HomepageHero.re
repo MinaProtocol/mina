@@ -7,6 +7,7 @@ module Styles = {
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/HeroSectionBackground.png")),
       media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      position(`relative),
     ]);
 
   let container =
