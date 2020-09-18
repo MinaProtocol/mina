@@ -36,7 +36,6 @@ module Styles = {
     style([
       position(`absolute),
       top(`rem(4.)),
-      left(`rem(1.25)),
       background(white),
       width(`rem(21.)),
       height(`rem(19.25)),
@@ -53,10 +52,9 @@ module Styles = {
       media(
         Theme.MediaQuery.desktop,
         [
-          marginLeft(`rem(33.5)),
-          marginTop(`rem(8.75)),
           width(`rem(47.)),
           height(`rem(25.)),
+          right(`rem(9.5)),
         ],
       ),
     ]);

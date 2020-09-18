@@ -65,7 +65,7 @@ let make = (~children) => {
           <span className=Styles.learnMoreText>
             {React.string("Learn More")}
           </span>
-          <Icon kind=Icon.ArrowRightMedium currentColor="orange" />
+          <Icon kind=Icon.ArrowRightMedium />
         </div>
       </Next.Link>
     </div>
