@@ -402,7 +402,7 @@ let make = () => {
             </span>
             <span className=Css.(style([marginTop(`rem(2.))]))>
               {React.string(
-                 "Prepare to engage in Testworld and we'll see you in October.",
+                 "Prepare to engage in Testworld and we'll see you later this year.",
                )}
             </span>
           </div>
