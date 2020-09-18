@@ -58,7 +58,6 @@ module Styles = {
       style([
         display(`flex),
         alignItems(`center),
-        width(`percent(100.)),
         height(`rem(5.5)),
         padding2(~v=`zero, ~h=`rem(1.5)),
         color(white),
