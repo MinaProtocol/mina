@@ -1,1 +1,1 @@
-export { make as default } from "@reason/pages/Adversarial";
+export { make as default } from "@reason/pages/LeadGen";
