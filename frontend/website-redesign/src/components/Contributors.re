@@ -109,19 +109,17 @@ module GenesisMembersGrid = {
 [@react.component]
 let make = () => {
   <div className=Styles.container>
-      <div className=Styles.headerCopy>
-        <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
-           )}
-        </p>
-      </div>
-      <Rule color=Theme.Colors.black />
-      <TeamGrid />
-      <div className=Styles.genesisRule>
-        <Rule color=Theme.Colors.black />
-      </div>
-      <GenesisMembersGrid />
-    </div>;
+    <div className=Styles.headerCopy>
+      <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
+      <p className=Styles.sectionSubhead>
+        {React.string(
+           "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
+         )}
+      </p>
+    </div>
+    <Rule color=Theme.Colors.black />
+    <TeamGrid />
+    <div className=Styles.genesisRule> <Rule color=Theme.Colors.black /> </div>
+    <GenesisMembersGrid />
+  </div>;
 };
