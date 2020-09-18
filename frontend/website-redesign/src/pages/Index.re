@@ -12,12 +12,10 @@ module Styles = {
 
 [@react.component]
 let make = () => {
-  <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
+  <Page title="Mina Protocol" footerColor=Theme.Colors.orange>
     <div className=Styles.page>
-      <AnnouncementBanner>
-        {React.string("Mainnet is live!")}
-      </AnnouncementBanner>
       <HomepageHero />
+      <BlockchainComparison />
       <AlternatingSections
         sections=[|
           {

@@ -8,8 +8,8 @@ RUN echo "Building image with version $coda_dev_version"
 
 # Dependencies
 RUN apt-get -y update && \
-  apt-get -y upgrade && \
-  apt-get -y install \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install \
     curl \
     strace \
     dumb-init \
