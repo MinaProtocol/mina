@@ -132,37 +132,6 @@ let combine_errors (malleable_errors : 'a t list) : 'a list t =
 let try_with (type a) ?(backtrace = false) (f : unit -> a) : a t =
   of_or_error_hard (Or_error.try_with ~backtrace f)
 
-let rec malleable_error_list_iter ls ~f =
-  let open T.Let_syntax in
-  match ls with
-  | [] ->
-      return ()
-  | h :: t ->
-      let%bind () = f h in
-      malleable_error_list_iter t ~f
-
-let rec malleable_error_list_map ls ~f =
-  let open T.Let_syntax in
-  match ls with
-  | [] ->
-      return []
-  | h :: t ->
-      let%bind h' = f h in
-      let%map t' = malleable_error_list_map t ~f in
-      h' :: t'
-
-let rec malleable_error_list_fold_left_while ls ~init ~f =
-  let open T.Let_syntax in
-  match ls with
-  | [] ->
-      return init
-  | h :: t -> (
-      match%bind f init h with
-      | `Stop init' ->
-          return init'
-      | `Continue init' ->
-          malleable_error_list_fold_left_while t ~init:init' ~f )
-
 let of_option opt msg : 'a t =
   Option.value_map opt
     ~default:
@@ -186,6 +155,39 @@ let lift_error_set (type a) (m : a t) :
       Ok (computation_result, internal_error_set [] soft_errors)
   | Error {Hard_fail.hard_error; soft_errors} ->
       Error (internal_error_set [hard_error] soft_errors)
+
+module Map = struct
+  let rec malleable_error_list_iter ls ~f =
+    let open T.Let_syntax in
+    match ls with
+    | [] ->
+        return ()
+    | h :: t ->
+        let%bind () = f h in
+        malleable_error_list_iter t ~f
+
+  let rec malleable_error_list_map ls ~f =
+    let open T.Let_syntax in
+    match ls with
+    | [] ->
+        return []
+    | h :: t ->
+        let%bind h' = f h in
+        let%map t' = malleable_error_list_map t ~f in
+        h' :: t'
+
+  let rec malleable_error_list_fold_left_while ls ~init ~f =
+    let open T.Let_syntax in
+    match ls with
+    | [] ->
+        return init
+    | h :: t -> (
+        match%bind f init h with
+        | `Stop init' ->
+            return init'
+        | `Continue init' ->
+            malleable_error_list_fold_left_while t ~init:init' ~f )
+end
 
 (* Unit tests to follow *)
 
