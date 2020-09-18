@@ -347,6 +347,7 @@ let make = () => {
           <div>
             <img className=Styles.logo src="/static/img/testworld_logo.png" />
           </div>
+          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h1> {React.string("Welcome to Testworld")} </h1>
             <p>
@@ -355,7 +356,6 @@ let make = () => {
                )}
             </p>
           </div>
-          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h2> {React.string("How Testworld works")} </h2>
             <p>
