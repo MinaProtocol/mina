@@ -828,7 +828,8 @@ module Base = struct
                 *)
                 { ret with
                   source_not_present= true
-                ; not_token_owner= true
+                ; not_token_owner=
+                    not Token_id.(equal default (Account_id.token_id receiver))
                 ; token_auth=
                     not ((not payload.body.token_locked) || predicate_result)
                 }
