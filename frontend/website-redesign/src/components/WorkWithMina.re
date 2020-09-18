@@ -15,7 +15,7 @@ module Styles = {
         [padding2(~v=`rem(7.), ~h=`rem(9.5))],
       ),
     ]);
-  let header = merge([Theme.Type.h2, style([marginBottom(`rem(1.))])]);
+  let header = merge([Theme.Type.h2, style([marginBottom(`rem(1.5))])]);
   let content =
     style([
       display(`flex),
@@ -28,6 +28,7 @@ module Styles = {
 module FeaturedContent = {
   module Styles = {
     open Css;
+    let label = merge([Theme.Type.metadata, style([marginTop(`rem(1.))])]);
     let blogListImage =
       style([
         marginTop(`rem(1.)),
@@ -42,7 +43,7 @@ module FeaturedContent = {
   [@react.component]
   let make = () => {
     <div>
-      <h4 className=Theme.Type.metadata>
+      <h4 className=Styles.label>
         {React.string("Genesis Program / O(1) Labs")}
       </h4>
       <img
@@ -93,7 +94,6 @@ module ContentColumn = {
   [@react.component]
   let make = () => {
     <div>
-      <Rule color=Theme.Colors.digitalBlack />
       <Content title="Protocol Infrastructure Engineer" url="/" />
       <Content title="Protocol Infrastructure Engineer" url="/" />
       <Content title="Protocol Infrastructure Engineer" url="/" />
@@ -111,6 +111,10 @@ let make = () => {
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
     </>
-    <div className=Styles.content> <FeaturedContent /> <ContentColumn /> </div>
+    <div className=Styles.content>
+      <Rule color=Theme.Colors.black />
+      <FeaturedContent />
+      <ContentColumn />
+    </div>
   </div>;
 };
