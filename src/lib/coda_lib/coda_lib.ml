@@ -474,7 +474,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     let nonces =
       List.map pooled_transactions
         ~f:
-          (Fn.compose User_command.nonce
+          (Fn.compose User_command.nonce_exn
              Transaction_hash.User_command_with_valid_signature.command)
     in
     (* The last nonce gives us the maximum nonce in the transaction pool *)
@@ -537,7 +537,7 @@ module Root_diff = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { user_commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
 
       let to_latest = Fn.id
@@ -569,7 +569,10 @@ let root_diff t =
         | Some frontier ->
             let root = Transition_frontier.root frontier in
             Strict_pipe.Writer.write root_diff_writer
-              { user_commands= Transition_frontier.Breadcrumb.user_commands root
+              { commands=
+                  List.map
+                    (Transition_frontier.Breadcrumb.commands root)
+                    ~f:(With_status.map ~f:User_command.forget_check)
               ; root_length= length_of_breadcrumb root } ;
             Broadcast_pipe.Reader.iter
               Transition_frontier.(
@@ -591,9 +594,13 @@ let root_diff t =
                         Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
-                        { user_commands=
-                            Transition_frontier.Breadcrumb.user_commands
+                        { commands=
+                            Transition_frontier.Breadcrumb.commands
                               new_root_breadcrumb
+                            |> List.map
+                                 ~f:
+                                   (With_status.map
+                                      ~f:User_command.forget_check)
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -979,7 +986,7 @@ let create (config : Config.t) =
             Strict_pipe.(create ~name:"local snark work" Synchronous)
           in
           let txn_pool_config =
-            Network_pool.Transaction_pool.Resource_pool.make_config
+            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
@@ -1006,7 +1013,9 @@ let create (config : Config.t) =
                   else
                     (*callback for the result from transaction_pool.apply_diff*)
                     Strict_pipe.Writer.write local_txns_writer
-                      (user_commands, result_cb)
+                      ( List.map user_commands ~f:(fun c ->
+                            User_command.Signed_command c )
+                      , result_cb )
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"

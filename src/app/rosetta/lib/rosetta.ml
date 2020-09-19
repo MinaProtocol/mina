@@ -3,19 +3,21 @@ open Async
 open Rosetta_lib
 
 let router ~graphql_uri ~db ~logger route body =
-  match route with
-  | "network" :: tl ->
-      Network.router tl body ~db ~graphql_uri ~logger
-  | "account" :: tl ->
-      Account.router tl body ~db ~graphql_uri ~logger
-  | "mempool" :: tl ->
-      Mempool.router tl body ~db ~graphql_uri ~logger
-  | "block" :: tl ->
-      Block.router tl body ~db ~graphql_uri ~logger
-  | "construction" :: tl ->
-      Construction.router tl body ~graphql_uri ~logger
-  | _ ->
-      Deferred.return (Error `Page_not_found)
+  try
+    match route with
+    | "network" :: tl ->
+        Network.router tl body ~db ~graphql_uri ~logger
+    | "account" :: tl ->
+        Account.router tl body ~db ~graphql_uri ~logger
+    | "mempool" :: tl ->
+        Mempool.router tl body ~db ~graphql_uri ~logger
+    | "block" :: tl ->
+        Block.router tl body ~db ~graphql_uri ~logger
+    | "construction" :: tl ->
+        Construction.router tl body ~graphql_uri ~logger
+    | _ ->
+        Deferred.return (Error `Page_not_found)
+  with exn -> Deferred.return (Error (`Exception exn))
 
 let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let uri = Cohttp_async.Request.uri req in
@@ -29,6 +31,8 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
                `App e
            | `Page_not_found ->
                `Page_not_found
+           | `Exception exn ->
+               `Exception exn
            | `Connect_failed _e ->
                `App (Errors.create (`Sql "Connect failed"))
            | `Connect_rejected _e ->
@@ -47,6 +51,13 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
         |> Deferred.Result.fail |> Errors.Lift.wrap
   in
   let lift x = `Response x in
+  let respond_500 error =
+    Cohttp_async.Server.respond_string
+      ~status:(Cohttp.Code.status_of_code 500)
+      (Yojson.Safe.to_string (Rosetta_models.Error.to_yojson error))
+      ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
+    >>| lift
+  in
   match result with
   | Ok json ->
       Cohttp_async.Server.respond_string
@@ -55,15 +66,18 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
       >>| lift
   | Error `Page_not_found ->
       Cohttp_async.Server.respond (Cohttp.Code.status_of_code 404) >>| lift
+  | Error (`Exception exn) ->
+      let exn_str = Exn.to_string_mach exn in
+      [%log warn]
+        ~metadata:[("exception", `String exn_str)]
+        "Exception when processing request" ;
+      let error = Errors.create (`Exception exn_str) |> Errors.erase in
+      respond_500 error
   | Error (`App app_error) ->
       let error = Errors.erase app_error in
       let metadata = [("error", Rosetta_models.Error.to_yojson error)] in
       [%log warn] ~metadata "Error response: $error" ;
-      Cohttp_async.Server.respond_string
-        ~status:(Cohttp.Code.status_of_code 500)
-        (Yojson.Safe.to_string (Rosetta_models.Error.to_yojson error))
-        ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
-      >>| lift
+      respond_500 error
 
 let command =
   let open Command.Let_syntax in
