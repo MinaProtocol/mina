@@ -1,3 +1,15 @@
+module type Stable_v1 = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.V1.t [@@deriving sexp, compare, yojson]
+end
+
 module type Inputs_intf = sig
   open Intf
 
@@ -16,6 +28,20 @@ module type Inputs_intf = sig
 
     val create :
       Unsigned.Size_t.t -> Unsigned.Size_t.t -> Unsigned.Size_t.t -> t
+  end
+
+  module Scalar_field : sig
+    include Stable_v1
+
+    include Type_with_delete with type t := t
+
+    val one : t
+
+    module Vector : sig
+      include Vector with type elt = t
+
+      module Double : Double with type elt := t
+    end
   end
 
   module Index : sig
@@ -85,13 +111,14 @@ module type Inputs_intf = sig
 
     val emul3_comm : t -> Poly_comm.Backend.t
   end
+
 end
 
 module Make (Inputs : Inputs_intf) = struct
   open Core_kernel
   open Inputs
 
-  type t = Index.t
+  type t = {index : Index.t ; cs : (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t}
 
   let name = sprintf "%s_%d_v2" name (Pickles_types.Nat.to_int Rounds.n)
 
@@ -148,14 +175,16 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create {Plonk_constraint_system.auxiliary_input_size; gates} =
-    let t = Index.create gates (Unsigned.Size_t.of_int auxiliary_input_size) (load_urs ())
-    in Caml.Gc.finalise Index.delete t ;
-    t
+  let create cs =
+    let {Plonk_constraint_system.auxiliary_input_size; gates} = cs in
+    let index = Index.create gates (Unsigned.Size_t.of_int auxiliary_input_size) (load_urs ())
+    in Caml.Gc.finalise Index.delete index ;
+    {index ; cs}
 
-  let vk t = Verifier_index.create t
+  let vk t = Verifier_index.create t.index
 
-  let pk = Fn.id
+  (* let pk = Fn.id   this breaks Snarky backend interface *)
+  let pk t = t.index
 
   open Pickles_types
 end

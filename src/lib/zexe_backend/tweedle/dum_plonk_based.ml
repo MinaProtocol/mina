@@ -40,6 +40,7 @@ module Verification_key = struct
 end
 
 module Proof = Dlog_plonk_based_proof.Make (struct
+  module Constraint_system = R1CS_constraint_system
   module Scalar_field = Field
   module Backend = B.Field_proof
   module Verifier_index = B.Field_verifier_index

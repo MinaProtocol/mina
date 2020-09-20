@@ -155,7 +155,7 @@ struct
    external variables and previously generated internal variables.
 *)
 
-  let compute_witness sys ~(external_values : int -> Fp.t) : Fp.t array array =
+  let compute_witness sys (external_values : int -> Fp.t) : Fp.t array array =
     let internal_values : Fp.t Internal_var.Table.t = Internal_var.Table.create () in
     let res = Array.init sys.next_row ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
     let compute ((lc, c) : ((Fp.t * V.t) list * Fp.t option)) =
@@ -331,8 +331,7 @@ let create () =
 
   let add_constraint ?label:_ sys (constr : (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic) =
 
-    let deb = Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr) in
-    print_endline deb;
+    (*print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr));*)
 
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =

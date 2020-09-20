@@ -105,6 +105,12 @@ module type Inputs_intf = sig
     module Double : Double with type elt := t
 end
 
+  module Constraint_system : sig
+    type t
+  
+    val compute_witness : t -> (int -> Scalar_field.t) -> Scalar_field.t array array
+  end
+
   module Index : sig
     type t
   end
@@ -185,6 +191,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Backend = Backend
   module Fq = Scalar_field
   module G = Curve
+  module CS = Constraint_system
 
   module Challenge_polynomial = struct
     [%%versioned
@@ -380,6 +387,14 @@ module Make (Inputs : Inputs_intf) = struct
     to_backend' chal_polys (field_vector_of_list primary_input) t
 
   let create ?message pk ~primary ~auxiliary =
+    let external_values i =
+      if i = 0 then Fq.one
+      else if i - 1 < Fq.Vector.length primary
+      then Fq.Vector.get primary (i - 1)
+      else Fq.Vector.get auxiliary (i - 1 - Fq.Vector.length primary)
+    in
+    (*let witness = CS.compute_witness external_values
+    in*)
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
