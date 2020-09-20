@@ -14,7 +14,7 @@ let make = (~overflowHidden=false, ~children) => {
         ),
         media(
           Theme.MediaQuery.tablet,
-          [maxWidth(`rem(89.0)), ...paddingX(`rem(2.5))],
+          [maxWidth(`rem(80.0)), ...paddingX(`rem(2.5))],
         ),
         ...paddingX(`rem(1.5)),
       ],

@@ -81,51 +81,106 @@ module Styles = {
     style([width(`percent(100.)), height(`auto), maxWidth(`rem(29.))]);
 };
 
-type section = {
-  title: string,
-  description: string,
-  linkCopy: string,
-  linkUrl: string,
-  image: string,
+module Section = {
+  module SimpleRow = {
+    type t = {
+      title: string,
+      description: string,
+      buttonCopy: string,
+      buttonUrl: string,
+      image: string,
+    };
+
+    [@react.component]
+    let make = (~rows) => {
+      rows
+      |> Array.mapi((idx, row) => {
+           <div
+             key={row.title}
+             className={Styles.rowContainer(
+               ~reverse={
+                 idx mod 2 != 0;
+               },
+               (),
+             )}>
+             <div className=Styles.textContainer>
+               <div
+                 className={Styles.seperator("0" ++ string_of_int(idx + 1))}
+               />
+               <h2 className=Styles.title> {React.string(row.title)} </h2>
+               <p className=Styles.paragraphText>
+                 {React.string(row.description)}
+               </p>
+               <Button bgColor=Theme.Colors.orange>
+                 {React.string(row.buttonCopy)}
+                 <Icon kind=Icon.ArrowRightMedium />
+               </Button>
+             </div>
+             <img src={row.image} className=Styles.image />
+           </div>
+         })
+      |> React.array;
+    };
+  };
+
+  module FeaturedRow = {
+    type t = {
+      title: string,
+      description: string,
+      linkCopy: string,
+      linkUrl: string,
+      image: string,
+    };
+
+    [@react.component]
+    let make = (~rows) => {
+      rows
+      |> Array.mapi((idx, row) => {
+           <div
+             key={row.title}
+             className={Styles.rowContainer(
+               ~reverse={
+                 idx mod 2 != 0;
+               },
+               (),
+             )}>
+             <div className=Styles.textContainer>
+               <div
+                 className={Styles.seperator("0" ++ string_of_int(idx + 1))}
+               />
+               <h2 className=Styles.title> {React.string(row.title)} </h2>
+               <p className=Styles.paragraphText>
+                 {React.string(row.description)}
+               </p>
+               <Next.Link href={row.linkUrl}>
+                 <span className=Styles.linkText>
+                   <span> {React.string(row.linkCopy)} </span>
+                   <span className=Styles.icon>
+                     <Icon kind=Icon.ArrowRightMedium />
+                   </span>
+                 </span>
+               </Next.Link>
+             </div>
+             <img src={row.image} className=Styles.image />
+           </div>
+         })
+      |> React.array;
+    };
+  };
+
+  type t =
+    | SimpleRow(array(SimpleRow.t))
+    | FeaturedRow(array(FeaturedRow.t));
 };
 
 [@react.component]
-let make = (~sections: array(section)) => {
+let make = (~sections: Section.t) => {
   <div className=Styles.sectionBackgroundImage>
     <Wrapped>
-      {sections
-       |> Array.mapi((idx, section) => {
-            <div
-              key={section.title}
-              className={Styles.rowContainer(
-                ~reverse={
-                  idx mod 2 != 0;
-                },
-                (),
-              )}>
-              <div className=Styles.textContainer>
-                <div
-                  className={Styles.seperator("0" ++ string_of_int(idx + 1))}
-                />
-                <h2 className=Styles.title>
-                  {React.string(section.title)}
-                </h2>
-                <p className=Styles.paragraphText>
-                  {React.string(section.description)}
-                </p>
-                <Next.Link href={section.linkUrl}>
-                  <span className=Styles.linkText>
-                    <span> {React.string(section.linkCopy)} </span>
-                    <span className=Styles.icon>
-                      <Icon kind=Icon.ArrowRightMedium />
-                    </span>
-                  </span>
-                </Next.Link>
-              </div>
-              <img src={section.image} className=Styles.image />
-            </div>
-          })
-       |> React.array}
+      {switch (sections) {
+       | Section.FeaturedRow(rows) => <Section.FeaturedRow rows />
+       | Section.SimpleRow(rows) => <Section.SimpleRow rows />
+       }}
     </Wrapped>
   </div>;
 };
