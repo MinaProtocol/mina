@@ -3,6 +3,7 @@ open Css;
 module Colors = {
   let orange = `hex("ff603b");
   let mint = `hex("9fe4c9");
+  let greyScale = `hex("757575");
   let gray = `hex("d9d9d9");
   let white = Css.white;
   let black = Css.black;
@@ -169,7 +170,6 @@ module Type = {
       fontSize(`rem(0.75)),
       fontWeight(`num(500)),
       lineHeight(`rem(1.)),
-      color(Colors.digitalBlack),
       textTransform(`uppercase),
       letterSpacing(`px(1)),
     ]);
