@@ -53,7 +53,6 @@ module Styles = {
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
         textAlign(`center),
-        alignSelf(`center),
         hover([
           color(white),
           after([transform(translate(`rem(-0.25), `rem(-0.25)))]),

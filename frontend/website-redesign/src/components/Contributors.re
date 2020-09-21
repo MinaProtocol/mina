@@ -5,7 +5,7 @@ module Styles = {
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(8.), ~h=`rem(9.5))],
+        [padding2(~v=`rem(8.), ~h=`rem(9.5)), maxWidth(`rem(89.))],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
