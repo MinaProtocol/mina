@@ -7,6 +7,12 @@ module type Inputs_intf = sig
 
   module Gate_vector : T0
 
+  module Constraint_system : sig
+    type t
+
+    val gate_vector : t -> Gate_vector.t
+  end
+
   module Urs : sig
     type t
 
@@ -106,7 +112,8 @@ module Make (Inputs : Inputs_intf) = struct
   let create constraint_system =
     (* TODO: Make this flexible. *)
     let max_poly_size = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-    Index.create constraint_system
+    Index.create
+      (Constraint_system.gate_vector constraint_system)
       (Unsigned.Size_t.of_int max_poly_size)
       (load_urs ())
 

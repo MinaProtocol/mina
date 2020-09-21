@@ -80,6 +80,7 @@ module Keypair = Plonk_dlog_keypair.Make (struct
   module Scalar_field = Field
   module Verifier_index = B.Field_verifier_index
   module Gate_vector = B.Gate_vector
+  module Constraint_system = Constraint_system
 end)
 
 module Oracles = Plonk_dlog_oracles.Make (struct
