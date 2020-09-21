@@ -133,7 +133,7 @@ module Hash = Core.Md5
 let digest (t : _ t) = Hash_state.digest t.hash
 
 module Make (Fp : sig
-    include Field_plonk.S
+    include Field.S
     val to_bigint_raw_noalloc : t -> Bigint.t
   end)
     (Gates : Gate_vector_intf with type field_vector := Fp.Vector.t)

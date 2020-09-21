@@ -2,7 +2,7 @@ open Zexe_backend_common
 open Basic
 module T = Snarky_bn382.Tweedle
 module Field = Fq
-module B = T.Dum.Marlin
+module B = T.Dum
 module Curve = Dum
 
 module Bigint = struct

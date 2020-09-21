@@ -176,8 +176,7 @@ module Make (F : Input_intf) :
   with type Stable.V1.t = F.t
    and module Bigint = F.Bigint
    and type Vector.t = F.Vector.t
-   and type Vector.Triple.t = F.Vector.Triple.t
-  = struct
+   and type Vector.Triple.t = F.Vector.Triple.t = struct
   open F
   module Bigint = Bigint
 

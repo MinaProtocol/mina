@@ -54,11 +54,11 @@ end
 module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dum
   module Base_field = Fp
-  module Backend = Snarky_bn382.Tweedle.Dum.Marlin.Field_poly_comm
+  module Backend = Snarky_bn382.Tweedle.Dum.Field_poly_comm
 end)
 
 module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dee
   module Base_field = Fq
-  module Backend = Snarky_bn382.Tweedle.Dee.Marlin.Field_poly_comm
+  module Backend = Snarky_bn382.Tweedle.Dee.Field_poly_comm
 end)
