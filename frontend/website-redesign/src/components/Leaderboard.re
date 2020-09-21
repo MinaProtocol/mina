@@ -139,10 +139,10 @@ module Styles = {
       width(`percent(100.)),
       borderRadius(px(3)),
       paddingTop(`rem(1.)),
-      Theme.Typeface.ibmplexsans,
+      Theme.Typeface.monumentGrotesk,
       fontSize(rem(1.5)),
       lineHeight(rem(1.5)),
-      color(Theme.Colors.orange),
+      color(Theme.Colors.digitalBlack),
       selector(
         "div:nth-child(even)",
         [
@@ -167,7 +167,7 @@ module Styles = {
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
       gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
-      hover([backgroundColor(`hex("E0E0E0"))]),
+      hover([backgroundColor(Theme.Colors.orangeAlpha(0.1))]),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -214,7 +214,8 @@ module Styles = {
       desktopLeaderboardRow,
       style([
         position(`sticky),
-        backgroundColor(white),
+        backgroundColor(Theme.Colors.digitalBlack),
+        color(white),
         top(`zero),
         zIndex(99),
         display(`none),
@@ -559,7 +560,7 @@ module LeaderboardRow = {
         </div>
       </Next.Link>;
     };
-  }; 
+  };
 
   [@react.component]
   let make = (~sort, ~member) => {

@@ -33,7 +33,7 @@ module Styles = {
       borderRadius(px(4)),
       width(`percent(100.)),
       fontSize(rem(1.)),
-      color(Theme.Colors.orange),
+      color(Theme.Colors.greyScale),
       padding(px(12)),
       marginTop(`rem(0.5)),
       border(px(1), `solid, Theme.Colors.gray),
@@ -74,7 +74,7 @@ module SearchBar = {
   [@react.component]
   let make = (~onUsernameEntered, ~username) => {
     <div className=Styles.searchBar>
-      <span className=Theme.Type.h5>
+      <span className=Theme.Type.inputLabel>
         {React.string("Find Participant")}
       </span>
       <input
@@ -135,7 +135,7 @@ module ToggleButtons = {
     };
 
     <div className=Styles.flexColumn>
-      <h3 className=Theme.Type.paragraphMono> {React.string("View")} </h3>
+      <h3 className=Theme.Type.inputLabel> {React.string("View")} </h3>
       <Spacer height=0.5 />
       <div className=Styles.buttonRow> {renderToggleButtons()} </div>
     </div>;
@@ -164,7 +164,7 @@ module FilterDropdown = {
   [@react.component]
   let make = (~currentFilter, ~onFilterPress, ~filterLabels) => {
     <div className=Styles.flexColumn>
-      <h3 className=Theme.Type.paragraphMono> {React.string("View")} </h3>
+      <h3 className=Theme.Type.inputLabel> {React.string("View")} </h3>
       <Spacer height=0.5 />
       <Dropdown
         items=filterLabels

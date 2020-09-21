@@ -148,7 +148,10 @@ module Styles = {
       style([lineHeight(`px(28)), color(Theme.Colors.orange)]),
     ]);
   let updatedDate =
-    merge([Theme.Type.h6, style([color(Theme.Colors.black)])]);
+    merge([
+      Theme.Type.h6,
+      style([color(Theme.Colors.black), marginTop(`px(12))]),
+    ]);
   let icon =
     style([marginRight(`px(8)), position(`relative), top(`px(1))]);
 };
