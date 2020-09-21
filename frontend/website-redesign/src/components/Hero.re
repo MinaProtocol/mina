@@ -81,14 +81,14 @@ module Styles = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~title, ~header, ~copy) => {
   <div className=Styles.heroContainer>
     <div className=Styles.heroContent>
-      <h4 className=Styles.headerLabel> {React.string("About")} </h4>
-      <h1 className=Styles.header> {React.string("We're on a mission.")} </h1>
+      <h4 className=Styles.headerLabel> {React.string(title)} </h4>
+      <h1 className=Styles.header> {React.string(header)} </h1>
       <p className=Styles.headerCopy>
         {React.string(
-           "To create a vibrant decentralized network and open programmable currency - so we can all participate, build, exchange and thrive.",
+           copy
          )}
       </p>
     </div>
