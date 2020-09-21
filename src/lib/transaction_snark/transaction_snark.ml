@@ -5268,6 +5268,44 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none receiver_account) ) )
 
+    let%test_unit "create new token account fails if claimed token owner is \
+                   also the account creation target and does not exist" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner are the same. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account
+                     { token_owner_pk= fee_payer_pk
+                     ; token_id
+                     ; receiver_pk= fee_payer_pk
+                     ; account_disabled= false })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Option.is_none token_owner_account) ;
+              assert (Option.is_none receiver_account) ) )
+
     let%test_unit "create new token account works for default token" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
