@@ -36,7 +36,7 @@ module Outcome = struct
             Some x
         | `Both (x, y) -> (
           (* This should never happen. Still, we handle it
-          unless the truly unthinkable occurs *)
+          in case the truly unthinkable occurs *)
           match (x, y) with
           | `Valid _, `Valid _ ->
               Some x
@@ -118,8 +118,7 @@ let rec determine_outcome : type p r partial.
           res_xs v
       in
       let length = List.length potentially_invalid in
-      let left = List.take potentially_invalid (length / 2) in
-      let right = List.drop potentially_invalid (length / 2) in
+      let left, right = List.split_n potentially_invalid (length / 2) in
       let%bind outcome_l = outcome left in
       let%map outcome_r = outcome right in
       List.fold known
