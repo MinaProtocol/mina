@@ -105,7 +105,7 @@ module Item = {
       | None => (slug, `Top)
       };
     let isCurrentItem = currentSlug == fullSlug;
-    let href = slugConcat("/docs", fullSlug);
+    let href = fullSlug;
     <li
       className={
         switch (placement) {
