@@ -256,7 +256,7 @@ module SignupWidget = {
       onSubmit={e => {
         ReactEvent.Form.preventDefault(e);
         ReFetch.fetch(
-          "",
+          "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
           ~method_=Post,
           ~body=
             Fetch.BodyInit.makeWithUrlSearchParams(
@@ -279,15 +279,17 @@ module SignupWidget = {
                  {React.string("Good to go!")}
                </span>
                <span>
-                 <button className=Styles.button type_="submit">
-                   {React.string("Continue ")}
-                   <MinaIcon kind=MinaIcon.ArrowRightMedium />
-                 </button>
+                 <Next.Link href="/genesis">
+                   <button className=Styles.button type_="submit">
+                     {React.string("Continue ")}
+                     <MinaIcon kind=MinaIcon.ArrowRightMedium />
+                   </button>
+                 </Next.Link>
                </span>
              </div>
            </div>
          : <div>
-             <h2> {React.string("Sign up to participate in Testworld")} </h2>
+             <h2> {React.string("Sign Up to Receive Updates")} </h2>
              <div
                className=Css.(style([display(`flex), alignItems(`center)]))>
                <input
@@ -347,15 +349,15 @@ let make = () => {
           <div>
             <img className=Styles.logo src="/static/img/testworld_logo.png" />
           </div>
+          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h1> {React.string("Welcome to Testworld")} </h1>
             <p>
               {React.string(
-                 "Get ready to join Coda's adversarial testnet, 'Testworld', starting Tuesday, October 13. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
+                 "Get ready to join Coda's adversarial testnet, Testworld, starting later this year. In contrast to Coda's regular testnet, Testworld is where you will compete with others to maximize the amount of tokens earned, find critical bugs, and push the boundaries of the network in order to make Coda as secure as possible for mainnet.",
                )}
             </p>
           </div>
-          <div className=Styles.textContainer> <SignupWidget /> </div>
           <div className=Styles.textContainer>
             <h2> {React.string("How Testworld works")} </h2>
             <p>
@@ -390,7 +392,7 @@ let make = () => {
                 </span>
               </Next.Link>
               {React.string(
-                 "before mainnet launches in Q4 of this year. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
+                 "before mainnet launches. There are up to 800 Genesis grants still available, and Genesis grant recipients, otherwise known as Genesis Founding Members (GFMs), will each receive 66,000 tokens. ",
                )}
               <Next.Link href="/genesis">
                 <span className=Styles.link>
@@ -400,7 +402,7 @@ let make = () => {
             </span>
             <span className=Css.(style([marginTop(`rem(2.))]))>
               {React.string(
-                 "Prepare to engage in Testworld and we'll see you in October.",
+                 "Prepare to engage in Testworld and we'll see you later this year.",
                )}
             </span>
           </div>
