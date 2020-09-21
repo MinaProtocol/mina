@@ -51,11 +51,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [
-          width(`rem(47.)),
-          height(`rem(25.)),
-          right(`rem(9.5)),
-        ],
+        [width(`rem(47.)), height(`rem(25.)), right(`rem(9.5))],
       ),
     ]);
   let quote =
