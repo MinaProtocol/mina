@@ -9,12 +9,12 @@ let make = (~overflowHidden=false, ~children) => {
       @ [
         margin(`auto),
         media(
-          Theme.MediaQuery.desktop,
-          [maxWidth(`rem(90.0)), ...paddingX(`rem(9.5))],
+          Theme.MediaQuery.tablet,
+          [maxWidth(`rem(85.0)), ...paddingX(`rem(2.5))],
         ),
         media(
-          Theme.MediaQuery.tablet,
-          [maxWidth(`rem(80.0)), ...paddingX(`rem(2.5))],
+          Theme.MediaQuery.desktop,
+          [maxWidth(`rem(90.0)), ...paddingX(`rem(9.5))],
         ),
         ...paddingX(`rem(1.5)),
       ],

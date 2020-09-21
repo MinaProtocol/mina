@@ -119,6 +119,20 @@ let make = () => {
            "Quote / Lorem ipsum dolor sit amet, consectetur amet adipiscing elit, sed do eiusmod tempor.",
          )}
       </p>
+      <AlternatingSections
+        backgroundImg=""
+        sections={
+          AlternatingSections.Section.SimpleRow([|
+            {
+              AlternatingSections.Section.SimpleRow.title: "Run a Node",
+              description: "You don't have to have expensive hardware, wait days for the blockchain to sync, or use a ton of compute power to participate in consensus. Just follow clear, straightforward instructions and connect to the live peer-to-peer Mina network.",
+              buttonCopy: "Get Started",
+              buttonUrl: "/",
+              image: "/static/img/hands.png",
+            },
+          |])
+        }
+      />
     </div>
   </Page>;
 };

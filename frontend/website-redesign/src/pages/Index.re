@@ -17,7 +17,7 @@ let make = () => {
       <HomepageHero />
       <BlockchainComparison />
       <AlternatingSections
-        backgroundImg="/static/img/HomepageAlternatingSectionsBackground.png"
+        backgroundImg="/static/img/MinaSimplePattern1.png"
         sections={
           AlternatingSections.Section.FeaturedRow([|
             {
@@ -73,20 +73,6 @@ let make = () => {
             buttonTextColor: Theme.Colors.white,
             dark: false,
           },
-        }
-      />
-      <AlternatingSections
-        backgroundImg="/static/img/BackgroundGlowCluster01.png"
-        sections={
-          AlternatingSections.Section.SimpleRow([|
-            {
-              AlternatingSections.Section.SimpleRow.title: "Run a Node",
-              description: "You don't have to have expensive hardware, wait days for the blockchain to sync, or use a ton of compute power to participate in consensus. Just follow clear, straightforward instructions and connect to the live peer-to-peer Mina network.",
-              buttonCopy: "Get Started",
-              buttonUrl: "/",
-              image: "/static/img/hands.png",
-            },
-          |])
         }
       />
     </div>

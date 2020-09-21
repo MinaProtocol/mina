@@ -19,6 +19,7 @@ module Section = {
         display(`flex),
         flexDirection(`column),
         justifyContent(`spaceBetween),
+        width(`percent(100.)),
         alignItems(`center),
         marginTop(`rem(2.)),
         media(
@@ -38,7 +39,10 @@ module Section = {
       ]);
 
     let textContainer =
-      style([maxWidth(`rem(29.)), width(`percent(100.))]);
+      style([
+        width(`percent(100.)),
+        media(Theme.MediaQuery.tablet, [maxWidth(`rem(29.))]),
+      ]);
 
     let title = merge([Theme.Type.h2, style([marginTop(`rem(1.5))])]);
 
@@ -56,7 +60,12 @@ module Section = {
       ]);
 
     let image =
-      style([width(`percent(100.)), height(`auto), maxWidth(`rem(29.))]);
+      style([
+        width(`percent(100.)),
+        height(`auto),
+        maxWidth(`rem(29.)),
+        marginTop(`rem(2.)),
+      ]);
   };
   module SimpleRow = {
     type t = {
@@ -70,10 +79,16 @@ module Section = {
     module Styles = {
       open Css;
 
-      let seperator =
-        style([borderBottom(`px(1), `solid, Theme.Colors.digitalBlack)]);
+      let rowContainer = (~reverse=false, ()) =>
+        merge([
+          SectionStyles.rowContainer(~reverse, ()),
+          style([borderTop(`px(1), `solid, Theme.Colors.digitalBlack)]),
+        ]);
 
       let button = style([marginTop(`rem(2.))]);
+
+      let image =
+        merge([SectionStyles.image, style([marginTop(`rem(2.))])]);
     };
 
     [@react.component]
@@ -82,14 +97,13 @@ module Section = {
       |> Array.mapi((idx, row) => {
            <div
              key={row.title}
-             className={SectionStyles.rowContainer(
+             className={Styles.rowContainer(
                ~reverse={
                  idx mod 2 != 0;
                },
                (),
              )}>
              <div className=SectionStyles.textContainer>
-               <div className=Styles.seperator />
                <h2 className=SectionStyles.title>
                  {React.string(row.title)}
                </h2>
@@ -105,7 +119,7 @@ module Section = {
                  </Button>
                </div>
              </div>
-             <img src={row.image} className=SectionStyles.image />
+             <img src={row.image} className=Styles.image />
            </div>
          })
       |> React.array;
@@ -193,7 +207,7 @@ module Section = {
 };
 
 [@react.component]
-let make = (~backgroundImg, ~sections: Section.t) => {
+let make = (~backgroundImg, ~sections) => {
   <div className={Styles.sectionBackgroundImage(backgroundImg)}>
     <Wrapped>
       {switch (sections) {
