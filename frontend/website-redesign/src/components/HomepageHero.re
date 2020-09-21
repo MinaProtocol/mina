@@ -7,6 +7,7 @@ module Styles = {
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/HeroSectionBackground.png")),
       media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      position(`relative),
     ]);
 
   let container =
@@ -79,7 +80,12 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon = style([marginTop(`rem(0.65)), marginLeft(`rem(0.5))]);
+  let buttonIcon =
+    style([
+      marginTop(`rem(0.65)),
+      marginLeft(`rem(0.5)),
+      color(hex("#FF603B")),
+    ]);
 
   let heroText =
     merge([
@@ -138,7 +144,7 @@ let make = () => {
                   width={`rem(13.5)}>
                   <span> {React.string("See Behind The Tech")} </span>
                   <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall currentColor="#FF603B" />
+                    <Icon kind=Icon.ArrowRightSmall />
                   </span>
                 </Button>
               </span>
