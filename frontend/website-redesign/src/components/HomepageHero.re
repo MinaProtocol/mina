@@ -7,6 +7,7 @@ module Styles = {
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/HeroSectionBackground.png")),
       media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      position(`relative),
     ]);
 
   let container =
@@ -83,7 +84,7 @@ module Styles = {
     style([
       marginTop(`rem(0.65)),
       marginLeft(`rem(0.5)),
-      color(Theme.Colors.orange),
+      color(hex("#FF603B")),
     ]);
 
   let heroText =
@@ -134,17 +135,19 @@ let make = () => {
               </p>
             </span>
             <span className=Styles.heroButton>
-              <Button
-                href="/tech"
-                bgColor=Theme.Colors.white
-                paddingX=1.
-                width={`rem(13.5)}>
-                <span> {React.string("See Behind The Tech")} </span>
-                <span className=Styles.buttonIcon>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
-              </Button>
-            </span>
+              //TODO: Add link to tech
+
+                <Button
+                  href="/"
+                  bgColor=Theme.Colors.white
+                  paddingX=1.
+                  width={`rem(13.5)}>
+                  <span> {React.string("See Behind The Tech")} </span>
+                  <span className=Styles.buttonIcon>
+                    <Icon kind=Icon.ArrowRightSmall />
+                  </span>
+                </Button>
+              </span>
           </div>
           <div className=Styles.heroImageContainer>
             <img

@@ -264,11 +264,12 @@ module Type = {
 
   let sectionSubhead =
     style([
-      Typeface.monumentGroteskMono,
+      Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
       color(Colors.digitalBlack),
+      fontWeight(`light),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
@@ -335,6 +336,8 @@ global(
   "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
   [boxSizing(`borderBox)],
 );
+
+global("body", [unsafe("minWidth", "fit-content")]);
 
 // Reset padding that appears only on some browsers
 global(

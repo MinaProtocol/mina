@@ -41,10 +41,6 @@ else
   opam switch $SWITCH
 fi
 
-# FIXME: Manually pin ocamlgraph while their hosting is down
-opam install conf-autoconf # This is needed because the ocamlgraph opam file is lacking..
-opam pin ocamlgraph https://github.com/backtracking/ocamlgraph/archive/v1.8.8.tar.gz
-
 # All our ocaml packages
 opam switch import src/opam.export
 eval $(opam config env)
