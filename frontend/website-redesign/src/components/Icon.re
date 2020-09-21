@@ -48,7 +48,7 @@ type kind =
  *  Some icons have not been edited for currentColor properties. TODO is to come back and clean them up when needed.
  */
 [@react.component]
-let make = (~kind, ~size=1.5, ~currentColor="white") => {
+let make = (~kind, ~size=1.5) => {
   let iconSize = Js.Float.toString(size *. 16.) ++ "px";
   let sizeValue = Js.Float.toString(size *. 16.);
   <svg
