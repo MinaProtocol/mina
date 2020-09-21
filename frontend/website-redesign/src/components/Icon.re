@@ -844,7 +844,7 @@ let make = (~kind, ~size=1.5) => {
            stroke="currentColor"
          />
          <line x1="1" y1="12.5" x2="23" y2="12.5" stroke="currentColor" />
-       </svg>
+       </>
      | TechnicalGrants =>
        <>
          <g>
