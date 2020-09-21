@@ -758,16 +758,41 @@ module Base = struct
                           || predicate_result )
                       , true )
               in
-              { predicate_failed= false
-              ; source_not_present
-              ; receiver_not_present= false
-              ; amount_insufficient_to_create= false
-              ; token_cannot_create= false
-              ; source_insufficient_balance= false
-              ; source_bad_timing= false
-              ; receiver_exists
-              ; not_token_owner
-              ; token_auth }
+              let ret =
+                { predicate_failed= false
+                ; source_not_present
+                ; receiver_not_present= false
+                ; amount_insufficient_to_create= false
+                ; token_cannot_create= false
+                ; source_insufficient_balance= false
+                ; source_bad_timing= false
+                ; receiver_exists
+                ; not_token_owner
+                ; token_auth }
+              in
+              (* Note: This logic is dependent upon all failures above, so we
+                 have to calculate it separately here. *)
+              if
+                (* If we think the source exists *)
+                (not source_not_present)
+                (* and there is a failure *)
+                && List.exists ~f:Fn.id (to_list ret)
+                (* and the receiver account did not exist *)
+                && (not receiver_exists)
+                (* and the source account was the receiver account *)
+                && Account_id.equal source receiver
+              then
+                (* then the receiver account will not be initialized, and so
+                   the source (=receiver) account will not be present.
+                *)
+                { ret with
+                  source_not_present= true
+                ; not_token_owner=
+                    not Token_id.(equal default (Account_id.token_id receiver))
+                ; token_auth=
+                    not ((not payload.body.token_locked) || predicate_result)
+                }
+              else ret
           | Mint_tokens ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -2353,6 +2378,7 @@ module Base = struct
          in
          Amount.Checked.sub base_amount coinbase_receiver_fee)
     in
+    let receiver_overflow = ref Boolean.false_ in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
         (Frozen_ledger_hash.modify_account_recv
@@ -2446,11 +2472,34 @@ module Base = struct
                    ~then_:Amount.(var_of_t zero)
                    ~else_:amount_for_new_account
                in
-               (* TODO: This case can be contrived using minted tokens, handle
-                  it in the transaction logic and add a case for it to
-                  [User_command_failure.t].
-                *)
-               Balance.Checked.(account.balance + receiver_amount)
+               (* NOTE: Instead of capturing this as part of the user command
+                  failures, we capture it inline here and bubble it out to a
+                  reference. This behavior is still in line with the
+                  out-of-snark transaction logic.
+
+                  Updating [user_command_fails] to include this value from here
+                  onwards will ensure that we do not update the source or
+                  receiver accounts. The only places where [user_command_fails]
+                  may have already affected behaviour are
+                  * when the fee-payer is paying the account creation fee, and
+                  * when a new token is created.
+                  In both of these, this account is new, and will have a
+                  balance of 0, so we can guarantee that there is no overflow.
+               *)
+               let%bind balance, `Overflow overflow =
+                 Balance.Checked.add_amount_flagged account.balance
+                   receiver_amount
+               in
+               let%bind () =
+                 [%with_label "Overflow error only occurs in user commands"]
+                   Boolean.(Assert.any [is_user_command; not overflow])
+               in
+               receiver_overflow := overflow ;
+               Balance.Checked.if_ overflow ~then_:account.balance
+                 ~else_:balance
+             in
+             let%bind user_command_fails =
+               Boolean.(!receiver_overflow || user_command_fails)
              in
              let%bind is_empty_and_writeable =
                (* Do not create a new account if the user command will fail. *)
@@ -2490,6 +2539,9 @@ module Base = struct
              ; timing= account.timing
              ; permissions= account.permissions
              ; snapp= account.snapp } ))
+    in
+    let%bind user_command_fails =
+      Boolean.(!receiver_overflow || user_command_fails)
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -2648,11 +2700,19 @@ module Base = struct
           (let user_command_excess =
              Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
            in
-           let%bind fee_transfer_excess =
-             let%map magnitude =
-               Checked.(payload.body.amount + of_fee payload.common.fee)
+           let%bind fee_transfer_excess, fee_transfer_excess_overflowed =
+             let%map magnitude, `Overflow overflowed =
+               Checked.(
+                 add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+           in
+           let%bind () =
+             (* TODO: Reject this in txn pool before fees-in-tokens. *)
+             [%with_label "Fee excess does not overflow"]
+               Boolean.(
+                 Assert.any
+                   [not is_fee_transfer; not fee_transfer_excess_overflowed])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
              ~else_:user_command_excess)
@@ -5206,6 +5266,44 @@ let%test_module "transaction_snark" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Balance.(equal zero) token_owner_account.balance) ;
+              assert (Option.is_none receiver_account) ) )
+
+    let%test_unit "create new token account fails if claimed token owner is \
+                   also the account creation target and does not exist" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner are the same. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account
+                     { token_owner_pk= fee_payer_pk
+                     ; token_id
+                     ; receiver_pk= fee_payer_pk
+                     ; account_disabled= false })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Option.is_none token_owner_account) ;
               assert (Option.is_none receiver_account) ) )
 
     let%test_unit "create new token account works for default token" =
