@@ -56,15 +56,14 @@ module Styles = {
         alignSelf(`center),
         hover([
           color(white),
-          after([transform(translate(`rem(-0.25), `rem(-0.25))),
-          ]),
+          after([transform(translate(`rem(-0.25), `rem(-0.25)))]),
           backgrounds([
             {
               dark
                 ? `url("/static/ButtonHoverDark.png")
                 : `url("/static/ButtonHoverLight.png");
             },
-            black
+            black,
           ]),
         ]),
       ]),
