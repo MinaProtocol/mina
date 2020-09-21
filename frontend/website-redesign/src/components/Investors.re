@@ -40,7 +40,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(84.))],
+        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(89.))],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -79,7 +79,10 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [gridTemplateColumns([`repeat((`num(6), `rem(11.)))])],
+        [
+          gridTemplateColumns([`repeat((`num(6), `rem(11.)))]),
+          marginBottom(`rem(7.)),
+        ],
       ),
     ]);
   let advisors =
@@ -155,34 +158,35 @@ let make = () => {
           <TeamMember
             fullName="Jill Carlson"
             title="Co-founder, Open Money Initiative"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/carlson.jpg"
           />
           <TeamMember
             fullName="Paul Davidson"
             title="Co-founder & CEO, Alpha Exploration Co."
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/davidson.jpg"
           />
           <TeamMember
             fullName="Joseph Bonneau"
-            title="Head of Product Engineering, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bonneau.jpg"
           />
           <TeamMember
             fullName="Akis Kattis"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/kattis.jpg"
           />
           <TeamMember
             fullName="Benedikt Bunz"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bunz.jpg"
           />
           <TeamMember
             fullName="Amit Sahai"
             title="Director, Center for Encrypted Functionalities"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/sahai.jpg"
           />
         </div>
+      <Spacer height=2. />
       <Rule color=Theme.Colors.black />
     </div>
   </div>;
