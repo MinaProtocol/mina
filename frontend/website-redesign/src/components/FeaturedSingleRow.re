@@ -138,7 +138,7 @@ module SingleRow = {
               <span className=RowStyles.buttonText>
                 {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall currentColor="white" />
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
               </span>
             </Button>
@@ -196,7 +196,7 @@ module SingleRow = {
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall currentColor="black" />
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
               </span>
             </Button>
