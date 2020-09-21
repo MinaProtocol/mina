@@ -58,6 +58,15 @@ module Proving_key = struct
   let of_string _ = failwith "TODO"
 end
 
+module Params = struct
+  let params =
+    Sponge.Params.(
+      map tweedle_q ~f:(fun x ->
+          Field.of_bigint (Bigint256.of_decimal_string x) ))
+end
+
+module Constraint_system =
+  Plonk_constraint_system.Make (Field) (B.Gate_vector) (Params)
 module Rounds = Rounds.Step
 
 module Keypair = Plonk_dlog_keypair.Make (struct

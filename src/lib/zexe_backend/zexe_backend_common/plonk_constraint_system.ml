@@ -29,16 +29,16 @@ module type Gate_vector_intf = sig
 
   val create : unit -> t
 
-  val add_gate :
+  val add_raw :
        t
-    -> int
-    -> size_t
-    -> size_t
-    -> int
-    -> size_t
-    -> int
-    -> size_t
-    -> int
+    -> gate_enum:int
+    -> row:size_t
+    -> lrow:size_t
+    -> lcol:int
+    -> rrow:size_t
+    -> rcol:int
+    -> orow:size_t
+    -> ocol:int
     -> field_vector
     -> unit
 end
@@ -265,8 +265,9 @@ struct
   open Position
 
   let add_row sys row t l r o c =
-    Gates.add_gate sys.gates t (of_int sys.next_row) (of_int l.row) l.col
-      (of_int r.row) r.col (of_int o.row) o.col c ;
+    Gates.add_raw sys.gates ~gate_enum:t ~row:(of_int sys.next_row)
+      ~lrow:(of_int l.row) ~lcol:l.col ~rrow:(of_int r.row) ~rcol:r.col
+      ~orow:(of_int o.row) ~ocol:o.col c ;
     sys.next_row <- sys.next_row + 1 ;
     sys.rows_rev <- row :: sys.rows_rev
 
