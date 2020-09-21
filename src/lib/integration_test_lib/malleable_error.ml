@@ -54,12 +54,6 @@ end)
 
 include T
 
-(* let return_without_deferred a =
-  Ok {Accumulator.computation_result= a; soft_errors= []}
-
-let return_unit_without_deferred =
-  Ok {Accumulator.computation_result= (); soft_errors= []} *)
-
 let ok_unit = return ()
 
 let ok_exn (res : 'a t) : 'a Deferred.t =
@@ -156,27 +150,27 @@ let lift_error_set (type a) (m : a t) :
   | Error {Hard_fail.hard_error; soft_errors} ->
       Error (internal_error_set [hard_error] soft_errors)
 
-module Map = struct
-  let rec malleable_error_list_iter ls ~f =
+module List = struct
+  let rec iter ls ~f =
     let open T.Let_syntax in
     match ls with
     | [] ->
         return ()
     | h :: t ->
         let%bind () = f h in
-        malleable_error_list_iter t ~f
+        iter t ~f
 
-  let rec malleable_error_list_map ls ~f =
+  let rec map ls ~f =
     let open T.Let_syntax in
     match ls with
     | [] ->
         return []
     | h :: t ->
         let%bind h' = f h in
-        let%map t' = malleable_error_list_map t ~f in
+        let%map t' = map t ~f in
         h' :: t'
 
-  let rec malleable_error_list_fold_left_while ls ~init ~f =
+  let rec fold_left_while ls ~init ~f =
     let open T.Let_syntax in
     match ls with
     | [] ->
@@ -186,7 +180,7 @@ module Map = struct
         | `Stop init' ->
             return init'
         | `Continue init' ->
-            malleable_error_list_fold_left_while t ~init:init' ~f )
+            fold_left_while t ~init:init' ~f )
 end
 
 (* Unit tests to follow *)
@@ -271,7 +265,7 @@ let%test_unit "malleable error test 3: ok result that accumulates soft errors"
         (Ok
            { Accumulator.computation_result= "123"
            ; soft_errors=
-               List.map ["a"; "b"]
+               Base.List.map ["a"; "b"]
                  ~f:(Fn.compose Test_error.raw_internal_error Error.of_string)
            }) )
 

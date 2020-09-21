@@ -181,7 +181,7 @@ module Subscription = struct
     | [] | ["DATA"] ->
         return []
     | "DATA" :: data ->
-        Malleable_error.Map.malleable_error_list_map data ~f:load_config_json
+        Malleable_error.List.map data ~f:load_config_json
     | _ ->
         Malleable_error.hard_error_string
           (sprintf "Invalid subscription pull result: %s" result)
@@ -443,7 +443,7 @@ let rec pull_subscription_in_background ~logger ~subscription_name
     uninterruptible
       (let open Malleable_error.Let_syntax in
       let%bind logs = Subscription.pull subscription in
-      Malleable_error.Map.malleable_error_list_map logs ~f:parse_subscription)
+      Malleable_error.List.map logs ~f:parse_subscription)
   in
   [%log info] "Pulling %s subscription" subscription_name ;
   let%bind () =
@@ -664,7 +664,7 @@ let wait_for' :
           ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
           "Pulled $n logs for blocks produced: $logs" ;
         let%bind finished, aggregated_res' =
-          Malleable_error.Map.malleable_error_list_fold_left_while logs
+          Malleable_error.List.fold_left_while logs
             ~init:(false, aggregated_res) ~f:(fun (_, acc) log ->
               let open Malleable_error.Let_syntax in
               let%map result = Block_produced_query.parse log in
