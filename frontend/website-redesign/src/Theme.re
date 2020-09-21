@@ -228,7 +228,7 @@ module Type = {
     ]);
 
   let metadata_ = [
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`px(12)),
       lineHeight(`rem(1.)),
       letterSpacing(`em(0.05)),

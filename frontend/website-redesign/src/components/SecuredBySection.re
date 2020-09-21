@@ -43,6 +43,7 @@ module Styles = {
         ],
       ),
     ]);
+
   let gridItem1 = style([unsafe("grid-area", "1 / 1 / 2 / 2")]);
   let gridItem2 = style([unsafe("grid-area", "2 / 1 / 3 / 2")]);
   let gridItem3 =
