@@ -23,7 +23,7 @@
     "emotion-server": "^10.0.17",
     "isomorphic-unfetch": "^3.0.0",
     "moment": "^2.26.0",
-    "next": "latest",
+    "next": "^9.5.3",
     "next-transpile-modules": "2.3.1",
     "nextjs-morph-page": "^2.0.3",
     "react": "^16.8.6",
@@ -45,6 +45,7 @@
     "@2fd/graphdoc": "^2.4.0",
     "@babel/core": "^7.4.3",
     "@next/bundle-analyzer": "^9.1.4",
+    "babel-plugin-module-resolver": "^4.0.0",
     "bs-platform": "7.0.0-dev.1",
     "concurrently": "^4.1.0",
     "rehype-highlight": "^3.1.0"

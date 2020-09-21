@@ -5,7 +5,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       display(`flex),
-      width(`rem(50.)),
+      width(`percent(100.)),
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignContent(`spaceAround),
@@ -28,9 +28,6 @@ module Styles = {
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
-    <AnnouncementBanner>
-      {React.string("Mainnet is live!")}
-    </AnnouncementBanner>
     <div className=Styles.page>
       <div className=Styles.container>
         /*** Regular buttons */
@@ -39,7 +36,7 @@ let make = () => {
             {React.string("Button Label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.mint>
+          <Button bgColor=Theme.Colors.mint dark=true>
             {React.string("Button label ")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
@@ -51,7 +48,7 @@ let make = () => {
             {React.string("Button label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          /*** Documentation Button */
+          /*** Documentation Button TODO: Add link for documentation */
           <PromoButton bgColor=Theme.Colors.orange>
             <Icon kind=Icon.Documentation size=2.5 />
             <span className=Styles.documentationButton>

@@ -218,8 +218,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let ip_for_peer t peer_id =
       Deferred.return (Hashtbl.find t.peer_table peer_id)
-
-    let net2 _ = None
   end
 
   type network = Network.t

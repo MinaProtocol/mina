@@ -23,7 +23,7 @@ PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # rebuild
 pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe
+PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe src/app/rosetta/ocaml-signer/signer.exe
 popd
 
 # make genesis (synchronously)
@@ -68,12 +68,19 @@ if [[ "$ARG" == "CURL" ]]; then
   echo "Running for curl mode, no agent present"
   sleep infinity
 else
+  if [[ "$ARG" == "FOREVER" ]]; then
+    echo "Running forever, not exiting agent afterwards"
+    EXTRA_FLAGS=" -dont-exit"
+  else
+    EXTRA_FLAGS=""
+  fi
+
   # test agent
   ../../../_build/default/src/app/rosetta/test-agent/agent.exe \
     -graphql-uri http://localhost:3085/graphql \
     -rosetta-uri http://localhost:3087/ \
     -log-level Trace \
-    -log-json &
+    -log-json $EXTRA_FLAGS &
 
   # wait for test agent to exit (asynchronously)
   AGENT_PID=$!

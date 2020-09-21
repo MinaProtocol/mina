@@ -160,6 +160,12 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
       let acc = f init x in
       fold xs ~f ~init:acc
 
+let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
+ fun v ~f ->
+  with_return (fun {return} ->
+      iter v ~f:(fun x -> if not (f x) then return false) ;
+      true )
+
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
 

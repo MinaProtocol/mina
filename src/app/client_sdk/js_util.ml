@@ -6,7 +6,7 @@ open Coda_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Global_slot = Coda_numbers_nonconsensus.Global_slot
-module Memo = User_command_memo
+module Memo = Signed_command_memo
 module Signature_lib = Signature_lib_nonconsensus
 
 type string_js = Js.js_string Js.t
@@ -33,7 +33,7 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   let valid_until = Js.to_string valid_until_js |> Global_slot.of_string in
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
-  User_command_payload.Common.Poly.
+  Signed_command_payload.Common.Poly.
     {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
 type payment_payload_js =
@@ -60,13 +60,13 @@ let payment_body_of_js payment_payload =
   let amount =
     payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
   in
-  User_command_payload.Body.Payment
+  Signed_command_payload.Body.Payment
     Payment_payload.Poly.{source_pk; receiver_pk; token_id; amount}
 
-let payload_of_payment_js payment_js : User_command_payload.t =
+let payload_of_payment_js payment_js : Signed_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
   let body = payment_body_of_js payment_js##.paymentPayload in
-  User_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{common; body}
 
 type stake_delegation_payload_js =
   < delegator: string_js Js.prop ; newDelegate: string_js Js.prop > Js.t
@@ -85,13 +85,13 @@ let stake_delegation_body_of_js delegation_payload =
     Js.to_string delegation_payload##.newDelegate
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
-  User_command_payload.Body.Stake_delegation
+  Signed_command_payload.Body.Stake_delegation
     (Set_delegate {delegator; new_delegate})
 
-let payload_of_stake_delegation_js payment_js : User_command_payload.t =
+let payload_of_stake_delegation_js payment_js : Signed_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
   let body = stake_delegation_body_of_js payment_js##.delegationPayload in
-  User_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{common; body}
 
 type signature_js =
   < field: string_js Js.readonly_prop ; scalar: string_js Js.readonly_prop >

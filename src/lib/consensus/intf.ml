@@ -171,12 +171,7 @@ module type Snark_transition = sig
   type consensus_transition_var
 
   module Poly : sig
-    type ( 'blockchain_state
-         , 'consensus_transition
-         , 'amount
-         , 'public_key
-         , 'pending_coinbase_action )
-         t
+    type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
     [@@deriving sexp]
   end
 
@@ -187,16 +182,13 @@ module type Snark_transition = sig
   type var =
     ( blockchain_state_var
     , consensus_transition_var
-    , Amount.var
-    , Public_key.Compressed.var
-    , Pending_coinbase.Update.Action.var )
+    , Pending_coinbase.Update.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _) Poly.t -> 'consensus_transition
 
-  val blockchain_state :
-    ('blockchain_state, _, _, _, _) Poly.t -> 'blockchain_state
+  val blockchain_state : ('blockchain_state, _, _) Poly.t -> 'blockchain_state
 end
 
 module type State_hooks = sig
@@ -243,7 +235,9 @@ module type State_hooks = sig
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
+    -> ( [`Success of Snark_params.Tick.Boolean.var]
+         * [`Supercharge_coinbase of Snark_params.Tick.Boolean.var]
+         * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -456,6 +450,16 @@ module type S = sig
 
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
+      val blockchain_length_var : var -> Length.Checked.t
+
+      val min_window_density_var : var -> Length.Checked.t
+
+      val total_currency_var : var -> Amount.Checked.t
+
+      val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
+
+      val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
@@ -470,6 +474,10 @@ module type S = sig
 
     module Block_data : sig
       type t
+
+      val epoch_ledger : t -> Coda_base.Sparse_ledger.t
+
+      val global_slot : t -> Coda_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
     end
@@ -519,9 +527,13 @@ module type S = sig
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Produce_now of Signature_lib.Keypair.t * Block_data.t
-      | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
-      ]
+      | `Produce_now of
+        Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
+      | `Produce of
+        Unix_timestamp.t
+        * Signature_lib.Keypair.t
+        * Block_data.t
+        * Public_key.Compressed.t ]
 
     (**
      * Determine if and when to next produce a block. Either informs the callee

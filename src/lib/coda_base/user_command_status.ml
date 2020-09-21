@@ -15,6 +15,10 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
+        | Signed_command_on_snapp_account
+        | Snapp_account_not_present
+        | Update_not_permitted
+        | Incorrect_nonce
       [@@deriving sexp, yojson, eq, compare]
 
       let to_latest = Fn.id
@@ -44,6 +48,14 @@ module Failure = struct
         "Mismatched_token_permissions"
     | Overflow ->
         "Overflow"
+    | Signed_command_on_snapp_account ->
+        "Signed_command_on_snapp_account"
+    | Snapp_account_not_present ->
+        "Snapp_account_not_present"
+    | Update_not_permitted ->
+        "Update_not_permitted"
+    | Incorrect_nonce ->
+        "Incorrect_nonce"
 
   let of_string = function
     | "Predicate" ->
@@ -66,13 +78,16 @@ module Failure = struct
         Ok Mismatched_token_permissions
     | "Overflow" ->
         Ok Overflow
+    | "Snapp_account_not_present" ->
+        Ok Snapp_account_not_present
+    | "Incorrect_nonce" ->
+        Ok Incorrect_nonce
     | _ ->
-        Error "User_command_status.Failure.of_string: Unknown value"
+        Error "Signed_command_status.Failure.of_string: Unknown value"
 
   let describe = function
     | Predicate ->
-        "The fee-payer is not authorised to issue this command for the source \
-         account"
+        "A predicate failed"
     | Source_not_present ->
         "The source account does not exist"
     | Receiver_not_present ->
@@ -93,6 +108,14 @@ module Failure = struct
         "The permissions for this token do not match those in the command"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Signed_command_on_snapp_account ->
+        "The source of a signed command cannot be a snapp account"
+    | Snapp_account_not_present ->
+        "A snapp account does not exist"
+    | Update_not_permitted ->
+        "An account is not permitted to make the given update"
+    | Incorrect_nonce ->
+        "Incorrect nonce"
 end
 
 module Auxiliary_data = struct

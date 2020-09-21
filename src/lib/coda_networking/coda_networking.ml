@@ -9,7 +9,7 @@ open Pipe_lib
 
 let refused_answer_query_string = "Refused to answer_query"
 
-type exn += No_initial_peers
+exception No_initial_peers
 
 type Structured_log_events.t +=
   | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
@@ -1170,8 +1170,6 @@ let get_best_tip t peer =
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
   >>| Fn.const (Ok ())
-
-let net2 t = Gossip_net.Any.net2 t.gossip_net
 
 let try_non_preferred_peers (type b) t input peers ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =
