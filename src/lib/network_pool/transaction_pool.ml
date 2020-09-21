@@ -685,7 +685,7 @@ struct
                 ~f:
                   (List.map
                      ~f:
-                       (Command_transaction.to_verifiable_exn ~ledger ~get
+                       (User_command.to_verifiable_exn ~ledger ~get
                           ~location_of_account)) )
         with
         | None ->

@@ -10,8 +10,8 @@ module Outcome = struct
      whether or not it is valid.
 
      We allow valid proofs to carry data of type 'result, rather than just being
-     propositional. This is to support, e.g., Command_transaction.t's getting
-     verified into a result of type Command_transaction.Valid.t.
+     propositional. This is to support, e.g., User_command.t's getting
+     verified into a result of type User_command.Valid.t.
   *)
   type ('proof, 'result) t = [`Valid of 'result | `Invalid of 'proof] Id.Map.t
   [@@deriving sexp]
@@ -200,7 +200,7 @@ let compare_envelope (e1 : _ Envelope.Incoming.t) (e2 : _ Envelope.Incoming.t)
 module Transaction_pool = struct
   open Coda_base
 
-  type diff = Command_transaction.Verifiable.t list Envelope.Incoming.t
+  type diff = User_command.Verifiable.t list Envelope.Incoming.t
   [@@deriving sexp]
 
   (* A partially verified transaction is either valid, or valid assuming that some list of
@@ -209,9 +209,9 @@ module Transaction_pool = struct
      verify. 
   *)
   type partial_item =
-    [ `Valid of Command_transaction.Valid.t
+    [ `Valid of User_command.Valid.t
     | `Valid_assuming of
-      Command_transaction.Verifiable.t
+      User_command.Verifiable.t
       * ( Pickles.Side_loaded.Verification_key.t
         * Snapp_statement.t
         * Pickles.Side_loaded.Proof.t )
@@ -220,8 +220,7 @@ module Transaction_pool = struct
 
   type partial = partial_item list [@@deriving sexp]
 
-  type t = (diff, partial, Command_transaction.Valid.t list) batcher
-  [@@deriving sexp]
+  type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp]
 
   type input = [`Proof of diff | `Partially_validated of partial]
 

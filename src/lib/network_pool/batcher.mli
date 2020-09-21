@@ -23,6 +23,6 @@ module Transaction_pool : sig
 
   val verify :
        t
-    -> Command_transaction.Verifiable.t list Envelope.Incoming.t
-    -> (Command_transaction.Valid.t list, unit) Result.t Deferred.Or_error.t
+    -> User_command.Verifiable.t list Envelope.Incoming.t
+    -> (User_command.Valid.t list, unit) Result.t Deferred.Or_error.t
 end
