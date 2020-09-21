@@ -619,6 +619,48 @@ pub extern "C" fn zexe_bn382_fq_verifier_index_c_rc_comm(
     ))
 }
 
+// verifier index vector stubs
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_create<'a>(
+) -> *const Vec<*const DlogVerifierIndex<'a, GAffine>> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_length(
+    v: *const Vec<*const DlogVerifierIndex<GAffine>>,
+) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_emplace_back<'a>(
+    v: *mut Vec<*const DlogVerifierIndex<'a, GAffine>>,
+    x: *const DlogVerifierIndex<'a, GAffine>,
+) {
+    let v_ = unsafe { &mut (*v) };
+    v_.push(x);
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_get<'a>(
+    v: *mut Vec<*const DlogVerifierIndex<'a, GAffine>>,
+    i: u32,
+) -> *const DlogVerifierIndex<GAffine> {
+    let v_ = unsafe { &mut (*v) };
+    return v_[i as usize];
+}
+
+#[no_mangle]
+pub extern "C" fn zexe_bn382_fq_verifier_index_vector_delete(
+    v: *mut Vec<*const DlogVerifierIndex<GAffine>>,
+) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
+}
+
 // Fq stubs
 
 #[no_mangle]
@@ -1365,14 +1407,18 @@ pub extern "C" fn zexe_bn382_fq_proof_verify(
 // TODO: Batch verify across different indexes
 #[no_mangle]
 pub extern "C" fn zexe_bn382_fq_proof_batch_verify(
-    index: *const DlogVerifierIndex<GAffine>,
+    indexes: *const Vec<*const DlogVerifierIndex<GAffine>>,
     proofs: *const Vec<DlogProof<GAffine>>,
 ) -> bool {
-    let index = unsafe { &(*index) };
+    let indexes = unsafe { &(*indexes) };
     let proofs = unsafe { &(*proofs) };
     let group_map = <Affine as CommitmentCurve>::Map::setup();
-    let v: Vec<_> = proofs.iter().map(|proof| (index, proof.clone())).collect();
-
+    // TODO: Don't clone
+    let v: Vec<_> = indexes
+        .iter()
+        .zip(proofs.iter())
+        .map(|(&index, p)| (unsafe { &(*index) }, p.clone()))
+        .collect();
     DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters, SC>, DefaultFrSponge<Fq, SC>>(
         &group_map,
         &v,

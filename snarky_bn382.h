@@ -305,6 +305,12 @@ void *zexe_bn382_fp_verifier_index_c_col_comm(void*);
 void *zexe_bn382_fp_verifier_index_c_val_comm(void*);
 void *zexe_bn382_fp_verifier_index_c_rc_comm(void*);
 
+void *zexe_bn382_fp_verifier_index_vector_create();
+int zexe_bn382_fp_verifier_index_vector_length(void *);
+void zexe_bn382_fp_verifier_index_vector_emplace_back(void *, void *);
+void *zexe_bn382_fp_verifier_index_vector_get(void *, int);
+void zexe_bn382_fp_verifier_index_vector_delete(void *);
+
 // Fq verifier index
 void *zexe_bn382_fq_verifier_index_create(void*);
 void zexe_bn382_fq_verifier_index_delete(void*);
@@ -334,6 +340,12 @@ void *zexe_bn382_fq_verifier_index_c_row_comm(void*);
 void *zexe_bn382_fq_verifier_index_c_col_comm(void*);
 void *zexe_bn382_fq_verifier_index_c_val_comm(void*);
 void *zexe_bn382_fq_verifier_index_c_rc_comm(void*);
+
+void *zexe_bn382_fq_verifier_index_vector_create();
+int zexe_bn382_fq_verifier_index_vector_length(void *);
+void zexe_bn382_fq_verifier_index_vector_emplace_back(void *, void *);
+void *zexe_bn382_fq_verifier_index_vector_get(void *, int);
+void zexe_bn382_fq_verifier_index_vector_delete(void *);
 
 // Fp URS
 void *zexe_bn382_fp_urs_create(size_t);
@@ -748,6 +760,12 @@ void *zexe_tweedle_fq_verifier_index_c_col_comm(void*);
 void *zexe_tweedle_fq_verifier_index_c_val_comm(void*);
 void *zexe_tweedle_fq_verifier_index_c_rc_comm(void*);
 
+void *zexe_tweedle_fq_verifier_index_vector_create();
+int zexe_tweedle_fq_verifier_index_vector_length(void *);
+void zexe_tweedle_fq_verifier_index_vector_emplace_back(void *, void *);
+void *zexe_tweedle_fq_verifier_index_vector_get(void *, int);
+void zexe_tweedle_fq_verifier_index_vector_delete(void *);
+
 // Fq URS
 void *zexe_tweedle_fq_urs_create(size_t, size_t, size_t);
 void zexe_tweedle_fq_urs_delete(void*);
@@ -1023,6 +1041,12 @@ void *zexe_tweedle_fp_verifier_index_c_row_comm(void*);
 void *zexe_tweedle_fp_verifier_index_c_col_comm(void*);
 void *zexe_tweedle_fp_verifier_index_c_val_comm(void*);
 void *zexe_tweedle_fp_verifier_index_c_rc_comm(void*);
+
+void *zexe_tweedle_fp_verifier_index_vector_create();
+int zexe_tweedle_fp_verifier_index_vector_length(void *);
+void zexe_tweedle_fp_verifier_index_vector_emplace_back(void *, void *);
+void *zexe_tweedle_fp_verifier_index_vector_get(void *, int);
+void zexe_tweedle_fp_verifier_index_vector_delete(void *);
 
 // Fq URS
 void *zexe_tweedle_fp_urs_create(size_t, size_t, size_t);

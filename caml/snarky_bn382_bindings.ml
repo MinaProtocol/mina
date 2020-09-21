@@ -162,6 +162,54 @@ struct
     foreign (prefix "find_wnaf") (size_t @-> typ @-> returning (ptr void))
 end
 
+module Vector
+    (F : Cstubs_applicative.Foreign_applicative)
+    (P : Prefix)
+    (E : Type_with_finalizer
+         with type 'a result := 'a F.result
+          and type 'a return := 'a F.return) =
+struct
+  open F
+  open F.Let_syntax
+
+  type elt = E.t
+
+  let prefix = with_prefix (P.prefix "vector")
+
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let add_finalizer =
+    F.map delete ~f:(fun delete x ->
+        Caml.Gc.finalise (bind_return ~f:delete) x ;
+        x )
+
+  (* Stub out delete to make sure we don't attempt to double-free. *)
+  let delete : t -> unit = ignore
+
+  let create =
+    let%map create = foreign (prefix "create") (void @-> returning typ)
+    and add_finalizer = add_finalizer in
+    fun () -> add_finalizer (create ())
+
+  let length = foreign (prefix "length") (typ @-> returning int)
+
+  let emplace_back =
+    foreign (prefix "emplace_back") (typ @-> E.typ @-> returning void)
+
+  let get =
+    let%map get = foreign (prefix "get") (typ @-> int @-> returning E.typ)
+    and add_finalizer = E.add_finalizer in
+    fun v i -> add_finalizer (get v i)
+end
+
 module VerifierIndex
     (F : Cstubs_applicative.Foreign_applicative)
     (P : Prefix)
@@ -173,30 +221,34 @@ module VerifierIndex
                 with type 'a result := 'a F.result
                  and type 'a return := 'a F.return) =
 struct
-  include (
-    struct
-        type t = unit ptr
-
-        let typ = ptr void
-      end :
-      Type )
-
   open F
   open F.Let_syntax
 
   let prefix = P.prefix
 
-  let write = foreign (prefix "write") (typ @-> string @-> returning void)
+  module T :
+    Type_with_finalizer
+    with type 'a result := 'a F.result
+     and type 'a return := 'a F.return = struct
+    type t = unit ptr
 
-  let delete = foreign (prefix "delete") (typ @-> returning void)
+    let typ = ptr void
 
-  let add_finalizer =
-    F.map delete ~f:(fun delete x ->
-        Caml.Gc.finalise (bind_return ~f:delete) x ;
-        x )
+    let delete = foreign (prefix "delete") (typ @-> returning void)
+
+    let add_finalizer =
+      F.map delete ~f:(fun delete x ->
+          Caml.Gc.finalise (bind_return ~f:delete) x ;
+          x )
+  end
+
+  include T
+  module Vector = Vector (F) (P) (T)
 
   (* Stub out delete to make sure we don't attempt to double-free. *)
   let delete : t -> unit = ignore
+
+  let write = foreign (prefix "write") (typ @-> string @-> returning void)
 
   let create =
     let%map create = foreign (prefix "create") (Index.typ @-> returning typ)
@@ -534,54 +586,6 @@ struct
   let metadata s = foreign (prefix s) (typ @-> returning size_t)
 
   let public_inputs = metadata "public_inputs"
-end
-
-module Vector
-    (F : Cstubs_applicative.Foreign_applicative)
-    (P : Prefix)
-    (E : Type_with_finalizer
-         with type 'a result := 'a F.result
-          and type 'a return := 'a F.return) =
-struct
-  open F
-  open F.Let_syntax
-
-  type elt = E.t
-
-  let prefix = with_prefix (P.prefix "vector")
-
-  include (
-    struct
-        type t = unit ptr
-
-        let typ = ptr void
-      end :
-      Type )
-
-  let delete = foreign (prefix "delete") (typ @-> returning void)
-
-  let add_finalizer =
-    F.map delete ~f:(fun delete x ->
-        Caml.Gc.finalise (bind_return ~f:delete) x ;
-        x )
-
-  (* Stub out delete to make sure we don't attempt to double-free. *)
-  let delete : t -> unit = ignore
-
-  let create =
-    let%map create = foreign (prefix "create") (void @-> returning typ)
-    and add_finalizer = add_finalizer in
-    fun () -> add_finalizer (create ())
-
-  let length = foreign (prefix "length") (typ @-> returning int)
-
-  let emplace_back =
-    foreign (prefix "emplace_back") (typ @-> E.typ @-> returning void)
-
-  let get =
-    let%map get = foreign (prefix "get") (typ @-> int @-> returning E.typ)
-    and add_finalizer = E.add_finalizer in
-    fun v i -> add_finalizer (get v i)
 end
 
 module Curve
@@ -1153,8 +1157,11 @@ module Dlog_marlin_proof
     (ScalarField : Type_with_finalizer
                    with type 'a result := 'a F.result
                     and type 'a return := 'a F.return)
-    (Index : Type)
-    (VerifierIndex : Type)
+    (Index : Type) (VerifierIndex : sig
+        include Type
+
+        module Vector : Type
+    end)
     (ScalarFieldVector : Type_with_finalizer
                          with type 'a result := 'a F.result
                           and type 'a return := 'a F.return)
@@ -1322,7 +1329,7 @@ struct
 
   let batch_verify =
     foreign (prefix "batch_verify")
-      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
+      (VerifierIndex.Vector.typ @-> Vector.typ @-> returning bool)
 
   let f name f_typ add_finalizer =
     let%map f = foreign (prefix name) (typ @-> returning f_typ)
