@@ -142,7 +142,11 @@ module Styles = {
       ),
     ]);
 
-  let link = merge([Theme.Type.link, style([lineHeight(`px(28))])]);
+  let link =
+    merge([
+      Theme.Type.link,
+      style([lineHeight(`px(28)), color(Theme.Colors.orange)]),
+    ]);
   let updatedDate =
     merge([Theme.Type.h6, style([color(Theme.Colors.black)])]);
   let icon =
@@ -304,11 +308,15 @@ let make = () => {
         <div className=Styles.heroLinks>
           <div className=Styles.flexColumn>
             <Next.Link href="https://bit.ly/leaderboardFAQ">
-              <a className=Styles.link> {React.string("Leaderboard FAQ")} </a>
+              <a className=Styles.link>
+                {React.string("Leaderboard FAQ")}
+                <Icon kind=Icon.Digital />
+              </a>
             </Next.Link>
             <Next.Link href="https://bit.ly/CodaDiscord">
               <a className=Styles.link>
                 {React.string("Discord #Leaderboard Channel")}
+                <Icon kind=Icon.Digital />
               </a>
             </Next.Link>
             <span className=Styles.updatedDate>
