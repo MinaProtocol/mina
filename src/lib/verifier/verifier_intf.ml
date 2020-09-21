@@ -9,10 +9,10 @@ module Base = struct
 
     val verify_commands :
          t
-      -> Coda_base.Command_transaction.Verifiable.t list
+      -> Coda_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
    communicating with the verifier. *)
-      -> [ `Valid of Coda_base.Command_transaction.Valid.t
+      -> [ `Valid of Coda_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t

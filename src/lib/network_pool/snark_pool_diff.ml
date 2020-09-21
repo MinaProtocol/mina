@@ -105,17 +105,6 @@ module Make
     in
     match%map res with false -> None | true -> Some t
 
-  (*
-  let verify pool
-      ({data= Add_solved_work (work, p); sender} as t : t Envelope.Incoming.t)
-      =
-    match%map Pool.verify_and_act pool ~work:(work, p) ~sender with
-    | false ->
-        None
-    | true ->
-        Some t
-
-*)
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in

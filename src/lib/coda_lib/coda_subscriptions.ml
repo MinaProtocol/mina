@@ -18,7 +18,7 @@ end
 
 type t =
   { subscribed_payment_users:
-      User_command.t reader_and_writer Public_key.Compressed.Table.t
+      Signed_command.t reader_and_writer Public_key.Compressed.Table.t
   ; subscribed_block_users:
       (Filtered_external_transition.t, State_hash.t) With_hash.t
       reader_and_writer
@@ -66,14 +66,14 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
               |> Filtered_external_transition.commands
               |> List.map ~f:(fun {With_hash.data; _} -> data)
               |> List.filter_map ~f:(function
-                   | Command_transaction.User_command c ->
+                   | User_command.Signed_command c ->
                        Some c
                    | Snapp_command _ ->
                        None )
-              |> Fn.flip User_command.filter_by_participant participant
+              |> Fn.flip Signed_command.filter_by_participant participant
             in
             List.iter user_commands ~f:(fun user_command ->
-                Pipe.write_without_pushback writer user_command ) ) )
+                Pipe.write_without_pushback_if_open writer user_command ) ) )
   in
   let update_block_subscriptions {With_hash.data= external_transition; hash}
       transactions participants =
@@ -87,7 +87,8 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
                     (`Some (Public_key.Compressed.Set.singleton participant))
                     transactions
                 in
-                Pipe.write_without_pushback writer {With_hash.data; hash} ) )
+                Pipe.write_without_pushback_if_open writer
+                  {With_hash.data; hash} ) )
           ~if_not_found:ignore ) ;
     Hashtbl.find_and_call subscribed_block_users None
       ~if_found:(fun pipes ->

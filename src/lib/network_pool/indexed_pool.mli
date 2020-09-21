@@ -27,12 +27,11 @@ val min_fee : t -> Currency.Fee.t option
 (** Remove the lowest fee command from the pool, along with any others from the
     same account with higher nonces. *)
 val remove_lowest_fee :
-     t
-  -> Transaction_hash.Command_transaction_with_valid_signature.t Sequence.t * t
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
 (** Get the highest fee applicable command in the pool *)
 val get_highest_fee :
-  t -> Transaction_hash.Command_transaction_with_valid_signature.t option
+  t -> Transaction_hash.User_command_with_valid_signature.t option
 
 (** Call this when a transaction is added to the best tip or when generating a
     sequence of transactions to apply. This will drop any transactions at that
@@ -44,14 +43,13 @@ val get_highest_fee :
 *)
 val handle_committed_txn :
      t
-  -> Transaction_hash.Command_transaction_with_valid_signature.t
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> fee_payer_balance:Currency.Amount.t
-  -> ( t
-       * Transaction_hash.Command_transaction_with_valid_signature.t Sequence.t
+  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
      , [ `Queued_txns_by_sender of
          string
-         * Transaction_hash.Command_transaction_with_valid_signature.t
-           Sequence.t ] )
+         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ]
+     )
      Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
@@ -62,11 +60,10 @@ val handle_committed_txn :
 *)
 val add_from_gossip_exn :
      t
-  -> Transaction_hash.Command_transaction_with_valid_signature.t
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> Account_nonce.t
   -> Currency.Amount.t
-  -> ( t
-       * Transaction_hash.Command_transaction_with_valid_signature.t Sequence.t
+  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
      , [> `Invalid_nonce of
           [ `Expected of Account.Nonce.t
           | `Between of Account.Nonce.t * Account.Nonce.t ]
@@ -88,26 +85,24 @@ val add_from_gossip_exn :
     switching chains. Must be called in reverse order i.e. newest-to-oldest.
 *)
 val add_from_backtrack :
-  t -> Transaction_hash.Command_transaction_with_valid_signature.t -> t
+  t -> Transaction_hash.User_command_with_valid_signature.t -> t
 
 (** Check whether a command is in the pool *)
-val member :
-  t -> Transaction_hash.Command_transaction_with_valid_signature.t -> bool
+val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
      t
   -> Account_id.t
-  -> Transaction_hash.Command_transaction_with_valid_signature.t list
+  -> Transaction_hash.User_command_with_valid_signature.t list
 
 (** Get all user commands in the pool. *)
-val get_all :
-  t -> Transaction_hash.Command_transaction_with_valid_signature.t list
+val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
 
 val find_by_hash :
      t
   -> Transaction_hash.t
-  -> Transaction_hash.Command_transaction_with_valid_signature.t option
+  -> Transaction_hash.User_command_with_valid_signature.t option
 
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
@@ -116,7 +111,7 @@ val revalidate :
      t
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
-  -> t * Transaction_hash.Command_transaction_with_valid_signature.t Sequence.t
+  -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

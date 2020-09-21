@@ -107,8 +107,8 @@ module Snarked_ledger_hash = struct
           hash
 end
 
-module Command_transaction = struct
-  module User_command = struct
+module User_command = struct
+  module Signed_command = struct
     type t =
       { typ: string
       ; fee_payer_id: int
@@ -154,9 +154,12 @@ module Command_transaction = struct
            "SELECT id FROM user_commands WHERE hash = ?")
         (Transaction_hash.to_base58_check transaction_hash)
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (t : User_command.t) =
+    let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
+        (t : Signed_command.t) =
       let open Deferred.Result.Let_syntax in
-      let transaction_hash = Transaction_hash.hash_command (User_command t) in
+      let transaction_hash =
+        Transaction_hash.hash_command (Signed_command t)
+      in
       match%bind find (module Conn) ~transaction_hash with
       | Some user_command_id ->
           return user_command_id
@@ -164,17 +167,17 @@ module Command_transaction = struct
           let%bind fee_payer_id =
             Public_key.add_if_doesn't_exist
               (module Conn)
-              (User_command.fee_payer_pk t)
+              (Signed_command.fee_payer_pk t)
           in
           let%bind source_id =
             Public_key.add_if_doesn't_exist
               (module Conn)
-              (User_command.source_pk t)
+              (Signed_command.source_pk t)
           in
           let%bind receiver_id =
             Public_key.add_if_doesn't_exist
               (module Conn)
-              (User_command.receiver_pk t)
+              (Signed_command.receiver_pk t)
           in
           (* TODO: Converting these uint64s to int can overflow; see #5419 *)
           Conn.find
@@ -183,30 +186,35 @@ module Command_transaction = struct
                 receiver_id, fee_token, token, nonce, amount, fee, memo, \
                 hash, status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \
                 ?, ?, ?, ?, ?) RETURNING id")
-            { typ= User_command.tag_string t
+            { typ=
+                ( match via with
+                | `Ident ->
+                    Signed_command.tag_string t
+                | `Snapp_command ->
+                    "snapp" )
             ; fee_payer_id
             ; source_id
             ; receiver_id
             ; fee_token=
-                User_command.fee_token t |> Token_id.to_uint64
+                Signed_command.fee_token t |> Token_id.to_uint64
                 |> Unsigned.UInt64.to_int
             ; token=
-                User_command.token t |> Token_id.to_uint64
+                Signed_command.token t |> Token_id.to_uint64
                 |> Unsigned.UInt64.to_int
-            ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
+            ; nonce= Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount=
-                User_command.amount t
+                Signed_command.amount t
                 |> Core.Option.map ~f:Currency.Amount.to_int
-            ; fee= User_command.fee t |> Currency.Fee.to_int
-            ; memo= User_command.memo t |> User_command_memo.to_string
+            ; fee= Signed_command.fee t |> Currency.Fee.to_int
+            ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
             ; failure_reason= None }
 
-    let add_with_status (module Conn : CONNECTION) (t : User_command.t)
-        (status : User_command_status.t) =
+    let add_with_status ?(via = `Ident) (module Conn : CONNECTION)
+        (t : Signed_command.t) (status : User_command_status.t) =
       let open Deferred.Result.Let_syntax in
-      let%bind user_command_id = add_if_doesn't_exist (module Conn) t in
+      let%bind user_command_id = add_if_doesn't_exist ~via (module Conn) t in
       let ( status_str
           , failure_reason
           , fee_payer_account_creation_fee_paid
@@ -257,9 +265,9 @@ module Command_transaction = struct
       user_command_id
   end
 
-  let as_user_command (t : Command_transaction.t) : Coda_base.User_command.t =
+  let as_signed_command (t : User_command.t) : Coda_base.Signed_command.t =
     match t with
-    | User_command c ->
+    | Signed_command c ->
         c
     | Snapp_command c ->
         let module S = Coda_base.Snapp_command in
@@ -276,7 +284,7 @@ module Command_transaction = struct
                     Option.value (S.nonce c)
                       ~default:Coda_numbers.Account_nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
-                ; memo= User_command_memo.create_from_string_exn "snapp" }
+                ; memo= Signed_command_memo.create_from_string_exn "snapp" }
             ; body=
                 Payment
                   { source_pk= source
@@ -284,15 +292,23 @@ module Command_transaction = struct
                   ; token_id= S.token_id c
                   ; amount } } }
 
-  let add_if_doesn't_exist conn (t : Command_transaction.t) =
-    User_command.add_if_doesn't_exist conn (as_user_command t)
+  let via (t : User_command.t) : [`Snapp_command | `Ident] =
+    match t with
+    | Signed_command _ ->
+        `Ident
+    | Snapp_command _ ->
+        `Snapp_command
 
-  let add_with_status conn (t : Command_transaction.t)
+  let add_if_doesn't_exist conn (t : User_command.t) =
+    Signed_command.add_if_doesn't_exist conn ~via:(via t) (as_signed_command t)
+
+  let add_with_status conn (t : User_command.t)
       (status : User_command_status.t) =
-    User_command.add_with_status conn (as_user_command t) status
+    Signed_command.add_with_status conn ~via:(via t) (as_signed_command t)
+      status
 
   let find conn ~(transaction_hash : Transaction_hash.t) =
-    User_command.find conn ~transaction_hash
+    Signed_command.find conn ~transaction_hash
 end
 
 module Internal_command = struct
@@ -422,7 +438,7 @@ module Block_and_Internal_command = struct
       (block_id, internal_command_id)
 end
 
-module Block_and_User_command = struct
+module Block_and_signed_command = struct
   let add (module Conn : CONNECTION) ~block_id ~user_command_id =
     Conn.exec
       (Caqti_request.exec
@@ -576,7 +592,7 @@ module Block = struct
         let%bind command_ids =
           deferred_result_list_fold commands ~init:[] ~f:(fun acc command ->
               let%map id =
-                Command_transaction.add_with_status
+                User_command.add_with_status
                   (module Conn)
                   command.data command.status
               in
@@ -585,7 +601,7 @@ module Block = struct
         let%bind () =
           deferred_result_list_fold command_ids ~init:()
             ~f:(fun () user_command_id ->
-              Block_and_User_command.add
+              Block_and_signed_command.add
                 (module Conn)
                 ~block_id ~user_command_id
               >>| ignore )
@@ -761,8 +777,8 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
         Deferred.List.iter added ~f:(fun command ->
-            Command_transaction.add_if_doesn't_exist (module Conn) command
-            >>| ignore ) )
+            User_command.add_if_doesn't_exist (module Conn) command >>| ignore
+        ) )
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     ~delete_older_than =

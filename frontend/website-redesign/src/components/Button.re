@@ -13,23 +13,42 @@ module Styles = {
     merge([
       Theme.Type.buttonLabel,
       style([
+        position(`relative),
         display(`flex),
-        justifyContent(`center),
+        justifyContent(`spaceBetween),
         alignItems(`center),
         width(buttonWidth),
         height(buttonHeight),
         border(`px(1), `solid, borderColor),
-        boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
         borderTopLeftRadius(`px(4)),
         borderBottomRightRadius(`px(4)),
         borderTopRightRadius(`px(1)),
         borderBottomLeftRadius(`px(1)),
+        cursor(`pointer),
         textDecoration(`none),
         fontSize(`px(12)),
+        transformStyle(`preserve3d),
+        transition("background", ~duration=200, ~timingFunction=`easeIn),
+        //transition("transform", ~duration=500, ~timingFunction=`easeIn),
+        after([
+          position(`absolute),
+          contentRule(""),
+          top(`rem(0.25)),
+          left(`rem(0.25)),
+          right(`rem(-0.25)),
+          bottom(`rem(-0.25)),
+          borderTopLeftRadius(`px(4)),
+          borderBottomRightRadius(`px(4)),
+          borderTopRightRadius(`px(1)),
+          borderBottomLeftRadius(`px(1)),
+          border(`px(1), `solid, dark ? bgColor : borderColor),
+          transform(translateZ(`px(-1))),
+          transition("transform", ~duration=200, ~timingFunction=`easeIn),
+        ]),
         color(
           {
-            bgColor === Theme.Colors.white ? black : white;
+            bgColor === Theme.Colors.white ? Theme.Colors.digitalBlack : white;
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
@@ -37,18 +56,16 @@ module Styles = {
         alignSelf(`center),
         hover([
           color(white),
-          boxShadow(~x=`px(0), ~y=`px(0), black),
-          unsafe(
-            "transition",
-            "box-shadow 0.2s ease-in, transform 0.5s ease-in",
-          ),
-          background(
+          after([transform(translate(`rem(-0.25), `rem(-0.25))),
+          ]),
+          backgrounds([
             {
               dark
                 ? `url("/static/ButtonHoverDark.png")
                 : `url("/static/ButtonHoverLight.png");
             },
-          ),
+            black
+          ]),
         ]),
       ]),
     ]);
@@ -57,7 +74,6 @@ module Styles = {
 /**
  * Button is light by default, and setting dark to true as a prop will make the background image change accordingly.
  * Buttons have four different colors: orange, mint, black, and white.
- *
  */
 [@react.component]
 let make =

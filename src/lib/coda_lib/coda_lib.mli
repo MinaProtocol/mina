@@ -54,7 +54,7 @@ val add_block_subscriber :
      With_hash.t
      Pipe.Reader.t
 
-val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
 val snark_worker_key : t -> Public_key.Compressed.t option
 
@@ -112,7 +112,7 @@ module Root_diff : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { commands: Command_transaction.Stable.V1.t With_status.Stable.V1.t list
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
     end
   end]

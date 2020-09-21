@@ -1,15 +1,15 @@
 FROM ubuntu:18.04
-# Run with `docker build --build-arg coda_version=<version>`
-ARG coda_version
+# Run with `docker build --build-arg coda_deb_version=<version>`
+ARG coda_deb_version
 ARG deb_repo=stable
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN echo "Building image with version $coda_version"
+RUN echo "Building image with version $coda_dev_version"
 
 # Dependencies
 RUN apt-get -y update && \
-  apt-get -y upgrade && \
-  apt-get -y install \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install \
     curl \
     strace \
     dumb-init \
@@ -27,7 +27,7 @@ RUN apt-get -y update && \
 # coda package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
   && apt-get update \
-  && apt-get install -y "coda-testnet-postake-medium-curves=$coda_version"
+  && apt-get install -y "coda-testnet-postake-medium-curves=$coda_deb_version"
 
 WORKDIR /root
 
@@ -35,15 +35,19 @@ RUN echo '#!/bin/bash -x\n\
 mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
-coda "$@" 2>&1 >coda.log &\n\
-coda_pid=$!\n\
-tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
-tail_pid=$!\n\
-wait "$coda_pid"\n\
-echo "Coda process exited with status code $?"\n\
-sleep 10\n\
-kill "$tail_pid"\n\
-exit 0'\
+while true; do\n\
+  coda "$@" 2>&1 >coda.log &\n\
+  coda_pid=$!\n\
+  tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
+  tail_pid=$!\n\
+  wait "$coda_pid"\n\
+  echo "Coda process exited with status code $?"\n\
+  sleep 10\n\
+  kill "$tail_pid"\n\
+  if [ ! -f stay_alive ]; then\n\
+    exit 0\n\
+  fi\n\
+done'\
 > init_coda.sh
 
 RUN chmod +x init_coda.sh

@@ -23,7 +23,7 @@ struct
       (struct
         type value = Tree_node.t
 
-        type proof_elem = Command_transaction.t
+        type proof_elem = User_command.t
 
         type context = Key_value_db.t * Receipt.Chain_hash.t
 
@@ -38,11 +38,11 @@ struct
           else Key_value_db.get t ~key:parent
       end)
 
-  let cons_command parent_hash (proof_elem : Command_transaction.t) =
+  let cons_command parent_hash (proof_elem : User_command.t) =
     let p =
       match proof_elem with
-      | User_command c ->
-          Receipt.Elt.User_command (User_command.payload c)
+      | Signed_command c ->
+          Receipt.Elt.Signed_command (Signed_command.payload c)
       | Snapp_command x ->
           Receipt.Elt.Snapp_command
             Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
@@ -50,7 +50,7 @@ struct
     Receipt.Chain_hash.cons p parent_hash
 
   module Verifier = Merkle_list_verifier.Make (struct
-    type proof_elem = Command_transaction.t
+    type proof_elem = User_command.t
 
     type hash = Receipt.Chain_hash.t [@@deriving eq]
 
@@ -90,7 +90,7 @@ struct
     let%map result = Key_value_db.get t ~key:receipt in
     result.value
 
-  let add t ~previous (command : Command_transaction.t) =
+  let add t ~previous (command : User_command.t) =
     let open Monad.Let_syntax in
     let receipt_chain_hash = cons_command previous command in
     let%bind tree_node = Key_value_db.get t ~key:receipt_chain_hash in
@@ -147,19 +147,19 @@ let%test_module "receipt_database" =
       |> ignore
 
     let user_command_gen =
-      User_command.Gen.payment_with_random_participants
+      Signed_command.Gen.payment_with_random_participants
         ~keys:
           (Array.init 5 ~f:(fun (_ : int) -> Signature_lib.Keypair.create ()))
         ~max_amount:10000 ~max_fee:1000 ()
 
-    let ucs = List.map ~f:(fun x -> Command_transaction.Poly.User_command x)
+    let ucs = List.map ~f:(fun x -> User_command.Poly.Signed_command x)
 
     (* HACK: Limited tirals because tests were taking too long *)
     let%test_unit "Recording a sequence of user commands can generate a valid \
                    proof from the first user command to the last user command"
         =
       Quickcheck.test ~trials:100
-        ~sexp_of:[%sexp_of: Receipt.Chain_hash.t * User_command.t list]
+        ~sexp_of:[%sexp_of: Receipt.Chain_hash.t * Signed_command.t list]
         Quickcheck.Generator.(
           tuple2 Receipt.Chain_hash.gen (list_non_empty user_command_gen))
         ~f:(fun (initial_receipt_chain, user_commands) ->
@@ -169,7 +169,7 @@ let%test_module "receipt_database" =
               ~f:(fun prev_receipt_chain user_command ->
                 match
                   Receipt_db.add db ~previous:prev_receipt_chain
-                    (User_command user_command)
+                    (Signed_command user_command)
                 with
                 | `Ok new_receipt_chain ->
                     (new_receipt_chain, user_command)
@@ -184,10 +184,11 @@ let%test_module "receipt_database" =
           in
           let proving_receipt =
             Receipt.Chain_hash.cons
-              (User_command (User_command.payload @@ List.hd_exn user_commands))
+              (Signed_command
+                 (Signed_command.payload @@ List.hd_exn user_commands))
               initial_receipt_chain
           in
-          [%test_result: Receipt.Chain_hash.t * Command_transaction.t list]
+          [%test_result: Receipt.Chain_hash.t * User_command.t list]
             ~message:"Proofs should be equal"
             ~expect:
               (proving_receipt, ucs (Non_empty_list.tail expected_merkle_path))
@@ -199,7 +200,7 @@ let%test_module "receipt_database" =
       Quickcheck.test ~trials:100
         ~sexp_of:
           [%sexp_of:
-            Receipt.Chain_hash.t * User_command.t * User_command.t list]
+            Receipt.Chain_hash.t * Signed_command.t * Signed_command.t list]
         Quickcheck.Generator.(
           tuple3 Receipt.Chain_hash.gen user_command_gen
             (list_non_empty user_command_gen))
@@ -208,7 +209,7 @@ let%test_module "receipt_database" =
           let initial_receipt_chain =
             match
               Receipt_db.add db ~previous:prev_receipt_chain
-                (User_command initial_user_command)
+                (Signed_command initial_user_command)
             with
             | `Ok receipt_chain ->
                 receipt_chain
@@ -246,7 +247,7 @@ let%test_module "receipt_database" =
       Quickcheck.test ~trials:100
         ~sexp_of:
           [%sexp_of:
-            Receipt.Chain_hash.t * User_command.t * User_command.t list]
+            Receipt.Chain_hash.t * Signed_command.t * Signed_command.t list]
         Quickcheck.Generator.(
           tuple3 Receipt.Chain_hash.gen user_command_gen
             (list_non_empty user_command_gen))
@@ -260,8 +261,8 @@ let%test_module "receipt_database" =
               List.find_map receipt_chains ~f:(fun receipt_chain ->
                   let new_receipt_chain =
                     Receipt.Chain_hash.cons
-                      (User_command
-                         (User_command.payload unrecorded_user_command))
+                      (Signed_command
+                         (Signed_command.payload unrecorded_user_command))
                       receipt_chain
                   in
                   Option.some_if
