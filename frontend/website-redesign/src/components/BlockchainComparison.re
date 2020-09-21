@@ -30,6 +30,7 @@ module Styles = {
         [flexDirection(`row), alignItems(`flexEnd)],
       ),
       media(Theme.MediaQuery.tablet, [maxWidth(`rem(30.))]),
+      media(Theme.MediaQuery.desktop, [maxWidth(`rem(40.))]),
     ]);
 
   let contentContainer =
@@ -56,7 +57,7 @@ module Styles = {
       height(`percent(100.)),
       maxWidth(`rem(35.)),
       borderLeft(`px(1), `solid, Theme.Colors.digitalBlack),
-      paddingLeft(`rem(0.5)),
+      paddingLeft(`rem(1.5)),
       media(Theme.MediaQuery.notMobile, [flexDirection(`column)]),
     ]);
 
