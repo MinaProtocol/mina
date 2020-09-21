@@ -266,7 +266,15 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+    memo @bsDecoder(fn: "Coda_base.Signed_command_memo.of_string")
   }
+}
+|}]
+
+module Next_available_token =
+[%graphql
+{|
+query next_available_token {
+  nextAvailableToken @bsDecoder(fn: "Decoders.token")
 }
 |}]

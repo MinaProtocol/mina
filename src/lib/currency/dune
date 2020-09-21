@@ -3,7 +3,7 @@
  (public_name currency)
  (library_flags -linkall)
  (inline_tests)
- (libraries core fold_lib tuple_lib snark_bits sgn snark_params random_oracle
+ (libraries core coda_numbers fold_lib tuple_lib snark_bits sgn snark_params random_oracle
    unsigned_extended test_util codable ppx_dhall_type)
  (preprocessor_deps ../../config.mlh)
  (preprocess

@@ -8,13 +8,12 @@ In this section, we'll make our first transaction on the Coda network. After [in
 
 ## Get the network information
 
-Because only 200 participants can join testnet 3.2b, you'll first need to get the peer addresses of the seed nodes. The 200 participants have already been selected, but you can sign up for the waitlist [here](http://bit.ly/StakingSignup) in case a spot opens up. 
+Because only 500 participants can join testnet 3.3, you'll first need to get the peer addresses of the seed nodes. The 500 participants have already been selected, but you can sign up for the waitlist [here](http://bit.ly/StakingSignup) in case a spot opens up. 
 
-Once you're in, you'll receive an email close to release 3.2b launch date with the seed node addresses and updated commands. We can start by storing the seed addresses as environment variables to help with the next steps:
+Once you're in, you'll receive an email close to release 3.3 launch date with the seed node addresses and updated commands. We can start by storing the seed addresses as environment variables to help with the next steps:
 
 ```
 export SEED1='<seed-address-1>'
-export SEED2='<seed-address-2>'
 ```
 
 ## Start up a node
@@ -93,7 +92,7 @@ The response from this command will look like this:
 
 <Alert kind="warning">
 
-If you are one of the selected Testnet 3.2b participants that has been delegated stake, please complete the challenges using the account that you had previously created. You do not need to create a new account! (If you create a new account and use it to complete the challenges, we will not be able to track your points for your activities.)
+If you are one of the selected Testnet 3.3 participants that has been delegated stake, please complete the challenges using the account that you had previously created. You do not need to create a new account! (If you create a new account and use it to complete the challenges, we will not be able to track your points for your activities.)
 
 </Alert>
 
@@ -159,7 +158,7 @@ Finally we get to the good stuff, sending our first transaction! Before you send
 
 For testing purposes, there's already an echo service set up that will immediately refund your payment minus the transaction fees. You can use the following public key for the echo bot.
 ```
-4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1
+B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9
 ```
 
 <Alert kind="warning">
@@ -174,7 +173,7 @@ Let's send some of our newly received coda to this service to see what a payment
 
     coda client send-payment \
       -amount 0.5 \
-      -receiver 4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1 \
+      -receiver B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9 \
       -fee 0.1 \
       -sender $CODA_PUBLIC_KEY
 
@@ -199,4 +198,3 @@ Once you feel comfortable with the basics of creating an address, and sending & 
 \*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
 
 </span>
-

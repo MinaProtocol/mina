@@ -88,7 +88,7 @@ module type Engine_intf = sig
     val stop : t -> unit Deferred.Or_error.t
 
     val send_payment :
-      t -> User_command_input.t -> Coda_base.User_command.t Deferred.t
+      t -> User_command_input.t -> Coda_base.Signed_command.t Deferred.t
   end
 
   module Network : sig

@@ -53,7 +53,8 @@ module Payloads = struct
           Construction_payloads_request.(
             { network_identifier= net_id network_response
             ; operations
-            ; metadata= Some metadata }
+            ; metadata= Some metadata
+            ; public_keys= [] }
             |> to_yojson)
         ~path:"construction/payloads"
     in
@@ -83,7 +84,7 @@ module Parse = struct
 end
 
 module Combine = struct
-  let req ~rosetta_uri ~logger ~unsigned_transaction ~signature ~address
+  let req ~rosetta_uri ~logger ~unsigned_transaction ~signature ~account_id
       ~public_key_hex_bytes ~network_response =
     let%bind r =
       post ~rosetta_uri ~logger
@@ -94,13 +95,14 @@ module Combine = struct
             ; signatures=
                 [ (* TODO: How important is it to fill in all these details properly? *)
                   { Signature.signing_payload=
-                      { Signing_payload.address
+                      { Signing_payload.account_identifier= Some account_id
+                      ; address= None
                       ; hex_bytes= "TODO"
                       ; signature_type= None }
                   ; public_key=
                       { Public_key.hex_bytes= public_key_hex_bytes
                       ; curve_type= "tweedle" }
-                  ; signature_type= "schnorr"
+                  ; signature_type= "schnorr_poseidon"
                   ; hex_bytes= signature } ] }
             |> to_yojson)
         ~path:"construction/combine"

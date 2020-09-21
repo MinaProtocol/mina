@@ -125,7 +125,7 @@ let computeUsers = (userIndex, userData) => {
 };
 
 let computeMemberProfileData = (mainData, allTimeData, phaseData, releaseData) => {
-  let mainUserIndex = 0; /* usernames are located in the 1st column */
+  let mainUserIndex = 1; /* usernames are located in the 2nd column */
   let allTimeUserIndex = 4; /* usernames are located in the 5th column */
   let phaseUserIndex = 2; /* usernames are located in the 3rd column */
   let releaseUserIndex = 1; /* usernames are located in the 2nd column */

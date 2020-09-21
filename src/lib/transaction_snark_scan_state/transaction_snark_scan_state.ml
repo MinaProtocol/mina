@@ -39,6 +39,8 @@ module Transaction_with_witness = struct
       type t =
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+              (* TODO: It's inefficient to store this here. Optimize it someday. *)
+        ; state_view: Coda_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
@@ -168,6 +170,7 @@ Stable.Latest.(hash)]
 let create_expected_statement ~constraint_constants
     { Transaction_with_witness.transaction_with_info
     ; state_hash
+    ; state_view
     ; ledger_witness
     ; init_stack
     ; statement } =
@@ -179,17 +182,13 @@ let create_expected_statement ~constraint_constants
   let next_available_token_before =
     Sparse_ledger.next_available_token ledger_witness
   in
-  let%bind {data= transaction; status= _} =
+  let {With_status.data= transaction; status= _} =
     Ledger.Undo.transaction transaction_with_info
-  in
-  let txn_global_slot =
-    (* TODO: Get from protocol state. *)
-    Coda_numbers.Global_slot.zero
   in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
-          ~txn_global_slot ledger_witness transaction )
+          ~txn_state_view:state_view ledger_witness transaction )
   in
   let target =
     Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
@@ -389,8 +388,8 @@ struct
   let check_invariants t ~constraint_constants ~verifier ~error_prefix
       ~ledger_hash_end:current_ledger_hash
       ~ledger_hash_begin:snarked_ledger_hash
-      ~next_available_token_before:next_tkn1
-      ~next_available_token_after:next_tkn2 =
+      ~next_available_token_begin:snarked_ledger_next_available_token
+      ~next_available_token_end:current_ledger_next_available_token =
     let clarify_error cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
@@ -440,13 +439,16 @@ struct
             (Token_id.equal Token_id.default fee_token_r)
             "nondefault fee token"
         and () =
-          clarify_error
-            Token_id.(next_available_token_before = next_tkn1)
-            "next available token before does not match"
+          Option.value_map ~default:(Ok ()) snarked_ledger_next_available_token
+            ~f:(fun next_tkn ->
+              clarify_error
+                Token_id.(next_available_token_before = next_tkn)
+                "next available token from snarked ledger does not match" )
         and () =
           clarify_error
-            Token_id.(next_available_token_after = next_tkn2)
-            "next available token after does not match"
+            Token_id.(
+              next_available_token_after = current_ledger_next_available_token)
+            "next available token from staged ledger does not match"
         in
         ()
 end
@@ -514,7 +516,6 @@ let extract_txns txns_with_witnesses =
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
         Ledger.Undo.transaction txn_with_witness.transaction_with_info
-        |> Or_error.ok_exn
       in
       let state_hash = fst txn_with_witness.state_hash in
       (txn, state_hash) )
@@ -545,13 +546,12 @@ let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       t.transaction_with_info |> Ledger.Undo.transaction )
   @@ Parallel_scan.pending_data t
-  |> Or_error.all
 
 let staged_transactions_with_protocol_states t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      let%bind txn = t.transaction_with_info |> Ledger.Undo.transaction in
+      let txn = t.transaction_with_info |> Ledger.Undo.transaction in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state) )
   @@ Parallel_scan.pending_data t
@@ -651,7 +651,7 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind {data= transaction; status} =
+        let {With_status.data= transaction; status} =
           Ledger.Undo.transaction transaction_with_info
         in
         let%bind protocol_state_body =

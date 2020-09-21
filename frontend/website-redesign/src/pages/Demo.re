@@ -5,7 +5,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       display(`flex),
-      width(`rem(50.)),
+      width(`percent(100.)),
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignContent(`spaceAround),
@@ -28,10 +28,23 @@ module Styles = {
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
-    <AnnouncementBanner>
-      {React.string("Mainnet is live!")}
-    </AnnouncementBanner>
     <div className=Styles.page>
+      <div>
+        <SideNav currentSlug="">
+          <SideNav.Item title="Overview" slug="" />
+          <SideNav.Item title="Getting Started" slug="getting-started" />
+          <SideNav.Section title="Developers" slug="developers">
+            <SideNav.Item title="Developers Overview" slug="" />
+            <SideNav.Item title="Codebase Overview" slug="codebase-overview" />
+          </SideNav.Section>
+          <SideNav.Section title="SNARKs" slug="snarks">
+            <SideNav.Item title="SNARKs Overview" slug="" />
+          </SideNav.Section>
+          <SideNav.Item title="Archive Node" slug="archive-node" />
+          <SideNav.Item title="Snapps" slug="snapps" />
+          <SideNav.Item title="Glossary" slug="glossary" />
+        </SideNav>
+      </div>
       <div className=Styles.container>
         /*** Regular buttons */
 
@@ -39,7 +52,7 @@ let make = () => {
             {React.string("Button Label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.mint>
+          <Button bgColor=Theme.Colors.mint dark=true>
             {React.string("Button label ")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
@@ -51,7 +64,7 @@ let make = () => {
             {React.string("Button label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          /*** Documentation Button */
+          /*** Documentation Button TODO: Add link for documentation */
           <PromoButton bgColor=Theme.Colors.orange>
             <Icon kind=Icon.Documentation size=2.5 />
             <span className=Styles.documentationButton>
@@ -122,6 +135,20 @@ let make = () => {
            "Quote / Lorem ipsum dolor sit amet, consectetur amet adipiscing elit, sed do eiusmod tempor.",
          )}
       </p>
+      <AlternatingSections
+        backgroundImg=""
+        sections={
+          AlternatingSections.Section.SimpleRow([|
+            {
+              AlternatingSections.Section.SimpleRow.title: "Run a Node",
+              description: "You don't have to have expensive hardware, wait days for the blockchain to sync, or use a ton of compute power to participate in consensus. Just follow clear, straightforward instructions and connect to the live peer-to-peer Mina network.",
+              buttonCopy: "Get Started",
+              buttonUrl: "/",
+              image: "/static/img/hands.png",
+            },
+          |])
+        }
+      />
     </div>
   </Page>;
 };

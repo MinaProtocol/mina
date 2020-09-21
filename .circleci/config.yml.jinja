@@ -106,6 +106,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -161,6 +162,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -423,7 +425,7 @@ jobs:
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" make build_or_download_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; ./scripts/zexe-standardize.sh && eval `opam config env` && PATH="$HOME/.cargo/bin:$PATH" make build_or_download_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
@@ -433,8 +435,8 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune build src/app/generate_keypair/generate_keypair.exe'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; ./scripts/zexe-standardize.sh &&  eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh && eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     GO: /usr/lib/go/bin/go
@@ -443,11 +445,11 @@ jobs:
             - run:
                 name: Output compiled ledger and genesis proof
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh && eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
             - run:
                 name: Generate runtime ledger with 10k accounts
                 command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
+                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh && eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && dune exec --profile={{profile}} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
                 no_output_timeout: 20m
             - run:
                 name: Upload genesis data
@@ -483,10 +485,25 @@ jobs:
             {%- endif %}
     {%- endfor %}
 
+
     {%- for profile in build_artifact_profiles %}
     {%- if profile in medium_curve_profiles %}
-    {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
-    build-artifacts-docker--{{profile}}--{{docker_image}}:
+    {%- for docker_image_set in [
+        {
+          'images': ['coda-daemon', 'coda-daemon-puppeteered'],
+          'build_args': {
+            'coda-daemon': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO',
+            'coda-daemon-puppeteered': '--build-arg coda_version=$CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH'
+          }
+        },
+        {
+          'images': ['coda-demo'],
+          'build_args': {
+            'coda-demo': '--build-arg coda_deb_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO'
+          }
+        }
+    ] %}
+    build-artifacts-docker--{{profile}}--{{docker_image_set['images'] | first}}:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -506,13 +523,13 @@ jobs:
                         echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
                         set -x
                         if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
-
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              {%- for docker_image in docker_image_set['images'] %}
                               scripts/release-docker.sh \
-                              -s {{docker_image}} \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
-
+                                -s {{docker_image}} \
+                                -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                                --extra-args "{{docker_image_set['build_args'][docker_image]}}"
+                              {%- endfor %}
                         fi
                     fi
             - store_artifacts:

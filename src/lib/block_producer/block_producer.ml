@@ -106,7 +106,8 @@ end
 
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~coinbase_receiver ~(keypair : Keypair.t) ~block_data ~scheduled_time
+    ~coinbase_receiver ~(keypair : Keypair.t)
+    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
@@ -117,25 +118,30 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
       previous_protocol_state
   in
-  let previous_global_slot =
+  let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.consensus_state
-    |> Consensus.Data.Consensus_state.curr_slot
+    |> Coda_state.Protocol_state.Body.view
   in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
+      let supercharge_coinbase =
+        let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+        let global_slot = Consensus.Data.Block_data.global_slot block_data in
+        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+          ~epoch_ledger ~global_slot
+      in
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
               ~coinbase_receiver ~logger
-              ~current_global_slot:previous_global_slot
+              ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
-              ~log_block_creation )
+              ~log_block_creation ~supercharge_coinbase )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_global_slot:previous_global_slot
+          diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
@@ -143,8 +149,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) ->
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+        ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn
@@ -154,8 +160,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
-            , coinbase_amount
-            , pending_coinbase_action )
+            , pending_coinbase_update )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
@@ -177,8 +182,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       , next_staged_ledger_hash
       , ledger_proof_opt
       , is_new_stack
-      , coinbase_amount
-      , pending_coinbase_action ) ->
+      , pending_coinbase_update ) ->
       let%bind protocol_state, consensus_transition_data =
         lift_sync (fun () ->
             let previous_ledger_hash =
@@ -237,13 +241,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~coinbase_receiver:
-                    ( match coinbase_receiver with
-                    | `Producer ->
-                        self
-                    | `Other pk ->
-                        pk )
-                  ~coinbase_amount ~pending_coinbase_action ()
+                  ~pending_coinbase_update ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
@@ -272,7 +270,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (keypair, scheduled_time, block_data) =
+      let produce ivar (keypair, scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -312,7 +310,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation
+                ~log_block_creation ~winner_pk
             in
             trace_event "next state generated" ;
             match next_state_opt with
@@ -619,14 +617,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
-                | `Produce_now (keypair, data) ->
+                | `Produce_now (keypair, data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
-                         (keypair, now, data))
+                         (keypair, now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
-                | `Produce (time, keypair, data) ->
+                | `Produce (time, keypair, data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
@@ -635,7 +633,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch
                                 production_supervisor
-                                (keypair, scheduled_time, data))
+                                (keypair, scheduled_time, data, winner_pk))
                              ~f:check_next_block_timing) ) ) )
       in
       let start () =

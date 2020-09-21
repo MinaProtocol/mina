@@ -103,7 +103,9 @@ module Accounts = struct
         in
         ( sk
         , { account with
-            delegate= Option.value ~default:account.delegate delegate } ) )
+            delegate=
+              (if Option.is_some delegate then delegate else account.delegate)
+          } ) )
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -730,6 +732,9 @@ let make_constraint_constants
   ; pending_coinbase_depth
   ; coinbase_amount=
       Option.value ~default:default.coinbase_amount config.coinbase_amount
+  ; supercharged_coinbase_factor=
+      Option.value ~default:default.supercharged_coinbase_factor
+        config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee }
@@ -985,6 +990,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; transaction_capacity=
             Some (Log_2 constraint_constants.transaction_capacity_log_2)
         ; coinbase_amount= Some constraint_constants.coinbase_amount
+        ; supercharged_coinbase_factor=
+            Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
         }
   ; ledger=
@@ -1012,7 +1019,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
                    ; sk= Option.map ~f:Private_key.to_base58_check sk
                    ; balance
                    ; delegate=
-                       Some (Public_key.Compressed.to_base58_check delegate)
+                       Option.map ~f:Public_key.Compressed.to_base58_check
+                         delegate
                    ; timing } ))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
