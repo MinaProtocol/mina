@@ -655,12 +655,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 end
 
 module Side_loaded = struct
+  module V = Verification_key
+
   module Verification_key = struct
     include Side_loaded_verification_key
 
     let of_compiled tag : t =
       let d = Types_map.lookup_compiled tag.Tag.id in
-      { wrap_vk= Lazy.force d.wrap_vk
+      { wrap_vk= Some (Lazy.force d.wrap_vk)
       ; wrap_index=
           Lazy.force d.wrap_key
           |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)
@@ -701,6 +703,52 @@ module Side_loaded = struct
       end
     end]
   end
+
+  let verify (type t) ~(value_to_field_elements : t -> _)
+      (ts : (Verification_key.t * t * Proof.t) list) =
+    let m =
+      ( module struct
+        type nonrec t = t
+
+        let to_field_elements = value_to_field_elements
+      end
+      : Intf.Statement_value
+        with type t = t )
+    in
+    (* TODO: This should be the actual max width on a per proof basis *)
+    let max_branching =
+      (module Verification_key.Max_width
+      : Nat.Intf
+        with type n = Verification_key.Max_width.n )
+    in
+    with_return (fun {return} ->
+        List.map ts ~f:(fun (vk, x, p) ->
+            let vk : V.t =
+              { commitments=
+                  Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) vk.wrap_index
+              ; step_domains=
+                  Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
+                      let input_size =
+                        Side_loaded_verification_key.(
+                          input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
+                            (Width.to_int vk.max_width))
+                      in
+                      { Domains.x=
+                          Pow_2_roots_of_unity (Int.ceil_log2 (1 + input_size))
+                      ; h= d.h
+                      ; k= d.k } )
+              ; index=
+                  (match vk.wrap_vk with None -> return false | Some x -> x)
+              ; data=
+                  (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
+                  { variables= 0
+                  ; public_inputs= 0
+                  ; constraints= 0
+                  ; nonzero_entries= 0
+                  ; max_degree= 0 } }
+            in
+            Verify.Instance.T (max_branching, m, vk, x, p) )
+        |> Verify.verify_heterogenous )
 end
 
 let compile
@@ -863,6 +911,8 @@ let%test_module "test" =
                 | _ ->
                     unhandled ) )
 
+        module Proof = (val p)
+
         let side_loaded_vk = Side_loaded.Verification_key.of_compiled tag
       end
 
@@ -942,6 +992,33 @@ let%test_module "test" =
             Txn_snark.merge [(base1, t1); (base2, t2)] base12 )
       in
       assert (Txn_snark.Proof.verify [(base1, t1); (base2, t2); (base12, t12)]) ;
+      Common.time "verify" (fun () ->
+          assert (
+            Verify.verify_heterogenous
+              [ T
+                  ( (module Nat.N2)
+                  , (module Txn_snark.Know_preimage.Statement.Constant)
+                  , Lazy.force Txn_snark.Know_preimage.Proof.verification_key
+                  , base1
+                  , preimage_proof )
+              ; T
+                  ( (module Nat.N2)
+                  , (module Txn_snark.Statement.Constant)
+                  , Lazy.force Txn_snark.Proof.verification_key
+                  , base1
+                  , t1 )
+              ; T
+                  ( (module Nat.N2)
+                  , (module Txn_snark.Statement.Constant)
+                  , Lazy.force Txn_snark.Proof.verification_key
+                  , base2
+                  , t2 )
+              ; T
+                  ( (module Nat.N2)
+                  , (module Txn_snark.Statement.Constant)
+                  , Lazy.force Txn_snark.Proof.verification_key
+                  , base12
+                  , t12 ) ] ) ) ;
       (base12, t12)
 
     module Blockchain_snark = struct

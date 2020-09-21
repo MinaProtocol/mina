@@ -274,7 +274,7 @@ let start_custom :
          ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
-      ~f:(fun prog -> Process.create ~prog ~args ())
+      ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   let%bind () =
     Deferred.map ~f:Or_error.return

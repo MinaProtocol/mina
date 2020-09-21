@@ -85,9 +85,7 @@ let make = (~metadata, ~children) => {
       <div className=Style.content>
         <EditLink route={router.route} />
         // <Next.MDXProvider components={DocsComponents.allComponents()}>
-        <Next.MDXProvider>
-          children
-        </Next.MDXProvider>
+        <Next.MDXProvider> children </Next.MDXProvider>
       </div>
     </div>
   </Page>;

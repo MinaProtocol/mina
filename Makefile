@@ -88,7 +88,7 @@ build_archive: git_hooks reformat-diff
 
 build_rosetta:
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/rosetta/rosetta.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 client_sdk :
@@ -230,6 +230,12 @@ publish-macos:
 
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
+	@mkdir -p /tmp/artifacts
+	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+
+deb_optimized:
+	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
