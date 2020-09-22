@@ -309,17 +309,16 @@ module Type = {
 
   let paragraphMono =
     style([
-      Typeface.monumentGrotesk,
+      Typeface.monumentGroteskMono,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
-      letterSpacing(`rem(0.03125)),
+      letterSpacing(`em(0.03)),
       color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
         [
           fontSize(`rem(1.)),
           lineHeight(`rem(1.5)),
-          letterSpacing(`px(-1)),
         ],
       ),
     ]);
