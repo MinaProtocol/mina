@@ -5,7 +5,7 @@ module Style = {
 
   let content =
     style([
-      maxWidth(`rem(43.)),
+      maxWidth(`rem(53.)),
       media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.))]),
       selector(
         "p > code, li > code",
@@ -75,7 +75,15 @@ type metadata = {title: string};
 let make = (~metadata, ~children) => {
   let router = Next.Router.useRouter();
   let currentSlug =
-    Js.String.replaceByRe(Js.Re.fromString("^/docs/?"), "", router.route);
+    if (router.route == "/docs") {
+      "/docs";
+    } else {
+      Js.String.replaceByRe(
+        Js.Re.fromString("^/docs/?"),
+        "/docs/",
+        router.route,
+      );
+    };
   <Page title={metadata.title}>
     <Next.Head>
       <link rel="stylesheet" href="/static/css/a11y-light.css" />
@@ -85,7 +93,9 @@ let make = (~metadata, ~children) => {
       <div className=Style.content>
         <EditLink route={router.route} />
         // <Next.MDXProvider components={DocsComponents.allComponents()}>
-        <Next.MDXProvider> children </Next.MDXProvider>
+        <Next.MDXProvider components={DocsComponents.allComponents()}>
+          children
+        </Next.MDXProvider>
       </div>
     </div>
   </Page>;
