@@ -146,7 +146,35 @@ let setup_and_submit_user_commands t user_command_list =
     "batch-send-payments does not yet report errors"
     ~metadata:
       [("coda_command", `String "scheduling a batch of user transactions")] ;
+  txn_count := !txn_count + List.length user_command_list ;
   Coda_lib.add_transactions t user_command_list
+
+let setup_and_submit_snapp_command t
+    (snapp_command_input : Snapp_command_input.t) =
+  let open Participating_state.Let_syntax in
+  let%map () = Coda_lib.active_or_bootstrapping t in
+  (* TODO: Receipt chain hash. *)
+  let open Deferred.Let_syntax in
+  let%map result = Coda_lib.add_snapp_transactions t [snapp_command_input] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([Snapp_command txn], []) ->
+      [%log' info (Coda_lib.top_level_logger t)]
+        ~metadata:[("command", User_command.to_yojson (Snapp_command txn))]
+        "Scheduled snapp transaction $command" ;
+      Ok txn
+  | Ok _ ->
+      Error
+        (Error.of_string "Invalid result from scheduling a snapp transaction")
+  | Error e ->
+      Error e
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)

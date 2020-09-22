@@ -3,13 +3,41 @@
  (public_name coda_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core coda_intf pipe_lib user_command_input logger async async_extra
-  unix_timestamp debug_assert o1trace consensus
-  incremental secrets auxiliary_database work_selector
-  coda_networking block_producer genesis_constants sync_handler transition_router node_addrs_and_ports
-  otp_lib protocol_version snark_worker participating_state transaction_status
-  receipt_chain_database sync_status daemon_rpcs archive_lib
-  exit_handlers)
+ (libraries
+  ; opam deps
+  async
+  async_extra
+  core
+  ; libs
+  archive_lib
+  auxiliary_database
+  block_producer
+  coda_intf
+  coda_networking
+  consensus
+  daemon_rpcs
+  debug_assert
+  exit_handlers
+  genesis_constants
+  incremental
+  logger
+  node_addrs_and_ports
+  o1trace
+  otp_lib
+  participating_state
+  pipe_lib
+  protocol_version
+  receipt_chain_database
+  secrets
+  snapp_command_input
+  snark_worker
+  sync_handler
+  sync_status
+  transaction_status
+  transition_router
+  unix_timestamp
+  user_command_input
+  work_selector)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps
   ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash

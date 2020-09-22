@@ -1,4 +1,5 @@
 open Core_kernel
+open Async
 open Coda_numbers
 open Coda_base
 
@@ -54,11 +55,14 @@ module Stable = struct
       ( Party.Stable.V1.t
       , Second_party.Stable.V1.t )
       Snapp_command.Inner.Stable.V1.t
-    [@@deriving sexp]
+    [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
+
+[%%define_locally
+Stable.Latest.(to_yojson)]
 
 (* TODO: Deduplicate with User_command_input *)
 let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
@@ -76,8 +80,13 @@ let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
       (txn_pool_or_account_nonce, updated_map)
 
 let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ({token_id; fee_payment; one; two} : t) :
+    ({token_id; fee_payment; one; two} as snapp_input : t) :
     (Snapp_command.t * Account_nonce.t Account_id.Map.t, _) Result.t =
+  Result.map_error ~f:(fun str ->
+      Error.createf "Error creating snapp command: %s Error: %s"
+        (Yojson.Safe.to_string (to_yojson snapp_input))
+        str )
+  @@
   let open Result.Let_syntax in
   let empty body : Snapp_command.Party.Authorized.Empty.t =
     {data= {body; predicate= ()}; authorization= ()}
@@ -143,3 +152,21 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       let%bind one, nonce_map = signed body1 signature1 in
       let%map two, nonce_map = signed ~nonce_map body2 signature2 in
       (Snapp_command.Signed_signed {token_id; fee_payment; one; two}, nonce_map)
+
+let to_snapp_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
+    uc_inputs : Snapp_command.t list Deferred.Or_error.t =
+  (* When batching multiple user commands, keep track of the nonces and send
+      all the user commands if they are valid or none if there is an error in
+      one of them.
+  *)
+  let open Deferred.Or_error.Let_syntax in
+  let%map snapp_commands, _ =
+    Deferred.Or_error.List.fold ~init:([], nonce_map) uc_inputs
+      ~f:(fun (valid_snapp_commands, nonce_map) uc_input ->
+        let%map res, updated_nonce_map =
+          let%map.Async () = Async.Scheduler.yield () in
+          to_snapp_command ~nonce_map ~get_current_nonce uc_input
+        in
+        (res :: valid_snapp_commands, updated_nonce_map) )
+  in
+  List.rev snapp_commands
