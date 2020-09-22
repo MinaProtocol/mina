@@ -239,25 +239,26 @@ module Json_parsing = struct
   let float : float parser =
    fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
 
-  let user_commands_with_statuses :
-      Coda_base.User_command.t Coda_base.With_status.t list parser = function
+  let signed_commands_with_statuses :
+      Coda_base.Signed_command.t Coda_base.With_status.t list parser = function
     | `List cmds ->
         let cmd_or_errors =
           List.map cmds
             ~f:
-              (Coda_base.With_status.of_yojson Coda_base.User_command.of_yojson)
+              (Coda_base.With_status.of_yojson
+                 Coda_base.Signed_command.of_yojson)
         in
         List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
             match (accum, cmd_or_err) with
             | _, Error _ ->
                 (* fail on any error *)
                 failwith
-                  "user_commands_with_statuses: unable to parse JSON for user \
-                   command"
+                  "signed_commands_with_statuses: unable to parse JSON for \
+                   user command"
             | cmds, Ok cmd ->
                 cmd :: cmds )
     | _ ->
-        failwith "user_commands_with_statuses: expected `List"
+        failwith "signed_commands_with_statuses: expected `List"
 
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
       : 'a Or_error.t =
@@ -451,7 +452,7 @@ module Breadcrumb_added_query = struct
   open Coda_base
 
   module Result = struct
-    type t = {user_commands: User_command.t With_status.t list}
+    type t = {user_commands: Signed_command.t With_status.t list}
   end
 
   let filter testnet_log_filter =
@@ -467,7 +468,7 @@ module Breadcrumb_added_query = struct
     let open Or_error.Let_syntax in
     (* JSON path to metadata entry *)
     let path = ["jsonPayload"; "metadata"; "user_commands"] in
-    let parser = user_commands_with_statuses in
+    let parser = signed_commands_with_statuses in
     let%map user_commands = find parser js path in
     Result.{user_commands}
 end
@@ -852,10 +853,12 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
                       if found_inner then true
                       else
                         (* N.B.: we're not checking fee, nonce or memo *)
-                        let cmd = cmd_with_status.With_status.data in
-                        match
-                          User_command.payload cmd |> User_command_payload.body
-                        with
+                        let signed_cmd = cmd_with_status.With_status.data in
+                        let body =
+                          Signed_command.payload signed_cmd
+                          |> Signed_command_payload.body
+                        in
+                        match body with
                         | Payment
                             { source_pk
                             ; receiver_pk
