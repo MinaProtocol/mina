@@ -203,7 +203,6 @@ module Styles = {
       gridColumnGap(`rem(1.5)),
       cursor(`pointer),
       padding2(~v=`rem(1.), ~h=`rem(1.)),
-      fontWeight(`semiBold),
       fontSize(`rem(1.)),
       height(`percent(100.)),
       width(`percent(100.)),
@@ -221,12 +220,15 @@ module Styles = {
         display(`none),
         paddingBottom(`rem(0.5)),
         fontSize(`rem(1.)),
-        fontWeight(`semiBold),
+        fontWeight(`normal),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
         borderBottom(`px(1), `solid, Theme.Colors.orange),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
-        hover([backgroundColor(white), cursor(`default)]),
+        hover([
+          backgroundColor(Theme.Colors.digitalBlack),
+          cursor(`default),
+        ]),
       ]),
     ]);
 
@@ -257,7 +259,7 @@ module Styles = {
 
   let topTen =
     merge([
-      Theme.Type.h6,
+      Theme.Type.inputLabel,
       style([
         display(`flex),
         alignItems(`center),
@@ -436,7 +438,7 @@ module LeaderboardRow = {
       Js.Array.push(
         <Badge
           key={member.name ++ "Technical & Community MVP"}
-          src="/static/img/LeaderboardAwardDoubleMVP.png"
+          src="/static/img/badges/Badge_MVP_Double.svg"
           title="Technical & Community MVP"
           alt="Technical & Community MVP"
           height
@@ -453,7 +455,7 @@ module LeaderboardRow = {
       Js.Array.push(
         <Badge
           key={member.name ++ "Technical MVP"}
-          src="/static/img/LeaderboardAwardTechnicalMVP.png"
+          src="/static/img/badges/Badge_MVP_Tech.svg"
           title="Technical MVP"
           alt="Technical MVP"
           height
@@ -470,7 +472,7 @@ module LeaderboardRow = {
       Js.Array.push(
         <Badge
           key={member.name ++ "Community MVP"}
-          src="/static/img/LeaderboardAwardCommunityMVP.png"
+          src="/static/img/badges/Badge_MVP_Community.svg"
           title="Community MVP"
           alt="Community MVP"
           height
@@ -490,7 +492,7 @@ module LeaderboardRow = {
       Js.Array.push(
         <Badge
           key={member.name ++ "Genesis Founding Member"}
-          src="/static/img/LeaderboardAwardGenesisMember.png"
+          src="/static/img/badges/Badge_Genesis.svg"
           title="Genesis Program Founding Member"
           alt="Genesis Program Founding Member"
           height
@@ -704,7 +706,6 @@ let make =
            Array.length(topTen) > 0
              ? [|
                <div className=Styles.topTen>
-                 <img src="/static/img/star.svg" alt="Star icon" />
                  <p> {React.string("Top 10")} </p>
                </div>,
              |]
@@ -715,7 +716,6 @@ let make =
            Array.length(topFifty) > 0
              ? [|
                <div className=Styles.topTen>
-                 <img src="/static/img/star.svg" alt="Star icon" />
                  <p> {React.string("Top 50")} </p>
                </div>,
              |]

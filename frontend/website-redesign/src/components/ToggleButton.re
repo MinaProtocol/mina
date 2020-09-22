@@ -2,9 +2,9 @@ module ButtonStyles = {
   open Css;
 
   let textStyles =
-    merge([Theme.Type.h6, style([textTransform(`uppercase)])]);
+    merge([Theme.Type.buttonLabel, style([textTransform(`uppercase)])]);
 
-  let hover =
+  let hoverStyles =
     hover([
       backgroundColor(Theme.Colors.orange),
       color(Theme.Colors.white),
@@ -14,7 +14,7 @@ module ButtonStyles = {
     merge([
       textStyles,
       style([
-        hover,
+        hoverStyles,
         display(`flex),
         justifyContent(`center),
         alignItems(`center),
@@ -24,6 +24,15 @@ module ButtonStyles = {
         backgroundColor(Theme.Colors.white),
         color(Theme.Colors.black),
         cursor(`pointer),
+        hover([
+          color(white),
+          backgrounds([
+            {
+              `url("/static/ButtonHoverLight.png");
+            },
+            black,
+          ]),
+        ]),
       ]),
     ]);
 

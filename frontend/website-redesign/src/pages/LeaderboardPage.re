@@ -113,13 +113,33 @@ module ToggleButtons = {
       merge([
         style([
           display(`flex),
+          position(`relative),
           width(`rem(40.5)),
-          borderRadius(`px(4)),
-          overflow(`hidden),
+          borderTopLeftRadius(`px(4)),
+          borderBottomRightRadius(`px(4)),
+          borderTopRightRadius(`px(1)),
+          borderBottomLeftRadius(`px(1)),
+          border(`px(1), `solid, Theme.Colors.digitalBlack),
+          zIndex(100),
           selector(
             "*:not(:last-child)",
-            [borderRight(`px(1), `solid, Theme.Colors.gray)],
+            [borderRight(`px(1), `solid, Theme.Colors.digitalBlack)],
           ),
+          before([
+            position(`absolute),
+            contentRule(""),
+            top(`rem(0.25)),
+            left(`rem(0.25)),
+            right(`rem(-0.25)),
+            bottom(`rem(-0.25)),
+            borderTopLeftRadius(`px(4)),
+            borderBottomRightRadius(`px(4)),
+            borderTopRightRadius(`px(1)),
+            borderBottomLeftRadius(`px(1)),
+            border(`px(1), `solid, black),
+            transform(translateZ(`px(-1))),
+            zIndex(-99),
+          ]),
         ]),
       ]);
   };
