@@ -8,11 +8,14 @@ module Colors = {
   let black = Css.black;
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
-  let digitalBlackA = a => `rgba(45, 45, 45, a);
+  let digitalBlackA = a => `rgba((45, 45, 45, a));
   let purple = `hex("5362C8");
   let digitalGray = `hex("575757");
   let error = `hex("e93939");
   let status = `hex("ffb13b");
+  let operational = `hex("9FE4C9");
+  let amber = `rgb((242, 149, 68));
+  let amberAlpha = a => `rgba((242, 149, 68, a));
 };
 
 module Typeface = {
@@ -340,6 +343,15 @@ module Type = {
         MediaQuery.tablet,
         [fontSize(`rem(2.5)), lineHeight(`rem(3.125))],
       ),
+    ]);
+
+  let disclaimer =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      opacity(0.5),
+      color(Colors.digitalBlack),
     ]);
 };
 
