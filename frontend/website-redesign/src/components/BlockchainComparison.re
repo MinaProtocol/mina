@@ -13,6 +13,10 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       marginLeft(`zero),
+      selector(
+        "div:last-child",
+        [media(Theme.MediaQuery.desktop, [marginLeft(`rem(3.))])],
+      ),
       media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
     ]);
 
