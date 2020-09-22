@@ -33,6 +33,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
+echo 'service="'$SERVICE'" version="'$VERSION'"'
+
 echo $EXTRA
 
 # Verify Required Parameters are Present
