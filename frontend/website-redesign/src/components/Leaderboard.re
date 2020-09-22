@@ -78,7 +78,7 @@ module Toggle = {
 
   let toggle_of_string = toggle => {
     switch (toggle) {
-    | "All Participants" => All
+    | "Everyone" => All
     | "Genesis Members" => Genesis
     | "Non-Genesis Members" => NonGenesis
     | _ => All
@@ -87,7 +87,7 @@ module Toggle = {
 
   let string_of_toggle = toggle => {
     switch (toggle) {
-    | All => "All Participants"
+    | All => "Everyone"
     | Genesis => "Genesis Members"
     | NonGenesis => "Non-Genesis Members"
     };

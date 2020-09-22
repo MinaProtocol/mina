@@ -3,8 +3,10 @@ module Styles = {
   let page =
     style([
       maxWidth(`rem(58.0)),
-      margin(`auto),
-      media(Theme.MediaQuery.tablet, [maxWidth(`rem(89.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [maxWidth(`rem(89.)), paddingTop(`rem(4.))],
+      ),
     ]);
   let filters =
     style([
