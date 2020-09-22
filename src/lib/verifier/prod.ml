@@ -53,15 +53,15 @@ module Worker_state = struct
                    * Pickles.Side_loaded.Proof.t )
                    list ]
                  list =
-               List.map cs ~f:(function
-                 | Signed_command c -> (
-                   match Signed_command.check c with
-                   | Some c ->
-                       `Valid (User_command.Signed_command c)
-                   | None ->
-                       `Invalid )
-                 | Snapp_command _ ->
-                     `Invalid )
+               List.map cs ~f:(fun c ->
+                   match Common.check c with
+                   | `Valid c ->
+                       `Valid c
+                   | `Invalid ->
+                       `Invalid
+                   | `Valid_assuming (c, _) ->
+                       (* For now we just let snapp commands verify *)
+                       `Valid c )
 
              let verify_blockchain_snark state proof =
                Blockchain_snark.Blockchain_snark_state.verify state proof
