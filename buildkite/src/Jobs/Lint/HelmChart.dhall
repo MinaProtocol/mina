@@ -17,9 +17,9 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "helm/", S.strictlyStart (S.contains "src/helm") ],
+      dirtyWhen = [ S.contains "helm" ],
       path = "Lint",
-      name = "HelmRelease"
+      name = "HelmChart"
     },
     steps = [
       Command.build

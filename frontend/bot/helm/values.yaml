@@ -3,6 +3,7 @@ bot:
   image: codaprotocol/coda-user-agent:0.1.5
   testnet: default
   role: user-agent
+  cmd:
   resources:
     requests:
       memory: 1.0Gi
@@ -10,3 +11,18 @@ bot:
     limits:
       cpu: 1000m
       memory: 1.0Gi
+  command: ["bash"]
+  args: ["-c", "python3 agent.py"]
+  optionalEnv:
+    - name: AGENT_MIN_FEE
+      value: 1
+    - name: AGENT_MAX_FEE
+      value: 5
+    - name: AGENT_MIN_TX
+      value: 1
+    - name: AGENT_MAX_TX
+      value: 10
+    - name: AGENT_SEND_EVERY_MINUTES
+      value: "10"
+    - name: PYTHONUNBUFFERED
+      value: "1"
