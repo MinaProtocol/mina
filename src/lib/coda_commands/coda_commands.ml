@@ -120,12 +120,10 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [failed_txn]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string )))
+      Or_error.error_string
+        ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error.to_yojson
+            (snd failed_txn)
+        |> Yojson.Safe.to_string )
   | Ok ([Signed_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
@@ -159,12 +157,10 @@ let setup_and_submit_snapp_command t
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [failed_txn]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string )))
+      Or_error.error_string !"%s"
+        ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error.to_yojson
+            (snd failed_txn)
+        |> Yojson.Safe.to_string )
   | Ok ([Snapp_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:[("command", User_command.to_yojson (Snapp_command txn))]
