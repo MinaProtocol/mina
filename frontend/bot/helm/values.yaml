@@ -1,0 +1,12 @@
+bot:
+  name: o1-bot
+  image: codaprotocol/coda-user-agent:0.1.5
+  testnet: default
+  role: user-agent
+  resources:
+    requests:
+      memory: 1.0Gi
+      cpu: 1000m
+    limits:
+      cpu: 1000m
+      memory: 1.0Gi

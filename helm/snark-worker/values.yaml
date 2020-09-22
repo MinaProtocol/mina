@@ -1,0 +1,30 @@
+testnetName: "coda-testnet"
+coda: 
+  genesis: 
+    active: true
+    k: 10
+    delta: 3
+    txpool_max_size: 3000
+    genesis_state_timestamp: "2020-04-20 11:00:00-07:00"
+    ledger: "{}"
+  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  seedPeers: 
+    - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
+    - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
+
+worker: 
+  fullname: "snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+  active: true
+  numReplicas: 1
+  remoteCoordinatorHost: "{{ tpl $.Values.coordinator.fullname . }}.{{ $.Values.testnetName }}"
+  remoteCoordinatorPort: 8301
+
+coordinator: 
+  fullname: "snark-coordinator-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
+  rpcPort: 8301
+  hostPort: 10001
+  deployService: true
+  active: true
+  publicKey: "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+  snarkFee: "0.025"
+  workSelectionAlgorithm: seq # seq OR rand

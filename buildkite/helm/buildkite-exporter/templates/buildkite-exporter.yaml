@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{tpl $.Values.exporter.name .}}
+  labels:
+    app: {{tpl $.Values.exporter.name .}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{tpl $.Values.exporter.name .}}
+  template:
+    metadata:
+      labels:
+        app: {{tpl $.Values.exporter.name .}}
+        pipeline: {{ $.Values.exporter.name }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.exporter.listening_port }}
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: exporter
+        resources:
+          limits:
+            memory: 2.0Gi
+          requests:
+            memory: 2.0Gi
+            cpu: 1000m
+        image: {{ $.Values.exporter.image }}
+        env:
+          - name: BUILDKITE_API_KEY
+            value: {{ .Values.exporter.buildkiteApiKey }}
+{{- if .Values.exporter.optionalEnv }}
+{{ toYaml .Values.exporter.optionalEnv | nindent 10 }}
+{{- end }}
+        ports:
+        - containerPort: {{ .Values.exporter.listening_port }}
+          hostPort: {{ .Values.exporter.listening_port }}
+          protocol: TCP
+        imagePullPolicy: Always

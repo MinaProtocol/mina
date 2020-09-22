@@ -1,0 +1,52 @@
+testnetName: "coda-testnet"
+
+coda:
+  runtimeConfig: ""
+  logLevel: "Trace"
+  logReceivedBlocks: false
+  logSnarkWorkGossip: false
+  image: codaprotocol/coda-daemon:0.0.12-beta-new-genesis-01eca9b
+  privkeyPass: "naughty blue worm"
+  seedPeers:
+    - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
+    - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+
+userAgent:
+  image: ""
+  minFee: ""
+  maxFee: ""
+  minTx: ""
+  maxTx: ""
+
+bots:
+  image: ""
+  faucet:
+    amount: "10000000000"
+    fee: "100000000"
+
+# for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
+blockProducerConfigs:
+  - name: "test-1"
+    externalPort: 1
+    runWithUserAgent: false
+    runWithBots: false
+    enableGossipFlooding: false
+    privateKeySecret: "yolo"
+  - name: "test-2"
+    externalPort: 2
+    runWithUserAgent: true
+    runWithBots: false
+    enableGossipFlooding: true
+    privateKeySecret: "yolo"
+  - name: "test-3"
+    externalPort: 3
+    runWithUserAgent: false
+    runWithBots: true
+    enableGossipFlooding: true
+    privateKeySecret: "yolo"
+  - name: "test-4"
+    externalPort: 4
+    runWithUserAgent: true
+    runWithBots: true
+    enableGossipFlooding: false
+    privateKeySecret: "yolo"
