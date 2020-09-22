@@ -5,7 +5,7 @@ module Styles = {
     style([
       height(`percent(100.)),
       width(`percent(100.)),
-      paddingBottom(`rem(6.)),
+      paddingBottom(`rem(9.)),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
     ]);
