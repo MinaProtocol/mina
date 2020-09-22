@@ -5,7 +5,7 @@ module type Inputs_intf = sig
 
   module Rounds : Pickles_types.Nat.Intf
 
-  module Constraint_system : T0
+  module Gate_vector : T0
 
   module Urs : sig
     type t
@@ -23,7 +23,7 @@ module type Inputs_intf = sig
 
     val delete : t -> unit
 
-    val create : Constraint_system.t -> Unsigned.Size_t.t -> Urs.t -> t
+    val create : Gate_vector.t -> Unsigned.Size_t.t -> Urs.t -> t
   end
 
   module Curve : sig

@@ -1,4 +1,4 @@
-let siteDescription = "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets.";
+let siteDescription = "Mina is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Mina directly from any device, in less data than a few tweets.";
 
 [@react.component]
 let make =
@@ -26,6 +26,12 @@ let make =
       <link
         rel="icon"
         type_="image/png"
+        href="/static/favicon-96x96.png"
+        sizes="96x96"
+      />
+      <link
+        rel="icon"
+        type_="image/png"
         href="/static/favicon-32x32.png"
         sizes="32x32"
       />
@@ -45,7 +51,11 @@ let make =
         {React.string("img:-moz-loading { visibility: hidden; }")}
       </style>
     </Next.Head>
-    <div> children </div>
+    <AnnouncementBanner>
+      {React.string("Mainnet is live!")}
+    </AnnouncementBanner>
+    <Nav />
+    <main> children </main>
     <CookieWarning />
     <Footer />
   </>;

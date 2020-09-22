@@ -436,7 +436,7 @@ let propose_block_onto_chain ~logger ~keys
       ~transactions:
         ( Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands
             staged_ledger_diff
-          :> User_command.t list )
+          :> Signed_command.t list )
       ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
   in
   let snark_transition =
