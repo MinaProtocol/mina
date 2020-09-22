@@ -1,0 +1,4 @@
+(library
+ (name snapp_runner_functor)
+ (public_name snapp_runner.functor)
+ (libraries core))
