@@ -54,6 +54,7 @@ let make =
     <AnnouncementBanner>
       {React.string("Mainnet is live!")}
     </AnnouncementBanner>
+    <Nav />
     <main> children </main>
     <CookieWarning />
     <Footer />

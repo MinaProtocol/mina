@@ -8,7 +8,9 @@ module Colors = {
   let black = Css.black;
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
+  let digitalBlackA = a => `rgba(45, 45, 45, a);
   let purple = `hex("5362C8");
+  let digitalGray = `hex("575757");
 };
 
 module Typeface = {
@@ -198,7 +200,9 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.1)),
       lineHeight(`rem(1.1)),
+      cursor(`pointer),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let sidebarLink =
@@ -206,7 +210,10 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
+      cursor(`pointer),
+      textDecoration(`none),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let tooltip =
@@ -225,14 +232,14 @@ module Type = {
       letterSpacing(`em(-0.01)),
     ]);
 
-  let metadata =
-    style([
-      Typeface.monumentGrotesk,
+  let metadata_ = [
+      Typeface.monumentGroteskMono,
       fontSize(`px(12)),
       lineHeight(`rem(1.)),
       letterSpacing(`em(0.05)),
       textTransform(`uppercase),
-    ]);
+    ];
+  let metadata = style(metadata_);
 
   let announcement =
     style([

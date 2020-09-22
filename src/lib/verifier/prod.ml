@@ -44,9 +44,30 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (_cs : User_command.Verifiable.t list) :
-                 _ list =
-               failwith "unimplemented"
+             let verify_commands (cs : User_command.Verifiable.t list) : _ list
+                 =
+               let cs = List.map cs ~f:Common.check in
+               let to_verify =
+                 List.concat_map cs ~f:(function
+                   | `Valid _ ->
+                       []
+                   | `Invalid ->
+                       []
+                   | `Valid_assuming (_, xs) ->
+                       xs )
+               in
+               let all_verified =
+                 Pickles.Side_loaded.verify
+                   ~value_to_field_elements:Snapp_statement.to_field_elements
+                   to_verify
+               in
+               List.map cs ~f:(function
+                 | `Valid c ->
+                     `Valid c
+                 | `Invalid ->
+                     `Invalid
+                 | `Valid_assuming (c, xs) ->
+                     if all_verified then `Valid c else `Valid_assuming xs )
 
              let verify_blockchain_snark state proof =
                Blockchain_snark.Blockchain_snark_state.verify state proof
