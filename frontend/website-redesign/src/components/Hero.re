@@ -86,11 +86,7 @@ let make = (~title, ~header, ~copy) => {
     <div className=Styles.heroContent>
       <h4 className=Styles.headerLabel> {React.string(title)} </h4>
       <h1 className=Styles.header> {React.string(header)} </h1>
-      <p className=Styles.headerCopy>
-        {React.string(
-           copy
-         )}
-      </p>
+      <p className=Styles.headerCopy> {React.string(copy)} </p>
     </div>
   </div>;
 };
