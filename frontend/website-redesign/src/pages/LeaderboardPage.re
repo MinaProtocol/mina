@@ -43,21 +43,21 @@ module Styles = {
         outline(px(0), `solid, `transparent),
         padding(px(11)),
         borderWidth(px(2)),
-        borderColor(Theme.Colors.orange),
+        borderColor(Theme.Colors.digitalBlackA(0.3)),
       ]),
       focus([
         outline(px(0), `solid, `transparent),
         padding(px(11)),
         borderWidth(px(2)),
-        borderColor(Theme.Colors.orange),
+        borderColor(Theme.Colors.digitalBlackA(0.3)),
       ]),
-      hover([borderColor(Theme.Colors.orange)]),
+      hover([borderColor(Theme.Colors.digitalBlackA(0.3))]),
       selector(
         "::placeholder",
         [
           fontSize(`px(12)),
           fontWeight(normal),
-          color(Theme.Colors.orange),
+          color(Theme.Colors.digitalBlackA(0.3)),
         ],
       ),
       media(
@@ -82,7 +82,7 @@ module SearchBar = {
       <input
         type_="text"
         value=username
-        placeholder="NAME"
+        placeholder="Name"
         onChange={e => {
           let value = ReactEvent.Form.target(e)##value;
           onUsernameEntered(value);
