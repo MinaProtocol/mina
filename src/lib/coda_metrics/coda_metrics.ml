@@ -590,6 +590,10 @@ module Transition_frontier = struct
     in
     Gauge.v "recently_finalized_staged_txns" ~help ~namespace ~subsystem
 
+  let best_tip_user_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
   (* TODO:
   let recently_finalized_snarked_txns : Gauge.t =
     let help = "toal # of snarked txns that have been finalized" in

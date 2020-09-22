@@ -277,6 +277,12 @@ module type S = sig
     -> Undo.t
     -> unit Or_error.t
 
+  val has_locked_tokens :
+       global_slot:Global_slot.t
+    -> account_id:Account_id.t
+    -> ledger
+    -> bool Or_error.t
+
   module For_tests : sig
     val validate_timing :
          account:Account.t
@@ -322,29 +328,10 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
             *)
             nsf_error ()
         | Some proposed_new_balance ->
-            let open Unsigned in
             let curr_min_balance =
-              if Global_slot.(txn_global_slot < cliff_time) then
-                initial_minimum_balance
-              else
-                (* take advantage of fact that global slots are uint32's *)
-                let num_periods =
-                  UInt32.(
-                    Infix.((txn_global_slot - cliff_time) / vesting_period)
-                    |> to_int64 |> UInt64.of_int64)
-                in
-                let min_balance_decrement =
-                  UInt64.Infix.(
-                    num_periods * Amount.to_uint64 vesting_increment)
-                  |> Amount.of_uint64
-                in
-                match
-                  Balance.(initial_minimum_balance - min_balance_decrement)
-                with
-                | None ->
-                    Balance.zero
-                | Some amt ->
-                    amt
+              Account.min_balance_at_slot ~global_slot:txn_global_slot
+                ~cliff_time ~vesting_period ~vesting_increment
+                ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
               min_balance_error curr_min_balance
@@ -461,6 +448,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
+
+  let has_locked_tokens ~global_slot ~account_id ledger =
+    let open Or_error.Let_syntax in
+    let%map _, account = get_with_location ledger account_id in
+    Account.has_locked_tokens ~global_slot account
 
   let get_user_account_with_location ledger account_id =
     let open Or_error.Let_syntax in

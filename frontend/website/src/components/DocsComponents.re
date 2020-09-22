@@ -215,7 +215,7 @@ module Img =
   });
 
 module DaemonCommandExample = {
-  let defaultArgs = ["coda daemon", "-peer $SEED1", "-peer $SEED2"];
+  let defaultArgs = ["coda daemon", "-peer $SEED1"];
   [@react.component]
   let make = (~args: array(string)=[||]) => {
     let allArgs = defaultArgs @ Array.to_list(args);

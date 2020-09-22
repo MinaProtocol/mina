@@ -54,3 +54,9 @@ val handler : t -> Handler.t Staged.t
 
 val snapp_accounts :
   t -> Transaction.t -> Snapp_account.t option * Snapp_account.t option
+
+val has_locked_tokens_exn :
+     global_slot:Coda_numbers.Global_slot.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool

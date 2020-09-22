@@ -124,8 +124,7 @@ val apply :
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -141,8 +140,7 @@ val apply_diff_unchecked :
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
            option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -161,7 +159,14 @@ val create_diff :
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> supercharge_coinbase:bool
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+
+val can_apply_supercharged_coinbase_exn :
+     winner:Public_key.Compressed.t
+  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> global_slot:Coda_numbers.Global_slot.t
+  -> bool
 
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
