@@ -61,7 +61,7 @@ module Wrap = struct
           Step_field.of_bigint (Wrap_field.to_bigint x) )
     in
     let open Types.Dlog_based.Statement in
-    let (T (typ, f)) = Spec.packed_typ (module Impl) (T (fp, Fn.id)) spec in
-    let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, fun x -> of_data (f x))
+    let (T (typ, f)) = Spec.packed_typ (module Impl) (T (fp, Fn.id)) In_circuit.spec in
+    let typ = Typ.transport typ ~there:In_circuit.to_data ~back:In_circuit.of_data in
+    Spec.ETyp.T (typ, fun x -> In_circuit.of_data (f x))
 end

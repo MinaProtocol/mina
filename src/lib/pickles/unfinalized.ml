@@ -16,7 +16,7 @@ type t =
     , Tock.Rounds.n )
     Pickles_types.Vector.t
   , Field.t )
-  Types.Pairing_based.Proof_state.Per_proof.t
+  Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
   * Boolean.var
 
 module Constant = struct
@@ -30,22 +30,30 @@ module Constant = struct
       , Tock.Rounds.n )
       Vector.t
     , Digest.Constant.t )
-    Types.Pairing_based.Proof_state.Per_proof.t
+    Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
 
   let dummy : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
+    let alpha = chal () in
+    let beta = chal () in
+    let gamma = chal () in
+    let zeta = scalar_chal () in
     { deferred_values=
-        { marlin=
-            { sigma_2= tock ()
-            ; sigma_3= tock ()
-            ; alpha= chal ()
-            ; eta_a= chal ()
-            ; eta_b= chal ()
-            ; eta_c= chal ()
-            ; beta_1= Scalar_challenge (chal ())
-            ; beta_2= Scalar_challenge (chal ())
-            ; beta_3= Scalar_challenge (chal ()) }
+        { plonk=
+            { (Marlin_checks.derive_plonk (module Tock.Field)
+              ~endo:Endo.Dum.base (* I think this is right *)
+              ~domain:(Marlin_checks.domain (module Tock.Field) wrap_domains.h :> _ Marlin_checks.vanishing_polynomial_domain )
+              { alpha= Challenge.Constant.to_tock_field alpha
+              ; beta= Challenge.Constant.to_tock_field beta
+              ; gamma= Challenge.Constant.to_tock_field gamma
+              ; zeta= Common.Ipa.Wrap.endo_to_field zeta
+              }
+              Dummy.evals_combined)
+              with
+                alpha
+              ; beta; gamma
+              ; zeta }
         ; combined_inner_product= tock ()
         ; xi= Scalar_challenge one_chal
         ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges

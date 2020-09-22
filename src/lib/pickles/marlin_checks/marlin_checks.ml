@@ -24,6 +24,8 @@ module type Field_intf = sig
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
+
+  val negate : t -> t
 end
 
 type 'f field = (module Field_intf with type t = 'f)
@@ -49,7 +51,8 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
-    (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
+    (e : Field.t array) (pt : Field.t) ~rounds : Field.t 
+  =
   let pt_n =
     let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
     go pt rounds
@@ -60,11 +63,12 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
   | [] ->
       failwith "empty list"
 
-let evals_of_split_evals field (b1, b2, b3)
-    ((e1, e2, e3) : _ Dlog_marlin_types.Evals.t Tuple_lib.Triple.t) ~rounds =
+(*
+let evals_of_split_evals field (b1, b2)
+    ((e1, e2) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ~rounds =
   let e = actual_evaluation field ~rounds in
   let abc es = Abc.map es ~f:(Fn.flip e b3) in
-  { Pairing_marlin_types.Evals.w_hat= e e1.w_hat b1
+  { Pairing_plonk_types.Evals.w_hat= e e1.w_hat b1
   ; z_hat_a= e e1.z_hat_a b1
   ; z_hat_b= e e1.z_hat_b b1
   ; g_1= e e1.g_1 b1
@@ -77,81 +81,141 @@ let evals_of_split_evals field (b1, b2, b3)
   ; col= abc e3.col
   ; value= abc e3.value
   ; rc= abc e3.rc }
+   *)
 
-(* These correspond to the blue equations on [page 32 here](https://eprint.iacr.org/2019/1047.pdf),
-   with a few modifications:
+open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
-   - our [sigma_2] is the paper's [sigma_2 / domain_h#size]
-   - our [sigma_3] is the paper's [sigma_3 / domain_k#size]
-   - our Marlin variant does not have [h_0] and so the last equation on that page can be omitted.
-*)
-let checks (type t) (module F : Field_intf with type t = t)
-    ~(input_domain : t vanishing_polynomial_domain) ~domain_h ~domain_k
-    ~x_hat_beta_1
-    { Composition_types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
-    ; sigma_3
-    ; alpha
-    ; eta_a
-    ; eta_b
-    ; eta_c
-    ; beta_1
-    ; beta_2
-    ; beta_3 }
-    { Pairing_marlin_types.Evals.w_hat
-    ; z_hat_a
-    ; z_hat_b
-    ; g_1
-    ; h_1
-    ; g_2
-    ; h_2
-    ; g_3
-    ; h_3
-    ; row= {a= row_a; b= row_b; c= row_c}
-    ; col= {a= col_a; b= col_b; c= col_c}
-    ; value= {a= value_a; b= value_b; c= value_c}
-    ; rc= {a= rc_a; b= rc_b; c= rc_c} } =
+let derive_plonk (type t) (module F : Field_intf with type t = t)
+    ~endo
+~(domain : t vanishing_polynomial_domain)
+  =
   let open F in
-  let abc = Abc.abc in
-  (* Marlin checks follow *)
-  let row = abc row_a row_b row_c
-  and col = abc col_a col_b col_c
-  and value = abc value_a value_b value_c
-  and rc = abc rc_a rc_b rc_c
-  and eta = abc eta_a eta_b eta_c
-  and z_ = abc z_hat_a z_hat_b (z_hat_a * z_hat_b) in
-  let z_hat =
-    let v_X_beta_1 = input_domain#vanishing_polynomial beta_1 in
-    (w_hat * v_X_beta_1) + x_hat_beta_1
+  let square x = x * x in
+      let double x = of_int 2 * x in
+  let sbox x =
+    (* x^5 *)
+    square (square x) * x
   in
-  let sum = map_reduce ( + ) in
-  let prod = map_reduce ( * ) in
-  let r_alpha =
-    let v_h_alpha = domain_h#vanishing_polynomial alpha in
-    fun x -> (v_h_alpha - domain_h#vanishing_polynomial x) / (alpha - x)
-  in
-  let v_h_beta_1 = domain_h#vanishing_polynomial beta_1 in
-  let v_h_beta_2 = domain_h#vanishing_polynomial beta_2 in
-  let a_beta_3, b_beta_3 =
-    let beta_1_beta_2 = beta_1 * beta_2 in
-    let term =
-      Memo.general ~cache_size_bound:10 (fun m ->
-          beta_1_beta_2 + rc m - (beta_1 * row m) - (beta_2 * col m) )
+  let r, o = failwith "Compute r, o" in
+  fun ({ alpha; beta; gamma; zeta } : _ Minimal.t) ((e0, e1) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ->
+    let bz = beta * zeta in
+    let perm0 =
+      (e0.l + bz + gamma) *
+      (e0.r + (bz * r) + gamma) *
+      (e0.o + (bz * o) + gamma) *
+      alpha +
+      (alpha * alpha * (domain#vanishing_polynomial zeta) / (zeta - one))
+    in 
+    let perm1 =
+      negate (e0.l + (beta * e0.sigma1) + gamma) *
+      (e0.r + (beta * e0.sigma2) + gamma) *
+      (e1.z * beta * alpha)
+    in 
+    let gnrc_l = e0.l in
+    let gnrc_r = e0.r in
+    let gnrc_o = e0.o in
+    let alphas =
+      let a2 = alpha * alpha in
+      let a = Array.init 4 ~f:(fun _ -> a2) in
+      for i = 1 to Int.(Array.length a - 1) do
+        a.(i) <- a.(Int.(i - 1) ) * alpha
+      done;
+      a
     in
-    let a =
-      v_h_beta_1 * v_h_beta_2
-      * sum Abc.Label.all (fun m -> eta m * value m * prod (all_but m) term)
-    in
-    let b = prod Abc.Label.all term in
-    (a, b)
-  in
-  [ ( h_3 * domain_k#vanishing_polynomial beta_3
-    , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
-  ; ( r_alpha beta_2 * sigma_3 * domain_k#size
-    , (h_2 * v_h_beta_2) + sigma_2 + (g_2 * beta_2) )
-  ; ( r_alpha beta_1 * sum Abc.Label.all (fun m -> eta m * z_ m)
-    , (h_1 * v_h_beta_1) + (beta_1 * g_1) + (sigma_2 * domain_h#size * z_hat)
-    ) ]
+    let psdn0 =
+      let (l, r, o) = (sbox(e0.l), sbox(e0.r), sbox(e0.o)) in
+      ((l + o - e1.l) * alphas.(1)) + ((l + r - e1.r) * alphas.(2)) + ((r + o - e1.o) * alphas.(3))
+    in 
+    let ecad0 =
+        ((e1.r - e1.l) * (e0.o + e0.l) -
+        ((e1.l - e1.o) * (e0.r - e0.l))) * alphas.(1) +
+        (((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o) -
+        ((e0.o + e0.l) * (e0.o + e0.l))) * alphas.(2))
+    in 
+    let vbmul0, vbmul1 =
+        let tmp = double e0.l - square e0.r + e1.r in
+        (square e0.r - e0.r) * alphas.(1)
+        +
+        ((e1.l - e0.l) * e1.r
+        -
+        e1.o + (e0.o * (double e0.r - one))) * alphas.(2)
+        ,
+        ( square (double e0.o - (tmp * e0.r))
+        -
+        (( square e0.r - e1.r + e1.l) * square tmp )) * alphas.(1)
+        +
+        (((e0.l - e1.l) * (double e0.o - (tmp * e0.r))
+        -
+        ((e1.o + e0.o) * tmp)) * alphas.(2))
+    in 
+    let endomul0, endomul1, endomul2 =
+        let xr = square e0.r - e0.l - e1.r in
+        let t = e0.l - xr in
+        let u = double e0.o - (t * e0.r) in 
+        (square e0.l - e0.l) * alphas.(1) + ((square e1.l - e1.l) * alphas.(2))
+        +
+        ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3))
+        ,
+        (((e1.l - e0.r) * e1.r) - e1.o) + (e0.o * (double e0.l - one))
+        ,
+        (square u - (square t * (xr + e0.l + e1.l))) * alphas.(1)
+        +
+        ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2))
+    in 
+    { In_circuit.alpha
+    ; beta
+    ; gamma
+    ; zeta
+    ; perm0
+    ; perm1
+    ; gnrc_l
+    ; gnrc_r
+    ; gnrc_o
+    ; psdn0
+    ; ecad0
+    ; vbmul0
+    ; vbmul1
+    ; endomul0; endomul1; endomul2
+    }
 
+let checked (type t)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
+    ~domain
+    ~endo
+    (plonk : _ In_circuit.t)
+    evals
+    =
+    let actual = 
+      derive_plonk
+        (module Impl.Field)
+        ~endo
+        ~domain
+        { alpha= plonk.alpha
+        ; beta= plonk.beta
+        ; gamma= plonk.gamma
+        ; zeta= plonk.zeta
+        }
+        evals
+    in 
+    let open Impl in
+    let open In_circuit in
+      List.map ~f:(fun f -> Field.equal (f plonk) (f actual))
+      [ perm0 
+      ; perm1 
+      ; gnrc_l
+      ; gnrc_r
+      ; gnrc_o
+      ; psdn0
+      ; ecad0
+      ; vbmul0
+      ; vbmul1
+      ; endomul0
+      ; endomul1
+      ; endomul2
+      ]
+      |> Boolean.all
+
+(*
 let checked (type t)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
     ~input_domain ~domain_h ~domain_k ~x_hat_beta_1 marlin evals =
@@ -178,3 +242,4 @@ let checked (type t)
       Field.equal x y )
     eqns
   |> Boolean.all
+*)

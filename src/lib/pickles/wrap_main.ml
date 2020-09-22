@@ -156,7 +156,7 @@ let wrap_main
   let main
       ({ proof_state=
            { deferred_values=
-               { marlin
+               { plonk
                ; xi
                ; combined_inner_product
                ; b
@@ -335,10 +335,10 @@ let wrap_main
     in
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual)
-        , marlin_actual ) =
+        ) =
       let messages =
         exists
-          (Dlog_marlin_types.Messages.typ ~dummy:Inner_curve.Params.one
+          (Dlog_plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
              Other_field.Packed.typ Inner_curve.typ
              ~commitment_lengths:
                (let open Vector in
@@ -366,9 +366,9 @@ let wrap_main
              (pack_statement Max_branching.n prev_statement))
         ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b} ~messages
         ~which_branch ~openings_proof
+        ~plonk
     in
     Boolean.Assert.is_true bulletproof_success ;
-    assert_eq_marlin marlin marlin_actual ;
     Field.Assert.equal me_only_digest
       (hash_me_only Max_branching.n
          { Types.Dlog_based.Proof_state.Me_only.sg= openings_proof.sg

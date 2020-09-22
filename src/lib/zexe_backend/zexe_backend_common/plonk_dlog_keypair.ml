@@ -98,12 +98,13 @@ module Make (Inputs : Inputs_intf) = struct
   include Dlog_urs.Make (struct
     include Inputs
 
-    let public_inputs = lazy (failwith "TODO")
+    (* TODO *)
+    let public_inputs = lazy Unsigned.Size_t.zero
 
-    let size = lazy (failwith "TODO")
+    let size = lazy Unsigned.Size_t.zero
   end)
 
-  let create constraint_system =
+  let create (constraint_system : Constraint_system.t) =
     (* TODO: Make this flexible. *)
     let max_poly_size = 1 lsl Pickles_types.Nat.to_int Rounds.n in
     Index.create constraint_system
@@ -117,8 +118,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Pickles_types
 
   let vk_commitments t :
-      ( Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t
-      , Scalar_field.t )
+      ( Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t )
       Plonk_verification_key_evals.t =
     let f (t : Poly_comm.Backend.t) =
       match Poly_comm.of_backend t with
@@ -145,7 +145,5 @@ module Make (Inputs : Inputs_intf) = struct
     ; mul2_comm= f (mul2_comm t)
     ; emul1_comm= f (emul1_comm t)
     ; emul2_comm= f (emul2_comm t)
-    ; emul3_comm= f (emul3_comm t)
-    ; r= r t
-    ; o= o t }
+    ; emul3_comm= f (emul3_comm t) }
 end

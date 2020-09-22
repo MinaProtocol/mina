@@ -271,7 +271,7 @@ module Pairing_main_inputs = struct
     module Input_domain : sig
       val domain : Domain.t
 
-      val lagrange_commitments : Inner_curve.Constant.t array Lazy.t
+(*       val lagrange_commitments : Inner_curve.Constant.t array Lazy.t *)
     end
 
     module Sponge : sig

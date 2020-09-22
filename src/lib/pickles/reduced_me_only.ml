@@ -14,10 +14,10 @@ module Pairing_based = struct
     {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
   [@@deriving sexp, bin_io, yojson, sexp, compare, hash, eq]
 
-  let prepare ~dlog_marlin_index {app_state; sg; old_bulletproof_challenges} =
+  let prepare ~dlog_plonk_index {app_state; sg; old_bulletproof_challenges} =
     { Pairing_based.Proof_state.Me_only.app_state
     ; sg
-    ; dlog_marlin_index
+    ; dlog_plonk_index
     ; old_bulletproof_challenges=
         Vector.map ~f:Ipa.Step.compute_challenges old_bulletproof_challenges }
 end

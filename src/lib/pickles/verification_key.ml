@@ -11,7 +11,6 @@ module Data = struct
         { public_inputs: int
         ; variables: int
         ; constraints: int
-        ; nonzero_entries: int
         ; max_degree: int }
 
       let to_latest = Fn.id
@@ -25,8 +24,8 @@ module Repr = struct
     module V1 = struct
       type t =
         { commitments:
-            Dee.Affine.Stable.V1.t array Abc.Stable.V1.t
-            Matrix_evals.Stable.V1.t
+            Dee.Affine.Stable.V1.t array
+            Plonk_verification_key_evals.Stable.V1.t
         ; step_domains: Domains.Stable.V1.t array
         ; data: Data.Stable.V1.t }
 
@@ -36,7 +35,7 @@ module Repr = struct
 end
 
 type t =
-  { commitments: Dee.Affine.t array Abc.t Matrix_evals.t
+  { commitments: Dee.Affine.t array Plonk_verification_key_evals.t
   ; step_domains: Domains.t array
   ; index: Impls.Wrap.Verification_key.t
   ; data: Data.t }
@@ -46,11 +45,33 @@ let of_repr urs {Repr.commitments= c; step_domains; data= d} =
   let u = Unsigned.Size_t.of_int in
   let g = Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend in
   let t =
-    Snarky_bn382.Tweedle.Dee.Field_verifier_index.make (u d.public_inputs)
-      (u d.variables) (u d.constraints) (u d.nonzero_entries) (u d.max_degree)
-      urs (g c.row.a) (g c.col.a) (g c.value.a) (g c.rc.a) (g c.row.b)
-      (g c.col.b) (g c.value.b) (g c.rc.b) (g c.row.c) (g c.col.c)
-      (g c.value.c) (g c.rc.c)
+    let d = Domain.Pow_2_roots_of_unity (Int.ceil_log2 d.constraints) in
+    let r, o = Common.tock_shifts d in
+    let max_quot_size = 5 * (Domain.size d + 2) - 5 in
+    Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
+      ~max_poly_size:( u(1 lsl Nat.to_int Rounds.Wrap.n))
+      ~max_quot_size:(u max_quot_size)
+      ~urs
+      ~sigma_comm0:(g c.sigma_comm_0)
+      ~sigma_comm1:(g c.sigma_comm_1)
+      ~sigma_comm2:(g c.sigma_comm_2)
+      ~ql_comm:(g c.ql_comm)
+      ~qr_comm:(g c.qr_comm)
+      ~qo_comm:(g c.qo_comm)
+      ~qm_comm:(g c.qm_comm)
+      ~qc_comm:(g c.qc_comm)
+      ~rcm_comm0:(g c.rcm_comm_0)
+      ~rcm_comm1:(g c.rcm_comm_1)
+      ~rcm_comm2:(g c.rcm_comm_2)
+      ~psm_comm:(g c.psm_comm)
+      ~add_comm:(g c.add_comm)
+      ~mul1_comm:(g c.mul1_comm)
+      ~mul2_comm:(g c.mul2_comm)
+      ~emul1_comm:(g c.emul1_comm)
+      ~emul2_comm:(g c.emul2_comm)
+      ~emul3_comm:(g c.emul3_comm)
+      ~r
+      ~o
   in
   {commitments= c; step_domains; data= d; index= t}
 
@@ -68,19 +89,40 @@ include Binable.Of_binable
 
 let dummy =
   lazy
-    (let lengths =
-       Commitment_lengths.of_domains Common.wrap_domains
-         ~max_degree:Common.Max_degree.wrap
+    (let rows = Domain.size Common.wrap_domains.h in
+      let g =
+      let len =
+        let max_degree = Common.Max_degree.wrap in
+        Int.round_up (rows)
+          ~to_multiple_of:max_degree / max_degree
+      in
+      Array.create ~len Dee.(to_affine_exn one)
      in
-     let g = Dee.(to_affine_exn one) in
-     let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
-     { Repr.commitments= {row= e; col= e; value= e; rc= e}
+     { Repr.commitments=
+         { sigma_comm_0 = g
+      ; sigma_comm_1    = g
+      ; sigma_comm_2    = g
+      ; ql_comm         = g
+      ; qr_comm         = g
+      ; qo_comm         = g
+      ; qm_comm         = g
+      ; qc_comm         = g
+      ; rcm_comm_0      = g
+      ; rcm_comm_1      = g
+      ; rcm_comm_2      = g
+      ; psm_comm        = g
+      ; add_comm        = g
+      ; mul1_comm       = g
+      ; mul2_comm       = g
+      ; emul1_comm      = g
+      ; emul2_comm      = g
+      ; emul3_comm      = g
+      }
      ; step_domains= [||]
      ; data=
          { public_inputs= 0
          ; variables= 0
-         ; constraints= 0
-         ; nonzero_entries= 0
+         ; constraints= rows
          ; max_degree= 0 } }
      |> of_repr
           (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one

@@ -8,12 +8,16 @@ let wrap_domains = Common.wrap_domains
 
 let evals =
   let e =
-    Dlog_marlin_types.Evals.map
+    Dlog_plonk_types.Evals.map
       (Commitment_lengths.of_domains ~max_degree:Max_degree.wrap wrap_domains)
       ~f:(fun len -> Array.create ~len Backend.Tock.Field.one)
   in
   let ex = (e, Backend.Tock.Field.zero) in
-  (ex, ex, ex)
+  (ex, ex)
+
+let evals_combined =
+  Tuple_lib.Double.map evals
+    ~f:(fun (e, _x) -> Dlog_plonk_types.Evals.map e ~f:(Array.reduce_exn ~f:Backend.Tock.Field.(+)))
 
 module Ipa = struct
   module Wrap = struct

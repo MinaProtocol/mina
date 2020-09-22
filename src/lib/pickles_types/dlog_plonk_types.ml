@@ -148,7 +148,7 @@ module Messages = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'g t =
+      type ('g, 'a) t =
         { l_comm: 'g Without_degree_bound.Stable.V1.t
         ; r_comm: 'g Without_degree_bound.Stable.V1.t
         ; o_comm: 'g Without_degree_bound.Stable.V1.t
@@ -160,7 +160,7 @@ module Messages = struct
 
   let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t) =
     let open Snarky_backendless.Typ in
-    let {Evals.l; r; o; z; t; _} = commitment_lengths in
+    let {Evals.l; r; o; z; t} = commitment_lengths in
     let array ~length elt =
       let typ = Snarky_backendless.Typ.array ~length elt in
       { typ with
@@ -183,7 +183,7 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type ('g, 'fq, 'fqv) t =
-        { messages: 'g Messages.Stable.V1.t
+        { messages: ('g, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
       [@@deriving sexp, compare, yojson, hash, eq]
     end
