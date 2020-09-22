@@ -47,7 +47,7 @@ module type S = sig
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
-     and type resource_pool_diff_verified := Resource_pool.Diff.t
+     and type resource_pool_diff_verified := Resource_pool.Diff.verified
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
