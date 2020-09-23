@@ -79,19 +79,19 @@ let main inputs =
           ~default:(Malleable_error.return Test_error.Set.empty)
           ~f:Engine.Log_engine.destroy
       in
-      let%bind test_error_set =
-        match%map Malleable_error.lift_error_set test_result with
-        | Ok ((), error_set) ->
-            error_set
-        | Error error_set ->
-            error_set
-      in
       let%bind log_engine_error_set =
         match%map Malleable_error.lift_error_set log_engine_cleanup_result with
         | Ok (remote_error_set, internal_error_set) ->
             Test_error.Set.combine [remote_error_set; internal_error_set]
         | Error internal_error_set ->
             internal_error_set
+      in
+      let%bind test_error_set =
+        match%map Malleable_error.lift_error_set test_result with
+        | Ok ((), error_set) ->
+            error_set
+        | Error error_set ->
+            error_set
       in
       report_test_errors
         (Test_error.Set.combine [test_error_set; log_engine_error_set])
