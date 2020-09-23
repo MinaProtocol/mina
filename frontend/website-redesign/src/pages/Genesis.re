@@ -98,6 +98,7 @@ let make = () => {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Theme.Colors.white,
           dark: false,
+          href:"/"
         },
       }>
       <Spacer height=4. />
