@@ -1,0 +1,11 @@
+(executable
+ (name gen_values)
+ (libraries
+   ppxlib
+   ppx_util
+   core_kernel
+   zexe_backend)
+ (preprocess
+  (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
+ (modes native))
+
