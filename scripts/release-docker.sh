@@ -50,20 +50,15 @@ bot)
   ;;
 coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
-  DOCKER_CONTEXT="."
   ;;
 coda-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
-  DOCKER_CONTEXT="."
   ;;
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
-  DOCKER_CONTEXT="."
   ;;
 coda-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
-  mkdir -p some_empty_dir
-  DOCKER_CONTEXT="./some_empty_dir"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
@@ -72,6 +67,11 @@ leaderboard)
 *)
 esac
 
+# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
+if [ -z "$DOCKER_CONTEXT" ]; then
+cat $DOCKERFILE_PATH | docker build $EXTRA -t codaprotocol/$SERVICE:$VERSION -
+else
 docker build $EXTRA $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+fi
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then docker push codaprotocol/$SERVICE:$VERSION; fi;
