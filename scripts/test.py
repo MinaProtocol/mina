@@ -19,9 +19,9 @@ from readchar import readchar
 
 build_artifact_profiles = []
 
-unit_test_profiles = ['dev']
+unit_test_profiles = []
 
-unit_test_profiles_medium_curves = ['dev_medium_curves']
+unit_test_profiles_medium_curves = []
 
 simple_tests = [
     'full-test',
