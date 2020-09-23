@@ -898,11 +898,8 @@ let wait_for :
       Deferred.return (Error e)
 
 let await_timeout ~waiting_for ~timeout_duration deferred =
-  let start_time = Time.now () in
   match%map Timeout.await ~timeout_duration () deferred with
   | `Timeout ->
-      Printf.printf !"fuck... %f%!\n"
-        (Time.Span.to_sec @@ Time.diff (Time.now ()) start_time) ;
       failwithf "timeout while waiting for %s" waiting_for ()
   | `Ok x ->
       x
