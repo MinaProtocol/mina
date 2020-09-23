@@ -125,7 +125,6 @@ module Listing = {
 
 [@react.component]
 let make = (~items, ~mainImg) => {
-  Js.log(items);
   <Wrapped>
     <div className=Styles.container>
       {switch (Belt.Array.get(items, 0)) {
