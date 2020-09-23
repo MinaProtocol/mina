@@ -14,7 +14,7 @@ module Style = {
       ),
       selector(
         "h1 + p",
-        [ marginBottom(`rem(3.)) ] @ Theme.Type.sectionSubhead_
+        Theme.Type.sectionSubhead_
       )
     ]);
 

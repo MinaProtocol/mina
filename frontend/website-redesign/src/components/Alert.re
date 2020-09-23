@@ -9,7 +9,11 @@ module Styles = {
     ]);
 
   let inner =
-    merge([style([margin(`zero), padding2(~v=`rem(0.), ~h=`rem(1.))])]);
+    merge([style([
+                 margin(`zero),
+                 padding2(~v=`rem(1.), ~h=`rem(1.)),
+                 selector("p", [ margin(`zero) ])
+    ])]);
 
   let title = c =>
     merge([

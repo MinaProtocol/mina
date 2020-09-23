@@ -28,6 +28,26 @@ module Styles = {
   let paragraphSpacing = style([
     marginBottom(`rem(1.))
   ]);
+
+  let code = style([
+    Theme.Typeface.monumentGroteskMono,
+    fontSize(`rem(1.)),
+    lineHeight(`rem(1.5))
+  ]);
+
+  let list = style([
+    color(Theme.Colors.digitalBlack),
+    Theme.Typeface.monumentGrotesk,
+    fontSize(`rem(1.125)),
+    lineHeight(`rem(1.6875)),
+    marginTop(`rem(0.5)),
+    marginBottom(`rem(1.)),
+    marginLeft(`rem(2.6875)),
+  ]);
+
+  let link = style([
+    textDecoration(`none)
+  ]);
 };
 
 module type Component = {let element: React.element;};
@@ -66,7 +86,7 @@ open Css;
 
 module H1 =
   WrapHeader({
-    let element = <h1 className=merge([Styles.headerSpacing, Theme.Type.h1]) />;
+    let element = <h1 className=merge([Styles.h1Spacing, Theme.Type.h1]) />;
   });
 
 module H2 =
@@ -91,7 +111,7 @@ module P =
 
 module A =
   Wrap({
-    let element = <a className=Theme.Type.link />;
+    let element = <a className=merge([Styles.link, Theme.Type.link]) />;
   });
 
 module Strong =
@@ -152,17 +172,17 @@ module Pre = {
 
 module Code =
   Wrap({
-    let element = <code className=Theme.Type.inlineCode />;
+    let element = <code className=Styles.code />;
   });
 
 module Ul =
   Wrap({
-    let element = <ul className="" /* TODO */ />;
+    let element = <ul className=Styles.list />;
   });
 
 module Ol =
   Wrap({
-    let element = <ol className="" /* TODO */ />;
+    let element = <ol className=Styles.list />;
   });
 
 module Img =
