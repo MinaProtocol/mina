@@ -8,7 +8,7 @@ module Styles = {
       firstChild([marginLeft(`zero)]),
       padding(`zero),
       media(
-        Theme.MediaQuery.notMobile,
+        Theme.MediaQuery.tablet,
         [
           marginRight(rem(2.)),
           marginTop(`zero),
@@ -183,8 +183,8 @@ module Section = {
 };
 
 [@react.component]
-let make = (~currentSlug, ~children) => {
-  <aside>
+let make = (~currentSlug, ~className="", ~children) => {
+  <aside className>
     <CurrentSlugProvider value=currentSlug>
       <ol role="list" className=Styles.sideNav> children </ol>
     </CurrentSlugProvider>

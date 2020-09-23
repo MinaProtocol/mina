@@ -23,6 +23,7 @@ module Router = {
   type t('a) = {
     query: Js.Dict.t('a),
     route: string,
+    asPath: string,
   };
 
   [@bs.module "next/router"] [@bs.val]
