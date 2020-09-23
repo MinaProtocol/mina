@@ -474,8 +474,8 @@ module Block = struct
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                "INSERT INTO blocks (state_hash, parent_id, creator_id, \
-                snarked_ledger_hash_id, ledger_hash, height, timestamp) \
-                VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
+                snarked_ledger_hash_id, ledger_hash, height, global_slot, \
+                timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; creator_id
