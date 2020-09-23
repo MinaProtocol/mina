@@ -109,7 +109,7 @@ module Poly = struct
             Max_branches_vec.T.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Abc.Stable.V1.t Matrix_evals.Stable.V1.t
-        ; wrap_vk: 'vk option }
+        ; wrap_vk: ('vk option[@of_yojson fun _ -> Ok None]) }
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
@@ -178,6 +178,10 @@ end = struct
     module V1 = struct
       type t = (G.t, Vk.t) Poly.Stable.V1.t
       [@@deriving sexp, eq, compare, hash, yojson]
+
+      let to_yojson json =
+        let x = to_yojson json in
+        {x with wrap_vk= Some (Vk.of_repr t)}
 
       let to_latest = Fn.id
 
