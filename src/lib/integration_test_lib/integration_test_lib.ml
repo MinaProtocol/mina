@@ -83,17 +83,24 @@ module type Engine_intf = sig
   module Node : sig
     type t
 
-    val start : t -> unit Deferred.t
+    val start : fresh_state:bool -> t -> unit Deferred.Or_error.t
 
-    val stop : t -> unit Deferred.t
+    val stop : t -> unit Deferred.Or_error.t
 
     val send_payment :
-      t -> User_command_input.t -> Coda_base.Signed_command.t Deferred.t
+         logger:Logger.t
+      -> t
+      -> sender:Signature_lib.Public_key.Compressed.t
+      -> receiver:Signature_lib.Public_key.Compressed.t
+      -> amount:Currency.Amount.t
+      -> fee:Currency.Fee.t
+      -> unit Deferred.Or_error.t
   end
 
   module Network : sig
     type t =
-      { constraint_constants: Genesis_constants.Constraint_constants.t
+      { namespace: string
+      ; constraint_constants: Genesis_constants.Constraint_constants.t
       ; genesis_constants: Genesis_constants.t
       ; block_producers: Node.t list
       ; snark_coordinators: Node.t list
@@ -152,6 +159,19 @@ module type Engine_intf = sig
       -> unit Deferred.Or_error.t
 
     val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
+
+    (** wait until a payment transaction appears in an added breadcrumb
+        num_tries is the maximum number of breadcrumbs to examine
+    *)
+    val wait_for_payment :
+         ?num_tries:int
+      -> t
+      -> logger:Logger.t
+      -> sender:Signature_lib.Public_key.Compressed.t
+      -> receiver:Signature_lib.Public_key.Compressed.t
+      -> amount:Currency.Amount.t
+      -> unit
+      -> unit Or_error.t Deferred.t
   end
 end
 
