@@ -5,13 +5,9 @@ module Styles = {
       display(`flex),
       justifyContent(`spaceBetween),
       flexDirection(`column),
-      alignItems(`center),
       width(`percent(100.)),
       height(`percent(100.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), height(`rem(32.))],
-      ),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 
   let listingContainer =
@@ -27,8 +23,19 @@ module Styles = {
   let description =
     merge([Theme.Type.paragraphSmall, style([marginTop(`rem(1.))])]);
 
+  let metadata =
+    merge([Theme.Type.metadata, style([marginTop(`rem(0.5))])]);
+
   let link =
-    merge([Theme.Type.link, style([display(`flex), alignItems(`center)])]);
+    merge([
+      Theme.Type.link,
+      style([
+        display(`flex),
+        alignItems(`center),
+        cursor(`pointer),
+        marginTop(`rem(1.)),
+      ]),
+    ]);
 };
 
 module MainListing = {
@@ -47,27 +54,19 @@ module MainListing = {
   };
 
   [@react.component]
-  let make = () => {
+  let make = (~item: ContentType.BlogPost.t) => {
     <div className=MainListingStyles.container>
-      <div className=Theme.Type.metadata>
+      <div className=Styles.metadata>
         <span> {React.string("Press")} </span>
         <span> {React.string(" / ")} </span>
-        <span> {React.string("16 Jun 2020")} </span>
+        <span> {React.string(item.date)} </span>
         <span> {React.string(" / ")} </span>
-        <span> {React.string("Coindesk")} </span>
+        <span> {React.string(item.author)} </span>
       </div>
       <img src="/static/img/ArticleImage.png" />
       <article>
-        <h5 className=Styles.title>
-          {React.string(
-             "Coda Protocol (now Mina) Sets aside $2.1M in tokens for Dev gains",
-           )}
-        </h5>
-        <p className=Styles.description>
-          {React.string(
-             {js|The new grant program, which would be paid out using Coda’s (now Mina’s) tokens, is open to any project that helps develop the protocol, build tooling, organize meetups or create content.|js},
-           )}
-        </p>
+        <h5 className=Styles.title> {React.string(item.title)} </h5>
+        <p className=Styles.description> {React.string(item.snippet)} </p>
       </article>
       <Next.Link href="/">
         <div className=Styles.link>
@@ -95,47 +94,45 @@ module Listing = {
         ),
       ]);
 
-    let link =
-      merge([
-        Styles.link,
-        style([marginTop(`rem(0.5)), marginBottom(`rem(1.))]),
-      ]);
+    let link = merge([Styles.link, style([marginBottom(`rem(2.))])]);
   };
 
   [@react.component]
-  let make = () => {
-    <div className=ListingStyles.container>
-      <div className=Theme.Type.metadata>
-        <span> {React.string("Press")} </span>
-        <span> {React.string(" / ")} </span>
-        <span> {React.string("16 Jun 2020")} </span>
-        <span> {React.string(" / ")} </span>
-        <span> {React.string("Coindesk")} </span>
-      </div>
-      <h5 className=Styles.title>
-        {React.string(
-           "Coda Protocol (now Mina) Sets aside $2.1M in tokens for Dev gains",
-         )}
-      </h5>
-      <Next.Link href="/">
-        <div className=ListingStyles.link>
-          <span> {React.string("Read more")} </span>
-          <Icon kind=Icon.ArrowRightMedium />
-        </div>
-      </Next.Link>
-    </div>;
+  let make = (~items) => {
+    items
+    |> Array.map((item: ContentType.BlogPost.t) => {
+         <div className=ListingStyles.container>
+           <div className=Styles.metadata>
+             <span> {React.string("Press")} </span>
+             <span> {React.string(" / ")} </span>
+             <span> {React.string(item.date)} </span>
+             <span> {React.string(" / ")} </span>
+             <span> {React.string(item.author)} </span>
+           </div>
+           <h5 className=Styles.title> {React.string(item.title)} </h5>
+           <Next.Link href="/">
+             <div className=ListingStyles.link>
+               <span> {React.string("Read more")} </span>
+               <Icon kind=Icon.ArrowRightMedium />
+             </div>
+           </Next.Link>
+         </div>
+       })
+    |> React.array;
   };
 };
 
 [@react.component]
-let make = () => {
+let make = (~items) => {
+  Js.log("List Module");
   <Wrapped>
     <div className=Styles.container>
-      <MainListing />
+      {switch (Belt.Array.get(items, 0)) {
+       | Some(item) => <MainListing item />
+       | None => <div> {React.string("Loading...")} </div>
+       }}
       <div className=Styles.listingContainer>
-        <Listing />
-        <Listing />
-        <Listing />
+        <Listing items={Belt.Array.slice(items, ~offset=1, ~len=3)} />
       </div>
     </div>
   </Wrapped>;
