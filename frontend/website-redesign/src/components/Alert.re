@@ -3,7 +3,7 @@ module Styles = {
 
   let main =
     style([
-      border(px(1), `solid, Theme.Colors.digitalBlack),
+      border(px(1), `solid, Theme.Colors.digitalBlackA(0.25)),
       borderRadius(px(4)),
       overflow(`hidden),
     ]);

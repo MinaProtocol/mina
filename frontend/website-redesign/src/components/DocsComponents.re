@@ -14,6 +14,20 @@ module Styles = {
       backgroundSize(`cover),
       backgroundImage(url("/static/img/link.svg")),
     ]);
+
+  let h1Spacing = style([
+    marginBottom(`rem(1.))
+  ]);
+
+  let headerSpacing = merge([
+                            h1Spacing,
+                            style([
+    marginTop(`rem(3.))
+  ])]);
+
+  let paragraphSpacing = style([
+    marginBottom(`rem(1.))
+  ]);
 };
 
 module type Component = {let element: React.element;};
@@ -52,27 +66,27 @@ open Css;
 
 module H1 =
   WrapHeader({
-    let element = <h1 className=Theme.Type.h1 />;
+    let element = <h1 className=merge([Styles.headerSpacing, Theme.Type.h1]) />;
   });
 
 module H2 =
   WrapHeader({
-    let element = <h2 className=Theme.Type.h2 />;
+    let element = <h2 className=merge([Styles.headerSpacing, Theme.Type.h2]) />;
   });
 
 module H3 =
   WrapHeader({
-    let element = <h3 className=Theme.Type.h3 />;
+    let element = <h3 className=merge([Styles.headerSpacing, Theme.Type.h3]) />;
   });
 
 module H4 =
   WrapHeader({
-    let element = <h4 className=Theme.Type.h4 />;
+    let element = <h4 className=merge([Styles.headerSpacing, Theme.Type.h4]) />;
   });
 
 module P =
   Wrap({
-    let element = <p className=Theme.Type.paragraph />;
+    let element = <p className=merge([Styles.paragraphSpacing, Theme.Type.paragraph]) />;
   });
 
 module A =
@@ -128,7 +142,7 @@ module Pre = {
           borderRadius(`px(4)),
           padding2(~v=`rem(1.), ~h=`rem(1.)),
           overflow(`scroll),
-          // selector("code", [Theme.Type.paragraphMono]),
+          selector("code", [color(Theme.Colors.white)]),
         ])}>
         children
       </pre>
@@ -138,7 +152,7 @@ module Pre = {
 
 module Code =
   Wrap({
-    let element = <code className=Theme.Type.paragraphMono />;
+    let element = <code className=Theme.Type.inlineCode />;
   });
 
 module Ul =
