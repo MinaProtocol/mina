@@ -8,8 +8,8 @@ echo "--- Build/Release docker artifact for ${CODA_SERVICE}"
 scripts/release-docker.sh --service "${CODA_SERVICE}" --version "${CODA_VERSION}"\
  --extra-args "--build-arg coda_deb_version=${CODA_DEB_VERSION} --build-arg deb_repo=${CODA_DEB_REPO}"
 echo "--- Build/Release docker artifact for ${CODA_SERVICE}-puppeteered"
-scripts/release-docker.sh --service "${CODA_SERVCE}-puppeteered" --version "${CODA_VERSION}"\
- --extra-args "--build-arg coda_deb_version=${CODA_DEB_VERSION} --build-arg coda_version=${CODA_VERSION} --build-arg deb_repo=${CODA_DEB_REPO}"
+scripts/release-docker.sh --service "${CODA_SERVICE}-puppeteered" --version "${CODA_VERSION}"\
+ --extra-args "--build-arg coda_deb_version=${CODA_DEB_VERSION} --build-arg CODA_VERSION=${CODA_VERSION} --build-arg CODA_BRANCH=${CODA_GIT_BRANCH} --build-arg deb_repo=${CODA_DEB_REPO}"
 
 if [[ -n $CODA_BUILD_ROSETTA ]]; then
   echo "--- Build/Release coda-rosetta to docker hub"
