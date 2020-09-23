@@ -1076,6 +1076,10 @@ let create (config : Config.t) =
                          [%log' fatal config.logger]
                            !"tm %{sexp: Block_time.t} tn %{sexp: Block_time.t}"
                            tm tn_production_time ;
+                         [%log' fatal config.logger]
+                           !"diff %{sexp: Core_kernel_private.Span_float.t}"
+                           Block_time.(
+                             Span.to_time_span @@ diff tm tn_production_time) ;
                          Coda_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
                          Coda_metrics.Block_latency.Gossip_time.update
