@@ -12,6 +12,8 @@ module Colors = {
   let digitalBlackA = a => `rgba(45, 45, 45, a);
   let purple = `hex("5362C8");
   let digitalGray = `hex("575757");
+  let error = `hex("e93939");
+  let status = `hex("ffb13b");
 };
 
 module Typeface = {
@@ -152,12 +154,12 @@ module Type = {
       ),
     ]);
   /** some styles have not been perfected, but all can be added and adjusted as needed! */
-  let label =
+  let label_ = c =>
     style([
       Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
-      color(Colors.digitalBlack),
+      color(c),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
       media(
@@ -165,6 +167,9 @@ module Type = {
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
+
+  let label = label_(Colors.digitalBlack);
+  let whiteLabel = label_(Colors.white);
 
   let buttonLabel =
     style([
