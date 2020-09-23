@@ -1,5 +1,6 @@
 open Zexe_backend_common
 open Basic_plonk
+open Core_kernel
 module T = Snarky_bn382.Tweedle
 module Field = Fp
 module B = T.Dee_plonk.Plonk
@@ -39,20 +40,23 @@ module Verification_key = struct
   let of_string _ = failwith "TODO"
 end
 
-module Proof = Dlog_plonk_based_proof.Make (struct
-  module Constraint_system = R1CS_constraint_system
+module Rounds = Rounds.Wrap
+
+module Keypair = Dlog_plonk_based_keypair.Make (struct
+  let name = "tweedledee"
+  
   module Scalar_field = Field
-  module Backend = B.Field_proof
-  module Verifier_index = B.Field_verifier_index
+  module Rounds = Rounds
+  module Urs = B.Field_urs
   module Index = B.Field_index
-  module Evaluations_backend = B.Field_proof.Evaluations
-  module Opening_proof_backend = B.Field_opening_proof
-  module Poly_comm = Fp_poly_comm
   module Curve = Curve
+  module Poly_comm = Fp_poly_comm
+  module Verifier_index = B.Field_verifier_index
+  module Gate_vector = B.Gate_vector
 end)
 
 module Proving_key = struct
-  type t = B.Field_index.t
+  type t = Keypair.t
 
   include Core_kernel.Binable.Of_binable
             (Core_kernel.Unit)
@@ -73,23 +77,47 @@ module Proving_key = struct
   let of_string _ = failwith "TODO"
 end
 
-module Rounds = Rounds.Wrap
+module Proof = Dlog_plonk_based_proof.Make (struct
+  module Scalar_field = Field
+  module Backend = struct
+    include B.Field_proof
+    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+      let external_values i =
+        if i = 0 then Field.one
+        else if i - 1 < Field.Vector.length primary
+        then Field.Vector.get primary (i - 1)
+        else Field.Vector.get auxiliary (i - 1 - Field.Vector.length primary)
+      in
+      let w = R1CS_constraint_system.compute_witness pk.cs external_values in
+      let n = Unsigned.Size_t.to_int (B.Field_index.domain_d1_size pk.index) in
+      let witness = Field.Vector.create() in
+
+      for i = 0 to Array.length w.(0) - 1 do
+        for j = 0 to n - 1 do
+
+          let elm = if j < (Array.length w) then w.(j).(i) else Field.zero in
+          print_endline (String.concat [(Sexp.to_string ([%sexp_of: Field.t] elm)); (Printf.sprintf "%d" (n*i+j))] ~sep:", ");
+          Out_channel.flush stdout;
+
+          Field.Vector.emplace_back witness (if j < (Array.length w) then w.(j).(i) else Field.zero)
+        done;
+      done;
+      create pk.index (Field.Vector.create()) witness prev_chals prev_comms
+  end
+  module Verifier_index = B.Field_verifier_index
+  module Index = struct
+    include Keypair
+    let create (pk : Keypair.t) = create pk.cs
+  end
+  module Evaluations_backend = B.Field_proof.Evaluations
+  module Opening_proof_backend = B.Field_opening_proof
+  module Poly_comm = Fp_poly_comm
+  module Curve = Curve
+end)
 
 module Oracles = Dlog_plonk_based_oracles.Make (struct
   module Verifier_index = B.Field_verifier_index
   module Field = Field
   module Proof = Proof
   module Backend = B.Field_oracles
-end)
-
-module Keypair = Dlog_plonk_based_keypair.Make (struct
-  let name = "tweedledee"
-
-  module Rounds = Rounds
-  module Urs = B.Field_urs
-  module Index = B.Field_index
-  module Curve = Curve
-  module Poly_comm = Fp_poly_comm
-  module Verifier_index = B.Field_verifier_index
-  module Gate_vector = B.Gate_vector
 end)

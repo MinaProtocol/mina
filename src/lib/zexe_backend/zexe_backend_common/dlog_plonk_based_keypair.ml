@@ -184,7 +184,7 @@ module Make (Inputs : Inputs_intf) = struct
   let vk t = Verifier_index.create t.index
 
   (* let pk = Fn.id   this breaks Snarky backend interface *)
-  let pk t = t.index
+  let pk t = t
 
   open Pickles_types
 end

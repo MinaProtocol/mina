@@ -244,21 +244,33 @@ let create () =
       in
       Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
-  let neg_one = Fp.(negate one)
-
   open Position
   let add_row sys row t l r o c =
+
+    print_endline (Sexp.to_string ([%sexp_of: V.t option array] row));
+
+    Printf.printf "row: %d\n" sys.next_row; 
+    Printf.printf "l.row: %d, l.col: %d\n" l.row l.col; 
+    Printf.printf "r.row: %d, r.col: %d\n" r.row r.col; 
+    Printf.printf "o.row: %d, o.col: %d\n" o.row o.col; 
+    Out_channel.flush stdout;
+
     Gates.add_gate sys.gates t (of_int sys.next_row)
       (of_int l.row) (l.col)
       (of_int r.row) (r.col)
       (of_int o.row) (o.col)
+    (*
+      (of_int sys.next_row) 0
+      (of_int sys.next_row) 1
+      (of_int sys.next_row) 2
+    *)
       (c);
     sys.next_row <- sys.next_row + 1 ;
     sys.rows_rev <- row :: sys.rows_rev
 
   let wire sys key row col =
     let prev = match V.Table.find sys.equivalence_classes key with
-      | Some x -> (match List.last x with
+      | Some x -> (match List.hd x with
         | Some x -> x
         | None -> {row= row; col})
       | None -> {row= row; col}
@@ -266,20 +278,18 @@ let create () =
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col } ;
     prev
 
-  let add_generic_constraint sys ?m ?c ?o ?r ((ls : Fp.t), (lx: V.t)) : unit =
+  let add_generic_constraint ?l ?r ?o c sys : unit =
 
-    let lp = wire sys lx sys.next_row 0 in
+    let lp = match l with
+      | Some (_, lx) -> wire sys lx sys.next_row 0
+      | None -> {row= sys.next_row; col= 0} in
     let rp = match r with
       | Some (_, rx) -> wire sys rx sys.next_row 1
       | None -> {row= sys.next_row; col= 1} in
     let op = match o with
       | Some (_, ox) -> wire sys ox sys.next_row 2
       | None -> {row= sys.next_row; col= 2} in
-    let ct c = match c with | Some (x, _) -> x | None -> Fp.zero in
-    let cs c = match c with | Some x -> x | None -> Fp.zero in
-
-    add_row sys [| Some lx; Option.map r ~f:snd; Option.map o ~f:snd |]
-      1 lp rp op (Fp.Vector.of_array [|ls; (ct r); (ct o); (cs m); (cs c)|]) 
+    add_row sys [| Option.map l ~f:snd; Option.map r ~f:snd; Option.map o ~f:snd |] 1 lp rp op c 
 
   let completely_reduce sys (terms : (Fp.t * int) list) = (* just adding constrained variables without values *)
     let rec go = function
@@ -289,7 +299,8 @@ let create () =
         let lx = V.External lx in
         let (rs, rx) = go t in
         let s1x1_plus_s2x2 = create_internal sys [ (ls, lx) ; (rs, rx) ] in
-        add_generic_constraint sys (ls, lx) ~r:(rs, rx) ~o:(neg_one, s1x1_plus_s2x2) ;
+        add_generic_constraint ~l:(ls, lx) ~r:(rs, rx) ~o:(Fp.one, s1x1_plus_s2x2)
+          (Fp.Vector.of_array [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|]) sys ;
         (Fp.one, s1x1_plus_s2x2)
     in
     go terms
@@ -325,13 +336,14 @@ let create () =
         let (rs, rx) = completely_reduce sys tl in
         let res = create_internal sys [ (ls, External lx); (rs, rx) ] in
         (* res = ls * lx + rs * rx *)
-        add_generic_constraint sys ?c:constant (ls, External lx) ~r:(rs, rx) ~o:(neg_one, res) ;
+        add_generic_constraint ~l:(ls, External lx) ~r:(rs, rx) ~o:(Fp.one, res)
+          (Fp.Vector.of_array [|ls; rs; Fp.(negate one); Fp.zero; match constant with | Some x -> x | None -> Fp.zero |]) sys ;
         (Fp.one, `Var res)
   ;;
 
   let add_constraint ?label:_ sys (constr : (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic) =
 
-    (*print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr));*)
+    print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr));
 
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -340,20 +352,58 @@ let create () =
       | `Var x ->
         if Fp.equal s Fp.one then x
         else let sx = create_internal sys [ (s, x) ] in
-          add_generic_constraint sys ~o:(Fp.(negate one), sx) (s, x);
+          add_generic_constraint ~l:(s, x) ~o:(Fp.one, sx)
+            (Fp.Vector.of_array [|Fp.one; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]) sys ;
           x
       | `Constant ->
         let x = create_internal sys ~constant:s [] in
-        add_generic_constraint sys ~c:(Fp.negate s) (Fp.one, x);
+        add_generic_constraint ~l:(Fp.one, x)
+          (Fp.Vector.of_array [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]) sys ;
         x
     in
     match constr with
+
+    | Snarky_backendless.Constraint.Square (v1, v2) ->
+      let (sl, xl), (so, xo) = red v1, red v2 in
+      ( 
+        match xl, xo with
+        | `Var xl, `Var xo -> add_generic_constraint ~l:(sl, xl) ~r:(sl, xl) ~o:(so, xo)
+            (Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]) sys
+        | `Var xl, `Constant -> add_generic_constraint ~l:(sl, xl) ~r:(sl, xl)
+            (Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]) sys
+        | `Constant, `Var xl -> add_generic_constraint ~l:(sl, xl)
+            (Fp.Vector.of_array [|sl; Fp.zero; Fp.zero; Fp.zero; Fp.negate (Fp.square so)|]) sys
+        | `Constant, `Constant -> assert Fp.(equal (square sl) so)
+      )
+
+    | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
+      let (s1, x1), (s2, x2), (s3, x3) = red v1, red v2, red v3 in
+      ( 
+        match x1, x2, x3 with
+        | `Var x1, `Var x2, `Var x3 -> add_generic_constraint ~l:(s1, x1) ~r:(s2, x2) ~o:(s3, x3)
+          (Fp.Vector.of_array [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]) sys
+
+        | `Var x1, `Var x2, `Constant -> add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+          (Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]) sys
+        | `Var x1, `Constant, `Var x3 -> add_generic_constraint ~l:(s1, x1) ~o:(s3, x3)
+          (Fp.Vector.of_array [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]) sys
+        | `Constant, `Var x2, `Var x3 -> add_generic_constraint ~r:(s2, x2) ~o:(s3, x3)
+          (Fp.Vector.of_array [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]) sys          
+        | `Var x1, `Constant, `Constant -> add_generic_constraint ~l:(s1, x1)
+          (Fp.Vector.of_array [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]) sys
+        | `Constant, `Var x2, `Constant -> add_generic_constraint ~r:(s2, x2)
+          (Fp.Vector.of_array [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]) sys
+        | `Constant, `Constant, `Var x3 -> add_generic_constraint ~o:(s3, x3)
+          (Fp.Vector.of_array [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]) sys
+        | `Constant, `Constant, `Constant -> assert Fp.(equal s3 Fp.(s1 * s2))
+      )
 
     | Snarky_backendless.Constraint.Boolean v ->
       let (s, x) = red v in
       ( 
         match x with
-        | `Var x -> add_generic_constraint sys ~m:Fp.(negate (square s)) (s, x) ~r:(s, x)
+        | `Var x -> add_generic_constraint~l:(s, x) ~r:(s, x)
+          (Fp.Vector.of_array [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|]) sys
         | `Constant -> assert Fp.(equal s (s * s))
       )
 
@@ -362,36 +412,16 @@ let create () =
       ( 
         match x1, x2 with
         | `Var x1, `Var x2 ->
-          if s1 <> s2 then add_generic_constraint sys (Fp.negate s1, x1) ~r:(s2, x2)
+          if s1 <> s2 then add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+            (Fp.Vector.of_array [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]) sys
           (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
-          else add_generic_constraint sys (Fp.negate s1, x1) ~r:(s2, x2)
-        | `Var x1, `Constant -> add_generic_constraint sys (Fp.negate s1, x1) ~c:s2
-        | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:s1
+          else add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+            (Fp.Vector.of_array [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]) sys
+        | `Var x1, `Constant -> add_generic_constraint ~l:(s1, x1)
+          (Fp.Vector.of_array [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]) sys
+        | `Constant, `Var x2 -> add_generic_constraint ~r:(s2, x2)
+          (Fp.Vector.of_array [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|]) sys
         | `Constant, `Constant -> assert Fp.(equal s1 s2)
-      )
-
-    | Snarky_backendless.Constraint.Square (v1, v2) ->
-      let (s1, x1), (s2, x2) = red v1, red v2 in
-      ( 
-        match x1, x2 with
-        | `Var x1, `Var x2 -> add_generic_constraint sys ~m:Fp.(s1 * s1) ~o:(Fp.negate s2, x2) (s1, x1) ~r:(s1, x1)
-        | `Var x1, `Constant -> add_generic_constraint sys ~m:Fp.(s1 * s1) ~c:s2 (s1, x1) ~r:(s1, x1)
-        | `Constant, `Var x2 -> add_generic_constraint sys (Fp.negate s2, x2) ~c:(Fp.square s1)
-        | `Constant, `Constant -> assert Fp.(equal (square s1) s2)
-      )
-
-    | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
-      let (s1, x1), (s2, x2), (s3, x3) = red v1, red v2, red v3 in
-      ( 
-        match x1, x2, x3 with
-        | `Var x1, `Var x2, `Var x3 -> add_generic_constraint sys ~m:Fp.(s1 * s2) ~o:(Fp.negate s3, x3) (s1, x1) ~r:(s2, x2)
-        | `Var x1, `Var x2, `Constant -> add_generic_constraint sys ~m:Fp.(s1 * s2) ~c:(Fp.negate s3) (s1, x1) ~r:(s2, x2)
-        | `Var x1, `Constant, `Var x3 -> add_generic_constraint sys ~o:(Fp.negate s3, x3) (Fp.(s1 * s2), x1)
-        | `Constant, `Var x2, `Var x3 -> add_generic_constraint sys ~o:(Fp.negate s3, x3) (Fp.(s1 * s2), x2)
-        | `Var x1, `Constant, `Constant -> add_generic_constraint sys ~c:(Fp.negate s3) (Fp.(s1 * s2), x1)
-        | `Constant, `Var x2, `Constant -> add_generic_constraint sys ~c:(Fp.negate s3) (Fp.(s1 * s2), x2)
-        | `Constant, `Constant, `Var x3 -> add_generic_constraint sys ~c:Fp.(negate s1 * s2) (s3, x3)
-        | `Constant, `Constant, `Constant -> assert Fp.(equal s3 Fp.(s1 * s2))
       )
 
     | Plonk_constraint.T (Poseidon { start; state }) ->
