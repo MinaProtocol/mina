@@ -55,6 +55,7 @@ CREATE TABLE blocks
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
 , height                 bigint NOT NULL
+, global_slot            bigint NOT NULL
 , timestamp              bigint NOT NULL
 );
 

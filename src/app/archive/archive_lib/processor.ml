@@ -388,6 +388,7 @@ module Block = struct
     ; snarked_ledger_hash_id: int
     ; ledger_hash: string
     ; height: int
+    ; global_slot: int64
     ; timestamp: int64 }
 
   let to_hlist
@@ -397,6 +398,7 @@ module Block = struct
       ; snarked_ledger_hash_id
       ; ledger_hash
       ; height
+      ; global_slot
       ; timestamp } =
     H_list.
       [ state_hash
@@ -405,6 +407,7 @@ module Block = struct
       ; snarked_ledger_hash_id
       ; ledger_hash
       ; height
+      ; global_slot
       ; timestamp ]
 
   let of_hlist
@@ -414,6 +417,7 @@ module Block = struct
        ; snarked_ledger_hash_id
        ; ledger_hash
        ; height
+       ; global_slot
        ; timestamp ] :
         (unit, _) H_list.t) =
     { state_hash
@@ -422,6 +426,7 @@ module Block = struct
     ; snarked_ledger_hash_id
     ; ledger_hash
     ; height
+    ; global_slot
     ; timestamp }
 
   let typ =
@@ -441,7 +446,7 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.int typ
          "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
-          ledger_hash, height, timestamp FROM blocks WHERE id = ?")
+          ledger_hash, height, global_slot, timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
@@ -482,6 +487,8 @@ module Block = struct
             ; height=
                 External_transition.blockchain_length t
                 |> Unsigned.UInt32.to_int
+            ; global_slot=
+                External_transition.global_slot t |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             }
         in
