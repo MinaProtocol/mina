@@ -254,17 +254,18 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
           ~precomputed_values
-      then
+      then (
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
+        [%log fatal] "Close 1" ;
         let%map () = Transition_frontier.close frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
           ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
-          ~best_seen_transition:(Some best_tip) ~precomputed_values
+          ~best_seen_transition:(Some best_tip) ~precomputed_values )
       else
         let root = Transition_frontier.root frontier in
         let%map () =
@@ -434,6 +435,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                        let%bind () =
                          Strict_pipe.Writer.write clear_writer `Clear
                        in
+                       [%log fatal] "Close 2" ;
                        let%map () = Transition_frontier.close frontier in
                        start_bootstrap_controller ~logger ~trust_system
                          ~verifier ~network ~time_controller

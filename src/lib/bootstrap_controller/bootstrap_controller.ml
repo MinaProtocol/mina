@@ -208,24 +208,39 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       (* We ignore the resulting ledger returned here since it will always
        * be the same as the ledger we started with because we are syncing
        * a db ledger. *)
-      let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+      let%bind _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
       Sync_ledger.Db.destroy root_sync_ledger ;
+      [%log fatal] "TEST TEST 123 A" ;
+      let%map () = Clock.after (Time.Span.of_sec 15.) in
+      [%log fatal] "TEST TEST 123 B" ;
       data
     in
     let%bind staged_ledger_aux_result =
+      [%log fatal] "1" ;
       let open Deferred.Or_error.Let_syntax in
       let%bind ( scan_state
                , expected_merkle_root
                , pending_coinbases
                , protocol_states ) =
-        Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-          t.network sender_peer_id hash
+        let open Deferred.Let_syntax in
+        let%bind x =
+          Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
+            t.network sender_peer_id hash
+        in
+        match x with
+        | Ok _ ->
+            Deferred.return x
+        | Error e ->
+            [%log fatal] "ERROR B %s" (Error.to_string_hum e) ;
+            Deferred.return x
       in
       let received_staged_ledger_hash =
+        [%log fatal] "2" ;
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
           (Staged_ledger.Scan_state.hash scan_state)
           expected_merkle_root pending_coinbases
       in
+      [%log fatal] "3" ;
       [%log debug]
         ~metadata:
           [ ( "expected_staged_ledger_hash"
@@ -233,6 +248,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           ; ( "received_staged_ledger_hash"
             , Staged_ledger_hash.to_yojson received_staged_ledger_hash ) ]
         "Comparing $expected_staged_ledger_hash to $received_staged_ledger_hash" ;
+      [%log fatal] "4" ;
       let%bind new_root =
         t.current_root
         |> External_transition.skip_frontier_dependencies_validation
@@ -252,6 +268,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       let get_state hash =
         match Map.find protocol_states_map hash with
         | None ->
+            [%log fatal] "5" ;
             let new_state_hash = (fst new_root).hash in
             [%log error]
               ~metadata:
@@ -265,11 +282,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 root %{sexp:State_hash.t}"
               hash new_state_hash
         | Some protocol_state ->
+            [%log fatal] "6" ;
             Ok protocol_state
       in
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
+      [%log fatal] "7" ;
       let%map _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
@@ -284,6 +303,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       in
       (scan_state, pending_coinbases, new_root, protocol_states)
     in
+    [%log fatal] "8" ;
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
     match staged_ledger_aux_result with
@@ -600,6 +620,7 @@ let%test_module "Bootstrap_controller tests" =
         Transition_frontier.(
           Breadcrumb.validated_transition (root my_net.state.frontier))
       in
+      [%log fatal] "bootstrap close frontier" ;
       let%bind () = Transition_frontier.close my_net.state.frontier in
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration

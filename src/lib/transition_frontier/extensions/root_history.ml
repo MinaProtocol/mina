@@ -8,13 +8,14 @@ module T = struct
   type t =
     { history: Root_data.Historical.t Queue.t
     ; capacity: int
+    ; logger: Logger.t
     ; mutable current_root: Root_data.Historical.t
     ; mutable protocol_states_for_root_scan_state:
         Full_frontier.Protocol_states_for_root_scan_state.t }
 
   type view = t
 
-  let create ~logger:_ frontier =
+  let create ~logger frontier =
     let capacity = 2 * Full_frontier.max_length frontier in
     let history = Queue.create () in
     let current_root =
@@ -22,6 +23,7 @@ module T = struct
     in
     let t =
       { history
+      ; logger
       ; capacity
       ; current_root
       ; protocol_states_for_root_scan_state=
@@ -31,8 +33,11 @@ module T = struct
 
   let enqueue t new_root =
     let open Root_data.Historical in
-    ( if Queue.length t.history >= t.capacity then
+    if Queue.length t.history >= t.capacity then (
       let oldest_root = Queue.dequeue_front_exn t.history in
+      Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
+        !"DEQUEUE %{sexp:State_hash.t}"
+        (External_transition.Validated.state_hash (transition oldest_root)) ;
       (*Update the protocol states required for scan state at the new root*)
       let _new_oldest_hash, new_oldest_root =
         Queue.first_with_key t.history |> Option.value_exn
@@ -54,9 +59,14 @@ module T = struct
       t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
     assert (
       `Ok
-      = Queue.enqueue_back t.history
-          (External_transition.Validated.state_hash (transition t.current_root))
-          t.current_root ) ;
+      =
+      let state_hash =
+        External_transition.Validated.state_hash (transition t.current_root)
+      in
+      Logger.fatal t.logger ~module_:__MODULE__ ~location:__LOC__
+        !"ENQUEUE %{sexp:State_hash.t}"
+        state_hash ;
+      Queue.enqueue_back t.history state_hash t.current_root ) ;
     t.current_root <- new_root
 
   let handle_diffs root_history frontier diffs_with_mutants =
@@ -77,7 +87,12 @@ end
 include T
 module Broadcasted = Functor.Make_broadcasted (T)
 
-let lookup {history; _} = Queue.lookup history
+let lookup {history; logger; _} state_hash =
+  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+    !"LOOKUP %b %{sexp:State_hash.t}"
+    (Queue.lookup history state_hash = None)
+    state_hash ;
+  Queue.lookup history state_hash
 
 let mem {history; _} = Queue.mem history
 
