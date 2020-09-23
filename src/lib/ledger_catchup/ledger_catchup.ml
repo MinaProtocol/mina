@@ -279,21 +279,21 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                 Actions.(Violated_protocol, Some (error_msg, [])))
             |> don't_wait_for ;
             Deferred.Or_error.error_string error_msg )
-          else
+          else (
             [%log debug]
               ~metadata:
                 [ ( "hashes_of_missing_transitions"
                   , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
               "successfully downloaded the transitions of \
                $hashes_of_missing_transitions" ;
-          Deferred.Or_error.return
-          @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
-                 let transition_with_hash =
-                   With_hash.of_data transition ~hash_data:(Fn.const hash)
-                 in
-                 Envelope.Incoming.wrap ~data:transition_with_hash
-                   ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
-             ) ) )
+            Deferred.Or_error.return
+            @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
+                   let transition_with_hash =
+                     With_hash.of_data transition ~hash_data:(Fn.const hash)
+                   in
+                   Envelope.Incoming.wrap ~data:transition_with_hash
+                     ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
+               ) ) ) )
 
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
