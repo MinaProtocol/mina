@@ -54,7 +54,7 @@ module MainListing = {
   };
 
   [@react.component]
-  let make = (~item: ContentType.BlogPost.t) => {
+  let make = (~item: ContentType.BlogPost.t, ~mainImg) => {
     <div className=MainListingStyles.container>
       <div className=Styles.metadata>
         <span> {React.string("Press")} </span>
@@ -63,12 +63,12 @@ module MainListing = {
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.author)} </span>
       </div>
-      <img src="/static/img/ArticleImage.png" />
+      <img src=mainImg />
       <article>
         <h5 className=Styles.title> {React.string(item.title)} </h5>
         <p className=Styles.description> {React.string(item.snippet)} </p>
       </article>
-      <Next.Link href="/">
+      <Next.Link href="/blog/[slug]" _as={"/blog/" ++ item.slug} passHref=true>
         <div className=Styles.link>
           <span> {React.string("Read more")} </span>
           <Icon kind=Icon.ArrowRightMedium />
@@ -101,7 +101,7 @@ module Listing = {
   let make = (~items) => {
     items
     |> Array.map((item: ContentType.BlogPost.t) => {
-         <div className=ListingStyles.container>
+         <div className=ListingStyles.container key={item.title}>
            <div className=Styles.metadata>
              <span> {React.string("Press")} </span>
              <span> {React.string(" / ")} </span>
@@ -110,7 +110,8 @@ module Listing = {
              <span> {React.string(item.author)} </span>
            </div>
            <h5 className=Styles.title> {React.string(item.title)} </h5>
-           <Next.Link href="/">
+           <Next.Link
+             href="/blog/[slug]" _as={"/blog/" ++ item.slug} passHref=true>
              <div className=ListingStyles.link>
                <span> {React.string("Read more")} </span>
                <Icon kind=Icon.ArrowRightMedium />
@@ -123,13 +124,14 @@ module Listing = {
 };
 
 [@react.component]
-let make = (~items) => {
-  Js.log("List Module");
+let make = (~items, ~mainImg) => {
+  Js.log(items);
   <Wrapped>
     <div className=Styles.container>
       {switch (Belt.Array.get(items, 0)) {
-       | Some(item) => <MainListing item />
-       | None => <div> {React.string("Loading...")} </div>
+       | Some(item) => <MainListing item mainImg />
+       | None =>
+         <div className=Theme.Type.label> {React.string("Loading...")} </div>
        }}
       <div className=Styles.listingContainer>
         <Listing items={Belt.Array.slice(items, ~offset=1, ~len=3)} />
