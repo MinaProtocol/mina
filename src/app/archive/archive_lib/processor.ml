@@ -431,7 +431,9 @@ module Block = struct
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[string; option int; int; int; string; int; int64] in
+    let spec =
+      Caqti_type.[string; option int; int; int; string; int; int64; int64]
+    in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
