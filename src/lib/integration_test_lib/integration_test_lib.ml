@@ -80,6 +80,16 @@ end
  *  interacting with networks.
  *)
 module type Engine_intf = sig
+  (* unique name identifying the engine (used in test executive cli) *)
+  val name : string
+
+  (* additional cli inputs available for this engine *)
+  module Cli_inputs : sig
+    type t
+
+    val term : t Cmdliner.Term.t
+  end
+
   module Node : sig
     type t
 
@@ -114,6 +124,7 @@ module type Engine_intf = sig
     val expand :
          logger:Logger.t
       -> test_name:string
+      -> cli_inputs:Cli_inputs.t
       -> test_config:Test_config.t
       -> images:Container_images.t
       -> t
