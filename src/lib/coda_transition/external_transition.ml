@@ -144,6 +144,7 @@ Stable.Latest.
   , transactions
   , user_commands
   , payments
+  , global_slot
   , to_yojson )]
 
 let equal = Stable.Latest.equal
