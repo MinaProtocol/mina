@@ -21,6 +21,6 @@ kill -s SIGUSR1 $(./find_puppeteer.sh)'\
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
 
 RUN curl -sL "https://raw.githubusercontent.com/CodaProtocol/coda/${CODA_BRANCH}/dockerfiles/coda_daemon_puppeteer.py" \
-  /root/coda_daemon_puppeteer.py
+  -o /root/coda_daemon_puppeteer.py
 
 ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]
