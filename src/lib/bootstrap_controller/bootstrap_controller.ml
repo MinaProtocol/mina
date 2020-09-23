@@ -345,6 +345,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               , Some staged_ledger_construction_time
               , result ) )
     in
+    [%log fatal] "8" ;
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
     match staged_ledger_aux_result with
@@ -694,6 +695,7 @@ let%test_module "Bootstrap_controller tests" =
         Transition_frontier.(
           Breadcrumb.validated_transition (root my_net.state.frontier))
       in
+      [%log fatal] "bootstrap close frontier" ;
       let%bind () = Transition_frontier.close my_net.state.frontier in
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration

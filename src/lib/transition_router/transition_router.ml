@@ -269,11 +269,10 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           (best_tip |> Envelope.Incoming.data)
           ~precomputed_values
       then (
-        [%log info]
-          "Network best tip is too new to catchup to; starting bootstrap" ;
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
+        [%log fatal] "Close 1" ;
         let%map () = Transition_frontier.close frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
           ~time_controller ~producer_transition_reader
@@ -281,10 +280,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
           ~best_seen_transition:(Some best_tip) ~precomputed_values )
-      else (
-        [%log info]
-          "Network best tip is recent enough to catchup to; syncing local \
-           state and starting participation" ;
+      else
         let root = Transition_frontier.root frontier in
         let%map () =
           match
@@ -320,7 +316,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
+          ~transition_writer_ref ~frontier_w ~precomputed_values frontier
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -455,6 +451,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                        let%bind () =
                          Strict_pipe.Writer.write clear_writer `Clear
                        in
+                       [%log fatal] "Close 2" ;
                        let%map () = Transition_frontier.close frontier in
                        start_bootstrap_controller ~logger ~trust_system
                          ~verifier ~network ~time_controller

@@ -89,7 +89,7 @@ let setup (type n) ?(logger = Logger.null ())
                             , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                        ~frontier input
+                        ~frontier ~logger input
                     in
                     let staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash

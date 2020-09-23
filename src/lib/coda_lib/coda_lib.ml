@@ -807,6 +807,7 @@ let create (config : Config.t) =
           in
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
+              [%log' fatal config.logger] "close on daemon shutdown" ;
               match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
               | None ->
                   Deferred.unit
@@ -904,9 +905,11 @@ let create (config : Config.t) =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
+                [%log' fatal config.logger] "CALLED!" ;
                 trace_recurring
                   "get_staged_ledger_aux_and_pending_coinbases_at_hash"
                   (fun () ->
+                    [%log' fatal config.logger] "A" ;
                     let input = Envelope.Incoming.data query_env in
                     Deferred.return
                     @@
@@ -914,25 +917,29 @@ let create (config : Config.t) =
                     let%bind frontier =
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
+                    [%log' fatal config.logger] "B" ;
                     let%map ( scan_state
                             , expected_merkle_root
                             , pending_coinbases
                             , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
-                        ~frontier input
+                        ~frontier input ~logger:config.logger
                     in
+                    [%log' fatal config.logger] "C" ;
                     let staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                         (Staged_ledger.Scan_state.hash scan_state)
                         expected_merkle_root pending_coinbases
                     in
+                    [%log' fatal config.logger] "D" ;
                     [%log' debug config.logger]
                       ~metadata:
                         [ ( "staged_ledger_hash"
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
+                    [%log' fatal config.logger] "E" ;
                     ( scan_state
                     , expected_merkle_root
                     , pending_coinbases

@@ -8,13 +8,14 @@ module T = struct
   type t =
     { history: Root_data.Historical.t Queue.t
     ; capacity: int
+    ; logger: Logger.t
     ; mutable current_root: Root_data.Historical.t
     ; mutable protocol_states_for_root_scan_state:
         Full_frontier.Protocol_states_for_root_scan_state.t }
 
   type view = t
 
-  let create ~logger:_ frontier =
+  let create ~logger frontier =
     let capacity = 2 * Full_frontier.max_length frontier in
     let history = Queue.create () in
     let current_root =
@@ -22,6 +23,7 @@ module T = struct
     in
     let t =
       { history
+      ; logger
       ; capacity
       ; current_root
       ; protocol_states_for_root_scan_state=
@@ -54,9 +56,11 @@ module T = struct
       t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
     assert (
       `Ok
-      = Queue.enqueue_back t.history
-          (External_transition.Validated.state_hash (transition t.current_root))
-          t.current_root ) ;
+      =
+      let state_hash =
+        External_transition.Validated.state_hash (transition t.current_root)
+      in
+      Queue.enqueue_back t.history state_hash t.current_root ) ;
     t.current_root <- new_root
 
   let handle_diffs root_history frontier diffs_with_mutants =
@@ -77,7 +81,7 @@ end
 include T
 module Broadcasted = Functor.Make_broadcasted (T)
 
-let lookup {history; _} = Queue.lookup history
+let lookup {history; logger; _} state_hash = Queue.lookup history state_hash
 
 let mem {history; _} = Queue.mem history
 

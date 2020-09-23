@@ -61,8 +61,8 @@ module Make (Inputs : Inputs_intf) :
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
-      =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier ~logger
+      state_hash =
     let open Option.Let_syntax in
     let protocol_states scan_state =
       Staged_ledger.Scan_state.required_state_hashes scan_state
@@ -96,13 +96,18 @@ module Make (Inputs : Inputs_intf) :
       (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
     with
     | Some res ->
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__ "YES" ;
         Some res
     | None ->
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__ "NO" ;
         let open Root_data.Historical in
         let%bind root = find_in_root_history frontier state_hash in
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__ "FOUND" ;
         let%map scan_state_protocol_states =
           protocol_states_in_root_history frontier state_hash
         in
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "DOUBLE FOUND" ;
         ( scan_state root
         , staged_ledger_target_ledger_hash root
         , pending_coinbase root
