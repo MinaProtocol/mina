@@ -50,7 +50,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       paddingTop(`rem(2.8)),
-      media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
         Theme.MediaQuery.desktop,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
@@ -173,7 +172,14 @@ module StatisticsRow = {
         statistic,
         style([
           display(`flex),
-          media(Theme.MediaQuery.tablet, [fontSize(`rem(2.5))]),
+          media(
+            Theme.MediaQuery.tablet,
+            [
+              marginBottom(`px(3)),
+              fontSize(`rem(2.5)),
+              lineHeight(`rem(2.5)),
+            ],
+          ),
         ]),
       ]);
     let container =
