@@ -6,12 +6,46 @@ module Digest = Digest
 module Spec = Spec
 open Core_kernel
 
-let index_to_field_elements (k : 'a Plonk_verification_key_evals.t)
-    ~g =
-  let [ g1; g2; g3; g4; g5; g6; g7; g8; g9; g10; g11; g12; g13; g14; g15; g16; g17; g18] =
+let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
+  let [ g1
+      ; g2
+      ; g3
+      ; g4
+      ; g5
+      ; g6
+      ; g7
+      ; g8
+      ; g9
+      ; g10
+      ; g11
+      ; g12
+      ; g13
+      ; g14
+      ; g15
+      ; g16
+      ; g17
+      ; g18 ] =
     Plonk_verification_key_evals.to_hlist k
-  in 
-  List.map [ g1; g2; g3; g4; g5; g6; g7; g8; g9; g10; g11; g12; g13; g14; g15; g16; g17; g18]
+  in
+  List.map
+    [ g1
+    ; g2
+    ; g3
+    ; g4
+    ; g5
+    ; g6
+    ; g7
+    ; g8
+    ; g9
+    ; g10
+    ; g11
+    ; g12
+    ; g13
+    ; g14
+    ; g15
+    ; g16
+    ; g17
+    ; g18 ]
     ~f:g
   |> Array.concat
 
@@ -19,7 +53,6 @@ module Dlog_based = struct
   module Proof_state = struct
     module Deferred_values = struct
       module Plonk = struct
-
         (*
         best (num muls , num inpus)
 
@@ -120,7 +153,7 @@ module Dlog_based = struct
             ; gamma: 'challenge
             ; zeta: 'scalar_challenge }
           [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
-        end 
+        end
 
         open Pickles_types
 
@@ -129,56 +162,51 @@ module Dlog_based = struct
             { alpha: 'challenge
             ; beta: 'challenge
             ; gamma: 'challenge
-            ; zeta: 'scalar_challenge 
-            ; perm0 : 'fp
-            ; perm1 : 'fp
-            ; gnrc_l : 'fp
-            ; gnrc_r : 'fp
-            ; gnrc_o : 'fp
+            ; zeta: 'scalar_challenge
+            ; perm0: 'fp
+            ; perm1: 'fp
+            ; gnrc_l: 'fp
+            ; gnrc_r: 'fp
+            ; gnrc_o: 'fp
             ; psdn0: 'fp
             ; ecad0: 'fp
             ; vbmul0: 'fp
             ; vbmul1: 'fp
             ; endomul0: 'fp
             ; endomul1: 'fp
-            ; endomul2: 'fp
-            }
+            ; endomul2: 'fp }
           [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq, fields]
 
-          let map_challenges
-              t ~f ~scalar =
-            { t with alpha= f t.alpha
+          let map_challenges t ~f ~scalar =
+            { t with
+              alpha= f t.alpha
             ; beta= f t.beta
             ; gamma= f t.gamma
-            ; zeta= scalar t.zeta 
-            }
+            ; zeta= scalar t.zeta }
 
-          let map_fields
-              t ~f =
-            { t with 
-              perm0 = f t.perm0         
-            ; perm1 = f t.perm1         
-            ; gnrc_l = f t.gnrc_l       
-            ; gnrc_r = f t.gnrc_r       
-            ; gnrc_o = f t.gnrc_o       
-            ; psdn0 = f t.psdn0         
-            ; ecad0 = f t.ecad0         
-            ; vbmul0 = f t.vbmul0       
-            ; vbmul1 = f t.vbmul1       
-            ; endomul0 = f t.endomul0   
-            ; endomul1 = f t.endomul1   
-            ; endomul2 = f t.endomul2   
-            }
+          let map_fields t ~f =
+            { t with
+              perm0= f t.perm0
+            ; perm1= f t.perm1
+            ; gnrc_l= f t.gnrc_l
+            ; gnrc_r= f t.gnrc_r
+            ; gnrc_o= f t.gnrc_o
+            ; psdn0= f t.psdn0
+            ; ecad0= f t.ecad0
+            ; vbmul0= f t.vbmul0
+            ; vbmul1= f t.vbmul1
+            ; endomul0= f t.endomul0
+            ; endomul1= f t.endomul1
+            ; endomul2= f t.endomul2 }
 
           open Snarky_backendless.H_list
 
-          let typ chal fp =
+          let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
               [ chal
               ; chal
               ; chal
               ; Scalar_challenge.typ chal
-              ; Scalar_challenge.typ chal 
               ; fp
               ; fp
               ; fp
@@ -190,10 +218,13 @@ module Dlog_based = struct
               ; fp
               ; fp
               ; fp
-              ]
+              ; fp ]
               ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
               ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-        end 
+        end
+
+        let to_minimal (t : _ In_circuit.t) : _ Minimal.t =
+          {alpha= t.alpha; beta= t.beta; zeta= t.zeta; gamma= t.gamma}
       end
 
       type ( 'plonk
@@ -211,56 +242,59 @@ module Dlog_based = struct
         ; which_branch: 'index }
       [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
-
       module Minimal = struct
         type ( 'challenge
-            , 'scalar_challenge
-            , 'fp
-            , 'fq
-            , 'bulletproof_challenges
-            , 'index )
-            t =
+             , 'scalar_challenge
+             , 'fp
+             , 'fq
+             , 'bulletproof_challenges
+             , 'index )
+             t =
           ( ('challenge, 'scalar_challenge, 'fp) Plonk.Minimal.t
-            , 'scalar_challenge
-            , 'fp
-            , 'fq
-            , 'bulletproof_challenges
-            , 'index ) t_
+          , 'scalar_challenge
+          , 'fp
+          , 'fq
+          , 'bulletproof_challenges
+          , 'index )
+          t_
         [@@deriving bin_io, sexp, compare, yojson, hash, eq]
-      end 
+      end
+
+      let map_challenges
+          { plonk
+          ; combined_inner_product
+          ; b: 'fp
+          ; xi
+          ; bulletproof_challenges
+          ; which_branch } ~f ~scalar =
+        { xi= scalar xi
+        ; combined_inner_product
+        ; b
+        ; plonk
+        ; bulletproof_challenges
+        ; which_branch }
 
       module In_circuit = struct
         type ( 'challenge
-            , 'scalar_challenge
-            , 'fp
-            , 'fq
-            , 'bulletproof_challenges
-            , 'index )
-            t =
+             , 'scalar_challenge
+             , 'fp
+             , 'fq
+             , 'bulletproof_challenges
+             , 'index )
+             t =
           ( ('challenge, 'scalar_challenge, 'fp) Plonk.In_circuit.t
-            , 'scalar_challenge
-            , 'fp
-            , 'fq
-            , 'bulletproof_challenges
-            , 'index ) t_
+          , 'scalar_challenge
+          , 'fp
+          , 'fq
+          , 'bulletproof_challenges
+          , 'index )
+          t_
         [@@deriving bin_io, sexp, compare, yojson, hash, eq]
-        let to_hlist, of_hlist = t__to_hlist, t__of_hlist
 
-        let map_challenges
-            { plonk
-            ; combined_inner_product
-            ; b: 'fp
-            ; xi
-            ; bulletproof_challenges
-            ; which_branch } ~f ~scalar =
-          { xi= scalar xi
-          ; combined_inner_product
-          ; b
-          ; plonk= Plonk.In_circuit.map_challenges plonk ~f ~scalar
-          ; bulletproof_challenges
-          ; which_branch }
+        let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
-        let typ chal fp fq index bool =
+        let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) fq
+            index bool =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ chal fp
             ; fp
@@ -272,7 +306,10 @@ module Dlog_based = struct
             ; index ]
             ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-      end 
+      end
+
+      let to_minimal (t : _ In_circuit.t) : _ Minimal.t =
+        {t with plonk= Plonk.to_minimal t.plonk}
     end
 
     module Me_only = struct
@@ -320,65 +357,76 @@ module Dlog_based = struct
 
     module Minimal = struct
       type ( 'challenge
-          , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'bp_chals
-          , 'index )
-          t =
+           , 'scalar_challenge
+           , 'fp
+           , 'bool
+           , 'fq
+           , 'me_only
+           , 'digest
+           , 'bp_chals
+           , 'index )
+           t =
         ( ('challenge, 'scalar_challenge, 'fp) Deferred_values.Plonk.Minimal.t
-         , 'scalar_challenge
-         , 'fp
-         , 'bool
-         , 'fq
-         , 'me_only
-         , 'digest
-         , 'bp_chals
-         , 'index )
-         t_
+        , 'scalar_challenge
+        , 'fp
+        , 'bool
+        , 'fq
+        , 'me_only
+        , 'digest
+        , 'bp_chals
+        , 'index )
+        t_
       [@@deriving bin_io, sexp, compare, yojson, hash, eq]
     end
 
     module In_circuit = struct
       type ( 'challenge
+           , 'scalar_challenge
+           , 'fp
+           , 'bool
+           , 'fq
+           , 'me_only
+           , 'digest
+           , 'bp_chals
+           , 'index )
+           t =
+        ( ( 'challenge
           , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'bp_chals
-          , 'index )
-          t =
-        ( ('challenge, 'scalar_challenge, 'fp) Deferred_values.Plonk.In_circuit.t
-         , 'scalar_challenge
-         , 'fp
-         , 'bool
-         , 'fq
-         , 'me_only
-         , 'digest
-         , 'bp_chals
-         , 'index )
-         t_
+          , 'fp )
+          Deferred_values.Plonk.In_circuit.t
+        , 'scalar_challenge
+        , 'fp
+        , 'bool
+        , 'fq
+        , 'me_only
+        , 'digest
+        , 'bp_chals
+        , 'index )
+        t_
       [@@deriving bin_io, sexp, compare, yojson, hash, eq]
-        let to_hlist, of_hlist = t__to_hlist, t__of_hlist
 
-      let typ chal fp bool fq me_only digest index =
+      let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
+
+      let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) bool
+          fq me_only digest index =
         Snarky_backendless.Typ.of_hlistable
-          [Deferred_values.In_circuit.typ chal fp fq index bool; bool; digest; me_only]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
-    end 
+          [ Deferred_values.In_circuit.typ chal fp fq index bool
+          ; bool
+          ; digest
+          ; me_only ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    end
+
+    let to_minimal (t : _ In_circuit.t) : _ Minimal.t =
+      {t with deferred_values= Deferred_values.to_minimal t.deferred_values}
   end
 
   module Pass_through = struct
     type ('g, 's, 'sg, 'bulletproof_challenges) t =
       { app_state: 's
       ; dlog_plonk_index:
-          'g Dlog_plonk_types.Poly_comm.Without_degree_bound.t 
+          'g Dlog_plonk_types.Poly_comm.Without_degree_bound.t
           Plonk_verification_key_evals.t
       ; sg: 'sg
       ; old_bulletproof_challenges: 'bulletproof_challenges }
@@ -416,7 +464,7 @@ module Dlog_based = struct
 
     let typ comm g s chal branching =
       Snarky_backendless.Typ.of_hlistable
-        [s; (Plonk_verification_key_evals.typ comm); Vector.typ g branching; chal]
+        [s; Plonk_verification_key_evals.typ comm; Vector.typ g branching; chal]
         (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -450,51 +498,59 @@ module Dlog_based = struct
 
     module Minimal = struct
       type ( 'challenge
+           , 'scalar_challenge
+           , 'fp
+           , 'bool
+           , 'fq
+           , 'me_only
+           , 'digest
+           , 'pass_through
+           , 'bp_chals
+           , 'index )
+           t =
+        ( ( 'challenge
           , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'pass_through
-          , 'bp_chals
-          , 'index )
-          t =
-          ( ('challenge, 'scalar_challenge, 'fp) Proof_state.Deferred_values.Plonk.Minimal.t
-          , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'pass_through
-          , 'bp_chals
-          , 'index ) t_
+          , 'fp )
+          Proof_state.Deferred_values.Plonk.Minimal.t
+        , 'scalar_challenge
+        , 'fp
+        , 'bool
+        , 'fq
+        , 'me_only
+        , 'digest
+        , 'pass_through
+        , 'bp_chals
+        , 'index )
+        t_
       [@@deriving bin_io, compare, yojson, sexp, hash, eq]
-    end 
+    end
 
     module In_circuit = struct
       type ( 'challenge
+           , 'scalar_challenge
+           , 'fp
+           , 'bool
+           , 'fq
+           , 'me_only
+           , 'digest
+           , 'pass_through
+           , 'bp_chals
+           , 'index )
+           t =
+        ( ( 'challenge
           , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'pass_through
-          , 'bp_chals
-          , 'index )
-          t =
-          ( ('challenge, 'scalar_challenge, 'fp) Proof_state.Deferred_values.Plonk.In_circuit.t
-          , 'scalar_challenge
-          , 'fp
-          , 'bool
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'pass_through
-          , 'bp_chals
-          , 'index ) t_
+          , 'fp )
+          Proof_state.Deferred_values.Plonk.In_circuit.t
+        , 'scalar_challenge
+        , 'fp
+        , 'bool
+        , 'fq
+        , 'me_only
+        , 'digest
+        , 'pass_through
+        , 'bp_chals
+        , 'index )
+        t_
       [@@deriving bin_io, compare, yojson, sexp, hash, eq]
 
       let spec =
@@ -510,36 +566,36 @@ module Dlog_based = struct
 
       let to_data
           ({ proof_state=
-              { deferred_values=
-                  { xi
-                  ; combined_inner_product
-                  ; b
-                  ; which_branch
-                  ; bulletproof_challenges
-                  ; plonk=
-                      { alpha
-                      ; beta
-                      ; gamma
-                      ; zeta 
-                      ; perm0
-                      ; perm1
-                      ; gnrc_l
-                      ; gnrc_r
-                      ; gnrc_o
-                      ; psdn0
-                      ; ecad0
-                      ; vbmul0
-                      ; vbmul1
-                      ; endomul0
-                      ; endomul1
-                      ; endomul2
-                      } }
-              ; was_base_case
-              ; sponge_digest_before_evaluations
-              ; me_only }
-          ; pass_through } : _ t) =
+               { deferred_values=
+                   { xi
+                   ; combined_inner_product
+                   ; b
+                   ; which_branch
+                   ; bulletproof_challenges
+                   ; plonk=
+                       { alpha
+                       ; beta
+                       ; gamma
+                       ; zeta
+                       ; perm0
+                       ; perm1
+                       ; gnrc_l
+                       ; gnrc_r
+                       ; gnrc_o
+                       ; psdn0
+                       ; ecad0
+                       ; vbmul0
+                       ; vbmul1
+                       ; endomul0
+                       ; endomul1
+                       ; endomul2 } }
+               ; was_base_case
+               ; sponge_digest_before_evaluations
+               ; me_only }
+           ; pass_through } :
+            _ t) =
         let open Vector in
-        let fp = 
+        let fp =
           [ combined_inner_product
           ; b
           ; perm0
@@ -553,12 +609,14 @@ module Dlog_based = struct
           ; vbmul1
           ; endomul0
           ; endomul1
-          ; endomul2
-          ] in
+          ; endomul2 ]
+        in
         let challenge = [alpha; beta; gamma] in
         let scalar_challenge = [zeta; xi] in
         let bool = [was_base_case] in
-        let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
+        let digest =
+          [sponge_digest_before_evaluations; me_only; pass_through]
+        in
         let index = [which_branch] in
         Hlist.HlistId.
           [ bool
@@ -579,27 +637,28 @@ module Dlog_based = struct
             ; bulletproof_challenges
             ; index ] : _ t =
         let open Vector in
-        let 
-          [ combined_inner_product
-          ; b
-          ; perm0
-          ; perm1
-          ; gnrc_l
-          ; gnrc_r
-          ; gnrc_o
-          ; psdn0
-          ; ecad0
-          ; vbmul0
-          ; vbmul1
-          ; endomul0
-          ; endomul1
-          ; endomul2
-          ]
-          = fp in
-        let  [alpha; beta; gamma] = challenge in
-        let  [zeta; xi]= scalar_challenge  in
+        let [ combined_inner_product
+            ; b
+            ; perm0
+            ; perm1
+            ; gnrc_l
+            ; gnrc_r
+            ; gnrc_o
+            ; psdn0
+            ; ecad0
+            ; vbmul0
+            ; vbmul1
+            ; endomul0
+            ; endomul1
+            ; endomul2 ] =
+          fp
+        in
+        let [alpha; beta; gamma] = challenge in
+        let [zeta; xi] = scalar_challenge in
         let [was_base_case] = bool in
-        let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
+        let [sponge_digest_before_evaluations; me_only; pass_through] =
+          digest
+        in
         let [which_branch] = index in
         { proof_state=
             { was_base_case
@@ -609,28 +668,30 @@ module Dlog_based = struct
                 ; b
                 ; which_branch
                 ; bulletproof_challenges
-                ; plonk={ alpha
-                      ; beta
-                      ; gamma
-                        ; zeta 
-          ; perm0
-          ; perm1
-          ; gnrc_l
-          ; gnrc_r
-          ; gnrc_o
-          ; psdn0
-          ; ecad0
-          ; vbmul0
-          ; vbmul1
-          ; endomul0
-          ; endomul1
-          ; endomul2
-                    }
-                    }
+                ; plonk=
+                    { alpha
+                    ; beta
+                    ; gamma
+                    ; zeta
+                    ; perm0
+                    ; perm1
+                    ; gnrc_l
+                    ; gnrc_r
+                    ; gnrc_o
+                    ; psdn0
+                    ; ecad0
+                    ; vbmul0
+                    ; vbmul1
+                    ; endomul0
+                    ; endomul1
+                    ; endomul2 } }
             ; sponge_digest_before_evaluations
             ; me_only }
         ; pass_through }
-    end 
+    end
+
+    let to_minimal (t : _ In_circuit.t) : _ Minimal.t =
+      {t with proof_state= Proof_state.to_minimal t.proof_state}
   end
 end
 
@@ -681,13 +742,21 @@ module Pairing_based = struct
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-        (('challenge, 'scalar_challenge, 'fq) Plonk.Minimal.t, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_
+          ( ('challenge, 'scalar_challenge, 'fq) Plonk.Minimal.t
+          , 'scalar_challenge
+          , 'fq
+          , 'bulletproof_challenges )
+          t_
         [@@deriving bin_io, sexp, compare, yojson]
       end
 
       module In_circuit = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-        (('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t, 'scalar_challenge, 'fq, 'bulletproof_challenges) t_
+          ( ('challenge, 'scalar_challenge, 'fq) Plonk.In_circuit.t
+          , 'scalar_challenge
+          , 'fq
+          , 'bulletproof_challenges )
+          t_
         [@@deriving bin_io, sexp, compare, yojson]
       end
     end
@@ -712,34 +781,37 @@ module Pairing_based = struct
       [@@deriving bin_io, sexp, compare, yojson]
 
       module Minimal = struct
-      type ( 'challenge
-           , 'scalar_challenge
-           , 'fq
-           , 'bulletproof_challenges
-           , 'digest )
-           t =
-      ( ('challenge, 'scalar_challenge, 'fq) Deferred_values.Plonk.Minimal.t
-           , 'scalar_challenge
-           , 'fq
-           , 'bulletproof_challenges
-           , 'digest )
-           t_
-      [@@deriving bin_io, sexp, compare, yojson]
-      end 
+        type ( 'challenge
+             , 'scalar_challenge
+             , 'fq
+             , 'bulletproof_challenges
+             , 'digest )
+             t =
+          ( ('challenge, 'scalar_challenge, 'fq) Deferred_values.Plonk.Minimal.t
+          , 'scalar_challenge
+          , 'fq
+          , 'bulletproof_challenges
+          , 'digest )
+          t_
+        [@@deriving bin_io, sexp, compare, yojson]
+      end
 
       module In_circuit = struct
         type ( 'challenge
+             , 'scalar_challenge
+             , 'fq
+             , 'bulletproof_challenges
+             , 'digest )
+             t =
+          ( ( 'challenge
             , 'scalar_challenge
-            , 'fq
-            , 'bulletproof_challenges
-            , 'digest )
-            t =
-        ( ('challenge, 'scalar_challenge, 'fq) Deferred_values.Plonk.In_circuit.t
-            , 'scalar_challenge
-            , 'fq
-            , 'bulletproof_challenges
-            , 'digest )
-            t_
+            , 'fq )
+            Deferred_values.Plonk.In_circuit.t
+          , 'scalar_challenge
+          , 'fq
+          , 'bulletproof_challenges
+          , 'digest )
+          t_
         [@@deriving bin_io, sexp, compare, yojson]
 
         let spec bp_log2 =
@@ -753,31 +825,31 @@ module Pairing_based = struct
 
         let to_data
             ({ deferred_values=
-                { xi
-                ; bulletproof_challenges
-                ; b
-                ; combined_inner_product
-                ; plonk={ alpha
-                      ; beta
-                      ; gamma
-                      ; zeta
-            ; perm0
-            ; perm1
-            ; gnrc_l
-            ; gnrc_r
-            ; gnrc_o
-            ; psdn0
-            ; ecad0
-            ; vbmul0
-            ; vbmul1
-            ; endomul0
-            ; endomul1
-            ; endomul2
-                      }
-                }
-            ; sponge_digest_before_evaluations } : _ t) =
+                 { xi
+                 ; bulletproof_challenges
+                 ; b
+                 ; combined_inner_product
+                 ; plonk=
+                     { alpha
+                     ; beta
+                     ; gamma
+                     ; zeta
+                     ; perm0
+                     ; perm1
+                     ; gnrc_l
+                     ; gnrc_r
+                     ; gnrc_o
+                     ; psdn0
+                     ; ecad0
+                     ; vbmul0
+                     ; vbmul1
+                     ; endomul0
+                     ; endomul1
+                     ; endomul2 } }
+             ; sponge_digest_before_evaluations } :
+              _ t) =
           let open Vector in
-          let fq = 
+          let fq =
             [ combined_inner_product
             ; b
             ; perm0
@@ -791,8 +863,8 @@ module Pairing_based = struct
             ; vbmul1
             ; endomul0
             ; endomul1
-            ; endomul2
-            ] in
+            ; endomul2 ]
+          in
           let challenge = [alpha; beta; gamma] in
           let scalar_challenge = [zeta; xi] in
           let digest = [sponge_digest_before_evaluations] in
@@ -800,84 +872,86 @@ module Pairing_based = struct
           [fq; digest; challenge; scalar_challenge; bulletproof_challenges]
 
         let of_data
-            Hlist.HlistId.[ Vector.[combined_inner_product; b
-            ; perm0
-            ; perm1
-            ; gnrc_l
-            ; gnrc_r
-            ; gnrc_o
-            ; psdn0
-            ; ecad0
-            ; vbmul0
-            ; vbmul1
-            ; endomul0
-            ; endomul1
-            ; endomul2
-                    ]
-            ; Vector.[sponge_digest_before_evaluations]
-            ; Vector.[alpha; beta; gamma]
-            ; Vector.[zeta; xi]
-            ; bulletproof_challenges ] : _ t =
+            Hlist.HlistId.
+              [ Vector.
+                  [ combined_inner_product
+                  ; b
+                  ; perm0
+                  ; perm1
+                  ; gnrc_l
+                  ; gnrc_r
+                  ; gnrc_o
+                  ; psdn0
+                  ; ecad0
+                  ; vbmul0
+                  ; vbmul1
+                  ; endomul0
+                  ; endomul1
+                  ; endomul2 ]
+              ; Vector.[sponge_digest_before_evaluations]
+              ; Vector.[alpha; beta; gamma]
+              ; Vector.[zeta; xi]
+              ; bulletproof_challenges ] : _ t =
           { deferred_values=
               { xi
               ; bulletproof_challenges
               ; b
               ; combined_inner_product
-              ; plonk={ alpha
-                      ; beta
-                      ; gamma
-                      ; zeta
-            ; perm0
-            ; perm1
-            ; gnrc_l
-            ; gnrc_r
-            ; gnrc_o
-            ; psdn0
-            ; ecad0
-            ; vbmul0
-            ; vbmul1
-            ; endomul0
-            ; endomul1
-            ; endomul2
-                      }
-                  }
+              ; plonk=
+                  { alpha
+                  ; beta
+                  ; gamma
+                  ; zeta
+                  ; perm0
+                  ; perm1
+                  ; gnrc_l
+                  ; gnrc_r
+                  ; gnrc_o
+                  ; psdn0
+                  ; ecad0
+                  ; vbmul0
+                  ; vbmul1
+                  ; endomul0
+                  ; endomul1
+                  ; endomul2 } }
           ; sponge_digest_before_evaluations }
-      end 
+      end
     end
 
     type ('unfinalized_proofs, 'me_only) t =
       {unfinalized_proofs: 'unfinalized_proofs; me_only: 'me_only}
-    [@@
-      deriving
-      bin_io, sexp, compare, yojson]
+    [@@deriving bin_io, sexp, compare, yojson]
 
     let spec unfinalized_proofs me_only =
       let open Spec in
       Struct [unfinalized_proofs; me_only]
 
     include struct
-    open Hlist.HlistId
+      open Hlist.HlistId
 
-    let to_data {unfinalized_proofs; me_only} =
-      [ Vector.map unfinalized_proofs ~f:(fun (unfinalized, should_verify) ->
-            [Per_proof.In_circuit.to_data unfinalized; should_verify] )
-      ; me_only ]
+      let to_data {unfinalized_proofs; me_only} =
+        [ Vector.map unfinalized_proofs ~f:(fun (unfinalized, should_verify) ->
+              [Per_proof.In_circuit.to_data unfinalized; should_verify] )
+        ; me_only ]
 
-    let of_data [unfinalized_proofs; me_only] =
-      { unfinalized_proofs=
-          Vector.map unfinalized_proofs ~f:(fun [unfinalized; should_verify] ->
-              (Per_proof.In_circuit.of_data unfinalized, should_verify) )
-      ; me_only }
-    end 
+      let of_data [unfinalized_proofs; me_only] =
+        { unfinalized_proofs=
+            Vector.map unfinalized_proofs
+              ~f:(fun [unfinalized; should_verify] ->
+                (Per_proof.In_circuit.of_data unfinalized, should_verify) )
+        ; me_only }
+    end
 
-    let typ impl branching fq
-      : ( ((_ * _, _) Vector.t, _) t
-        , ((_ * _, _) Vector.t, _) t, _) Snarky_backendless.Typ.t
-      =
+    let typ impl branching fq :
+        ( ((_ * _, _) Vector.t, _) t
+        , ((_ * _, _) Vector.t, _) t
+        , _ )
+        Snarky_backendless.Typ.t =
       let unfinalized_proofs =
         let open Spec in
         Vector
-          (Struct [Per_proof.In_circuit.spec Backend.Tock.Rounds.n; B Bool], branching)
+          ( Struct [Per_proof.In_circuit.spec Backend.Tock.Rounds.n; B Bool]
+          , branching )
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq
@@ -909,7 +983,9 @@ module Pairing_based = struct
 
     let spec branching bp_log2 =
       let open Spec in
-      let per_proof = Struct [Proof_state.Per_proof.In_circuit.spec bp_log2; B Bool] in
+      let per_proof =
+        Struct [Proof_state.Per_proof.In_circuit.spec bp_log2; B Bool]
+      in
       Struct
         [Vector (per_proof, branching); B Digest; Vector (B Digest, branching)]
   end

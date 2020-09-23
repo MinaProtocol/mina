@@ -41,19 +41,22 @@ module Constant = struct
     let zeta = scalar_chal () in
     { deferred_values=
         { plonk=
-            { (Marlin_checks.derive_plonk (module Tock.Field)
-              ~endo:Endo.Dum.base (* I think this is right *)
-              ~domain:(Marlin_checks.domain (module Tock.Field) wrap_domains.h :> _ Marlin_checks.vanishing_polynomial_domain )
-              { alpha= Challenge.Constant.to_tock_field alpha
-              ; beta= Challenge.Constant.to_tock_field beta
-              ; gamma= Challenge.Constant.to_tock_field gamma
-              ; zeta= Common.Ipa.Wrap.endo_to_field zeta
-              }
-              Dummy.evals_combined)
+            { (Marlin_checks.derive_plonk
+                 (module Tock.Field)
+                 ~endo:Endo.Dum.base (* I think this is right *)
+                 ~domain:
+                   ( Marlin_checks.domain (module Tock.Field) wrap_domains.h
+                     :> _ Marlin_checks.vanishing_polynomial_domain )
+                 { alpha= Challenge.Constant.to_tock_field alpha
+                 ; beta= Challenge.Constant.to_tock_field beta
+                 ; gamma= Challenge.Constant.to_tock_field gamma
+                 ; zeta= Common.Ipa.Wrap.endo_to_field zeta }
+                 Dummy.evals_combined)
               with
-                alpha
-              ; beta; gamma
-              ; zeta }
+              alpha
+            ; beta
+            ; gamma
+            ; zeta }
         ; combined_inner_product= tock ()
         ; xi= Scalar_challenge one_chal
         ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges

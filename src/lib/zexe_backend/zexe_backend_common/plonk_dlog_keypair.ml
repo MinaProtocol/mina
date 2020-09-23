@@ -5,7 +5,7 @@ module type Inputs_intf = sig
 
   module Rounds : Pickles_types.Nat.Intf
 
-  module Gate_vector : T0
+  module Constraint_system : T0
 
   module Urs : sig
     type t
@@ -23,7 +23,7 @@ module type Inputs_intf = sig
 
     val delete : t -> unit
 
-    val create : Gate_vector.t -> Unsigned.Size_t.t -> Urs.t -> t
+    val create : Constraint_system.t -> Unsigned.Size_t.t -> Urs.t -> t
   end
 
   module Curve : sig
@@ -118,7 +118,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Pickles_types
 
   let vk_commitments t :
-      ( Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t )
+      Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t
       Plonk_verification_key_evals.t =
     let f (t : Poly_comm.Backend.t) =
       match Poly_comm.of_backend t with

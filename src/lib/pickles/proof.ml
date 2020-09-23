@@ -26,8 +26,7 @@ module Base = struct
       ; proof: Tick.Proof.t }
   end
 
-  type 'a triple = 'a * 'a * 'a
-  [@@deriving bin_io, compare, sexp, yojson, hash, eq]
+  type 'a double = 'a * 'a [@@deriving bin_io, compare, sexp, yojson, hash, eq]
 
   module Dlog_based = struct
     type ('dlog_me_only, 'pairing_me_only) t =
@@ -49,8 +48,8 @@ module Base = struct
       ; prev_evals:
           Tick.Field.t Dlog_plonk_types.Pc_array.Stable.Latest.t
           Dlog_plonk_types.Evals.Stable.Latest.t
-          triple
-      ; prev_x_hat: Tick.Field.t triple
+          double
+      ; prev_x_hat: Tick.Field.t double
       ; proof: Tock.Proof.t }
     [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
@@ -85,8 +84,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
   let tock len = Array.init len ~f:(fun _ -> tock ()) in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
   let lengths =
-    Commitment_lengths.of_domains 
-      wrap_domains ~max_degree:Max_degree.wrap
+    Commitment_lengths.of_domains wrap_domains ~max_degree:Max_degree.wrap
   in
   T
     { statement=
@@ -101,8 +99,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                     { alpha= chal ()
                     ; beta= chal ()
                     ; gamma= chal ()
-                    ; zeta= scalar_chal () }
-                }
+                    ; zeta= scalar_chal () } }
             ; sponge_digest_before_evaluations=
                 Digest.Constant.of_tock_field Tock.Field.zero
             ; was_base_case= true
@@ -126,8 +123,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
             ; r_comm= g lengths.r
             ; o_comm= g lengths.o
             ; z_comm= g lengths.z
-            ; t_comm= g lengths.t
-            }
+            ; t_comm= g lengths.t }
         ; openings=
             { proof=
                 { lr=
@@ -141,8 +137,8 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                  (e (), e ())) } }
     ; prev_evals=
         (let e () = Dlog_plonk_types.Evals.map lengths ~f:tick_arr in
-         (e (), e (), e ()))
-    ; prev_x_hat= (tick (), tick (), tick ()) }
+         (e (), e ()))
+    ; prev_x_hat= (tick (), tick ()) }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module Max_branching_at_most = At_most.With_length (W)

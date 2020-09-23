@@ -12,18 +12,12 @@ module Max_degree = struct
 end
 
 let tick_shifts : Domain.t -> Backend.Tick.Field.t Tuple_lib.Double.t =
-  Memo.general
-    ~cache_size_bound:20
-    ~hashable:Domain.Table.hashable
-    (function (Pow_2_roots_of_unity x) ->
-       failwithf "sample_shifts %d" x ())
+  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
+      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
 
 let tock_shifts : Domain.t -> Backend.Tock.Field.t Tuple_lib.Double.t =
-  Memo.general
-    ~cache_size_bound:20
-    ~hashable:Domain.Table.hashable
-    (function (Pow_2_roots_of_unity x) ->
-       failwithf "sample_shifts %d" x ())
+  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
+      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
 
 let wrap_domains =
   { Domains.h= failwith "TBD"
@@ -56,10 +50,8 @@ let hash_dlog_me_only (type n) (max_branching : n Nat.t)
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
-      total Nat.t * (n_branching, Nat.N9.n, total) Nat.Adds.t)
-    =
-  Pcs_batch.create ~without_degree_bound
-    ~with_degree_bound:[]
+      total Nat.t * (n_branching, Nat.N9.n, total) Nat.Adds.t) =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
 
 module Pairing_pcs_batch = struct
   let beta_1 : (int, _, _) Pcs_batch.t =
@@ -306,8 +298,10 @@ let tick_public_input_of_statement ~max_branching
        ~f:(Backend.Tick.Field.Vector.get input)
 
 let index_commitment_length k ~max_degree =
-  let actual = Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree in
-  [%test_eq: int] actual 1;
+  let actual =
+    Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+  in
+  [%test_eq: int] actual 1 ;
   1
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree

@@ -1,7 +1,8 @@
 open Core_kernel
 open Import
 
-let domains (sys : _ Zexe_backend_common.Plonk_r1cs_constraint_system.t) : Domains.t =
+let domains (sys : _ Zexe_backend_common.Plonk_r1cs_constraint_system.t) :
+    Domains.t =
   let open Zexe_backend.R1CS_constraint_system in
   let open Domain in
   let rows = !sys in
@@ -17,7 +18,8 @@ let domains (type field a)
     (module Impl : Snarky_backendless.Snark_intf.Run
       with type field = field
        and type R1CS_constraint_system.t = a
-                                           Zexe_backend_common.Plonk_r1cs_constraint_system
+                                           Zexe_backend_common
+                                           .Plonk_r1cs_constraint_system
                                            .t) (Spec.ETyp.T (typ, conv)) main =
   let main x () : unit = main (conv x) in
   domains (Impl.constraint_system ~exposing:[typ] main)

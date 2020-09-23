@@ -121,15 +121,14 @@ let step_main
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
-        let dlog_marlin_index =
+        let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Matrix_evals.typ
-               (Abc.typ
-                  (Typ.array Inner_curve.typ
-                     ~length:
-                       (index_commitment_length ~max_degree:Max_degree.wrap
-                          basic.wrap_domains.k))))
+            (Plonk_verification_key_evals.typ
+               (Typ.array Inner_curve.typ
+                  ~length:
+                    (index_commitment_length ~max_degree:Max_degree.wrap
+                       basic.wrap_domains.h)))
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
@@ -165,7 +164,7 @@ let step_main
             ; value_to_field_elements= basic.value_to_field_elements
             ; wrap_domains= basic.wrap_domains
             ; step_domains= `Known basic.step_domains
-            ; wrap_key= dlog_marlin_index }
+            ; wrap_key= dlog_plonk_index }
           in
           let module M =
             H4.Map (Tag) (Types_map.For_step)
@@ -294,7 +293,7 @@ let step_main
                           ~which_branch
                           (* Use opt sponge for cutting off the bulletproof challenges early *)
                           { app_state
-                          ; dlog_marlin_index= d.wrap_key
+                          ; dlog_plonk_index= d.wrap_key
                           ; sg= sg_old
                           ; old_bulletproof_challenges }
                       in
@@ -303,7 +302,7 @@ let step_main
                     in
                     let verified =
                       verify ~branching:d.max_branching
-                        ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
+                        ~wrap_domain:d.wrap_domains.h
                         ~is_base_case:should_verify ~sg_old ~opening ~messages
                         ~wrap_verification_key:d.wrap_key statement unfinalized
                     in
@@ -337,13 +336,13 @@ let step_main
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
                 unstage
-                  (hash_me_only ~index:dlog_marlin_index
+                  (hash_me_only ~index:dlog_plonk_index
                      basic.var_to_field_elements)
               in
               Field.Assert.equal stmt.proof_state.me_only
                 (hash_me_only
                    { app_state
-                   ; dlog_marlin_index
+                   ; dlog_plonk_index
                    ; sg= sgs
                    ; old_bulletproof_challenges=
                        (* Note: the bulletproof_challenges here are unpadded! *)

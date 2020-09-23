@@ -19,10 +19,10 @@ module Make
     end)
     (Max_branching : Nat.Add.Intf_transparent) =
 struct
-  let triple_zip (a1, a2, a3) (b1, b2, b3) = ((a1, b1), (a2, b2), (a3, b3))
+  let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
-    type t = Tock.Field.t array Dlog_marlin_types.Evals.t Triple.t
+    type t = Tock.Field.t array Dlog_plonk_types.Evals.t Double.t
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -43,7 +43,7 @@ struct
         with type length = Max_branching.n
          and type ns = max_local_max_branchings)
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~self_dlog_marlin_index pk self_dlog_vk
+      ~self_dlog_plonk_index pk self_dlog_vk
       (prev_with_proofs :
         (prev_values, local_widths, local_heights) H3.T(P.With_data).t) :
       ( A_value.t
@@ -97,7 +97,7 @@ struct
     in
 *)
     let module X_hat = struct
-      type t = Tock.Field.t Triple.t
+      type t = Tock.Field.t Double.t
     end in
     let module Statement_with_hashes = struct
       type t =
@@ -114,7 +114,7 @@ struct
           Bulletproof_challenge.t
           Step_bp_vec.t
         , Index.t )
-        Dlog_based.Statement.t
+        Dlog_based.Statement.In_circuit.t
     end in
     let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~inv) in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
@@ -131,6 +131,38 @@ struct
              * X_hat.t
              * (value, local_max_branching, m) Per_proof_witness.Constant.t =
        fun max dlog_vk dlog_index (T t) tag ~must_verify ->
+        let plonk0 = t.statement.proof_state.deferred_values.plonk in
+        let plonk =
+          let domain =
+            (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
+                                                                     t
+                                                                       .statement
+                                                                       .proof_state
+                                                                       .deferred_values
+                                                                       .which_branch)
+          in
+          let to_field =
+            SC.to_field_constant (module Tick.Field) ~endo:Endo.Dum.scalar
+          in
+          let zeta = to_field plonk0.zeta in
+          let zetaw =
+            Tick.Field.(
+              zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+          in
+          Marlin_checks.derive_plonk
+            (module Tick.Field)
+            ~endo:Endo.Dee.base
+            ~domain:
+              ( Marlin_checks.domain (module Tick.Field) domain
+                :> _ Marlin_checks.vanishing_polynomial_domain )
+            { zeta
+            ; alpha= Challenge.Constant.to_tick_field plonk0.alpha
+            ; beta= Challenge.Constant.to_tick_field plonk0.beta
+            ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
+            (Marlin_checks.evals_of_split_evals
+               (module Tick.Field)
+               t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+        in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
         let T = Local_max_branching.eq in
@@ -140,15 +172,23 @@ struct
           Vector.map ~f:Ipa.Wrap.compute_challenges
             statement.proof_state.me_only.old_bulletproof_challenges
         in
-        let prev_statement_with_hashes : _ Dlog_based.Statement.t =
+        let prev_statement_with_hashes : _ Dlog_based.Statement.In_circuit.t =
           { pass_through=
               Common.hash_pairing_me_only
                 (Reduced_me_only.Pairing_based.prepare
-                   ~dlog_marlin_index:dlog_index statement.pass_through)
+                   ~dlog_plonk_index:dlog_index statement.pass_through)
                 ~app_state:data.value_to_field_elements
           ; proof_state=
               { statement.proof_state with
-                me_only=
+                deferred_values=
+                  { statement.proof_state.deferred_values with
+                    plonk=
+                      { plonk with
+                        zeta= plonk0.zeta
+                      ; alpha= plonk0.alpha
+                      ; beta= plonk0.beta
+                      ; gamma= plonk0.gamma } }
+              ; me_only=
                   Common.hash_dlog_me_only Max_branching.n
                     { old_bulletproof_challenges=
                         (* TODO: Get rid of this padding *)
@@ -175,19 +215,19 @@ struct
               |> to_list)
             public_input t.proof
         in
-        let ((x_hat_1, x_hat_2, x_hat_3) as x_hat) = O.x_hat o in
+        let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
         let scalar_chal f =
           Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
         in
-        let beta_1 = scalar_chal O.beta1 in
-        let beta_2 = scalar_chal O.beta2 in
-        let beta_3 = scalar_chal O.beta3 in
-        let alpha = O.alpha o in
-        let eta_a = O.eta_a o in
-        let eta_b = O.eta_b o in
-        let eta_c = O.eta_c o in
-        let xi = scalar_chal O.polys in
-        let r = scalar_chal O.evals in
+        let plonk0 =
+          { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
+              O.alpha o
+          ; beta= O.beta o
+          ; gamma= O.gamma o
+          ; zeta= scalar_chal O.zeta }
+        in
+        let xi = scalar_chal O.v in
+        let r = scalar_chal O.u in
         let sponge_digest_before_evaluations = O.digest_before_evaluations o in
         let to_field =
           SC.to_field_constant (module Tock.Field) ~endo:Endo.Dee.scalar
@@ -197,12 +237,13 @@ struct
 
           let xi = to_field xi
 
-          let beta_1 = to_field beta_1
-
-          let beta_2 = to_field beta_2
-
-          let beta_3 = to_field beta_3
+          let zeta = to_field plonk0.zeta
         end in
+        let w =
+          Tock.Field.domain_generator
+            ~log2_size:(Domain.log2_size data.wrap_domains.h)
+        in
+        let zetaw = Tock.Field.mul As_field.zeta w in
         let new_bulletproof_challenges, b =
           let prechals =
             Array.map (O.opening_prechallenges o) ~f:(fun x ->
@@ -219,7 +260,7 @@ struct
           let open As_field in
           let b =
             let open Tock.Field in
-            b_poly beta_1 + (r * (b_poly beta_2 + (r * b_poly beta_3)))
+            b_poly zeta + (r * b_poly zetaw)
           in
           let prechals =
             Vector.of_list_and_length_exn
@@ -238,7 +279,7 @@ struct
         let witness : _ Per_proof_witness.Constant.t =
           ( t.P.Base.Dlog_based.statement.pass_through.app_state
           , {prev_statement_with_hashes.proof_state with me_only= ()}
-          , Triple.map2 t.prev_evals t.prev_x_hat ~f:Tuple.T2.create
+          , Double.map2 t.prev_evals t.prev_x_hat ~f:Tuple.T2.create
           , Vector.extend_exn t.statement.pass_through.sg Local_max_branching.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
@@ -249,7 +290,7 @@ struct
           , ({t.proof.openings.proof with sg}, t.proof.messages) )
         in
         let combined_inner_product =
-          let e1, e2, e3 = t.proof.openings.evals in
+          let e1, e2 = t.proof.openings.evals in
           let b_polys =
             Vector.map
               ~f:(fun chals -> unstage (b_poly (Vector.to_array chals)))
@@ -257,45 +298,49 @@ struct
           in
           let open As_field in
           let combine (x_hat : Tock.Field.t) pt e =
-            let a, b = Dlog_marlin_types.Evals.(to_vectors (e : _ array t)) in
+            let a = Dlog_plonk_types.Evals.(to_vector (e : _ array t)) in
             let v : (Tock.Field.t array, _) Vector.t =
               Vector.append
                 (Vector.map b_polys ~f:(fun f -> [|f pt|]))
                 ([|x_hat|] :: a)
-                (snd (Local_max_branching.add Nat.N19.n))
+                (snd (Local_max_branching.add Nat.N9.n))
             in
             let open Tock.Field in
-            let domains = data.wrap_domains in
             Pcs_batch.combine_split_evaluations
-              (Common.dlog_pcs_batch
-                 (Local_max_branching.add Nat.N19.n)
-                 ~h_minus_1:Int.(Domain.size domains.h - 1)
-                 ~k_minus_1:Int.(Domain.size domains.k - 1))
+              (Common.dlog_pcs_batch (Local_max_branching.add Nat.N9.n))
               ~xi ~init:Fn.id ~mul ~last:Array.last
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
                 Pcs_batch.pow ~one ~mul x
                   Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
-              v b
+              v []
           in
           let open Tock.Field in
-          combine x_hat_1 beta_1 e1
-          + (r * (combine x_hat_2 beta_2 e2 + (r * combine x_hat_3 beta_3 e3)))
+          combine x_hat_1 As_field.zeta e1 + (r * combine x_hat_2 zetaw e2)
         in
         let chal = Challenge.Constant.of_tock_field in
+        let plonk =
+          Marlin_checks.derive_plonk
+            (module Tock.Field)
+            ~endo:Endo.Dum.base
+            ~domain:
+              ( Marlin_checks.domain (module Tock.Field) data.wrap_domains.h
+                :> _ Marlin_checks.vanishing_polynomial_domain )
+            {plonk0 with zeta= As_field.zeta}
+            (Marlin_checks.evals_of_split_evals
+               (module Tock.Field)
+               t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
+               ~zeta:As_field.zeta ~zetaw)
+        in
         ( `Sg sg
         , { Types.Pairing_based.Proof_state.Per_proof.deferred_values=
-              { marlin=
-                  { sigma_2= fst t.proof.messages.sigma_gh_2
-                  ; sigma_3= fst t.proof.messages.sigma_gh_3
-                  ; alpha= chal alpha
-                  ; eta_a= chal eta_a
-                  ; eta_b= chal eta_b
-                  ; eta_c= chal eta_c
-                  ; beta_1
-                  ; beta_2
-                  ; beta_3 }
+              { plonk=
+                  { plonk with
+                    zeta= plonk0.zeta
+                  ; alpha= chal plonk0.alpha
+                  ; beta= chal plonk0.beta
+                  ; gamma= chal plonk0.gamma }
               ; combined_inner_product
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
@@ -324,7 +369,7 @@ struct
         | p :: ps, max :: maxes, t :: ts, must_verify :: must_verifys, S l ->
             let dlog_vk, dlog_index =
               if Type_equal.Id.same self.Tag.id t.id then
-                (self_dlog_vk, self_dlog_marlin_index)
+                (self_dlog_vk, self_dlog_plonk_index)
               else
                 let d = Types_map.lookup_basic t in
                 (d.wrap_vk, d.wrap_key)
@@ -390,7 +435,7 @@ struct
     in
     let next_me_only_prepared =
       Reduced_me_only.Pairing_based.prepare
-        ~dlog_marlin_index:self_dlog_marlin_index
+        ~dlog_plonk_index:self_dlog_plonk_index
         next_statement.proof_state.me_only
     in
     let handler (Snarky_backendless.Request.With {request; respond} as r) =
@@ -399,7 +444,7 @@ struct
       | Req.Proof_with_datas ->
           k witnesses
       | Req.Wrap_index ->
-          k self_dlog_marlin_index
+          k self_dlog_plonk_index
       | Req.App_state ->
           k next_me_only_prepared.app_state
       | _ -> (
@@ -435,7 +480,7 @@ struct
             in
             Common.hash_dlog_me_only Max_branching.n t :: pad [] ms n
       in
-      let {Domains.h; k; x} =
+      let {Domains.h; x} =
         List.nth_exn
           (Vector.to_list step_domains)
           (Index.to_int branch_data.index)
@@ -453,9 +498,9 @@ struct
         let module V = H3.To_vector (Tick.Curve.Affine) in
         V.f prev_values_length (M.f prev_with_proofs)
       in
-      ksprintf Common.time "step-prover %d (%d, %d, %d)"
-        (Index.to_int branch_data.index)
-        (Domain.size h) (Domain.size k) (Domain.size x) (fun () ->
+      ksprintf Common.time "step-prover %d (%d, %d)"
+        (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
+        (fun () ->
           Impls.Step.prove pk [input]
             ~message:
               (* emphatically NOT padded with dummies *)
@@ -503,6 +548,6 @@ struct
     ; prev_evals=
         Vector.extend
           (Vector.map2 prev_evals x_hats ~f:(fun es x_hat ->
-               triple_zip es x_hat ))
+               double_zip es x_hat ))
           lte Max_branching.n Dummy.evals }
 end

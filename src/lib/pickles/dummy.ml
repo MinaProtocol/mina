@@ -16,8 +16,9 @@ let evals =
   (ex, ex)
 
 let evals_combined =
-  Tuple_lib.Double.map evals
-    ~f:(fun (e, _x) -> Dlog_plonk_types.Evals.map e ~f:(Array.reduce_exn ~f:Backend.Tock.Field.(+)))
+  Tuple_lib.Double.map evals ~f:(fun (e, _x) ->
+      Dlog_plonk_types.Evals.map e
+        ~f:(Array.reduce_exn ~f:Backend.Tock.Field.( + )) )
 
 module Ipa = struct
   module Wrap = struct

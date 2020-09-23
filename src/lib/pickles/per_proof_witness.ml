@@ -18,9 +18,9 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
       Types.Bulletproof_challenge.t
       Types.Step_bp_vec.t
     , 'local_num_branches One_hot_vector.t )
-    Types.Dlog_based.Proof_state.t
-  * (Impl.Field.t array Dlog_marlin_types.Evals.t * Impl.Field.t)
-    Tuple_lib.Triple.t
+    Types.Dlog_based.Proof_state.In_circuit.t
+  * (Impl.Field.t array Dlog_plonk_types.Evals.t * Impl.Field.t)
+    Tuple_lib.Double.t
   * (Step_main_inputs.Inner_curve.t, 'local_max_branching) Vector.t
   * ((Impl.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
   * Wrap_proof.var
@@ -42,9 +42,9 @@ module Constant = struct
         Types.Bulletproof_challenge.t
         Types.Step_bp_vec.t
       , Types.Index.t )
-      Types.Dlog_based.Proof_state.t
-    * (Tick.Field.t array Dlog_marlin_types.Evals.t * Tick.Field.t)
-      Tuple_lib.Triple.t
+      Types.Dlog_based.Proof_state.In_circuit.t
+    * (Tick.Field.t array Dlog_plonk_types.Evals.t * Tick.Field.t)
+      Tuple_lib.Double.t
     * (Tick.Inner_curve.Affine.t, 'local_max_branching) Vector.t
     * ((Tick.Field.t, Tick.Rounds.n) Vector.t, 'local_max_branching) Vector.t
     * Wrap_proof.t
@@ -63,22 +63,22 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
   Snarky_backendless.Typ.tuple6 statement
-    (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ
-       Other_field.typ
+    (Types.Dlog_based.Proof_state.In_circuit.typ Challenge.typ Fp.typ
+       Boolean.typ Other_field.typ
        (Snarky_backendless.Typ.unit ())
        Digest.typ index)
     (let lengths =
        Commitment_lengths.of_domains_vector step_domains
          ~max_degree:Common.Max_degree.step
-       |> Dlog_marlin_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
+       |> Dlog_plonk_types.Evals.map ~f:(Vector.reduce_exn ~f:Core.Int.max)
      in
      let t =
        Typ.tuple2
-         (Dlog_marlin_types.Evals.typ ~default:Field.Constant.zero lengths
+         (Dlog_plonk_types.Evals.typ ~default:Field.Constant.zero lengths
             Field.typ)
          Field.typ
      in
-     Typ.tuple3 t t t)
+     Typ.tuple2 t t)
     (Vector.typ Inner_curve.typ local_max_branching)
     (Vector.typ (Vector.typ Field.typ Tick.Rounds.n) local_max_branching)
     Wrap_proof.typ

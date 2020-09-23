@@ -23,8 +23,7 @@ module Basic = struct
     ; wrap_key:
         Tick.Inner_curve.Affine.t
         Dlog_marlin_types.Poly_comm.Without_degree_bound.t
-        Abc.t
-        Matrix_evals.t
+        Plonk_verification_key_evals.t
     ; wrap_vk: Impls.Wrap.Verification_key.t }
 end
 
@@ -77,7 +76,7 @@ module Side_loaded = struct
     ; typ
     ; branches
     ; wrap_domains= Common.wrap_domains
-    ; wrap_key= Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) wrap_key }
+    ; wrap_key= Plonk_verification_key_evals.map ~f:Array.of_list wrap_key }
 end
 
 module Compiled = struct
@@ -106,8 +105,7 @@ module Compiled = struct
     ; wrap_key:
         Tick.Inner_curve.Affine.t
         Dlog_marlin_types.Poly_comm.Without_degree_bound.t
-        Abc.t
-        Matrix_evals.t
+        Plonk_verification_key_evals.t
         Lazy.t
     ; wrap_vk: Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains: Domains.t
@@ -149,8 +147,7 @@ module For_step = struct
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; wrap_key:
         inner_curve_var Dlog_marlin_types.Poly_comm.Without_degree_bound.t
-        Abc.t
-        Matrix_evals.t
+        Plonk_verification_key_evals.t
     ; wrap_domains: Domains.t
     ; step_domains:
         [ `Known of (Domains.t, 'branches) Vector.t
@@ -211,8 +208,8 @@ module For_step = struct
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key=
-        Matrix_evals.map (Lazy.force wrap_key)
-          ~f:(Abc.map ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant))
+        Plonk_verification_key_evals.map (Lazy.force wrap_key)
+          ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
     ; wrap_domains
     ; step_domains= `Known step_domains }
 end
@@ -250,6 +247,25 @@ let lookup_basic : type a b n m. (a, b, n, m) Tag.t -> (a, b, n, m) Basic.t =
       Compiled.to_basic (lookup_compiled t.id)
   | Side_loaded ->
       Side_loaded.to_basic (lookup_side_loaded t.id)
+
+let lookup_step_domains : type a b n m.
+    (a, b, n, m) Tag.t -> (Domain.t, m) Vector.t =
+ fun t ->
+  let f = Vector.map ~f:Domains.h in
+  match t.kind with
+  | Compiled ->
+      f (lookup_compiled t.id).step_domains
+  | Side_loaded -> (
+      let t = lookup_side_loaded t.id in
+      match t.ephemeral with
+      | Some {index= `In_circuit _} | None ->
+          failwith __LOC__
+      | Some {index= `In_prover k} ->
+          let a =
+            At_most.to_array (At_most.map k.step_data ~f:(fun (ds, _) -> ds.h))
+          in
+          Vector.init t.permanent.branches ~f:(fun i ->
+              try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0 ) )
 
 let max_branching : type n1.
     (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =

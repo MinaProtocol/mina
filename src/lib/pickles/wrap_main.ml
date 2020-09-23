@@ -45,7 +45,7 @@ let check_wrap_domains ds =
                   (struct
                     let f (d : Domains.t) =
                       let d' = Common.wrap_domains in
-                      [%test_eq: Domain.t * Domain.t] (d.h, d.k) (d'.h, d'.k)
+                      [%test_eq: Domain.t] d.h d'.h
                   end))
   in
   I.f ds
@@ -69,7 +69,7 @@ let pad_domains (type prev_varss prev_valuess branches n)
     let dummy_domains =
       (* TODO: The dummy should really be equal to one of the already present domains. *)
       let d = Domain.Pow_2_roots_of_unity 1 in
-      {Domains.h= d; k= d; x= d}
+      {Domains.h= d; x= d}
     in
     let module M =
       H4.Map
@@ -135,7 +135,8 @@ let wrap_main
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t
-    * ((_, _, _, _, _, _, _, _, _, _) Types.Dlog_based.Statement.t -> unit) =
+    * (   (_, _, _, _, _, _, _, _, _, _) Types.Dlog_based.Statement.In_circuit.t
+       -> unit) =
   Timer.clock __LOC__ ;
   let wrap_domains =
     check_wrap_domains prev_wrap_domains ;
@@ -167,19 +168,22 @@ let wrap_main
            ; me_only= me_only_digest
            ; was_base_case }
        ; pass_through } :
-        _ Types.Dlog_based.Statement.t) =
+        _ Types.Dlog_based.Statement.In_circuit.t) =
     let which_branch = One_hot_vector.of_index which_branch ~length:branches in
     let prev_proof_state =
       let open Types.Pairing_based.Proof_state in
       let typ = typ (module Impl) Max_branching.n Field.typ in
       exists typ ~request:(fun () -> Req.Proof_state)
     in
-    let pairing_marlin_index =
+    let pairing_plonk_index =
       choose_key which_branch
         (Vector.map (Lazy.force step_keys)
            ~f:
-             (Matrix_evals.map
-                ~f:(Abc.map ~f:(Array.map ~f:Inner_curve.constant))))
+             (Plonk_verification_key_evals.map ~f:(function
+               | [|g|] ->
+                   Inner_curve.constant g
+               | _ ->
+                   assert false )))
     in
     let prev_step_accs =
       exists (Vector.typ Inner_curve.typ Max_branching.n) ~request:(fun () ->
@@ -220,36 +224,30 @@ let wrap_main
     let eval_lengths =
       Vector.map domainses ~f:(fun v ->
           Commitment_lengths.generic Vector.map
-            ~h:(Vector.map v ~f:(fun {h; _} -> Domain.size h))
-            ~k:(Vector.map v ~f:(fun {k; _} -> Domain.size k)) )
+            ~h:(Vector.map v ~f:(fun {h; _} -> Domain.size h)) )
     in
     let new_bulletproof_challenges =
       let evals =
         let ty =
           let ty =
             Typ.tuple2
-              (Dlog_marlin_types.Evals.typ ~default:Field.Constant.zero
+              (Dlog_plonk_types.Evals.typ ~default:Field.Constant.zero
                  (Commitment_lengths.of_domains wrap_domains
                     ~max_degree:Max_degree.wrap)
                  Field.typ)
               Field.typ
           in
-          Vector.typ (Typ.tuple3 ty ty ty) Max_branching.n
+          Vector.typ (Typ.tuple2 ty ty) Max_branching.n
         in
         exists ty ~request:(fun () -> Req.Evals)
       in
       let chals =
-        let (wrap_domains : (_, Max_branching.n) Vector.t), hk_minus_1s =
+        let (wrap_domains : (_, Max_branching.n) Vector.t) =
           Vector.map domainses ~f:(fun ds ->
-              ( Vector.map
-                  Domains.[h; k; x]
-                  ~f:(fun f ->
-                    Pseudo.Domain.to_domain (which_branch, Vector.map ds ~f) )
-              , ( ( which_branch
-                  , Vector.map ds ~f:(fun d -> Domain.size d.h - 1) )
-                , ( which_branch
-                  , Vector.map ds ~f:(fun d -> Domain.size d.k - 1) ) ) ) )
-          |> Vector.unzip
+              Vector.map
+                Domains.[h; x]
+                ~f:(fun f ->
+                  Pseudo.Domain.to_domain (which_branch, Vector.map ds ~f) ) )
         in
         let actual_branchings =
           padded
@@ -265,16 +263,14 @@ let wrap_main
           ; actual_branchings
           ; evals
           ; eval_lengths
-          ; wrap_domains
-          ; hk_minus_1s ]
+          ; wrap_domains ]
           ~f:(fun [ ( {deferred_values; sponge_digest_before_evaluations}
                     , should_verify )
                   ; old_bulletproof_challenges
                   ; actual_branching
                   ; evals
                   ; eval_lengths
-                  ; [domain_h; domain_k; input_domain]
-                  ; (h_minus_1, k_minus_1) ]
+                  ; [domain; input_domain] ]
              ->
             let sponge =
               let s = Sponge.create sponge_params in
@@ -301,11 +297,11 @@ let wrap_main
             let verified, chals =
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
-                ~actual_branching ~h_minus_1 ~k_minus_1
+                ~actual_branching
                 ~input_domain:
                   (input_domain :> _ Marlin_checks.vanishing_polynomial_domain)
-                ~domain_k ~domain_h ~sponge deferred_values
-                ~old_bulletproof_challenges evals
+                ~domain:(domain :> _ Marlin_checks.vanishing_polynomial_domain)
+                ~sponge deferred_values ~old_bulletproof_challenges evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;
             chals )
@@ -328,27 +324,23 @@ let wrap_main
     in
     let openings_proof =
       exists
-        (Dlog_marlin_types.Openings.Bulletproof.typ Other_field.Packed.typ
+        (Dlog_plonk_types.Openings.Bulletproof.typ Other_field.Packed.typ
            Inner_curve.typ
            ~length:(Nat.to_int Backend.Tick.Rounds.n))
         ~request:(fun () -> Req.Openings_proof)
     in
     let ( sponge_digest_before_evaluations_actual
-        , (`Success bulletproof_success, bulletproof_challenges_actual)
-        ) =
+        , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
       let messages =
         exists
           (Dlog_plonk_types.Messages.typ ~dummy:Inner_curve.Params.one
-             Other_field.Packed.typ Inner_curve.typ
+             Inner_curve.typ
              ~commitment_lengths:
                (let open Vector in
                Commitment_lengths.generic map ~max_degree:Max_degree.step
                  ~h:
                    (Vector.map step_domains
-                      ~f:(Fn.compose Domain.size Domains.h))
-                 ~k:
-                   (Vector.map step_domains
-                      ~f:(Fn.compose Domain.size Domains.k))))
+                      ~f:(Fn.compose Domain.size Domains.h))))
           ~request:(fun () -> Req.Messages)
       in
       let sponge = Opt.create sponge_params in
@@ -358,7 +350,7 @@ let wrap_main
       in
       incrementally_verify_proof
         (module Max_branching)
-        ~step_widths ~step_domains ~verification_key:pairing_marlin_index ~xi
+        ~step_widths ~step_domains ~verification_key:pairing_plonk_index ~xi
         ~sponge
         ~public_input:
           (Array.append
@@ -366,7 +358,13 @@ let wrap_main
              (pack_statement Max_branching.n prev_statement))
         ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b} ~messages
         ~which_branch ~openings_proof
-        ~plonk
+        ~plonk:
+          (Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit
+           .map_fields
+             plonk
+             (* TODO: Don't use a boolean-constraining unpacking function. It's not
+   necessary with PLONK. *)
+             ~f:Other_field.Packed.to_bits)
     in
     Boolean.Assert.is_true bulletproof_success ;
     Field.Assert.equal me_only_digest

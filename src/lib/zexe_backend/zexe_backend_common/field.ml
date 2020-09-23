@@ -32,6 +32,8 @@ module type Input_intf = sig
 
   val of_int : Unsigned.UInt64.t -> t
 
+  val domain_generator : Unsigned.Size_t.t -> t
+
   val add : t -> t -> t
 
   val sub : t -> t -> t
@@ -109,6 +111,8 @@ module type S = sig
   val of_bigint : Bigint.t -> t
 
   val of_int : int -> t
+
+  val domain_generator : log2_size:int -> t
 
   val one : t
 
@@ -300,6 +304,9 @@ module Make (F : Input_intf) :
   include Stable.Latest
 
   let of_int = gc1 (Fn.compose of_int Unsigned.UInt64.of_int)
+
+  let domain_generator ~log2_size =
+    gc1 (Fn.compose domain_generator Unsigned.Size_t.of_int) log2_size
 
   let one = of_int 1
 

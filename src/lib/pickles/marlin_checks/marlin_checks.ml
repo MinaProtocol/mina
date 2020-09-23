@@ -1,6 +1,7 @@
 open Core_kernel
 open Pickles_types
 open Pickles_base
+open Tuple_lib
 module Domain = Domain
 
 type 'field vanishing_polynomial_domain =
@@ -51,8 +52,7 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
 let actual_evaluation (type f) (module Field : Field_intf with type t = f)
-    (e : Field.t array) (pt : Field.t) ~rounds : Field.t 
-  =
+    (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
   let pt_n =
     let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
     go pt rounds
@@ -63,54 +63,38 @@ let actual_evaluation (type f) (module Field : Field_intf with type t = f)
   | [] ->
       failwith "empty list"
 
-(*
-let evals_of_split_evals field (b1, b2)
-    ((e1, e2) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ~rounds =
-  let e = actual_evaluation field ~rounds in
-  let abc es = Abc.map es ~f:(Fn.flip e b3) in
-  { Pairing_plonk_types.Evals.w_hat= e e1.w_hat b1
-  ; z_hat_a= e e1.z_hat_a b1
-  ; z_hat_b= e e1.z_hat_b b1
-  ; g_1= e e1.g_1 b1
-  ; h_1= e e1.h_1 b1
-  ; g_2= e e2.g_2 b2
-  ; h_2= e e2.h_2 b2
-  ; g_3= e e3.g_3 b3
-  ; h_3= e e3.h_3 b3
-  ; row= abc e3.row
-  ; col= abc e3.col
-  ; value= abc e3.value
-  ; rc= abc e3.rc }
-   *)
+let evals_of_split_evals field ~zeta ~zetaw
+    ((es1, es2) : _ Dlog_plonk_types.Evals.t Double.t) ~rounds =
+  let e = Fn.flip (actual_evaluation field ~rounds) in
+  Dlog_plonk_types.Evals.(map es1 ~f:(e zeta), map es2 ~f:(e zetaw))
 
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
-let derive_plonk (type t) (module F : Field_intf with type t = t)
-    ~endo
-~(domain : t vanishing_polynomial_domain)
-  =
+let derive_plonk (type t) (module F : Field_intf with type t = t) ~endo
+    ~(domain : t vanishing_polynomial_domain) =
   let open F in
   let square x = x * x in
-      let double x = of_int 2 * x in
+  let double x = of_int 2 * x in
   let sbox x =
     (* x^5 *)
     square (square x) * x
   in
   let r, o = failwith "Compute r, o" in
-  fun ({ alpha; beta; gamma; zeta } : _ Minimal.t) ((e0, e1) : _ Dlog_plonk_types.Evals.t Tuple_lib.Double.t) ->
+  fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
+      ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
     let bz = beta * zeta in
     let perm0 =
-      (e0.l + bz + gamma) *
-      (e0.r + (bz * r) + gamma) *
-      (e0.o + (bz * o) + gamma) *
-      alpha +
-      (alpha * alpha * (domain#vanishing_polynomial zeta) / (zeta - one))
-    in 
+      (e0.l + bz + gamma)
+      * (e0.r + (bz * r) + gamma)
+      * (e0.o + (bz * o) + gamma)
+      * alpha
+      + (alpha * alpha * domain#vanishing_polynomial zeta / (zeta - one))
+    in
     let perm1 =
-      negate (e0.l + (beta * e0.sigma1) + gamma) *
-      (e0.r + (beta * e0.sigma2) + gamma) *
-      (e1.z * beta * alpha)
-    in 
+      negate (e0.l + (beta * e0.sigma1) + gamma)
+      * (e0.r + (beta * e0.sigma2) + gamma)
+      * (e1.z * beta * alpha)
+    in
     let gnrc_l = e0.l in
     let gnrc_r = e0.r in
     let gnrc_o = e0.o in
@@ -118,50 +102,46 @@ let derive_plonk (type t) (module F : Field_intf with type t = t)
       let a2 = alpha * alpha in
       let a = Array.init 4 ~f:(fun _ -> a2) in
       for i = 1 to Int.(Array.length a - 1) do
-        a.(i) <- a.(Int.(i - 1) ) * alpha
-      done;
+        a.(i) <- a.(Int.(i - 1)) * alpha
+      done ;
       a
     in
     let psdn0 =
-      let (l, r, o) = (sbox(e0.l), sbox(e0.r), sbox(e0.o)) in
-      ((l + o - e1.l) * alphas.(1)) + ((l + r - e1.r) * alphas.(2)) + ((r + o - e1.o) * alphas.(3))
-    in 
+      let l, r, o = (sbox e0.l, sbox e0.r, sbox e0.o) in
+      ((l + o - e1.l) * alphas.(1))
+      + ((l + r - e1.r) * alphas.(2))
+      + ((r + o - e1.o) * alphas.(3))
+    in
     let ecad0 =
-        ((e1.r - e1.l) * (e0.o + e0.l) -
-        ((e1.l - e1.o) * (e0.r - e0.l))) * alphas.(1) +
-        (((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o) -
-        ((e0.o + e0.l) * (e0.o + e0.l))) * alphas.(2))
-    in 
+      (((e1.r - e1.l) * (e0.o + e0.l)) - ((e1.l - e1.o) * (e0.r - e0.l)))
+      * alphas.(1)
+      + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
+        - ((e0.o + e0.l) * (e0.o + e0.l)) )
+        * alphas.(2)
+    in
     let vbmul0, vbmul1 =
-        let tmp = double e0.l - square e0.r + e1.r in
-        (square e0.r - e0.r) * alphas.(1)
-        +
-        ((e1.l - e0.l) * e1.r
-        -
-        e1.o + (e0.o * (double e0.r - one))) * alphas.(2)
-        ,
-        ( square (double e0.o - (tmp * e0.r))
-        -
-        (( square e0.r - e1.r + e1.l) * square tmp )) * alphas.(1)
-        +
-        (((e0.l - e1.l) * (double e0.o - (tmp * e0.r))
-        -
-        ((e1.o + e0.o) * tmp)) * alphas.(2))
-    in 
+      let tmp = double e0.l - square e0.r + e1.r in
+      ( ((square e0.r - e0.r) * alphas.(1))
+        + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
+          * alphas.(2)
+      , ( square (double e0.o - (tmp * e0.r))
+        - ((square e0.r - e1.r + e1.l) * square tmp) )
+        * alphas.(1)
+        + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
+          - ((e1.o + e0.o) * tmp) )
+          * alphas.(2) )
+    in
     let endomul0, endomul1, endomul2 =
-        let xr = square e0.r - e0.l - e1.r in
-        let t = e0.l - xr in
-        let u = double e0.o - (t * e0.r) in 
-        (square e0.l - e0.l) * alphas.(1) + ((square e1.l - e1.l) * alphas.(2))
-        +
-        ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3))
-        ,
-        (((e1.l - e0.r) * e1.r) - e1.o) + (e0.o * (double e0.l - one))
-        ,
-        (square u - (square t * (xr + e0.l + e1.l))) * alphas.(1)
-        +
-        ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2))
-    in 
+      let xr = square e0.r - e0.l - e1.r in
+      let t = e0.l - xr in
+      let u = double e0.o - (t * e0.r) in
+      ( ((square e0.l - e0.l) * alphas.(1))
+        + ((square e1.l - e1.l) * alphas.(2))
+        + ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3))
+      , ((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one))
+      , ((square u - (square t * (xr + e0.l + e1.l))) * alphas.(1))
+        + ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2)) )
+    in
     { In_circuit.alpha
     ; beta
     ; gamma
@@ -175,45 +155,40 @@ let derive_plonk (type t) (module F : Field_intf with type t = t)
     ; ecad0
     ; vbmul0
     ; vbmul1
-    ; endomul0; endomul1; endomul2
-    }
+    ; endomul0
+    ; endomul1
+    ; endomul2 }
 
 let checked (type t)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-    ~domain
-    ~endo
-    (plonk : _ In_circuit.t)
-    evals
-    =
-    let actual = 
-      derive_plonk
-        (module Impl.Field)
-        ~endo
-        ~domain
-        { alpha= plonk.alpha
-        ; beta= plonk.beta
-        ; gamma= plonk.gamma
-        ; zeta= plonk.zeta
-        }
-        evals
-    in 
-    let open Impl in
-    let open In_circuit in
-      List.map ~f:(fun f -> Field.equal (f plonk) (f actual))
-      [ perm0 
-      ; perm1 
-      ; gnrc_l
-      ; gnrc_r
-      ; gnrc_o
-      ; psdn0
-      ; ecad0
-      ; vbmul0
-      ; vbmul1
-      ; endomul0
-      ; endomul1
-      ; endomul2
-      ]
-      |> Boolean.all
+    ~domain ~endo (plonk : _ In_circuit.t) evals =
+  let actual =
+    derive_plonk
+      (module Impl.Field)
+      ~endo ~domain
+      { alpha= plonk.alpha
+      ; beta= plonk.beta
+      ; gamma= plonk.gamma
+      ; zeta= plonk.zeta }
+      evals
+  in
+  let open Impl in
+  let open In_circuit in
+  List.map
+    ~f:(fun f -> Field.equal (f plonk) (f actual))
+    [ perm0
+    ; perm1
+    ; gnrc_l
+    ; gnrc_r
+    ; gnrc_o
+    ; psdn0
+    ; ecad0
+    ; vbmul0
+    ; vbmul1
+    ; endomul0
+    ; endomul1
+    ; endomul2 ]
+  |> Boolean.all
 
 (*
 let checked (type t)
