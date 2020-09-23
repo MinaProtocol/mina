@@ -108,6 +108,8 @@ module Side_loaded : sig
       end
     end]
 
+    val of_compiled : (_, _, _, _) Tag.t -> t
+
     val dummy : t
 
     open Impls.Step
