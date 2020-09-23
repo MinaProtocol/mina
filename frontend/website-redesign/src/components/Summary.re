@@ -33,7 +33,7 @@ let fetchStatistics = () => {
 
 module Styles = {
   open Css;
-
+  let container = style([marginTop(`rem(5.))]);
   let header =
     merge([
       Theme.Type.h1,
@@ -283,7 +283,7 @@ let make = () => {
     None;
   });
 
-  <>
+  <div className=Styles.container>
     <h1 className=Styles.header> {React.string("Testnet Leaderboard")} </h1>
     <div className=Styles.heroRow>
       <div className=Styles.heroLeft>
@@ -344,5 +344,5 @@ let make = () => {
         </div>
       </div>
     </div>
-  </>;
+  </div>;
 };

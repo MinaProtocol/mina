@@ -201,7 +201,7 @@ module Points = {
         display(`flex),
         flexDirection(`row),
         justifyContent(`center),
-        marginTop(`rem(6.)),
+        media(Theme.MediaQuery.notMobile, [marginTop(`rem(6.))]),
         selector(
           "> :last-child",
           [

@@ -210,13 +210,21 @@ module Footer = {
         width(`percent(100.)),
         background(Theme.Colors.gray),
         color(Theme.Colors.white),
-        padding2(~v=`rem(3.3), ~h=`rem(6.)),
+        padding2(~v=`rem(2.), ~h=`rem(2.)),
+        media(
+          Theme.MediaQuery.tablet,
+          [padding2(~v=`rem(3.3), ~h=`rem(6.))],
+        ),
       ]);
     let header = merge([Theme.Type.h5, style([fontSize(`rem(1.5))])]);
     let copy =
       merge([
         Theme.Type.h5,
-        style([fontSize(`rem(1.)), fontWeight(`light), lineHeight(`rem(1.5))]),
+        style([
+          fontSize(`rem(1.)),
+          fontWeight(`light),
+          lineHeight(`rem(1.5)),
+        ]),
       ]);
 
     let bold = merge([Theme.Type.h6, style([fontSize(`rem(1.25))])]);
