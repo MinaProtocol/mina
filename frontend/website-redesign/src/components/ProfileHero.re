@@ -15,7 +15,8 @@ module Styles = {
           width(`rem(30.)),
           display(`flex),
           justifyContent(`spaceBetween),
-alignItems(`baseline)        ],
+          alignItems(`baseline),
+        ],
       ),
     ]);
   let header =
@@ -260,9 +261,10 @@ module Points = {
           color(Theme.Colors.black),
           fontSize(`rem(1.)),
           lineHeight(`rem(1.5)),
+          alignSelf(`center),
         ]),
       ]);
-    let points = merge([flexColumn, style([marginLeft(`rem(2.))])]);
+    let points = merge([flexColumn, style([marginLeft(`rem(1.))])]);
     let value =
       merge([
         Theme.Type.h3,
