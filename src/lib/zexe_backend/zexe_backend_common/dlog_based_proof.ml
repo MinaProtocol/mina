@@ -134,6 +134,8 @@ module type Inputs_intf = sig
 
   module Verifier_index : sig
     type t
+
+    module Vector : Vector with type elt := t
   end
 
   module Backend : sig
@@ -174,7 +176,7 @@ module type Inputs_intf = sig
       -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
-    val batch_verify : Verifier_index.t -> Vector.t -> bool
+    val batch_verify : Verifier_index.Vector.t -> Vector.t -> bool
 
     val proof : t -> Opening_proof_backend.t
 
@@ -460,13 +462,15 @@ module Make (Inputs : Inputs_intf) = struct
     Backend.delete res ; t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
-      (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =
+      (ts : (Verifier_index.t * t * 'a * message option) list) =
+    let vks = Verifier_index.Vector.create () in
     let v = Backend.Vector.create () in
-    List.iter ts ~f:(fun (t, xs, m) ->
+    List.iter ts ~f:(fun (vk, t, xs, m) ->
         let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+        Verifier_index.Vector.emplace_back vks vk ;
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
-    let res = Backend.batch_verify vk v in
+    let res = Backend.batch_verify vks v in
     Backend.Vector.delete v ; res
 
   let batch_verify =
@@ -481,5 +485,5 @@ module Make (Inputs : Inputs_intf) = struct
           Fq.Vector.emplace_back v (Fq.Vector.get xs i)
         done ;
         v )
-      [(t, xs, message)] vk
+      [(vk, t, xs, message)]
 end

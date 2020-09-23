@@ -3,10 +3,27 @@
 open Core_kernel
 open Async
 
+let ocaml_memory_stats () =
+  let bytes_per_word = Sys.word_size / 8 in
+  let stat = Gc.stat () in
+  [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
+  ; ("heap_chunks", `Int stat.heap_chunks)
+  ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
+  ; ("live_size", `Int (stat.live_words * bytes_per_word))
+  ; ("live_blocks", `Int stat.live_blocks) ]
+
+let jemalloc_memory_stats () =
+  let {Jemalloc.active; resident; allocated; mapped} =
+    Jemalloc.get_memory_stats ()
+  in
+  [ ("active", `Int active)
+  ; ("resident", `Int resident)
+  ; ("allocated", `Int allocated)
+  ; ("mapped", `Int mapped) ]
+
 let log_memory_stats logger ~process =
   don't_wait_for
-    (let bytes_per_word = Sys.word_size / 8 in
-     (* Curve points are allocated in C++ and deallocated with finalizers.
+    ((* Curve points are allocated in C++ and deallocated with finalizers.
              The points on the C++ heap are much bigger than the OCaml heap
              objects that point to them, which makes the GC underestimate how
              much memory has been allocated since the last collection and not
@@ -39,25 +56,11 @@ let log_memory_stats logger ~process =
               (map ~f:Float.of_string @@ Unix.getenv "CODA_GC_HACK_INTERVAL"))
      in
      let log_stats suffix =
-       let stat = Gc.stat () in
+       let proc = ("process", `String process) in
        [%log debug] "OCaml memory statistics, %s" suffix
-         ~metadata:
-           [ ("process", `String process)
-           ; ("heap_size", `Int (stat.heap_words * bytes_per_word))
-           ; ("heap_chunks", `Int stat.heap_chunks)
-           ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
-           ; ("live_size", `Int (stat.live_words * bytes_per_word))
-           ; ("live_blocks", `Int stat.live_blocks) ] ;
-       let {Jemalloc.active; resident; allocated; mapped} =
-         Jemalloc.get_memory_stats ()
-       in
+         ~metadata:(proc :: ocaml_memory_stats ()) ;
        [%log debug] "Jemalloc memory statistics (in bytes)"
-         ~metadata:
-           [ ("process", `String process)
-           ; ("active", `Int active)
-           ; ("resident", `Int resident)
-           ; ("allocated", `Int allocated)
-           ; ("mapped", `Int mapped) ]
+         ~metadata:(proc :: jemalloc_memory_stats ())
      in
      let rec loop () =
        log_stats "before major gc" ;
