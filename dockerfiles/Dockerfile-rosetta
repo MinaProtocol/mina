@@ -213,7 +213,7 @@ RUN eval $(opam config env) \
 FROM opam-deps AS builder
 
 # Use --build-arg "DUNE_PROFILE=dev" to build a dev image or for CI
-ARG DUNE_PROFILE=testnet_postake_medium_curves
+ARG DUNE_PROFILE=testnet
 
 # branch to checkout on first clone (this will be the only availible branch in the container)
 # can also be a tagged release

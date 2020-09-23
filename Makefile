@@ -108,7 +108,7 @@ client_sdk_test_sigs_nonconsensus :
 
 rosetta_lib_encodings :
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=testnet
 	$(info Build complete)
 
 rosetta_lib_encodings_nonconsensus :

@@ -35,7 +35,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker [
-            "DUNE_PROFILE=testnet_postake_medium_curves",
+            "DUNE_PROFILE=testnet",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
