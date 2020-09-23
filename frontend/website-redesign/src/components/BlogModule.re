@@ -1,7 +1,3 @@
-module Style = {
-  open Css;
-};
-
 let fetchBlogs = () => {
   Contentful.getEntries(
     Lazy.force(Contentful.client),
@@ -28,5 +24,5 @@ let make = () => {
     Js.log(blogs);
     None;
   });
-  <div> {React.string("hello")} </div>;
+  <div> <ListModule /> </div>;
 };
