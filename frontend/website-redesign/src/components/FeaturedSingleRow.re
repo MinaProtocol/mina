@@ -223,12 +223,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~row: Row.t) => {
+let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
     <Wrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
        }}
     </Wrapped>
   </div>;
