@@ -9,6 +9,7 @@
 [%%import "/src/config/account_creation_fee/standard.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
 
 [%%define time_offsets false]
 [%%define cache_exceptions false]

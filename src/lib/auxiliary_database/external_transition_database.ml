@@ -53,7 +53,7 @@ let add_user_blocks (pagination : Pagination.t)
   in
   let user_command_participants =
     List.rev @@ fst
-    @@ List.fold ~init:([], next_available_token) transactions.user_commands
+    @@ List.fold ~init:([], next_available_token) transactions.commands
          ~f:(fun (participants, next_available_token) txn ->
            ( List.rev_append
                (User_command.accounts_accessed ~next_available_token txn.data)

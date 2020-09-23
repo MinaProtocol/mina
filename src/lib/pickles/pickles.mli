@@ -131,6 +131,7 @@ module Side_loaded : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
+        (* TODO: This should really be able to be any width up to the max width... *)
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, eq, yojson, hash, compare]
@@ -145,6 +146,11 @@ module Side_loaded : sig
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+
+  val verify :
+       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+    -> (Verification_key.t * 'value * Proof.t) list
+    -> bool
 
   (* Must be called in the inductive rule snarky function defining a
    rule for which this tag is used as a predecessor. *)

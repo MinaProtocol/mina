@@ -8,6 +8,7 @@
 [%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/realistic.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
@@ -22,7 +23,9 @@
 [%%define plugins false]
 
 [%%define genesis_ledger "testnet_postake"]
+
 [%%define genesis_state_timestamp "2020-07-24 12:40:00-07:00"]
+
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
@@ -36,3 +39,4 @@
 
 [%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
+

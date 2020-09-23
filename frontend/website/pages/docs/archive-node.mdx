@@ -1,0 +1,135 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Archive Node"});
+
+# Archive Node
+Coda nodes are succinct by default, meaning they don't need to maintain historical information about the network, block, or transactions. 
+For some usecases, it is useful to maintain this historical data, which you can do by running an **Archive Node.**
+
+An **Archive Node** is just a regular Coda daemon that is connected to a running archive process. 
+The daemon will regularly send blockchain data to the archive process, 
+which will store it in a [Postgres](https://www.postgresql.org/) database. 
+
+Running an archive node therefore requires some knowledge of managing a Postgres database instance.
+In this section, we'll set up a database, run the Archive Node, connect it to a daemon, and try some queries on the data. 
+Let's get started by installing what we need.  
+
+## Installation 
+1. Install the latest version of Coda. If you haven't upgraded to the latest version of the daemon, head [back to the docs](/docs/getting-started) to get the latest version. You can run ```coda -help``` to check if the installation succeeded.
+2. Install [Postgres](https://www.postgresql.org/download/).
+    - MacOS: Install using [Homebrew](https://wiki.postgresql.org/wiki/Homebrew). ```brew install postgresql```. That will give you both the Postgres server and the command line interface, **psql**. 
+3. Install the archive node package. 
+    - MacOS: Install using [Homebrew](https://brew.sh).
+    ```
+    brew install codaprotocol/coda/coda-archive
+    ```
+    - Windows: (placeholder)
+    - Ubuntu/Debian:
+      ```
+      sudo apt-get install -t unstable coda-archive
+      ```
+    - Docker: Use the following container
+      ```
+      codaprotocol/coda-daemon:0.0.16-beta5-master-fdc283b and coda-archive:0.0.16-beta5-master-fdc283b
+      ```
+
+
+## Setup 
+
+Below are some basic instructions on how to set up everything required to get an archive node running locally. These will be slightly different if you're connecting to a cloud instance of postgres, if your deployment uses docker, or if you want to run these processes on different machines.
+
+<Alert>
+
+Note: Some of these instructions may depend on how your operating system installs postgres (and assume that it is installed in the first place).
+
+</Alert>
+
+1. Start a local postgres server. This will just run it in the foreground for testing, you will likely want to run it in the background or use your OS's service manager (like systemd) to run it for you. Alternatively, you may use a postgres service hosted by a cloud provider.
+```
+postgres -p 5432 -D /usr/local/var/postgres
+```
+For macOS, run ```brew services start postgres``` to start a local postgres server.
+
+2. Create database (here called `archiver`) on server and load the schema into it. This will only need to be done the first time the archive node is set up.
+```
+createdb -h localhost -p 5432 -e archiver
+
+psql -h localhost -p 5432 -d archiver -f <(curl -Ls https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql)
+```
+
+3. Start archive process on port 3086, connecting to the postgres database we started on port 5432 in step 1.
+```
+coda-archive \
+  -postgres-uri postgres://localhost:5432/archiver \
+  -server-port 3086
+```
+
+4. Start the daemon, connecting it to the archive process that we just started on port 3086. If you want to connect to an archive process on another machine, you can specify a hostname as well, like `localhost:3086`.
+```
+coda daemon \
+    .....
+  -archive-address 3086\
+```
+
+## Using the Archive Node
+
+Now that we've got the archive node running, let's take a look at the tables in the database. 
+
+To list the tables in the database, you can run the ``\dt`` command, in psql.
+View the full schema of the tables [here](https://github.com/CodaProtocol/coda/blob/develop/src/app/archive/create_schema.sql).
+
+Below are some notable fields in each table. 
+
+### Table 1: user_commands
+This table keeps track of transactions made on the network. 
+```
+...
+  user_command_type          Type of transaction being made
+                             Possible values: `'payment', 'delegation', 'create_token', 'create_account', 'mint_tokens'`
+                             To see a specific type of transaction, i.e. payments or creating a token, specify this field in your queries.
+  source_id                  public key of the sender 
+  receiver_id                public key of the receiver 
+  amount                     amount being sent from the sender to the receiver
+  token                      ID of a token **If you are querying for different type of token transactions, specify this field.**
+```
+
+### Table 2: internal_commands
+This table keeps track of rewards earned from snark work or block producing. 
+```
+...
+  internal_command_type      represents whether the command is a `fee_transfer` from snark work or a `coinbase` reward from block producing. 
+                             Use this field for information about block rewards and snark rewards (there is also an extra fee_transfer added to support sending all the transaction fees summed together to the block_creator)
+  receiver_id                public key ID of the receiver 
+  fee                        amount being sent from the protocol to the receiver
+  token                      ID of a token **If you are querying for different type of token transactions, specify this field.**
+```
+
+### Table 3: blocks
+```
+...
+  id        
+  parent_id                  ID of the previous block in the blockchain
+                             Use this field for information about block rewards and snark rewards (there is also an extra fee_transfer added to support sending all the transaction fees summed together to the block_creator)
+  creator_id                 public key of the block creator 
+```
+
+## Try a query 
+
+Now that we've taken a look at the structure of the data, let's try a query. 
+
+**Example 1:** Find all blocks that have been created by your public key
+```
+SELECT *
+FROM blocks AS b
+INNER JOIN public_keys AS pk1 ON b.creator_id = pk1.id
+WHERE value = 'MY_PK'
+```
+
+**Example 2:** Find all payments you’ve received by your public key
+```
+SELECT *
+FROM user_commands AS uc
+JOIN blocks_user_commands AS buc ON uc.id = buc.user_command_id
+JOIN public_keys AS pk ON uc.receiver_id = pk.id
+WHERE value = 'MY_PK'
+AND type = 'payment'
+```

@@ -207,7 +207,9 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+  ORDER BY timestamp ASC
+  LIMIT 1)
 
   UNION ALL
 
@@ -250,6 +252,8 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       INNER JOIN public_keys pk
       ON pk.id = b.creator_id
       WHERE b.height = (select MAX(b.height) from blocks b)
+      ORDER BY timestamp ASC
+      LIMIT 1
         |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
@@ -287,7 +291,9 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
     end
 
     let typ =
-      Caqti_type.(tup3 int Archive_lib.Processor.User_command.typ Extras.typ)
+      Caqti_type.(
+        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
+          Extras.typ)
 
     let query =
       Caqti_request.collect Caqti_type.int typ
@@ -408,7 +414,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
-            match uc.Archive_lib.Processor.User_command.typ with
+            match uc.Archive_lib.Processor.User_command.Signed_command.typ with
             | "payment" ->
                 M.return `Payment
             | "delegation" ->

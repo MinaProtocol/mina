@@ -20,15 +20,15 @@ let record_payment t (txn : User_command.t) account =
   | `Ok hash ->
       [%log debug]
         ~metadata:
-          [ ("user_command", User_command.to_yojson txn)
+          [ ("command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
-        "Added  payment $user_command into receipt_chain database. You should \
-         wait for a bit to see your account's receipt chain hash update as \
+        "Added  payment $command into receipt_chain database. You should wait \
+         for a bit to see your account's receipt chain hash update as \
          $receipt_chain_hash" ;
       hash
   | `Duplicate hash ->
       [%log warn]
-        ~metadata:[("user_command", User_command.to_yojson txn)]
+        ~metadata:[("command", User_command.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
@@ -126,11 +126,14 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
-  | Ok ([txn], []) ->
+  | Ok ([Signed_command txn], []) ->
       [%log' info (Coda_lib.top_level_logger t)]
-        ~metadata:[("user_command", User_command.to_yojson txn)]
-        "Scheduled payment $user_command" ;
-      Ok (txn, record_payment t txn (Option.value_exn account_opt))
+        ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
+        "Scheduled payment $command" ;
+      Ok
+        ( txn
+        , record_payment t (Signed_command txn) (Option.value_exn account_opt)
+        )
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->
@@ -334,7 +337,7 @@ let get_status ~flag t =
     Option.map (Coda_lib.next_producer_timing t) ~f:(function
       | `Produce_now _ ->
           `Produce_now
-      | `Produce (time, _, _) ->
+      | `Produce (time, _, _, _) ->
           `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
@@ -380,24 +383,23 @@ module Subscriptions = struct
 end
 
 module For_tests = struct
-  let get_all_user_commands coda public_key =
+  let get_all_commands coda public_key =
     let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
-    let user_commands =
+    let commands =
       List.concat_map ~f:(fun transition ->
           transition |> With_hash.data
-          |> Auxiliary_database.Filtered_external_transition.user_commands
+          |> Auxiliary_database.Filtered_external_transition.commands
           |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in
-    let participants_user_commands =
-      User_command.filter_by_participant user_commands public_key
+    let participants_commands =
+      User_command.filter_by_participant commands public_key
     in
-    List.dedup_and_sort participants_user_commands
-      ~compare:User_command.compare
+    List.dedup_and_sort participants_commands ~compare:User_command.compare
 
   module Subscriptions = struct
     let new_user_commands coda public_key =

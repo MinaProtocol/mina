@@ -725,8 +725,15 @@ module Helper = struct
                           value here except ignore is UNSOUND because
                           write_pipe has a cast type. We don't remember
                           what the original 'return was. *)
-                  Strict_pipe.Writer.write sub.write_pipe (wrap m.sender data)
-                  |> ignore
+                  if Strict_pipe.Writer.is_closed sub.write_pipe then
+                    [%log' error t.logger]
+                      "subscription writer for $topic unexpectedly closed. \
+                       dropping message."
+                      ~metadata:[("topic", `String sub.topic)]
+                  else
+                    Strict_pipe.Writer.write sub.write_pipe
+                      (wrap m.sender data)
+                    |> ignore
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -1299,7 +1306,7 @@ let unban_ip net ip =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~logger ~conf_dir =
+let create ~on_unexpected_termination ~logger ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1327,7 +1334,9 @@ let create ~logger ~conf_dir =
                   [%log fatal]
                     !"libp2p_helper process died unexpectedly: %s"
                     (Unix.Exit_or_signal.to_string_hum e) ;
-                  raise Child_processes.Child_died
+                  Option.iter !termination_hack_ref ~f:(fun t ->
+                      t.finished <- true ) ;
+                  on_unexpected_termination ()
               | Ok () ->
                   [%log error]
                     "libp2p helper process exited peacefully but it should \
@@ -1381,7 +1390,7 @@ let create ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log error]
+              [%log debug]
                 ~metadata:[("line", `String line); ("error", `String err)]
                 "failed to parse log line from helper stderr" ) ;
           Deferred.unit )
@@ -1420,12 +1429,16 @@ let%test_module "coda network tests" =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
           ~conf_dir:a_tmp
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
         >>| Or_error.ok_exn
       in
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
           ~conf_dir:b_tmp
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
         >>| Or_error.ok_exn
       in
       let%bind kp_a = Keypair.random a in
