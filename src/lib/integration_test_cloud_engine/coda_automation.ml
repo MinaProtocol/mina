@@ -76,7 +76,7 @@ module Network_config = struct
     in
     let testnet_name = "integration-test-" ^ test_name in
     (* HARD CODED NETWORK VALUES *)
-    let coda_automation_location = "../automation" in
+    let coda_automation_location = "/home/steck/tmp/coda-automation" in
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
     let cluster_name = "coda-infra-east" in
@@ -112,7 +112,7 @@ module Network_config = struct
            (List.take keypairs (List.length block_producers)))
       |> List.unzip
     in
-    (* DEAMON CONFIG *)
+    (* DAEMON CONFIG *)
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
@@ -253,8 +253,8 @@ module Network_manager = struct
     ; testnet_log_filter: string
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: string list
-    ; snark_coordinator_pod_names: string list
+    ; block_producer_pod_names: Kubernetes_network.Node.t list
+    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
     ; mutable deployed: bool }
 
   let run_cmd' testnet_dir prog args =
@@ -346,12 +346,17 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
+    let cons_node pod_id =
+      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      ; pod_id }
+    in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i -> Printf.sprintf "test-block-producer-%d" (i + 1))
+        ~f:(fun i ->
+          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = ["snark-coordinator-1"] in
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
       { cluster= network_config.cluster_id
       ; namespace= network_config.terraform.testnet_name
@@ -384,7 +389,8 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    { Kubernetes_network.constraint_constants= t.constraint_constants
+    { Kubernetes_network.namespace= t.namespace
+    ; constraint_constants= t.constraint_constants
     ; genesis_constants= t.genesis_constants
     ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names
