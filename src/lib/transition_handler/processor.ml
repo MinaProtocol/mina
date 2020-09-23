@@ -292,6 +292,20 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                 ~source:`Catchup) )
                    with
                  | Ok () ->
+                     [%log debug]
+                       ~metadata:
+                         [ ( "hashes of transitions"
+                           , `List
+                               (List.map breadcrumb_subtrees ~f:(fun tree ->
+                                    Rose_tree.to_yojson
+                                      (fun breadcrumb ->
+                                        Cached.peek breadcrumb
+                                        |> Transition_frontier.Breadcrumb
+                                           .state_hash |> State_hash.to_yojson
+                                        )
+                                      tree )) ) ]
+                       "Successfully added catchup breadcrumbs to \
+                        transition_frontier" ;
                      ()
                  | Error err ->
                      List.iter breadcrumb_subtrees ~f:(fun tree ->

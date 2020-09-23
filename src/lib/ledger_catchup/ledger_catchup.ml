@@ -95,6 +95,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
       Deferred.return @@ Ok (`In_frontier hash)
   | Error (`In_process consumed_state) -> (
       [%log trace]
+        ~metadata:
+          [ ( "state_hash"
+            , With_hash.hash transition_with_hash |> State_hash.to_yojson ) ]
         "transition queried during ledger catchup is still in process in one \
          of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
@@ -277,14 +280,20 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
             |> don't_wait_for ;
             Deferred.Or_error.error_string error_msg )
           else
-            Deferred.Or_error.return
-            @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
-                   let transition_with_hash =
-                     With_hash.of_data transition ~hash_data:(Fn.const hash)
-                   in
-                   Envelope.Incoming.wrap ~data:transition_with_hash
-                     ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
-               ) ) )
+            [%log debug]
+              ~metadata:
+                [ ( "hashes_of_missing_transitions"
+                  , `List (List.map hashes ~f:State_hash.to_yojson) ) ]
+              "successfully downloaded the transitions of \
+               $hashes_of_missing_transitions" ;
+          Deferred.Or_error.return
+          @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
+                 let transition_with_hash =
+                   With_hash.of_data transition ~hash_data:(Fn.const hash)
+                 in
+                 Envelope.Incoming.wrap ~data:transition_with_hash
+                   ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
+             ) ) )
 
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
