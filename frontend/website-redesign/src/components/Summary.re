@@ -137,7 +137,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.notMobile,
-        [padding2(~v=`rem(0.), ~h=`rem(6.0))],
+        [position(`absolute), top(`rem(7.)), left(`zero)],
       ),
     ]);
 
