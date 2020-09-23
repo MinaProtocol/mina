@@ -50,23 +50,7 @@ type kind =
 [@react.component]
 let make = (~kind, ~size=1.5) => {
   let iconSize = Js.Float.toString(size *. 16.) ++ "px";
-  let sizeValue = Js.Float.toString(size *. 16.);
-  <svg
-    width=iconSize
-    height=iconSize
-    viewBox={
-      "0 0 "
-      ++ {
-        sizeValue;
-      }
-      ++ {
-        " ";
-      }
-      ++ {
-        sizeValue;
-      }
-    }
-    fill="currentColor">
+  <svg width=iconSize height=iconSize viewBox="0 0 24 24" fill="currentColor">
     {switch (kind) {
      | World =>
        <path
@@ -122,135 +106,40 @@ let make = (~kind, ~size=1.5) => {
          fill="currentColor"
        />
      | ArrowUpMedium =>
-       <svg>
-         <rect x="11" y="4" width="1" height="16" fill="currentColor" />
-         <rect x="12" y="5" width="1" height="1" fill="currentColor" />
-         <rect x="13" y="6" width="1" height="1" fill="currentColor" />
-         <rect x="14" y="7" width="1" height="1" fill="currentColor" />
-         <rect x="15" y="8" width="1" height="1" fill="currentColor" />
-         <rect x="16" y="9" width="1" height="1" fill="currentColor" />
-         <rect x="6" y="9" width="1" height="1" fill="currentColor" />
-         <rect x="7" y="8" width="1" height="1" fill="currentColor" />
-         <rect x="8" y="7" width="1" height="1" fill="currentColor" />
-         <rect x="9" y="6" width="1" height="1" fill="currentColor" />
-         <rect x="10" y="5" width="1" height="1" fill="currentColor" />
-       </svg>
+       <>
+         <rect x="11" y="4" width="1" height="16" />
+         <rect x="12" y="5" width="1" height="1" />
+         <rect x="13" y="6" width="1" height="1" />
+         <rect x="14" y="7" width="1" height="1" />
+         <rect x="15" y="8" width="1" height="1" />
+         <rect x="16" y="9" width="1" height="1" />
+         <rect x="6" y="9" width="1" height="1" />
+         <rect x="7" y="8" width="1" height="1" />
+         <rect x="8" y="7" width="1" height="1" />
+         <rect x="9" y="6" width="1" height="1" />
+         <rect x="10" y="5" width="1" height="1" />
+       </>
      | ArrowLeftLarge =>
        <>
-         <rect
-           width="24"
-           height="1"
-           transform="matrix(-1 0 0 1 24 11)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 2 12)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 2 10)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 3 9)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 4 8)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 5 7)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 6 6)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 7 5)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 8 4)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 9 3)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 10 2)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 3 13)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 4 14)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 5 15)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 6 16)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 7 17)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 8 18)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 9 19)"
-           fill="currentColor"
-         />
-         <rect
-           width="1"
-           height="1"
-           transform="matrix(-1 0 0 1 10 20)"
-           fill="currentColor"
-         />
+         <rect width="24" height="1" transform="matrix(-1 0 0 1 24 11)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 2 12)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 2 10)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 3 9)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 4 8)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 5 7)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 6 6)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 7 5)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 8 4)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 9 3)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 10 2)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 3 13)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 4 14)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 5 15)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 6 16)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 7 17)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 8 18)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 9 19)" />
+         <rect width="1" height="1" transform="matrix(-1 0 0 1 10 20)" />
        </>
      | ArrowRightMedium =>
        <>
@@ -302,38 +191,10 @@ let make = (~kind, ~size=1.5) => {
            transform="rotate(90 15 16)"
            fill="currentColor"
          />
-         <rect
-           x="15"
-           y="6"
-           width="1"
-           height="1"
-           transform="rotate(90 15 6)"
-           fill="currentColor"
-         />
-         <rect
-           x="16"
-           y="7"
-           width="1"
-           height="1"
-           transform="rotate(90 16 7)"
-           fill="currentColor"
-         />
-         <rect
-           x="17"
-           y="8"
-           width="1"
-           height="1"
-           transform="rotate(90 17 8)"
-           fill="currentColor"
-         />
-         <rect
-           x="18"
-           y="9"
-           width="1"
-           height="1"
-           transform="rotate(90 18 9)"
-           fill="currentColor"
-         />
+         <rect x="15" y="6" width="1" height="1" transform="rotate(90 15 6)" />
+         <rect x="16" y="7" width="1" height="1" transform="rotate(90 16 7)" />
+         <rect x="17" y="8" width="1" height="1" transform="rotate(90 17 8)" />
+         <rect x="18" y="9" width="1" height="1" transform="rotate(90 18 9)" />
          <rect
            x="19"
            y="10"
@@ -344,22 +205,17 @@ let make = (~kind, ~size=1.5) => {
          />
        </>
      | ArrowRightSmall =>
-       <svg
-         width="16"
-         height="16"
-         viewBox="0 0 16 16"
-         fill="currentColor"
-         xmlns="http://www.w3.org/2000/svg">
-         <rect x="3" y="7" width="10" height="1" fill="currentColor" />
-         <rect x="11" y="6" width="1" height="1" fill="currentColor" />
-         <rect x="10" y="5" width="1" height="1" fill="currentColor" />
-         <rect x="9" y="4" width="1" height="1" fill="currentColor" />
-         <rect x="10" y="9" width="1" height="1" fill="currentColor" />
-         <rect x="9" y="10" width="1" height="1" fill="currentColor" />
-         <rect x="11" y="8" width="1" height="1" fill="currentColor" />
-       </svg>
+       <>
+         <rect x="7" y="11.5" width="10" height="1" />
+         <rect x="15" y="10.5" width="1" height="1" />
+         <rect x="14" y="9.5" width="1" height="1" />
+         <rect x="13" y="8.5" width="1" height="1" />
+         <rect x="14" y="13.5" width="1" height="1" />
+         <rect x="13" y="14.5" width="1" height="1" />
+         <rect x="15" y="12.5" width="1" height="1" />
+       </>
      | ChevronDownLarge =>
-       <svg>
+       <>
          <rect x="3" y="8" width="1" height="1" fill="currentColor" />
          <rect x="4" y="9" width="1" height="1" fill="currentColor" />
          <rect x="5" y="10" width="1" height="1" fill="currentColor" />
@@ -379,9 +235,9 @@ let make = (~kind, ~size=1.5) => {
          <rect x="19" y="10" width="1" height="1" fill="currentColor" />
          <rect x="20" y="9" width="1" height="1" fill="currentColor" />
          <rect x="21" y="8" width="1" height="1" fill="currentColor" />
-       </svg>
+       </>
      | ChevronDown =>
-       <svg>
+       <>
          <rect x="14.5" y="11" width="1" height="1" fill="currentColor" />
          <rect x="13.5" y="12" width="1" height="1" fill="currentColor" />
          <rect x="15.5" y="10" width="1" height="1" fill="currentColor" />
@@ -393,7 +249,7 @@ let make = (~kind, ~size=1.5) => {
          <rect x="10.5" y="13" width="1" height="1" fill="currentColor" />
          <rect x="12.5" y="13" width="1" height="1" fill="currentColor" />
          <rect x="11.5" y="14" width="1" height="1" fill="currentColor" />
-       </svg>
+       </>
      | ChevronUp =>
        <>
          <rect
@@ -596,10 +452,7 @@ let make = (~kind, ~size=1.5) => {
          d="M17 7H16H15H14H13V8H14H15V9H14V10H13V11H12V12H11V13H10V14H11V13H12V12H13V11H14V10H15V9H16V10V11H17V10V9V8V7ZM7 9H8H11V10H8V16H14V13H15V16V17H14H8H7V16V10V9Z"
          fill="currentColor"
        />
-     | BulletPoint =>
-       <svg>
-         <rect x="9" y="9" width="6" height="6" rx="3" fill="currentColor" />
-       </svg>
+     | BulletPoint => <rect x="9" y="9" width="6" height="6" rx="3" />
      | ArrowRightLarge =>
        <>
          <rect y="11" width="24" height="1" fill="currentColor" />
@@ -625,13 +478,8 @@ let make = (~kind, ~size=1.5) => {
      | Copy =>
        <>
          <rect x="9.5" y="6.5" width="9" height="13" stroke="#2D2D2D" />
-         <rect x="7" y="3" width="10" height="1" fill="currentColor" />
-         <rect
-           width="1"
-           height="15"
-           transform="matrix(1 0 0 -1 6 18)"
-           fill="currentColor"
-         />
+         <rect x="7" y="3" width="10" height="1" />
+         <rect width="1" height="15" transform="matrix(1 0 0 -1 6 18)" />
        </>
      | NodeOperators =>
        <>
@@ -641,60 +489,76 @@ let make = (~kind, ~size=1.5) => {
            width="23"
            height="23"
            rx="0.5"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
          />
-         <path d="M5.4 8.40002L9 12L5.4 15.6" stroke="#2D2D2D" />
-         <line x1="10.8" y1="15.1" x2="18.6" y2="15.1" stroke="#2D2D2D" />
+         <path
+           d="M5.4 8.40002L9 12L5.4 15.6"
+           fill="none"
+           stroke="currentColor"
+         />
+         <line
+           x1="10.8"
+           y1="15.1"
+           x2="18.6"
+           y2="15.1"
+           fill="none"
+           stroke="currentColor"
+         />
        </>
      | Developers =>
        <>
-         <path d="M18 7.19995L22.8 12L18 16.7999" stroke="#2D2D2D" />
+         <path
+           d="M18 7.19995L22.8 12L18 16.7999"
+           fill="none"
+           stroke="currentColor"
+         />
          <path
            d="M6.00001 7.19995L1.20001 12L6.00001 16.7999"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
          />
          <line
            x1="16.0535"
            y1="3.81053"
            x2="8.25348"
            y2="20.6105"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
          />
        </>
      | Documentation =>
        <>
-         <mask id="path-1-inside-1" fill="white">
-           <rect x="4" y="4" width="36" height="36" rx="1" />
-         </mask>
-         <rect
-           x="4"
-           y="4"
-           width="36"
-           height="36"
-           rx="1"
-           fill="#FF603B"
-           stroke="white"
-           strokeWidth="3"
-           mask="url(#path-1-inside-1)"
-         />
-         <mask id="path-2-inside-2" fill="white">
-           <rect width="36" height="36" rx="1" />
-         </mask>
-         <rect
-           width="36"
-           height="36"
-           rx="1"
-           fill="#FF603B"
-           stroke="white"
-           strokeWidth="3"
-           mask="url(#path-2-inside-2)"
-         />
-         <path
-           fillRule="evenodd"
-           clipRule="evenodd"
-           d="M28 8H8V9.5H28V8ZM25 14H8V15.5H25V14ZM8 20H28V21.5H8V20ZM21 26H8V27.5H21V26Z"
-           fill="white"
-         />
+         <g clipPath="url(#clip0)">
+           <rect
+             x="2.90002"
+             y="2.90002"
+             width="20.6"
+             height="20.6"
+             rx="0.5"
+             fill="none"
+             stroke="currentColor"
+           />
+           <rect
+             x="0.5"
+             y="0.5"
+             width="20.6"
+             height="20.6"
+             rx="0.5"
+             fill="none"
+             stroke="currentColor"
+           />
+           <path
+             fillRule="evenodd"
+             clipRule="evenodd"
+             d="M16.8 4.80005H4.79999V5.70005H16.8V4.80005ZM15 8.40005H4.79999V9.30005H15V8.40005ZM4.79999 12H16.8V12.9H4.79999V12ZM12.6 15.6H4.79999V16.5H12.6V15.6Z"
+           />
+         </g>
+         <defs>
+           <clipPath id="clip0">
+             <rect width="24" height="24" fill="none" />
+           </clipPath>
+         </defs>
        </>
      | GenesisProgram =>
        <>
@@ -708,29 +572,11 @@ let make = (~kind, ~size=1.5) => {
              stroke="#2D2D2D"
            />
            <line x1="1" y1="11.5" x2="23" y2="11.5" stroke="#2D2D2D" />
-           <ellipse
-             cx="19.2353"
-             cy="3.91768"
-             rx="1.8"
-             ry="1.8"
-             fill="currentColor"
-           />
-           <circle cx="22.2" cy="16.8" r="1.8" fill="currentColor" />
-           <ellipse
-             cx="1.8"
-             cy="6.74116"
-             rx="1.8"
-             ry="1.8"
-             fill="currentColor"
-           />
-           <circle cx="22.2" cy="16.8" r="1.8" fill="currentColor" />
-           <ellipse
-             cx="1.8"
-             cy="6.74116"
-             rx="1.8"
-             ry="1.8"
-             fill="currentColor"
-           />
+           <ellipse cx="19.2353" cy="3.91768" rx="1.8" ry="1.8" />
+           <circle cx="22.2" cy="16.8" r="1.8" />
+           <ellipse cx="1.8" cy="6.74116" rx="1.8" ry="1.8" />
+           <circle cx="22.2" cy="16.8" r="1.8" />
+           <ellipse cx="1.8" cy="6.74116" rx="1.8" ry="1.8" />
            <path
              d="M11.4 1.8C11.4 2.79411 10.5941 3.6 9.59999 3.6C8.60588 3.6 7.79999 2.79411 7.79999 1.8C7.79999 0.805887 8.60588 0 9.59999 0C10.5941 0 11.4 0.805887 11.4 1.8Z"
              fill="currentColor"
@@ -742,14 +588,9 @@ let make = (~kind, ~size=1.5) => {
              ry="1.8"
              fill="currentColor"
            />
-           <ellipse
-             cx="3.00001"
-             cy="18.6"
-             rx="1.8"
-             ry="1.8"
-             fill="currentColor"
-           />
-           <ellipse cx="12" cy="11.4" rx="1.8" ry="1.8" fill="currentColor" />
+           <ellipse cx="13.8" cy="22.2" rx="1.8" ry="1.8" />
+           <ellipse cx="3.00001" cy="18.6" rx="1.8" ry="1.8" />
+           <ellipse cx="12" cy="11.4" rx="1.8" ry="1.8" />
          </g>
          <defs>
            <clipPath id="clip0">
@@ -780,11 +621,13 @@ let make = (~kind, ~size=1.5) => {
            width="23"
            height="23"
            rx="11.5"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
          />
          <path
            d="M6.59998 12.28L11.46 16.2001L17.4 7.80005"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
            strokeLinecap="round"
          />
        </>
@@ -844,7 +687,7 @@ let make = (~kind, ~size=1.5) => {
            stroke="currentColor"
          />
          <line x1="1" y1="12.5" x2="23" y2="12.5" stroke="currentColor" />
-       </svg>
+       </>
      | TechnicalGrants =>
        <>
          <g>
@@ -941,13 +784,7 @@ let make = (~kind, ~size=1.5) => {
            d="M18.1 14.1C18.1 17.6346 15.2347 20.5 11.7 20.5C8.16543 20.5 5.30005 17.6346 5.30005 14.1C5.30005 10.5653 8.16543 7.69995 11.7 7.69995C15.2347 7.69995 18.1 10.5653 18.1 14.1Z"
            stroke="#2D2D2D"
          />
-         <rect
-           x="4.80005"
-           y="13.7999"
-           width="13.8"
-           height="1"
-           fill="currentColor"
-         />
+         <rect x="4.80005" y="13.7999" width="13.8" height="1" />
          <path
            d="M14.5 14.1C14.5 15.9475 14.1408 17.5957 13.5824 18.7633C13.0065 19.9674 12.3081 20.5 11.7 20.5C11.0919 20.5 10.3936 19.9674 9.81764 18.7633C9.25923 17.5957 8.90002 15.9475 8.90002 14.1C8.90002 12.2524 9.25923 10.6042 9.81764 9.43664C10.3936 8.23246 11.0919 7.69995 11.7 7.69995C12.3081 7.69995 13.0065 8.23246 13.5824 9.43664C14.1408 10.6042 14.5 12.2524 14.5 14.1Z"
            stroke="#2D2D2D"
@@ -955,27 +792,9 @@ let make = (~kind, ~size=1.5) => {
        </>
      | BurgerMenu =>
        <>
-         <rect
-           x="2.40002"
-           y="7.19995"
-           width="19.2"
-           height="1"
-           fill="currentColor"
-         />
-         <rect
-           x="2.40002"
-           y="11.4"
-           width="19.2"
-           height="1"
-           fill="currentColor"
-         />
-         <rect
-           x="2.40002"
-           y="15.6"
-           width="19.2"
-           height="1"
-           fill="currentColor"
-         />
+         <rect x="2.40002" y="7.19995" width="19.2" height="1" />
+         <rect x="2.40002" y="11.4" width="19.2" height="1" />
+         <rect x="2.40002" y="15.6" width="19.2" height="1" />
        </>
      | CloseMenu =>
        <>
@@ -990,10 +809,15 @@ let make = (~kind, ~size=1.5) => {
        <>
          <path
            d="M12 3L3 6.375V17.625L12 21L21 17.625V6.375L12 3Z"
-           stroke="#2D2D2D"
+           fill="none"
+           stroke="currentColor"
          />
-         <path d="M3 6.375L12 9.75L21 6.375" stroke="#2D2D2D" />
-         <path d="M12 9.75V21" stroke="#2D2D2D" />
+         <path
+           d="M3 6.375L12 9.75L21 6.375"
+           fill="none"
+           stroke="currentColor"
+         />
+         <path d="M12 9.75V21" fill="none" stroke="currentColor" />
        </>
      }}
   </svg>;

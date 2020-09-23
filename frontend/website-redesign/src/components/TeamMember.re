@@ -2,12 +2,7 @@ module Styles = {
   open Css;
   let memberContainer =
     style([height(`rem(17.)), width(`rem(11.)), color(orange)]);
-  let image =
-    style([
-      width(`rem(10.)),
-      marginBottom(`rem(1.)),
-      media(Theme.MediaQuery.desktop, [width(`rem(11.))]),
-    ]);
+  let image = style([width(`rem(10.)), marginBottom(`rem(1.))]);
   let name =
     merge([
       Theme.Type.h5,
