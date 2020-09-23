@@ -10,8 +10,14 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
+  "async"
   "core"
   "dune"
+  "pickles"
+  "base64"
+  "ppx_deriving_yojson"
+  "ppx_sexp_conv"
+  "ppx_let"
 ]
 synopsis: "Runner for coda snapp transactions"
 description: "
