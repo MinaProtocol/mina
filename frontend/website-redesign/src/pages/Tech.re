@@ -8,9 +8,13 @@ module Styles = {
       borderTop(`px(1), `solid, black),
       margin2(~v=`rem(6.5), ~h=`auto),
       paddingTop(`rem(3.)),
-      paddingLeft(`rem(18.)),
       backgroundPosition(`rem(-6.5), `rem(-2.)),
+      gridTemplateColumns([`em(14.), `auto]),
+      selector("> aside", [gridColumnStart(1)]),
+      selector("> :not(aside)", [gridColumnStart(2)]),
     ]);
+
+  let sideNav = style([position(`sticky), top(`zero), gridRowStart(1)]);
 };
 
 module Section = {
@@ -29,6 +33,12 @@ module Section = {
 [@react.component]
 let make = () => {
   let router = Next.Router.useRouter();
+  let hashExp = Js.Re.fromString("#(.+)");
+  let hash =
+    Js.Re.(exec_(hashExp, router.asPath) |> Option.map(captures))
+    |> Js.Option.andThen((. res) => Js.Nullable.toOption(res[0]))
+    |> Js.Option.getWithDefault("");
+  Js.log(hash);
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
     <div className=Nav.Styles.spacer />
     <Hero
@@ -36,13 +46,14 @@ let make = () => {
       header="An Elegant Solution"
       copy="Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale."
     />
-    <SideNav currentSlug={"#" ++ router.route}>
-      <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
-    </SideNav>
     <Section
       title="How Mina Works"
       subhead={js|Mina is a layer one protocol designed to deliver on the original promise of blockchain — true decentralization, scale and security.|js}
       slug="how-mina-works">
+      <SideNav currentSlug=hash className=Styles.sideNav>
+        <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
+        <SideNav.Item title="Projects & Possibilities" slug="#projects" />
+      </SideNav>
       <img
         src="/static/img/how-mina-works-mirrors.jpg"
         height="563"
@@ -154,6 +165,12 @@ let make = () => {
            )}
         </b>
       </p>
+    </Section>
+    <Section
+      title="Projects & Possibilities"
+      subhead={js|Developers are already building powerful applications on Mina — but this is just the beginning.|js}
+      slug="projects">
+      <p className=Theme.Type.paragraph> {React.string("Built on Mina")} </p>
     </Section>
   </Page>;
 };
