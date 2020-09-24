@@ -85,7 +85,7 @@ let currency_consumed :
         let open Snapp_command.Party in
         let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
             (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
-            token_id fee_payment =
+            token_id (fee_payment : Coda_base.Other_fee_payer.t option) =
           let fee_payer =
             match fee_payment with
             | Some {public_key; token_id; _} ->
