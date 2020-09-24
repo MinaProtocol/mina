@@ -2205,13 +2205,11 @@ module Types = struct
                     Snapp_command_input.Authorization.Proved
                       (snapp_predicate, control)
                 | None ->
-                    let signature =
-                      (* TODO: Bubble this error up to the command and handle
-                         it there, rather than silencing it.
-                      *)
-                      Option.value ~default:Signature.dummy signature
-                    in
-                    Snapp_command_input.Authorization.Signed signature
+                    Snapp_command_input.Authorization.Signed
+                      (Option.value_map
+                         ~default:Snapp_command_input.Sign_choice.Other
+                         ~f:(fun s -> Signature s)
+                         signature)
               in
               let delta =
                 let magnitude =
@@ -2242,7 +2240,9 @@ module Types = struct
         let secondParty =
           obj "secondParty"
             ~doc:"The secondary account involved in a snapp transaction"
-            ~coerce:(fun pk update delta proof signature snapp_predicate ->
+            ~coerce:
+              (fun pk update delta proof signature generate_signature
+                   snapp_predicate ->
               match pk with
               | None ->
                   Snapp_command_input.Second_party.Not_given
@@ -2265,10 +2265,14 @@ module Types = struct
                         Some
                           (Snapp_command_input.Authorization.Proved
                              (snapp_predicate, control))
-                    | None ->
-                        Option.map signature ~f:(fun signature ->
-                            Snapp_command_input.Authorization.Signed signature
-                        )
+                    | None -> (
+                      match (signature, generate_signature) with
+                      | Some signature, _ ->
+                          Some (Signed (Signature signature))
+                      | None, Some true ->
+                          Some (Signed Other)
+                      | None, (None | Some false) ->
+                          None )
                   in
                   let delta =
                     let magnitude =
@@ -2295,6 +2299,11 @@ module Types = struct
               ; arg "signature"
                   ~doc:"A signature to authorize the account update"
                   ~typ:signature_arg
+              ; arg "generateSignature"
+                  ~doc:
+                    "Whether to generate a signature in the daemon (default \
+                     false)"
+                  ~typ:bool
               ; arg "predicate"
                   ~doc:"The predicate that applies to the account update"
                   ~typ:snappPredicate ]

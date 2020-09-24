@@ -1,7 +1,20 @@
 open Core_kernel
 open Async
 open Coda_numbers
+open Signature_lib
 open Coda_base
+
+module Sign_choice = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Signature of Signature.Stable.V1.t | Other
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
 
 module Authorization = struct
   [%%versioned
@@ -9,8 +22,7 @@ module Authorization = struct
     module V1 = struct
       type t =
         | Proved of Snapp_predicate.Stable.V1.t * Control.Stable.V1.t
-        | Signed of Signature.Stable.V1.t (* TODO: Sign choice, like in
-                                             User_command_input *)
+        | Signed of Sign_choice.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -64,6 +76,22 @@ end]
 [%%define_locally
 Stable.Latest.(to_yojson)]
 
+let sign ~find_identity ~signer ~(snapp_command : Snapp_command.t) = function
+  | Sign_choice.Signature signature ->
+      Deferred.Result.return signature
+  | Other -> (
+    match find_identity ~needle:signer with
+    | None ->
+        Deferred.Result.fail
+          "Couldn't find an unlocked key for specified `sender`. Did you \
+           unlock the account you're making a transaction from?"
+    | Some (`Keypair {Keypair.private_key; _}) ->
+        Deferred.Result.return (Snapp_command.sign snapp_command private_key)
+    | Some (`Hd_index hd_index) ->
+        Secrets.Hardware_wallets.sign_snapp ~hd_index
+          ~public_key:(Public_key.decompress_exn signer)
+          ~snapp_payload_digest:(Snapp_command.payload_digest snapp_command) )
+
 (* TODO: Deduplicate with User_command_input *)
 let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
   let open Result.Let_syntax in
@@ -80,29 +108,38 @@ let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
       (txn_pool_or_account_nonce, updated_map)
 
 let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ({token_id; fee_payment; one; two} as snapp_input : t) :
-    (Snapp_command.t * Account_nonce.t Account_id.Map.t, _) Result.t =
-  Result.map_error ~f:(fun str ->
+    ~find_identity ({token_id; fee_payment; one; two} as snapp_input : t) :
+    (Snapp_command.t * Account_nonce.t Account_id.Map.t, _) Deferred.Result.t =
+  Deferred.Result.map_error ~f:(fun str ->
       Error.createf "Error creating snapp command: %s Error: %s"
         (Yojson.Safe.to_string (to_yojson snapp_input))
         str )
   @@
-  let open Result.Let_syntax in
+  let open Deferred.Result.Let_syntax in
   let empty body : Snapp_command.Party.Authorized.Empty.t =
     {data= {body; predicate= ()}; authorization= ()}
   in
   let proved body predicate control : Snapp_command.Party.Authorized.Proved.t =
     {data= {body; predicate}; authorization= control}
   in
-  let signed ?(nonce_map = nonce_map) (body : Snapp_command.Party.Body.t)
-      signature =
-    let%map nonce, nonce_map =
-      inferred_nonce ~get_current_nonce ~nonce_map
-        ~account_id:(Account_id.create body.pk token_id)
+  let signed ?(nonce_map = nonce_map) ~sign (body : Snapp_command.Party.Body.t)
+      sign_choice =
+    let%bind authorization = sign ~signer:body.pk sign_choice in
+    Deferred.return
+    @@ let%map.Result.Let_syntax nonce, nonce_map =
+         inferred_nonce ~get_current_nonce ~nonce_map
+           ~account_id:(Account_id.create body.pk token_id)
+       in
+       ( ( {data= {body; predicate= nonce}; authorization}
+           : Snapp_command.Party.Authorized.Signed.t )
+       , nonce_map )
+  in
+  (* TODO: Make this less bad. *)
+  let sign_payload ~f =
+    let%bind snapp_command, _ =
+      f ~sign:(fun ~signer:_ _ -> Deferred.Result.return Signature.dummy)
     in
-    ( ( {data= {body; predicate= nonce}; authorization= signature}
-        : Snapp_command.Party.Authorized.Signed.t )
-    , nonce_map )
+    f ~sign:(sign ~find_identity ~snapp_command)
   in
   match (one, two) with
   | {body; predicate= Proved (predicate, control)}, Not_given ->
@@ -131,30 +168,37 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
             ; two= proved body2 predicate2 control2 }
         , nonce_map )
   | ( {body= body1; predicate= Proved (predicate, control)}
-    , Existing {body= body2; predicate= Signed signature} )
-  | ( {body= body2; predicate= Signed signature}
+    , Existing {body= body2; predicate= Signed sign_choice} )
+  | ( {body= body2; predicate= Signed sign_choice}
     , Existing {body= body1; predicate= Proved (predicate, control)} ) ->
-      let%map two, nonce_map = signed body2 signature in
-      ( Snapp_command.Proved_signed
-          {token_id; fee_payment; one= proved body1 predicate control; two}
-      , nonce_map )
-  | {body; predicate= Signed signature}, Not_given ->
-      let%map one, nonce_map = signed body signature in
-      ( Snapp_command.Signed_empty {token_id; fee_payment; one; two= None}
-      , nonce_map )
-  | {body= body1; predicate= Signed signature}, New body2 ->
-      let%map one, nonce_map = signed body1 signature in
-      ( Snapp_command.Signed_empty
-          {token_id; fee_payment; one; two= Some (empty body2)}
-      , nonce_map )
-  | ( {body= body1; predicate= Signed signature1}
-    , Existing {body= body2; predicate= Signed signature2} ) ->
-      let%bind one, nonce_map = signed body1 signature1 in
-      let%map two, nonce_map = signed ~nonce_map body2 signature2 in
-      (Snapp_command.Signed_signed {token_id; fee_payment; one; two}, nonce_map)
+      sign_payload ~f:(fun ~sign ->
+          let%map two, nonce_map = signed ~sign body2 sign_choice in
+          ( Snapp_command.Proved_signed
+              {token_id; fee_payment; one= proved body1 predicate control; two}
+          , nonce_map ) )
+  | {body; predicate= Signed sign_choice}, Not_given ->
+      sign_payload ~f:(fun ~sign ->
+          let%map one, nonce_map = signed ~sign body sign_choice in
+          ( Snapp_command.Signed_empty {token_id; fee_payment; one; two= None}
+          , nonce_map ) )
+  | {body= body1; predicate= Signed sign_choice}, New body2 ->
+      sign_payload ~f:(fun ~sign ->
+          let%map one, nonce_map = signed ~sign body1 sign_choice in
+          ( Snapp_command.Signed_empty
+              {token_id; fee_payment; one; two= Some (empty body2)}
+          , nonce_map ) )
+  | ( {body= body1; predicate= Signed sign_choice1}
+    , Existing {body= body2; predicate= Signed sign_choice2} ) ->
+      sign_payload ~f:(fun ~sign ->
+          let%bind one, nonce_map = signed ~sign body1 sign_choice1 in
+          let%map two, nonce_map =
+            signed ~nonce_map ~sign body2 sign_choice2
+          in
+          ( Snapp_command.Signed_signed {token_id; fee_payment; one; two}
+          , nonce_map ) )
 
 let to_snapp_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    uc_inputs : Snapp_command.t list Deferred.Or_error.t =
+    ~find_identity uc_inputs : Snapp_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
       one of them.
@@ -164,8 +208,8 @@ let to_snapp_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     Deferred.Or_error.List.fold ~init:([], nonce_map) uc_inputs
       ~f:(fun (valid_snapp_commands, nonce_map) uc_input ->
         let%map res, updated_nonce_map =
-          let%map.Async () = Async.Scheduler.yield () in
-          to_snapp_command ~nonce_map ~get_current_nonce uc_input
+          to_snapp_command ~nonce_map ~get_current_nonce ~find_identity
+            uc_input
         in
         (res :: valid_snapp_commands, updated_nonce_map) )
   in

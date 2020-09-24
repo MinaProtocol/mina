@@ -1040,6 +1040,10 @@ let create (config : Config.t) =
                     result_cb (Error e) ;
                     Deferred.unit )
           in
+          let%bind wallets =
+            Secrets.Wallets.load ~logger:config.logger
+              ~disk_location:config.wallets_disk_location
+          in
           (* Redirect user command and snapp command inputs to the network
              pool.
           *)
@@ -1048,7 +1052,9 @@ let create (config : Config.t) =
             ~to_transaction:(fun c -> User_command.Signed_command c)
           |> Deferred.don't_wait_for ;
           command_to_network_pool snapp_command_input_reader
-            ~from_input:(Snapp_command_input.to_snapp_commands ?nonce_map:None)
+            ~from_input:
+              (Snapp_command_input.to_snapp_commands ?nonce_map:None
+                 ~find_identity:(Secrets.Wallets.find_identity wallets))
             ~to_transaction:(fun c -> User_command.Snapp_command c)
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
@@ -1230,10 +1236,6 @@ let create (config : Config.t) =
               ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
-          in
-          let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
