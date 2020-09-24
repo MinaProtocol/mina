@@ -2,39 +2,34 @@
 
 This chart bootstraps a Buildkite GraphQL API metrics exporter providing job and agent statistics to a Prometheus compatible endpoint.
 
-## Add Buildkite Exporter Helm chart repository:
+## Add Coda Helm chart repository:
 
  ```console
- helm repo add buildkite <insert>
+ helm repo add coda <insert-repository-url>
  helm repo update
  ```
 
-## Installing the Chart
-
-In order for the chart to configure the Buildkite exporter properly during the installation process, you must provide some minimal configuration which can't rely on defaults:
-
-To install the chart with the release name `bk-exporter`:
-
-```console
-helm install --name bk-exporter --namespace buildkite codaprotocol/buildkite-exporter \
-    --set exporter.buildkiteApiKey="BUILDKITE_API_KEY"
-```
-
 ## Configuration
 
-The following table lists the configurable parameters of the `buildkite-exporter` chart and their default values.
+The following table lists the configurable parameters of the `buildkite-exporter` chart and its default values.
+
+## Required Settings
+
+Parameter | Description
+--- | --- | ---
+`exporter.buildkiteApiKey` | Buildkite GraphQL API access key
+
+### Optional Settings
 
 Parameter | Description | Default
 --- | --- | ---
-`replicaCount` | Replicas count | 1
+`exporter.pipeline` | Buildkite pipeline to scrape and export | coda
+`exporter.image` | Buildkite exporter container image to deploy | codaprotocol/buildkite-exporter:0.1.0
+`exporter.listeningPort` | port on which to listen for data collection requests | 8000
+`exporter.optionalEnv` | optional environment variable configuration settings | []
 
 ## buildkite-exporter launch examples
 
-
-## Uninstalling the Chart
-
-To uninstall/delete the `bk-exporter` release:
-
 ```console
-helm delete bk-exporter
+helm install buildkite-exporter --set exporter.buildkiteApiKey=<api-key>,exporter.optionalEnv=[{'name': 'BUILDKITE_BRANCH', 'value': 'release'}]
 ```

@@ -10,5 +10,5 @@ spec:
   ports:
   - name: metric-collection
     protocol: TCP
-    port: {{ $.Values.exporter.listening_port }}
-    targetPort: {{ $.Values.exporter.listening_port }}
+    port: {{ $.Values.exporter.listeningPort }}
+    targetPort: {{ $.Values.exporter.listeningPort }}

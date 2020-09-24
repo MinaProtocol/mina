@@ -16,7 +16,7 @@ spec:
         pipeline: {{ $.Values.exporter.pipeline }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ $.Values.exporter.listening_port | quote }}
+        prometheus.io/port: {{ $.Values.exporter.listeningPort | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -35,7 +35,7 @@ spec:
 {{ toYaml .Values.exporter.optionalEnv | nindent 10 }}
 {{- end }}
         ports:
-        - containerPort: {{ .Values.exporter.listening_port }}
-          hostPort: {{ .Values.exporter.listening_port }}
+        - containerPort: {{ .Values.exporter.listeningPort }}
+          hostPort: {{ .Values.exporter.listeningPort }}
           protocol: TCP
         imagePullPolicy: Always
