@@ -1,5 +1,6 @@
 exporter:
-  name: buildkite-coda-exporter
+  pipeline: coda
+  name: "buildkite-{{ .Values.exporter.pipeline }}-exporter"
   image: codaprotocol/buildkite-exporter:0.1.0
   listening_port: 8000
   optionalEnv:
