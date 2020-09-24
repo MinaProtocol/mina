@@ -48,9 +48,11 @@ module Styles = {
   let activeMembers =
     style([
       position(`absolute),
-      right(`zero),
+      bottom(`zero),
+      right(`rem(35.5)),
       height(`rem(9.375)),
       zIndex(99),
+      width(`rem(8.375)),
     ]);
   let number =
     style([
@@ -58,6 +60,7 @@ module Styles = {
       fontSize(`rem(4.)),
       lineHeight(`rem(4.)),
     ]);
+  let mintNumber = merge([number, style([color(Theme.Colors.mint)])]);
   let label =
     merge([
       Theme.Type.label,
@@ -67,6 +70,8 @@ module Styles = {
         letterSpacing(`em(0.03)),
       ]),
     ]);
+  let icon = style([color(white)]);
+  let whiteLabel = merge([label, style([color(white)])]);
 };
 [@react.component]
 let make = () => {
@@ -88,7 +93,9 @@ let make = () => {
               {React.string("Genesis Spots Remaining")}
             </span>
           </div>
-          <Icon kind=Icon.GenesisProgram size=6.25 />
+          <span className=Styles.icon>
+            <Icon kind=Icon.GenesisProgram size=6.25 />
+          </span>
         </div>
       </>
       <>
@@ -96,6 +103,12 @@ let make = () => {
           className=Styles.worldMapImage
           src="/static/svg/World_Map_Illustration.svg"
         />
+        <div className=Styles.activeMembers>
+          <p className=Styles.mintNumber> {React.string("150")} </p>
+          <span className=Styles.whiteLabel>
+            {React.string("Active Genesis Members")}
+          </span>
+        </div>
       </>
     </div>
   </Wrapped>;
