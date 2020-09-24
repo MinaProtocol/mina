@@ -81,12 +81,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~title, ~header, ~copy) => {
+let make = (~title, ~header, ~copy, ~children=?) => {
   <div className=Styles.heroContainer>
     <div className=Styles.heroContent>
       <h4 className=Styles.headerLabel> {React.string(title)} </h4>
       <h1 className=Styles.header> {React.string(header)} </h1>
       <p className=Styles.headerCopy> {React.string(copy)} </p>
+      {switch (children) {
+       | Some(children) => children
+       | None => React.null
+       }}
     </div>
   </div>;
 };
