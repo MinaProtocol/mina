@@ -90,12 +90,13 @@ let currency_consumed :
             x1.data.body
             :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
           in
-          List.find_map_exn ps ~f:(fun p ->
+          List.find_map ps ~f:(fun p ->
               match p.delta.sgn with
               | Pos ->
                   None
               | Neg ->
                   Some p.delta.magnitude )
+          |> Option.value ~default:Currency.Amount.zero
         in
         match c with
         | Proved_proved r ->
