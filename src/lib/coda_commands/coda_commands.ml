@@ -157,7 +157,7 @@ let setup_and_submit_snapp_command t
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [failed_txn]) ->
-      Or_error.error_string !"%s"
+      Or_error.error_string
         ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error.to_yojson
             (snd failed_txn)
         |> Yojson.Safe.to_string )
