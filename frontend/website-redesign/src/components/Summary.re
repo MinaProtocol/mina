@@ -33,10 +33,10 @@ let fetchStatistics = () => {
 
 module Styles = {
   open Css;
-
+  let container = style([marginTop(`rem(5.))]);
   let header =
     merge([
-      Theme.H1.basic,
+      Theme.Type.h1,
       style([
         marginTop(`zero),
         fontSize(`rem(3.)),
@@ -50,21 +50,20 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       paddingTop(`rem(2.8)),
-      media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
-        Theme.MediaQuery.veryVeryLarge,
+        Theme.MediaQuery.desktop,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
       ),
     ]);
 
   let heroH3 =
     merge([
-      Theme.Body.big_semibold,
+      Theme.Type.paragraphSmall,
       style([
         display(none),
         textAlign(`left),
-        fontWeight(`semiBold),
-        color(Theme.Colors.leaderboardMidnight),
+        fontWeight(`normal),
+        color(Theme.Colors.black),
         media(
           Theme.MediaQuery.notMobile,
           [
@@ -76,22 +75,20 @@ module Styles = {
       ]),
     ]);
 
-  let asterisk =
-    merge([
-      Theme.Body.basic,
-      style([
-        display(none),
-        media(Theme.MediaQuery.notMobile, [display(`inline)]),
-      ]),
-    ]);
   let disclaimer =
     merge([
-      Theme.Body.basic_small,
+      Theme.Type.paragraphSmall,
       style([
         marginTop(`rem(3.6)),
+        color(Theme.Colors.greyScale),
         media(
           Theme.MediaQuery.notMobile,
-          [display(`inline), marginTop(`rem(4.6))],
+          [
+            display(`inline),
+            marginTop(`rem(4.6)),
+            important(fontSize(`px(13))),
+            lineHeight(`rem(1.)),
+          ],
         ),
       ]),
     ]);
@@ -111,7 +108,7 @@ module Styles = {
     style([
       media(Theme.MediaQuery.tablet, [marginBottom(`rem(3.))]),
       media(
-        Theme.MediaQuery.veryVeryLarge,
+        Theme.MediaQuery.desktop,
         [maxWidth(`rem(38.)), marginRight(`rem(7.))],
       ),
     ]);
@@ -133,20 +130,27 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`center),
+      justifyContent(`flexStart),
     ]);
 
   let heroLinks =
     style([
       media(
         Theme.MediaQuery.notMobile,
-        [padding2(~v=`rem(0.), ~h=`rem(6.0)), width(`rem(25.))],
+        [position(`absolute), top(`rem(7.)), left(`zero)],
       ),
     ]);
 
-  let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
+  let link =
+    merge([
+      Theme.Type.link,
+      style([lineHeight(`px(28)), color(Theme.Colors.orange)]),
+    ]);
   let updatedDate =
-    merge([Theme.Body.basic, style([color(Theme.Colors.teal)])]);
+    merge([
+      Theme.Type.h6,
+      style([color(Theme.Colors.black), marginTop(`px(12))]),
+    ]);
   let icon =
     style([marginRight(`px(8)), position(`relative), top(`px(1))]);
 };
@@ -156,13 +160,11 @@ module StatisticsRow = {
     open Css;
     let statistic =
       style([
-        Theme.Typeface.ibmplexsans,
+        Theme.Typeface.monumentGroteskMono,
         textTransform(`uppercase),
-        fontSize(`rem(1.0)),
-        color(Theme.Colors.saville),
-        letterSpacing(`px(2)),
-        fontWeight(`semiBold),
-        alignSelf(`center),
+        fontSize(`px(14)),
+        color(Theme.Colors.black),
+        letterSpacing(`em(0.03)),
       ]);
 
     let value =
@@ -170,15 +172,21 @@ module StatisticsRow = {
         statistic,
         style([
           display(`flex),
-          fontSize(`rem(2.25)),
-          justifyContent(`center),
+          media(
+            Theme.MediaQuery.tablet,
+            [
+              marginBottom(`px(3)),
+              fontSize(`rem(2.5)),
+              lineHeight(`rem(2.5)),
+            ],
+          ),
         ]),
       ]);
     let container =
       style([
         display(`flex),
         flexWrap(`wrap),
-        justifyContent(`spaceAround),
+        justifyContent(`spaceBetween),
         media(
           Theme.MediaQuery.tablet,
           [gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)])],
@@ -188,7 +196,7 @@ module StatisticsRow = {
       style([
         display(`flex),
         flexDirection(`column),
-        justifyContent(`center),
+        justifyContent(`flexStart),
       ]);
     let lastStatistic =
       merge([
@@ -203,24 +211,26 @@ module StatisticsRow = {
   let make = (~statistics) => {
     <div className=Styles.container>
       <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic> {React.string("Participants")} </h2>
-        <span className=Styles.value>
+        <div className=Styles.value>
           {React.string(statistics.participants)}
-        </span>
+        </div>
+        <h2 className=Styles.statistic> {React.string("Participants")} </h2>
       </div>
       <div className=Styles.flexColumn>
-        <h2 className=Styles.statistic> {React.string("Blocks")} </h2>
-        <span className=Styles.value>
-          {React.string(statistics.blockCount)}
-        </span>
-      </div>
-      <div className=Styles.lastStatistic>
-        <span className=Styles.statistic>
-          {React.string("Genesis Members")}
-        </span>
         <span className=Styles.value>
           {React.string(statistics.genesisMembers)}
         </span>
+        <span className=Styles.statistic>
+          {React.string("Genesis Members")}
+        </span>
+      </div>
+      <div className=Styles.lastStatistic>
+        <div className=Styles.value>
+          {React.string(statistics.blockCount)}
+        </div>
+        <h2 className=Styles.statistic>
+          {React.string("Blocks Produced")}
+        </h2>
       </div>
     </div>;
   };
@@ -232,14 +242,12 @@ module HeroText = {
     <div>
       <p className=Styles.heroH3>
         {React.string(
-           "Coda rewards community members with testnet points* for completing challenges \
-           that contribute to the development of the protocol.",
+           "Mina rewards community members with testnet points for completing challenges that contribute to the development of the protocol.* ",
          )}
       </p>
-      <span className=Styles.asterisk> {React.string("*")} </span>
       <div className=Styles.disclaimer>
         {React.string(
-           "Testnet Points (abbreviated 'pts') are designed solely to track contributions \
+           "*Testnet Points (abbreviated 'pts') are designed solely to track contributions \
            to the Testnet and Testnet Points have no cash or other monetary value. \
            Testnet Points are not transferable and are not redeemable or exchangeable \
            for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
@@ -275,7 +283,7 @@ let make = () => {
     None;
   });
 
-  <>
+  <div className=Styles.container>
     <h1 className=Styles.header> {React.string("Testnet Leaderboard")} </h1>
     <div className=Styles.heroRow>
       <div className=Styles.heroLeft>
@@ -288,51 +296,39 @@ let make = () => {
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            link="https://bit.ly/3dNmPle"
-            label="Current Challenges"
-            bgColor=Theme.Colors.clover
-            bgColorHover=Theme.Colors.jungle
-          />
+            href="https://bit.ly/3dNmPle"
+            bgColor=Theme.Colors.black
+            width={`rem(15.)}
+            paddingX=1.5>
+            <p className=Theme.Type.buttonLabel>
+              {React.string("Current Challenges")}
+            </p>
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
           <Spacer width=2.0 height=1.0 />
-          <Button
-            link="/genesis"
-            label="Genesis Program"
-            bgColor=Theme.Colors.clover
-            bgColorHover=Theme.Colors.jungle
-          />
+          <Button bgColor=Theme.Colors.black width={`rem(13.)} paddingX=1.5>
+            <p className=Theme.Type.buttonLabel>
+              {React.string("Genesis Program")}
+            </p>
+            <Icon kind=Icon.ArrowRightMedium />
+          </Button>
         </div>
         <Spacer height=4.8 />
         <div className=Styles.heroLinks>
           <div className=Styles.flexColumn>
             <Next.Link href="https://bit.ly/leaderboardFAQ">
               <a className=Styles.link>
-                <Svg
-                  link="/static/img/Icon.Link.svg"
-                  dims=(1.0, 1.0)
-                  className=Styles.icon
-                  alt="an arrow pointing to the right with a square around it"
-                />
                 {React.string("Leaderboard FAQ")}
+                <Icon kind=Icon.Digital />
               </a>
             </Next.Link>
             <Next.Link href="https://bit.ly/CodaDiscord">
               <a className=Styles.link>
-                <Svg
-                  link="/static/img/Icon.Link.svg"
-                  dims=(0.9425, 0.8725)
-                  className=Styles.icon
-                  alt="an arrow pointing to the right with a square around it"
-                />
                 {React.string("Discord #Leaderboard Channel")}
+                <Icon kind=Icon.Digital />
               </a>
             </Next.Link>
             <span className=Styles.updatedDate>
-              <Svg
-                link="/static/img/Icon.Info.svg"
-                className=Styles.icon
-                dims=(1.0, 1.0)
-                alt="a undercase letter i inside a blue circle"
-              />
               {switch (state.statistics) {
                | Some(statistics) =>
                  let date =
@@ -348,5 +344,5 @@ let make = () => {
         </div>
       </div>
     </div>
-  </>;
+  </div>;
 };
