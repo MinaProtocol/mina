@@ -34,11 +34,6 @@ let make = () => {
   let (blogs, setBlogs) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
-    fetchBlogs() |> Promise.iter(blogs => setBlogs(_ => blogs));
-    None;
-  });
-
-  React.useEffect0(() => {
     fetchBlogs()
     |> Promise.iter(blogs => {
          let filteredBlogs =
