@@ -88,8 +88,8 @@ let currency_consumed :
             token_id (fee_payment : Coda_base.Other_fee_payer.t option) =
           let fee_payer =
             match fee_payment with
-            | Some {public_key; token_id; _} ->
-                Some (Account_id.create public_key token_id)
+            | Some {payload= {pk; token_id; _}; _} ->
+                Some (Account_id.create pk token_id)
             | None ->
                 None
           in
