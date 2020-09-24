@@ -23,8 +23,6 @@ let tests : test list =
   ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf))
   ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
 
-let to_or_error = Deferred.map ~f:Or_error.return
-
 let report_test_errors error_set =
   let open Test_error in
   let open Test_error.Set in

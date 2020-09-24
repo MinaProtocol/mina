@@ -149,10 +149,6 @@ module type Engine_intf = sig
   end
 end
 
-(** A test is a functor which produces a configuration and run function from an
- *  implementation of the DSL.
- *)
-
 module type Test_intf = sig
   type network
 
