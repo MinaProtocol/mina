@@ -1,6 +1,6 @@
 module Styles = {
   open Css;
-  let container = style([position(`relative), height(`rem(30.8))]);
+  let container = style([position(`relative), height(`rem(32.8))]);
   let text =
     style([
       position(`absolute),
@@ -36,14 +36,14 @@ module Styles = {
       display(`grid),
       gridTemplateColumns([`rem(10.75), `rem(6.25)]),
       gridColumnGap(`rem(1.)),
+      color(black),
     ]);
   let worldMapImage =
     style([
       position(`absolute),
-      right(`zero),
+      right(`rem(-5.)),
       width(`rem(50.)),
       height(`rem(30.8)),
-      zIndex(-99),
     ]);
   let activeMembers =
     style([
@@ -51,6 +51,21 @@ module Styles = {
       right(`zero),
       height(`rem(9.375)),
       zIndex(99),
+    ]);
+  let number =
+    style([
+      Theme.Typeface.monumentGrotesk,
+      fontSize(`rem(4.)),
+      lineHeight(`rem(4.)),
+    ]);
+  let label =
+    merge([
+      Theme.Type.label,
+      style([
+        important(fontSize(`px(14))),
+        important(lineHeight(`px(16))),
+        letterSpacing(`em(0.03)),
+      ]),
     ]);
 };
 [@react.component]
@@ -60,7 +75,7 @@ let make = () => {
       <>
         <div className=Styles.text>
           <h2 className=Styles.header>
-            {React.string("A Growing Community")}
+            {React.string("A Growing Global Community")}
           </h2>
           <span className=Styles.sectionSubhead>
             {React.string("See where Genesis members are around the world ->")}
@@ -68,16 +83,19 @@ let make = () => {
         </div>
         <div className=Styles.remainingSpots>
           <div>
-            <p className=Theme.Type.h2> {React.string("850")} </p>
-            <p className=Theme.Type.subheadMono>
+            <p className=Styles.number> {React.string("850")} </p>
+            <span className=Styles.label>
               {React.string("Genesis Spots Remaining")}
-            </p>
+            </span>
           </div>
+          <Icon kind=Icon.GenesisProgram size=6.25 />
         </div>
       </>
       <>
-        <img className=Styles.worldMapImage />
-        <div className=Styles.activeMembers />
+        <img
+          className=Styles.worldMapImage
+          src="/static/svg/World_Map_Illustration.svg"
+        />
       </>
     </div>
   </Wrapped>;

@@ -182,6 +182,7 @@ let make = () => {
     <div className=Styles.genesisSection>
       <FoundingMembersSection />
       <WorldMapSection />
+      <Spacer height=4./>
     </div>
   </Page>;
 };
