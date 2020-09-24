@@ -1,3 +1,12 @@
+module Styles = {
+  open Css;
+  let genesisSection =
+    style([
+      backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
+      backgroundSize(`cover),
+    ]);
+};
+
 module HowItWorksGrid = {
   module Styles = {
     open Css;
@@ -130,19 +139,6 @@ module FoundingMembersSection = {
   };
 };
 
-module WorldMapSection = {
-  module Styles = {
-    open Css;
-    let container = style([width(`percent(100.)), position(`relative)]);
-  };
-  [@react.component]
-  let make = () => {
-    <div className=Styles.container> 
-    <div className=Styles.
-    </div> 
-  };
-};
-
 [@react.component]
 let make = () => {
   <Page title="Genesis Page">
@@ -183,7 +179,9 @@ let make = () => {
       <Rule color=Theme.Colors.white />
       <Spacer height=7. />
     </FeaturedSingleRow>
-    <FoundingMembersSection />
-    <WorldMapSection />
+    <div className=Styles.genesisSection>
+      <FoundingMembersSection />
+      <WorldMapSection />
+    </div>
   </Page>;
 };
