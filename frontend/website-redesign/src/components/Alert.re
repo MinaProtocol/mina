@@ -3,13 +3,17 @@ module Styles = {
 
   let main =
     style([
-      border(px(1), `solid, Theme.Colors.digitalBlack),
+      border(px(1), `solid, Theme.Colors.digitalBlackA(0.25)),
       borderRadius(px(4)),
       overflow(`hidden),
     ]);
 
   let inner =
-    merge([style([margin(`zero), padding2(~v=`rem(0.), ~h=`rem(1.))])]);
+    merge([style([
+                 margin(`zero),
+                 padding2(~v=`rem(1.), ~h=`rem(1.)),
+                 selector("p", [ margin(`zero) ])
+    ])]);
 
   let title = c =>
     merge([

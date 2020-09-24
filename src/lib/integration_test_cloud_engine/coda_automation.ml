@@ -62,8 +62,8 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(test_config : Test_config.t)
-      ~(images : Container_images.t) =
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+      ~(test_config : Test_config.t) ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
         ; proof_level
@@ -76,7 +76,6 @@ module Network_config = struct
     in
     let testnet_name = "integration-test-" ^ test_name in
     (* HARD CODED NETWORK VALUES *)
-    let coda_automation_location = "../automation" in
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
     let cluster_name = "coda-infra-east" in
@@ -112,7 +111,7 @@ module Network_config = struct
            (List.take keypairs (List.length block_producers)))
       |> List.unzip
     in
-    (* DEAMON CONFIG *)
+    (* DAEMON CONFIG *)
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
@@ -163,7 +162,7 @@ module Network_config = struct
       ; run_with_bots= false }
     in
     (* NETWORK CONFIG *)
-    { coda_automation_location
+    { coda_automation_location= cli_inputs.coda_automation_location
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
@@ -363,8 +362,8 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    [%log' info t.logger] "Network successfully deployed" ;
-    { Kubernetes_network.constraint_constants= t.constraint_constants
+    { Kubernetes_network.namespace= t.namespace
+    ; constraint_constants= t.constraint_constants
     ; genesis_constants= t.genesis_constants
     ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names

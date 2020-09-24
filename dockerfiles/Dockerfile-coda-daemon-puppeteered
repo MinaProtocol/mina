@@ -2,8 +2,9 @@
 # this dockerfile in a production environment. See `coda_daemon_puppeteer.py`
 # for more details.
 
-ARG coda_version
-FROM codaprotocol/coda-daemon:${coda_version}
+ARG CODA_VERSION
+ARG CODA_BRANCH
+FROM codaprotocol/coda-daemon:${CODA_VERSION}
 
 RUN echo '#!/bin/bash\n\
 pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\
@@ -19,6 +20,7 @@ kill -s SIGUSR1 $(./find_puppeteer.sh)'\
 
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
 
-ADD dockerfiles/coda_daemon_puppeteer.py .
+RUN curl -sL "https://raw.githubusercontent.com/CodaProtocol/coda/${CODA_BRANCH}/dockerfiles/coda_daemon_puppeteer.py" \
+  -o /root/coda_daemon_puppeteer.py
 
 ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]
