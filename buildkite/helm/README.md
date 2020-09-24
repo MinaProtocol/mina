@@ -31,5 +31,7 @@ Parameter | Description | Default
 ## buildkite-exporter launch examples
 
 ```console
-helm install buildkite-exporter --set exporter.buildkiteApiKey=<api-key>,exporter.optionalEnv=[{'name': 'BUILDKITE_BRANCH', 'value': 'release'}]
+helm install buildkite-exporter \
+    --set exporter.buildkiteApiKey=<api-key> \
+    --set exporter.optionalEnv=[{'name': 'BUILDKITE_BRANCH', 'value': 'release'}]
 ```
