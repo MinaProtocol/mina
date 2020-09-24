@@ -2,14 +2,14 @@ open Css;
 
 module Colors = {
   let orange = `hex("ff603b");
-  let orangeAlpha = a => `rgba(255,96,59, a);
+  let orangeAlpha = a => `rgba((255, 96, 59, a));
   let mint = `hex("9fe4c9");
   let greyScale = `hex("757575");
   let gray = `hex("d9d9d9");
   let white = Css.white;
   let black = Css.black;
   let digitalBlack = `hex("2d2d2d");
-  let digitalBlackA = a => `rgba(45, 45, 45, a);
+  let digitalBlackA = a => `rgba((45, 45, 45, a));
   let purple = `hex("5362C8");
   let digitalGray = `hex("575757");
 };
@@ -233,12 +233,12 @@ module Type = {
     ]);
 
   let metadata_ = [
-      Typeface.monumentGroteskMono,
-      fontSize(`px(12)),
-      lineHeight(`rem(1.)),
-      letterSpacing(`em(0.05)),
-      textTransform(`uppercase),
-    ];
+    Typeface.monumentGroteskMono,
+    fontSize(`px(12)),
+    lineHeight(`rem(1.)),
+    letterSpacing(`em(0.05)),
+    textTransform(`uppercase),
+  ];
   let metadata = style(metadata_);
 
   let announcement =
@@ -283,6 +283,9 @@ module Type = {
       ),
     ]);
 
+  let subheadMono =
+    merge([sectionSubhead, style([Typeface.monumentGroteskMono])]);
+
   let paragraph =
     style([
       Typeface.monumentGrotesk,
@@ -316,10 +319,7 @@ module Type = {
       color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
-        [
-          fontSize(`rem(1.)),
-          lineHeight(`rem(1.5)),
-        ],
+        [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
       ),
     ]);
 
