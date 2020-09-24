@@ -2316,23 +2316,27 @@ module Types = struct
                     ; token_id= Token_id.default
                     ; nonce
                     ; fee= Fee.of_uint64 fee }
-                ; signature=
-                    (* TODO: Propagate this error, handle it at the command
-                       level.
-                    *)
-                    signature |> Option.bind ~f:Result.ok
-                    |> Option.value ~default:Signature.dummy }
-                : Other_fee_payer.t ) )
+                ; sign_choice=
+                    ( match signature with
+                    | None ->
+                        Other
+                    | Some (Ok signature) ->
+                        Signature signature
+                    | Some (Error _) ->
+                        (* TODO: Propagate this error, handle it at the command
+                           level.
+                        *)
+                        Other ) }
+                : Snapp_command_input.Other_fee_payer.t ) )
             ~fields:
               [ arg "publicKey"
                   ~doc:"Public key of the account to pay fees from"
                   ~typ:(non_null public_key_arg)
               ; (* TODO: Make this nullable *)
                 arg "nonce" ~doc:"The nonce of the fee payer's account"
-                  ~typ:(non_null uint32_arg)
+                  ~typ:uint32_arg
               ; arg "fee" ~doc:"The fee to pay" ~typ:(non_null uint64_arg)
-              ; (* TODO: Make this optional, like with user commands. *)
-                arg "signature" ~doc:"The signature to authorize the payment"
+              ; arg "signature" ~doc:"The signature to authorize the payment"
                   ~typ:signature_arg ]
       end
 

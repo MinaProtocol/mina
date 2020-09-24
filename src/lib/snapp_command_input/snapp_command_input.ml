@@ -60,13 +60,33 @@ module Second_party = struct
   end]
 end
 
+module Other_fee_payer = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { payload:
+            ( Public_key.Compressed.Stable.V1.t
+            , Token_id.Stable.V1.t
+            , Coda_numbers.Account_nonce.Stable.V1.t option
+            , Currency.Fee.Stable.V1.t )
+            Coda_base.Other_fee_payer.Payload.Poly.Stable.V1.t
+        ; sign_choice: Sign_choice.Stable.V1.t }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t =
-      ( Party.Stable.V1.t
-      , Second_party.Stable.V1.t )
-      Snapp_command.Inner.Stable.V1.t
+      { token_id: Token_id.Stable.V1.t
+      ; fee_payment: Other_fee_payer.Stable.V1.t option
+      ; one: Party.Stable.V1.t
+      ; two: Second_party.Stable.V1.t }
     [@@deriving sexp]
 
     let to_latest = Fn.id
@@ -104,6 +124,8 @@ let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
       let updated_map = update_map ~data:txn_pool_or_account_nonce in
       (txn_pool_or_account_nonce, updated_map)
 
+(* TODO: [nonce_map] may need to be updated regardless of whether we actually
+   use it or not. *)
 let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     ~find_identity ({token_id; fee_payment; one; two} : t) :
     (Snapp_command.t * Account_nonce.t Account_id.Map.t, _) Deferred.Result.t =
@@ -126,6 +148,33 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
            : Snapp_command.Party.Authorized.Signed.t )
        , nonce_map )
   in
+  (* TODO: A fee_payment from one of the snapp accounts will mess up our nonce
+     calculation and result in an invalid transaction.
+  *)
+  let fee_payment ?(nonce_map = nonce_map) ~sign () =
+    match fee_payment with
+    | Some {payload= {pk; token_id; nonce; fee}; sign_choice} ->
+        let%bind nonce, nonce_map =
+          match nonce with
+          | Some nonce ->
+              let next_nonce = Account_nonce.succ nonce in
+              return
+                ( nonce
+                , Map.set nonce_map
+                    ~key:(Account_id.create pk token_id)
+                    ~data:next_nonce )
+          | None ->
+              Deferred.return
+              @@ inferred_nonce ~get_current_nonce ~nonce_map
+                   ~account_id:(Account_id.create pk token_id)
+        in
+        let%map signature = sign ~signer:pk sign_choice in
+        ( ( Some {payload= {pk; token_id; nonce; fee}; signature}
+            : Coda_base.Other_fee_payer.t option )
+        , nonce_map )
+    | None ->
+        return (None, nonce_map)
+  in
   (* TODO: Make this less bad. *)
   let sign_payload ~f =
     let%bind snapp_command, _ =
@@ -135,47 +184,53 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
   in
   match (one, two) with
   | {body; predicate= Proved (predicate, control)}, Not_given ->
-      return
-        ( Snapp_command.Proved_empty
-            { token_id
-            ; fee_payment
-            ; one= proved body predicate control
-            ; two= None }
-        , nonce_map )
+      sign_payload ~f:(fun ~sign ->
+          let%map fee_payment, nonce_map = fee_payment ~sign () in
+          ( Snapp_command.Proved_empty
+              { token_id
+              ; fee_payment
+              ; one= proved body predicate control
+              ; two= None }
+          , nonce_map ) )
   | {body= body1; predicate= Proved (predicate, control)}, New body2 ->
-      return
-        ( Snapp_command.Proved_empty
-            { token_id
-            ; fee_payment
-            ; one= proved body1 predicate control
-            ; two= Some (empty body2) }
-        , nonce_map )
+      sign_payload ~f:(fun ~sign ->
+          let%map fee_payment, nonce_map = fee_payment ~sign () in
+          ( Snapp_command.Proved_empty
+              { token_id
+              ; fee_payment
+              ; one= proved body1 predicate control
+              ; two= Some (empty body2) }
+          , nonce_map ) )
   | ( {body= body1; predicate= Proved (predicate1, control1)}
     , Existing {body= body2; predicate= Proved (predicate2, control2)} ) ->
-      return
-        ( Snapp_command.Proved_proved
-            { token_id
-            ; fee_payment
-            ; one= proved body1 predicate1 control1
-            ; two= proved body2 predicate2 control2 }
-        , nonce_map )
+      sign_payload ~f:(fun ~sign ->
+          let%map fee_payment, nonce_map = fee_payment ~sign () in
+          ( Snapp_command.Proved_proved
+              { token_id
+              ; fee_payment
+              ; one= proved body1 predicate1 control1
+              ; two= proved body2 predicate2 control2 }
+          , nonce_map ) )
   | ( {body= body1; predicate= Proved (predicate, control)}
     , Existing {body= body2; predicate= Signed sign_choice} )
   | ( {body= body2; predicate= Signed sign_choice}
     , Existing {body= body1; predicate= Proved (predicate, control)} ) ->
       sign_payload ~f:(fun ~sign ->
-          let%map two, nonce_map = signed ~sign body2 sign_choice in
+          let%bind two, nonce_map = signed ~sign body2 sign_choice in
+          let%map fee_payment, nonce_map = fee_payment ~nonce_map ~sign () in
           ( Snapp_command.Proved_signed
               {token_id; fee_payment; one= proved body1 predicate control; two}
           , nonce_map ) )
   | {body; predicate= Signed sign_choice}, Not_given ->
       sign_payload ~f:(fun ~sign ->
-          let%map one, nonce_map = signed ~sign body sign_choice in
+          let%bind one, nonce_map = signed ~sign body sign_choice in
+          let%map fee_payment, nonce_map = fee_payment ~nonce_map ~sign () in
           ( Snapp_command.Signed_empty {token_id; fee_payment; one; two= None}
           , nonce_map ) )
   | {body= body1; predicate= Signed sign_choice}, New body2 ->
       sign_payload ~f:(fun ~sign ->
-          let%map one, nonce_map = signed ~sign body1 sign_choice in
+          let%bind one, nonce_map = signed ~sign body1 sign_choice in
+          let%map fee_payment, nonce_map = fee_payment ~nonce_map ~sign () in
           ( Snapp_command.Signed_empty
               {token_id; fee_payment; one; two= Some (empty body2)}
           , nonce_map ) )
@@ -183,8 +238,9 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     , Existing {body= body2; predicate= Signed sign_choice2} ) ->
       sign_payload ~f:(fun ~sign ->
           let%bind one, nonce_map = signed ~sign body1 sign_choice1 in
-          let%map two, nonce_map =
+          let%bind two, nonce_map =
             signed ~nonce_map ~sign body2 sign_choice2
           in
+          let%map fee_payment, nonce_map = fee_payment ~sign ~nonce_map () in
           ( Snapp_command.Signed_signed {token_id; fee_payment; one; two}
           , nonce_map ) )
