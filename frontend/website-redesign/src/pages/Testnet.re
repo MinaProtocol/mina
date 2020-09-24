@@ -56,6 +56,45 @@ module Styles = {
         marginTop(`rem(3.)),
       ]),
     ]);
+
+  let gradientSectionExpanded =
+    style([
+      height(`auto),
+      width(`percent(100.)),
+      position(`relative),
+      overflow(`hidden),
+      display(`flex),
+      flexWrap(`wrap),
+      marginLeft(`auto),
+      marginRight(`auto),
+      justifyContent(`center),
+    ]);
+
+  let gradientSection =
+    merge([
+      gradientSectionExpanded,
+      style([
+        height(`rem(53.)),
+        after([
+          contentRule(""),
+          position(`absolute),
+          bottom(`px(-1)),
+          left(`zero),
+          height(`rem(8.)),
+          width(`percent(100.)),
+          pointerEvents(`none),
+          backgroundImage(
+            `linearGradient((
+              `deg(0.),
+              [
+                (`zero, Theme.Colors.white),
+                (`percent(100.), Theme.Colors.white),
+              ],
+            )),
+          ),
+        ]),
+      ]),
+    ]);
 };
 
 [@react.component]
@@ -83,12 +122,16 @@ let make = () => {
                "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
              )}
           </p>
-          <Button bgColor=Theme.Colors.orange>
+          <Button bgColor=Theme.Colors.orange href="/leaderboard">
             {React.string("See The Full Leaderboard")}
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
         </div>
-        <div> {React.string("Leaderboard goes here")} </div>
+        <div className=Styles.gradientSection>
+          <a href="/leaderboard" className=Styles.leaderboardLink>
+            <Leaderboard interactive=false />
+          </a>
+        </div>
         <p className=Styles.disclaimer>
           {React.string(
              "Testnet Points are designed solely to track contributions to the Testnet and are non-transferable. Testnet Points have no cash or monetary value and are not redeemable for any cryptocurrency or digital assets. We may amend or eliminate Testnet Points at any time.",
