@@ -397,7 +397,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
     let t = of_backend res in
-    Backend.delete res ; t
+    (*Backend.delete res ;*)
+    t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
       (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =

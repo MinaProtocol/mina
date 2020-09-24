@@ -105,10 +105,7 @@ module Proof = Dlog_plonk_based_proof.Make (struct
       create pk.index (Field.Vector.create()) witness prev_chals prev_comms
   end
   module Verifier_index = B.Field_verifier_index
-  module Index = struct
-    include Keypair
-    let create (pk : Keypair.t) = create pk.cs
-  end
+  module Index = Keypair
   module Evaluations_backend = B.Field_proof.Evaluations
   module Opening_proof_backend = B.Field_opening_proof
   module Poly_comm = Fp_poly_comm

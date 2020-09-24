@@ -38,6 +38,13 @@ module type Gate_vector_intf = sig
     int ->
     field_vector ->
     unit
+  val wrap_gate : 
+    t ->
+    size_t ->
+    int ->
+    size_t ->
+    int ->
+    unit
 end
 
 module Hash_state = struct
@@ -256,9 +263,9 @@ let create () =
     Out_channel.flush stdout;
 
     Gates.add_gate sys.gates t (of_int sys.next_row)
-      (of_int l.row) (l.col)
-      (of_int r.row) (r.col)
-      (of_int o.row) (o.col)
+      (of_int l.row) l.col
+      (of_int r.row) r.col
+      (of_int o.row) o.col
     (*
       (of_int sys.next_row) 0
       (of_int sys.next_row) 1

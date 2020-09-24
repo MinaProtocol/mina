@@ -1,3 +1,5 @@
+open Unsigned.Size_t
+
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
@@ -17,7 +19,18 @@ module type Inputs_intf = sig
 
   module Rounds : Pickles_types.Nat.Intf
 
-  module Gate_vector : T0
+  module Gate_vector : sig
+    open Unsigned
+    type t
+
+    val wrap_gate : 
+      t ->
+      size_t ->
+      int ->
+      size_t ->
+      int ->
+      unit
+  end
 
   module Urs : sig
     type t
@@ -176,14 +189,20 @@ module Make (Inputs : Inputs_intf) = struct
     (set_urs_info, load)
 
   let create cs =
-    let {Plonk_constraint_system.auxiliary_input_size; gates} = cs in
-    let index = Index.create gates (Unsigned.Size_t.of_int auxiliary_input_size) (load_urs ())
+    let {Plonk_constraint_system.gates; equivalence_classes} = cs in
+    Plonk_constraint_system.V.Table.iter equivalence_classes ~f:(fun x ->
+    (
+      if List.length x > 1 then
+        let h = List.hd_exn x in
+        let t = List.last_exn x in
+        Gate_vector.wrap_gate gates (of_int t.row) t.col (of_int h.row) h.col ;
+    )); 
+    let index = Index.create gates (Unsigned.Size_t.of_int 0) (load_urs ())
     in Caml.Gc.finalise Index.delete index ;
     {index ; cs}
 
   let vk t = Verifier_index.create t.index
 
-  (* let pk = Fn.id   this breaks Snarky backend interface *)
   let pk t = t
 
   open Pickles_types
