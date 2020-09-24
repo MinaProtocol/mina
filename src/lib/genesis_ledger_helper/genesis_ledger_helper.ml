@@ -737,7 +737,17 @@ let make_constraint_constants
         config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
-        config.account_creation_fee }
+        config.account_creation_fee
+  ; fork=
+      ( match config.fork with
+      | None ->
+          default.fork
+      | Some {previous_state_hash; previous_length} ->
+          Some
+            { previous_state_hash=
+                State_hash.of_base58_check_exn previous_state_hash
+            ; previous_length= Coda_numbers.Length.of_int previous_length } )
+  }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -993,7 +1003,13 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; supercharged_coinbase_factor=
             Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
-        }
+        ; fork=
+            Option.map constraint_constants.fork
+              ~f:(fun {previous_state_hash; previous_length} ->
+                { Runtime_config.Fork_config.previous_state_hash=
+                    State_hash.to_base58_check previous_state_hash
+                ; previous_length= Coda_numbers.Length.to_int previous_length
+                } ) }
   ; ledger=
       Some
         { base=
