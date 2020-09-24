@@ -10,7 +10,7 @@
 let getEnvOrFail = name =>
   switch (Js.Dict.get(Node.Process.process##env, name)) {
   | Some(value) => value
-  | None => failwith({j|Couldn't find env var: `$name`"|j})
+  | None => failwith({j|Couldn't find env var: `$name`|j})
   };
 
 /* The Google Sheets API expects the credentials to be a local file instead of a parameter */
@@ -36,11 +36,10 @@ let main = () => {
         spreadsheetId,
         blocks |> Array.length |> string_of_int,
       );
-
-      UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
     | Error(error) => Js.log(error)
     }
   });
+  UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
   Postgres.endPool(pool);
 };
 

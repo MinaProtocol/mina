@@ -1,11 +1,13 @@
 module Styles = {
   open Css;
-  let heroBackgroundImage =
+  let heroBackgroundImage = backgroundImg =>
     style([
-      height(`px(1924)),
+      height(`rem(120.)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/HeroSectionBackground.png")),
+      backgroundImage(`url(backgroundImg)),
+      media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      position(`relative),
     ]);
 
   let container =
@@ -22,8 +24,10 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      marginTop(`rem(9.5)),
+      marginTop(`rem(13.)),
       media("(min-width:65rem)", [flexDirection(`row)]),
+      media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
+      media(Theme.MediaQuery.desktop, [marginTop(`rem(50.))]),
     ]);
 
   let heroHeadline =
@@ -33,7 +37,9 @@ module Styles = {
         display(`flex),
         justifyContent(`center),
         alignItems(`center),
-        marginTop(`rem(22.)),
+        marginTop(`rem(23.)),
+        media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(37.))]),
       ]),
     ]);
 
@@ -74,7 +80,12 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon = style([marginTop(`rem(0.65)), marginLeft(`rem(0.5))]);
+  let buttonIcon =
+    style([
+      marginTop(`rem(0.65)),
+      marginLeft(`rem(0.5)),
+      color(hex("#FF603B")),
+    ]);
 
   let heroText =
     merge([
@@ -105,8 +116,8 @@ module Styles = {
 };
 
 [@react.component]
-let make = () => {
-  <div className=Styles.heroBackgroundImage>
+let make = (~backgroundImg) => {
+  <div className={Styles.heroBackgroundImage(backgroundImg)}>
     <Wrapped>
       <div className=Styles.container>
         <h1 className=Styles.heroHeadline>
@@ -133,7 +144,7 @@ let make = () => {
                   width={`rem(13.5)}>
                   <span> {React.string("See Behind The Tech")} </span>
                   <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall currentColor="#FF603B" />
+                    <Icon kind=Icon.ArrowRightSmall />
                   </span>
                 </Button>
               </span>

@@ -96,15 +96,16 @@ module Stable = struct
       | Error e ->
           Core.Error.raise (Error.to_error e)
 
-    let user_commands {staged_ledger_diff; _} =
-      Staged_ledger_diff.user_commands staged_ledger_diff
+    let commands {staged_ledger_diff; _} =
+      Staged_ledger_diff.commands staged_ledger_diff
 
     let payments external_transition =
-      List.filter (user_commands external_transition) ~f:(function
-        | {data= {payload= {body= Payment _; _}; _}; _} ->
-            true
+      List.filter_map (commands external_transition) ~f:(function
+        | { data= Signed_command ({payload= {body= Payment _; _}; _} as c)
+          ; status } ->
+            Some {With_status.data= c; status}
         | _ ->
-            false )
+            None )
 
     let global_slot t =
       consensus_state t |> Consensus.Data.Consensus_state.curr_global_slot
@@ -142,7 +143,7 @@ Stable.Latest.
   , consensus_time_produced_at
   , block_producer
   , transactions
-  , user_commands
+  , commands
   , payments
   , global_slot
   , to_yojson )]
@@ -713,7 +714,7 @@ module With_validation = struct
 
   let block_producer t = lift block_producer t
 
-  let user_commands t = lift user_commands t
+  let commands t = lift commands t
 
   let transactions ~constraint_constants t =
     lift (transactions ~constraint_constants) t
@@ -880,7 +881,7 @@ module Validated = struct
     , consensus_time_produced_at
     , block_producer
     , transactions
-    , user_commands
+    , commands
     , payments
     , global_slot
     , erase
@@ -891,6 +892,15 @@ module Validated = struct
   let to_initial_validated t =
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
+
+  let commands (t : t) =
+    List.map (commands t) ~f:(fun x ->
+        (* This is safe because at this point the stage ledger diff has been
+             applied successfully. *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
+          User_command.to_valid_unsafe x.data
+        in
+        {x with data= c} )
 end
 
 let genesis ~precomputed_values =
@@ -904,11 +914,12 @@ let genesis ~precomputed_values =
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
-          ; user_commands= []
+          ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
-    ; coinbase_receiver= creator }
+    ; coinbase_receiver= creator
+    ; supercharge_coinbase= false }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -1038,7 +1049,7 @@ module Staged_ledger_validation = struct
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
-             , `Pending_coinbase_data _ ) =
+             , `Pending_coinbase_update _ ) =
       Staged_ledger.apply
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff

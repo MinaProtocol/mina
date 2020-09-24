@@ -4,7 +4,7 @@ module Styles = {
     style([
       display(`inlineFlex),
       alignItems(`center),
-      height(`rem(1.3)),
+      height(`rem(3.25)),
       borderRadius(px(4)),
       width(`rem(14.5)),
       fontSize(rem(1.)),
@@ -77,7 +77,7 @@ let make = () => {
     {successState
        ? <div className=Styles.successState>
            <span className=Styles.successText>
-             {React.string({"Check your email!"})}
+             {React.string([@reason.preserve_braces] "Check your email!")}
            </span>
          </div>
        : <div className=Styles.inputContainer>

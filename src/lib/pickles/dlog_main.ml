@@ -600,6 +600,13 @@ struct
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
       without_degree_bound with_degree_bound
 
+  let det_sqrt =
+    unstage
+      (Common.det_sqrt
+         (module Impl)
+         ~two_adic_root_of_unity:(Backend.Tock.Field.two_adic_root_of_unity ())
+         ~two_adicity:33 ~det_sqrt_witness:Backend.Tock.Field.det_sqrt_witness)
+
   let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Field.of_int 5 in
@@ -608,8 +615,7 @@ struct
         let sq =
           Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
         in
-        (* TODO: Make deterministic *)
-        Field.sqrt sq )
+        det_sqrt sq )
 
   let b_poly = Field.(b_poly ~add ~mul ~inv)
 

@@ -5,8 +5,9 @@ open Rosetta_models
 module Signature = Coda_base.Signature
 module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
-module User_command_payload = Coda_base.User_command_payload
+module Signed_command_payload = Coda_base.Signed_command_payload
 module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 module Transaction_hash = Coda_base.Transaction_hash
 
 module Get_nonce =
@@ -174,11 +175,12 @@ module Derive = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    (* TODO: Don't assume req.metadata is a token_id without checking *)
+    module Token_id_decode = Amount_of.Token_id.T (M)
+
     let handle ~(env : Env.T(M).t) (req : Construction_derive_request.t) =
       let open M.Let_syntax in
       (* TODO: Verify curve-type is tweedle *)
-      let%map pk =
+      let%bind pk =
         let pk_or_error =
           try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
           with exn -> Error (Core_kernel.Error.of_exn exn)
@@ -188,9 +190,14 @@ module Derive = struct
              ~f:(fun _ -> Errors.create `Malformed_public_key)
              pk_or_error
       in
-      { Construction_derive_response.address=
-          Public_key.(compress pk |> Compressed.to_base58_check)
-      ; metadata= req.metadata }
+      let%map token_id = Token_id_decode.decode req.metadata in
+      { Construction_derive_response.address= None
+      ; account_identifier=
+          Some
+            (User_command_info.account_id
+               (`Pk Public_key.(compress pk |> Compressed.to_base58_check))
+               (Option.value ~default:Amount_of.Token_id.default token_id))
+      ; metadata= None }
   end
 
   module Real = Impl (Deferred.Result)
@@ -317,7 +324,8 @@ module Preprocess = struct
             (Options.to_json
                { Options.sender= pk
                ; token_id= partial_user_command.User_command_info.Partial.token
-               }) }
+               })
+      ; required_public_keys= [] }
   end
 
   module Real = Impl (Deferred.Result)
@@ -379,7 +387,7 @@ module Payloads = struct
           partial_user_command
         |> env.lift
       in
-      let random_oracle_input = User_command.to_input user_command_payload in
+      let random_oracle_input = Signed_command.to_input user_command_payload in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
         ; command= partial_user_command
@@ -392,11 +400,12 @@ module Payloads = struct
       { Construction_payloads_response.unsigned_transaction=
           unsigned_transaction_string
       ; payloads=
-          [ { Signing_payload.address=
-                (let (`Pk pk) =
-                   partial_user_command.User_command_info.Partial.source
-                 in
-                 pk)
+          [ { Signing_payload.address= None
+            ; account_identifier=
+                Some
+                  (User_command_info.account_id
+                     partial_user_command.User_command_info.Partial.source
+                     partial_user_command.User_command_info.Partial.token)
             ; hex_bytes= pk
             ; signature_type= Some "schnorr_poseidon" } ] }
   end
@@ -479,7 +488,7 @@ module Parse = struct
         try M.return (Yojson.Safe.from_string req.transaction)
         with _ -> M.fail (Errors.create (`Json_parse None))
       in
-      let%map operations, `Pk signer_pk =
+      let%map operations, account_identifier_signers =
         match req.signed with
         | true ->
             let%map signed_transaction =
@@ -491,7 +500,8 @@ module Parse = struct
             in
             ( User_command_info.to_operations ~failure_status:None
                 signed_transaction.command
-            , signed_transaction.command.source )
+            , [ User_command_info.account_id signed_transaction.command.source
+                  signed_transaction.command.token ] )
         | false ->
             let%map unsigned_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
@@ -502,10 +512,11 @@ module Parse = struct
             in
             ( User_command_info.to_operations ~failure_status:None
                 unsigned_transaction.command
-            , unsigned_transaction.command.source )
+            , [] )
       in
       { Construction_parse_response.operations
-      ; signers= [signer_pk]
+      ; signers= []
+      ; account_identifier_signers
       ; metadata= None }
   end
 
@@ -566,8 +577,11 @@ module Hash = struct
           ~error:(Errors.create `Signature_missing)
         |> env.lift
       in
-      let full_command = {User_command.Poly.payload; signature; signer} in
-      let hash = Transaction_hash.hash_user_command full_command in
+      let full_command = {Signed_command.Poly.payload; signature; signer} in
+      let hash =
+        Transaction_hash.hash_command
+          (User_command.Signed_command full_command)
+      in
       Construction_hash_response.create (Transaction_hash.to_base58_check hash)
   end
 

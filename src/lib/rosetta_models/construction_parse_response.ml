@@ -8,11 +8,12 @@
 
 type t =
   { operations: Operation.t list
-  ; (* All signers of a particular transaction. If the transaction is unsigned, it should be empty. *)
+  ; (* [DEPRECATED by `account_identifier_signers` in `v1.4.4`] All signers (addresses) of a particular transaction. If the transaction is unsigned, it should be empty. *)
     signers: string list
+  ; account_identifier_signers: Account_identifier.t list
   ; metadata: Yojson.Safe.t option [@default None] }
 [@@deriving yojson {strict= false}, show]
 
 (** ConstructionParseResponse contains an array of operations that occur in a transaction blob. This should match the array of operations provided to `/construction/preprocess` and `/construction/payloads`. *)
-let create (operations : Operation.t list) (signers : string list) : t =
-  {operations; signers; metadata= None}
+let create (operations : Operation.t list) : t =
+  {operations; signers= []; account_identifier_signers= []; metadata= None}
