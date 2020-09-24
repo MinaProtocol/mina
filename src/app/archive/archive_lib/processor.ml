@@ -571,14 +571,8 @@ module Block = struct
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
             function
             | { Coda_base.With_status.status
-              ; data= Coda_base.Transaction.User_command user_command_checked
-              } ->
-                let user_command =
-                  { Coda_base.With_status.status
-                  ; data=
-                      Coda_base.User_command.forget_check user_command_checked
-                  }
-                in
+              ; data= Coda_base.Transaction.Command command } ->
+                let user_command = Coda_base.With_status.{status; command} in
                 let%bind id =
                   User_command.add_with_status
                     (module Conn)
