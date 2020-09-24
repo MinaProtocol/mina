@@ -16,7 +16,7 @@ spec:
         pipeline: {{ $.Values.exporter.pipeline }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ $.Values.exporter.listening_port }}
+        prometheus.io/port: {{ $.Values.exporter.listening_port | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:

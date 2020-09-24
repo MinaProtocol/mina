@@ -8,7 +8,7 @@ spec:
   selector:
     app: {{ tpl $.Values.exporter.name . }}
   ports:
-  - name: metric_collection
+  - name: metric-collection
     protocol: TCP
     port: {{ $.Values.exporter.listening_port }}
     targetPort: {{ $.Values.exporter.listening_port }}
