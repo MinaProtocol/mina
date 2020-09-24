@@ -7,6 +7,11 @@ module Domain = Domain
 type 'field vanishing_polynomial_domain =
   < vanishing_polynomial: 'field -> 'field >
 
+type 'field plonk_domain =
+  < vanishing_polynomial: 'field -> 'field
+  ; shifts: 'field Snarky_bn382.Shifts.t
+  ; size: 'field >
+
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
 let debug = false
@@ -41,10 +46,14 @@ let vanishing_polynomial (type t) ((module F) : t field) domain x =
   in
   F.(pow2pow x k - one)
 
-let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
+let domain (type t) ((module F) : t field) ~shifts (domain : Domain.t) :
+    t plonk_domain =
   let size = F.of_int (Domain.size domain) in
+  let shifts = shifts ~log2_size:(Domain.log2_size domain) in
   object
     method size = size
+
+    method shifts = shifts
 
     method vanishing_polynomial x = vanishing_polynomial (module F) domain x
   end
@@ -71,7 +80,7 @@ let evals_of_split_evals field ~zeta ~zetaw
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
 let derive_plonk (type t) (module F : Field_intf with type t = t) ~endo
-    ~(domain : t vanishing_polynomial_domain) =
+    ~(domain : t plonk_domain) =
   let open F in
   let square x = x * x in
   let double x = of_int 2 * x in
@@ -79,7 +88,7 @@ let derive_plonk (type t) (module F : Field_intf with type t = t) ~endo
     (* x^5 *)
     square (square x) * x
   in
-  let r, o = failwith "Compute r, o" in
+  let {Snarky_bn382.Shifts.r; o} = domain#shifts in
   fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
     let bz = beta * zeta in

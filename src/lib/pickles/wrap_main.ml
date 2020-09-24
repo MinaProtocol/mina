@@ -120,6 +120,10 @@ let pack_statement max_branching =
       (Types.Pairing_based.Statement.spec max_branching Backend.Tock.Rounds.n)
       (Types.Pairing_based.Statement.to_data t)
 
+let shifts ~log2_size =
+  Backend.Tock.B.Field_verifier_index.shifts ~log2_size
+  |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
+
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_branching branches prev_varss prev_valuess env
@@ -247,7 +251,8 @@ let wrap_main
               Vector.map
                 Domains.[h; x]
                 ~f:(fun f ->
-                  Pseudo.Domain.to_domain (which_branch, Vector.map ds ~f) ) )
+                  Pseudo.Domain.to_domain ~shifts
+                    (which_branch, Vector.map ds ~f) ) )
         in
         let actual_branchings =
           padded
@@ -298,9 +303,8 @@ let wrap_main
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
                 ~actual_branching
-                ~input_domain:
-                  (input_domain :> _ Marlin_checks.vanishing_polynomial_domain)
-                ~domain:(domain :> _ Marlin_checks.vanishing_polynomial_domain)
+                ~input_domain:(input_domain :> _ Marlin_checks.plonk_domain)
+                ~domain:(domain :> _ Marlin_checks.plonk_domain)
                 ~sponge deferred_values ~old_bulletproof_challenges evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;

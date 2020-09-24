@@ -431,6 +431,12 @@ struct
       in
       Field.sub (go x 0) Field.one
 
+  let shifts ~log2_size =
+    Backend.Tick.B.Field_verifier_index.shifts ~log2_size
+    |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
+
+  module O = One_hot_vector.Make (Impl)
+
   let side_loaded_input_domain =
     let open Side_loaded_verification_key in
     let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
@@ -443,9 +449,9 @@ struct
       assert (List.last_exn (Vector.to_list domain_log2s) = n) ;
       Nat.of_int n
     in
-    let module O = One_hot_vector.Make (Impl) in
     fun ~width ->
       let mask = O.of_index width ~length:(S max_width) in
+      let shifts = lazy (Pseudo.Domain.shifts (mask, domain_log2s) ~shifts) in
       let vp =
         let log2_size = Pseudo.choose (mask, domain_log2s) ~f:Field.of_int in
         let mask =
@@ -454,6 +460,11 @@ struct
         vanishing_polynomial mask
       in
       object
+        method shifts = Lazy.force shifts
+
+        method size =
+          Pseudo.choose (mask, domain_log2s) ~f:(fun x -> Field.of_int (1 lsl x))
+
         method vanishing_polynomial = vp
       end
 
@@ -465,6 +476,11 @@ struct
         let (T max_n) = Nat.of_int max in
         let log2_size = Pseudo.choose ~f:Domain.log2_size (branch, v) in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
+        let shifts =
+          Pseudo.Domain.shifts
+            (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
+            ~shifts
+        in
         let vanishing_polynomial = vanishing_polynomial mask in
         let size =
           Vector.map mask ~f:(fun b ->
@@ -479,16 +495,14 @@ struct
           method log2_size = log2_size
 
           method vanishing_polynomial x = vanishing_polynomial x
+
+          method shifts = shifts
         end
       in
       { Domains.h=
           domain
             (Vector.map domains ~f:(fun {h; _} -> h))
-            ~max:(Domain.log2_size max_domains.h)
-      ; k=
-          domain
-            (Vector.map domains ~f:(fun {k; _} -> k))
-            ~max:(Domain.log2_size max_domains.k) }
+            ~max:(Domain.log2_size max_domains.h) }
 
   let%test_module "side loaded domains" =
     ( module struct
@@ -516,6 +530,7 @@ struct
               Marlin_checks.domain
                 (module Field.Constant)
                 (Pow_2_roots_of_unity d)
+                ~shifts:Backend.Tick.B.Field_verifier_index.shifts
             in
             let checked_domain () =
               side_loaded_input_domain ~width:(Field.of_int i)
@@ -530,7 +545,7 @@ struct
         let module O = One_hot_vector.Make (Impl) in
         let open Side_loaded_verification_key in
         let branches = Nat.N2.n in
-        let domains = Vector.[{Domains.h= 10; k= 10}; {h= 15; k= 17}] in
+        let domains = Vector.[{Domains.h= 10}; {h= 15}] in
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list domains) ~f:(fun i ds ->
             let check field1 field2 =
@@ -538,6 +553,7 @@ struct
                 Marlin_checks.domain
                   (module Field.Constant)
                   (Pow_2_roots_of_unity (field1 ds))
+                  ~shifts:Backend.Tick.B.Field_verifier_index.shifts
               in
               let checked_domain () =
                 side_loaded_domains
@@ -556,7 +572,7 @@ struct
                      (checked_domain ())#vanishing_polynomial
                        (Field.constant pt) ))
             in
-            check Domains.h Domains.h ; check Domains.k Domains.k )
+            check Domains.h Domains.h )
     end )
 
   module Split_evaluations = struct
@@ -682,7 +698,7 @@ struct
               (Underlying)
   end
 
-  let side_loaded_commitment_lengths ~h ~k =
+  let side_loaded_commitment_lengths ~h =
     let max_lengths =
       Commitment_lengths.of_domains ~max_degree:Max_degree.step
         { h=
@@ -743,9 +759,8 @@ struct
       match step_domains with
       | `Known domains ->
           ( `Known domains
-          , ( Pseudo.Domain.to_domain
-                (which_branch, Vector.map domains ~f:Domains.x)
-              :> _ Marlin_checks.vanishing_polynomial_domain ) )
+          , Pseudo.Domain.to_domain ~shifts
+              (which_branch, Vector.map domains ~f:Domains.x) )
       | `Side_loaded ds ->
           ( `Side_loaded (side_loaded_domains ds which_branch)
           , (* This has to be the max_width of this proof system rather than actual width *)
@@ -765,8 +780,8 @@ struct
             |> Evals.map ~f:(fun lengths ->
                    Bounded.of_pseudo (which_branch, lengths) )
             |> Evals.map ~f:Split_evaluations.mask'
-        | `Side_loaded {h; k} ->
-            side_loaded_commitment_lengths ~h ~k
+        | `Side_loaded {h} ->
+            side_loaded_commitment_lengths ~h
       in
       Tuple_lib.Double.map es ~f:(fun (e, x) ->
           (Evals.map2 lengths e ~f:Array.zip_exn, x) )
@@ -839,10 +854,9 @@ struct
       match step_domains with
       | `Known ds ->
           let hs = map ds ~f:(fun {Domains.h; _} -> h) in
-          ( Pseudo.Domain.to_domain (which_branch, hs)
-            :> _ Marlin_checks.vanishing_polynomial_domain )
-      | `Side_loaded {h; k} ->
-          (h :> _ Marlin_checks.vanishing_polynomial_domain)
+          Pseudo.Domain.to_domain (which_branch, hs) ~shifts
+      | `Side_loaded {h} ->
+          (h :> _ Marlin_checks.plonk_domain)
     in
     let marlin_checks_passed =
       let e = Fn.flip actual_evaluation in

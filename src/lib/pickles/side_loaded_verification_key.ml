@@ -101,17 +101,12 @@ module Domains = struct
            ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
            ~back:(fun n -> Domain.Pow_2_roots_of_unity n)
     in
-    Typ.of_hlistable [dom; dom] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
+    Typ.of_hlistable [dom] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_of_hlist:of_hlist
-
-  let iter {h; k} ~f = f h ; f k
-
-  let map {h; k} ~f = {h= f h; k= f k}
 end
 
 (* TODO: Probably better to have these match the step rounds. *)
-let max_domains =
-  {Domains.h= Domain.Pow_2_roots_of_unity 20; k= Domain.Pow_2_roots_of_unity 20}
+let max_domains = {Domains.h= Domain.Pow_2_roots_of_unity 20}
 
 let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
@@ -219,8 +214,8 @@ module Checked = struct
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun {step_domains; step_widths; max_width; wrap_index; num_branches} ->
       ( List.reduce_exn ~f:append
-          [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h; k} ->
-                map_reduce [|h; k|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
+          [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
+                map_reduce [|h|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
                     bitstring (Field.unpack x ~length:max_log2_degree) ) )
           ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
             |> bitstrings

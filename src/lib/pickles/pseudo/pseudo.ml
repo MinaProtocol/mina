@@ -16,11 +16,14 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
         let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
         Field.Assert.equal x y ; y
 
-  let choose : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t =
-   fun (bits, xs) ~f ->
-    let bits = (bits :> (Boolean.var, n) Vector.t) in
-    Vector.map (Vector.zip bits xs) ~f:(fun (b, x) -> Field.((b :> t) * f x))
+  let mask (type n) (bits : n One_hot_vector.T(Impl).t) xs =
+    Vector.map
+      (Vector.zip (bits :> (Boolean.var, n) Vector.t) xs)
+      ~f:(fun (b, x) -> Field.((b :> t) * x))
     |> Vector.fold ~init:Field.zero ~f:Field.( + )
+
+  let choose : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t =
+   fun (bits, xs) ~f -> mask bits (Vector.map xs ~f)
 
   module Degree_bound = struct
     type nonrec 'n t = (int, 'n) t
@@ -33,11 +36,21 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   end
 
   module Domain = struct
+    let shifts (type n) ((which, log2s) : (int, n) t) ~shifts =
+      let shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
+      let open Snarky_bn382.Shifts in
+      let mk f = mask which (Vector.map shifts ~f) in
+      {r= mk (fun {r; _} -> r); o= mk (fun {o; _} -> o)}
+
     type nonrec 'n t = (Domain.t, 'n) t
 
-    let to_domain (type n) (t : n t) : Field.t Marlin_checks.domain =
+    let to_domain ~shifts:s (type n) (t : n t) :
+        Field.t Marlin_checks.plonk_domain =
       (* TODO: Special case when all the domains happen to be the same. *)
       let size = seal (choose t ~f:(fun d -> Field.of_int (Domain.size d))) in
+      let shifts =
+        shifts (fst t, Vector.map (snd t) ~f:Domain.log2_size) ~shifts:s
+      in
       let max_log2 =
         let _, ds = t in
         List.fold (Vector.to_list ds) ~init:0 ~f:(fun acc d ->
@@ -45,6 +58,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       in
       object
         method size = size
+
+        method shifts = shifts
 
         method vanishing_polynomial x =
           let pow2_pows =

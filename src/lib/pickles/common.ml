@@ -20,7 +20,7 @@ let tock_shifts : Domain.t -> Backend.Tock.Field.t Tuple_lib.Double.t =
       | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
 
 let wrap_domains =
-  { Domains.h= failwith "TBD"
+  { Domains.h= Pow_2_roots_of_unity 17
   ; x=
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in

@@ -311,7 +311,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Snarky_bn382.Tweedle.Dum.Field_verifier_index.t * Dirty.t) Lazy.t
+      * (Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.t * Dirty.t)
+        Lazy.t
 
     (* TODO Think this is right.. *)
   end
@@ -568,7 +569,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_marlin_index:wrap_vk.commitments
+            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
@@ -603,9 +604,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           in
           let proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
-              wrap_requests ~dlog_marlin_index:wrap_vk.commitments wrap_main
+              wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
-              ~pairing_marlin_indices:(Lazy.force step_vks) ~wrap_domains
+              ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
@@ -665,12 +666,12 @@ module Side_loaded = struct
       { wrap_vk= Some (Lazy.force d.wrap_vk)
       ; wrap_index=
           Lazy.force d.wrap_key
-          |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)
+          |> Plonk_verification_key_evals.map ~f:Array.to_list
       ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data=
           At_most.of_vector
             (Vector.map2 d.branchings d.step_domains ~f:(fun width ds ->
-                 ({Domains.h= ds.h; k= ds.k}, Width.of_int_exn width) ))
+                 ({Domains.h= ds.h}, Width.of_int_exn width) ))
             (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n) }
 
     module Max_width = Width.Max
@@ -725,7 +726,8 @@ module Side_loaded = struct
         List.map ts ~f:(fun (vk, x, p) ->
             let vk : V.t =
               { commitments=
-                  Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) vk.wrap_index
+                  Plonk_verification_key_evals.map ~f:Array.of_list
+                    vk.wrap_index
               ; step_domains=
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
                       let input_size =
@@ -735,17 +737,12 @@ module Side_loaded = struct
                       in
                       { Domains.x=
                           Pow_2_roots_of_unity (Int.ceil_log2 (1 + input_size))
-                      ; h= d.h
-                      ; k= d.k } )
+                      ; h= d.h } )
               ; index=
                   (match vk.wrap_vk with None -> return false | Some x -> x)
               ; data=
                   (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
-                  { variables= 0
-                  ; public_inputs= 0
-                  ; constraints= 0
-                  ; nonzero_entries= 0
-                  ; max_degree= 0 } }
+                  {constraints= 0} }
             in
             Verify.Instance.T (max_branching, m, vk, x, p) )
         |> Verify.verify_heterogenous )
@@ -812,7 +809,6 @@ let compile
     module Max_local_max_branching = Max_branching
     module Max_branching_vec = Nvector (Max_branching)
     include Proof.Make (Max_branching) (Max_local_max_branching)
-    module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
 
     let id = wrap_disk_key
 

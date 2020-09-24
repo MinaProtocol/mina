@@ -73,14 +73,14 @@ module Domains = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {h: 'a; k: 'a}
+      type 'a t = {h: 'a}
       [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
     end
   end]
 
-  let iter {h; k} ~f = f h ; f k
+  let iter {h} ~f = f h
 
-  let map {h; k} ~f = {h= f h; k= f k}
+  let map {h} ~f = {h= f h}
 end
 
 module Repr = struct
@@ -115,8 +115,7 @@ module Poly = struct
   end]
 end
 
-let dummy_domains =
-  {Domains.h= Domain.Pow_2_roots_of_unity 0; k= Pow_2_roots_of_unity 0}
+let dummy_domains = {Domains.h= Domain.Pow_2_roots_of_unity 0}
 
 let dummy_width = Width.zero
 
@@ -180,8 +179,8 @@ let to_input : _ Poly.t -> _ =
         |> Vector.unzip
       in
       List.reduce_exn ~f:append
-        [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h; k} ->
-              map_reduce [|h; k|] ~f:(fun (Pow_2_roots_of_unity x) ->
+        [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
+              map_reduce [|h|] ~f:(fun (Pow_2_roots_of_unity x) ->
                   bits ~len:max_log2_degree x ) )
         ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits
           |> bitstrings

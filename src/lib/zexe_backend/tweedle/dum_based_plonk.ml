@@ -70,6 +70,14 @@ let lagrange =
 let with_lagrange f vk =
   f (lagrange (B.Field_verifier_index.domain_log2 vk)) vk
 
+let with_lagranges f vks =
+  let lgrs = B.Field_poly_comm.Vector.Vector.create () in
+  for i = 0 to B.Field_verifier_index.Vector.length vks - 1 do
+    B.Field_poly_comm.Vector.Vector.emplace_back lgrs
+      (lagrange B.Field_verifier_index.(domain_log2 (Vector.get vks i)))
+  done ;
+  f lgrs vks
+
 module Proof = Plonk_dlog_proof.Make (struct
   module Scalar_field = Field
 
@@ -78,10 +86,10 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let verify = with_lagrange verify
 
-    let batch_verify = with_lagrange batch_verify
+    let batch_verify = with_lagranges batch_verify
   end
 
-  module Verifier_index = Verification_key
+  module Verifier_index = B.Field_verifier_index
   module Index = B.Field_index
   module Evaluations_backend = B.Field_proof.Evaluations
   module Opening_proof_backend = B.Field_opening_proof

@@ -77,8 +77,10 @@ let verify_heterogenous (ts : Instance.t list) =
               (module Tick.Field)
               ~endo:Endo.Dee.base
               ~domain:
-                ( Marlin_checks.domain (module Tick.Field) step_domains.h
-                  :> _ Marlin_checks.vanishing_polynomial_domain )
+                (Marlin_checks.domain
+                   (module Tick.Field)
+                   step_domains.h
+                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
               { zeta
               ; beta= chal plonk0.beta
               ; gamma= chal plonk0.gamma

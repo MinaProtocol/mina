@@ -25,37 +25,24 @@ module Step = struct
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, t) ~path ->
         let t =
-          failwith __LOC__
-          (*
-          Snarky_bn382.Tweedle.Dum.Field_index.read
+          Snarky_bn382.Tweedle.Dum.Plonk.Field_index.read
             (Backend.Tick.Keypair.load_urs ())
+            (*
             t.m.a t.m.b t.m.c
             (Unsigned.Size_t.of_int (1 + t.public_input_size))
-            path *)
+*)
+            path
         in
         t )
-      (failwith __LOC__ (*       Snarky_bn382.Tweedle.Dum.Field_index.write *))
+      Snarky_bn382.Tweedle.Dum.Plonk.Field_index.write
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
-        failwith __LOC__
-        (*          Snarky_bn382.Fp_verifier_index.read path *) )
-      (failwith __LOC__ (*       Snarky_bn382.Fp_verifier_index.write *))
-
-  let vk_storable =
-    Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
-      (fun _ ~path:_ ->
-        failwith __LOC__
-        (*
-        Snarky_bn382.Tweedle.Dum.Field_verifier_index.read
+        Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.read
           (Backend.Tick.Keypair.load_urs ())
-          path 
-*)
-        )
-      (failwith __LOC__)
-
-  (*       Snarky_bn382.Tweedle.Dum.Field_verifier_index.write *)
+          path )
+      Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.write
 
   let read_or_generate cache k_p k_v typ main =
     let s_p = storable in
@@ -123,27 +110,24 @@ module Wrap = struct
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, t) ~path ->
         let t =
-          failwith __LOC__
-          (*
-          Snarky_bn382.Tweedle.Dee.Field_index.read
+          Snarky_bn382.Tweedle.Dee.Plonk.Field_index.read
             (Backend.Tock.Keypair.load_urs ())
+            (*
             t.m.a t.m.b t.m.c
             (Unsigned.Size_t.of_int (1 + t.public_input_size))
-            path
 *)
+            path
         in
         t )
-      (failwith __LOC__)
-
-  (*       Snarky_bn382.Tweedle.Dee.Field_index.write *)
+      Snarky_bn382.Tweedle.Dee.Plonk.Field_index.write
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
-        Snarky_bn382.Tweedle.Dee.Field_verifier_index.read
+        Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.read
           (Backend.Tock.Keypair.load_urs ())
           path )
-      Snarky_bn382.Tweedle.Dee.Field_verifier_index.write
+      Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.write
 
   let read_or_generate step_domains cache k_p k_v typ main =
     let module Vk = Verification_key in
@@ -173,14 +157,15 @@ module Wrap = struct
          | Error _e ->
              let kp, _dirty = Lazy.force pk in
              let vk = Keypair.vk kp in
-             let _pk = Keypair.pk kp in
+             let pk = Keypair.pk kp in
              let vk : Vk.t =
                { index= vk
                ; commitments= Backend.Tock.Keypair.vk_commitments vk
                ; step_domains
                ; data=
                    (let open Snarky_bn382.Tweedle.Dee.Plonk.Field_index in
-                   {constraints= failwith __LOC__}) }
+                   {constraints= Unsigned.Size_t.to_int (domain_d1_size pk)})
+               }
              in
              let _ = Key_cache.Sync.write cache s_v k_v vk in
              vk)

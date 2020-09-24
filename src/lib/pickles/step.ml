@@ -153,8 +153,9 @@ struct
             (module Tick.Field)
             ~endo:Endo.Dee.base
             ~domain:
-              ( Marlin_checks.domain (module Tick.Field) domain
-                :> _ Marlin_checks.vanishing_polynomial_domain )
+              (Marlin_checks.domain
+                 (module Tick.Field)
+                 domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
             { zeta
             ; alpha= Challenge.Constant.to_tick_field plonk0.alpha
             ; beta= Challenge.Constant.to_tick_field plonk0.beta
@@ -325,8 +326,10 @@ struct
             (module Tock.Field)
             ~endo:Endo.Dum.base
             ~domain:
-              ( Marlin_checks.domain (module Tock.Field) data.wrap_domains.h
-                :> _ Marlin_checks.vanishing_polynomial_domain )
+              (Marlin_checks.domain
+                 (module Tock.Field)
+                 data.wrap_domains.h
+                 ~shifts:Backend.Tock.B.Field_verifier_index.shifts)
             {plonk0 with zeta= As_field.zeta}
             (Marlin_checks.evals_of_split_evals
                (module Tock.Field)

@@ -267,8 +267,9 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         (module Tick.Field)
         ~endo:Endo.Dee.base
         ~domain:
-          ( Marlin_checks.domain (module Tick.Field) domain
-            :> _ Marlin_checks.vanishing_polynomial_domain )
+          (Marlin_checks.domain
+             (module Tick.Field)
+             domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
         {plonk0 with zeta= As_field.zeta}
         (Marlin_checks.evals_of_split_evals
            (module Tick.Field)

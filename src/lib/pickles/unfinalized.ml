@@ -45,8 +45,9 @@ module Constant = struct
                  (module Tock.Field)
                  ~endo:Endo.Dum.base (* I think this is right *)
                  ~domain:
-                   ( Marlin_checks.domain (module Tock.Field) wrap_domains.h
-                     :> _ Marlin_checks.vanishing_polynomial_domain )
+                   (Marlin_checks.domain
+                      (module Tock.Field)
+                      wrap_domains.h ~shifts:Tock.B.Field_verifier_index.shifts)
                  { alpha= Challenge.Constant.to_tock_field alpha
                  ; beta= Challenge.Constant.to_tock_field beta
                  ; gamma= Challenge.Constant.to_tock_field gamma
