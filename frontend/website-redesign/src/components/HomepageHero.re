@@ -82,7 +82,7 @@ module Styles = {
 
   let buttonIcon =
     style([
-      marginTop(`rem(0.65)),
+      height(`rem(1.5)),
       marginLeft(`rem(0.5)),
       color(hex("#FF603B")),
     ]);
