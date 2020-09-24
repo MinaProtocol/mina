@@ -32,7 +32,8 @@ module Variant = struct
     | `Operations_not_valid of Partial_reason.t list
     | `Unsupported_operation_for_construction
     | `Signature_missing
-    | `Public_key_format_not_valid ]
+    | `Public_key_format_not_valid
+    | `Exception of string ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -92,6 +93,8 @@ end = struct
         "Unsupported operation for construction"
     | `Signature_missing ->
         "Signature missing"
+    | `Exception _ ->
+        "Exception"
 
   let context = function
     | `Sql msg ->
@@ -122,10 +125,10 @@ end = struct
     | `Transaction_not_found hash ->
         Some
           (sprintf
-             !"You attempt to lookup %s but it is missing from the mempool. \
-               This may be due to it's inclusion in a block -- try looking \
-               for this transaction in a recent block. It also could be due \
-               to the transaction being evicted from the mempool."
+             "You attempt to lookup %s but it is missing from the mempool. \
+              This may be due to it's inclusion in a block -- try looking for \
+              this transaction in a recent block. It also could be due to the \
+              transaction being evicted from the mempool."
              hash)
     | `Block_missing ->
         (* TODO: Add context around the query made *)
@@ -144,6 +147,8 @@ end = struct
         None
     | `Signature_missing ->
         None
+    | `Exception s ->
+        Some (sprintf "Exception when processing request: %s" s)
 
   let retriable = function
     | `Sql _ ->
@@ -173,6 +178,8 @@ end = struct
     | `Unsupported_operation_for_construction ->
         false
     | `Signature_missing ->
+        false
+    | `Exception _ ->
         false
 
   let create ?context kind = {extra_context= context; kind}

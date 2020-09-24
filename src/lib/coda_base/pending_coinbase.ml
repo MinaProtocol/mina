@@ -24,7 +24,7 @@ module Coinbase_data = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -34,9 +34,7 @@ module Coinbase_data = struct
 
   type var = Public_key.Compressed.var * Amount.var
 
-  type value = Stable.Latest.t [@@deriving sexp]
-
-  let var_of_t ((public_key, amount) : value) =
+  let var_of_t ((public_key, amount) : t) =
     (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let to_input (pk, amount) =
@@ -54,7 +52,7 @@ module Coinbase_data = struct
                (Amount.var_to_bits amount)) ]
   end
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, t) Typ.t =
     let spec =
       let open Data_spec in
       [Public_key.Compressed.typ; Amount.typ]
@@ -441,23 +439,46 @@ module Update = struct
     end
   end
 
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('action, 'coinbase_data) t =
+          {action: 'action; coinbase_data: 'coinbase_data}
+        [@@deriving sexp, to_yojson, hlist]
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        Action.Stable.V1.t
-        * Coinbase_data.Stable.V1.t
-        * State_body_hash.Stable.V1.t
-      [@@deriving sexp]
+      type t = (Action.Stable.V1.t, Coinbase_data.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type var = Action.var * Coinbase_data.var * State_body_hash.var
+  [%%define_locally
+  Poly.(to_hlist, of_hlist)]
 
-  let var_of_t (a, c, s) =
-    (Action.var_of_t a, Coinbase_data.var_of_t c, State_body_hash.var_of_t s)
+  type var = (Action.var, Coinbase_data.var) Poly.t
+
+  let typ =
+    let open Snark_params.Tick.Typ in
+    of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      [Action.typ; Coinbase_data.typ]
+
+  let genesis : t =
+    { coinbase_data=
+        (Signature_lib.Public_key.Compressed.empty, Currency.Amount.zero)
+    ; action= Action.Update_none }
+
+  let var_of_t (t : t) : var =
+    { action= Action.var_of_t t.action
+    ; coinbase_data= Coinbase_data.var_of_t t.coinbase_data }
 end
 
 (* Sparse_ledger.Make is applied more than once in the code, so
@@ -795,7 +816,8 @@ module T = struct
 
     let%snarkydef add_coinbase
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) t
-        ((action : Update.Action.var), (pk, amount), state_body_hash) =
+        ({action; coinbase_data= pk, amount} : Update.var)
+        ~supercharge_coinbase state_body_hash =
       let depth = constraint_constants.pending_coinbase_depth in
       let%bind addr1, addr2 =
         request_witness
@@ -821,8 +843,20 @@ module T = struct
       in
       let update_stack1 stack =
         let%bind stack = update_state_stack stack in
-        let total_coinbase_amount =
-          Currency.Amount.var_of_t constraint_constants.coinbase_amount
+        let%bind total_coinbase_amount =
+          let coinbase_amount =
+            Currency.Amount.var_of_t constraint_constants.coinbase_amount
+          in
+          let supercharged_coinbase =
+            let amt =
+              Option.value_exn
+                (Currency.Amount.scale constraint_constants.coinbase_amount
+                   constraint_constants.supercharged_coinbase_factor)
+            in
+            Currency.Amount.var_of_t amt
+          in
+          Currency.Amount.Checked.if_ supercharge_coinbase
+            ~then_:supercharged_coinbase ~else_:coinbase_amount
         in
         let%bind rem_amount =
           Currency.Amount.Checked.sub total_coinbase_amount amount
@@ -1229,7 +1263,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
-            List.fold cbs ~init:!pending_coinbases ~f:(fun acc coinbase ->
+            List.fold cbs ~init:!pending_coinbases ~f:(fun acc (coinbase, _) ->
                 let t =
                   add_coinbase ~depth acc ~coinbase ~is_new_stack:!is_new_stack
                   |> Or_error.ok_exn
@@ -1257,16 +1291,21 @@ end
 let add_coinbase_with_zero_checks (type t)
     (module T : Pending_coinbase_intf with type t = t) (t : t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~coinbase ~state_body_hash ~is_new_stack =
+    ~coinbase ~supercharged_coinbase ~state_body_hash ~is_new_stack =
   let depth = constraint_constants.pending_coinbase_depth in
   if Amount.equal coinbase.Coinbase.amount Amount.zero then t
   else
-    let max_coinbase_amount = constraint_constants.coinbase_amount in
+    let max_coinbase_amount =
+      if supercharged_coinbase then
+        Option.value_exn
+          (Currency.Amount.scale constraint_constants.coinbase_amount
+             constraint_constants.supercharged_coinbase_factor)
+      else constraint_constants.coinbase_amount
+    in
     let coinbase' =
       Coinbase.create
         ~amount:
-          ( Amount.sub max_coinbase_amount coinbase.amount
-          |> Option.value_exn ?here:None ?message:None ?error:None )
+          (Option.value_exn (Amount.sub max_coinbase_amount coinbase.amount))
         ~receiver:coinbase.receiver ~fee_transfer:None
       |> Or_error.ok_exn
     in
@@ -1291,7 +1330,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
   in
   test ~trials:20
     (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
-    ~f:(fun (base, cb) ->
+    ~f:(fun (base, (cb, _supercharged_coinbase)) ->
       let coinbase_data = Coinbase_data.of_coinbase cb in
       let unchecked = Stack.push_coinbase cb base in
       let checked =
@@ -1319,7 +1358,9 @@ let%test_unit "Checked_tree = Unchecked_tree" =
     (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
        State_body_hash.gen)
-    ~f:(fun (coinbase, state_body_hash) ->
+    ~f:
+      (fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+           , state_body_hash ) ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
         Currency.Amount.(
@@ -1330,6 +1371,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         add_coinbase_with_zero_checks ~constraint_constants
           (module T)
           pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
+          ~supercharged_coinbase
       in
       (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1338,12 +1380,17 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.var_of_t action in
+          let supercharge_coinbase_var =
+            Boolean.var_of_value supercharged_coinbase
+          in
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 (action_var, coinbase_var, state_body_hash_var))
+                 {Update.Poly.action= action_var; coinbase_data= coinbase_var}
+                 ~supercharge_coinbase:supercharge_coinbase_var
+                 state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack))
           in
           As_prover.read Hash.typ result
@@ -1363,7 +1410,9 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
     (Generator.tuple2
        (Coinbase.Gen.gen ~constraint_constants)
        State_body_hash.gen)
-    ~f:(fun (coinbase, state_body_hash) ->
+    ~f:
+      (fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+           , state_body_hash ) ->
       let pending_coinbases = create ~depth () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let action =
@@ -1375,6 +1424,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         add_coinbase_with_zero_checks ~constraint_constants
           (module T)
           pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
+          ~supercharged_coinbase
       in
       (* inside the `open' below, Checked means something else, so define these functions *)
       let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
@@ -1384,12 +1434,17 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.(var_of_t action) in
+          let supercharge_coinbase_var =
+            Boolean.var_of_value supercharged_coinbase
+          in
           let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 (action_var, coinbase_var, state_body_hash_var))
+                 {Update.Poly.action= action_var; coinbase_data= coinbase_var}
+                 ~supercharge_coinbase:supercharge_coinbase_var
+                 state_body_hash_var)
               (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1439,7 +1494,8 @@ let%test_unit "push and pop multiple stacks" =
           |> Or_error.ok_exn
         in
         (Pending_coinbase.Stack.empty, t')
-    | (initial_coinbase, state_body_hash) :: coinbases ->
+    | ((initial_coinbase, _supercharged_coinbase), state_body_hash)
+      :: coinbases ->
         let t' =
           Pending_coinbase.add_state ~depth t state_body_hash
             ~is_new_stack:true
@@ -1450,11 +1506,14 @@ let%test_unit "push and pop multiple stacks" =
         in
         let updated =
           List.fold coinbases ~init:t'
-            ~f:(fun pending_coinbases (coinbase, state_body_hash) ->
+            ~f:(fun pending_coinbases
+               ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+               , state_body_hash )
+               ->
               add_coinbase_with_zero_checks ~constraint_constants
                 (module Pending_coinbase)
                 pending_coinbases ~coinbase ~is_new_stack:false
-                ~state_body_hash )
+                ~state_body_hash ~supercharged_coinbase )
         in
         let new_stack =
           Or_error.ok_exn

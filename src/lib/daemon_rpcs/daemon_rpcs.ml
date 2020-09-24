@@ -6,7 +6,7 @@ module Types = Types
 module Client = Client
 
 module Get_transaction_status = struct
-  type query = User_command.Stable.Latest.t [@@deriving bin_io_unversioned]
+  type query = Signed_command.Stable.Latest.t [@@deriving bin_io_unversioned]
 
   type response = Transaction_status.State.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]

@@ -534,6 +534,7 @@ let update_metrics_with_diff (type mutant) t
       Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
+      let best_tip_breadcrumb = best_tip t in
       let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
       let blockchain_length =
         Int.to_float
@@ -546,17 +547,20 @@ let update_metrics_with_diff (type mutant) t
         |> Float.of_int
       in
       Coda_metrics.(
+        let best_tip_user_txns =
+          Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
+        in
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float
-            (List.length (Breadcrumb.user_commands new_root_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
         in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
+        Gauge.set Transition_frontier.best_tip_user_txns best_tip_user_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc_one Transition_frontier.root_transitions ;

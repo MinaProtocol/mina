@@ -8,12 +8,17 @@ module Colors = {
   let black = Css.black;
   let purple = `hex("5362C8");
   let digitalBlack = `hex("2d2d2d");
+  let digitalBlackA = a => `rgba(45, 45, 45, a);
   let purple = `hex("5362C8");
+  let digitalGray = `hex("575757");
+  let error = `hex("e93939");
+  let status = `hex("ffb13b");
+  let codeHighlight = `hex("e9eaf3");
 };
 
 module Typeface = {
   let monumentGrotesk = fontFamily("Monument Grotesk, serif");
-  let monumentGroteskMono = fontFamily("Monument Grotesk mono, serif");
+  let monumentGroteskMono = fontFamily("Monument Grotesk Mono, monospace");
   let ibmplexsans = fontFamily("IBM Plex Sans, sans-serif");
 };
 
@@ -61,6 +66,7 @@ module Type = {
   let h2 =
     style([
       Typeface.monumentGrotesk,
+      fontWeight(`normal),
       fontSize(`rem(1.875)),
       lineHeight(`rem(2.25)),
       color(Colors.digitalBlack),
@@ -148,12 +154,12 @@ module Type = {
       ),
     ]);
   /** some styles have not been perfected, but all can be added and adjusted as needed! */
-  let label =
+  let label_ = c =>
     style([
       Typeface.monumentGroteskMono,
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
-      color(Colors.digitalBlack),
+      color(c),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
       media(
@@ -161,6 +167,9 @@ module Type = {
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
     ]);
+
+  let label = label_(Colors.digitalBlack);
+  let whiteLabel = label_(Colors.white);
 
   let buttonLabel =
     style([
@@ -197,7 +206,9 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.1)),
       lineHeight(`rem(1.1)),
+      cursor(`pointer),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let sidebarLink =
@@ -205,7 +216,10 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
+      cursor(`pointer),
+      textDecoration(`none),
       color(Colors.digitalBlack),
+      hover([color(Colors.orange)]),
     ]);
 
   let tooltip =
@@ -224,14 +238,14 @@ module Type = {
       letterSpacing(`em(-0.01)),
     ]);
 
-  let metadata =
-    style([
-      Typeface.monumentGrotesk,
+  let metadata_ = [
+      Typeface.monumentGroteskMono,
       fontSize(`px(12)),
       lineHeight(`rem(1.)),
       letterSpacing(`em(0.05)),
       textTransform(`uppercase),
-    ]);
+    ];
+  let metadata = style(metadata_);
 
   let announcement =
     style([
@@ -261,18 +275,19 @@ module Type = {
       ),
     ]);
 
-  let sectionSubhead =
-    style([
-      Typeface.monumentGroteskMono,
+  let sectionSubhead_ = [
+      Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
       letterSpacing(`px(-1)),
       color(Colors.digitalBlack),
+      fontWeight(`light),
       media(
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
-    ]);
+    ];
+  let sectionSubhead = style(sectionSubhead_);
 
   let paragraph =
     style([
@@ -297,6 +312,17 @@ module Type = {
         [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
       ),
     ]);
+
+  let inlineCode_ =[
+      Typeface.monumentGroteskMono,
+      fontSize(`rem(0.9375)),
+      lineHeight(`rem(1.5)),
+      color(Colors.digitalBlack),
+      backgroundColor(Colors.codeHighlight),
+      padding2(~v=`zero, ~h=`rem(0.625)),
+      borderRadius(`px(3))
+    ];
+  let inlineCode = style(inlineCode_);
 
   let paragraphMono =
     style([
@@ -334,6 +360,8 @@ global(
   "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
   [boxSizing(`borderBox)],
 );
+
+global("body", [unsafe("minWidth", "fit-content")]);
 
 // Reset padding that appears only on some browsers
 global(

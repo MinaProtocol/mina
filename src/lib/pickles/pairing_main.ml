@@ -333,6 +333,13 @@ struct
           ; beta_2
           ; beta_3 } ) )
 
+  let det_sqrt =
+    unstage
+      (Common.det_sqrt
+         (module Impl)
+         ~two_adic_root_of_unity:(Backend.Tick.Field.two_adic_root_of_unity ())
+         ~two_adicity:34 ~det_sqrt_witness:Backend.Tick.Field.det_sqrt_witness)
+
   let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Field.of_int 5 in
@@ -341,8 +348,7 @@ struct
         let sq =
           Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
         in
-        (* TODO: Make deterministic *)
-        Field.sqrt sq )
+        det_sqrt sq )
 
   let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~inv)
 
