@@ -19,8 +19,8 @@ Parameter | Description
 --- | ---
 `bot.name` | name of bot to deploy
 `bot.image` | container image representing bot function/role
-`bot.testnet` | coda protocol testnet to deploy to
 `bot.role` | role/function of bot to deploy
+`bot.testnet` | coda protocol testnet to deploy to
 
 ### Optional Settings
 

@@ -24,8 +24,8 @@ spec:
 {{ toYaml .Values.bot.resources | nindent 10 }}
 {{- end }}
         image: {{ $.Values.bot.image }}
-        command: {{ $.Values.bot.command | default([], true) }}
-        args: {{ $.Values.bot.args | default([], true) }}
+        command: {{ $.Values.bot.command }}
+        args: {{ $.Values.bot.args }}
         env:
 {{- if .Values.bot.optionalEnv }}
 {{ toYaml .Values.bot.optionalEnv | nindent 10 }}
