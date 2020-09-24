@@ -168,12 +168,12 @@ struct
     let compute ((lc, c) : ((Fp.t * V.t) list * Fp.t option)) =
       List.fold lc ~init:(Option.value c ~default:Fp.zero)
         ~f:(fun acc (s, x) ->
-            let sx =
+            let x =
               match x with
               | External x -> external_values x
               | Internal x -> Hashtbl.find_exn internal_values x
             in
-            Fp.(acc + sx))
+            Fp.(acc + s * x))
     in
     List.iteri (List.rev sys.rows_rev) ~f:(fun i row ->
         Array.iteri row ~f:(fun j v ->
@@ -338,7 +338,19 @@ let create () =
       in
       match terms with
       | [] -> assert false
-      | [(x, i)] -> (x, `Var (V.External i))
+
+
+      | [(ls, lx)] -> 
+        begin match constant with
+          | None -> (ls, `Var (V.External lx))
+          | Some c ->
+            (* res = ls * lx + c *)
+            let res = create_internal ~constant:c sys [ (ls, External lx) ] in
+            add_generic_constraint ~l:(ls, External lx) ~o:(Fp.one, res)
+              (Fp.Vector.of_array [|ls; Fp.zero; Fp.(negate one); Fp.zero; match constant with | Some x -> x | None -> Fp.zero |]) sys ;
+            (Fp.one, `Var res)
+        end 
+
       | (ls, lx) :: tl ->
         let (rs, rx) = completely_reduce sys tl in
         let res = create_internal sys [ (ls, External lx); (rs, rx) ] in
