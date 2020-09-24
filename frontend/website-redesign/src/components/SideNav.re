@@ -11,7 +11,7 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [
           marginRight(rem(2.)),
-          marginTop(rem(2.)),
+          marginTop(`zero),
           position(`sticky),
           top(rem(2.5)),
         ],
