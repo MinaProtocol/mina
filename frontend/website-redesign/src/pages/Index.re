@@ -75,6 +75,7 @@ let make = () => {
           },
         }
       />
+      <BlogModule />
     </div>
   </Page>;
 };

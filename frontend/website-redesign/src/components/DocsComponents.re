@@ -14,6 +14,40 @@ module Styles = {
       backgroundSize(`cover),
       backgroundImage(url("/static/img/link.svg")),
     ]);
+
+  let h1Spacing = style([
+    marginBottom(`rem(1.))
+  ]);
+
+  let headerSpacing = merge([
+                            h1Spacing,
+                            style([
+    marginTop(`rem(3.))
+  ])]);
+
+  let paragraphSpacing = style([
+    marginBottom(`rem(1.))
+  ]);
+
+  let code = style([
+    Theme.Typeface.monumentGroteskMono,
+    fontSize(`rem(1.)),
+    lineHeight(`rem(1.5))
+  ]);
+
+  let list = style([
+    color(Theme.Colors.digitalBlack),
+    Theme.Typeface.monumentGrotesk,
+    fontSize(`rem(1.125)),
+    lineHeight(`rem(1.6875)),
+    marginTop(`rem(0.5)),
+    marginBottom(`rem(1.)),
+    marginLeft(`rem(2.6875)),
+  ]);
+
+  let link = style([
+    textDecoration(`none)
+  ]);
 };
 
 module type Component = {let element: React.element;};
@@ -52,32 +86,32 @@ open Css;
 
 module H1 =
   WrapHeader({
-    let element = <h1 className=Theme.Type.h1 />;
+    let element = <h1 className=merge([Styles.h1Spacing, Theme.Type.h1]) />;
   });
 
 module H2 =
   WrapHeader({
-    let element = <h2 className=Theme.Type.h2 />;
+    let element = <h2 className=merge([Styles.headerSpacing, Theme.Type.h2]) />;
   });
 
 module H3 =
   WrapHeader({
-    let element = <h3 className=Theme.Type.h3 />;
+    let element = <h3 className=merge([Styles.headerSpacing, Theme.Type.h3]) />;
   });
 
 module H4 =
   WrapHeader({
-    let element = <h4 className=Theme.Type.h4 />;
+    let element = <h4 className=merge([Styles.headerSpacing, Theme.Type.h4]) />;
   });
 
 module P =
   Wrap({
-    let element = <p className=Theme.Type.paragraph />;
+    let element = <p className=merge([Styles.paragraphSpacing, Theme.Type.paragraph]) />;
   });
 
 module A =
   Wrap({
-    let element = <a className=Theme.Type.link />;
+    let element = <a className=merge([Styles.link, Theme.Type.link]) />;
   });
 
 module Strong =
@@ -128,7 +162,7 @@ module Pre = {
           borderRadius(`px(4)),
           padding2(~v=`rem(1.), ~h=`rem(1.)),
           overflow(`scroll),
-          // selector("code", [Theme.Type.paragraphMono]),
+          selector("code", [color(Theme.Colors.white)]),
         ])}>
         children
       </pre>
@@ -138,17 +172,17 @@ module Pre = {
 
 module Code =
   Wrap({
-    let element = <code className=Theme.Type.paragraphMono />;
+    let element = <code className=Styles.code />;
   });
 
 module Ul =
   Wrap({
-    let element = <ul className="" /* TODO */ />;
+    let element = <ul className=Styles.list />;
   });
 
 module Ol =
   Wrap({
-    let element = <ol className="" /* TODO */ />;
+    let element = <ol className=Styles.list />;
   });
 
 module Img =
