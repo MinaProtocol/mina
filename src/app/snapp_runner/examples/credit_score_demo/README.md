@@ -105,6 +105,16 @@
   ```
   - The `verificationKey` field should be replaced with the generated verification key
   - The `snappAccount.publicKey` field should be replaced with the snapp account's public key
+* Transfer some funds from the demo-block-producer to the snapp account:
+  ```graphql
+  mutation TransferToSnappAccount {
+    sendPayment(input:
+      { fee: "10000000"
+      , amount: "100000000"
+      , to: "NEW_PK_HERE"
+      , from: "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g" })
+  }
+  ```
 * Lock the demo-block-producer's wallet.
   - `_build/default/src/app/cli/src/coda.exe accounts lock -public-key B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`
   - This demonstrates that the client isn't generating a signature in order for
