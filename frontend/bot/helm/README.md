@@ -13,10 +13,10 @@ This chart bootstraps O(1) Lab's Coda protocol bot for providing various service
 
 The following table lists the configurable parameters of the `o1-bot` chart and its default values.
 
-## Required Settings
+### Required Settings
 
 Parameter | Description
---- | --- | ---
+--- | ---
 `bot.name` | name of bot to deploy
 `bot.image` | container image representing bot function/role
 `bot.testnet` | coda protocol testnet to deploy to

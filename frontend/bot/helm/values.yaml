@@ -1,4 +1,4 @@
-bot: # user-agent default settings
+bot: # user-agent role default settings
   name: o1-bot
   image: codaprotocol/coda-user-agent:0.1.5
   testnet: default
