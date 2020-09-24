@@ -144,11 +144,19 @@ let make = () => {
               description: "You don't have to have expensive hardware, wait days for the blockchain to sync, or use a ton of compute power to participate in consensus. Just follow clear, straightforward instructions and connect to the live peer-to-peer Mina network.",
               buttonCopy: "Get Started",
               buttonUrl: "/",
-              image: "/static/img/hands.png",
+              image: "/static/img/ProgrammableMoney.png",
             },
           |])
         }
       />
     </div>
+    <ButtonBar
+      kind=ButtonBar.HelpAndSupport
+      backgroundImg="/static/img/ButtonBarBackground.png"
+    />
+    <ButtonBar
+      kind=ButtonBar.CommunityLanding
+      backgroundImg="/static/img/ButtonBarBackground.png"
+    />
   </Page>;
 };
