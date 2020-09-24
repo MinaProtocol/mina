@@ -179,8 +179,8 @@ end = struct
       type t = (G.t, Vk.t) Poly.Stable.V1.t
       [@@deriving sexp, eq, compare, hash, yojson]
 
-      let to_yojson json =
-        let x = to_yojson json in
+      let of_yojson json =
+        let x = of_yojson json in
         {x with wrap_vk= Some (Vk.of_repr t)}
 
       let to_latest = Fn.id
