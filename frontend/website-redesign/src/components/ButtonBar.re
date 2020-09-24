@@ -59,36 +59,58 @@ module Card = {
   };
 };
 
+module ButtonBarStyles = {
+  open Css;
+
+  let background = backgroundImg =>
+    style([
+      padding2(~v=`rem(1.5), ~h=`rem(1.25)),
+      backgroundImage(`url(backgroundImg)),
+      backgroundSize(`cover),
+      media(
+        Theme.MediaQuery.tablet,
+        [padding2(~v=`rem(4.25), ~h=`rem(2.75))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [padding2(~v=`rem(16.), ~h=`rem(9.5))],
+      ),
+    ]);
+
+  let container =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceEvenly),
+      selector(
+        "h2",
+        [marginBottom(`rem(2.)), important(color(Theme.Colors.white))],
+      ),
+    ]);
+
+  let grid =
+    style([
+      display(`grid),
+      gridTemplateColumns([
+        `repeat((`autoFit, `minmax((`rem(6.5), `fr(1.))))),
+      ]),
+      gridGap(`rem(1.)),
+    ]);
+
+  let content =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      color(Theme.Colors.white),
+    ]);
+
+  let icon = merge([style([marginLeft(`zero)])]);
+};
+
 module CommunityLanding = {
   module Styles = {
     open Css;
-    let container =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`spaceEvenly),
-        selector(
-          "h2",
-          [marginBottom(`rem(2.)), important(color(Theme.Colors.white))],
-        ),
-      ]);
-
-    let grid =
-      style([
-        display(`grid),
-        gridTemplateColumns([
-          `repeat((`autoFit, `minmax((`px(103), `fr(1.))))),
-        ]),
-        gridGap(`rem(1.)),
-      ]);
-
-    let content =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        alignItems(`center),
-        color(Theme.Colors.white),
-      ]);
 
     let title =
       merge([
@@ -102,25 +124,23 @@ module CommunityLanding = {
           marginBottom(`rem(0.5)),
         ]),
       ]);
-
-    let icon = style([marginLeft(`zero)]);
   };
   [@react.component]
   let make = () => {
     let renderCard = (kind, title) => {
       <Card>
-        <div className=Styles.content>
-          <span className=Styles.icon> <Icon kind /> </span>
+        <div className=ButtonBarStyles.content>
+          <span className=ButtonBarStyles.icon> <Icon kind /> </span>
           <h5 className=Styles.title> {React.string(title)} </h5>
         </div>
       </Card>;
     };
 
-    <div className=Styles.container>
+    <div className=ButtonBarStyles.container>
       <h2 className=Theme.Type.pageLabel>
         {React.string("All The Things")}
       </h2>
-      <div className=Styles.grid>
+      <div className=ButtonBarStyles.grid>
         {renderCard(Icon.Twitter, "Twitter")}
         {renderCard(Icon.Forums, "Forums")}
         {renderCard(Icon.Wiki, "Wiki")}
@@ -136,33 +156,10 @@ module CommunityLanding = {
 module HelpAndSupport = {
   module Styles = {
     open Css;
-    let container =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`spaceEvenly),
-        selector(
-          "h2",
-          [marginBottom(`rem(2.)), important(color(Theme.Colors.white))],
-        ),
-      ]);
-
-    let grid =
-      style([
-        display(`grid),
-        gridTemplateColumns([
-          `repeat((`autoFit, `minmax((`px(103), `fr(1.))))),
-        ]),
-        gridGap(`rem(1.)),
-      ]);
-
     let content =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        alignItems(`center),
-        color(Theme.Colors.white),
-        media(Theme.MediaQuery.tablet, [alignItems(`flexStart)]),
+      merge([
+        ButtonBarStyles.content,
+        style([media(Theme.MediaQuery.tablet, [alignItems(`flexStart)])]),
       ]);
 
     let title =
@@ -198,9 +195,9 @@ module HelpAndSupport = {
       ]);
 
     let icon =
-      style([
-        marginLeft(`zero),
-        media(Theme.MediaQuery.tablet, [marginLeft(`auto)]),
+      merge([
+        ButtonBarStyles.icon,
+        style([media(Theme.MediaQuery.tablet, [marginLeft(`auto)])]),
       ]);
   };
   [@react.component]
@@ -215,9 +212,9 @@ module HelpAndSupport = {
       </Card>;
     };
 
-    <div className=Styles.container>
+    <div className=ButtonBarStyles.container>
       <h2 className=Theme.Type.h2> {React.string("Help & Support")} </h2>
-      <div className=Styles.grid>
+      <div className=ButtonBarStyles.grid>
         {renderCard(
            Icon.Discord,
            "Discord",
@@ -248,28 +245,9 @@ module HelpAndSupport = {
   };
 };
 
-module Styles = {
-  open Css;
-
-  let background = backgroundImg =>
-    style([
-      padding2(~v=`rem(1.5), ~h=`rem(1.25)),
-      backgroundImage(`url(backgroundImg)),
-      backgroundSize(`cover),
-      media(
-        Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.25), ~h=`rem(2.75))],
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(16.), ~h=`rem(9.5))],
-      ),
-    ]);
-};
-
 [@react.component]
 let make = (~kind, ~backgroundImg) => {
-  <div className={Styles.background(backgroundImg)}>
+  <div className={ButtonBarStyles.background(backgroundImg)}>
     <Wrapped>
       {switch (kind) {
        | GetStarted => React.null
