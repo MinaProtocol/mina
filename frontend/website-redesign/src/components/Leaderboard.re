@@ -677,7 +677,7 @@ let make =
        } else if (Array.length(filteredMembers) == 0) {
          <div className=Styles.emptyMessage>
            <Badge
-             src="/static/img/LeaderboardEmpty.png"
+             src="/static/svg/EmptyLeaderboard.svg"
              title="Empty Leaderboard"
              alt="Empty Leaderboard"
            />

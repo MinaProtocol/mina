@@ -11,7 +11,7 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [
           marginRight(rem(2.)),
-          marginTop(rem(2.)),
+          marginTop(`zero),
           position(`sticky),
           top(rem(2.5)),
         ],
@@ -20,7 +20,7 @@ module Styles = {
 
   let cell =
     style([
-      height(`rem(2.75)),
+      minHeight(`rem(2.75)),
       width(`rem(12.)),
       display(`flex),
       justifyContent(`spaceBetween),
@@ -65,9 +65,10 @@ module Styles = {
     merge([
       Theme.Type.sidebarLink,
       style([
+        padding2(~v=`rem(0.6), ~h=`zero),
         display(`inlineBlock),
         marginLeft(`rem(1.)),
-        height(`rem(1.5)),
+        minHeight(`rem(1.5)),
       ]),
     ]);
 
@@ -105,6 +106,7 @@ module Item = {
       | None => (slug, `Top)
       };
     let isCurrentItem = currentSlug == fullSlug;
+    Js.log4("currentSlug", currentSlug, "fullSlug", fullSlug);
     let href = fullSlug;
     <li
       className={

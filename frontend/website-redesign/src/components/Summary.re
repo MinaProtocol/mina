@@ -33,7 +33,7 @@ let fetchStatistics = () => {
 
 module Styles = {
   open Css;
-
+  let container = style([marginTop(`rem(5.))]);
   let header =
     merge([
       Theme.Type.h1,
@@ -50,7 +50,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       paddingTop(`rem(2.8)),
-      media(Theme.MediaQuery.notMobile, [alignItems(`center)]),
       media(
         Theme.MediaQuery.desktop,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
@@ -138,7 +137,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.notMobile,
-        [padding2(~v=`rem(0.), ~h=`rem(6.0))],
+        [position(`absolute), top(`rem(7.)), left(`zero)],
       ),
     ]);
 
@@ -173,7 +172,14 @@ module StatisticsRow = {
         statistic,
         style([
           display(`flex),
-          media(Theme.MediaQuery.tablet, [fontSize(`rem(2.5))]),
+          media(
+            Theme.MediaQuery.tablet,
+            [
+              marginBottom(`px(3)),
+              fontSize(`rem(2.5)),
+              lineHeight(`rem(2.5)),
+            ],
+          ),
         ]),
       ]);
     let container =
@@ -277,7 +283,7 @@ let make = () => {
     None;
   });
 
-  <>
+  <div className=Styles.container>
     <h1 className=Styles.header> {React.string("Testnet Leaderboard")} </h1>
     <div className=Styles.heroRow>
       <div className=Styles.heroLeft>
@@ -338,5 +344,5 @@ let make = () => {
         </div>
       </div>
     </div>
-  </>;
+  </div>;
 };

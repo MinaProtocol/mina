@@ -208,28 +208,39 @@ module Footer = {
     let footer =
       style([
         width(`percent(100.)),
-        background(`rgba((255, 239, 235, 1.))),
+        background(Theme.Colors.gray),
         color(Theme.Colors.white),
-        padding(`rem(1.)),
+        padding2(~v=`rem(2.), ~h=`rem(2.)),
+        media(
+          Theme.MediaQuery.tablet,
+          [padding2(~v=`rem(3.3), ~h=`rem(6.))],
+        ),
       ]);
     let header = merge([Theme.Type.h5, style([fontSize(`rem(1.5))])]);
     let copy =
       merge([
-        Theme.Type.paragraph,
-        style([fontSize(`rem(1.)), fontWeight(`light)]),
+        Theme.Type.h5,
+        style([
+          fontSize(`rem(1.)),
+          fontWeight(`light),
+          lineHeight(`rem(1.5)),
+        ]),
       ]);
 
-    let bold = merge([header, style([fontSize(`rem(1.25))])]);
-    let disclaimer = merge([copy, style([fontSize(`rem(1.))])]);
+    let bold = merge([Theme.Type.h6, style([fontSize(`rem(1.25))])]);
+    let disclaimer =
+      merge([Theme.Type.paragraphSmall, style([fontSize(`rem(1.))])]);
   };
   [@react.component]
   let make = () => {
     <div className=Styles.footer>
-      <p className=Styles.header>
-        {React.string(
-           "Testnet points are displayed for releases in the current testnet phase.",
-         )}
-      </p>
+      <strong>
+        <p className=Styles.header>
+          {React.string(
+             "Testnet points are displayed for releases in the current testnet phase.",
+           )}
+        </p>
+      </strong>
       <p className=Styles.copy>
         {React.string(
            "Point totals from all testnet phases are included when calculating total testnet points.",

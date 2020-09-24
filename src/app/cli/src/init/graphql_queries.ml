@@ -1,4 +1,4 @@
-module Decoders = Graphql_client.Decoders
+module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
 [%graphql
@@ -151,8 +151,7 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $token: UInt64,
-          $fee: UInt64!,
+          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input:
