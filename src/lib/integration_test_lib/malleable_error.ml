@@ -64,14 +64,15 @@ let ok_exn (res : 'a t) : 'a Deferred.t =
   | Error {Hard_fail.hard_error= err; Hard_fail.soft_errors= _} ->
       Error.raise err.error
 
-let hard_error_string message =
+let of_string_hard_error message =
   Deferred.return
     (Error
        { Hard_fail.hard_error=
            Test_error.raw_internal_error (Error.of_string message)
        ; soft_errors= [] })
 
-let hard_errorf format = Printf.ksprintf hard_error_string format
+let of_string_hard_error_format format =
+  Printf.ksprintf of_string_hard_error format
 
 let soft_error res err =
   Deferred.return
@@ -79,7 +80,7 @@ let soft_error res err =
        { Accumulator.computation_result= res
        ; soft_errors= [Test_error.raw_internal_error err] })
 
-let hard_error err =
+let of_error_hard err =
   Deferred.return
     (Error
        { Hard_fail.hard_error= Test_error.raw_internal_error err

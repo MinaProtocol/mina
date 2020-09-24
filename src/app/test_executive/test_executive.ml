@@ -9,7 +9,8 @@ type inputs = {test: test; coda_image: string}
 
 let tests : test list =
   [ ( "block-production"
-    , (module Block_production_test.Make : Test_functor_intf) ) ]
+    , (module Block_production_test.Make : Test_functor_intf) )
+  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
 
 let to_or_error = Deferred.map ~f:Or_error.return
 
@@ -123,8 +124,8 @@ let main inputs =
         @@ Printf.sprintf "received signal %s" (Signal.to_string signal)
       in
       don't_wait_for
-        (dispatch_cleanup "signal received" (Malleable_error.hard_error error))
-  ) ;
+        (dispatch_cleanup "signal received"
+           (Malleable_error.of_error_hard error)) ) ;
   let%bind monitor_test_result =
     Monitor.try_with ~extract_exn:true (fun () ->
         let open Malleable_error.Let_syntax in
@@ -151,7 +152,7 @@ let main inputs =
     | Ok malleable_error ->
         Deferred.return malleable_error
     | Error exn ->
-        Malleable_error.hard_error (Error.of_exn exn)
+        Malleable_error.of_error_hard (Error.of_exn exn)
   in
   let%bind () = dispatch_cleanup "test completed" test_result in
   exit 0
@@ -200,7 +201,8 @@ let () =
   let test_executive_term =
     Term.(
       const start $ inputs
-      $ const (module Block_production_test.Make : Test_functor_intf))
+      $ const (module Block_production_test.Make : Test_functor_intf)
+      $ const (module Send_payment_test.Make : Test_functor_intf))
   in
   let test_executive_info =
     let doc = "Run coda integration test(s)." in

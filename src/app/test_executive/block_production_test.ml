@@ -16,7 +16,7 @@ module Make (Engine : Engine_intf) = struct
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in
-    let block_producer = List.nth network.block_producers 0 in
+    let block_producer = Core_kernel.List.nth_exn network.block_producers 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
     Log_engine.wait_for ~blocks:1 ~timeout:(`Slots 30) log_engine
 end
