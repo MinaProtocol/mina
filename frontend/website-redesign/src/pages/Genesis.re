@@ -130,6 +130,19 @@ module FoundingMembersSection = {
   };
 };
 
+module WorldMapSection = {
+  module Styles = {
+    open Css;
+    let container = style([width(`percent(100.)), position(`relative)]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.container> 
+    <div className=Styles.
+    </div> 
+  };
+};
+
 [@react.component]
 let make = () => {
   <Page title="Genesis Page">
@@ -171,6 +184,6 @@ let make = () => {
       <Spacer height=7. />
     </FeaturedSingleRow>
     <FoundingMembersSection />
-
+    <WorldMapSection />
   </Page>;
 };
