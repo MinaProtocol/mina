@@ -158,6 +158,9 @@ let to_input : _ Poly.t -> _ =
         ; num_branches ]
       : _ Random_oracle_input.t )
 
+let to_repr {Poly.step_data; max_width; wrap_index; wrap_vk= _} =
+  {Repr.step_data; max_width; wrap_index}
+
 module Make (G : sig
   type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 end) (Vk : sig
@@ -179,9 +182,10 @@ end = struct
       type t = (G.t, Vk.t) Poly.Stable.V1.t
       [@@deriving sexp, eq, compare, hash, yojson]
 
-      let to_yojson json =
-        let x = to_yojson json in
-        {x with wrap_vk= Some (Vk.of_repr t)}
+      let of_yojson json =
+        let open Result.Let_syntax in
+        let%map t = of_yojson json in
+        {t with Poly.wrap_vk= Some (Vk.of_repr (to_repr t))}
 
       let to_latest = Fn.id
 
@@ -194,9 +198,7 @@ end = struct
                 (struct
                   type nonrec t = t
 
-                  let to_binable
-                      {Poly.step_data; max_width; wrap_index; wrap_vk= _} =
-                    {Repr.Stable.V1.step_data; max_width; wrap_index}
+                  let to_binable = to_repr
 
                   let of_binable
                       ( {Repr.Stable.V1.step_data; max_width; wrap_index= c} as
