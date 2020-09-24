@@ -572,7 +572,9 @@ module Block = struct
             function
             | { Coda_base.With_status.status
               ; data= Coda_base.Transaction.Command command } ->
-                let user_command = Coda_base.With_status.{status; command} in
+                let user_command =
+                  Coda_base.With_fstatus.{status; data= command}
+                in
                 let%bind id =
                   User_command.add_with_status
                     (module Conn)
