@@ -297,12 +297,25 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                          [ ( "hashes of transitions"
                            , `List
                                (List.map breadcrumb_subtrees ~f:(fun tree ->
+                                    let module T = struct
+                                      type t = bool * State_hash.t
+                                      [@@deriving to_yojson]
+                                    end in
                                     Rose_tree.to_yojson
                                       (fun breadcrumb ->
-                                        Cached.peek breadcrumb
-                                        |> Transition_frontier.Breadcrumb
-                                           .state_hash |> State_hash.to_yojson
-                                        )
+                                        let t =
+                                          try
+                                            ( false
+                                            , Cached.peek breadcrumb
+                                              |> Transition_frontier.Breadcrumb
+                                                 .state_hash )
+                                          with _ ->
+                                            ( true
+                                            , Cached.value breadcrumb
+                                              |> Transition_frontier.Breadcrumb
+                                                 .state_hash )
+                                        in
+                                        t |> T.to_yojson )
                                       tree )) ) ]
                        "Successfully added catchup breadcrumbs to \
                         transition_frontier" ;
