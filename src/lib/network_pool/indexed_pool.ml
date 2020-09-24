@@ -85,30 +85,45 @@ let currency_consumed :
         let open Snapp_command.Party in
         let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
             (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
-            =
+            token_id fee_payment =
+          let fee_payer =
+            match fee_payment with
+            | Some {public_key; token_id; _} ->
+                Some (Account_id.create public_key token_id)
+            | None ->
+                None
+          in
           let ps =
             x1.data.body
             :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
           in
           List.find_map ps ~f:(fun p ->
-              match p.delta.sgn with
-              | Pos ->
+              match fee_payer with
+              | Some fee_payer
+                when not
+                       (Account_id.equal fee_payer
+                          (Account_id.create p.pk token_id)) ->
+                  (* Fee payer is distinct from this account. *)
                   None
-              | Neg ->
-                  Some p.delta.magnitude )
+              | _ -> (
+                match p.delta.sgn with
+                | Pos ->
+                    None
+                | Neg ->
+                    Some p.delta.magnitude ) )
           |> Option.value ~default:Currency.Amount.zero
         in
         match c with
         | Proved_proved r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Signed_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_empty r ->
-            f r.one r.two
+            f r.one r.two r.token_id r.fee_payment
         | Signed_empty r ->
-            f r.one r.two )
+            f r.one r.two r.token_id r.fee_payment )
   in
   fee_amt + amt
 
