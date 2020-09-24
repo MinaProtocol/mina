@@ -13,6 +13,7 @@ module Colors = {
   let digitalGray = `hex("575757");
   let error = `hex("e93939");
   let status = `hex("ffb13b");
+  let codeHighlight = `hex("e9eaf3");
 };
 
 module Typeface = {
@@ -274,8 +275,7 @@ module Type = {
       ),
     ]);
 
-  let sectionSubhead =
-    style([
+  let sectionSubhead_ = [
       Typeface.monumentGrotesk,
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
@@ -286,7 +286,8 @@ module Type = {
         MediaQuery.tablet,
         [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
       ),
-    ]);
+    ];
+  let sectionSubhead = style(sectionSubhead_);
 
   let paragraph =
     style([
@@ -311,6 +312,17 @@ module Type = {
         [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
       ),
     ]);
+
+  let inlineCode_ =[
+      Typeface.monumentGroteskMono,
+      fontSize(`rem(0.9375)),
+      lineHeight(`rem(1.5)),
+      color(Colors.digitalBlack),
+      backgroundColor(Colors.codeHighlight),
+      padding2(~v=`zero, ~h=`rem(0.625)),
+      borderRadius(`px(3))
+    ];
+  let inlineCode = style(inlineCode_);
 
   let paragraphMono =
     style([
