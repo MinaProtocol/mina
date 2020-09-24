@@ -24,9 +24,17 @@ spec:
 {{ toYaml .Values.bot.resources | nindent 10 }}
 {{- end }}
         image: {{ $.Values.bot.image }}
-        command: {{ $.Values.bot.cmd }}
-        args: {{ $.Values.bot.args }}
+        command: {{ $.Values.bot.command | default([], true) }}
+        args: {{ $.Values.bot.args | default([], true) }}
         env:
 {{- if .Values.bot.optionalEnv }}
 {{ toYaml .Values.bot.optionalEnv | nindent 10 }}
+{{- end }}
+        volumeMounts:
+{{- if .Values.bot.volumeMounts }}
+{{ toYaml .Values.bot.optionalEnv | nindent 10 }}
+{{- end }}
+      volumes:
+{{- if .Values.bot.volumes }}
+{{ toYaml .Values.bot.volumes | nindent 8 }}
 {{- end }}
