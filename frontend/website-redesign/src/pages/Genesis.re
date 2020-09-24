@@ -5,6 +5,7 @@ let make = () => {
       <Hero
         title="Community"
         header="Genesis Program"
+        backgroundImg=""
         copy="We're looking for community members to join the Genesis Token Grant Program and form the backbone of Mina's robust decentralized network.">
         <Spacer height=2. />
         <Button bgColor=Theme.Colors.black>

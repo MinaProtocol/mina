@@ -113,8 +113,11 @@ let make = () => {
           },
         }
       />
-      <div> {React.string("Testnet Retros & Release Notes goes here")} </div>
-      <div> {React.string("Help and Support goes here")} </div>
+      <TestnetRetroModule />
+      <ButtonBar
+        kind=ButtonBar.HelpAndSupport
+        backgroundImg="/static/img/ButtonBarBackground.png"
+      />
     </div>
   </Page>;
 };
