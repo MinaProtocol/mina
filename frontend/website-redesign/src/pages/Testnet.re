@@ -17,7 +17,8 @@ module Styles = {
       style([color(Theme.Colors.white), marginTop(`rem(4.5))]),
     ]);
 
-  let leaderboardLink = style([textDecoration(`none)]);
+  let leaderboardLink =
+    style([width(`percent(100.)), textDecoration(`none)]);
 
   let leaderboardTextContainer =
     style([
@@ -57,9 +58,9 @@ module Styles = {
       ]),
     ]);
 
-  let gradientSectionExpanded =
+  let leaderboardContainer =
     style([
-      height(`auto),
+      height(`rem(45.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -68,32 +69,6 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
-    ]);
-
-  let gradientSection =
-    merge([
-      gradientSectionExpanded,
-      style([
-        height(`rem(53.)),
-        after([
-          contentRule(""),
-          position(`absolute),
-          bottom(`px(-1)),
-          left(`zero),
-          height(`rem(8.)),
-          width(`percent(100.)),
-          pointerEvents(`none),
-          backgroundImage(
-            `linearGradient((
-              `deg(0.),
-              [
-                (`zero, Theme.Colors.white),
-                (`percent(100.), Theme.Colors.white),
-              ],
-            )),
-          ),
-        ]),
-      ]),
     ]);
 };
 
@@ -105,8 +80,12 @@ let make = () => {
       <Hero
         title="Testnet"
         header="Secure the Network"
-        copy={j|"Push the boundaries of Mina’s testnet to help prepare for mainnet."|j}
-        backgroundImg="/static/img/TestnetBackground.png">
+        copy={j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j}
+        background={
+          Theme.desktop: "/static/img/TestnetBackground.png",
+          tablet: "/static/img/TestnetBackground.png",
+          mobile: "/static/img/TestnetBackground.png",
+        }>
         <p className=Styles.statusBadge>
           {React.string("Testnet Status: ")}
           <StatusBadge service=`Network />
@@ -127,7 +106,7 @@ let make = () => {
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
         </div>
-        <div className=Styles.gradientSection>
+        <div className=Styles.leaderboardContainer>
           <a href="/leaderboard" className=Styles.leaderboardLink>
             <Leaderboard interactive=false />
           </a>

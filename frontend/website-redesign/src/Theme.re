@@ -2,7 +2,7 @@ open Css;
 
 module Colors = {
   let orange = `hex("ff603b");
-  let orangeAlpha = a => `rgba(255,96,59, a);
+  let orangeAlpha = a => `rgba((255, 96, 59, a));
   let mint = `hex("9fe4c9");
   let greyScale = `hex("757575");
   let gray = `hex("d9d9d9");
@@ -35,6 +35,12 @@ module MediaQuery = {
 
   /** to add a style just to mobile  */
   let mobile = "(max-width:48rem)";
+};
+
+type backgroundImage = {
+  desktop: string,
+  tablet: string,
+  mobile: string,
 };
 
 /** this function is needed to include the font files with the font styles */
@@ -242,12 +248,12 @@ module Type = {
     ]);
 
   let metadata_ = [
-      Typeface.monumentGroteskMono,
-      fontSize(`px(12)),
-      lineHeight(`rem(1.)),
-      letterSpacing(`em(0.05)),
-      textTransform(`uppercase),
-    ];
+    Typeface.monumentGroteskMono,
+    fontSize(`px(12)),
+    lineHeight(`rem(1.)),
+    letterSpacing(`em(0.05)),
+    textTransform(`uppercase),
+  ];
   let metadata = style(metadata_);
 
   let announcement =
@@ -279,17 +285,17 @@ module Type = {
     ]);
 
   let sectionSubhead_ = [
-      Typeface.monumentGrotesk,
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
-      letterSpacing(`px(-1)),
-      color(Colors.digitalBlack),
-      fontWeight(`light),
-      media(
-        MediaQuery.tablet,
-        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
-      ),
-    ];
+    Typeface.monumentGrotesk,
+    fontSize(`rem(1.)),
+    lineHeight(`rem(1.5)),
+    letterSpacing(`px(-1)),
+    color(Colors.digitalBlack),
+    fontWeight(`light),
+    media(
+      MediaQuery.tablet,
+      [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
+    ),
+  ];
   let sectionSubhead = style(sectionSubhead_);
 
   let paragraph =
@@ -316,15 +322,15 @@ module Type = {
       ),
     ]);
 
-  let inlineCode_ =[
-      Typeface.monumentGroteskMono,
-      fontSize(`rem(0.9375)),
-      lineHeight(`rem(1.5)),
-      color(Colors.digitalBlack),
-      backgroundColor(Colors.codeHighlight),
-      padding2(~v=`zero, ~h=`rem(0.625)),
-      borderRadius(`px(3))
-    ];
+  let inlineCode_ = [
+    Typeface.monumentGroteskMono,
+    fontSize(`rem(0.9375)),
+    lineHeight(`rem(1.5)),
+    color(Colors.digitalBlack),
+    backgroundColor(Colors.codeHighlight),
+    padding2(~v=`zero, ~h=`rem(0.625)),
+    borderRadius(`px(3)),
+  ];
   let inlineCode = style(inlineCode_);
 
   let paragraphMono =
@@ -336,10 +342,7 @@ module Type = {
       color(Colors.digitalBlack),
       media(
         MediaQuery.tablet,
-        [
-          fontSize(`rem(1.)),
-          lineHeight(`rem(1.5)),
-        ],
+        [fontSize(`rem(1.)), lineHeight(`rem(1.5))],
       ),
     ]);
 
