@@ -4,10 +4,28 @@ module Styles = {
     style([
       height(`rem(120.)),
       width(`percent(100.)),
+      position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
       media(Theme.MediaQuery.desktop, [height(`rem(140.))]),
       position(`relative),
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`zero),
+        left(`zero),
+        right(`zero),
+        height(`rem(30.)),
+        background(
+          linearGradient(
+            deg(0.),
+            [
+              (`percent(0.), white),
+              (`percent(100.), rgba(255, 255, 255, 0.)),
+            ],
+          ),
+        ),
+      ]),
     ]);
 
   let container =
@@ -44,7 +62,6 @@ module Styles = {
 
   let heroImageSize =
     style([
-      height(`rem(20.5)),
       width(`percent(100.)),
       media(
         "(min-width:38rem)",

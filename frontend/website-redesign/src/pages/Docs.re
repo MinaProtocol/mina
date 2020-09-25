@@ -8,14 +8,8 @@ module Style = {
       maxWidth(`rem(53.)),
       marginBottom(`rem(2.875)),
       media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.))]),
-      selector(
-        "p > code, li > code",
-        Theme.Type.inlineCode_,
-      ),
-      selector(
-        "h1 + p",
-        Theme.Type.sectionSubhead_
-      )
+      selector("p > code, li > code", Theme.Type.inlineCode_),
+      selector("h1 + p", Theme.Type.sectionSubhead_),
     ]);
 
   let page =
@@ -23,15 +17,13 @@ module Style = {
       display(`block),
       justifyContent(`center),
       margin(`auto),
-      marginTop(`rem(4.)),
+      marginTop(`rem(2.)),
       padding2(~v=`zero, ~h=`rem(2.)),
       media(Theme.MediaQuery.desktop, [display(`flex)]),
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
     ]);
 
-  let eyebrow = style([
-    marginBottom(`rem(1.))
-  ])
+  let eyebrow = style([marginBottom(`rem(1.))]);
 
   let editLink =
     style([
@@ -92,11 +84,12 @@ let make = (~metadata, ~children) => {
     <Next.Head>
       <link rel="stylesheet" href="/static/css/a11y-light.css" />
     </Next.Head>
+    <div className=Nav.Styles.spacer />
     <div className=Style.page>
       <DocsSideNav currentSlug />
       <div className=Style.content>
         <div className=Style.eyebrow>
-          <LabelEyebrow copy="Documentation"/>
+          <LabelEyebrow copy="Documentation" />
         </div>
         <EditLink route={router.route} />
         <Next.MDXProvider components={DocsComponents.allComponents()}>

@@ -59,8 +59,8 @@ module Styles = {
       style([
         display(`flex),
         alignItems(`center),
-        height(`rem(5.5)),
         padding2(~v=`zero, ~h=`rem(1.5)),
+        minHeight(`rem(5.5)),
         color(white),
         borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
         hover([color(Theme.Colors.orange)]),
@@ -144,13 +144,10 @@ module NavGroup = {
   let make = (~label, ~children) => {
     let (active, setActive) = React.useState(() => false);
     <>
-      <span
-        className=Styles.navLink
-        onMouseOver={_ => setActive(_ => true)}
-        onMouseLeave={_ => setActive(_ => false)}>
+      <span className=Styles.navLink onClick={_ => setActive(_ => !active)}>
         {React.string(label)}
-        {active ? <ul className=Styles.navGroup> children </ul> : React.null}
       </span>
+      {active ? <ul className=Styles.navGroup> children </ul> : React.null}
     </>;
   };
 };
@@ -162,7 +159,13 @@ module NavGroupLink = {
       <li>
         <Icon kind=icon size=2. />
         <Spacer width=1. />
-        <span className=Css.(style([flexGrow(1.)]))>
+        <span
+          className=Css.(
+            merge([
+              Theme.Type.navLink,
+              style([color(white), flexGrow(1.)]),
+            ])
+          )>
           {React.string(label)}
         </span>
         <Icon kind=Icon.ArrowRightSmall size=1.5 />

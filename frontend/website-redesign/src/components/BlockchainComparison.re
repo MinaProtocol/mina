@@ -4,7 +4,8 @@ module Styles = {
     style([
       width(`percent(100.)),
       height(`percent(100.)),
-      margin2(~v=`rem(3.), ~h=`zero),
+      marginBottom(`rem(3.)),
+      media(Theme.MediaQuery.tablet, [margin2(~v=`rem(3.), ~h=`zero)]),
     ]);
 
   let flex =
@@ -24,7 +25,7 @@ module Styles = {
       justifyContent(`spaceBetween),
       width(`percent(100.)),
       height(`percent(100.)),
-      marginTop(`rem(3.)),
+      marginTop(`rem(5.)),
       media(
         Theme.MediaQuery.notMobile,
         [flexDirection(`row), alignItems(`flexEnd)],
@@ -91,32 +92,24 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`center),
       alignItems(`center),
-      marginTop(`rem(1.5)),
-      width(`percent(100.)),
-      height(`rem(20.)),
+      width(`rem(30.)),
+      height(`rem(30.)),
       marginLeft(`zero),
+      overflow(`hidden),
       media(
         Theme.MediaQuery.notMobile,
-        [width(`rem(21.)), height(`rem(14.))],
+        [width(`rem(26.)), height(`rem(14.))],
       ),
-      media(
-        Theme.MediaQuery.tablet,
-        [justifyContent(`flexEnd), height(`rem(20.))],
-      ),
+      media(Theme.MediaQuery.tablet, [height(`rem(20.))]),
     ]);
 
-  let minaBlockChainImage = style([width(`rem(5.)), height(`rem(5.))]);
+  let minaBlockChainImage = style([height(`percent(90.))]);
 
   let comparisonLabel =
     merge([Theme.Type.label, style([fontSize(`rem(1.25))])]);
 
   let otherBlockChainImage =
-    style([
-      width(`percent(100.)),
-      height(`percent(100.)),
-      marginLeft(`zero),
-      media(Theme.MediaQuery.tablet, [marginLeft(`rem(3.))]),
-    ]);
+    style([height(`percent(100.)), marginLeft(`zero)]);
 };
 
 [@react.component]
@@ -147,7 +140,7 @@ let make = () => {
           </div>
           <div className=Styles.comparisonImage>
             <img
-              src="/static/img/MinaBlockchain.png"
+              src="/static/img/mina-cubes.gif"
               className=Styles.minaBlockChainImage
               alt="Mina Blockchain Size"
             />
@@ -176,7 +169,7 @@ let make = () => {
           </div>
           <div className=Styles.comparisonImage>
             <img
-              src="/static/img/OtherBlockchains.png"
+              src="/static/img/mina-heavy.gif"
               className=Styles.otherBlockChainImage
               alt="Other Blockchain Size"
             />

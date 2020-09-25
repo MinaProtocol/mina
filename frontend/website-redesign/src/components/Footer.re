@@ -105,16 +105,20 @@ module LeftSide = {
         alignContent(`spaceBetween),
         media(Theme.MediaQuery.desktop, [marginRight(`rem(10.6))]),
       ]);
+
     let emailInputSection =
       style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
+
     let logo =
       style([
         height(`rem(3.1)),
         width(`rem(11.)),
         marginBottom(`rem(4.)),
       ]);
+
     let label =
       merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);
+
     let emailSubtext =
       merge([
         Theme.Type.paragraph,
@@ -127,6 +131,7 @@ module LeftSide = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.leftSide>
@@ -251,7 +256,7 @@ module Subfooter = {
 
 [@react.component]
 let make = () => {
-  <div className=Styles.footerContainer>
+  <footer className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
     <hr className=Styles.whiteLine />
     <Subfooter />
@@ -270,5 +275,5 @@ let make = () => {
         </span>
       </Button>
     </div>
-  </div>;
+  </footer>;
 };
