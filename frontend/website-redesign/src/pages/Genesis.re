@@ -5,6 +5,13 @@ module Styles = {
       backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
       backgroundSize(`cover),
     ]);
+  let background =
+    style([
+      backgroundImage(
+        `url("/static/img/BecomeAGenesisMemberBackground.png"),
+      ),
+      backgroundSize(`cover),
+    ]);
 };
 
 module HowItWorksGrid = {
@@ -58,45 +65,47 @@ module HowItWorksGrid = {
 
   [@react.component]
   let make = () => {
-    <div className=Styles.container>
-      <h2 className=Styles.h2> {React.string("How It Works")} </h2>
-      <div className=Styles.grid>
-        <GridItem label="What Members Do: Pre-Mainnet">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "Get hands-on experience developing applications with zero knowledge proofs, plus an overview of different types of constructions.",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="What Members Do: Post-Mainnet">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. ",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="Who is Selected">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "Highly engaged node operators and community leaders, with new Genesis Members being announced on a rolling basis until we reach a thousand.",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="What They Get">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "To ensure decentralization, Mina has allocated 6.6% of the protocol (or 66,000 Mina tokens) to Genesis Founding Members.",
-             )}
-          </p>
-          // TODO: Add link here to terms and conditions
-          <Next.Link href="/">
-            <a className=Styles.link>
-              {React.string("Read Terms and Conditions.")}
-            </a>
-          </Next.Link>
-        </GridItem>
+    <Wrapped>
+      <div className=Styles.container>
+        <h2 className=Styles.h2> {React.string("How It Works")} </h2>
+        <div className=Styles.grid>
+          <GridItem label="What Members Do: Pre-Mainnet">
+            <p className=Theme.Type.paragraph>
+              {React.string(
+                 "Get hands-on experience developing applications with zero knowledge proofs, plus an overview of different types of constructions.",
+               )}
+            </p>
+          </GridItem>
+          <GridItem label="What Members Do: Post-Mainnet">
+            <p className=Theme.Type.paragraph>
+              {React.string(
+                 "Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. ",
+               )}
+            </p>
+          </GridItem>
+          <GridItem label="Who is Selected">
+            <p className=Theme.Type.paragraph>
+              {React.string(
+                 "Highly engaged node operators and community leaders, with new Genesis Members being announced on a rolling basis until we reach a thousand.",
+               )}
+            </p>
+          </GridItem>
+          <GridItem label="What They Get">
+            <p className=Theme.Type.paragraph>
+              {React.string(
+                 "To ensure decentralization, Mina has allocated 6.6% of the protocol (or 66,000 Mina tokens) to Genesis Founding Members.",
+               )}
+            </p>
+            // TODO: Add link here to terms and conditions
+            <Next.Link href="/">
+              <a className=Styles.link>
+                {React.string("Read Terms and Conditions.")}
+              </a>
+            </Next.Link>
+          </GridItem>
+        </div>
       </div>
-    </div>;
+    </Wrapped>;
   };
 };
 
@@ -229,30 +238,32 @@ let make = () => {
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
     </Hero>
-    <FeaturedSingleRow
-      row={
-        FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
-        title: "Become a Genesis Member",
-        description: "Up to 1,000 community participants will be selected to help us harden Mina’s protocol, strengthen the network and receive a distribution of 66,000 tokens.",
-        textColor: Theme.Colors.white,
-        image: "/static/img/GenesisCopy.jpg",
-        background: Image("/static/img/BecomeAGenesisMemberBackground.png"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        button: {
-          FeaturedSingleRow.Row.buttonText: "Apply Now",
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Theme.Colors.white,
-          dark: false,
-          href: "/",
-        },
-      }>
+    <div className=Styles.background>
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          title: "Become a Genesis Member",
+          description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
+          textColor: Theme.Colors.white,
+          image: "/static/img/GenesisCopy.jpg",
+          background: Image("/static/img/BecomeAGenesisMemberBackground.png"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          button: {
+            FeaturedSingleRow.Row.buttonText: "Apply Now",
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Theme.Colors.white,
+            dark: false,
+            href: "/",
+          },
+        }
+      />
       <Spacer height=4. />
       <Rule color=Theme.Colors.white />
       <Spacer height=4. />
       <HowItWorksGrid />
       <Rule color=Theme.Colors.white />
       <Spacer height=7. />
-    </FeaturedSingleRow>
+    </div>
     <div className=Styles.genesisSection>
       <FoundingMembersSection />
       <WorldMapSection />
