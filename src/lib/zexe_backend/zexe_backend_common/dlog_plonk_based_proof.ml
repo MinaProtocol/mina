@@ -287,7 +287,7 @@ module Make (Inputs : Inputs_intf) = struct
       opening_proof_of_backend t
     in
     let evals =
-      let t = evals_nocopy t in
+      let t = Backend.evals_nocopy t in
       Evaluations_backend.Double.(f0 t, f1 t)
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
@@ -371,7 +371,10 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend commitment )
       |> g_array_to_vec
     in
-    Backend.make primary_input (pcwo l_comm) (pcwo r_comm) (pcwo o_comm)
+    Backend.make
+      (*primary_input*)
+      (Fq.Vector.create ())
+      (pcwo l_comm) (pcwo r_comm) (pcwo o_comm)
       (pcwo z_comm) (pcw t_comm) lr z_1 z_2 (g delta) (g sg)
       (* Leaky! *)
       (eval_to_backend evals0)
@@ -397,7 +400,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
     let t = of_backend res in
-    (*Backend.delete res ;*)
+    Backend.delete res ;
+    print_endline ("created proof");
     t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
@@ -408,7 +412,9 @@ module Make (Inputs : Inputs_intf) = struct
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
     let res = Backend.batch_verify vk v in
-    Backend.Vector.delete v ; res
+    Backend.Vector.delete v ;
+    print_endline (match res with | true -> "Verification success" | false  -> "Verification failure");
+    res
 
   let batch_verify =
     batch_verify' (fun xs -> field_vector_of_list (Fq.one :: xs))

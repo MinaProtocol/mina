@@ -95,7 +95,6 @@ module Proof = Dlog_plonk_based_proof.Make (struct
 
       for i = 0 to Array.length w.(0) - 1 do
         for j = 0 to n - 1 do
-          Printf.printf "i: %d, j: %d\n" i j; 
           Field.Vector.emplace_back witness (if j < (Array.length w) then w.(j).(i) else Field.zero)
         done;
       done;

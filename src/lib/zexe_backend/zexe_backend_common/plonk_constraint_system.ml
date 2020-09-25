@@ -253,15 +253,14 @@ let create () =
 
   open Position
   let add_row sys row t l r o c =
-
+(*
     print_endline (Sexp.to_string ([%sexp_of: V.t option array] row));
-
     Printf.printf "row: %d\n" sys.next_row; 
     Printf.printf "l.row: %d, l.col: %d\n" l.row l.col; 
     Printf.printf "r.row: %d, r.col: %d\n" r.row r.col; 
     Printf.printf "o.row: %d, o.col: %d\n" o.row o.col; 
     Out_channel.flush stdout;
-
+*)
     Gates.add_gate sys.gates t (of_int sys.next_row)
       (of_int l.row) l.col
       (of_int r.row) r.col
@@ -277,9 +276,7 @@ let create () =
 
   let wire sys key row col =
     let prev = match V.Table.find sys.equivalence_classes key with
-      | Some x -> (match List.hd x with
-        | Some x -> x
-        | None -> {row= row; col})
+      | Some x -> List.hd_exn x
       | None -> {row= row; col}
     in
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col } ;
@@ -362,7 +359,7 @@ let create () =
 
   let add_constraint ?label:_ sys (constr : (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic) =
 
-    print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr));
+    (*print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr));*)
 
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -401,7 +398,6 @@ let create () =
         match x1, x2, x3 with
         | `Var x1, `Var x2, `Var x3 -> add_generic_constraint ~l:(s1, x1) ~r:(s2, x2) ~o:(s3, x3)
           (Fp.Vector.of_array [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]) sys
-
         | `Var x1, `Var x2, `Constant -> add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
           (Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]) sys
         | `Var x1, `Constant, `Var x3 -> add_generic_constraint ~l:(s1, x1) ~o:(s3, x3)

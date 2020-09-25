@@ -73,20 +73,22 @@ module Evals = struct
         ; r_eval
         ; o_eval
         ; z_eval
+        ; t_eval
         ; f_eval
         ; sigma1_eval
         ; sigma2_eval]
-        , [t_eval])
+        , [])
 
   let of_vectors
       (( [ l_eval
          ; r_eval
          ; o_eval
          ; z_eval
+         ; t_eval
          ; f_eval
          ; sigma1_eval
          ; sigma2_eval]
-         , [t_eval] ) :
+         , [] ) :
         ('a, _) Vector.t * ('a, _) Vector.t) : 'a t =
     { l_eval
     ; r_eval

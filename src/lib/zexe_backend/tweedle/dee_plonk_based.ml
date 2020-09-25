@@ -94,11 +94,11 @@ module Proof = Dlog_plonk_based_proof.Make (struct
 
       for i = 0 to Array.length w.(0) - 1 do
         for j = 0 to n - 1 do
-
+(*
           let elm = if j < (Array.length w) then w.(j).(i) else Field.zero in
           print_endline (String.concat [(Sexp.to_string ([%sexp_of: Field.t] elm)); (Printf.sprintf "%d" (n*i+j))] ~sep:", ");
           Out_channel.flush stdout;
-
+*)
           Field.Vector.emplace_back witness (if j < (Array.length w) then w.(j).(i) else Field.zero)
         done;
       done;
