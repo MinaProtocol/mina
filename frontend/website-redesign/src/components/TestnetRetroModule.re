@@ -34,23 +34,31 @@ let make = () => {
   let (blogs, setBlogs) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
-    fetchBlogs() |> Promise.iter(blogs => setBlogs(_ => blogs));
+    fetchBlogs()
+    |> Promise.iter(blogs => {
+         let filteredBlogs =
+           Belt.Array.keep(blogs, (blog: ContentType.BlogPost.t) => {
+             Js.String.includes(
+               String.lowercase_ascii("testnet"),
+               String.lowercase_ascii(blog.title),
+             )
+           });
+         setBlogs(_ => filteredBlogs);
+       });
     None;
   });
 
   <div className=Styles.container>
     <Wrapped>
       <div className=Styles.header>
-        <h2 className=Theme.Type.h2> {React.string("In the News")} </h2>
-        <Button bgColor=Theme.Colors.digitalBlack href="/blog">
-          {React.string("See All Press")}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
+        <h2 className=Theme.Type.h2>
+          {React.string("Testnet Retros & Release Notes")}
+        </h2>
       </div>
     </Wrapped>
     <ListModule
       items=blogs
-      itemKind=ListModule.Blog
+      itemKind=ListModule.TestnetRetro
       mainImg="/static/img/ArticleImage.png"
     />
   </div>;

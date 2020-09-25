@@ -1,25 +1,21 @@
 open Css;
 
 module Styles = {
-  let heroContainer =
+  let heroContainer = (backgroundImg: Theme.backgroundImage) =>
     style([
       display(`flex),
       flexDirection(`column),
       justifyContent(`flexStart),
       alignContent(`spaceBetween),
-      backgroundImage(`url("/static/img/AboutHeroMobileBackground.jpg")),
+      backgroundImage(`url(backgroundImg.mobile)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [
-          backgroundImage(`url("/static/img/AboutHeroTabletBackground.jpg")),
-        ],
+        [backgroundImage(`url(backgroundImg.tablet))],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [
-          backgroundImage(`url("/static/img/AboutHeroDesktopBackground.jpg")),
-        ],
+        [backgroundImage(`url(backgroundImg.desktop))],
       ),
     ]);
   let heroContent =
@@ -81,8 +77,9 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~title, ~header, ~copy, ~children=?) => {
-  <div className=Styles.heroContainer>
+let make =
+    (~title, ~header, ~copy, ~background: Theme.backgroundImage, ~children=?) => {
+  <div className={Styles.heroContainer(background)}>
     <div className=Styles.heroContent>
       <h4 className=Styles.headerLabel> {React.string(title)} </h4>
       <h1 className=Styles.header> {React.string(header)} </h1>
