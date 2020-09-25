@@ -71,6 +71,7 @@ module type S = sig
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
@@ -209,7 +210,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants:_ ~consensus_constants:_
-          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+          ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
+          ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
@@ -385,7 +387,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~disk_location ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
+      ~time_controller ~disk_location ~incoming_diffs ~local_diffs
+      ~frontier_broadcast_pipe =
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
@@ -405,7 +408,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         network_pool
     | Error _e ->
         create ~config ~logger ~constraint_constants ~consensus_constants
-          ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
+          ~time_controller ~incoming_diffs ~local_diffs
+          ~frontier_broadcast_pipe
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -455,6 +459,8 @@ let%test_module "random set test" =
     let proof_level = precomputed_values.proof_level
 
     let logger = Logger.null ()
+
+    let time_controller = Block_time.Controller.basic ~logger
 
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
     open Ledger_proof.For_tests
@@ -508,7 +514,7 @@ let%test_module "random set test" =
         let config = config verifier in
         let resource_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants
+            ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -665,7 +671,7 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~incoming_diffs:pool_reader
+              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
               ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -754,8 +760,8 @@ let%test_module "random set test" =
             let config = config verifier in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~incoming_diffs:pool_reader
-                ~local_diffs:local_reader
+                ~consensus_constants ~time_controller
+                ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
             don't_wait_for
@@ -809,7 +815,7 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~constraint_constants ~consensus_constants
+              ~constraint_constants ~consensus_constants ~time_controller
               ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in

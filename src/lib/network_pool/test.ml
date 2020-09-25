@@ -17,6 +17,8 @@ let%test_module "network pool test" =
 
     let proof_level = precomputed_values.proof_level
 
+    let time_controller = Block_time.Controller.basic ~logger
+
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
@@ -52,7 +54,7 @@ let%test_module "network pool test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~incoming_diffs:pool_reader
+              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
               ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -122,7 +124,7 @@ let%test_module "network pool test" =
         let config = config verifier in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~incoming_diffs:pool_reader
+            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
             ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in

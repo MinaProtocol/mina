@@ -72,6 +72,8 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let time_controller = Block_time.Controller.basic ~logger
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
@@ -120,8 +122,8 @@ let%test_module "transaction_status" =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
-          ~frontier_broadcast_pipe
+          ~time_controller ~incoming_diffs:pool_reader ~logger
+          ~local_diffs:local_reader ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)

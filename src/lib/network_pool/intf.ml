@@ -26,6 +26,7 @@ module type Resource_pool_base_intf = sig
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
@@ -89,7 +90,7 @@ module type Resource_pool_intf = sig
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> has_timedout:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
+    t -> has_timed_out:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -121,6 +122,7 @@ module type Network_pool_base_intf = sig
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
