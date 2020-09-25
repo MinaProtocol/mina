@@ -563,6 +563,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let%bind net2 = !(t.net2) in
       Coda_net2.lookup_peerid net2 peer_id
       >>| function Ok p -> Some p | Error _ -> None
+
+    let connection_gating t =
+      let%bind net2 = !(t.net2) in
+      Coda_net2.connection_gating net2
+
+    let set_connection_gating t config =
+      let%bind net2 = !(t.net2) in
+      Coda_net2.configure_connection_gating net2 config
   end
 
   include T

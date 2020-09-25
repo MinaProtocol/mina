@@ -18,6 +18,11 @@ module type Gossip_net_intf = sig
 
   val initial_peers : t -> Coda_net2.Multiaddr.t list
 
+  val connection_gating : t -> Coda_net2.connection_gating Deferred.t
+
+  val set_connection_gating :
+    t -> Coda_net2.connection_gating -> unit Deferred.t
+
   val random_peers : t -> int -> Peer.t list Deferred.t
 
   val random_peers_except :

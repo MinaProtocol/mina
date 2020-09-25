@@ -450,6 +450,14 @@ module Types = struct
               (Coda_lib.config coda).precomputed_values.constraint_constants
                 .coinbase_amount |> Currency.Amount.to_uint64 ) ] )
 
+  let connection_gating_config =
+    obj "ConnectionGatingConfig" ~fields:(fun _ ->
+        [ field "trustedPeers"
+            ~typ:(list (non_null DaemonStatus.peer))
+            ~doc:"Peers we will always allow connections from"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} () -> return []) ] )
+
   module AccountObj = struct
     module AnnotatedBalance = struct
       type t =
@@ -2303,6 +2311,14 @@ module Mutations = struct
         Coda_lib.set_snark_work_fee coda fee ;
         Currency.Fee.to_uint64 last_fee )
 
+  let set_connection_gating =
+    result_field "setConnectionGating"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.connection_gating_config)]
+      ~typ:Arg.[]
+      ~resolve:(fun {ctx= coda; _} () config ->
+        Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
+        )
+
   let commands =
     [ add_wallet
     ; create_account
@@ -2323,7 +2339,8 @@ module Mutations = struct
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
-    ; set_snark_work_fee ]
+    ; set_snark_work_fee
+    ; set_connection_gating ]
 end
 
 module Queries = struct
@@ -2698,6 +2715,16 @@ module Queries = struct
                |> Staged_ledger.ledger |> Ledger.next_available_token )
         |> Option.value ~default:Token_id.(next default) )
 
+  let connection_gating =
+    field "conneectionGating"
+      ~doc:
+        "The rules that the libp2p helper will use to determine which \
+         connections to permit"
+      ~args:Arg.[]
+      ~typ:(non_null Types.connection_gating_config)
+      ~resulve:(fun {ctx= coda; _} _ ->
+        coda |> Coda_lib.net |> Coda_networking.connection_gating_config )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2705,6 +2732,7 @@ module Queries = struct
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
+    ; connection_gating
     ; account
     ; accounts_for_pk
     ; token_owner

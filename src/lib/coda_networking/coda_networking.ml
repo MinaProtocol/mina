@@ -1085,6 +1085,11 @@ include struct
 
   let ip_for_peer t peer_id =
     (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
+
+  let connection_gating_config t = lift connection_gating t
+
+  let set_connection_gating_config t config =
+    lift set_connection_gating t config
 end
 
 let on_first_received_message {first_received_message_signal; _} ~f =

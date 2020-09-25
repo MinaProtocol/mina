@@ -254,6 +254,11 @@ val ip_for_peer :
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
 
+val connection_gating_config : t -> Coda_net2.connection_gating Deferred.t
+
+val set_connection_gating_config :
+  t -> Coda_net2.connection_gating -> unit Deferred.t
+
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 

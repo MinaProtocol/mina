@@ -335,8 +335,9 @@ type connection_gating =
 (** Configure the connection gateway. 
 
   This will fail if any of the trusted or banned peers are on IPv6. *)
-val configure_connection_gating :
-  net -> connection_gating -> unit Deferred.Or_error.t
+val configure_connection_gating : net -> connection_gating -> unit Deferred.t
+
+val connection_gating : net -> connection_gating Deferred.t
 
 (** List of currently banned IPs. *)
 val banned_ips : net -> Unix.Inet_addr.t list Deferred.t

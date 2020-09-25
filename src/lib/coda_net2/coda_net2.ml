@@ -9,6 +9,10 @@ open Network_peer
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
+[@@deriving yojson]
+
 let peer_of_peer_info peer_info =
   Peer.create
     (Unix.Inet_addr.of_string peer_info.host)
@@ -115,6 +119,7 @@ module Helper = struct
       Some types would make it harder to misuse these integers.
     *)
     ; mutable seqno: int
+    ; mutable connection_gating: connection_gating
     ; logger: Logger.t
     ; me_keypair: Keypair0.t Ivar.t
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
@@ -1271,12 +1276,10 @@ let begin_advertising net =
 
 let lookup_peerid = Helper.lookup_peerid
 
-type connection_gating =
-  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
+let connection_gating net = Deferred.return net.Helper.connection_gating
 
 let configure_connection_gating net (config : connection_gating) =
   match%map
-<<<<<<< HEAD
     Helper.(
       do_rpc net
         (module Rpcs.Set_gater_config)
@@ -1291,22 +1294,15 @@ let configure_connection_gating net (config : connection_gating) =
               config.trusted_peers
         ; trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers
         ; isolate= config.isolate })
-=======
-    Helper.(do_rpc net (module Rpcs.Set_gater_config) {
-      banned_ips= List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.banned_peers ;
-      banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers ;
-      trusted_ips= List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.trusted_peers ;
-      trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers ;
-      isolate= config.isolate
-    })
->>>>>>> 10b31e9ae... support a list of trusted peer IDs
   with
   | Ok "ok" ->
-      Ok ()
+      net.connection_gating <- config ;
+      ()
   | Ok v ->
       failwithf "helper broke RPC protocol: setGaterConfig got %s" v ()
   | Error e ->
-      Error e
+      failwithf "unexpected error doing setGaterConfig: %s"
+        (Error.to_string_hum e) ()
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1364,6 +1360,8 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; conf_dir
         ; logger
         ; banned_ips= []
+        ; connection_gating=
+            {banned_peers= []; trusted_peers= []; isolate= false}
         ; me_keypair= Ivar.create ()
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
