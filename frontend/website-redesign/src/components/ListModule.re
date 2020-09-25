@@ -36,6 +36,12 @@ module Styles = {
         marginTop(`rem(1.)),
       ]),
     ]);
+
+  let mainListingContainer =
+    style([
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
+    ]);
 };
 
 type itemKind =
@@ -50,10 +56,8 @@ module MainListing = {
         display(`flex),
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
-        width(`percent(100.)),
         height(`percent(100.)),
         selector("img", [marginTop(`rem(1.))]),
-        media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
       ]);
   };
 
@@ -138,7 +142,10 @@ let make = (~items, ~mainImg, ~itemKind) => {
   <Wrapped>
     <div className=Styles.container>
       {switch (Belt.Array.get(items, 0)) {
-       | Some(item) => <MainListing item itemKind mainImg />
+       | Some(item) =>
+         <div className=Styles.mainListingContainer>
+           <MainListing item mainImg itemKind />
+         </div>
        | None =>
          <div className=Theme.Type.label> {React.string("Loading...")} </div>
        }}

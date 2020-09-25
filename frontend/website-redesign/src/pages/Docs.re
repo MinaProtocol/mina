@@ -8,14 +8,8 @@ module Style = {
       maxWidth(`rem(53.)),
       marginBottom(`rem(2.875)),
       media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.))]),
-      selector(
-        "p > code, li > code",
-        Theme.Type.inlineCode_,
-      ),
-      selector(
-        "h1 + p",
-        Theme.Type.sectionSubhead_
-      )
+      selector("p > code, li > code", Theme.Type.inlineCode_),
+      selector("h1 + p", Theme.Type.sectionSubhead_),
     ]);
 
   let page =
@@ -29,9 +23,7 @@ module Style = {
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
     ]);
 
-  let eyebrow = style([
-    marginBottom(`rem(1.))
-  ])
+  let eyebrow = style([marginBottom(`rem(1.))]);
 
   let editLink =
     style([
@@ -96,7 +88,7 @@ let make = (~metadata, ~children) => {
       <DocsSideNav currentSlug />
       <div className=Style.content>
         <div className=Style.eyebrow>
-          <LabelEyebrow copy="Documentation"/>
+          <LabelEyebrow copy="Documentation" />
         </div>
         <EditLink route={router.route} />
         <Next.MDXProvider components={DocsComponents.allComponents()}>
