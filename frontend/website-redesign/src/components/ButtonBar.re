@@ -62,20 +62,35 @@ module Card = {
 module ButtonBarStyles = {
   open Css;
 
-  let background = backgroundImg =>
+  let background = (kind, backgroundImg) => {
+    let (mobileV, tabletV, desktopV) =
+      switch (kind) {
+      | GetStarted => (1.5, 4.25, 16.)
+      | Developers => (1.5, 4.25, 16.)
+      | CommunityLanding => (1.5, 4.25, 4.25)
+      | HelpAndSupport => (1.5, 4.25, 16.)
+      };
+    let (mobileH, tabletH, desktopH) =
+      switch (kind) {
+      | GetStarted => (1.25, 2.75, 9.5)
+      | Developers => (1.25, 2.75, 9.5)
+      | CommunityLanding => (1.25, 1.25, 1.25)
+      | HelpAndSupport => (1.25, 2.75, 9.5)
+      };
     style([
-      padding2(~v=`rem(1.5), ~h=`rem(1.25)),
+      padding2(~v=`rem(mobileV), ~h=`rem(mobileH)),
       backgroundImage(`url(backgroundImg)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.25), ~h=`rem(2.75))],
+        [padding2(~v=`rem(tabletV), ~h=`rem(tabletH))],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(16.), ~h=`rem(9.5))],
+        [padding2(~v=`rem(desktopV), ~h=`rem(desktopH))],
       ),
-    ]);
+    ])
+  };
 
   let container =
     style([
@@ -124,6 +139,7 @@ module CommunityLanding = {
           marginBottom(`rem(0.5)),
         ]),
       ]);
+
   };
   [@react.component]
   let make = () => {
@@ -247,7 +263,7 @@ module HelpAndSupport = {
 
 [@react.component]
 let make = (~kind, ~backgroundImg) => {
-  <div className={ButtonBarStyles.background(backgroundImg)}>
+  <div className={ButtonBarStyles.background(kind, backgroundImg)}>
     <Wrapped>
       {switch (kind) {
        | GetStarted => React.null
