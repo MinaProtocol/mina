@@ -36,7 +36,17 @@ module Styles = {
         marginTop(`rem(1.)),
       ]),
     ]);
+
+  let mainListingContainer =
+    style([
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
+    ]);
 };
+
+type itemKind =
+  | Blog
+  | TestnetRetro;
 
 module MainListing = {
   module MainListingStyles = {
@@ -46,18 +56,19 @@ module MainListing = {
         display(`flex),
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
-        width(`percent(100.)),
         height(`percent(100.)),
         selector("img", [marginTop(`rem(1.))]),
-        media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
       ]);
   };
 
   [@react.component]
-  let make = (~item: ContentType.BlogPost.t, ~mainImg) => {
+  let make = (~item: ContentType.BlogPost.t, ~mainImg, ~itemKind) => {
     <div className=MainListingStyles.container>
       <div className=Styles.metadata>
-        <span> {React.string("Press")} </span>
+        {switch (itemKind) {
+         | Blog => <span> {React.string("Press")} </span>
+         | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+         }}
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.date)} </span>
         <span> {React.string(" / ")} </span>
@@ -98,12 +109,15 @@ module Listing = {
   };
 
   [@react.component]
-  let make = (~items) => {
+  let make = (~items, ~itemKind) => {
     items
     |> Array.map((item: ContentType.BlogPost.t) => {
          <div className=ListingStyles.container key={item.title}>
            <div className=Styles.metadata>
-             <span> {React.string("Press")} </span>
+             {switch (itemKind) {
+              | Blog => <span> {React.string("Press")} </span>
+              | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+              }}
              <span> {React.string(" / ")} </span>
              <span> {React.string(item.date)} </span>
              <span> {React.string(" / ")} </span>
@@ -124,16 +138,22 @@ module Listing = {
 };
 
 [@react.component]
-let make = (~items, ~mainImg) => {
+let make = (~items, ~mainImg, ~itemKind) => {
   <Wrapped>
     <div className=Styles.container>
       {switch (Belt.Array.get(items, 0)) {
-       | Some(item) => <MainListing item mainImg />
+       | Some(item) =>
+         <div className=Styles.mainListingContainer>
+           <MainListing item mainImg itemKind />
+         </div>
        | None =>
          <div className=Theme.Type.label> {React.string("Loading...")} </div>
        }}
       <div className=Styles.listingContainer>
-        <Listing items={Belt.Array.slice(items, ~offset=1, ~len=3)} />
+        <Listing
+          items={Belt.Array.slice(items, ~offset=1, ~len=3)}
+          itemKind
+        />
       </div>
     </div>
   </Wrapped>;
