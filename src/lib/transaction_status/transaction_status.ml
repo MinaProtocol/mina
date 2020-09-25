@@ -119,6 +119,7 @@ let%test_module "transaction_status" =
       let transaction_pool =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
+          ~consensus_constants:precomputed_values.consensus_constants
           ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
           ~frontier_broadcast_pipe
       in

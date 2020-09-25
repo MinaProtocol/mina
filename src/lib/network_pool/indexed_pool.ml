@@ -46,8 +46,29 @@ type t =
       Transaction_hash.User_command_with_valid_signature.t
       Transaction_hash.Map.t
   ; size: int
-  ; constraint_constants: Genesis_constants.Constraint_constants.t }
+  ; constraint_constants: Genesis_constants.Constraint_constants.t
+  ; consensus_constants: Consensus.Constants.t }
 [@@deriving sexp_of]
+
+module Command_error = struct
+  type t =
+    | Invalid_nonce of
+        [ `Expected of Account.Nonce.t
+        | `Between of Account.Nonce.t * Account.Nonce.t ]
+        * Account.Nonce.t
+    | Insufficient_funds of [`Balance of Currency.Amount.t] * Currency.Amount.t
+    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
+          each other that way! *)
+        Insufficient_replace_fee of
+        [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
+    | Overflow
+    | Bad_token
+    | Expired of
+        [`Valid_until of Coda_numbers.Global_slot.t]
+        * [`Current_global_slot of Coda_numbers.Global_slot.t]
+    | Unwanted_fee_token of Token_id.t
+  [@@deriving sexp_of, to_yojson]
+end
 
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
@@ -114,11 +135,11 @@ let currency_consumed :
 let currency_consumed' :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> Transaction_hash.User_command_with_valid_signature.t
-    -> (Currency.Amount.t, [> `Overflow]) Result.t =
+    -> (Currency.Amount.t, Command_error.t) Result.t =
  fun ~constraint_constants cmd ->
   cmd
   |> currency_consumed ~constraint_constants
-  |> Result.of_option ~error:`Overflow
+  |> Result.of_option ~error:Command_error.Overflow
 
 module For_tests = struct
   (* Check the invariants of the pool structure as listed in the comment above.
@@ -129,7 +150,8 @@ module For_tests = struct
        ; all_by_fee
        ; all_by_hash
        ; size
-       ; constraint_constants } ->
+       ; constraint_constants
+       ; consensus_constants= _ } ->
     let assert_all_by_fee tx =
       if
         Set.mem
@@ -253,13 +275,14 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants : t =
+let empty ~constraint_constants ~consensus_constants : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
   ; all_by_hash= Transaction_hash.Map.empty
   ; size= 0
-  ; constraint_constants }
+  ; constraint_constants
+  ; consensus_constants }
 
 let size : t -> int = fun t -> t.size
 
@@ -279,8 +302,7 @@ let all_from_account :
     -> Transaction_hash.User_command_with_valid_signature.t list =
  fun {all_by_sender; _} account_id ->
   Option.value_map ~default:[] (Map.find all_by_sender account_id)
-    ~f:(fun (user_commands, _) ->
-      Sequence.to_list @@ F_sequence.to_seq user_commands )
+    ~f:(fun (user_commands, _) -> F_sequence.to_list user_commands)
 
 let get_all {all_by_hash; _} :
     Transaction_hash.User_command_with_valid_signature.t list =
@@ -291,6 +313,22 @@ let find_by_hash :
     -> Transaction_hash.t
     -> Transaction_hash.User_command_with_valid_signature.t option =
  fun {all_by_hash; _} hash -> Map.find all_by_hash hash
+
+let current_global_slot consensus_constants =
+  let logger = Logger.null () in
+  let time_controller = Block_time.Controller.basic ~logger in
+  let current_time = Block_time.now time_controller in
+  Consensus.Data.Consensus_time.(
+    of_time_exn ~constants:consensus_constants current_time |> to_global_slot)
+
+let check_expiry ~consensus_constants (cmd : User_command.t) =
+  let current_global_slot = current_global_slot consensus_constants in
+  let valid_until = User_command.valid_until cmd in
+  if Global_slot.(valid_until < current_global_slot) then
+    Error
+      (Command_error.Expired
+         (`Valid_until valid_until, `Current_global_slot current_global_slot))
+  else Ok ()
 
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
@@ -475,6 +513,28 @@ let revalidate :
                     ~data:(keep_queue', currency_reserved'') }
             , Sequence.append dropped_acc to_drop ) )
 
+let remove_expired t :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
+  Map.fold t.all_by_sender ~init:(Sequence.empty, t)
+    ~f:(fun ~key:_ ~data:(queue, _) acc ->
+      match
+        F_sequence.find queue ~f:(fun cmd ->
+            match
+              check_expiry ~consensus_constants:t.consensus_constants
+                (Transaction_hash.User_command_with_valid_signature.command cmd)
+            with
+            | Error (Expired _) ->
+                true
+            | _ ->
+                false )
+      with
+      | None ->
+          acc
+      | Some expired_cmd ->
+          let dropped_acc, t = acc in
+          let removed, t' = remove_with_dependents_exn t expired_cmd in
+          (Sequence.append dropped_acc removed, t') )
+
 let handle_committed_txn :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
@@ -598,19 +658,11 @@ let rec add_from_gossip_exn :
     -> Account_nonce.t
     -> Currency.Amount.t
     -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-       , [> `Invalid_nonce of
-            [ `Expected of Account.Nonce.t
-            | `Between of Account.Nonce.t * Account.Nonce.t ]
-            * Account.Nonce.t
-         | `Insufficient_funds of
-           [`Balance of Currency.Amount.t] * Currency.Amount.t
-         | `Insufficient_replace_fee of
-           [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-         | `Overflow
-         | `Bad_token
-         | `Unwanted_fee_token of Token_id.t ] )
+       , Command_error.t )
        Result.t =
- fun ({constraint_constants; _} as t) cmd current_nonce balance ->
+ fun ({constraint_constants; consensus_constants; _} as t) cmd current_nonce
+     balance ->
+  let open Command_error in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
@@ -620,15 +672,16 @@ let rec add_from_gossip_exn :
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
+  let%bind () = check_expiry ~consensus_constants unchecked in
   let%bind consumed = currency_consumed' ~constraint_constants cmd in
   let%bind () =
-    if User_command.check_tokens unchecked then return () else Error `Bad_token
+    if User_command.check_tokens unchecked then return () else Error Bad_token
   in
   let%bind () =
     (* TODO: Proper exchange rate mechanism. *)
     let fee_token = User_command.fee_token unchecked in
     if Token_id.(equal default) fee_token then return ()
-    else Error (`Unwanted_fee_token fee_token)
+    else Error (Unwanted_fee_token fee_token)
   in
   (* C4 *)
   match Map.find t.all_by_sender fee_payer with
@@ -637,13 +690,13 @@ let rec add_from_gossip_exn :
       let%bind () =
         Result.ok_if_true
           (Account_nonce.equal current_nonce nonce)
-          ~error:(`Invalid_nonce (`Expected current_nonce, nonce))
+          ~error:(Invalid_nonce (`Expected current_nonce, nonce))
         (* C1/1a *)
       in
       let%bind () =
         Result.ok_if_true
           Currency.Amount.(consumed <= balance)
-          ~error:(`Insufficient_funds (`Balance balance, consumed))
+          ~error:(Insufficient_funds (`Balance balance, consumed))
         (* C2 *)
       in
       Result.Ok
@@ -664,7 +717,8 @@ let rec add_from_gossip_exn :
                   (Transaction_hash.User_command_with_valid_signature.hash cmd)
                 ~data:cmd
           ; size= t.size + 1
-          ; constraint_constants }
+          ; constraint_constants
+          ; consensus_constants }
         , Sequence.empty )
   | Some (queued_cmds, reserved_currency) -> (
       (* commands queued for this sender *)
@@ -678,13 +732,13 @@ let rec add_from_gossip_exn :
         (* this command goes on the end *)
         let%bind reserved_currency' =
           Currency.Amount.(consumed + reserved_currency)
-          |> Result.of_option ~error:`Overflow
+          |> Result.of_option ~error:Overflow
           (* C4 *)
         in
         let%bind () =
           Result.ok_if_true
             Currency.Amount.(balance >= reserved_currency')
-            ~error:(`Insufficient_funds (`Balance balance, reserved_currency'))
+            ~error:(Insufficient_funds (`Balance balance, reserved_currency'))
           (* C2 *)
         in
         Result.Ok
@@ -717,8 +771,8 @@ let rec add_from_gossip_exn :
             (Account_nonce.between ~low:first_queued_nonce
                ~high:last_queued_nonce nonce)
             ~error:
-              (`Invalid_nonce
-                (`Between (first_queued_nonce, last_queued_nonce), nonce))
+              (Invalid_nonce
+                 (`Between (first_queued_nonce, last_queued_nonce), nonce))
           (* C1/C1b *)
         in
         assert (
@@ -742,7 +796,7 @@ let rec add_from_gossip_exn :
           let replace_fee = User_command.fee_exn to_drop in
           Result.ok_if_true
             Currency.Fee.(fee >= replace_fee)
-            ~error:(`Insufficient_replace_fee (`Replace_fee replace_fee, fee))
+            ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
           (* C3 *)
         in
         let increment =
@@ -756,7 +810,7 @@ let rec add_from_gossip_exn :
           Result.ok_if_true
             Currency.Fee.(increment >= replace_fee)
             ~error:
-              (`Insufficient_replace_fee (`Replace_fee replace_fee, increment))
+              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
           (* C3 *)
         in
         let dropped, t' =
@@ -772,17 +826,21 @@ let rec add_from_gossip_exn :
             (* We've already removed them, so this should always be empty. *)
             assert (Sequence.is_empty dropped') ;
             Result.Ok (t'', dropped)
-        | Error (`Insufficient_funds _ as err) ->
+        | Error (Insufficient_funds _ as err) ->
             Error err (* C2 *)
         | _ ->
             failwith "recursive add_exn failed" )
 
 let add_from_backtrack :
-    t -> Transaction_hash.User_command_with_valid_signature.t -> t =
- fun ({constraint_constants; _} as t) cmd ->
+       t
+    -> Transaction_hash.User_command_with_valid_signature.t
+    -> (t, Command_error.t) Result.t =
+ fun ({constraint_constants; consensus_constants; _} as t) cmd ->
+  let open Result.Let_syntax in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
+  let%map () = check_expiry ~consensus_constants unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee_exn unchecked in
   let consumed =
@@ -809,7 +867,8 @@ let add_from_backtrack :
             (module Transaction_hash.User_command_with_valid_signature)
             t.applicable_by_fee fee cmd
       ; size= t.size + 1
-      ; constraint_constants }
+      ; constraint_constants
+      ; consensus_constants }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
       if
@@ -847,7 +906,8 @@ let add_from_backtrack :
               , Option.value_exn Currency.Amount.(currency_reserved + consumed)
               )
       ; size= t.size + 1
-      ; constraint_constants }
+      ; constraint_constants
+      ; consensus_constants }
 
 let%test_module _ =
   ( module struct
@@ -866,7 +926,9 @@ let%test_module _ =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let empty = empty ~constraint_constants
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let empty = empty ~constraint_constants ~consensus_constants
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -882,7 +944,7 @@ let%test_module _ =
             |> Currency.Amount.to_int > 500
           then
             match add_res with
-            | Error (`Insufficient_funds _) ->
+            | Error (Insufficient_funds _) ->
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds"
@@ -963,37 +1025,46 @@ let%test_module _ =
                     assert_invariants pool' ;
                     pool := pool' ;
                     go rest
-                | Error (`Invalid_nonce (`Expected want, got)) ->
+                | Error (Invalid_nonce (`Expected want, got)) ->
                     failwithf
                       !"Bad nonce. Expected: %{sexp: Account.Nonce.t}. Got: \
                         %{sexp: Account.Nonce.t}"
                       want got ()
-                | Error (`Invalid_nonce (`Between (low, high), got)) ->
+                | Error (Invalid_nonce (`Between (low, high), got)) ->
                     failwithf
                       !"Bad nonce. Expected between %{sexp: Account.Nonce.t} \
                         and %{sexp:Account.Nonce.t}. Got: %{sexp: \
                         Account.Nonce.t}"
                       low high got ()
-                | Error (`Insufficient_funds (`Balance bal, amt)) ->
+                | Error (Insufficient_funds (`Balance bal, amt)) ->
                     failwithf
                       !"Insufficient funds. Balance: %{sexp: \
                         Currency.Amount.t}. Amount: %{sexp: Currency.Amount.t}"
                       bal amt ()
-                | Error (`Insufficient_replace_fee (`Replace_fee rfee, fee)) ->
+                | Error (Insufficient_replace_fee (`Replace_fee rfee, fee)) ->
                     failwithf
                       !"Insufficient fee for replacement. Needed at least \
                         %{sexp: Currency.Fee.t} but got \
                         %{sexp:Currency.Fee.t}."
                       rfee fee ()
-                | Error `Overflow ->
+                | Error Overflow ->
                     failwith "Overflow."
-                | Error `Bad_token ->
+                | Error Bad_token ->
                     failwith "Token is incompatible with the command."
-                | Error (`Unwanted_fee_token fee_token) ->
+                | Error (Unwanted_fee_token fee_token) ->
                     failwithf
                       !"Bad fee token. The fees are paid in token %{sexp: \
                         Token_id.t}, which we are not accepting fees in."
-                      fee_token () )
+                      fee_token ()
+                | Error
+                    (Expired
+                      ( `Valid_until valid_until
+                      , `Current_global_slot current_global_slot )) ->
+                    failwithf
+                      !"Expired user command. Current global slot is \
+                        %{sexp:Coda_numbers.Global_slot.t} but user command \
+                        is only valid until %{sexp:Coda_numbers.Global_slot.t}"
+                      current_global_slot valid_until () )
           in
           go cmds )
 
@@ -1168,7 +1239,7 @@ let%test_module _ =
                 failwith "adding command failed"
           else
             match add_res with
-            | Error (`Insufficient_funds _) ->
+            | Error (Insufficient_funds _) ->
                 ()
             | _ ->
                 failwith "should've returned insufficient_funds" )

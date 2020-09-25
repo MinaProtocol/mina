@@ -25,6 +25,7 @@ module type Resource_pool_base_intf = sig
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
@@ -82,13 +83,13 @@ module type Resource_pool_intf = sig
   (** Locally generated items (user commands and snarks) should be periodically
       rebroadcast, to ensure network unreliability doesn't mean they're never
       included in a block. This function gets the locally generated items that
-      are currently rebroadcastable. [is_expired] is a function that returns
+      are currently rebroadcastable. [has_timed_out] is a function that returns
       true if an item that was added at a given time should not be rebroadcast
       anymore. If it does, the implementation should not return that item, and
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
+    t -> has_timedout:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -119,6 +120,7 @@ module type Network_pool_base_intf = sig
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
@@ -249,6 +251,7 @@ module type Transaction_pool_diff_intf = sig
       | Overflow
       | Bad_token
       | Unwanted_fee_token
+      | Expired
     [@@deriving sexp, yojson]
   end
 

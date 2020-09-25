@@ -9,10 +9,13 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let proof_level = precomputed_values.proof_level
 
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
@@ -49,7 +52,8 @@ let%test_module "network pool test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~consensus_constants ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let command =
@@ -118,7 +122,8 @@ let%test_module "network pool test" =
         let config = config verifier in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~incoming_diffs:pool_reader ~local_diffs:local_reader
+            ~consensus_constants ~incoming_diffs:pool_reader
+            ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
