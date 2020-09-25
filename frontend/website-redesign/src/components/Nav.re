@@ -210,9 +210,10 @@ let make = () => {
       <NavLink label="Community" href="/community" />
       <NavLink label="Blog" href="/blog" />
       <Spacer width=1.5 />
-      <Button href="/genesis" width={`rem(10.75)} paddingX=1.>
+      <Button href="/genesis" width={`rem(13.)} paddingX=1.>
         <img src="/static/img/promo-logo.svg" height="40" />
-        <span> {React.string("Join Genesis + Earn Mina")} </span>
+        <Spacer width=0.5 />
+        <span> {React.string("Join Genesis Token Program")} </span>
       </Button>
     </nav>
   </header>;
