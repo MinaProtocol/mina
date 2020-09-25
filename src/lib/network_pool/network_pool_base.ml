@@ -146,8 +146,9 @@ end)
     in
     go ()
 
-  let create ~config ~constraint_constants ~consensus_constants ~incoming_diffs
-      ~local_diffs ~frontier_broadcast_pipe ~logger =
+  let create ~config ~constraint_constants ~consensus_constants
+      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
+      ~logger =
     (*Diffs from tansition frontier extensions*)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -156,7 +157,8 @@ end)
     let t =
       of_resource_pool_and_diffs
         (Resource_pool.create ~constraint_constants ~consensus_constants
-           ~config ~logger ~frontier_broadcast_pipe ~tf_diff_writer)
+           ~time_controller ~config ~logger ~frontier_broadcast_pipe
+           ~tf_diff_writer)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
