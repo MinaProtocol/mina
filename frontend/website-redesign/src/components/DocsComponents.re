@@ -15,39 +15,31 @@ module Styles = {
       backgroundImage(url("/static/img/link.svg")),
     ]);
 
-  let h1Spacing = style([
-    marginBottom(`rem(1.))
-  ]);
+  let h1Spacing = style([marginBottom(`rem(1.))]);
 
-  let headerSpacing = merge([
-                            h1Spacing,
-                            style([
-    marginTop(`rem(3.))
-  ])]);
+  let headerSpacing = merge([h1Spacing, style([marginTop(`rem(3.))])]);
 
-  let paragraphSpacing = style([
-    marginBottom(`rem(1.))
-  ]);
+  let paragraphSpacing = style([marginBottom(`rem(1.))]);
 
-  let code = style([
-    Theme.Typeface.monumentGroteskMono,
-    fontSize(`rem(1.)),
-    lineHeight(`rem(1.5))
-  ]);
+  let code =
+    style([
+      Theme.Typeface.monumentGroteskMono,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+    ]);
 
-  let list = style([
-    color(Theme.Colors.digitalBlack),
-    Theme.Typeface.monumentGrotesk,
-    fontSize(`rem(1.125)),
-    lineHeight(`rem(1.6875)),
-    marginTop(`rem(0.5)),
-    marginBottom(`rem(1.)),
-    marginLeft(`rem(2.6875)),
-  ]);
+  let list =
+    style([
+      color(Theme.Colors.digitalBlack),
+      Theme.Typeface.monumentGrotesk,
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.6875)),
+      marginTop(`rem(0.5)),
+      marginBottom(`rem(1.)),
+      marginLeft(`rem(2.6875)),
+    ]);
 
-  let link = style([
-    textDecoration(`none)
-  ]);
+  let link = style([textDecoration(`none)]);
 };
 
 module type Component = {let element: React.element;};
@@ -86,32 +78,38 @@ open Css;
 
 module H1 =
   WrapHeader({
-    let element = <h1 className=merge([Styles.h1Spacing, Theme.Type.h1]) />;
+    let element = <h1 className={merge([Styles.h1Spacing, Theme.Type.h1])} />;
   });
 
 module H2 =
   WrapHeader({
-    let element = <h2 className=merge([Styles.headerSpacing, Theme.Type.h2]) />;
+    let element =
+      <h2 className={merge([Styles.headerSpacing, Theme.Type.h2])} />;
   });
 
 module H3 =
   WrapHeader({
-    let element = <h3 className=merge([Styles.headerSpacing, Theme.Type.h3]) />;
+    let element =
+      <h3 className={merge([Styles.headerSpacing, Theme.Type.h3])} />;
   });
 
 module H4 =
   WrapHeader({
-    let element = <h4 className=merge([Styles.headerSpacing, Theme.Type.h4]) />;
+    let element =
+      <h4 className={merge([Styles.headerSpacing, Theme.Type.h4])} />;
   });
 
 module P =
   Wrap({
-    let element = <p className=merge([Styles.paragraphSpacing, Theme.Type.paragraph]) />;
+    let element =
+      <p
+        className={merge([Styles.paragraphSpacing, Theme.Type.paragraph])}
+      />;
   });
 
 module A =
   Wrap({
-    let element = <a className=merge([Styles.link, Theme.Type.link]) />;
+    let element = <a className={merge([Styles.link, Theme.Type.link])} />;
   });
 
 module Strong =
