@@ -30,4 +30,3 @@ else
     git ls-files
   fi
 fi
-

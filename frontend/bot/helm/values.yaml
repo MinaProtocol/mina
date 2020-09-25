@@ -25,9 +25,13 @@ bot: # user-agent role default settings
       value: "10"
     - name: PYTHONUNBUFFERED
       value: "1"
+  ports: []
+  #   - name: graphql
+  #     containerPort: 3085
   volumeMounts: []
   #   - name: wallet-keys
   #     mountPath: /root/wallet-keys
   volumes: []
   #   - name: wallet-keys
   #     emptyDir: {}
+  

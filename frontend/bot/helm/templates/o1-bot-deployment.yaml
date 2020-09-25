@@ -30,9 +30,13 @@ spec:
 {{- if .Values.bot.optionalEnv }}
 {{ toYaml .Values.bot.optionalEnv | nindent 10 }}
 {{- end }}
+        ports:
+{{- if .Values.bot.ports }}
+{{ toYaml .Values.bot.ports | nindent 10 }}
+{{- end }}
         volumeMounts:
 {{- if .Values.bot.volumeMounts }}
-{{ toYaml .Values.bot.optionalEnv | nindent 10 }}
+{{ toYaml .Values.bot.volumeMounts | nindent 10 }}
 {{- end }}
       volumes:
 {{- if .Values.bot.volumes }}
