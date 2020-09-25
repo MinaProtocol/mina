@@ -45,6 +45,7 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`rem(21.)),
+        unsafe("height", "fit-content"),
         margin2(~h=`rem(5.), ~v=`zero),
         display(`flex),
         flexDirection(`column),
@@ -69,6 +70,10 @@ module SingleRow = {
         flexDirection(`column),
         alignItems(`flexStart),
         selector("h2,p", [color(textColor)]),
+        selector(
+          "p",
+          [Theme.Typeface.monumentGroteskMono, letterSpacing(`px(-1))],
+        ),
       ]);
     };
 
@@ -91,8 +96,12 @@ module SingleRow = {
         height(`percent(60.)),
         maxWidth(`rem(53.)),
         media(
-          Theme.MediaQuery.notMobile,
+          Theme.MediaQuery.tablet,
           [height(`percent(110.)), width(`percent(80.))],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [height(`percent(110.)), width(`percent(100.))],
         ),
       ]);
   };
@@ -116,7 +125,7 @@ module SingleRow = {
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [right(`zero), height(`auto), width(`rem(29.))],
+              [right(`zero), width(`rem(29.))],
             ),
           ]),
         ]);
@@ -170,7 +179,7 @@ module SingleRow = {
             top(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), height(`auto), width(`rem(32.))],
+              [left(`zero), width(`rem(32.))],
             ),
           ]),
         ]);

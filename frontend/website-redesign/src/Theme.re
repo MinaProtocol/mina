@@ -15,6 +15,9 @@ module Colors = {
   let error = `hex("e93939");
   let status = `hex("ffb13b");
   let codeHighlight = `hex("e9eaf3");
+  let operational = `hex("9FE4C9");
+  let amber = `rgb((242, 149, 68));
+  let amberAlpha = a => `rgba((242, 149, 68, a));
 };
 
 module Typeface = {
@@ -32,6 +35,12 @@ module MediaQuery = {
 
   /** to add a style just to mobile  */
   let mobile = "(max-width:48rem)";
+};
+
+type backgroundImage = {
+  desktop: string,
+  tablet: string,
+  mobile: string,
 };
 
 /** this function is needed to include the font files with the font styles */
@@ -276,17 +285,17 @@ module Type = {
     ]);
 
   let sectionSubhead_ = [
-      Typeface.monumentGrotesk,
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
-      letterSpacing(`px(-1)),
-      color(Colors.digitalBlack),
-      fontWeight(`light),
-      media(
-        MediaQuery.tablet,
-        [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
-      ),
-    ];
+    Typeface.monumentGrotesk,
+    fontSize(`rem(1.)),
+    lineHeight(`rem(1.5)),
+    letterSpacing(`px(-1)),
+    color(Colors.digitalBlack),
+    fontWeight(`light),
+    media(
+      MediaQuery.tablet,
+      [fontSize(`rem(1.25)), lineHeight(`rem(1.875))],
+    ),
+  ];
   let sectionSubhead = style(sectionSubhead_);
 
   let subheadMono =
@@ -316,15 +325,15 @@ module Type = {
       ),
     ]);
 
-  let inlineCode_ =[
-      Typeface.monumentGroteskMono,
-      fontSize(`rem(0.9375)),
-      lineHeight(`rem(1.5)),
-      color(Colors.digitalBlack),
-      backgroundColor(Colors.codeHighlight),
-      padding2(~v=`zero, ~h=`rem(0.625)),
-      borderRadius(`px(3))
-    ];
+  let inlineCode_ = [
+    Typeface.monumentGroteskMono,
+    fontSize(`rem(0.9375)),
+    lineHeight(`rem(1.5)),
+    color(Colors.digitalBlack),
+    backgroundColor(Colors.codeHighlight),
+    padding2(~v=`zero, ~h=`rem(0.625)),
+    borderRadius(`px(3)),
+  ];
   let inlineCode = style(inlineCode_);
 
   let paragraphMono =
@@ -358,6 +367,15 @@ module Type = {
       Typeface.monumentGroteskMono,
       textTransform(`uppercase),
       fontSize(`rem(1.)),
+    ]);
+
+  let disclaimer =
+    style([
+      Typeface.monumentGrotesk,
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+      opacity(0.5),
+      color(Colors.digitalBlack),
     ]);
 };
 
