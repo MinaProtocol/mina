@@ -22,7 +22,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [marginTop(`rem(0.)), width(`rem(36.5)), height(`rem(30.))],
+        [marginTop(`rem(0.)), height(`rem(30.))],
       ),
     ]);
   let linksGroup =

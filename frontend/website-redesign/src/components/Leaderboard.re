@@ -601,7 +601,7 @@ let make =
       ~toggle: Toggle.t=All,
       ~search: string="",
       ~interactive: bool=true,
-      ~onFilterPress: string => unit=?,
+      ~onFilterPress=_ => (),
     ) => {
   open Toggle;
   open Filter;

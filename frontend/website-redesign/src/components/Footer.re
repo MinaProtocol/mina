@@ -49,11 +49,22 @@ module Styles = {
       justifyContent(`spaceBetween),
       color(white),
     ]);
+
   let innerContainer =
     style([
       display(`flex),
       flexDirection(`column),
+      justifyContent(`spaceBetween),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
+    ]);
+
+  let whiteLine =
+    style([
+      border(`px(1), `solid, white),
+      marginTop(`rem(3.0)),
+      width(`percent(100.)),
+      opacity(0.2),
+      marginBottom(`rem(0.)),
     ]);
 };
 
@@ -173,6 +184,7 @@ module Subfooter = {
           media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
         ]),
       ]);
+  
     let linksContainer =
       style([
         display(`flex),
@@ -183,10 +195,12 @@ module Subfooter = {
             flexDirection(`row),
             justifyContent(`spaceBetween),
             alignContent(`center),
-            width(`rem(36.5)),
+            width(`rem(39.5)),
+            marginRight(`rem(5.25)),
           ],
         ),
       ]);
+
     let copyright =
       merge([
         Theme.Type.paragraphSmall,
@@ -199,6 +213,7 @@ module Subfooter = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.column>
@@ -234,29 +249,11 @@ module Subfooter = {
   };
 };
 
-module WhiteLine = {
-  module Styles = {
-    open Css;
-    let whiteLine =
-      style([
-        border(`px(1), `solid, white),
-        marginTop(`rem(3.0)),
-        width(`percent(100.)),
-        opacity(0.2),
-        marginBottom(`rem(0.)),
-      ]);
-  };
-  [@react.component]
-  let make = () => {
-    <hr className=Styles.whiteLine />;
-  };
-};
-
 [@react.component]
 let make = () => {
   <div className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
-    <WhiteLine />
+    <hr className=Styles.whiteLine />
     <Subfooter />
     <div className=Styles.backToTopButton>
       <Button

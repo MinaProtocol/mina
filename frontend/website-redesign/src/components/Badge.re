@@ -8,8 +8,8 @@ let make =
       ~marginRight=0.5,
       ~mobileMarginLeft=0.5,
       ~mobileMarginRight=0.5,
-      ~title: string=?,
-      ~alt: string=?,
+      ~title="",
+      ~alt="",
     ) => {
   <img
     src

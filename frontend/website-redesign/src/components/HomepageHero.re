@@ -6,7 +6,7 @@ module Styles = {
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(140.))]),
       position(`relative),
     ]);
 
@@ -27,7 +27,6 @@ module Styles = {
       marginTop(`rem(13.)),
       media("(min-width:65rem)", [flexDirection(`row)]),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
-      media(Theme.MediaQuery.desktop, [marginTop(`rem(50.))]),
     ]);
 
   let heroHeadline =
@@ -39,7 +38,7 @@ module Styles = {
         alignItems(`center),
         marginTop(`rem(23.)),
         media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
-        media(Theme.MediaQuery.desktop, [marginTop(`rem(37.))]),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(35.))]),
       ]),
     ]);
 
