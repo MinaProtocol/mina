@@ -35,7 +35,7 @@ done
 echo "--- Generating index based on chart updates"
 helm repo index $syncDir
 
-if [[ -n ${AUTO_DEPLOY:-false} ]]; then
+if [ -n "${AUTO_DEPLOY+x}" ]; then
     echo "--- Deploying/Syncing with remote repository"
     gsutil -m rsync $syncDir ${CODA_CHART_REPO:-"gs://coda-charts/"}
 fi
