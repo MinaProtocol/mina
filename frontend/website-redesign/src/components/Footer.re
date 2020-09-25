@@ -200,7 +200,7 @@ module Subfooter = {
             flexDirection(`row),
             justifyContent(`spaceBetween),
             alignContent(`center),
-            width(`rem(39.5)),
+            width(`rem(39.3)),
             marginRight(`rem(5.25)),
           ],
         ),
