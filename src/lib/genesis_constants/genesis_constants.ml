@@ -159,8 +159,12 @@ module Constraint_constants = struct
           Core_kernel.Int.ceil_log2
             (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
 
-        [%%ifdef
+        [%%ifndef
         fork_previous_length]
+
+        let fork = None
+
+        [%%else]
 
         [%%inject
         "fork_previous_length", fork_previous_length]
@@ -175,10 +179,6 @@ module Constraint_constants = struct
             ; previous_state_hash=
                 Data_hash_lib.State_hash.of_base58_check_exn
                   fork_previous_state_hash }
-
-        [%%else]
-
-        let fork = None
 
         [%%endif]
 
