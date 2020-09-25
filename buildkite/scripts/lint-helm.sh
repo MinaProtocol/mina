@@ -24,7 +24,4 @@ for dir in $dirs; do
 
   echo "--- Executing dry-run: ${dir}"
   helm install test $dir --dry-run --namespace default
-
-  echo "--- Checking for Chart version bump: ${dir}"
-  git diff develop... "${dir}/Chart.yaml" | grep version
 done
