@@ -139,6 +139,23 @@ module FoundingMembersSection = {
   };
 };
 
+module CultureFooter = {
+  module Styles = {
+    open Css;
+    let container = style([padding2(~v=`rem(2.5), ~h=`rem(2.5))]);
+    let grid =
+      style([
+        display(`grid),
+        gridTemplateColumns([`rem(12.93), `rem(47.)]),
+        gridColumnGap(`rem(2.56)),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    
+  }
+};
+
 [@react.component]
 let make = () => {
   <Page title="Genesis Page">
@@ -182,7 +199,8 @@ let make = () => {
     <div className=Styles.genesisSection>
       <FoundingMembersSection />
       <WorldMapSection />
-      <Spacer height=4./>
+      <Spacer height=4. />
+      <CultureFooter />
     </div>
   </Page>;
 };
