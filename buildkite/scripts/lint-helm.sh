@@ -23,7 +23,7 @@ for dir in $dirs; do
   helm lint $dir
 
   echo "--- Executing dry-run"
-  helm install test $dir --dry-run
+  helm install test $dir --dry-run --namespace default
 
   echo "--- Checking for Chart version bump"
   git diff develop... "${dir}/Chart.yaml" | grep version
