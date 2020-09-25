@@ -69,7 +69,7 @@ module ButtonBarStyles = {
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.25), ~h=`rem(2.75))],
+        [padding2(~v=`rem(5.75), ~h=`rem(2.75))],
       ),
       media(
         Theme.MediaQuery.desktop,
