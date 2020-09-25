@@ -39,6 +39,7 @@ type t [@@deriving sexp_of]
 val empty :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
+  -> time_controller:Block_time.Controller.t
   -> t
 
 (** How many transactions are currently in the pool *)

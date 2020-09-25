@@ -47,7 +47,8 @@ type t =
       Transaction_hash.Map.t
   ; size: int
   ; constraint_constants: Genesis_constants.Constraint_constants.t
-  ; consensus_constants: Consensus.Constants.t }
+  ; consensus_constants: Consensus.Constants.t
+  ; time_controller: Block_time.Controller.t }
 [@@deriving sexp_of]
 
 module Command_error = struct
@@ -151,7 +152,7 @@ module For_tests = struct
        ; all_by_hash
        ; size
        ; constraint_constants
-       ; consensus_constants= _ } ->
+       ; _ } ->
     let assert_all_by_fee tx =
       if
         Set.mem
@@ -275,14 +276,15 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
   ; all_by_hash= Transaction_hash.Map.empty
   ; size= 0
   ; constraint_constants
-  ; consensus_constants }
+  ; consensus_constants
+  ; time_controller }
 
 let size : t -> int = fun t -> t.size
 
@@ -660,8 +662,8 @@ let rec add_from_gossip_exn :
     -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
        , Command_error.t )
        Result.t =
- fun ({constraint_constants; consensus_constants; _} as t) cmd current_nonce
-     balance ->
+ fun ({constraint_constants; consensus_constants; time_controller; _} as t) cmd
+     current_nonce balance ->
   let open Command_error in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
@@ -718,7 +720,8 @@ let rec add_from_gossip_exn :
                 ~data:cmd
           ; size= t.size + 1
           ; constraint_constants
-          ; consensus_constants }
+          ; consensus_constants
+          ; time_controller }
         , Sequence.empty )
   | Some (queued_cmds, reserved_currency) -> (
       (* commands queued for this sender *)
@@ -835,7 +838,7 @@ let add_from_backtrack :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
     -> (t, Command_error.t) Result.t =
- fun ({constraint_constants; consensus_constants; _} as t) cmd ->
+ fun ({constraint_constants; consensus_constants; time_controller; _} as t) cmd ->
   let open Result.Let_syntax in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
@@ -868,7 +871,8 @@ let add_from_backtrack :
             t.applicable_by_fee fee cmd
       ; size= t.size + 1
       ; constraint_constants
-      ; consensus_constants }
+      ; consensus_constants
+      ; time_controller }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
       if
@@ -907,7 +911,8 @@ let add_from_backtrack :
               )
       ; size= t.size + 1
       ; constraint_constants
-      ; consensus_constants }
+      ; consensus_constants
+      ; time_controller }
 
 let%test_module _ =
   ( module struct
@@ -928,7 +933,12 @@ let%test_module _ =
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let empty = empty ~constraint_constants ~consensus_constants
+    let logger = Logger.null ()
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    let empty =
+      empty ~constraint_constants ~consensus_constants ~time_controller
 
     let%test_unit "empty invariants" = assert_invariants empty
 
