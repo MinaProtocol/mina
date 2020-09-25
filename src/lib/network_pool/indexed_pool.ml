@@ -46,7 +46,8 @@ type t =
       Transaction_hash.User_command_with_valid_signature.t
       Transaction_hash.Map.t
   ; size: int
-  ; constraint_constants: Genesis_constants.Constraint_constants.t }
+  ; constraint_constants: Genesis_constants.Constraint_constants.t
+  ; consensus_constants: Consensus.Constants.t }
 [@@deriving sexp_of]
 
 module Command_error = struct
@@ -62,6 +63,9 @@ module Command_error = struct
         [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
     | Overflow
     | Bad_token
+    | Expired of
+        [`Valid_until of Coda_numbers.Global_slot.t]
+        * [`Current_global_slot of Coda_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
   [@@deriving sexp_of, to_yojson]
 end
@@ -146,7 +150,8 @@ module For_tests = struct
        ; all_by_fee
        ; all_by_hash
        ; size
-       ; constraint_constants } ->
+       ; constraint_constants
+       ; consensus_constants= _ } ->
     let assert_all_by_fee tx =
       if
         Set.mem
@@ -270,13 +275,14 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants : t =
+let empty ~constraint_constants ~consensus_constants : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
   ; all_by_hash= Transaction_hash.Map.empty
   ; size= 0
-  ; constraint_constants }
+  ; constraint_constants
+  ; consensus_constants }
 
 let size : t -> int = fun t -> t.size
 
@@ -296,8 +302,7 @@ let all_from_account :
     -> Transaction_hash.User_command_with_valid_signature.t list =
  fun {all_by_sender; _} account_id ->
   Option.value_map ~default:[] (Map.find all_by_sender account_id)
-    ~f:(fun (user_commands, _) ->
-      Sequence.to_list @@ F_sequence.to_seq user_commands )
+    ~f:(fun (user_commands, _) -> F_sequence.to_list user_commands)
 
 let get_all {all_by_hash; _} :
     Transaction_hash.User_command_with_valid_signature.t list =
@@ -308,6 +313,22 @@ let find_by_hash :
     -> Transaction_hash.t
     -> Transaction_hash.User_command_with_valid_signature.t option =
  fun {all_by_hash; _} hash -> Map.find all_by_hash hash
+
+let current_global_slot consensus_constants =
+  let logger = Logger.null () in
+  let time_controller = Block_time.Controller.basic ~logger in
+  let current_time = Block_time.now time_controller in
+  Consensus.Data.Consensus_time.(
+    of_time_exn ~constants:consensus_constants current_time |> to_global_slot)
+
+let check_expiry ~consensus_constants (cmd : User_command.t) =
+  let current_global_slot = current_global_slot consensus_constants in
+  let valid_until = User_command.valid_until cmd in
+  if Global_slot.(valid_until < current_global_slot) then
+    Error
+      (Command_error.Expired
+         (`Valid_until valid_until, `Current_global_slot current_global_slot))
+  else Ok ()
 
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
@@ -492,6 +513,28 @@ let revalidate :
                     ~data:(keep_queue', currency_reserved'') }
             , Sequence.append dropped_acc to_drop ) )
 
+let remove_expired t :
+    Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
+  Map.fold t.all_by_sender ~init:(Sequence.empty, t)
+    ~f:(fun ~key:_ ~data:(queue, _) acc ->
+      match
+        F_sequence.find queue ~f:(fun cmd ->
+            match
+              check_expiry ~consensus_constants:t.consensus_constants
+                (Transaction_hash.User_command_with_valid_signature.command cmd)
+            with
+            | Error (Expired _) ->
+                true
+            | _ ->
+                false )
+      with
+      | None ->
+          acc
+      | Some expired_cmd ->
+          let dropped_acc, t = acc in
+          let removed, t' = remove_with_dependents_exn t expired_cmd in
+          (Sequence.append dropped_acc removed, t') )
+
 let handle_committed_txn :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
@@ -617,7 +660,8 @@ let rec add_from_gossip_exn :
     -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
        , Command_error.t )
        Result.t =
- fun ({constraint_constants; _} as t) cmd current_nonce balance ->
+ fun ({constraint_constants; consensus_constants; _} as t) cmd current_nonce
+     balance ->
   let open Command_error in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
@@ -628,6 +672,7 @@ let rec add_from_gossip_exn :
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
+  let%bind () = check_expiry ~consensus_constants unchecked in
   let%bind consumed = currency_consumed' ~constraint_constants cmd in
   let%bind () =
     if User_command.check_tokens unchecked then return () else Error Bad_token
@@ -672,7 +717,8 @@ let rec add_from_gossip_exn :
                   (Transaction_hash.User_command_with_valid_signature.hash cmd)
                 ~data:cmd
           ; size= t.size + 1
-          ; constraint_constants }
+          ; constraint_constants
+          ; consensus_constants }
         , Sequence.empty )
   | Some (queued_cmds, reserved_currency) -> (
       (* commands queued for this sender *)
@@ -786,11 +832,15 @@ let rec add_from_gossip_exn :
             failwith "recursive add_exn failed" )
 
 let add_from_backtrack :
-    t -> Transaction_hash.User_command_with_valid_signature.t -> t =
- fun ({constraint_constants; _} as t) cmd ->
+       t
+    -> Transaction_hash.User_command_with_valid_signature.t
+    -> (t, Command_error.t) Result.t =
+ fun ({constraint_constants; consensus_constants; _} as t) cmd ->
+  let open Result.Let_syntax in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
+  let%map () = check_expiry ~consensus_constants unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee_exn unchecked in
   let consumed =
@@ -817,7 +867,8 @@ let add_from_backtrack :
             (module Transaction_hash.User_command_with_valid_signature)
             t.applicable_by_fee fee cmd
       ; size= t.size + 1
-      ; constraint_constants }
+      ; constraint_constants
+      ; consensus_constants }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
       if
@@ -855,7 +906,8 @@ let add_from_backtrack :
               , Option.value_exn Currency.Amount.(currency_reserved + consumed)
               )
       ; size= t.size + 1
-      ; constraint_constants }
+      ; constraint_constants
+      ; consensus_constants }
 
 let%test_module _ =
   ( module struct
@@ -874,7 +926,9 @@ let%test_module _ =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let empty = empty ~constraint_constants
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let empty = empty ~constraint_constants ~consensus_constants
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -1001,7 +1055,16 @@ let%test_module _ =
                     failwithf
                       !"Bad fee token. The fees are paid in token %{sexp: \
                         Token_id.t}, which we are not accepting fees in."
-                      fee_token () )
+                      fee_token ()
+                | Error
+                    (Expired
+                      ( `Valid_until valid_until
+                      , `Current_global_slot current_global_slot )) ->
+                    failwithf
+                      !"Expired user command. Current global slot is \
+                        %{sexp:Coda_numbers.Global_slot.t} but user command \
+                        is only valid until %{sexp:Coda_numbers.Global_slot.t}"
+                      current_global_slot valid_until () )
           in
           go cmds )
 
