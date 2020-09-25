@@ -142,18 +142,75 @@ module FoundingMembersSection = {
 module CultureFooter = {
   module Styles = {
     open Css;
-    let container = style([padding2(~v=`rem(2.5), ~h=`rem(2.5))]);
     let grid =
       style([
-        display(`grid),
-        gridTemplateColumns([`rem(12.93), `rem(47.)]),
-        gridColumnGap(`rem(2.56)),
+        display(`flex),
+        height(`rem(17.)),
+        backgroundImage(
+          `url("/static/img/backgrounds/MinaCultureFooterDesktop.png"),
+        ),
+        backgroundSize(`cover),
+        flexDirection(`column),
+        padding2(~v=`rem(3.), ~h=`rem(2.75)),
+        justifyContent(`spaceBetween),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            gridTemplateColumns([`rem(6.56), `rem(30.8)]),
+            gridColumnGap(`rem(3.31)),
+            gridTemplateRows([`rem(4.875), `rem(1.)]),
+            padding2(~v=`rem(1.8), ~h=`rem(2.68)),
+            height(`rem(11.)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            display(`grid),
+            gridTemplateColumns([`rem(12.93), `rem(47.)]),
+            gridColumnGap(`rem(2.56)),
+            gridTemplateRows([`rem(4.), `rem(1.)]),
+            padding2(~v=`rem(2.5), ~h=`rem(2.5)),
+            height(`rem(11.)),
+          ],
+        ),
+      ]);
+    let culture =
+      style([
+        Theme.Typeface.monumentGrotesk,
+        color(white),
+        fontSize(`rem(2.)),
+      ]);
+    let body = merge([Theme.Type.paragraphSmall, style([color(white)])]);
+    let link =
+      style([
+        media(
+          Theme.MediaQuery.tablet,
+          [unsafe("grid-area", "2 / 2 / 3 /3 "), height(`rem(1.))],
+        ),
+        marginTop(`zero),
       ]);
   };
   [@react.component]
   let make = () => {
-    
-  }
+    <Wrapped>
+      <div className=Styles.grid>
+        <h2 className=Styles.culture> {React.string("Our Culture")} </h2>
+        <p className=Styles.body>
+          {React.string(
+             "It's hard to quantify, but it's not hard to see: in any community, culture is everything.  Ours is rooted in respect and openness, curiosity and excellence.",
+           )}
+        </p>
+        <div className=Styles.link>
+          <Link
+            text="Read our Code of Conduct"
+            href="https://github.com/CodaProtocol/coda/blob/develop/CODE_OF_CONDUCT.md"
+          />
+        </div>
+      </div>
+      <Spacer height=1. />
+    </Wrapped>;
+  };
 };
 
 [@react.component]
