@@ -66,6 +66,7 @@ module Diff_versioned = struct
           | Overflow
           | Bad_token
           | Unwanted_fee_token
+          | Expired
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -83,6 +84,7 @@ module Diff_versioned = struct
       | Overflow
       | Bad_token
       | Unwanted_fee_token
+      | Expired
     [@@deriving sexp, yojson]
   end
 
@@ -299,6 +301,13 @@ struct
           ("bad_token", [])
       | Unwanted_fee_token fee_token ->
           ("unwanted_fee_token", [("fee_token", Token_id.to_yojson fee_token)])
+      | Expired
+          (`Valid_until valid_until, `Current_global_slot current_global_slot)
+        ->
+          ( "expired"
+          , [ ("valid_until", Coda_numbers.Global_slot.to_yojson valid_until)
+            ; ( "current_global_slot"
+              , Coda_numbers.Global_slot.to_yojson current_global_slot ) ] )
 
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
@@ -361,9 +370,13 @@ struct
                 Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
                   ~data:time_added ) ;
             let pool', dropped_seq =
-              cmd
-              |> Indexed_pool.add_from_backtrack pool
-              |> drop_until_below_max_size ~pool_max_size
+              match cmd |> Indexed_pool.add_from_backtrack pool with
+              | Error e ->
+                  let error_str, metadata = of_indexed_pool_error e in
+                  log_indexed_pool_error error_str ~metadata cmd ;
+                  (pool, Sequence.empty)
+              | Ok indexed_pool ->
+                  drop_until_below_max_size ~pool_max_size indexed_pool
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
@@ -535,12 +548,18 @@ struct
                   log_and_remove "Fee_payer_account not found"
                     ~metadata:
                       [("user_command", User_command.to_yojson unchecked)] ) ;
+      (*Remove any expired user commands*)
+      let expired_commands, pool = Indexed_pool.remove_expired t.pool in
+      Sequence.iter expired_commands ~f:(fun cmd ->
+          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
+      ) ;
+      t.pool <- pool ;
       Deferred.unit
 
-    let create ~constraint_constants ~frontier_broadcast_pipe ~config ~logger
-        ~tf_diff_writer =
+    let create ~constraint_constants ~consensus_constants
+        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
-        { pool= Indexed_pool.empty ~constraint_constants
+        { pool= Indexed_pool.empty ~constraint_constants ~consensus_constants
         ; locally_generated_uncommitted=
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -676,6 +695,7 @@ struct
           | Overflow
           | Bad_token
           | Unwanted_fee_token
+          | Expired
         [@@deriving sexp, yojson]
       end
 
@@ -850,6 +870,16 @@ struct
                                 ( Unwanted_fee_token
                                 , [("fee_token", Token_id.to_yojson fee_token)]
                                 )
+                            | Expired
+                                ( `Valid_until valid_until
+                                , `Current_global_slot current_global_slot ) ->
+                                ( Expired
+                                , [ ( "valid_until"
+                                    , Coda_numbers.Global_slot.to_yojson
+                                        valid_until )
+                                  ; ( "current_global_slot"
+                                    , Coda_numbers.Global_slot.to_yojson
+                                        current_global_slot ) ] )
                           in
                           let yojson_fail_reason =
                             Fn.compose
@@ -866,7 +896,9 @@ struct
                                 | Bad_token ->
                                     "bad token"
                                 | Unwanted_fee_token _ ->
-                                    "unwanted fee token" )
+                                    "unwanted fee token"
+                                | Expired _ ->
+                                    "expired" )
                           in
                           match add_res with
                           | Ok (pool', dropped) ->
@@ -1025,7 +1057,7 @@ struct
         match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
     end
 
-    let get_rebroadcastable (t : t) ~is_expired =
+    let get_rebroadcastable (t : t) ~has_timed_out =
       let metadata ~key ~data =
         [ ( "cmd"
           , Transaction_hash.User_command_with_valid_signature.to_yojson key )
@@ -1037,8 +1069,8 @@ struct
       let logger = t.logger in
       Hashtbl.filteri_inplace t.locally_generated_uncommitted
         ~f:(fun ~key ~data ->
-          match is_expired data with
-          | `Expired ->
+          match has_timed_out data with
+          | `Timed_out ->
               [%log info]
                 "No longer rebroadcasting uncommitted command $cmd, %s"
                 added_str ~metadata:(metadata ~key ~data) ;
@@ -1047,8 +1079,8 @@ struct
               true ) ;
       Hashtbl.filteri_inplace t.locally_generated_committed
         ~f:(fun ~key ~data ->
-          match is_expired data with
-          | `Expired ->
+          match has_timed_out data with
+          | `Timed_out ->
               [%log debug]
                 "Removing committed locally generated command $cmd from \
                  possible rebroadcast pool, %s"
@@ -1218,7 +1250,7 @@ let%test_module _ =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
       let pool =
-        Test.create ~config ~logger ~constraint_constants
+        Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           ~frontier_broadcast_pipe:tf_pipe_r
         |> Test.resource_pool
@@ -1482,7 +1514,8 @@ let%test_module _ =
           in
           let pool =
             Test.create ~config ~logger ~constraint_constants
-              ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
+              ~consensus_constants ~incoming_diffs:incoming_diff_r
+              ~local_diffs:local_diff_r
               ~frontier_broadcast_pipe:frontier_pipe_r
             |> Test.resource_pool
           in
@@ -1692,7 +1725,7 @@ let%test_module _ =
       [%test_eq: User_command.t list list]
         ( List.map ~f:normalize
         @@ Test.Resource_pool.get_rebroadcastable pool
-             ~is_expired:(Fn.const `Ok) )
+             ~has_timed_out:(Fn.const `Ok) )
         expected
 
     let mock_sender =
@@ -1796,7 +1829,7 @@ let%test_module _ =
           *)
           let _ =
             Test.Resource_pool.get_rebroadcastable pool
-              ~is_expired:(Fn.const `Expired)
+              ~has_timed_out:(Fn.const `Timed_out)
           in
           assert_pool_txs (List.drop local_cmds' 4 @ remote_cmds') ;
           assert_rebroadcastable pool [] ;
