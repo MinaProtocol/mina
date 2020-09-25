@@ -1706,8 +1706,8 @@ module T = struct
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
-      Sequence.fold_until transactions_by_fee ~init:Sequence.empty
-        ~f:(fun seq txn ->
+      Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
+        ~f:(fun (seq, count) txn ->
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction ~constraint_constants
@@ -1715,25 +1715,22 @@ module T = struct
                   (Command (txn :> User_command.t)) )
           with
           | Error e ->
-              let error_message =
-                sprintf
-                  !"Staged_ledger_diff creation: Invalid user command! Error \
-                    was: %s, command was: $user_command"
-                  (Error.to_string_hum e)
-              in
-              [%log fatal]
-                ~metadata:[("user_command", User_command.Valid.to_yojson txn)]
-                !"%s" error_message ;
-              Stop seq
+              [%log error]
+                ~metadata:
+                  [ ("user_command", User_command.Valid.to_yojson txn)
+                  ; ("error", `String (Error.to_string_hum e)) ]
+                "Staged_ledger_diff creation: Skipping user command: \
+                 $user_command due to error: $error" ;
+              Continue (seq, count)
           | Ok status ->
               let txn_with_status = {With_status.data= txn; status} in
               let seq' =
                 Sequence.append (Sequence.singleton txn_with_status) seq
               in
-              if Sequence.length seq' = Scan_state.free_space t.scan_state then
-                Stop seq'
-              else Continue seq' )
-        ~finish:Fn.id
+              let count' = count + 1 in
+              if count' >= Scan_state.free_space t.scan_state then Stop seq'
+              else Continue (seq', count') )
+        ~finish:fst
     in
     let diff, log =
       O1trace.measure "generate diff" (fun () ->
