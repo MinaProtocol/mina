@@ -62,8 +62,8 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk kubectl -y
 
 # Helm tools
-RUN echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list && \
-    apt-get update && apt-get install helm
+RUN echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list && \
+    sudo apt-get update -y && sudo apt-get install helm -y --allow-unauthenticated
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rust_install.sh
 RUN chmod +x /tmp/rust_install.sh
