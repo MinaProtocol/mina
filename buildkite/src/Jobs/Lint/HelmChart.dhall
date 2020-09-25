@@ -27,7 +27,7 @@ Pipeline.build
           commands = [ Cmd.run "buildkite/scripts/lint-helm.sh" ]
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
-          , target = Size.Medium
+          , target = Size.Small
           , docker = None Docker.Type
         }
     ]
