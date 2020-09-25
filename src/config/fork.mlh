@@ -1,3 +1,3 @@
-[%%undef fork_previous_length]
-[%%undef fork_previous_state_hash]
+[%%define fork_previous_length 14]
+[%%define fork_previous_state_hash "3NKZ7QNPs569DWok5Grs4y4C5T6Coihxmzn5rNFvMWzqBxyvrZPN"]
 
