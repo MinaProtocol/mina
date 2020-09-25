@@ -24,7 +24,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [ Cmd.run "buildkite/scripts/helm-release.sh" ]
-          , label = "Helm chart release steps"
+          , label = "Helm chart release"
           , key = "release-helm-chart"
           , target = Size.Medium
           , docker = None Docker.Type
