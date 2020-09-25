@@ -65,10 +65,10 @@ module ButtonBarStyles = {
   let background = (kind, backgroundImg) => {
     let (mobileV, tabletV, desktopV) =
       switch (kind) {
-      | GetStarted => (1.5, 4.25, 16.)
-      | Developers => (1.5, 4.25, 16.)
+      | GetStarted => (1.5, 5.75, 16.)
+      | Developers => (1.5, 5.75, 16.)
       | CommunityLanding => (1.5, 4.25, 4.25)
-      | HelpAndSupport => (1.5, 4.25, 16.)
+      | HelpAndSupport => (1.5, 5.75, 16.)
       };
     let (mobileH, tabletH, desktopH) =
       switch (kind) {

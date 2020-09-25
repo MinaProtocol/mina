@@ -74,7 +74,7 @@ module MorePosts = {
         {posts |>
           Array.map(item => {
             <li className=Styles.postItem key=item.ContentType.BlogPost.slug>
-            <ListModule.MainListing item mainImg="/static/img/ArticleImageSmall.png" />
+            <ListModule.MainListing item mainImg="/static/img/ArticleImageSmall.png" itemKind=ListModule.Blog />
             </li>
           }) |> React.array}
       </ul>
