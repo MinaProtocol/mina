@@ -20,5 +20,11 @@ dirs=$(dirname $charts | xargs -n1 | sort -u | xargs)
 
 echo "--- Linting: ${dirs}"
 for dir in $dirs; do
-  helm lint $dir;
+  helm lint $dir
+
+  echo "--- Executing dry-run"
+  helm install test $dir --dry-run
+
+  echo "--- Checking for Chart version bump"
+  git diff develop... "${dir}/Chart.yaml" | grep version
 done
