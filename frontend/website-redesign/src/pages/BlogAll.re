@@ -1,9 +1,6 @@
-
 module Styles = {
   open Css;
-  let titleSpacing = style([
-    marginBottom(`rem(3.1875))
-  ])
+  let titleSpacing = style([marginBottom(`rem(3.1875))]);
 };
 
 [@react.component]
@@ -13,7 +10,7 @@ let make = (~posts) => {
     <div className=Nav.Styles.spacer />
     <Wrapped>
       <div className=Blog.Style.morePostsSpacing>
-        <h2 className=Css.merge([Theme.Type.h2, Styles.titleSpacing])>
+        <h2 className={Css.merge([Theme.Type.h2, Styles.titleSpacing])}>
           {React.string("All Blog Posts")}
         </h2>
         <Blog.MorePosts.Content posts />
@@ -22,12 +19,10 @@ let make = (~posts) => {
     <ButtonBar
       kind=ButtonBar.CommunityLanding
       backgroundImg="/static/img/ButtonBarBackground.png"
-      />
-      <Blog.InternalCtaSection />
+    />
+    <Blog.InternalCtaSection />
   </Page>;
 };
-
-
 
 // TODO: pagination
 Next.injectGetInitialProps(make, _ => {

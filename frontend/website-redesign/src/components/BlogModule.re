@@ -30,15 +30,15 @@ module Styles = {
 };
 
 module Title = {
-[@react.component]
+  [@react.component]
   let make = (~copy, ~buttonCopy, ~buttonHref) => {
-      <div className=Styles.header>
-        <h2 className=Theme.Type.h2> {React.string(copy)} </h2>
-        <Button bgColor=Theme.Colors.digitalBlack href=buttonHref>
-          {React.string(buttonCopy)}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-      </div>
+    <div className=Styles.header>
+      <h2 className=Theme.Type.h2> {React.string(copy)} </h2>
+      <Button bgColor=Theme.Colors.digitalBlack href=buttonHref>
+        {React.string(buttonCopy)}
+        <Icon kind=Icon.ArrowRightMedium />
+      </Button>
+    </div>;
   };
 };
 
@@ -53,7 +53,11 @@ let make = () => {
 
   <div className=Styles.container>
     <Wrapped>
-      <Title copy="In the News" buttonCopy="See All Press" buttonHref="/blog" />
+      <Title
+        copy="In the News"
+        buttonCopy="See All Press"
+        buttonHref="/blog"
+      />
     </Wrapped>
     <ListModule
       items=blogs

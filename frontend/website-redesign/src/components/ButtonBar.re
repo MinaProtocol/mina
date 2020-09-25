@@ -89,7 +89,7 @@ module ButtonBarStyles = {
         Theme.MediaQuery.desktop,
         [padding2(~v=`rem(desktopV), ~h=`rem(desktopH))],
       ),
-    ])
+    ]);
   };
 
   let container =
@@ -139,7 +139,6 @@ module CommunityLanding = {
           marginBottom(`rem(0.5)),
         ]),
       ]);
-
   };
   [@react.component]
   let make = () => {
