@@ -1633,7 +1633,7 @@ let%test_module _ =
               :: List.drop few_now 1 )
           in
           assert_pool_txs cmds_wo_check ;
-          (*after 5 block times and there should be no expired transactions*)
+          (*after 5 block times there should be no expired transactions*)
           let%bind () =
             after (Block_time.Span.to_time_span (n_block_times 5L))
           in
