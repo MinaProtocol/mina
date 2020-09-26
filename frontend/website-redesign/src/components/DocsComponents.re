@@ -202,6 +202,20 @@ module DaemonCommandExample = {
   };
 };
 
+module Blog = {
+  module Styles = {
+    let spacing = style([
+      padding2(~v=`rem(1.), ~h=`zero)
+    ]);
+  };
+
+  module Img =
+    Wrap({
+      let element = <img className=Styles.spacing width="100%" />;
+    });
+};
+
+
 let allComponents = () => {
   "Alert": Alert.make,
   "DaemonCommandExample": DaemonCommandExample.make,
