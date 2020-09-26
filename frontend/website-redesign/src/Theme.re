@@ -285,7 +285,7 @@ module Type = {
     ]);
 
   let sectionSubhead_ = [
-    Typeface.monumentGrotesk,
+    Typeface.monumentGroteskMono,
     fontSize(`rem(1.)),
     lineHeight(`rem(1.5)),
     letterSpacing(`px(-1)),
