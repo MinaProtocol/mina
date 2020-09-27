@@ -14,6 +14,7 @@ module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Coda_numbers = Coda_numbers_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 

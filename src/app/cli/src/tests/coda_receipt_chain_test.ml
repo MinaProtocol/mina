@@ -19,12 +19,12 @@ let main () =
   let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
   let sender_sk, largest_account =
-    Test_genesis_ledger.largest_account_exn ()
+    Precomputed_values.largest_account_exn precomputed_values
   in
   let receiver_pk =
-    Test_genesis_ledger.find_new_account_record_exn_
+    Precomputed_values.find_new_account_record_exn_ precomputed_values
       [Account.public_key largest_account]
-    |> Test_genesis_ledger.pk_of_account_record
+    |> Precomputed_values.pk_of_account_record
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
@@ -39,7 +39,7 @@ let main () =
   let n = 2 in
   let sender_sk = Option.value_exn sender_sk in
   let send_amount = Currency.Amount.of_int 10 in
-  let fee = User_command.minimum_fee in
+  let fee = Signed_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence
@@ -51,13 +51,14 @@ let main () =
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in
   let config = List.hd_exn configs in
   let%bind receipt_chain_hash =
     Coda_process.send_user_command_exn worker sender_sk receiver_pk send_amount
-      fee User_command_memo.dummy
+      fee Signed_command_memo.dummy
   in
   let _user_cmd, receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker ~logger in

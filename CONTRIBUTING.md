@@ -57,6 +57,8 @@ team on github.
 Maintainers should assign reviewers to pull requests, and tag them with any
 relevant labels.
 
+If you are PRing from the main remote, add `ci-build-me` label when you want to run CI. If you are PRing from a fork, ask a core contributor to `!ci-build-me` when you're ready for CI to run. Note: You will need the `!ci-build-me` comment for each and every run of CI.
+
 Once a PR has been reviewed and approved, and all CI tests have passed, tag the PR with the `ready-to-merge` label to trigger Mergify and automatically merge the code.
 
 ## Documentation

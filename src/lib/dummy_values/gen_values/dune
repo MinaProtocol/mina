@@ -1,6 +1,6 @@
 (executable
  (name gen_values)
- (libraries async core crypto_params snarky ppxlib)
+ (libraries async core crypto_params pickles ppxlib)
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))
  (modes native))

@@ -1,0 +1,199 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "My First Transaction"});
+
+# My First Transaction
+
+In this section, we'll make our first transaction on the Coda network. After [installing the software](./getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+
+## Get the network information
+
+Because only 200 participants can join testnet 3.2b, you'll first need to get the peer addresses of the seed nodes. The 200 participants have already been selected, but you can sign up for the waitlist [here](http://bit.ly/StakingSignup) in case a spot opens up. 
+
+Once you're in, you'll receive an email close to release 3.2b launch date with the seed node addresses and updated commands. We can start by storing the seed addresses as environment variables to help with the next steps:
+
+```
+export SEED1='<seed-address-1>'
+export SEED2='<seed-address-2>'
+```
+
+## Start up a node
+
+<Alert kind="status">
+
+  You can find the current status of the network and related services here: [status.codaprotocol.com](https://status.codaprotocol.com)
+
+</Alert>
+
+Run the following command to start up a Coda node instance and connect to the live network:
+
+<DaemonCommandExample />
+
+The `-peer` arguments specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](/docs/glossary#peer-to-peer) protocol, there is no single centralized server we rely on.
+
+By default, the node connects to the network using the default external-port of 8302. This can be changed using the `-external-port` flag.
+
+<Alert>
+
+  The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
+
+</Alert>
+
+See [here](/docs/troubleshooting) for common issues when first running a node.
+
+## Checking connectivity
+
+Now that we've started up a node and are running the Coda daemon, open up another shell and run the following command:
+
+    coda client status
+
+<Alert>
+
+It may take up to a minute before `coda client status` connects to the daemon when first starting up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
+
+If you are using the [Sandbox Node](/docs/developers/sandbox-node), due to a quirk in the way we communicate for the coda client status command, you will need to run `coda client status` inside the container itself:
+
+`docker exec -it coda bash`
+
+</Alert>
+
+Most likely we will see a response that include the fields below:
+
+    ...
+    Peers:                                         Total: 4 (...)
+    ...
+    Sync Status:                                   Bootstrap
+
+If you see `Sync Status: Bootstrap`, this means that the Coda node is bootstrapping and needs to sync with the rest of the network. You may need to be patient here as this step might take some time for the node to get all the data it needs. When sync status reaches `Synced` and the node is connected to 1 or more peers, we will have successfully connected to the network. We will also see a corresponding daemon log once we've synced: `[Info] Coda daemon is now synced`.
+
+If you the `Bootstrap` state persists for more than an hour, there may be an issue with your port configuration.
+
+## Create a new account
+
+Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to put the keys under a directory that is harder for attackers to access.
+
+Run the following command to create a new account/keypair:
+  
+    coda accounts create
+
+See `coda accounts -help` to learn more about how to use the command. 
+
+<Alert kind="warning">
+
+The public key can be shared freely with anyone, but be very careful with your private key file. Never share this private key with anyone, as it is the equivalent of a password for your funds.
+
+</Alert>
+
+The response from this command will look like this:
+
+    😄 Added new account!
+    Public key: ZsMSUrGkF2TaBv9z2j6jco5JjL4MnywfAQtsHMuswj2zWnTUsArfEStetwuu63Um6jC
+
+<Alert kind="warning">
+
+If you are one of the selected Testnet 3.2b participants that has been delegated stake, please complete the challenges using the account that you had previously created. You do not need to create a new account! (If you create a new account and use it to complete the challenges, we will not be able to track your points for your activities.)
+
+</Alert>
+
+Since the public key is quite long and difficult to remember, let's save it as an environment variable:
+
+    export CODA_PUBLIC_KEY=<YOUR-PUBLIC-KEY>
+
+Now we can access this everywhere as `$CODA_PUBLIC_KEY` -- see if it saved properly by trying `echo $CODA_PUBLIC_KEY`.
+
+
+Note that these environment variables will only be saved for the current shell session, so if you want to save them for future use, you can add them to `~/.profile` or `~/.bash_profile`.
+
+<Alert>
+
+If you are running the node on a cloud virtual machine, make sure to export and save the key file. You can export the key with:
+
+    coda accounts export -public-key <PUBLIC-KEY> -privkey-path <EXPORT-PATH>
+
+Then save it to your local machine, maybe using [scp](https://linux.die.net/man/1/scp):
+
+    scp <EXPORT-PATH> <LOCAL-DESTINATION>
+
+Later, when starting up a new VM, you can upload the key and then import it:
+
+    coda accounts import -privkey-path <PRIVATE-KEY-FILE>
+
+</Alert>
+
+If you ever forget what keypairs you've already created, you can see them all with:
+
+    coda accounts list
+
+## Request coda
+
+<Alert kind="note">
+
+  If the faucet is currently under maintenance, please request coda in the #faucet channel, and a core team member or community member will send you some tokens shortly.
+
+  Faucet Status: <StatusBadge service="Faucet" />
+
+</Alert>
+
+
+In order to send our first transaction, we'll first need to get some coda to play with. Head over to the [Coda Discord server](https://bit.ly/CodaDiscord) and join the `#faucet` channel. Once there, ask Tiny the dog for some coda (you'll receive 10 coda). Here's an example:
+
+    $request <YOUR-PUBLIC-KEY>
+
+## Check account balance
+
+It may take a few minutes for your funds to appear. We can check the balance of all our accounts using this command:
+
+    coda accounts list
+
+You might see `Balance: 0 coda` for your account. Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
+
+Hint: You can run `coda client status` to see the current block height updating.
+
+## Make a payment
+
+Finally we get to the good stuff, sending our first transaction! Before you send a payment, you'll need to unlock your account:
+
+    coda accounts unlock -public-key $CODA_PUBLIC_KEY
+
+For testing purposes, there's already an echo service set up that will immediately refund your payment minus the transaction fees. You can use the following public key for the echo bot.
+```
+B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9
+```
+
+<Alert kind="warning">
+
+  Currently, there is a known issue with the echo service that prevents it from properly echoing back your payment! Don't worry, we'll still give you Testnet Points[\*](#disclaimer) for completing the challenge.
+
+  Echo Status: <StatusBadge service="Echo Bot" />
+
+</Alert>
+
+Let's send some of our newly received coda to this service to see what a payment looks like:
+
+    coda client send-payment \
+      -amount 0.5 \
+      -receiver B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9 \
+      -fee 0.1 \
+      -sender $CODA_PUBLIC_KEY
+
+If you're wondering what we passed in to the commands above:
+
+- For `amount`, we're sending a test value of `0.5` coda
+- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
+- For `fee`, let's use 0.1 coda
+- The `sender` is the full public key, eg. `4vsRCVQq9Ai...`
+
+If this command is formatted properly, we should get a response that looks like the following:
+
+    Dispatched payment with ID 3XCgvAHLAqz9VVbU7an7f2L5ffJtZoFega7jZpVJrPCYA4j5HEmUAx51BCeMc232eBWVz6q9t62Kp2cNvQZoNCSGqJ1rrJpXFqMN6NQe7x987sAC2Sd6wu9Vbs9xSr8g1AkjJoB65v3suPsaCcvvCjyUvUs8c3eVRucH4doa2onGj41pjxT53y5ZkmGaPmPnpWzdJt4YJBnDRW1GcJeyqj61GKWcvvrV6KcGD25VEeHQBfhGppZc7ewVwi3vcUQR7QFFs15bMwA4oZDEfzSbnr1ECoiZGy61m5LX7afwFaviyUwjphtrzoPbQ2QAZ2w2ypnVUrcJ9oUT4y4dvDJ5vkUDazRdGxjAA6Cz86bJqqgfMHdMFqpkmLxCdLbj2Nq3Ar2VpPVvfn2kdKoxwmAGqWCiVhqYbTvHkyZSc4n3siGTEpTGAK9usPnBnqLi53Z2bPPaJ3PuZTMgmdZYrRv4UPxztRtmyBz2HdQSnH8vbxurLkyxK6yEwS23JSZWToccM83sx2hAAABNynBVuxagL8aNZF99k3LKX6E581uSVSw5DAJ2S198DvZHXD53QvjcDGpvB9jYUpofkk1aPvtW7QZkcofBYruePM7kCHjKvbDXSw2CV5brHVv5ZBV9DuUcuFHfcYAA2TVuDtFeNLBjxDumiBASgaLvcdzGiFvSqqnzmS9MBXxYybQcmmz1WuKZHjgqph99XVEapwTsYfZGi1T8ApahcWc5EX9
+    Receipt chain hash is now A3gpLyBJGvcpMXny2DsHjvE5GaNFn2bbpLLQqTCHuY3Nd7sqy8vDbM6qHTwHt8tcfqqBkd36LuV4CC6hVH6YsmRqRp4Lzx77WnN9gnRX7ceeXdCQUVB7B2uMo3oCYxfdpU5Q2f2KzJQ46
+
+You may not see the `Receipt chain hash` on the first transaction from the account, but in following transactions, this will show you the head of the receipt chain hash list.
+
+Once you feel comfortable with the basics of creating an address, and sending & receiving coda, we can move on to the truly unique parts of the Coda network - [participating in consensus and helping compress the blockchain](/docs/node-operator).
+
+<span id="disclaimer">
+
+\*_Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points._
+
+</span>
+

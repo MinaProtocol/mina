@@ -1,4 +1,5 @@
-open Impls.Pairing_based
+open Backend
+open Impls.Step
 open Pickles_types
 open Common
 open Import
@@ -10,9 +11,9 @@ open Import
 type t =
   ( Field.t
   , Field.t Scalar_challenge.t
-  , Fq.t
+  , Other_field.t
   , ( (Field.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
-    , Rounds.n )
+    , Tock.Rounds.n )
     Pickles_types.Vector.t
   , Field.t )
   Types.Pairing_based.Proof_state.Per_proof.t
@@ -24,32 +25,20 @@ module Constant = struct
   type t =
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
-    , Fq.t
+    , Tock.Field.t
     , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
-      , Rounds.n )
+      , Tock.Rounds.n )
       Vector.t
     , Digest.Constant.t )
     Types.Pairing_based.Proof_state.Per_proof.t
-
-  let dummy_bulletproof_challenges =
-    Vector.init Rounds.n ~f:(fun _ ->
-        let prechallenge = Ro.scalar_chal () in
-        { Bulletproof_challenge.is_square=
-            Fq.is_square (Endo.Dlog.to_field prechallenge)
-        ; prechallenge } )
-
-  let dummy_bulletproof_challenges_computed =
-    Vector.map dummy_bulletproof_challenges
-      ~f:(fun {is_square; prechallenge} ->
-        (compute_challenge ~is_square prechallenge : Fq.t) )
 
   let dummy : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
     { deferred_values=
         { marlin=
-            { sigma_2= fq ()
-            ; sigma_3= fq ()
+            { sigma_2= tock ()
+            ; sigma_3= tock ()
             ; alpha= chal ()
             ; eta_a= chal ()
             ; eta_b= chal ()
@@ -57,15 +46,9 @@ module Constant = struct
             ; beta_1= Scalar_challenge (chal ())
             ; beta_2= Scalar_challenge (chal ())
             ; beta_3= Scalar_challenge (chal ()) }
-        ; combined_inner_product= fq ()
+        ; combined_inner_product= tock ()
         ; xi= Scalar_challenge one_chal
-        ; r= Scalar_challenge one_chal
-        ; bulletproof_challenges= dummy_bulletproof_challenges
-        ; b= fq () }
+        ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges
+        ; b= tock () }
     ; sponge_digest_before_evaluations= Digest.Constant.dummy }
-
-  let corresponding_dummy_sg =
-    lazy
-      (Common.time "dummy sg" (fun () ->
-           compute_sg dummy_bulletproof_challenges ))
 end

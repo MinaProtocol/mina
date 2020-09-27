@@ -92,8 +92,8 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                   match staged_ledger_error with
                   | Invalid_proofs _ ->
                       make_actions Sent_invalid_proof
-                  | Pre_diff (Bad_signature _) ->
-                      make_actions Sent_invalid_signature
+                  | Pre_diff (Verification_failed _) ->
+                      make_actions Sent_invalid_signature_or_proof
                   | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
                       make_actions Gossiped_invalid_transition
                   | Unexpected _ ->
@@ -124,7 +124,7 @@ let blockchain_length = lift External_transition.Validated.blockchain_length
 
 let block_producer = lift External_transition.Validated.block_producer
 
-let user_commands = lift External_transition.Validated.user_commands
+let commands = lift External_transition.Validated.commands
 
 let payments = lift External_transition.Validated.payments
 
@@ -162,10 +162,16 @@ let display t =
   ; parent }
 
 let all_user_commands breadcrumbs =
-  Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+  Sequence.fold (Sequence.of_list breadcrumbs) ~init:Signed_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      let user_commands = user_commands breadcrumb in
-      Set.union acc_set (User_command.Set.of_list user_commands) )
+      breadcrumb |> commands
+      |> List.filter_map ~f:(fun {data; _} ->
+             match data with
+             | Snapp_command _ ->
+                 None
+             | Signed_command c ->
+                 Some (Signed_command.forget_check c) )
+      |> Signed_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
   open Currency
@@ -175,7 +181,7 @@ module For_tests = struct
      each user send a payment of one coin to another random
      user if they have at least one coin*)
   let gen_payments staged_ledger accounts_with_secret_keys :
-      User_command.With_valid_signature.t Sequence.t =
+      Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.identifier account )
@@ -209,11 +215,10 @@ module For_tests = struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
-        let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~fee_payer_pk:sender_pk ~nonce
-            ~valid_until:Coda_numbers.Global_slot.max_value
-            ~memo:User_command_memo.dummy
+        let payload : Signed_command.Payload.t =
+          Signed_command.Payload.create ~fee:Fee.zero
+            ~fee_token:Token_id.default ~fee_payer_pk:sender_pk ~nonce
+            ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
                  { source_pk= sender_pk
@@ -221,7 +226,7 @@ module For_tests = struct
                  ; token_id= token
                  ; amount= send_amount })
         in
-        User_command.sign sender_keypair payload )
+        Signed_command.sign sender_keypair payload )
 
   let gen ?(logger = Logger.null ())
       ~(precomputed_values : Precomputed_values.t) ?verifier
@@ -250,6 +255,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
+        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
@@ -266,42 +272,40 @@ module For_tests = struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
-                )
+                      ~sok_digest:Sok_message.Digest.default
+                      ~proof:Proof.transaction_dummy )
             ; prover }
       in
-      let current_global_slot, state_and_body_hash =
+      let current_state_view, state_and_body_hash =
         let prev_state =
           validated_transition parent_breadcrumb
           |> External_transition.Validated.protocol_state
         in
-        let current_global_slot =
-          Protocol_state.body prev_state
-          |> Protocol_state.Body.consensus_state
-          |> Consensus.Data.Consensus_state.curr_slot
+        let current_state_view =
+          Protocol_state.body prev_state |> Protocol_state.Body.view
         in
         let body_hash =
           Protocol_state.body prev_state |> Protocol_state.Body.hash
         in
-        ( current_global_slot
+        ( current_state_view
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_global_slot ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~current_state_view ~supercharge_coinbase:true
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
+               , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~current_global_slot ~state_and_body_hash
+            ~current_state_view ~state_and_body_hash
         with
         | Ok r ->
             return r
@@ -355,7 +359,7 @@ module For_tests = struct
       Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
+          ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
@@ -374,7 +378,7 @@ module For_tests = struct
           ~sender:None
       with
       | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ( "state_hash"
                 , state_hash new_breadcrumb |> State_hash.to_yojson ) ]

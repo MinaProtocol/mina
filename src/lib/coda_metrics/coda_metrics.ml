@@ -590,6 +590,10 @@ module Transition_frontier = struct
     in
     Gauge.v "recently_finalized_staged_txns" ~help ~namespace ~subsystem
 
+  let best_tip_user_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
   (* TODO:
   let recently_finalized_snarked_txns : Gauge.t =
     let help = "toal # of snarked txns that have been finalized" in
@@ -721,7 +725,7 @@ let server ~port ~logger =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+    [%log error]
       ~metadata:[("error", `String (Exn.to_string exn))]
       "Encountered error while handling request to prometheus server: $error"
   in

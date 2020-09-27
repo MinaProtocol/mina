@@ -3,10 +3,10 @@
  (public_name currency)
  (library_flags -linkall)
  (inline_tests)
- (libraries core fold_lib tuple_lib snark_bits sgn snark_params random_oracle
-   unsigned_extended test_util codable)
+ (libraries core coda_numbers fold_lib tuple_lib snark_bits sgn snark_params random_oracle
+   unsigned_extended test_util codable ppx_dhall_type)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson ppx_inline_test bisect_ppx --
-    -conditional))
+  (pps ppx_coda ppx_version ppx_let ppx_assert ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_custom_printf ppx_deriving.std ppx_deriving_yojson h_list.ppx ppx_inline_test bisect_ppx --
+    --conditional))
  (synopsis "Currency types"))

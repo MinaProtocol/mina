@@ -45,17 +45,25 @@ module type Resource_pool_diff_intf = sig
 
   type t [@@deriving sexp, to_yojson]
 
+  type verified [@@deriving sexp, to_yojson]
+
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
 
   val summary : t -> string
+
+  (** Warning: It must be safe to call this function asynchronously! *)
+  val verify :
+       pool
+    -> t Envelope.Incoming.t
+    -> verified Envelope.Incoming.t option Deferred.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
   val unsafe_apply :
        pool
-    -> t Envelope.Incoming.t
+    -> verified Envelope.Incoming.t
     -> ( t * rejected
        , [`Locally_generated of t * rejected | `Other of Error.t] )
        Result.t
@@ -98,6 +106,8 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type resource_pool_diff_verified
+
   type rejected_diff
 
   type transition_frontier_diff
@@ -139,7 +149,7 @@ module type Network_pool_base_intf = sig
 
   val apply_and_broadcast :
        t
-    -> resource_pool_diff Envelope.Incoming.t
+    -> resource_pool_diff_verified Envelope.Incoming.t
        * (bool -> unit)
        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
     -> unit Deferred.t
@@ -166,17 +176,17 @@ module type Snark_resource_pool_intf = sig
     -> fee:Fee_with_prover.t
     -> [`Added | `Statement_not_referenced]
 
+  val request_proof :
+       t
+    -> Transaction_snark_work.Statement.t
+    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+
   val verify_and_act :
        t
     -> work:Transaction_snark_work.Statement.t
             * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
-    -> unit Deferred.Or_error.t
-
-  val request_proof :
-       t
-    -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+    -> bool Deferred.t
 
   val snark_pool_json : t -> Yojson.Safe.t
 
@@ -196,6 +206,8 @@ module type Snark_pool_diff_intf = sig
         * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp]
 
+  type verified = t [@@deriving compare, sexp]
+
   type compact =
     { work: Transaction_snark_work.Statement.t
     ; fee: Currency.Fee.t
@@ -203,7 +215,10 @@ module type Snark_pool_diff_intf = sig
   [@@deriving yojson]
 
   include
-    Resource_pool_diff_intf with type t := t and type pool := resource_pool
+    Resource_pool_diff_intf
+    with type t := t
+     and type verified := t
+     and type pool := resource_pool
 
   val to_compact : t -> compact
 
@@ -232,6 +247,8 @@ module type Transaction_pool_diff_intf = sig
       | Insufficient_funds
       | Insufficient_fee
       | Overflow
+      | Bad_token
+      | Unwanted_fee_token
     [@@deriving sexp, yojson]
   end
 
@@ -252,13 +269,28 @@ module type Transaction_resource_pool_intf = sig
   include Resource_pool_base_intf with type t := t
 
   val make_config :
-    trust_system:Trust_system.t -> pool_max_size:int -> Config.t
+       trust_system:Trust_system.t
+    -> pool_max_size:int
+    -> verifier:Verifier.t
+    -> Config.t
 
-  val member : t -> User_command.With_valid_signature.t -> bool
+  val member :
+    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
-    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
+       logger:Logger.t
+    -> t
+    -> Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
   val all_from_account :
-    t -> Account_id.t -> User_command.With_valid_signature.t list
+       t
+    -> Account_id.t
+    -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
+
+  val find_by_hash :
+       t
+    -> Transaction_hash.t
+    -> Transaction_hash.User_command_with_valid_signature.t option
 end

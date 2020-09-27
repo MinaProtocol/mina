@@ -196,7 +196,7 @@ struct
   let map2_ t1 t2 ~f = A.map2 t1 t2 ~f:(fun x1 x2 -> F.map2_ x1 x2 ~f)
 end
 
-module F (Impl : Snarky.Snark_intf.S) :
+module F (Impl : Snarky_backendless.Snark_intf.S) :
   Intf.S with type 'a Base.t_ = 'a and type 'a A.t = 'a and module Impl = Impl =
 struct
   module T = struct

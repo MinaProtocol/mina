@@ -22,13 +22,15 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
-
 let to_input = T.to_input
 
 let to_string = T.to_string
 
 let of_string = T.of_string
+
+let to_uint64 = Fn.id
+
+let of_uint64 = Fn.id
 
 let next = T.succ
 
@@ -45,6 +47,8 @@ let gen_ge minimum =
 let gen = gen_ge 1L
 
 let gen_non_default = gen_ge 2L
+
+let gen_with_invalid = gen_ge 0L
 
 let unpack = T.to_bits
 
@@ -63,6 +67,8 @@ let var_of_t = T.Checked.constant
 module Checked = struct
   open Snark_params.Tick
 
+  type t = var
+
   let next = T.Checked.succ
 
   let next_if = T.Checked.succ_if
@@ -79,6 +85,16 @@ module Checked = struct
       let y = T.Checked.to_integer y |> Snarky_integer.Integer.to_field in
       Field.Checked.Assert.equal x y
   end
+
+  let ( = ) = T.Checked.( = )
+
+  let ( >= ) = T.Checked.( >= )
+
+  let ( <= ) = T.Checked.( <= )
+
+  let ( > ) = T.Checked.( > )
+
+  let ( < ) = T.Checked.( < )
 end
 
 let%test_unit "var_of_t preserves the underlying value" =

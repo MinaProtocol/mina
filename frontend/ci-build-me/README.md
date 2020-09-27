@@ -17,12 +17,12 @@ We currently dispatch a build the moment the `ci-build-me` label is added and an
 
 ## Deploy
 
-Acquire `$GITHUB_SECRET` and `$BUILDKITE_API_ACCESS_TOKEN` from our AWS secret store on us-west-2.
+Acquire `$GITHUB_SECRET` and `$BUILDKITE_API_ACCESS_TOKEN` and `$CIRCLECI_API_ACCESS_TOKEN` from our AWS secret store on us-west-2.
 
 ```
 gcloud functions deploy githubWebhookHandler \
   --trigger-http --runtime nodejs10 --memory 128MB \
-  --set-env-vars GITHUB_SECRET=$GITHUB_SECRET,BUILDKITE_API_ACCESS_TOKEN=$BUILDKITE_API_ACCESS_TOKEN \
+  --set-env-vars GITHUB_SECRET=$GITHUB_SECRET,BUILDKITE_API_ACCESS_TOKEN=$BUILDKITE_API_ACCESS_TOKEN,CIRCLECI_API_ACCESS_TOKEN=$CIRCLECI_API_ACCESS_TOKEN \
   --project o1labs-192920
 ```
 

@@ -50,12 +50,14 @@ module Styles = {
   let content =
     style([
       display(`flex),
-      flexDirection(`columnReverse),
       justifyContent(`center),
+      flexDirection(`column),
       width(`percent(100.)),
       marginBottom(`rem(1.5)),
-      media(Theme.MediaQuery.somewhatLarge, [flexDirection(`row)]),
     ]);
+
+  let leaderboardCopy =
+    style([maxWidth(`rem(36.5)), margin2(~v=`zero, ~h=`auto)]);
 
   let rowStyles = [
     display(`grid),
@@ -85,7 +87,7 @@ module Styles = {
       Theme.H3.basic,
       style([
         fontWeight(`semiBold),
-        marginTop(rem(0.75)),
+        marginTop(rem(1.5)),
         marginLeft(rem(1.75)),
       ]),
     ]);
@@ -99,7 +101,7 @@ module Styles = {
   let dashboardHeader =
     merge([
       header,
-      style([marginTop(rem(1.5)), marginBottom(rem(2.25))]),
+      style([marginTop(rem(1.5)), marginBottom(`rem(1.5))]),
     ]);
 
   let dashboard =
@@ -217,11 +219,33 @@ module Styles = {
 
   let heroText =
     merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
+  let disclaimer =
+    merge([Theme.Body.small, style([color(Theme.Colors.midnight)])]);
+
+  let leaderboardLink = style([textDecoration(`none)]);
+
+  let signUpContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`spaceBetween),
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      selector(
+        "a",
+        [
+          important(maxWidth(`rem(10.))),
+          important(height(`percent(100.))),
+          media(Theme.MediaQuery.tablet, [marginTop(`rem(0.5))]),
+        ],
+      ),
+    ]);
 };
 
 module Section = {
   [@react.component]
-  let make = (~name, ~expanded, ~setExpanded, ~children) => {
+  let make = (~name, ~expanded, ~setExpanded, ~children, ~link=?) => {
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       {if (expanded) {
          <div className=Styles.gradientSectionExpanded> children </div>;
@@ -230,11 +254,13 @@ module Section = {
            <div className=Styles.gradientSection> children </div>
            <div
              className=Styles.expandButton
-             onClick={_ => setExpanded(_ => true)}>
-             <div> {React.string("Expand " ++ name)} </div>
-             <div className=Css.(style([marginLeft(`rem(0.5))]))>
-               {React.string({js| ↓|js})}
-             </div>
+             onClick={_ =>
+               switch (link) {
+               | Some(dest) => ReasonReactRouter.push(dest)
+               | None => setExpanded(_ => true)
+               }
+             }>
+             <div> {React.string("View Full " ++ name)} </div>
            </div>
          </>;
        }}
@@ -255,22 +281,36 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             <p className=Theme.Body.basic>
               {React.string(
-                 "Coda's public testnet is live! There are weekly challenges for the community \
-                  to interact with the testnet and contribute to Coda's development. Each week \
-                  features a new competition to recognize and reward top contributors with testnet \
-                  points.",
+                 "Coda's public testnet is live! During testnet releases, there are challenges for the community to interact with the testnet and contribute to Coda's development. Top contributors will be recognized and rewarded with testnet points.",
                )}
             </p>
             <br />
             <p className=Theme.Body.basic>
               {React.string(
-                 "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
+                 "Later this year Coda will begin its adversarial testnet, 'Testworld', where users can earn Coda tokens, USD, and token delegations for participating.",
                )}
             </p>
-            <p className=Theme.Body.basic>
-              {React.string("Testnet Status: ")}
-              <StatusBadge service=`Network />
-            </p>
+            <div className=Styles.signUpContainer>
+              <Button
+                link="/adversarial"
+                label="Sign Up Now"
+                bgColor=Theme.Colors.jungle
+                bgColorHover={Theme.Colors.hyperlinkAlpha(1.)}
+              />
+              <span
+                className=Css.(
+                  style([
+                    display(`flex),
+                    alignItems(`center),
+                    justifyContent(`center),
+                  ])
+                )>
+                <p className=Theme.Body.basic>
+                  {React.string("Testnet Status: ")}
+                  <StatusBadge service=`Network />
+                </p>
+              </span>
+            </div>
           </div>
           <Terminal.Wrapper lineDelay=2000>
             <Terminal.Line prompt=">" value="coda daemon -peer ..." />
@@ -331,100 +371,36 @@ let make = (~challenges as _, ~testnetName as _) => {
           </div>
         </div>
         <hr />
-        <Section name="Leaderboard" expanded setExpanded>
+        <Section name="Leaderboard" expanded setExpanded link="/leaderboard">
           <div className=Styles.dashboardHeader>
             <h1 className=Theme.H1.hero>
               {React.string("Testnet Leaderboard")}
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
-            <a
-              href="https://bit.ly/TestnetLeaderboard"
-              target="_blank"
-              className=Styles.headerLink>
+            <a href="/leaderboard" className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
             </a>
           </div>
           <div className=Styles.content>
-            <Leaderboard />
-            <div className=Styles.copy>
-              <h4 className=Styles.sidebarHeader>
-                {React.string("Testnet Points")}
-              </h4>
-              <p className=Styles.markdownStyles>
-                {React.string("The goal of Testnet Points")}
-                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                  {React.string("*")}
-                </a>
+            <span className=Styles.leaderboardCopy>
+              <p className=Theme.Body.big_semibold>
                 {React.string(
-                   " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
+                   "Coda rewards community members with testnet points for completing challenges that \
+                  contribute to the development of the protocol. *",
                  )}
               </p>
-              // <Challenges challenges testnetName />
-              // Temporarily hardcode the following message instead of the "Challenge" component
-              <h4> {React.string("Genesis Token Program")} </h4>
-              <p className=Styles.markdownStyles>
+              <p className=Styles.disclaimer>
                 {React.string(
-                   "By completing challenges on testnet, you're preparing to become the first block producers upon mainnet launch. You're demonstrating that you have the skills and know-how to operate the Coda Protocol, the main purpose of ",
-                 )}
-                <a href="http://codaprotocol.com/genesis">
-                  {React.string("Genesis")}
-                </a>
-                {React.string(".")}
-              </p>
-              <h4> {React.string("Testnet Challenges")} </h4>
-              <p className=Styles.markdownStyles>
-                {React.string(
-                   "Learn how to operate the protocol, while contributing to Coda's network resilience. There are different ways for everyone to be involved. There are three categories of testnet challenges to earn testnet points",
-                 )}
-                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                  {React.string("*")}
-                </a>
-                {React.string(".")}
-              </p>
-              <ul className=Styles.markdownStyles>
-                <li>
-                  {React.string("Entry level challenges (up to 1000 pts")}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-                <li>
-                  {React.string(
-                     "Challenges for people who want to try out more features of the succinct blockchain (up to 4000 pts",
-                   )}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-                <li>
-                  {React.string(
-                     "Community challenges which require no technical skills (win Community MVP and up to 4000 pts",
-                   )}
-                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
-                    {React.string("*")}
-                  </a>
-                  {React.string(") per challenge.")}
-                </li>
-              </ul>
-              <p className=Styles.markdownStyles>
-                {React.string("Check out all challenges ")}
-                <a href="https://bit.ly/3dNmPle">
-                  {React.string(" here ")}
-                </a>
-                {React.string("and join ")}
-                <a href="http://bit.ly/CodaDiscord">
-                  {React.string("http://bit.ly/CodaDiscord")}
-                </a>
-                {React.string(" for the latest updates!")}
-              </p>
-              <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
-                {React.string(
-                   "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
+                   "* Testnet Points are designed solely to track contributions to the Testnet \
+                 and Testnet Points have no cash or other monetary value. Testnet Points and \
+                 are not transferable and are not redeemable or exchangeable for any cryptocurrency \
+                 or digital assets. We may at any time amend or eliminate Testnet Points.",
                  )}
               </p>
-            </div>
+            </span>
+            <a href="/leaderboard" className=Styles.leaderboardLink>
+              <Leaderboard interactive=false />
+            </a>
           </div>
         </Section>
         <hr />

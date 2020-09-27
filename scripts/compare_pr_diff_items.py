@@ -6,25 +6,11 @@ import os
 import sys
 import shutil
 import subprocess
-import json
 
 exit_code = 0
 
 
-# pr_url is of form https://github.com/CodaProtocol/coda/pull/n
-def run_comparison(pr_url, compare_script):
-    pr_number = os.path.basename(pr_url)
-    api_url = 'https://api.github.com/repos/CodaProtocol/coda/pulls/' + pr_number
-    pr_json = 'pr.json'
-    if os.path.exists(pr_json):
-        os.remove(pr_json)
-    subprocess.run([
-        'curl', api_url, '-H', 'Accept: application/vnd.github.v3.json', '-o',
-        pr_json
-    ])
-    with open(pr_json, 'r') as fp:
-        json_obj = json.load(fp, encoding='utf-8')
-    base = json_obj['base']['ref']
+def run_comparison(base_commit, compare_script):
     cwd = os.getcwd()
     # create a copy of the repo at base branch
     if os.path.exists('base'):
@@ -32,11 +18,13 @@ def run_comparison(pr_url, compare_script):
     os.mkdir('base')
     os.chdir('base')
     # it would be faster to do a clone of the local repo, but there's "smudge error" (?)
-    subprocess.run(['git', 'clone', 'git@github.com:CodaProtocol/coda.git'])
+    subprocess.run(['git', 'clone', 'https://github.com/CodaProtocol/coda.git'])
+    os.chdir('coda')
+    subprocess.run(['git', 'checkout', base_commit])
     os.chdir(cwd)
     # changed files in the PR
     diffs_raw = subprocess.check_output(
-        ['git', 'diff', '--name-only', 'origin/' + base])
+        ['git', 'diff', '--name-only', base_commit])
     diffs_decoded = diffs_raw.decode('UTF-8')
     diffs = diffs_decoded.split('\n')
     for diff in diffs:

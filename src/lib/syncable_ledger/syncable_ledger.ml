@@ -26,12 +26,6 @@ module Query = struct
       [@@deriving sexp, yojson]
     end
   end]
-
-  type 'addr t = 'addr Stable.Latest.t =
-    | What_child_hashes of 'addr
-    | What_contents of 'addr
-    | Num_accounts
-  [@@deriving sexp, yojson]
 end
 
 module Answer = struct
@@ -49,12 +43,6 @@ module Answer = struct
       [@@deriving sexp, yojson]
     end
   end]
-
-  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
-    | Child_hashes_are of 'hash * 'hash
-    | Contents_are of 'account list
-    | Num_accounts of int * 'hash
-  [@@deriving sexp, yojson]
 end
 
 module type Inputs_intf = sig
@@ -265,8 +253,8 @@ end = struct
           | Ok answer ->
               Either.First answer
           | Error e ->
-              Logger.error (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__
+              let logger = Logger.create () in
+              [%log error]
                 ~metadata:[("error", `String (Error.to_string_hum e))]
                 "When handling What_child_hashes request, the following error \
                  happended: $error" ;
@@ -312,7 +300,7 @@ end = struct
                 in
                 if not is_compact then (
                   (* indicates our ledger is invalid somehow. *)
-                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log fatal]
                     ~metadata:
                       [ ( "missing_address"
                         , Addr.to_yojson (Option.value_exn missing_address) )
@@ -386,7 +374,7 @@ end = struct
 
   let expect_children : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
-    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    [%log' trace t.logger]
       ~metadata:
         [ ("parent_address", Addr.to_yojson parent_addr)
         ; ("hash", Hash.to_yojson expected) ]
@@ -395,7 +383,7 @@ end = struct
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
-    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+    [%log' trace t.logger]
       ~metadata:
         [("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected)]
       "Expecting content addr $address, expected: $hash" ;
@@ -542,13 +530,13 @@ end = struct
       in
       let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
-      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      [%log' trace t.logger]
         ~metadata:
           [ ("root_hash", Root_hash.to_yojson root_hash)
           ; ("query", Query.to_yojson Addr.to_yojson query) ]
         "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' trace t.logger]
           ~metadata:
             [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
             ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
@@ -557,7 +545,7 @@ end = struct
       else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           "Got sync response when we're already finished syncing" ;
         Deferred.unit )
       else
@@ -653,8 +641,7 @@ end = struct
             (Option.value_exn t.desired_root)
             (MT.merkle_root t.tree)
         then (
-          Logger.Structured.trace t.logger ~module_:__MODULE__
-            ~location:__LOC__ Snarked_ledger_synced ;
+          [%str_log' trace t.logger] Snarked_ledger_synced ;
           all_done t ) ;
         Deferred.unit
     in
@@ -670,7 +657,7 @@ end = struct
     in
     if not should_skip then (
       Option.iter t.desired_root ~f:(fun root_hash ->
-          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          [%log' debug t.logger]
             ~metadata:
               [ ("old_root_hash", Root_hash.to_yojson root_hash)
               ; ("new_root_hash", Root_hash.to_yojson h) ]
@@ -687,8 +674,7 @@ end = struct
       Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
           equal data saved_data )
     then (
-      Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-        "New_goal to same hash, not doing anything" ;
+      [%log' debug t.logger] "New_goal to same hash, not doing anything" ;
       `Repeat )
     else (
       t.auxiliary_data <- Some data ;

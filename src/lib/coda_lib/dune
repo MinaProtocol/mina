@@ -12,8 +12,8 @@
   exit_handlers)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps
-  ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
+  ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
   ppx_fields_conv ppx_deriving.eq ppx_deriving.make
   ppx_sexp_conv ppx_let ppx_custom_printf ppx_register_event
-  ppx_inline_test bisect_ppx -- -conditional))
+  ppx_inline_test bisect_ppx -- --conditional))
  (synopsis "Coda gut layer"))

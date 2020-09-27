@@ -1,0 +1,36 @@
+(library
+  (name lib)
+  (public_name lib)
+  (inline_tests)
+  (libraries
+     async
+     async_ssl
+    caqti
+    caqti-async
+    caqti-driver-postgresql
+    cohttp
+    ctypes
+    cohttp-async
+    core_kernel
+    logger
+    ppx_deriving_yojson.runtime
+    rosetta_lib
+    rosetta_models
+    rosetta_coding
+    yojson
+    archive_lib
+    signature_lib
+    secrets
+    unsigned_extended
+    )
+  (preprocess (pps
+    graphql_ppx
+    ppx_coda
+    ppx_deriving.eq
+    ppx_deriving.show
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_inline_test
+    ppx_assert
+    ppx_version
+  )))

@@ -12,7 +12,6 @@
   bitstring
   cache_dir
   direction
-  dyn_array
   empty_hashes
   immutable_array
   key_value_database

@@ -5,5 +5,5 @@
  (libraries fold_lib bitstring_lib core_kernel integers)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp ppx_let ppx_deriving.eq ppx_inline_test bisect_ppx -- -conditional))
+  (pps ppx_version ppx_optcomp ppx_let ppx_deriving.eq ppx_inline_test bisect_ppx -- --conditional))
  (synopsis "Snark parameters"))

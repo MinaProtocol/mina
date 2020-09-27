@@ -1,6 +1,10 @@
 open Core_kernel
 open Pickles_types
+open Pickles_base
 module Domain = Domain
+
+type 'field vanishing_polynomial_domain =
+  < vanishing_polynomial: 'field -> 'field >
 
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
@@ -44,6 +48,36 @@ let domain (type t) ((module F) : t field) (domain : Domain.t) : t domain =
 
 let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
 
+let actual_evaluation (type f) (module Field : Field_intf with type t = f)
+    (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
+  let pt_n =
+    let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
+    go pt rounds
+  in
+  match List.rev (Array.to_list e) with
+  | e :: es ->
+      List.fold ~init:e es ~f:(fun acc fx -> Field.(fx + (pt_n * acc)))
+  | [] ->
+      failwith "empty list"
+
+let evals_of_split_evals field (b1, b2, b3)
+    ((e1, e2, e3) : _ Dlog_marlin_types.Evals.t Tuple_lib.Triple.t) ~rounds =
+  let e = actual_evaluation field ~rounds in
+  let abc es = Abc.map es ~f:(Fn.flip e b3) in
+  { Pairing_marlin_types.Evals.w_hat= e e1.w_hat b1
+  ; z_hat_a= e e1.z_hat_a b1
+  ; z_hat_b= e e1.z_hat_b b1
+  ; g_1= e e1.g_1 b1
+  ; h_1= e e1.h_1 b1
+  ; g_2= e e2.g_2 b2
+  ; h_2= e e2.h_2 b2
+  ; g_3= e e3.g_3 b3
+  ; h_3= e e3.h_3 b3
+  ; row= abc e3.row
+  ; col= abc e3.col
+  ; value= abc e3.value
+  ; rc= abc e3.rc }
+
 (* These correspond to the blue equations on [page 32 here](https://eprint.iacr.org/2019/1047.pdf),
    with a few modifications:
 
@@ -51,8 +85,9 @@ let all_but m = List.filter Abc.Label.all ~f:(( <> ) m)
    - our [sigma_3] is the paper's [sigma_3 / domain_k#size]
    - our Marlin variant does not have [h_0] and so the last equation on that page can be omitted.
 *)
-let checks (type t) (module F : Field_intf with type t = t) ~input_domain
-    ~domain_h ~domain_k ~x_hat_beta_1
+let checks (type t) (module F : Field_intf with type t = t)
+    ~(input_domain : t vanishing_polynomial_domain) ~domain_h ~domain_k
+    ~x_hat_beta_1
     { Composition_types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
     ; sigma_3
     ; alpha
@@ -117,7 +152,8 @@ let checks (type t) (module F : Field_intf with type t = t) ~input_domain
     , (h_1 * v_h_beta_1) + (beta_1 * g_1) + (sigma_2 * domain_h#size * z_hat)
     ) ]
 
-let checked (type t) (module Impl : Snarky.Snark_intf.Run with type field = t)
+let checked (type t)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
     ~input_domain ~domain_h ~domain_k ~x_hat_beta_1 marlin evals =
   let open Impl in
   let eqns =
@@ -134,11 +170,11 @@ let checked (type t) (module Impl : Snarky.Snark_intf.Run with type field = t)
               let x = read_var x in
               let y = read_var y in
               if not (Field.Constant.equal x y) then (
-                Core.printf "bad marlin %d\n%!" i ;
+                printf "bad marlin %d\n%!" i ;
                 Field.Constant.print x ;
-                Core.printf "%!" ;
+                printf "%!" ;
                 Field.Constant.print y ;
-                Core.printf "%!" )) ;
+                printf "%!" )) ;
       Field.equal x y )
     eqns
   |> Boolean.all

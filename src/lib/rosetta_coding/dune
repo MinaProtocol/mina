@@ -1,0 +1,9 @@
+(library
+ (name rosetta_coding)
+ (public_name rosetta_coding)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel snark_params signature_lib)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_version ppx_optcomp ppx_assert ppx_let ppx_inline_test))
+ (synopsis "Encoders and decoders for Rosetta"))

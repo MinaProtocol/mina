@@ -22,19 +22,11 @@ module Display = struct
         ; peer: Peer.Display.Stable.V1.t option
         ; libp2p_port: int
         ; client_port: int }
-      [@@deriving fields, yojson, bin_io, version, sexp]
+      [@@deriving fields, yojson, sexp]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { external_ip: string
-    ; bind_ip: string
-    ; peer: Peer.Display.Stable.Latest.t option
-    ; libp2p_port: int
-    ; client_port: int }
-  [@@deriving fields, yojson, sexp]
 end
 
 let to_display (t : t) =
@@ -56,7 +48,7 @@ let to_multiaddr (t : t) =
   match t.peer with
   | Some peer ->
       Some
-        (sprintf "/ip4/%s/tcp/%d/ipfs/%s"
+        (sprintf "/ip4/%s/tcp/%d/p2p/%s"
            (Unix.Inet_addr.to_string t.external_ip)
            t.libp2p_port peer.peer_id)
   | None ->

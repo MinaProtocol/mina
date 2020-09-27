@@ -14,7 +14,7 @@ val to_group :
   -> 'f * 'f
 
 module Checked : sig
-  open Snarky
+  open Snarky_backendless
 
   val wrap :
        'f Snark.m

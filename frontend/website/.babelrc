@@ -1,0 +1,11 @@
+{
+  "presets": ["next/babel"],
+  "plugins": [
+    ["module-resolver", {
+      "root": ["./pages"],
+      "alias": {
+        "@reason": "./lib/js/src"
+      }
+    }]
+  ]
+}

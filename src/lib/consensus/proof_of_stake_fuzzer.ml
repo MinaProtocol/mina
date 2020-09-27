@@ -98,11 +98,11 @@ module Vrf_distribution = struct
                  with
                  | `Check_again _ ->
                      None
-                 | `Produce_now (_, proposal_data) ->
+                 | `Produce_now (_, proposal_data, _) ->
                      let slot_span = constants.block_window_duration_ms in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
-                 | `Produce (proposal_time, _, proposal_data) ->
+                 | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
                            of_span_since_epoch @@ Span.of_ms proposal_time)
@@ -181,7 +181,7 @@ module Vrf_distribution = struct
           Option.map (Hashtbl.find dist slot) ~f:Hashtbl.data
         with
         | None -> all_possible_chains (slot + 1) pred
-        | Some potential_succ_proposals -> 
+        | Some potential_succ_proposals ->
             List.bind potential_succs_proposals ~f:(fun (succ_proposer, succ_proposal) ->
               if Public_key.equal pred_proposer.keypair.public_key succ_proposer.keypair.public_key then
                 compute_branches succ
@@ -310,7 +310,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         ; proof= wrap next_state_top_hash prev_proof } )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res
@@ -344,7 +344,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res
@@ -401,8 +401,8 @@ let propose_block_onto_chain ~logger ~keys
   let%map ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) =
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+      =
     let%map res =
       Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
@@ -436,7 +436,7 @@ let propose_block_onto_chain ~logger ~keys
       ~transactions:
         ( Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands
             staged_ledger_diff
-          :> User_command.t list )
+          :> Signed_command.t list )
       ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
   in
   let snark_transition =
@@ -452,8 +452,7 @@ let propose_block_onto_chain ~logger ~keys
            ~f:(fun (proof, _) -> (Ledger_proof.statement proof).supply_increase)
            ledger_proof_opt)
       ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-      ~consensus_transition ~coinbase_receiver:proposer_pk ~coinbase_amount
-      ~pending_coinbase_action ()
+      ~consensus_transition ~pending_coinbase_update ()
   in
   let internal_transition =
     Internal_transition.create ~snark_transition

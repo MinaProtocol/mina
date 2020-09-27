@@ -9,7 +9,11 @@
 
 
 
-version: 3
+version: 2.1
+parameters:
+  run-ci:
+    type: boolean
+    default: false
 jobs:
     tracetool:
         docker:
@@ -68,7 +72,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -100,16 +104,27 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
+                  name: Archive node unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env`; export PATH="$HOME/.cargo/bin:$PATH" && dune runtest src/app/archive'
+                  environment:
+                    DUNE_PROFILE: test_archive_processor
+            - run:
+                  name: Clean Up Database
+                  command: |
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Running test -- test_archive_processor:coda-archive-processor-test
@@ -118,7 +133,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -158,8 +173,8 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - save_cache:
                 name: Save cache - opam
@@ -169,7 +184,7 @@ jobs:
                 no_output_timeout: 1h
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
+                  command:  bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -178,6 +193,7 @@ jobs:
             - run:
                   name: Set Up Database
                   command: |
+                    sudo apt-get update
                     sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
@@ -189,7 +205,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -214,18 +230,18 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Check circle CI configuration rendering
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make check-format'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make check-format'
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make check-snarky-submodule'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make check-snarky-submodule'
             - run:
                   name: Check ppx_optcomp preprocessor_deps
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/lint_preprocessor_deps.sh'
@@ -240,7 +256,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppx-version.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -268,18 +284,22 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Compare versioned types in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_types.sh
             - run:
                   name: Compare binable functors in PR
+                  environment:
+                    BASE_BRANCH_NAME: << pipeline.git.base_revision >>
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -304,12 +324,52 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
+    client-sdk-unit-tests:
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            
+            - run:
+                name: Disable LFS checkout
+                command: |
+                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+                    git config --global lfs.fetchexclude "*"
+            - checkout
+
+            
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+            - run:
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
+
+            - run:
+                  name: Build client SDK, run unit tests
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/client-sdk-unit-tests.sh'
+            - run:
+                  name: Yarn deps
+                  command: cd frontend/client_sdk && yarn install
+            - run:
+                  name: Prepublish client SDK packages
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && cd frontend/client_sdk && yarn prepublishOnly'
+
     update-branch-protection:
         docker:
             - image: python:3
@@ -386,15 +446,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
+                    - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
                     - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
-                    - homebrew-v8-{{ checksum "brew_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend_or_rfcs.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
+                key: homebrew-v9-{{ checksum "brew_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -408,29 +468,25 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v8-{{ checksum "opam_ci_cache.sig" }}
+                    # Depend on the Brewfile, since brew installs opam and
+                    # we'll need a refresh if we change version
+                    - opam-v8-{{ checksum "opam_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
+
             - run:
-                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install macos dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
             - save_cache:
                 name: Save cache - opam
-                key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-v8-{{ checksum "opam_ci_cache.sig" }}-{{ checksum "scripts/Brewfile" }}
+
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
-            ### nix/cachix
-            - run:
-                name: Install nix and cachix
-                command: |
-                    curl -L https://nixos.org/nix/install | sh
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    nix-env -iA cachix -f https://cachix.org/api/v1/install
             ### dune
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
@@ -460,7 +516,6 @@ jobs:
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
-                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
                     cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
@@ -483,7 +538,7 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 \<<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
@@ -491,7 +546,7 @@ jobs:
             - run:
                 name: Build portable binary
                 command: |
-                    LIBP2P_NIXLESS=1 make macos-portable
+                    make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
@@ -499,264 +554,11 @@ jobs:
             - store_artifacts:
                   path: package
 
-    build-client-sdk:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            - run:
-                  name: Artifacts Path
-                  command: |
-                      mkdir -p /tmp/artifacts
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                  name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
-                  environment:
-                    DUNE_PROFILE: nonconsensus_medium_curves
-                  no_output_timeout: 10m
-    build-artifacts--testnet_postake_medium_curves:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            - run:
-                  name: Artifacts Path
-                  command: |
-                      mkdir -p /tmp/artifacts
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
-            # Explicitly generate PV-keys and uploading before building
-            # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
-            - run:
-                  name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
-                  no_output_timeout: 20m
-            - run:
-                  name: Upload generated PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/publish-pvkeys.sh
-            - run:
-                  name: Rebuild for pvkey changes
-                  command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                    EXTRA_NIX_ARGS: --option sandbox false
-                    GO: /usr/lib/go/bin/go
-                    LIBP2P_NIXLESS: 1
-
-                  no_output_timeout: 20m
-            - run:
-                name: Output compiled ledger and genesis proof
-                command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe'
-            - run:
-                name: Generate runtime ledger with 10k accounts
-                command: |
-                  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune exec --profile=testnet_postake_medium_curves src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json'
-                no_output_timeout: 20m
-            - run:
-                name: Upload genesis data
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/upload-genesis.sh'
-            - run:
-                  name: Build deb package with PV keys and PV key tar
-                  command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                    LIBP2P_NIXLESS: 1
-                  no_output_timeout: 20m
-            - run:
-                  name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make genesiskeys'
-                  environment:
-                    LIBP2P_NIXLESS: 1
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make publish_deb'
-                  environment:
-                    LIBP2P_NIXLESS: 1
-                  no_output_timeout: 20m
-            - run:
-                  name: Copy artifacts to cloud
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
-            - save_cache:
-                name: Save cache - docker deploy env
-                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
-                paths:
-                    - "/tmp/DOCKER_DEPLOY_ENV"
-                    - "scripts"
-                    - "dockerfiles"
-            - store_artifacts:
-                  path: /tmp/artifacts
-    build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            - restore_cache:
-                name: Restore cache - docker deploy env
-                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
-            - setup_remote_docker
-            - run:
-                  name: Build and Upload Docker
-                  command: |
-                    # Check if we should deploy this build
-                    FILE=/tmp/DOCKER_DEPLOY_ENV
-                    if test -f "$FILE"; then
-                        source $FILE
-                        echo "Publishing Docker"
-                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                        set -x
-                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
-
-                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              scripts/release-docker.sh \
-                              -s coda-daemon \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
-
-                        fi
-                    fi
-            - store_artifacts:
-                  path: /tmp/artifacts
-    build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            - restore_cache:
-                name: Restore cache - docker deploy env
-                key: docker-deploy-env-v1-testnet_postake_medium_curves-{{ .Revision }}
-            - setup_remote_docker
-            - run:
-                  name: Build and Upload Docker
-                  command: |
-                    # Check if we should deploy this build
-                    FILE=/tmp/DOCKER_DEPLOY_ENV
-                    if test -f "$FILE"; then
-                        source $FILE
-                        echo "Publishing Docker"
-                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                        set -x
-                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
-
-                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                              scripts/release-docker.sh \
-                              -s coda-demo \
-                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
-
-                        fi
-                    fi
-            - store_artifacts:
-                  path: /tmp/artifacts
-    test-unit--dev:
-        resource_class: xlarge
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            - run: ulimit -c unlimited
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
-                  environment:
-                    DUNE_PROFILE: dev
-                    LIBP2P_NIXLESS: 1
-                    GO: /usr/lib/go/bin/go
-                  no_output_timeout: 30m
-            - store_artifacts:
-                path: core_dumps
-
     # like the other unit test builds, but only runs tests in src/lib/nonconsensus
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -782,26 +584,25 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
-                    LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
                 path: core_dumps
-    test-unit--dev_medium_curves:
-        resource_class: xlarge
+    build-binaries--dev:
+        resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -827,146 +628,220 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && export GO=/usr/lib/go/bin/go && make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  name: Build OCaml
+                  command: |
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build'
+                      ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'echo built > should_run_tests'
                   environment:
-                    DUNE_PROFILE: dev_medium_curves
-                    LIBP2P_NIXLESS: 1
+                    DUNE_PROFILE: dev
                     GO: /usr/lib/go/bin/go
-                  no_output_timeout: 1h
-            - store_artifacts:
-                path: core_dumps
-    test--fake_hash:
+            - save_cache:
+                name: Store config-agnostic test binaries
+                key: dev-build-binaries-v1-{{ .Revision }}
+                paths:
+                    - "src/app/libp2p_helper/result"
+                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/logproc/logproc.exe"
+                    - "scripts"
+                    - "should_run_tests"
+    test--dev--coda-bootstrap-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- fake_hash:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "fake_hash:full-test"'
+                  name: Running test -- dev:coda-bootstrap-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake:
+    test--dev--coda-shared-state-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake:full-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:full-test"'
-            - run:
-                  name: Running test -- test_postake:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:transaction-snark-profiler -k 2"'
+                  name: Running test -- dev:coda-shared-state-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake_bootstrap:
+    test--dev--coda-batch-payment-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
+                  name: Running test -- dev:coda-batch-payment-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-peers-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                  name: Running test -- dev:coda-peers-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-transitive-peers-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- test_postake_bootstrap:coda-bootstrap-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_bootstrap:coda-bootstrap-test"'
+                  name: Running test -- dev:coda-transitive-peers-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-block-production-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-block-production-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-shared-prefix-test_-who-produces_0:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-shared-prefix-test -who-produces 0
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-shared-prefix-test_-who-produces_1:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-shared-prefix-test -who-produces 1
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-change-snark-worker-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-change-snark-worker-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-archive-node-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-archive-node-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
+            - store_artifacts:
+                  path: test_output/artifacts
+    test--dev--coda-delegation-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+        steps:
+            - restore_cache:
+                name: Restore cache - opam
+                keys:
+                    -  dev-build-binaries-v1-{{ .Revision }}
+            - run:
+                  name: Running test -- dev:coda-delegation-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"; fi
+                  environment:
+                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    GO: /usr/lib/go/bin/go
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -991,60 +866,21 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:coda-restart-node-test"'
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake_delegation:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake_delegation:coda-delegation-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_delegation:coda-delegation-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1069,12 +905,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -1083,7 +919,7 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1108,24 +944,24 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1150,78 +986,21 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake_split_snarkless:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-transitive-peers-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-block-production-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 0
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 0"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-change-snark-worker-test"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-archive-node-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-archive-node-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
     test--test_postake_three_producers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1246,63 +1025,21 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
             - store_artifacts:
                   path: test_output/artifacts
-    test--test_postake_txns:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
-        steps:
-            
-            - run:
-                name: Disable LFS checkout
-                command: |
-                    git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
-                    git config --global lfs.fetchexclude "*"
-            - checkout
-
-            
-            - run:
-                  name: Update Submodules
-                  command: git submodule sync && git submodule update --init --recursive
-            - run:
-                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
-                command: |
-                    cat scripts/setup-opam.sh > opam_ci_cache.sig
-                    cat src/opam.export >> opam_ci_cache.sig
-                    date +%Y-%m >> opam_ci_cache.sig
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
-            - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
-
-            - run:
-                name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
-            - run:
-                  name: Running test -- test_postake_txns:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-shared-state-test"'
-            - run:
-                  name: Running test -- test_postake_txns:coda-batch-payment-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-batch-payment-test"'
-            - store_artifacts:
-                  path: test_output/artifacts
     test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1327,12 +1064,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_full_epoch:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_full_epoch:full-test"'
@@ -1341,7 +1078,7 @@ jobs:
     test--test_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1366,26 +1103,26 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:full-test"'
                   no_output_timeout: 20m
             - run:
-                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:transaction-snark-profiler -k 1"'
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1410,24 +1147,24 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:full-test"'
             - run:
-                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
+                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 1"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea
+            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
         steps:
             
             - run:
@@ -1452,12 +1189,12 @@ jobs:
                 keys:
                     - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install opam dependencies - opam -- LIBP2P_NIXLESS=1 make setup-opam
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make setup-opam'
+                name: Install opam dependencies - opam -- make setup-opam
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - run:
                 name: Build libp2p_helper
-                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
+                command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -1467,10 +1204,16 @@ jobs:
 workflows:
     version: 2
     coda_parallel:
+        when:
+            # We do seem to need a useless `and true` here
+            and:
+              - true
+              - << pipeline.parameters.run-ci >>
         jobs:
             - lint
             - lint-opt
             - compare-test-signatures
+            - client-sdk-unit-tests
             - update-branch-protection:
                 filters:
                   branches:
@@ -1480,27 +1223,46 @@ workflows:
             - test-archive
             - build-archive
             - build-macos
-            - build-client-sdk
-            - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts-docker--testnet_postake_medium_curves--coda-daemon:
-                requires:
-                  - build-artifacts--testnet_postake_medium_curves
-            - build-artifacts-docker--testnet_postake_medium_curves--coda-demo:
-                requires:
-                  - build-artifacts--testnet_postake_medium_curves
-            - test-unit--dev
             - test-unit--nonconsensus_medium_curves
-            - test--fake_hash
-            - test--test_postake
-            - test--test_postake_bootstrap
             - test--test_postake_catchup
-            - test--test_postake_delegation
             - test--test_postake_five_even_txns
             - test--test_postake_snarkless
             - test--test_postake_split
-            - test--test_postake_split_snarkless
             - test--test_postake_three_producers
-            - test--test_postake_txns
+            - build-binaries--dev
+            - test--dev--coda-bootstrap-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-state-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-batch-payment-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-peers-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-transitive-peers-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-block-production-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-prefix-test_-who-produces_0:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-shared-prefix-test_-who-produces_1:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-change-snark-worker-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-archive-node-test:
+                requires:
+                  - build-binaries--dev
+            - test--dev--coda-delegation-test:
+                requires:
+                  - build-binaries--dev
 
     daily:
         triggers:
@@ -1512,7 +1274,6 @@ workflows:
                     - develop
                     - /release\/.*/
         jobs:
-          - test-unit--dev_medium_curves
           - test--test_postake_full_epoch
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves

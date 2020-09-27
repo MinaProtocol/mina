@@ -3,7 +3,7 @@
  (public_name sha256_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core coda_digestif snark_params)
+ (libraries core digestif snark_params)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "SNARK keys"))

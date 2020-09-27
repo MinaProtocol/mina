@@ -15,8 +15,6 @@ module Scan_state : sig
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp]
-
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
@@ -32,12 +30,13 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
-  val staged_transactions : t -> Transaction.t list Or_error.t
+  val staged_transactions : t -> Transaction.t With_status.t list
 
   val staged_transactions_with_protocol_states :
        t
     -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-    -> (Transaction.t * Coda_state.Protocol_state.value) list Or_error.t
+    -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+       Or_error.t
 
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
@@ -55,7 +54,8 @@ module Pre_diff_info : Pre_diff_info.S
 
 module Staged_ledger_error : sig
   type t =
-    | Non_zero_fee_excess of Scan_state.Space_partition.t * Transaction.t list
+    | Non_zero_fee_excess of
+        Scan_state.Space_partition.t * Transaction.t With_status.t list
     | Invalid_proofs of
         ( Ledger_proof.t
         * Transaction_snark.Statement.t
@@ -105,7 +105,7 @@ val of_scan_state_and_ledger_unchecked :
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
-  t -> (Transaction.t * State_hash.t) Non_empty_list.t option
+  t -> (Transaction.t With_status.t * State_hash.t) Non_empty_list.t option
 
 val copy : t -> t
 
@@ -117,14 +117,14 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
-           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
+           (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+           option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -133,14 +133,14 @@ val apply_diff_unchecked :
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
-           (Ledger_proof.t * (Transaction.t * State_hash.t) list) option ]
+           (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+           option ]
        * [`Staged_ledger of t]
-       * [ `Pending_coinbase_data of
-           bool * Currency.Amount.t * Pending_coinbase.Update.Action.t ]
+       * [`Pending_coinbase_update of bool * Pending_coinbase.Update.t]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -155,11 +155,18 @@ val create_diff :
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
-  -> current_global_slot:Coda_numbers.Global_slot.t
-  -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
+  -> current_state_view:Snapp_predicate.Protocol_state.View.t
+  -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
+  -> supercharge_coinbase:bool
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+
+val can_apply_supercharged_coinbase_exn :
+     winner:Public_key.Compressed.t
+  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> global_slot:Coda_numbers.Global_slot.t
+  -> bool
 
 val statement_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
@@ -189,3 +196,10 @@ val all_work_pairs :
      Or_error.t
 
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
+
+val check_commands :
+     Ledger.t
+  -> verifier:Verifier.t
+  -> User_command.t list
+  -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
+     Deferred.Or_error.t

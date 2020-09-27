@@ -7,18 +7,13 @@ module Stable = struct
     type t =
       { token_id: Token_id.Stable.V1.t
       ; token_owner_pk: Public_key.Compressed.Stable.V1.t
-      ; receiver_pk: Public_key.Compressed.Stable.V1.t }
+      ; receiver_pk: Public_key.Compressed.Stable.V1.t
+      ; account_disabled: bool }
     [@@deriving compare, eq, sexp, hash, yojson]
 
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  { token_id: Token_id.t
-  ; token_owner_pk: Public_key.Compressed.t
-  ; receiver_pk: Public_key.Compressed.t }
-[@@deriving compare, eq, sexp, hash, yojson]
 
 let receiver_pk {receiver_pk; _} = receiver_pk
 
@@ -36,5 +31,6 @@ let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind token_id = Token_id.gen_non_default in
   let%bind token_owner_pk = Public_key.Compressed.gen in
-  let%map receiver_pk = Public_key.Compressed.gen in
-  {token_id; token_owner_pk; receiver_pk}
+  let%bind receiver_pk = Public_key.Compressed.gen in
+  let%map account_disabled = Quickcheck.Generator.bool in
+  {token_id; token_owner_pk; receiver_pk; account_disabled}

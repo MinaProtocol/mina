@@ -8,19 +8,29 @@ include Hashable.Make_binable (Pid)
 
 type process_kind = Prover | Verifier [@@deriving show {with_path= false}]
 
-type t = process_kind Pid.Table.t
+type data = {kind: process_kind; termination_expected: bool}
 
-let create_pid_table () = Pid.Table.create ()
+type t = data Pid.Table.t
 
-let register_process t process kind =
-  Pid.Table.add_exn t ~key:(Process.pid process) ~data:kind
+let create_pid_table () : t = Pid.Table.create ()
 
-let check_terminated_child t child_pid logger =
-  if Pid.Table.mem t child_pid then (
-    let kind = Pid.Table.find_exn t child_pid in
-    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-      "Child process of kind $process_kind with pid $child_pid has terminated"
-      ~metadata:
-        [ ("child_pid", `Int (Pid.to_int child_pid))
-        ; ("process_kind", `String (show_process_kind kind)) ] ;
-    Core_kernel.exit 99 )
+let register_process ?(termination_expected = false) (t : t) process kind =
+  let data = {kind; termination_expected} in
+  Pid.Table.add_exn t ~key:(Process.pid process) ~data
+
+let mark_termination_as_expected t child_pid =
+  Pid.Table.change t child_pid
+    ~f:(Option.map ~f:(fun r -> {r with termination_expected= true}))
+
+let remove : t -> Pid.t -> unit = Pid.Table.remove
+
+let check_terminated_child (t : t) child_pid logger =
+  if Pid.Table.mem t child_pid then
+    let data = Pid.Table.find_exn t child_pid in
+    if not data.termination_expected then (
+      [%log error]
+        "Child process of kind $process_kind with pid $child_pid has terminated"
+        ~metadata:
+          [ ("child_pid", `Int (Pid.to_int child_pid))
+          ; ("process_kind", `String (show_process_kind data.kind)) ] ;
+      Core_kernel.exit 99 )

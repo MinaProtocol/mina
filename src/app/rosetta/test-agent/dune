@@ -1,0 +1,31 @@
+(executable
+  (package agent)
+  (name agent)
+  (public_name agent)
+  (modes native)
+  (libraries
+    async
+    async_ssl
+    caqti
+    caqti-async
+    caqti-driver-postgresql
+    cohttp
+    ctypes
+    cohttp-async
+    core_kernel
+    logger
+    rosetta_models
+    lib
+    ppx_deriving_yojson.runtime
+    yojson
+    )
+  (preprocess (pps
+    graphql_ppx
+    ppx_coda
+    ppx_deriving.show
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_version
+    ppx_deriving.eq
+    ))
+  )

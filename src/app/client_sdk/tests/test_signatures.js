@@ -2,16 +2,16 @@ var coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.
 
 var keypair = {
   privateKey:
-    "6BnSDyt3FKhJSt5oDk1HHeM5J8uKSnp7eaSYndj53y7g7oYzUEhHFrkpk6po4XfNFyjtoJK4ovVHvmCgdUqXVEfTXoAC1CNpaGLAKtu7ah9i4dTi3FtcoKpZhtiTGrRQkEN6Q95cb39Kp",
+    "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c",
   publicKey:
-    "4vsRCVnc5xmYJhaVbUgkg6po6nR3Mu7KEFunP3uQL67qZmPNnJKev57TRvMfuJ15XDP8MjaLSh7THG7CpTiTkfgRcQAKGmFo1XGMStCucmWAxBUiXjycDbx7hbVCqkDYiezM8Lvr1NMdTEGU",
+    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T",
 };
 
 var receiver =
-  "4vsRCVHzeYYbneMkHR3u445f8zYwo6nhx3UHKZQH7B2txTV5Shz66Ds9PdxoRKCiALWtuwPQDwpm2Kj22QPcZpKCLr6rnHmUMztKpWxL9meCPQcTkKhmK5HyM4Y9dMnTKrEjD1MX71kLTUaP";
+  "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY";
 
 var newDelegate =
-  "4vsRCVQNkGihARy4Jg9FsJ6NFtnwDsRnTqi2gQnPAoCNUoyLveY6FEnicGMmwEumPx3GjLxAb5fAivVSLnYRPPMfb5HdkhLdjHunjgqp6g7gYi8cWy4avdmHMRomaKkWyWeWn91w7baaFnUk";
+  "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt";
 
 var payments = [
     {

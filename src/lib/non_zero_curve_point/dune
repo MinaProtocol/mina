@@ -4,7 +4,7 @@
  (flags :standard -short-paths)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel snark_params fold_lib codable ppx_version)
+ (libraries core_kernel snark_params fold_lib codable ppx_version.runtime)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_deriving.eq)))
+  (pps ppx_snarky ppx_coda ppx_version ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_deriving.eq h_list.ppx ppx_custom_printf)))

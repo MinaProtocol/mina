@@ -32,7 +32,7 @@ defmodule Util do
   @doc "Tests to see if `mod` implements the given `behaviour`. Works both in and out of macros."
   @spec has_behaviour?(module, module) :: boolean
   def has_behaviour?(mod, behaviour) do
-    # if the module is compiled, then we expect the behaviour to available via reflection attributes
+    # if the module is compiled, then we expect the behaviour to be available via reflection attributes
     Keyword.get(mod.__info__(:attributes), :behaviour, [])
     |> Enum.member?(behaviour)
   rescue
@@ -41,11 +41,11 @@ defmodule Util do
       # if the module is still being compiled, we can inspect the modules actual attributes in more detail
       behaviours = Module.get_attribute(mod, :behaviour)
       Enum.member?(behaviours, behaviour)
-
     # triggered by Module.get_attribute if already compiled (not in macro) or does not exist
     ArgumentError ->
       # at this point, the module just doesn't exist
       false
+
   end
 
   defmodule ForMacros do

@@ -1,8 +1,10 @@
 open Pickles_types
 module Scalar_challenge = Pickles_types.Scalar_challenge
-open Core_kernel
 module Bulletproof_challenge = Bulletproof_challenge
+module Index = Index
+module Digest = Digest
 module Spec = Spec
+open Core_kernel
 
 let index_to_field_elements ({row; col; value} : 'a Abc.t Matrix_evals.t)
     ~g:g_to_field_elements =
@@ -24,7 +26,7 @@ module Dlog_based = struct
           ; beta_1: 'scalar_challenge
           ; beta_2: 'scalar_challenge
           ; beta_3: 'scalar_challenge }
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
         let map_challenges
             { sigma_2
@@ -46,35 +48,10 @@ module Dlog_based = struct
           ; beta_2= scalar beta_2
           ; beta_3= scalar beta_3 }
 
-        open Snarky.H_list
-
-        let to_hlist
-            { sigma_2
-            ; sigma_3
-            ; alpha
-            ; eta_a
-            ; eta_b
-            ; eta_c
-            ; beta_1
-            ; beta_2
-            ; beta_3 } =
-          [sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
-
-        let of_hlist
-            ([ sigma_2
-             ; sigma_3
-             ; alpha
-             ; eta_a
-             ; eta_b
-             ; eta_c
-             ; beta_1
-             ; beta_2
-             ; beta_3 ] :
-              (unit, _) t) =
-          {sigma_2; sigma_3; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3}
+        open Snarky_backendless.H_list
 
         let typ chal fp =
-          Snarky.Typ.of_hlistable
+          Snarky_backendless.Typ.of_hlistable
             [ fp
             ; fp
             ; chal
@@ -88,147 +65,143 @@ module Dlog_based = struct
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
 
-      type ('challenge, 'scalar_challenge, 'fp, 'fq) t =
-        { xi: 'scalar_challenge
-        ; r: 'scalar_challenge
-        ; r_xi_sum: 'fp
-        ; marlin: ('challenge, 'scalar_challenge, 'fp) Marlin.t }
-      [@@deriving bin_io, sexp, compare, yojson]
+      type ( 'challenge
+           , 'scalar_challenge
+           , 'fp
+           , 'fq
+           , 'bulletproof_challenges
+           , 'index )
+           t =
+        { marlin: ('challenge, 'scalar_challenge, 'fp) Marlin.t
+        ; combined_inner_product: 'fp
+        ; b: 'fp
+        ; xi: 'scalar_challenge
+        ; bulletproof_challenges: 'bulletproof_challenges
+        ; which_branch: 'index }
+      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
-      let map_challenges {xi; r; r_xi_sum; marlin} ~f ~scalar =
+      let map_challenges
+          { marlin
+          ; combined_inner_product
+          ; b: 'fp
+          ; xi
+          ; bulletproof_challenges
+          ; which_branch } ~f ~scalar =
         { xi= scalar xi
-        ; r= scalar r
-        ; r_xi_sum
-        ; marlin= Marlin.map_challenges marlin ~f ~scalar }
+        ; combined_inner_product
+        ; b
+        ; marlin= Marlin.map_challenges marlin ~f ~scalar
+        ; bulletproof_challenges
+        ; which_branch }
 
-      open Snarky.H_list
-
-      let to_hlist {xi; r; r_xi_sum; marlin} = [xi; r; r_xi_sum; marlin]
-
-      let of_hlist ([xi; r; r_xi_sum; marlin] : (unit, _) t) =
-        {xi; r; r_xi_sum; marlin}
-
-      let typ chal fp fq =
-        Snarky.Typ.of_hlistable
-          [ Scalar_challenge.typ chal
-          ; Scalar_challenge.typ chal
+      let typ chal fp fq index bool =
+        Snarky_backendless.Typ.of_hlistable
+          [ Marlin.typ chal fp
           ; fp
-          ; Marlin.typ chal fp ]
+          ; fp
+          ; Scalar_challenge.typ chal
+          ; Vector.typ
+              (Bulletproof_challenge.typ chal bool)
+              Backend.Tick.Rounds.n
+          ; index ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     module Me_only = struct
-      type ('g1, 'unshifted, 'bulletproof_challenges) t =
-        { pairing_marlin_acc:
-            ('g1, 'unshifted) Pairing_marlin_types.Accumulator.Stable.Latest.t
-        ; old_bulletproof_challenges: 'bulletproof_challenges }
-      [@@deriving bin_io, sexp, compare, yojson]
+      type ('g1, 'bulletproof_challenges) t =
+        {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
+      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
-      let to_field_elements
-          { pairing_marlin_acc=
-              { opening_check= {r_f_minus_r_v_plus_rz_pi; r_pi}
-              ; degree_bound_checks=
-                  {shifted_accumulator; unshifted_accumulators} }
-          ; old_bulletproof_challenges } ~g1:g1_to_field_elements =
+      let to_field_elements {sg; old_bulletproof_challenges}
+          ~g1:g1_to_field_elements =
         Array.concat
           [ Vector.to_array old_bulletproof_challenges
             |> Array.concat_map ~f:Vector.to_array
-          ; Array.concat_map
-              (Array.append
-                 [|r_f_minus_r_v_plus_rz_pi; r_pi; shifted_accumulator|]
-                 ( Map.to_sequence ~order:`Increasing_key unshifted_accumulators
-                 |> Sequence.map ~f:snd |> Sequence.to_array ))
-              ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
+          ; Array.of_list (g1_to_field_elements sg) ]
 
-      open Snarky.H_list
-
-      let to_hlist {pairing_marlin_acc; old_bulletproof_challenges} =
-        [pairing_marlin_acc; old_bulletproof_challenges]
-
-      let of_hlist
-          ([pairing_marlin_acc; old_bulletproof_challenges] : (unit, _) t) =
-        {pairing_marlin_acc; old_bulletproof_challenges}
-
-      let typ g1 chal domain_sizes ~length =
-        Snarky.Typ.of_hlistable
-          [ Pairing_marlin_types.Accumulator.typ domain_sizes g1
-          ; Vector.typ chal length ]
+      let typ g1 chal ~length =
+        Snarky_backendless.Typ.of_hlistable
+          [g1; Vector.typ chal length]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    type ('challenge, 'scalar_challenge, 'fp, 'bool, 'fq, 'me_only, 'digest) t =
+    type ( 'challenge
+         , 'scalar_challenge
+         , 'fp
+         , 'bool
+         , 'fq
+         , 'me_only
+         , 'digest
+         , 'bp_chals
+         , 'index )
+         t =
       { deferred_values:
-          ('challenge, 'scalar_challenge, 'fp, 'fq) Deferred_values.t
+          ( 'challenge
+          , 'scalar_challenge
+          , 'fp
+          , 'fq
+          , 'bp_chals
+          , 'index )
+          Deferred_values.t
       ; was_base_case: 'bool
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
 
-    open Snarky.H_list
-
-    let to_hlist
-        { deferred_values
-        ; was_base_case
-        ; sponge_digest_before_evaluations
-        ; me_only } =
-      [ deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only ]
-
-    let of_hlist
-        ([ deferred_values
-         ; was_base_case
-         ; sponge_digest_before_evaluations
-         ; me_only ] :
-          (unit, _) t) =
-      { deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ; me_only }
-
-    let typ chal fp bool fq me_only digest =
-      Snarky.Typ.of_hlistable
-        [Deferred_values.typ chal fp fq; bool; digest; me_only]
+    let typ chal fp bool fq me_only digest index =
+      Snarky_backendless.Typ.of_hlistable
+        [Deferred_values.typ chal fp fq index bool; bool; digest; me_only]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
   module Pass_through = struct
-    type ('g, 's, 'sg) t =
+    type ('g, 's, 'sg, 'bulletproof_challenges) t =
       { app_state: 's
       ; dlog_marlin_index:
           'g Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t
           Matrix_evals.t
-      ; sg: 'sg }
+      ; sg: 'sg
+      ; old_bulletproof_challenges: 'bulletproof_challenges }
+    [@@deriving sexp]
 
-    let to_field_elements {app_state; dlog_marlin_index; sg}
+    let to_field_elements
+        {app_state; dlog_marlin_index; sg; old_bulletproof_challenges}
         ~app_state:app_state_to_field_elements ~comm ~g =
       Array.concat
         [ index_to_field_elements ~g:comm dlog_marlin_index
+        ; app_state_to_field_elements app_state
         ; Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
-        ; app_state_to_field_elements app_state ]
+        ; Vector.to_array old_bulletproof_challenges
+          |> Array.concat_map ~f:Vector.to_array ]
 
-    let to_field_elements_without_index {app_state; dlog_marlin_index= _; sg}
+    let to_field_elements_without_index
+        {app_state; dlog_marlin_index= _; sg; old_bulletproof_challenges}
         ~app_state:app_state_to_field_elements ~g =
       Array.concat
-        [ Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
-        ; app_state_to_field_elements app_state ]
+        [ app_state_to_field_elements app_state
+        ; Array.of_list (List.concat_map ~f:g (Vector.to_list sg))
+        ; Vector.to_array old_bulletproof_challenges
+          |> Array.concat_map ~f:Vector.to_array ]
 
-    open Snarky.H_list
+    open Snarky_backendless.H_list
 
-    let to_hlist {app_state; dlog_marlin_index; sg} =
-      [app_state; dlog_marlin_index; sg]
+    let to_hlist {app_state; dlog_marlin_index; sg; old_bulletproof_challenges}
+        =
+      [app_state; dlog_marlin_index; sg; old_bulletproof_challenges]
 
-    let of_hlist ([app_state; dlog_marlin_index; sg] : (unit, _) t) =
-      {app_state; dlog_marlin_index; sg}
+    let of_hlist
+        ([app_state; dlog_marlin_index; sg; old_bulletproof_challenges] :
+          (unit, _) t) =
+      {app_state; dlog_marlin_index; sg; old_bulletproof_challenges}
 
-    let typ comm g s branching =
-      Snarky.Typ.of_hlistable
-        [s; Matrix_evals.typ (Abc.typ comm); Vector.typ g branching]
+    let typ comm g s chal branching =
+      Snarky_backendless.Typ.of_hlistable
+        [s; Matrix_evals.typ (Abc.typ comm); Vector.typ g branching; chal]
+        (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -241,7 +214,9 @@ module Dlog_based = struct
          , 'fq
          , 'me_only
          , 'digest
-         , 'pass_through )
+         , 'pass_through
+         , 'bp_chals
+         , 'index )
          t =
       { proof_state:
           ( 'challenge
@@ -250,26 +225,32 @@ module Dlog_based = struct
           , 'bool
           , 'fq
           , 'me_only
-          , 'digest )
+          , 'digest
+          , 'bp_chals
+          , 'index )
           Proof_state.t
       ; pass_through: 'pass_through }
-    [@@deriving bin_io, compare, yojson, sexp]
+    [@@deriving bin_io, compare, yojson, sexp, hash, eq]
 
     let spec =
       let open Spec in
       Struct
         [ Vector (B Bool, Nat.N1.n)
-        ; Vector (B Field, Nat.N3.n)
+        ; Vector (B Field, Nat.N4.n)
         ; Vector (B Challenge, Nat.N4.n)
-        ; Vector (Scalar Challenge, Nat.N5.n)
-        ; Vector (B Digest, Nat.N3.n) ]
+        ; Vector (Scalar Challenge, Nat.N4.n)
+        ; Vector (B Digest, Nat.N3.n)
+        ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
+        ; Vector (B Index, Nat.N1.n) ]
 
     let to_data
         { proof_state=
             { deferred_values=
                 { xi
-                ; r
-                ; r_xi_sum
+                ; combined_inner_product
+                ; b
+                ; which_branch
+                ; bulletproof_challenges
                 ; marlin=
                     { sigma_2
                     ; sigma_3
@@ -285,26 +266,45 @@ module Dlog_based = struct
             ; me_only }
         ; pass_through } =
       let open Vector in
-      let fp = [sigma_2; sigma_3; r_xi_sum] in
+      let fp = [sigma_2; sigma_3; combined_inner_product; b] in
       let challenge = [alpha; eta_a; eta_b; eta_c] in
-      let scalar_challenge = [beta_1; beta_2; beta_3; xi; r] in
+      let scalar_challenge = [beta_1; beta_2; beta_3; xi] in
       let bool = [was_base_case] in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      Hlist.HlistId.[bool; fp; challenge; scalar_challenge; digest]
+      let index = [which_branch] in
+      Hlist.HlistId.
+        [ bool
+        ; fp
+        ; challenge
+        ; scalar_challenge
+        ; digest
+        ; bulletproof_challenges
+        ; index ]
 
-    let of_data Hlist.HlistId.[bool; fp; challenge; scalar_challenge; digest] =
+    let of_data
+        Hlist.HlistId.
+          [ bool
+          ; fp
+          ; challenge
+          ; scalar_challenge
+          ; digest
+          ; bulletproof_challenges
+          ; index ] =
       let open Vector in
-      let [sigma_2; sigma_3; r_xi_sum] = fp in
+      let [sigma_2; sigma_3; combined_inner_product; b] = fp in
       let [alpha; eta_a; eta_b; eta_c] = challenge in
-      let [beta_1; beta_2; beta_3; xi; r] = scalar_challenge in
+      let [beta_1; beta_2; beta_3; xi] = scalar_challenge in
       let [was_base_case] = bool in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
+      let [which_branch] = index in
       { proof_state=
           { was_base_case
           ; deferred_values=
               { xi
-              ; r
-              ; r_xi_sum
+              ; combined_inner_product
+              ; b
+              ; which_branch
+              ; bulletproof_challenges
               ; marlin=
                   { sigma_2
                   ; sigma_3
@@ -341,16 +341,10 @@ module Pairing_based = struct
         
           It doesn't need to be sent on the wire, but it does need to be provided to the verifier
         *)
-        type ('fq, 'g) t = {b: 'fq}
-
-        open Snarky.H_list
-
-        let to_hlist {b} = [b]
-
-        let of_hlist ([b] : (unit, _) t) = {b}
+        type ('fq, 'g) t = {b: 'fq} [@@deriving hlist]
 
         let typ fq g =
-          let open Snarky.Typ in
+          let open Snarky_backendless.Typ in
           of_hlistable [fq] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
@@ -368,7 +362,6 @@ module Pairing_based = struct
         { marlin: ('challenge, 'scalar_challenge, 'fq) Marlin.t
         ; combined_inner_product: 'fq
         ; xi: 'scalar_challenge (* 128 bits *)
-        ; r: 'scalar_challenge (* 128 bits *)
         ; bulletproof_challenges: 'bulletproof_challenges
         ; b: 'fq }
       [@@deriving bin_io, sexp, compare, yojson]
@@ -399,13 +392,12 @@ module Pairing_based = struct
           [ Vector (B Field, Nat.N4.n)
           ; Vector (B Digest, Nat.N1.n)
           ; Vector (B Challenge, Nat.N4.n)
-          ; Vector (Scalar Challenge, Nat.N5.n)
+          ; Vector (Scalar Challenge, Nat.N4.n)
           ; Vector (B Bulletproof_challenge, bp_log2) ]
 
       let to_data
           { deferred_values=
               { xi
-              ; r
               ; bulletproof_challenges
               ; b
               ; combined_inner_product
@@ -423,7 +415,7 @@ module Pairing_based = struct
         let open Vector in
         let fq = [sigma_2; sigma_3; combined_inner_product; b] in
         let challenge = [alpha; eta_a; eta_b; eta_c] in
-        let scalar_challenge = [beta_1; beta_2; beta_3; xi; r] in
+        let scalar_challenge = [beta_1; beta_2; beta_3; xi] in
         let digest = [sponge_digest_before_evaluations] in
         let open Hlist.HlistId in
         [fq; digest; challenge; scalar_challenge; bulletproof_challenges]
@@ -434,11 +426,10 @@ module Pairing_based = struct
           [ Vector.[sigma_2; sigma_3; combined_inner_product; b]
           ; Vector.[sponge_digest_before_evaluations]
           ; Vector.[alpha; eta_a; eta_b; eta_c]
-          ; Vector.[beta_1; beta_2; beta_3; xi; r]
+          ; Vector.[beta_1; beta_2; beta_3; xi]
           ; bulletproof_challenges ] =
         { deferred_values=
             { xi
-            ; r
             ; bulletproof_challenges
             ; b
             ; combined_inner_product
@@ -478,15 +469,16 @@ module Pairing_based = struct
               (Per_proof.of_data unfinalized, should_verify) )
       ; me_only }
 
-    let typ impl branching bp_log2 fq =
+    let typ impl branching fq =
       let unfinalized_proofs =
         let open Spec in
-        Vector (Struct [Per_proof.spec bp_log2; B Bool], branching)
+        Vector
+          (Struct [Per_proof.spec Backend.Tock.Rounds.n; B Bool], branching)
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq
-      |> Snarky.Typ.transport ~there:to_data ~back:of_data
-      |> Snarky.Typ.transport_var ~there:to_data ~back:of_data
+      |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
+      |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end
 
   module Statement = struct
@@ -520,13 +512,14 @@ module Pairing_based = struct
 end
 
 module Nvector = Vector.With_length
-module Bp_vec = Nvector (Zexe_backend.Dlog_based.Rounds)
+module Wrap_bp_vec = Nvector (Backend.Tock.Rounds)
+module Step_bp_vec = Nvector (Backend.Tick.Rounds)
 
 module Challenges_vector = struct
   type 'n t =
-    (Zexe_backend.Dlog_based.Field.t Snarky.Cvar.t Bp_vec.t, 'n) Vector.t
+    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
-    type 'n t = (Zexe_backend.Dlog_based.Field.t Bp_vec.t, 'n) Vector.t
+    type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
   end
 end

@@ -58,13 +58,13 @@ module Styles = {
         borderRadius(`px(4)),
         pointerEvents(`auto),
         opacity(1.),
+        zIndex(100),
         selector(
           "li",
           [
             display(`block),
             textDecoration(`none),
             padding(`px(10)),
-            zIndex(1),
             hover([background(Theme.Colors.gandalf)]),
           ],
         ),

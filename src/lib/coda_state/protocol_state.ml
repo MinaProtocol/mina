@@ -17,13 +17,9 @@ module Poly = struct
     module V1 = struct
       type ('state_hash, 'body) t =
         {previous_state_hash: 'state_hash; body: 'body}
-      [@@deriving eq, ord, hash, sexp, to_yojson]
+      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
     end
   end]
-
-  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
-    {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving sexp]
 end
 
 let hash_abstract ~hash_body
@@ -43,21 +39,9 @@ module Body = struct
           ; blockchain_state: 'blockchain_state
           ; consensus_state: 'consensus_state
           ; constants: 'constants }
-        [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
+        [@@deriving sexp, eq, compare, to_yojson, hash, version, hlist]
       end
     end]
-
-    type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
-          ( 'state_hash
-          , 'blockchain_state
-          , 'consensus_state
-          , 'constants )
-          Stable.Latest.t =
-      { genesis_state_hash: 'state_hash
-      ; blockchain_state: 'blockchain_state
-      ; consensus_state: 'consensus_state
-      ; constants: 'constants }
-    [@@deriving sexp]
   end
 
   module Value = struct
@@ -75,8 +59,6 @@ module Body = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
   type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
@@ -94,17 +76,6 @@ module Body = struct
     , Protocol_constants_checked.var )
     Poly.t
 
-  let to_hlist
-      {Poly.genesis_state_hash; blockchain_state; consensus_state; constants} =
-    H_list.[genesis_state_hash; blockchain_state; consensus_state; constants]
-
-  let of_hlist :
-         (unit, 'sh -> 'bs -> 'cs -> 'cc -> unit) H_list.t
-      -> ('sh, 'bs, 'cs, 'cc) Poly.t =
-   fun H_list.
-         [genesis_state_hash; blockchain_state; consensus_state; constants] ->
-    {genesis_state_hash; blockchain_state; consensus_state; constants}
-
   let data_spec ~constraint_constants =
     Data_spec.
       [ State_hash.typ
@@ -115,8 +86,8 @@ module Body = struct
   let typ ~constraint_constants =
     Typ.of_hlistable
       (data_spec ~constraint_constants)
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
+      ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+      ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
   let to_input
       { Poly.genesis_state_hash: State_hash.t
@@ -153,12 +124,42 @@ module Body = struct
 
   let consensus_state {Poly.consensus_state; _} = consensus_state
 
+  let view_checked (t : var) : Snapp_predicate.Protocol_state.View.Checked.t =
+    let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
+    let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
+    { snarked_ledger_hash= t.blockchain_state.snarked_ledger_hash
+    ; snarked_next_available_token=
+        t.blockchain_state.snarked_next_available_token
+    ; timestamp= t.blockchain_state.timestamp
+    ; blockchain_length= C.blockchain_length_var cs
+    ; min_window_density= C.min_window_density_var cs
+    ; last_vrf_output= ()
+    ; total_currency= C.total_currency_var cs
+    ; curr_global_slot= C.curr_global_slot_var cs
+    ; staking_epoch_data= C.staking_epoch_data_var cs
+    ; next_epoch_data= C.next_epoch_data_var cs }
+
   [%%endif]
 
   let hash s =
     Random_oracle.hash ~init:Hash_prefix.protocol_state_body
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
+
+  let view (t : Value.t) : Snapp_predicate.Protocol_state.View.t =
+    let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
+    let cs = t.consensus_state in
+    { snarked_ledger_hash= t.blockchain_state.snarked_ledger_hash
+    ; snarked_next_available_token=
+        t.blockchain_state.snarked_next_available_token
+    ; timestamp= t.blockchain_state.timestamp
+    ; blockchain_length= C.blockchain_length cs
+    ; min_window_density= C.min_window_density cs
+    ; last_vrf_output= ()
+    ; total_currency= C.total_currency cs
+    ; curr_global_slot= C.curr_global_slot cs
+    ; staking_epoch_data= C.staking_epoch_data cs
+    ; next_epoch_data= C.next_epoch_data cs }
 end
 
 module Value = struct
@@ -172,8 +173,6 @@ module Value = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, to_yojson]
 
   include Hashable.Make (Stable.Latest)
 end
@@ -225,20 +224,14 @@ consensus_mechanism]
 
 let create_var = create'
 
-let to_hlist {Poly.Stable.Latest.previous_state_hash; body} =
-  H_list.[previous_state_hash; body]
-
-let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) Poly.t =
- fun H_list.[previous_state_hash; body] -> {previous_state_hash; body}
-
 let data_spec ~constraint_constants =
   Data_spec.[State_hash.typ; Body.typ ~constraint_constants]
 
 let typ ~constraint_constants =
   Typ.of_hlistable
     (data_spec ~constraint_constants)
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-    ~value_of_hlist:of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in

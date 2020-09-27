@@ -43,8 +43,6 @@ module Make () = struct
     end
   end]
 
-  type t = T1.t [@@deriving hash, sexp, compare]
-
   [%%define_locally
   T1.(to_raw_string, digest_string, to_hex)]
 
@@ -82,7 +80,7 @@ include Make ()
 let%test "serialization test V1" =
   let blake2s = T0.digest_string "serialization test V1" in
   let known_good_digest = "162e120bf889f4e2bccf8017ed93d845" in
-  Ppx_version.Serialization.check_serialization
+  Ppx_version_runtime.Serialization.check_serialization
     (module Stable.V1)
     blake2s known_good_digest
 

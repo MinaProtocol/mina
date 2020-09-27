@@ -1,0 +1,14 @@
+(library
+ (name vrf_lib_tests)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core snarky snarky_curves test_util signature_lib snark_params
+   vrf_lib coda_base random_oracle fold_lib)
+ (preprocess
+  (pps
+   bisect_ppx --conditional
+   h_list.ppx
+   ppx_bench
+   ppx_deriving.eq
+   ppx_jane
+   ppx_version)))

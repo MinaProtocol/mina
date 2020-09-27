@@ -45,7 +45,7 @@ module Styles = {
   let link = merge([Theme.Link.basic, style([lineHeight(`px(28))])]);
   let participantDetails =
     merge([
-      link,
+      Theme.Body.basic_semibold,
       style([
         display(`none),
         media(
@@ -102,8 +102,6 @@ module Styles = {
       style([
         position(`relative),
         marginTop(`rem(2.)),
-        left(`rem(2.0)),
-        width(`rem(18.)),
         media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
         media(
           Theme.MediaQuery.veryVeryLarge,
@@ -111,6 +109,19 @@ module Styles = {
         ),
       ]),
     ]);
+
+  let nameContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`flexStart),
+      media(
+        Theme.MediaQuery.notMobile,
+        [flexDirection(`row), alignItems(`center)],
+      ),
+    ]);
+
+  let username = merge([header, style([marginRight(`rem(1.5))])]);
 };
 
 module Links = {
@@ -118,13 +129,13 @@ module Links = {
   let make = () => {
     <div className=Styles.buttonAndLinks>
       <Button
-        link=""
+        link="https://forums.codaprotocol.com/t/testnet-beta-release-3-2b-challenges/435"
         label="Current Challenges"
         bgColor=Theme.Colors.clover
         bgColorHover=Theme.Colors.jungle
       />
       <div className=Styles.linksColumn>
-        <Next.Link href="">
+        <Next.Link href="https://bit.ly/leaderboardFAQ">
           <a className=Styles.link>
             <Svg
               link="/static/img/Icon.Link.svg"
@@ -135,7 +146,7 @@ module Links = {
             {React.string("Leaderboard FAQ")}
           </a>
         </Next.Link>
-        <Next.Link href="">
+        <Next.Link href="https://bit.ly/CodaDiscord">
           <a className=Styles.link>
             <Svg
               link="/static/img/Icon.Link.svg"
@@ -143,7 +154,7 @@ module Links = {
               className=Styles.icon
               alt="an arrow pointing to the right with a square around it"
             />
-            {React.string("Discord #Leaderboard Channel")}
+            {React.string("Discord #leaderboard-qa Channel")}
           </a>
         </Next.Link>
       </div>
@@ -260,23 +271,34 @@ module Points = {
     };
   };
 
+  let parsePointOrRank = n => {
+    n == 0 ? "N/A" : string_of_int(n);
+  };
+
   [@react.component]
-  let make =
-      (
-        ~pointsForRelease="1000",
-        ~pointsforPhase="11000",
-        ~pointsAllTime="100000",
-      ) => {
+  let make = (~member: Leaderboard.member) => {
     <div className=Styles.pointsRow>
-      <PointsColumn pointType="This Release" rank="1" points="5000" />
-      <PointsColumn pointType="This Phase" rank="19" points="10000" />
-      <PointsColumn pointType="All Time" rank="101" points="10500" />
+      <PointsColumn
+        pointType="This Release"
+        rank={parsePointOrRank(member.releaseRank)}
+        points={parsePointOrRank(member.releasePoints)}
+      />
+      <PointsColumn
+        pointType="This Phase"
+        rank={parsePointOrRank(member.phaseRank)}
+        points={parsePointOrRank(member.phasePoints)}
+      />
+      <PointsColumn
+        pointType="All Time"
+        rank={parsePointOrRank(member.allTimeRank)}
+        points={parsePointOrRank(member.allTimePoints)}
+      />
     </div>;
   };
 };
 
 [@react.component]
-let make = (~name="Matt Harrott / Figment Network#8705") => {
+let make = (~member: Leaderboard.member) => {
   <div className=Styles.linkRow>
     <Next.Link href="/testnet">
       <a className=Theme.Link.basic> {React.string("Testnet")} </a>
@@ -289,7 +311,20 @@ let make = (~name="Matt Harrott / Figment Network#8705") => {
     <span className=Styles.participantDetails>
       {React.string("Participant Details")}
     </span>
-    <p className=Styles.header> {React.string(name)} </p>
-    <div className=Styles.middleRow> <Points /> <Links /> </div>
+    <div className=Styles.nameContainer>
+      <p className=Styles.username> {React.string(member.name)} </p>
+      <span className=Css.(style([display(`flex), paddingTop(`rem(0.5))]))>
+        {Leaderboard.LeaderboardRow.renderBadges(
+           ~marginLeft=0.5,
+           ~marginRight=0.5,
+           ~mobileMarginLeft=0.,
+           ~mobileMarginRight=1.,
+           ~height=2.,
+           ~width=2.,
+           member,
+         )}
+      </span>
+    </div>
+    <div className=Styles.middleRow> <Points member /> <Links /> </div>
   </div>;
 };

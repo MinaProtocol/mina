@@ -210,8 +210,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Ok x ->
           Ok (transform t ~f:(Fn.const x))
       | Error err ->
-          Logger.error ~module_:__MODULE__ ~location:__LOC__
-            (Cache.logger (cache t))
+          [%log' error (Cache.logger (cache t))]
             "Cached.sequence_result called on an already consumed Cached.t" ;
           ignore (invalidate_with_failure t) ;
           Error err

@@ -3,6 +3,8 @@ open Coda_base
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type 'proof t = {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
     [@@deriving compare, fields, sexp, yojson]

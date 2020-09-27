@@ -29,6 +29,9 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
@@ -68,7 +71,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Ok () ->
           Ok ()
       | Error `Frontier_hash_does_not_match ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          [%log warn]
             ~metadata:
               [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
             "Persistent frontier hash did not match persistent root frontier \
@@ -81,7 +84,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Error `Bootstrap_required ->
           Error `Bootstrap_required
       | Error (`Failure msg) ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          [%log fatal]
             ~metadata:
               [("target_root", Root_identifier.to_yojson root_identifier)]
             "Unable to fast forward persistent frontier: %s" msg ;
@@ -191,21 +194,17 @@ let rec load_with_max_length :
       (* TODO: this case can be optimized to not create the
          * database twice through rocks -- currently on clean bootup,
          * this code path will reinitialize the rocksdb twice *)
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "persistent frontier database does not exist" ;
+      [%log info] "persistent frontier database does not exist" ;
       reset_and_continue ()
   | Error `Invalid_version ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "persistent frontier database out of date" ;
+      [%log info] "persistent frontier database out of date" ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "Persistent frontier database is corrupt: %s"
+      [%log error] "Persistent frontier database is corrupt: %s"
         (Persistent_frontier.Database.Error.message err) ;
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "destroying old persistent frontier database " ;
+        [%log info] "destroying old persistent frontier database " ;
         let%bind () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -248,8 +247,7 @@ let close
     ; persistent_frontier_instance
     ; extensions
     ; genesis_state_hash= _ } =
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    "Closing transition frontier" ;
+  [%log trace] "Closing transition frontier" ;
   Full_frontier.close full_frontier ;
   Extensions.close extensions ;
   let%map () =
@@ -272,17 +270,16 @@ let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
-        )
+            (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "PRE: ($state_hash, $n)" ;
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ( "diffs"
         , `List
@@ -297,7 +294,7 @@ let add_breadcrumb_exn t breadcrumb =
   Option.iter new_root_identifier
     ~f:
       (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
@@ -307,6 +304,17 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
+  let user_cmds = Breadcrumb.commands breadcrumb in
+  if not (List.is_empty user_cmds) then
+    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+       command or snapp command
+    *)
+    [%str_log' trace t.logger] Added_breadcrumb_user_commands
+      ~metadata:
+        [ ( "user_commands"
+          , `List
+              (List.map user_cmds
+                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

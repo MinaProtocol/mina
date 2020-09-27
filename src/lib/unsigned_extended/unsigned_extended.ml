@@ -36,8 +36,6 @@ module Extend
 
     let compare = Unsigned.compare
 
-    let equal t1 t2 = compare t1 t2 = 0
-
     let hash_fold_t s t = Int64.hash_fold_t s (Unsigned.to_int64 t)
 
     let hash t = Int64.hash (Unsigned.to_int64 t)
@@ -86,6 +84,8 @@ module UInt64 = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned.UInt64.t
 
@@ -132,6 +132,8 @@ module UInt32 = struct
 
   [%%versioned_binable
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned.UInt32.t
 
@@ -171,7 +173,7 @@ end
 (* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
-    open Ppx_version.Serialization
+    open Ppx_version_runtime.Serialization
 
     let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in

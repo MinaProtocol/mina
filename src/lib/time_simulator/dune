@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries coda_intf)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "Time simulator. Time moves faster if nothing is happening."))

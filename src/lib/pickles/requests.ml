@@ -3,8 +3,9 @@ open Import
 open Types
 open Pickles_types
 open Hlist
-open Snarky.Request
+open Snarky_backendless.Request
 open Common
+open Backend
 
 module Wrap = struct
   module type S = sig
@@ -12,9 +13,9 @@ module Wrap = struct
 
     type max_local_max_branchings
 
-    open Impls.Dlog_based
-    open Dlog_main_inputs
-    open Snarky.Request
+    open Impls.Wrap
+    open Wrap_main_inputs
+    open Snarky_backendless.Request
 
     type _ t +=
       | Evals :
@@ -24,8 +25,7 @@ module Wrap = struct
           , max_branching )
           Vector.t
           t
-      | Index : int t
-      | Pairing_accs : (Pairing_acc.t, max_branching) Vector.t t
+      | Step_accs : (Tock.Inner_curve.Affine.t, max_branching) Vector.t t
       | Old_bulletproof_challenges :
           max_local_max_branchings H1.T(Challenges_vector.Constant).t t
       | Proof_state :
@@ -35,7 +35,7 @@ module Wrap = struct
               , ( ( Challenge.Constant.t Scalar_challenge.t
                   , bool )
                   Bulletproof_challenge.t
-                , Rounds.n )
+                , Tock.Rounds.n )
                 Vector.t
               , Digest.Constant.t )
               Types.Pairing_based.Proof_state.Per_proof.t
@@ -46,8 +46,15 @@ module Wrap = struct
           Types.Pairing_based.Proof_state.t
           t
       | Messages :
-          (G1.Constant.t, Zexe_backend.Fp.t) Pairing_marlin_types.Messages.t t
-      | Openings_proof : G1.Constant.t Tuple_lib.Triple.t t
+          ( Tock.Inner_curve.Affine.t
+          , Tick.Field.t )
+          Dlog_marlin_types.Messages.t
+          t
+      | Openings_proof :
+          ( Tock.Inner_curve.Affine.t
+          , Tick.Field.t )
+          Dlog_marlin_types.Openings.Bulletproof.t
+          t
   end
 
   type ('mb, 'ml) t =
@@ -62,33 +69,27 @@ module Wrap = struct
 
       type nonrec max_local_max_branchings = ml
 
-      open Zexe_backend
-      open Snarky.Request
+      open Snarky_backendless.Request
 
       type 'a vec = ('a, max_branching) Vector.t
 
       type _ t +=
         | Evals :
-            (Fq.t array Dlog_marlin_types.Evals.t * Fq.t) Tuple_lib.Triple.t
+            (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t)
+            Tuple_lib.Triple.t
             vec
             t
-        | Index : int t
-        | Pairing_accs :
-            ( G1.Affine.t
-            , G1.Affine.t Int.Map.t )
-            Pairing_marlin_types.Accumulator.t
-            vec
-            t
+        | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
             max_local_max_branchings H1.T(Challenges_vector.Constant).t t
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Fq.t
+                , Tock.Field.t
                 , ( ( Challenge.Constant.t Scalar_challenge.t
                     , bool )
                     Bulletproof_challenge.t
-                  , Rounds.n )
+                  , Tock.Rounds.n )
                   Vector.t
                 , Digest.Constant.t )
                 Types.Pairing_based.Proof_state.Per_proof.t
@@ -98,8 +99,16 @@ module Wrap = struct
             , Digest.Constant.t )
             Types.Pairing_based.Proof_state.t
             t
-        | Messages : (G1.Affine.t, Fp.t) Pairing_marlin_types.Messages.t t
-        | Openings_proof : G1.Affine.t Tuple_lib.Triple.t t
+        | Messages :
+            ( Tock.Inner_curve.Affine.t
+            , Tick.Field.t )
+            Dlog_marlin_types.Messages.t
+            t
+        | Openings_proof :
+            ( Tock.Inner_curve.Affine.t
+            , Tick.Field.t )
+            Dlog_marlin_types.Openings.Bulletproof.t
+            t
     end in
     (module R)
 end
@@ -126,12 +135,8 @@ module Step = struct
           , local_branches )
           H3.T(Per_proof_witness.Constant).t
           t
-      | Me_only :
-          ( G.Affine.t
-          , statement
-          , (G.Affine.t, max_branching) Vector.t )
-          Types.Pairing_based.Proof_state.Me_only.t
-          t
+      | Wrap_index : Tock.Curve.Affine.t array Abc.t Matrix_evals.t t
+      | App_state : statement t
   end
 
   let create
@@ -162,12 +167,8 @@ module Step = struct
             , local_branches )
             H3.T(Per_proof_witness.Constant).t
             t
-        | Me_only :
-            ( G.Affine.t
-            , statement
-            , (G.Affine.t, max_branching) Vector.t )
-            Types.Pairing_based.Proof_state.Me_only.t
-            t
+        | Wrap_index : Tock.Curve.Affine.t array Abc.t Matrix_evals.t t
+        | App_state : statement t
     end in
     (module R)
 end

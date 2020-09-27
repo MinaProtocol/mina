@@ -8,6 +8,20 @@ open Network_peer
 
 exception No_initial_peers
 
+type Structured_log_events.t +=
+  | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
+  | Snark_work_received of
+      { work: Snark_pool.Resource_pool.Diff.compact
+      ; sender: Envelope.Sender.t }
+  | Transactions_received of
+      { txns: Transaction_pool.Resource_pool.Diff.t
+      ; sender: Envelope.Sender.t }
+  | Gossip_new_state of {state_hash: State_hash.t}
+  | Gossip_transaction_pool_diff of
+      { txns: Transaction_pool.Resource_pool.Diff.t }
+  | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
+  [@@deriving register_event]
+
 val refused_answer_query_string : string
 
 module Rpcs : sig
@@ -85,16 +99,6 @@ module Rpcs : sig
             ; k_block_hashes: State_hash.Stable.V1.t list }
         end
       end]
-
-      type t = Stable.Latest.t =
-        { node_ip_addr: Unix.Inet_addr.t
-        ; node_peer_id: Peer.Id.t
-        ; peers: Network_peer.Peer.t list
-        ; block_producers: Signature_lib.Public_key.Compressed.t list
-        ; protocol_state_hash: State_hash.t
-        ; ban_statuses:
-            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-        ; k_block_hashes: State_hash.t list }
     end
 
     type query = unit [@@deriving sexp, to_yojson]
@@ -249,8 +253,6 @@ val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
-
-val net2 : t -> Coda_net2.net option
 
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t

@@ -24,7 +24,7 @@ let max_rate secs =
 
 module type Input_intf = sig
   module Peer_id : sig
-    type t [@@deriving sexp, yojson]
+    type t [@@deriving sexp, to_yojson]
   end
 
   module Now : sig
@@ -42,37 +42,59 @@ module type Input_intf = sig
      and type config := Config.t
 
   module Action : Action_intf
+
+  type Structured_log_events.t +=
+    | Peer_banned of {peer_id: Peer_id.t; expiration: Time.t; action: string}
+    [@@deriving register_event]
 end
 
-module Make0 (Inputs : Input_intf) = struct
-  open Inputs
+module Peer_id = struct
+  include Unix.Inet_addr.Blocking_sexp
 
-  let ban_message =
-    if tmp_bans_are_disabled then
-      "Would ban peer $peer_id until $expiration due to $action, refusing due \
-       to trust system being disabled"
-    else "Banning peer $peer_id until $expiration due to $action"
+  let to_yojson x = `String (Unix.Inet_addr.to_string x)
 
+  let of_yojson = function
+    | `String addr ->
+        Result.return (Unix.Inet_addr.of_string addr)
+    | _ ->
+        Error "Trust_system.Peer_id.of_yojson"
+end
+
+module Time_with_json = struct
+  include Time
+
+  let to_yojson expiration =
+    `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
+
+  let of_yojson = function
+    | `String time ->
+        Ok
+          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc)
+             time)
+    | _ ->
+        Error "Trust_system.Peer_trust: Could not parse time"
+end
+
+let ban_message =
+  if tmp_bans_are_disabled then
+    "Would ban peer $peer_id until $expiration due to $action, refusing due \
+     to trust system being disabled"
+  else "Banning peer $peer_id until $expiration due to $action"
+
+module Log_events = struct
   (* TODO: Split per action. *)
   type Structured_log_events.t +=
     | Peer_banned of
         { peer_id: Peer_id.t
-        ; expiration:
-            (Time.t[@to_yojson
-                     fun expiration ->
-                       `String
-                         (Time.to_string_abs expiration ~zone:Time.Zone.utc)]
-                   [@of_yojson
-                     function
-                     | `String time ->
-                         Ok
-                           (Time.of_string_gen
-                              ~if_no_timezone:(`Use_this_one Time.Zone.utc)
-                              time)
-                     | _ ->
-                         Error "Trust_system.Peer_trust: Could not parse time"])
+        ; expiration: Time_with_json.t
         ; action: string }
     [@@deriving register_event {msg= ban_message}]
+end
+
+include Log_events
+
+module Make0 (Inputs : Input_intf) = struct
+  open Inputs
 
   type t =
     { db: Db.t option
@@ -159,7 +181,7 @@ module Make0 (Inputs : Input_intf) = struct
         if simple_new.trust >. simple_old.trust then "Increasing"
         else "Decreasing"
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
         "%s trust for peer $peer_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
@@ -167,8 +189,7 @@ module Make0 (Inputs : Input_intf) = struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.Str.faulty_peer_without_punishment logger ~module_:__MODULE__
-            ~location:__LOC__ ~metadata:action_metadata
+          [%str_log faulty_peer_without_punishment] ~metadata:action_metadata
             (Peer_banned {peer_id= peer; expiration; action= action_fmt}) ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
@@ -235,6 +256,13 @@ let%test_module "peer_trust" =
       module Config = Unit
       module Db = Db
       module Action = Action
+
+      type Structured_log_events.t +=
+        | Peer_banned of
+            { peer_id: Peer_id.t
+            ; expiration: Time_with_json.t
+            ; action: string }
+        [@@deriving register_event {msg= "Peer banned"}]
     end)
 
     (* We want to check the output of the pipe in these tests, but it's
@@ -408,17 +436,7 @@ let%test_module "peer_trust" =
   end )
 
 module Make (Action : Action_intf) = Make0 (struct
-  module Peer_id = struct
-    include Unix.Inet_addr.Blocking_sexp
-
-    let to_yojson x = `String (Unix.Inet_addr.to_string x)
-
-    let of_yojson = function
-      | `String addr ->
-          Result.return (Unix.Inet_addr.of_string addr)
-      | _ ->
-          Error "Trust_system.Peer_id.of_yojson"
-  end
+  module Peer_id = Peer_id
 
   module Now = struct
     let now = Time.now
@@ -428,4 +446,5 @@ module Make (Action : Action_intf) = Make0 (struct
   module Db =
     Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record.Stable.V1)
   module Action = Action
+  include Log_events
 end)

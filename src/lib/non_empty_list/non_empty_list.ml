@@ -8,9 +8,6 @@ module Stable = struct
   end
 end]
 
-(* bin_io omitted intentionally *)
-type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
-
 let init x xs = (x, xs)
 
 let singleton x = (x, [])

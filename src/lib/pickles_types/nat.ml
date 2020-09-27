@@ -110,6 +110,11 @@ module Add = struct
         end in
         (module Sn)
 
+  let n : type n. (module Intf with type n = n) -> n nat =
+   fun (module N) ->
+    let T = N.eq in
+    N.n
+
   module type Intf_transparent = sig
     type _ plus_n
 

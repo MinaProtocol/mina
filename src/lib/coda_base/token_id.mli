@@ -21,13 +21,15 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val to_string : t -> string
 
 val of_string : string -> t
+
+val to_uint64 : t -> Unsigned.UInt64.t
+
+val of_uint64 : Unsigned.UInt64.t -> t
 
 (** The default token ID, associated with the native coda token.
 
@@ -50,6 +52,11 @@ val gen : t Quickcheck.Generator.t
     [default].
 *)
 val gen_non_default : t Quickcheck.Generator.t
+
+(** Generates a random token ID. This may be any value, including [default] or
+    [invalid].
+*)
+val gen_with_invalid : t Quickcheck.Generator.t
 
 val unpack : t -> bool list
 
@@ -80,6 +87,18 @@ module Checked : sig
   module Assert : sig
     val equal : var -> var -> (unit, _) Checked.t
   end
+
+  type t = var
+
+  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 end
 
 [%%endif]
