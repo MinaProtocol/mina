@@ -12,6 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
+    href: string,
   };
 
   type t = {
@@ -201,7 +202,10 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
@@ -232,12 +236,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~row: Row.t) => {
+let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
     <Wrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
        }}
     </Wrapped>
   </div>;

@@ -76,6 +76,10 @@ module Styles = {
     ]);
 };
 
+/**
+ * This component takes in three different background images, as per Mina's design.
+ */
+
 [@react.component]
 let make =
     (~title, ~header, ~copy, ~background: Theme.backgroundImage, ~children=?) => {

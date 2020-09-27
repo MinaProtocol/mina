@@ -298,6 +298,9 @@ module Type = {
   ];
   let sectionSubhead = style(sectionSubhead_);
 
+  let subheadMono =
+    merge([sectionSubhead, style([Typeface.monumentGroteskMono])]);
+
   let paragraph =
     style([
       Typeface.monumentGrotesk,
