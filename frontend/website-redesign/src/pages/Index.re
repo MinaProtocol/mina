@@ -64,7 +64,7 @@ let make = () => {
           title: "It's Time to Own Our Future",
           description: "Why did we create the world's lightest blockchain? To rebalance the scales and give anyone with a smartphone the power to participate, build, exchange and thrive.",
           textColor: Theme.Colors.digitalBlack,
-          image: "/static/img/NodeOpsTestnet.png",
+          image: "/static/img/homepage-cta.jpg",
           background: Image("/static/img/MinaSpectrumPrimary3.png"),
           contentBackground: Color(Theme.Colors.white),
           button: {
@@ -72,9 +72,11 @@ let make = () => {
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
+            href: "/about",
           },
         }
       />
+      <BlogModule />
     </div>
   </Page>;
 };

@@ -41,6 +41,8 @@ module type External_transition_common_intf = sig
 
   val payments : t -> Signed_command.t With_status.t list
 
+  val global_slot : t -> Unsigned.uint32
+
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
   val current_protocol_version : t -> Protocol_version.t

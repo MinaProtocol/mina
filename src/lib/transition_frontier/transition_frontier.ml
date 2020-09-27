@@ -29,6 +29,9 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
@@ -271,8 +274,7 @@ let add_breadcrumb_exn t breadcrumb =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
-        )
+            (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
@@ -302,6 +304,17 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
+  let user_cmds = Breadcrumb.commands breadcrumb in
+  if not (List.is_empty user_cmds) then
+    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+       command or snapp command
+    *)
+    [%str_log' trace t.logger] Added_breadcrumb_user_commands
+      ~metadata:
+        [ ( "user_commands"
+          , `List
+              (List.map user_cmds
+                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

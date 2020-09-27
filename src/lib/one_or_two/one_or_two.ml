@@ -29,6 +29,12 @@ let length = function `One _ -> 1 | `Two _ -> 2
 
 let to_list = function `One a -> [a] | `Two (a, b) -> [a; b]
 
+let to_numbered_list = function
+  | `One a ->
+      [(0, a)]
+  | `Two (a, b) ->
+      [(0, a); (1, b)]
+
 let group_sequence : 'a Sequence.t -> 'a t Sequence.t =
  fun to_group ->
   Sequence.unfold ~init:to_group ~f:(fun acc ->

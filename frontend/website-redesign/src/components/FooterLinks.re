@@ -3,9 +3,7 @@ module Styles = {
   let linksGrid =
     style([
       display(`grid),
-      gridTemplateColumns([
-        `repeat((`num(2), `minmax((`rem(11.), `rem(11.5))))),
-      ]),
+      gridTemplateColumns([`repeat((`num(2), `fr(1.)))]),
       gridColumnGap(`rem(0.5)),
       gridRowGap(`rem(3.1)),
       marginTop(`rem(4.)),
@@ -22,7 +20,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [marginTop(`rem(0.)), width(`rem(36.5)), height(`rem(30.))],
+        [marginTop(`rem(0.)), height(`rem(30.))],
       ),
     ]);
   let linksGroup =

@@ -12,6 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
+    href: string,
   };
 
   type t = {
@@ -44,6 +45,7 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`rem(21.)),
+        unsafe("height", "fit-content"),
         margin2(~h=`rem(5.), ~v=`zero),
         display(`flex),
         flexDirection(`column),
@@ -68,6 +70,10 @@ module SingleRow = {
         flexDirection(`column),
         alignItems(`flexStart),
         selector("h2,p", [color(textColor)]),
+        selector(
+          "p",
+          [Theme.Typeface.monumentGroteskMono, letterSpacing(`px(-1))],
+        ),
       ]);
     };
 
@@ -90,8 +96,12 @@ module SingleRow = {
         height(`percent(60.)),
         maxWidth(`rem(53.)),
         media(
-          Theme.MediaQuery.notMobile,
+          Theme.MediaQuery.tablet,
           [height(`percent(110.)), width(`percent(80.))],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [height(`percent(110.)), width(`percent(100.))],
         ),
       ]);
   };
@@ -115,7 +125,7 @@ module SingleRow = {
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [right(`zero), height(`auto), width(`rem(29.))],
+              [right(`zero), width(`rem(29.))],
             ),
           ]),
         ]);
@@ -169,7 +179,7 @@ module SingleRow = {
             top(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), height(`auto), width(`rem(32.))],
+              [left(`zero), width(`rem(32.))],
             ),
           ]),
         ]);
@@ -192,7 +202,10 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
@@ -223,12 +236,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~row: Row.t) => {
+let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
     <Wrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
        }}
     </Wrapped>
   </div>;

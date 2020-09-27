@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries logger core pipe_lib async async_extra)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving_yojson bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving_yojson bisect_ppx -- --conditional))
  (synopsis "Distributed DSL"))
