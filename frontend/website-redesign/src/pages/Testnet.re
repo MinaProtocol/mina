@@ -120,6 +120,7 @@ let make = () => {
       <FeaturedSingleRow
         row={
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
+          copySize: `Small,
           title: "Testnet Challenges",
           description: "Learn how to operate the protocol, while contributing to Coda's network resilience.",
           textColor: Theme.Colors.white,
