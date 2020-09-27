@@ -32,8 +32,6 @@ let make = (~content) => {
         "components": {
           a: DocsComponents.A.make,
           p: DocsComponents.P.make,
-          code: DocsComponents.Code.make,
-          pre: DocsComponents.Pre.make,
           h2: DocsComponents.H2.make,
           h3: DocsComponents.H3.make,
           h4: DocsComponents.H4.make,
