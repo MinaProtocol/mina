@@ -1,6 +1,5 @@
 module Styles = {
   open Css;
-
   let sectionBackgroundImage = backgroundImg =>
     style([
       height(`percent(100.)),
@@ -26,14 +25,12 @@ module Section = {
           Theme.MediaQuery.tablet,
           [
             reverse ? flexDirection(`rowReverse) : flexDirection(`row),
-            marginTop(`rem(6.)),
           ],
         ),
         media(
           Theme.MediaQuery.desktop,
           [
             reverse ? flexDirection(`rowReverse) : flexDirection(`row),
-            marginTop(`rem(12.5)),
           ],
         ),
       ]);
@@ -65,8 +62,8 @@ module Section = {
         maxWidth(`rem(23.)),
         height(`auto),
         media(
-          Theme.MediaQuery.tablet,
-          [maxWidth(`rem(29.)), marginTop(`rem(2.))],
+          Theme.MediaQuery.desktop,
+          [maxWidth(`rem(35.)), marginTop(`rem(2.))],
         ),
       ]);
   };
