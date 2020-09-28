@@ -184,9 +184,32 @@ module FoundingMembersSection = {
           media(Theme.MediaQuery.tablet, [width(`rem(41.))]),
         ]),
       ]);
+    //member profile css
+    let profileRow =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        justifyContent(`center),
+        margin(`auto),
+        selector(
+          "> :last-child",
+          [marginBottom(`zero), marginRight(`zero)],
+        ),
+        media(
+          Theme.MediaQuery.tablet,
+          [justifyContent(`flexStart), flexDirection(`row)],
+        ),
+      ]);
+
+    let profile =
+      style([
+        marginRight(`rem(2.)),
+        marginBottom(`rem(5.)),
+        media(Theme.MediaQuery.tablet, [marginBottom(`zero)]),
+      ]);
   };
   [@react.component]
-  let make = () => {
+  let make = (~profiles) => {
     <div className=Styles.container>
       <Wrapped>
         <h2 className=Styles.h2>
@@ -197,6 +220,28 @@ module FoundingMembersSection = {
              "Get to know some of the founding members working to strengthen the protocol and build our community.",
            )}
         </p>
+        <Spacer height=6. />
+        <div className=Styles.profileRow>
+          {React.array(
+             Array.map(
+               (p: ContentType.GenesisProfile.t) => {
+                 <div className=Styles.profile>
+                   <GenesisMemberProfile
+                     key={p.name}
+                     name={p.name}
+                     photo={p.profilePhoto.fields.file.url}
+                     quote={"\"" ++ p.quote ++ "\""}
+                     location={p.memberLocation}
+                     twitter={p.twitter}
+                     github={p.github}
+                     blogPost={p.blogPost.fields.slug}
+                   />
+                 </div>
+               },
+               profiles,
+             ),
+           )}
+        </div>
       </Wrapped>
     </div>;
   };
@@ -277,7 +322,7 @@ module CultureFooter = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~profiles) => {
   <Page title="Genesis Page">
     <div className=Nav.Styles.spacer />
     <Hero
@@ -329,7 +374,7 @@ let make = () => {
       </Wrapped>
     </div>
     <div className=Styles.genesisSection>
-      <FoundingMembersSection />
+      <FoundingMembersSection profiles />
       <WorldMapSection />
       <Spacer height=4. />
       <div className=Styles.leaderboardBackground>
@@ -365,3 +410,23 @@ let make = () => {
     </div>
   </Page>;
 };
+
+Next.injectGetInitialProps(make, _ => {
+  Contentful.getEntries(
+    Lazy.force(Contentful.client),
+    {
+      "include": 1,
+      "content_type": ContentType.GenesisProfile.id,
+      "order": "-fields.publishDate",
+      "limit": 3,
+    },
+  )
+  |> Promise.map((entries: ContentType.GenesisProfile.entries) => {
+       let profiles =
+         Array.map(
+           (e: ContentType.GenesisProfile.entry) => e.fields,
+           entries.items,
+         );
+       {"profiles": profiles};
+     })
+});
