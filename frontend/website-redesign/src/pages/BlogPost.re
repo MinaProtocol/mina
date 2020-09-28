@@ -1,27 +1,35 @@
 module Style = {
   open Css;
-  let title =
-    style([
-      color(Theme.Colors.black),
-      fontSize(`rem(3.)),
-      letterSpacing(`rem(-0.01)),
-      fontWeight(`bold),
-      textDecoration(`none),
-      Theme.Typeface.ibmplexsans,
-    ]);
 
   let author = Blog.Style.author;
   let subtitle = Blog.Style.subtitle;
   let date = Blog.Style.date;
 
-  let wrapper =
-    style([
-      padding2(~v=`rem(1.), ~h=`rem(1.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [maxWidth(`rem(48.)), marginLeft(`auto), marginRight(`auto)],
-      ),
-    ]);
+  let marginX = x => [marginLeft(x), marginRight(x)];
+  let basicContainer =
+    style(
+      marginX(`rem(1.25))
+      @ [
+        marginTop(`rem(4.2)),
+        marginBottom(`rem(1.9)),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            marginBottom(`rem(6.5)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(2.5)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            marginBottom(`rem(8.)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(9.5)),
+          ],
+        ),
+      ],
+    );
 
   let mediaMedium = media("screen and (min-width:30em)");
   let mediaLarge = media("screen and (min-width:60em)");
@@ -34,46 +42,8 @@ module Style = {
   let blogContent =
     style([
       position(`relative),
-      selector("p", [lineHeight(`abs(1.5))]),
-      selector(
-        "h2",
-        [
-          Theme.Typeface.monumentGrotesk,
-          fontSize(`rem(1.125)),
-          letterSpacing(`em(0.1666)),
-          textTransform(`uppercase),
-          marginBottom(`rem(1.75)),
-          marginTop(`rem(1.75)),
-          lineHeight(`abs(1.25)),
-        ],
-      ),
-      selector("img", [width(`percent(100.))]),
-      selector(
-        "hr",
-        [
-          backgroundImage(
-            linearGradient(
-              `deg(90.),
-              [
-                (`percent(25.), `rgb((27, 104, 191))),
-                (`percent(0.), `rgba((255, 255, 255, 0.))),
-              ],
-            ),
-          ),
-          backgroundSize(`size((`rem(0.25), `rem(0.125)))),
-          backgroundRepeat(`repeatX),
-          width(`percent(100.)),
-          height(`rem(0.125)),
-          border(`zero, `none, white),
-          marginTop(`rem(2.)),
-          marginBottom(`rem(2.)),
-        ],
-      ),
-      color(Theme.Colors.black),
-      Theme.Typeface.ibmplexsans,
       /* selector(".side-footnote-container", [height(`zero)]), */
       selector(".footnotes", [mediaLarge([display(`none)])]),
-      selector("a", []),
       selector("a.footnote-ref", [fontSize(`rem(0.5))]),
       selector(
         ".side-footnote",
@@ -118,6 +88,8 @@ module Style = {
         selector(".mobile-only, .not-large", [display(`none)]),
       ]),
     ]);
+
+  let container = merge([basicContainer, blogContent]);
 };
 
 [@react.component]
@@ -138,23 +110,23 @@ let make = (~post: option(ContentType.BlogPost.t)) => {
     // Manually set the canonical route to remove .html
     <Page title description=snippet route={"/blog/" ++ slug}>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
-      <div className=Style.wrapper>
-        <div className=Style.title id="title"> {React.string(title)} </div>
-        {ReactExt.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
-           <div className=Style.subtitle id="subtitle">
-             {React.string(s)}
-           </div>
-         )}
-        <Spacer height=2.0 />
-        <div className=Style.author id="author">
-          {React.string("by " ++ author)}
-        </div>
-        <div className=Style.date id="date"> {React.string(date)} </div>
-        <Spacer height=2.0 />
-        <div className=Style.blogContent id="content">
-          <Markdown content />
-        </div>
-      </div>
+      <Hero
+        metadata={
+          Some(
+            CategoryDateSourceText.{category: "Post", date, source: author},
+          )
+        }
+        title="Blog"
+        header=title
+        copy={Js.Undefined.toOption(subtitle)}
+        background=Theme.{
+          desktop: "/static/img/BlogDetailImage.png",
+          tablet: "/static/img/BlogDetailImage.png",
+          mobile: "/static/img/BlogDetailImage.png",
+          // TODO: Get non-desktop versions of this image
+        }
+      />
+      <div className=Style.container> <Markdown content /> </div>
     </Page>
   };
 };

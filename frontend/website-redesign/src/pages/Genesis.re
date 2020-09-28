@@ -228,10 +228,16 @@ let make = () => {
     <Hero
       title="Community"
       header="Genesis Program"
-      copy="We're looking for community members to join the Genesis Token Grant Program and form the backbone of Mina's robust decentralized network."
-      backgroundSmall="/static/img/GenesisSmall.jpg"
-      backgroundMedium="/static/img/GenesisMedium.jpg"
-      backgroundLarge="/static/img/GenesisLarge.jpg">
+      copy={
+        Some(
+          "We're looking for community members to join the Genesis Token Grant Program and form the backbone of Mina's robust decentralized network.",
+        )
+      }
+      background=Theme.{
+        mobile: "/static/img/GenesisSmall.jpg",
+        tablet: "/static/img/GenesisMedium.jpg",
+        desktop: "/static/img/GenesisLarge.jpg",
+      }>
       <Spacer height=2. />
       <Button bgColor=Theme.Colors.black>
         {React.string("Apply Now")}
@@ -243,6 +249,7 @@ let make = () => {
         row={
           FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
           title: "Become a Genesis Member",
+          copySize: `Small,
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
