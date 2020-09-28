@@ -32,12 +32,12 @@ let make = () => {
       kind=ButtonBar.GetStarted
       backgroundImg="/static/img/ButtonBarBackground.png"
     />
-    <AlternatingSections
+    <AlternatingRowsButton
       backgroundImg="/static/img/MinaSimplePattern1.png"
       sections={
-        AlternatingSections.Section.FeaturedRow([|
+        AlternatingRowsButton.Section.FeaturedRow([|
           {
-            AlternatingSections.Section.FeaturedRow.title: "Run a Node",
+            AlternatingRowsButton.Section.FeaturedRow.title: "Run a Node",
             description: "Other protocols are so heavy they require intermediaries to run nodes, recreating the same old power dynamics. But Mina is light, so anyone can connect peer-to-peer and sync and verify the chain in seconds. Built on a consistent-sized cryptographic proof, the blockchain will stay accessible - even as it scales to millions of users.",
             linkCopy: "Explore the Tech",
             linkUrl: "/",
