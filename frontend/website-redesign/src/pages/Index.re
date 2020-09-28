@@ -62,6 +62,7 @@ let make = () => {
         row={
           FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
           title: "It's Time to Own Our Future",
+          copySize: `Small,
           description: "Why did we create the world's lightest blockchain? To rebalance the scales and give anyone with a smartphone the power to participate, build, exchange and thrive.",
           textColor: Theme.Colors.digitalBlack,
           image: "/static/img/homepage-cta.jpg",
@@ -72,6 +73,7 @@ let make = () => {
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
+            href: "/about",
           },
         }
       />

@@ -189,7 +189,7 @@ module Subfooter = {
           media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
         ]),
       ]);
-  
+
     let linksContainer =
       style([
         display(`flex),

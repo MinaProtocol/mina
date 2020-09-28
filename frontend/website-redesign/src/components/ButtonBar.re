@@ -9,6 +9,7 @@ module Card = {
     open Css;
     let container =
       style([
+        maxHeight(`rem(5.)), // bandaid for a bug on Safari
         display(`flex),
         justifyContent(`spaceBetween),
         flexDirection(`column),

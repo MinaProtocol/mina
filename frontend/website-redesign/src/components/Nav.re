@@ -33,6 +33,13 @@ module Styles = {
       media(Theme.MediaQuery.desktop, [height(`rem(7.))]),
     ]);
 
+  let spacerLarge =
+    style([
+      height(`rem(6.25)),
+      media(Theme.MediaQuery.tablet, [height(`rem(9.5))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(14.))]),
+    ]);
+
   let logo = style([cursor(`pointer), height(`rem(2.25))]);
 
   let nav =

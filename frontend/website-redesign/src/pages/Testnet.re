@@ -80,7 +80,11 @@ let make = () => {
       <Hero
         title="Testnet"
         header="Secure the Network"
-        copy={j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j}
+        copy={
+          Some(
+            {j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j},
+          )
+        }
         background={
           Theme.desktop: "/static/img/TestnetBackground.png",
           tablet: "/static/img/TestnetBackground.png",
@@ -120,6 +124,7 @@ let make = () => {
       <FeaturedSingleRow
         row={
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
+          copySize: `Small,
           title: "Testnet Challenges",
           description: "Learn how to operate the protocol, while contributing to Coda's network resilience.",
           textColor: Theme.Colors.white,
@@ -132,6 +137,7 @@ let make = () => {
             buttonColor: Theme.Colors.mint,
             buttonTextColor: Theme.Colors.digitalBlack,
             dark: true,
+            href: "#",
           },
         }
       />
