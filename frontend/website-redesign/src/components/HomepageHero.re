@@ -146,7 +146,7 @@ let make = (~backgroundImg) => {
             <span>
               <p className=Styles.heroText>
                 {React.string(
-                   "By design, the entire Coda blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
+                   "By design, the entire Mina blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
                  )}
               </p>
             </span>

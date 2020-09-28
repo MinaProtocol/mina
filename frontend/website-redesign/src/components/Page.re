@@ -52,7 +52,7 @@ let make =
       </style>
     </Next.Head>
     <AnnouncementBanner>
-      {React.string("Mainnet is live!")}
+      {React.string("Mina is Growing Fast.")}
     </AnnouncementBanner>
     <Nav />
     <main> children </main>
