@@ -18,6 +18,7 @@
     "@next/mdx": "^9.1.5",
     "bs-css": "^9.0.1",
     "bs-fetch": "^0.5.0",
+    "bs-webapi": "^0.19.1",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
     "contentful": "^7.10.0",
     "emotion-server": "^10.0.17",

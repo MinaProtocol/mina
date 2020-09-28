@@ -43,8 +43,8 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`center),
       marginTop(`rem(13.)),
-      media("(min-width:65rem)", [flexDirection(`row)]),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
+      media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
 
   let heroHeadline =

@@ -18,6 +18,7 @@ module Style = {
       justifyContent(`center),
       margin(`auto),
       marginTop(`rem(2.)),
+      marginBottom(`rem(6.)),
       padding2(~v=`zero, ~h=`rem(2.)),
       media(Theme.MediaQuery.desktop, [display(`flex)]),
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
@@ -30,7 +31,7 @@ module Style = {
       media(Theme.MediaQuery.tablet, [position(`relative), float(`right)]),
       display(`flex),
       alignItems(`center),
-      marginTop(`rem(3.25)),
+      marginTop(`rem(1.5)),
       marginBottom(`rem(0.5)),
       hover([color(Theme.Colors.black)]),
     ]);

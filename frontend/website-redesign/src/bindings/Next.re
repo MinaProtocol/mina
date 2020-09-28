@@ -20,14 +20,23 @@ module Head = {
 };
 
 module Router = {
+  type events;
   type t('a) = {
     query: Js.Dict.t('a),
     route: string,
     asPath: string,
+    events: events,
   };
 
   [@bs.module "next/router"] [@bs.val]
   external useRouter: unit => t('a) = "useRouter";
+
+  module Events = {
+    type handler = string => unit;
+    [@bs.send] external on: (events, string, handler) => unit = "on";
+    [@bs.send] external off: (events, string, handler) => unit = "off";
+  };
+
 };
 
 module Config = {
