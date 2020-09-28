@@ -3,15 +3,25 @@ module Styles = {
 
   let section =
     style([
-      width(`rem(71.)),
+      width(`percent(100.)),
+      maxWidth(`rem(71.)),
       margin2(~v=`auto, ~h=`auto),
       paddingTop(`rem(3.)),
-      paddingLeft(`rem(16.)),
       backgroundPosition(`rem(-6.5), `rem(-2.)),
       gridTemplateColumns([`em(14.), `auto]),
       selector("> aside", [gridColumnStart(1)]),
       selector("> :not(aside)", [gridColumnStart(2)]),
-      selector("img", [width(`percent(100.))]),
+      selector("> img", [width(`percent(100.))]),
+      media(Theme.MediaQuery.desktop, [paddingLeft(`rem(16.))]),
+    ]);
+
+  let sectionContainer = bg =>
+    style([
+      background(`url(bg)),
+      unsafe("background-size", "100% auto"),
+      backgroundRepeat(`noRepeat),
+      padding(`rem(2.)),
+      media(Theme.MediaQuery.desktop, [padding(`zero)]),
     ]);
 
   let sideNav = sticky =>
@@ -35,15 +45,32 @@ module Styles = {
   let projectContainer =
     style([
       display(`flex),
+      flexDirection(`column),
       alignItems(`center),
-      selector("img", [width(`rem(23.)), marginRight(`rem(2.))]),
+      selector("img", [width(`percent(100.)), marginBottom(`rem(2.))]),
+      media(
+        Theme.MediaQuery.desktop,
+        [
+          flexDirection(`row),
+          selector("img", [width(`rem(23.)), marginRight(`rem(2.))]),
+        ],
+      ),
     ]);
 
   let possibilities =
     style([
       display(`grid),
-      gridTemplateColumns([`fr(1.), `fr(1.), `fr(1.)]),
+      gridTemplateColumns([`fr(1.)]),
       gridGap(`rem(1.)),
+      selector("img", [width(`percent(100.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [gridTemplateColumns([`fr(1.), `fr(1.)])],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [gridTemplateColumns([`fr(1.), `fr(1.), `fr(1.)])],
+      ),
     ]);
 
   let divider =
@@ -110,39 +137,44 @@ module TechSideNav = {
 
 module HowMinaWorks = {
   [@react.component]
-  let make = () => {
-    <Section
-      title="How Mina Works"
-      subhead={js|Mina is a layer one protocol designed to deliver on the original promise of blockchain — true decentralization, scale and security.|js}
-      slug="how-mina-works">
-      <img
-        src="/static/img/how-mina-works-mirrors.jpg"
-        height="563"
-        alt="A series of mirrors reflecting each other ad infinitum."
-      />
-      <Spacer height=4. />
-      <p className=Theme.Type.paragraph>
-        <b>
+  let make = () =>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.png")}>
+      <Spacer height=6.5 />
+      <hr className=Styles.divider />
+      <Section
+        title="How Mina Works"
+        subhead={js|Mina is a layer one protocol designed to deliver on the original promise of blockchain — true decentralization, scale and security.|js}
+        slug="how-mina-works">
+        <img
+          src="/static/img/how-mina-works-mirrors.jpg"
+          alt="A series of mirrors reflecting each other ad infinitum."
+        />
+        <Spacer height=4. />
+        <p className=Theme.Type.paragraph>
+          <b>
+            {React.string(
+               "In theory, blockchains are designed to be held accountable by its users.",
+             )}
+          </b>
           {React.string(
-             "In theory, blockchains are designed to be held accountable by its users.",
-           )}
-        </b>
-        {React.string(
-           {js|
+             {js|
             When anyone can enforce the rules by validating an irrevocable public
             ledger — power remains in the hands of the many, not the few. This
             decentralized structure is what allows the network to conduct trustless
             transactions.
           |js},
-         )}
-      </p>
-      <Spacer height=1.5 />
-      <p className=Theme.Type.paragraph>
-        <b>
-          {React.string({js|But in practice, this hasn’t been the case.|js})}
-        </b>
-        {React.string(
-           {js|
+           )}
+        </p>
+        <Spacer height=1.5 />
+        <p className=Theme.Type.paragraph>
+          <b>
+            {React.string(
+               {js|But in practice, this hasn’t been the case.|js},
+             )}
+          </b>
+          {React.string(
+             {js|
              With legacy blockchains like Bitcoin and Ethereum, when a new participant
              joins, they have to check every transaction since the beginning of the
              network to verify correctness — which amounts to hundreds of gigabytes of
@@ -152,20 +184,20 @@ module HowMinaWorks = {
              — causing decentralization to suffer, power dynamics to shift, and the
              network to become more vulnerable to censorship.
           |js},
-         )}
-      </p>
-      <Spacer height=1.5 />
-      <p className=Theme.Type.paragraph>
-        <b>
-          {React.string(
-             {js|
+           )}
+        </p>
+        <Spacer height=1.5 />
+        <p className=Theme.Type.paragraph>
+          <b>
+            {React.string(
+               {js|
                Mina offers an elegant solution: replacing the blockchain with an
                easily verifiable, consistent-sized cryptographic proof.
              |js},
-           )}
-        </b>
-        {React.string(
-           {js|
+             )}
+          </b>
+          {React.string(
+             {js|
              Mina dramatically reduces the amount of data each user needs to download.
              Instead of verifying the entire chain from the beginning of time,
              participants fully verify the network and transactions using recursive
@@ -174,20 +206,18 @@ module HowMinaWorks = {
              stays accessible and can be trustlessly accessed from any device — even
              as it scales to millions of users and accumulates years of transaction data.
           |js},
-         )}
-      </p>
-      <Spacer height=4. />
-      // TODO replace with final animation
-      <img
-        src="/static/img/how-mina-works-mirrors.jpg"
-        height="563"
-        alt="A series of mirrors reflecting each other ad infinitum."
-      />
-      <Spacer height=4. />
-      <p className=Theme.Type.paragraph>
-        <b> {React.string("But how do zk-SNARKs work?")} </b>
-        {React.string(
-           {js|
+           )}
+        </p>
+        <Spacer height=4. />
+        <img
+          src="/static/img/mina-cubes.gif"
+          alt="A series of mirrors reflecting each other ad infinitum."
+        />
+        <Spacer height=4. />
+        <p className=Theme.Type.paragraph>
+          <b> {React.string("But how do zk-SNARKs work?")} </b>
+          {React.string(
+             {js|
             They capture the state of the entire blockchain as a lightweight snapshot
             and send that around — instead of the chain itself. It’s like sending your
             friend a postcard of an elephant, instead of a massive live animal. When
@@ -197,37 +227,37 @@ module HowMinaWorks = {
             and so on and so on. Rather amazingly, while it can contain proof of an
             infinite amount of information, the snapshot always remains the same size.
           |js},
-         )}
-      </p>
-      <Spacer height=1.5 />
-      <p className=Theme.Type.paragraph>
-        <b>
-          {React.string(
-             {js|
+           )}
+        </p>
+        <Spacer height=1.5 />
+        <p className=Theme.Type.paragraph>
+          <b>
+            {React.string(
+               {js|
                Coming full circle, the world’s lightest blockchain empowers inclusive consensus.
              |js},
-           )}
-        </b>
-        {React.string(
-           {js|
+             )}
+          </b>
+          {React.string(
+             {js|
              Our modified Ouroboros proof-of-stake protocol maximizes inclusivity in
              consensus. On Mina, all participants act as full nodes and anyone can take
              part in consensus, secure the blockchain and hold Mina accountable.
           |js},
-         )}
-      </p>
-      <Spacer height=1.5 />
-      <p className=Theme.Type.paragraph>
-        <b>
-          {React.string(
-             {js|
+           )}
+        </p>
+        <Spacer height=1.5 />
+        <p className=Theme.Type.paragraph>
+          <b>
+            {React.string(
+               {js|
                And that’s how Mina will deliver true decentralization, scale and security.
              |js},
-           )}
-        </b>
-      </p>
-    </Section>;
-  };
+             )}
+          </b>
+        </p>
+      </Section>
+    </div>;
 };
 
 module Projects = {
@@ -262,7 +292,9 @@ module Projects = {
 
   [@react.component]
   let make = () =>
-    <div className=Styles.projects>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      <Spacer height=5. />
       <Section
         title="Projects & Possibilities"
         subhead={js|Developers are already building powerful applications on Mina — but this is just the beginning.|js}
@@ -306,33 +338,33 @@ module Projects = {
         <div className=Styles.possibilities>
           <Possibility
             title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users' data to a public blockchain."
+            image="/static/img/tech-build-snapps.png"
           />
           <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            title="Power Enterprise Interoperability"
+            description="Use Mina to combine the cost-efficiency and privacy of a private chain with the interoperability of a public chain."
+            image="/static/img/tech-power-interop.png"
           />
           <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            title="Minimize Transaction Fees"
+            description="Power trustless e-commerce and global peer-to-peer transactions without using centralized intermediaries, or paying costly transaction fees."
+            image="/static/img/tech-txn-fees.png"
           />
           <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            title="Power secure & Fair Financial services"
+            description="Ensure lenders only use fair criteria to make decisions and securely verify relevant information without accessing  private user data."
+            image="/static/img/tech-power-fair.png"
           />
           <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            title="Enable private & auditable elections "
+            description="Guarantee fully verifiable and auditable elections, while keeping the process private and  protecting individuals' voting information. "
+            image="/static/img/tech-audit.png"
           />
           <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users’ data to a public blockchain."
-            image="/static/img/AboutHeroTabletBackground.jpg"
+            title="Access Money from Anywhere in the world"
+            description="With a 22kb Mina chain, access peer-to-peer stablecoins and tokens via smartphone and bring hard-earned money anywhere you go."
+            image="/static/img/tech-access.png"
           />
         </div>
       </Section>
@@ -362,46 +394,50 @@ module Incentives = {
 
   [@react.component]
   let make = () =>
-    <Section
-      title="Incentive Structure"
-      subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
-      slug="incentives">
-      <Button width={`rem(15.25)}>
-        {React.string("Economics Whitepaper")}
-        <Icon kind=Icon.ArrowRightSmall />
-      </Button>
-      <Spacer height=4. />
+    <div className={Styles.sectionContainer("")}>
+      <Spacer height=1.5 />
       <hr className=Styles.divider />
-      <Spacer height=2. />
-      <h3 className=Theme.Type.h3> {React.string("Ways to Earn Mina")} </h3>
-      <Spacer height=2. />
-      <p className=Theme.Type.sectionSubhead>
-        {React.string(
-           "Mina is breaking down barriers to participation and unleashing a host of exciting new pathways to earn tokens.",
-         )}
-      </p>
-      <Spacer height=3. />
-      <Incentive
-        title="As a Block Producer"
-        description="Block producers are akin to miners or stakers in other protocols. By staking Mina, they can be selected to produce a block and earn block rewards in the form of coinbase, transaction fees and network fees. Block producers can decide to also be SNARK producers."
-        image="/static/img/tech-block-producer.png"
-        url="/"
-      />
-      <Spacer height=3. />
-      <Incentive
-        title="As a Snark Producer"
-        description="The second type of consensus node operator on Mina, snark producers help compress data in the network by generating SNARK proofs of transactions. They then sell those proofs to block producers in return for a portion of the block rewards."
-        image="/static/img/tech-snark-producer.png"
-        url="/"
-      />
-      <Spacer height=3. />
-      <Incentive
-        title="As a Professional Block Producer"
-        description="Because staking requires nodes to be online, some may choose to delegate their Mina to staking pools. These groups run staking services in exchange for a fee, which is automatically deducted when the delegator gets selected to be a block producer."
-        image="/static/img/tech-pro-delegator.png"
-        url="/"
-      />
-    </Section>;
+      <Section
+        title="Incentive Structure"
+        subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
+        slug="incentives">
+        <Button width={`rem(15.25)}>
+          {React.string("Economics Whitepaper")}
+          <Icon kind=Icon.ArrowRightSmall />
+        </Button>
+        <Spacer height=4. />
+        <hr className=Styles.divider />
+        <Spacer height=2. />
+        <h3 className=Theme.Type.h3> {React.string("Ways to Earn Mina")} </h3>
+        <Spacer height=2. />
+        <p className=Theme.Type.sectionSubhead>
+          {React.string(
+             "Mina is breaking down barriers to participation and unleashing a host of exciting new pathways to earn tokens.",
+           )}
+        </p>
+        <Spacer height=3. />
+        <Incentive
+          title="As a Block Producer"
+          description="Block producers are akin to miners or stakers in other protocols. By staking Mina, they can be selected to produce a block and earn block rewards in the form of coinbase, transaction fees and network fees. Block producers can decide to also be SNARK producers."
+          image="/static/img/tech-block-producer.png"
+          url="/"
+        />
+        <Spacer height=3. />
+        <Incentive
+          title="As a Snark Producer"
+          description="The second type of consensus node operator on Mina, snark producers help compress data in the network by generating SNARK proofs of transactions. They then sell those proofs to block producers in return for a portion of the block rewards."
+          image="/static/img/tech-snark-producer.png"
+          url="/"
+        />
+        <Spacer height=3. />
+        <Incentive
+          title="As a Professional Block Producer"
+          description="Because staking requires nodes to be online, some may choose to delegate their Mina to staking pools. These groups run staking services in exchange for a fee, which is automatically deducted when the delegator gets selected to be a block producer."
+          image="/static/img/tech-pro-delegator.png"
+          url="/"
+        />
+      </Section>
+    </div>;
 };
 
 [@react.component]
@@ -411,23 +447,20 @@ let make = () => {
     <Hero
       background={
         Theme.desktop: "/static/img/tech-hero-desktop.jpg",
-        Theme.tablet: "/static/img/AboutHeroTabletBackground.jpg",
-        Theme.mobile: "/static/img/AboutHeroMobileBackground.jpg",
+        Theme.tablet: "/static/img/tech-hero-tablet.jpg",
+        Theme.mobile: "/static/img/tech-hero-mobile.jpg",
       }
       title="Tech"
       header="An Elegant Solution"
       copy="Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale."
     />
     <TechSideNav />
-    <Spacer height=6.5 />
-    <hr className=Styles.divider />
     <HowMinaWorks />
     <Projects />
-    <Spacer height=1.5 />
-    <hr className=Styles.divider />
     <Incentives />
-    <Spacer height=1.5 />
-    <div className=Styles.projects>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      <Spacer height=1.5 />
       <Section
         title="Mina Milestones and the Road Ahead"
         subhead={js|
@@ -450,8 +483,8 @@ let make = () => {
           that syncs in seconds, we’ll get you up and running in record time.
         |js},
         textColor: `currentColor,
-        image: "/static/img/skateboard.jpg",
-        background: Image("/static/img/skateboard.jpg"),
+        image: "/static/img/tech-skateboard.jpg",
+        background: Image("/static/img/MinaSpectrumPrimary3.png"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
@@ -461,29 +494,28 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
-    <Spacer height=6. />
-    <div className=Styles.section id="knowledge">
-      <h2 className=Theme.Type.h2>
-        {React.string("Knowledge Base")}
-      </h2>
+    <div className=Styles.sectionContainer("")>
+      <Spacer height=6. />
+      <div className=Styles.section id="knowledge">
+        <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
+      </div>
     </div>
     <Spacer height=12. />
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
-        title: "Get Started",
+        title: "Work on the Core Protocol",
         description: {js|
-          We’re passionate about making it as simple as possible to participate
-          in Mina. With clear documentation, a supportive community and a chain
-          that syncs in seconds, we’ll get you up and running in record time.
+          Interested in joining a team of passionate engineers and putting your
+          coding skills to work at the protocol level?
         |js},
         textColor: `currentColor,
-        image: "/static/img/skateboard.jpg",
-        background: Image("/static/img/skateboard.jpg"),
+        image: "/static/img/tech-touch.jpg",
+        background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          buttonText: "Run a Node",
+          buttonText: "Opportunities",
           dark: false,
         },
         contentBackground: Color(Css.white),

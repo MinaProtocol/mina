@@ -3,17 +3,22 @@ module Styles = {
 
   let container =
     style([
-      position(`absolute),
+      position(`sticky),
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
       padding2(~v=`zero, ~h=`rem(1.5)),
       height(`rem(4.25)),
+      marginBottom(`rem(-4.25)),
       width(`percent(100.)),
       zIndex(100),
       media(
         Theme.MediaQuery.tablet,
-        [height(`rem(6.25)), padding2(~v=`zero, ~h=`rem(2.5))],
+        [
+          position(`absolute),
+          height(`rem(6.25)),
+          padding2(~v=`zero, ~h=`rem(2.5)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
