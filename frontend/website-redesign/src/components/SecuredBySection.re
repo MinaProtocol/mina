@@ -32,7 +32,8 @@ module Styles = {
       media(
         Theme.MediaQuery.desktop,
         [
-          width(`rem(90.)),
+          maxWidth(`rem(89.)),
+          margin2(~v=`zero, ~h=`auto),
           padding2(~v=rem(8.9), ~h=`rem(9.5)),
           gridTemplateColumns([`rem(31.5), `rem(29.)]),
           gridTemplateRows([`rem(31.5), `rem(36.)]),
@@ -232,7 +233,7 @@ let make = () => {
           </p>
           <Spacer height=2. />
           <span className=Styles.button>
-            <Button bgColor=Theme.Colors.orange>
+            <Button bgColor=Theme.Colors.orange dark=true href="/docs">
               {React.string("Get Started")}
               <Icon kind=Icon.ArrowRightMedium />
             </Button>

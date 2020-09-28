@@ -49,11 +49,22 @@ module Styles = {
       justifyContent(`spaceBetween),
       color(white),
     ]);
+
   let innerContainer =
     style([
       display(`flex),
       flexDirection(`column),
+      justifyContent(`spaceBetween),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
+    ]);
+
+  let whiteLine =
+    style([
+      border(`px(1), `solid, white),
+      marginTop(`rem(3.0)),
+      width(`percent(100.)),
+      opacity(0.2),
+      marginBottom(`rem(0.)),
     ]);
 };
 
@@ -74,11 +85,19 @@ module SocialIcons = {
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <Icon kind=Icon.Discord size=2. />
-      <Icon kind=Icon.Twitter size=2. />
-      <Icon kind=Icon.Facebook size=2. />
-      <Icon kind=Icon.Telegram size=2. />
-      <Icon kind=Icon.WeChat size=2. />
+      <Next.Link href="https://discord.com/invite/Vexf4ED">
+        <Icon kind=Icon.Discord size=2. />
+      </Next.Link>
+      <Next.Link href="https://twitter.com/minaprotocol">
+        <Icon kind=Icon.Twitter size=2. />
+      </Next.Link>
+      <Next.Link href="https://facebook.com/minaprotocol">
+        <Icon kind=Icon.Facebook size=2. />
+      </Next.Link>
+      <Next.Link href="https://t.me/minaprotocol">
+        <Icon kind=Icon.Telegram size=2. />
+      </Next.Link>
+      <Next.Link href=""> <Icon kind=Icon.WeChat size=2. /> </Next.Link>
     </div>;
   };
 };
@@ -94,16 +113,20 @@ module LeftSide = {
         alignContent(`spaceBetween),
         media(Theme.MediaQuery.desktop, [marginRight(`rem(10.6))]),
       ]);
+
     let emailInputSection =
       style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
+
     let logo =
       style([
         height(`rem(3.1)),
         width(`rem(11.)),
         marginBottom(`rem(4.)),
       ]);
+
     let label =
       merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);
+
     let emailSubtext =
       merge([
         Theme.Type.paragraph,
@@ -116,6 +139,7 @@ module LeftSide = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.leftSide>
@@ -173,6 +197,7 @@ module Subfooter = {
           media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
         ]),
       ]);
+
     let linksContainer =
       style([
         display(`flex),
@@ -183,10 +208,12 @@ module Subfooter = {
             flexDirection(`row),
             justifyContent(`spaceBetween),
             alignContent(`center),
-            width(`rem(36.5)),
+            width(`rem(39.3)),
+            marginRight(`rem(5.25)),
           ],
         ),
       ]);
+
     let copyright =
       merge([
         Theme.Type.paragraphSmall,
@@ -199,6 +226,7 @@ module Subfooter = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.column>
@@ -234,29 +262,11 @@ module Subfooter = {
   };
 };
 
-module WhiteLine = {
-  module Styles = {
-    open Css;
-    let whiteLine =
-      style([
-        border(`px(1), `solid, white),
-        marginTop(`rem(3.0)),
-        width(`percent(100.)),
-        opacity(0.2),
-        marginBottom(`rem(0.)),
-      ]);
-  };
-  [@react.component]
-  let make = () => {
-    <hr className=Styles.whiteLine />;
-  };
-};
-
 [@react.component]
 let make = () => {
-  <div className=Styles.footerContainer>
+  <footer className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
-    <WhiteLine />
+    <hr className=Styles.whiteLine />
     <Subfooter />
     <div className=Styles.backToTopButton>
       <Button
@@ -273,5 +283,5 @@ let make = () => {
         </span>
       </Button>
     </div>
-  </div>;
+  </footer>;
 };
