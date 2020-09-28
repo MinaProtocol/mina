@@ -371,7 +371,7 @@ struct
       (struct
         type t = Boolean.var * Field.t
       end)
-      (Opt_sponge.Make (Impl))
+      (Opt_sponge.Make (Impl) (Wrap_main_inputs.Sponge.Permutation))
 
   let absorb sponge ty t =
     Util.absorb ~absorb_field:(Opt.absorb sponge)

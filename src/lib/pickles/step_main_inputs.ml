@@ -35,7 +35,16 @@ let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
 module Sponge = struct
-  module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
+  module Permutation =
+    Sponge_inputs.Make
+      (Impl)
+      (struct
+        include Tick_field_sponge.Inputs
+
+        let params = Tick_field_sponge.params
+      end)
+
+  module S = Sponge.Make_sponge (Permutation)
 
   include Sponge.Bit_sponge.Make (struct
               type t = Impl.Boolean.var

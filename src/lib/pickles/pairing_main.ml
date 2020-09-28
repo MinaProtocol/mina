@@ -695,7 +695,8 @@ struct
   open Dlog_plonk_types
 
   module Opt_sponge = struct
-    module Underlying = Opt_sponge.Make (Impl)
+    module Underlying =
+      Opt_sponge.Make (Impl) (Step_main_inputs.Sponge.Permutation)
 
     include S.Bit_sponge.Make (struct
                 type t = Boolean.var
