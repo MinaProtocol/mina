@@ -82,7 +82,12 @@ module MorePosts = {
         marginLeft(`rem(-2.)),
       ]);
 
-    let postItem = style([width(`rem(25.)), marginBottom(`rem(3.25)), padding2(~h=`rem(2.), ~v=`zero)]);
+    let postItem =
+      style([
+        width(`rem(25.)),
+        marginBottom(`rem(3.25)),
+        padding2(~h=`rem(2.), ~v=`zero),
+      ]);
   };
 
   module Content = {

@@ -20,7 +20,6 @@ module Styles = {
         left(`rem(2.5)),
       ]),
     ]);
-
   let profilePicture =
     style([
       position(`absolute),
@@ -39,7 +38,6 @@ module Styles = {
         hover([color(Theme.Colors.orange)]),
       ]),
     ]);
-
   let genesisLabel =
     merge([
       Theme.Type.paragraphMono,
