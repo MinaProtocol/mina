@@ -126,7 +126,7 @@ let make = () => {
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
           copySize: `Small,
           title: "Testnet Challenges",
-          description: "Learn how to operate the protocol, while contributing to Coda's network resilience.",
+          description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,
           image: "/static/img/AboutHeroDesktopBackground.jpg",
           background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
@@ -137,7 +137,7 @@ let make = () => {
             buttonColor: Theme.Colors.mint,
             buttonTextColor: Theme.Colors.digitalBlack,
             dark: true,
-            href: "#",
+            href: "",
           },
         }
       />

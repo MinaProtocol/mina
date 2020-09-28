@@ -5,10 +5,12 @@ let make =
     (
       ~title,
       ~description=siteDescription,
-      ~image="/static/img/coda_facebook_OG.jpg",
+      ~image="/static/img/mina_facebook_OG.jpg",
       ~route=?,
       ~children,
       ~footerColor=Theme.Colors.white,
+      ~darkTheme=false,
+      ~showFooter=true,
     ) => {
   let router = Next.Router.useRouter();
   let route = Option.value(route, ~default=router.route);
@@ -21,8 +23,8 @@ let make =
       <meta property="og:type" content="website" />
       <meta property="og:description" content=description />
       <meta name="description" content=description />
-      <meta property="og:url" content={"https://codaprotocol.com" ++ route} />
-      <link rel="canonical" href={"https://codaprotocol.com" ++ route} />
+      <meta property="og:url" content={"https://minaprotocol.com" ++ route} />
+      <link rel="canonical" href={"https://minaprotocol.com" ++ route} />
       <link
         rel="icon"
         type_="image/png"
@@ -51,12 +53,12 @@ let make =
         {React.string("img:-moz-loading { visibility: hidden; }")}
       </style>
     </Next.Head>
-    <AnnouncementBanner>
-      {React.string("Mainnet is live!")}
+    <AnnouncementBanner dark=darkTheme>
+      {React.string("Mina is growing fast!")}
     </AnnouncementBanner>
-    <Nav />
+    <Nav dark=darkTheme />
     <main> children </main>
     <CookieWarning />
-    <Footer />
+    {showFooter ? <Footer /> : React.null}
   </>;
 };
