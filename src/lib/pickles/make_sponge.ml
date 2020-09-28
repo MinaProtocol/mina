@@ -2,9 +2,9 @@ module D = Composition_types.Digest
 open Core_kernel
 
 module Rounds = struct
-  let rounds_full = 8
+  let rounds_full = 63
 
-  let rounds_partial = 30
+  let rounds_partial = 0
 end
 
 let high_entropy_bits = 128
@@ -17,22 +17,21 @@ module Make (Field : Zexe_backend.Field.S) = struct
     let to_the_alpha x =
       let open Field in
       let res = square x in
-      Mutable.square res ;
-      (* x^4 *)
-      Mutable.square res ;
-      (* x^8 *)
-      Mutable.square res ;
-      (* x^16 *)
-      res *= x ;
-      res
+      Mutable.square res ; (* x^4 *)
+                           res *= x ; (* x^5 *)
+                                      res
 
     module Operations = struct
       let add_assign ~state i x = Field.(state.(i) += x)
 
-      let apply_affine_map (_rows, c) v =
-        let open Field in
-        let res = [|v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2)|] in
-        Array.iteri res ~f:(fun i ri -> ri += c.(i)) ;
+      let apply_affine_map (matrix, constants) v =
+        let dotv row =
+          Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
+        in
+        let res = Array.map matrix ~f:dotv in
+        for i = 0 to Array.length res - 1 do
+          Field.(res.(i) += constants.(i))
+        done ;
         res
 
       let copy a = Array.map a ~f:(fun x -> Field.(x + zero))

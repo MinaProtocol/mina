@@ -47,7 +47,8 @@ module Constant = struct
                  ~domain:
                    (Marlin_checks.domain
                       (module Tock.Field)
-                      wrap_domains.h ~shifts:Tock.B.Field_verifier_index.shifts)
+                      wrap_domains.h ~shifts:Tock.B.Field_verifier_index.shifts
+                      ~domain_generator:Tock.Field.domain_generator)
                  { alpha= Challenge.Constant.to_tock_field alpha
                  ; beta= Challenge.Constant.to_tock_field beta
                  ; gamma= Challenge.Constant.to_tock_field gamma

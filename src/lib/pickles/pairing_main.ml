@@ -281,6 +281,7 @@ struct
                  (x, lagrange_commitment ~domain i) ))
         in
         let without = Type.Without_degree_bound in
+        let with_ = Type.With_degree_bound in
         absorb sponge PC x_hat ;
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
@@ -289,7 +290,7 @@ struct
         let gamma = sample () in
         let z_comm = receive without z_comm in
         let alpha = sample () in
-        let t_comm = receive without t_comm in
+        let t_comm = receive with_ t_comm in
         let zeta = sample_scalar () in
         (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
@@ -355,16 +356,18 @@ struct
               ; r_comm
               ; o_comm
               ; z_comm
-              ; t_comm
               ; f_comm
               ; [|m.sigma_comm_0|]
               ; [|m.sigma_comm_1|] ]
-              (snd (Branching.add Nat.N9.n))
+              (snd (Branching.add Nat.N8.n))
           in
           check_bulletproof
-            ~pcs_batch:(Common.dlog_pcs_batch (Branching.add Nat.N9.n))
+            ~pcs_batch:
+              (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
+                 ~max_quot_size:((5 * (Domain.size domain + 2)) - 5))
             ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-            ~advice ~openings_proof ~polynomials:(without_degree_bound, [])
+            ~advice ~openings_proof
+            ~polynomials:(without_degree_bound, [t_comm])
         in
         assert_eq_marlin
           { alpha= plonk.alpha
@@ -435,6 +438,9 @@ struct
     Backend.Tick.B.Field_verifier_index.shifts ~log2_size
     |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
 
+  let domain_generator ~log2_size =
+    Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant
+
   module O = One_hot_vector.Make (Impl)
 
   let side_loaded_input_domain =
@@ -452,6 +458,9 @@ struct
     fun ~width ->
       let mask = O.of_index width ~length:(S max_width) in
       let shifts = lazy (Pseudo.Domain.shifts (mask, domain_log2s) ~shifts) in
+      let generator =
+        lazy (Pseudo.Domain.generator (mask, domain_log2s) ~domain_generator)
+      in
       let vp =
         let log2_size = Pseudo.choose (mask, domain_log2s) ~f:Field.of_int in
         let mask =
@@ -461,6 +470,8 @@ struct
       in
       object
         method shifts = Lazy.force shifts
+
+        method generator = Lazy.force generator
 
         method size =
           Pseudo.choose (mask, domain_log2s) ~f:(fun x -> Field.of_int (1 lsl x))
@@ -476,11 +487,11 @@ struct
         let (T max_n) = Nat.of_int max in
         let log2_size = Pseudo.choose ~f:Domain.log2_size (branch, v) in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
-        let shifts =
-          Pseudo.Domain.shifts
-            (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
-            ~shifts
+        let log2_sizes =
+          (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
         in
+        let shifts = Pseudo.Domain.shifts log2_sizes ~shifts in
+        let generator = Pseudo.Domain.generator log2_sizes ~domain_generator in
         let vanishing_polynomial = vanishing_polynomial mask in
         let size =
           Vector.map mask ~f:(fun b ->
@@ -497,6 +508,8 @@ struct
           method vanishing_polynomial x = vanishing_polynomial x
 
           method shifts = shifts
+
+          method generator = generator
         end
       in
       { Domains.h=
@@ -531,6 +544,7 @@ struct
                 (module Field.Constant)
                 (Pow_2_roots_of_unity d)
                 ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                ~domain_generator:Backend.Tick.Field.domain_generator
             in
             let checked_domain () =
               side_loaded_input_domain ~width:(Field.of_int i)
@@ -554,6 +568,7 @@ struct
                   (module Field.Constant)
                   (Pow_2_roots_of_unity (field1 ds))
                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                  ~domain_generator:Backend.Tick.Field.domain_generator
               in
               let checked_domain () =
                 side_loaded_domains
@@ -613,23 +628,23 @@ struct
         let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
         Number.mod_pow_2 d (`Two_to_the k)
 
-    let combine_split_evaluations' b_plus_19 =
+    let combine_split_evaluations' b_plus_19 ~max_quot_size =
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
-        (Common.dlog_pcs_batch b_plus_19)
+        (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
         ~shifted_pow:
           (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
 
-    let combine_split_evaluations_side_loaded b_plus_19 =
+    let combine_split_evaluations_side_loaded b_plus_19 ~max_quot_size =
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
-        (Common.dlog_pcs_batch b_plus_19)
+        (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
         ~shifted_pow:(fun deg x -> pow x deg)
 
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -640,14 +655,15 @@ struct
   end
 
   let combined_evaluation (type b b_plus_19) b_plus_19 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound) =
+      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+      ~max_quot_size =
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~shifted_pow:
         (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
       ~init:Fn.id ~evaluation_point ~xi
-      (Common.dlog_pcs_batch b_plus_19)
+      (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
       without_degree_bound with_degree_bound
 
   let absorb_field sponge x = Sponge.absorb sponge (`Field x)
@@ -759,7 +775,7 @@ struct
       match step_domains with
       | `Known domains ->
           ( `Known domains
-          , Pseudo.Domain.to_domain ~shifts
+          , Pseudo.Domain.to_domain ~shifts ~domain_generator
               (which_branch, Vector.map domains ~f:Domains.x) )
       | `Side_loaded ds ->
           ( `Side_loaded (side_loaded_domains ds which_branch)
@@ -790,9 +806,9 @@ struct
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let absorb_evals x_hat e =
-      let xs = Evals.to_vector e in
+      let xs, ys = Evals.to_vectors e in
       List.iter
-        Vector.([|(Boolean.true_, x_hat)|] :: to_list xs)
+        Vector.([|(Boolean.true_, x_hat)|] :: (to_list xs @ to_list ys))
         ~f:(Array.iter ~f:(Opt_sponge.absorb sponge))
     in
     (* A lot of hashing. *)
@@ -806,7 +822,15 @@ struct
       Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
       .map_challenges ~f:Field.pack ~scalar plonk
     in
-    let zetaw = Field.mul (failwith "TODO") plonk.zeta in
+    let domain =
+      match step_domains with
+      | `Known ds ->
+          let hs = map ds ~f:(fun {Domains.h; _} -> h) in
+          Pseudo.Domain.to_domain (which_branch, hs) ~shifts ~domain_generator
+      | `Side_loaded {h} ->
+          (h :> _ Marlin_checks.plonk_domain)
+    in
+    let zetaw = Field.mul domain#generator plonk.zeta in
     let xi = scalar xi in
     let r = scalar (Scalar_challenge r_actual) in
     let combined_inner_product_correct =
@@ -816,10 +840,27 @@ struct
           Vector.map old_bulletproof_challenges ~f:(fun chals ->
               unstage (b_poly (Vector.to_array chals)) )
         in
+        let max_quot_size =
+          match step_domains with
+          | `Known step_domains ->
+              let open Int in
+              `Known
+                ( which_branch
+                , Vector.map step_domains ~f:(fun x ->
+                      (5 * (Domain.size x.Domains.h + 2)) - 5 ) )
+          | `Side_loaded domains ->
+              let conv domain =
+                let deg = (of_int 5 * domain#size) + of_int 5 in
+                let d = Split_evaluations.mod_max_degree deg in
+                Number.(
+                  to_bits (constant (Field.Constant.of_int Max_degree.step) - d))
+              in
+              `Side_loaded (conv domains.h)
+        in
         let combine pt x_hat e =
-          let pi = Branching.add Nat.N9.n in
-          let a =
-            Evals.to_vector (e : (Boolean.var * Field.t) array Evals.t)
+          let pi = Branching.add Nat.N8.n in
+          let a, b =
+            Evals.to_vectors (e : (Boolean.var * Field.t) array Evals.t)
           in
           let sg_evals =
             Vector.map2
@@ -830,13 +871,13 @@ struct
           let v =
             Vector.append sg_evals ([|(Boolean.true_, x_hat)|] :: a) (snd pi)
           in
-          match step_domains with
-          | `Known _ ->
+          match max_quot_size with
+          | `Known max_quot_size ->
               Split_evaluations.combine_split_evaluations' pi ~xi
-                ~evaluation_point:pt v []
-          | `Side_loaded _ ->
+                ~evaluation_point:pt v b ~max_quot_size
+          | `Side_loaded max_quot_size ->
               Split_evaluations.combine_split_evaluations_side_loaded pi ~xi
-                ~evaluation_point:pt v []
+                ~evaluation_point:pt v b ~max_quot_size
         in
         combine plonk.zeta x_hat1 evals1 + (r * combine zetaw x_hat2 evals2)
       in
@@ -849,14 +890,6 @@ struct
       let b_poly = unstage (b_poly (Vector.to_array bulletproof_challenges)) in
       let b_actual = b_poly plonk.zeta + (r * b_poly zetaw) in
       equal b b_actual
-    in
-    let domain =
-      match step_domains with
-      | `Known ds ->
-          let hs = map ds ~f:(fun {Domains.h; _} -> h) in
-          Pseudo.Domain.to_domain (which_branch, hs) ~shifts
-      | `Side_loaded {h} ->
-          (h :> _ Marlin_checks.plonk_domain)
     in
     let marlin_checks_passed =
       let e = Fn.flip actual_evaluation in

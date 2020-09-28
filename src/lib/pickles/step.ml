@@ -155,7 +155,8 @@ struct
             ~domain:
               (Marlin_checks.domain
                  (module Tick.Field)
-                 domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
+                 domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                 ~domain_generator:Backend.Tick.Field.domain_generator)
             { zeta
             ; alpha= Challenge.Constant.to_tick_field plonk0.alpha
             ; beta= Challenge.Constant.to_tick_field plonk0.beta
@@ -299,23 +300,26 @@ struct
           in
           let open As_field in
           let combine (x_hat : Tock.Field.t) pt e =
-            let a = Dlog_plonk_types.Evals.(to_vector (e : _ array t)) in
+            let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
             let v : (Tock.Field.t array, _) Vector.t =
               Vector.append
                 (Vector.map b_polys ~f:(fun f -> [|f pt|]))
                 ([|x_hat|] :: a)
-                (snd (Local_max_branching.add Nat.N9.n))
+                (snd (Local_max_branching.add Nat.N8.n))
             in
             let open Tock.Field in
+            let domains = data.wrap_domains in
             Pcs_batch.combine_split_evaluations
-              (Common.dlog_pcs_batch (Local_max_branching.add Nat.N9.n))
+              (Common.dlog_pcs_batch
+                 (Local_max_branching.add Nat.N8.n)
+                 ~max_quot_size:Int.((5 * Domain.size domains.h) - 5))
               ~xi ~init:Fn.id ~mul ~last:Array.last
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
               ~shifted_pow:(fun deg x ->
                 Pcs_batch.pow ~one ~mul x
                   Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
-              v []
+              v b
           in
           let open Tock.Field in
           combine x_hat_1 As_field.zeta e1 + (r * combine x_hat_2 zetaw e2)
@@ -329,7 +333,8 @@ struct
               (Marlin_checks.domain
                  (module Tock.Field)
                  data.wrap_domains.h
-                 ~shifts:Backend.Tock.B.Field_verifier_index.shifts)
+                 ~shifts:Backend.Tock.B.Field_verifier_index.shifts
+                 ~domain_generator:Backend.Tock.Field.domain_generator)
             {plonk0 with zeta= As_field.zeta}
             (Marlin_checks.evals_of_split_evals
                (module Tock.Field)

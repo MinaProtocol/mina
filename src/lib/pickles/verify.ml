@@ -77,10 +77,12 @@ let verify_heterogenous (ts : Instance.t list) =
               (module Tick.Field)
               ~endo:Endo.Dee.base
               ~domain:
+                (* TODO: Cache the shifts and domain_generator *)
                 (Marlin_checks.domain
                    (module Tick.Field)
                    step_domains.h
-                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
+                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                   ~domain_generator:Backend.Tick.Field.domain_generator)
               { zeta
               ; beta= chal plonk0.beta
               ; gamma= chal plonk0.gamma
@@ -130,8 +132,10 @@ let verify_heterogenous (ts : Instance.t list) =
           (absorb sponge, squeeze)
         in
         let absorb_evals (x_hat, e) =
-          let xs = Dlog_plonk_types.Evals.to_vector e in
-          List.iter Vector.([|x_hat|] :: to_list xs) ~f:(Array.iter ~f:absorb)
+          let xs, ys = Dlog_plonk_types.Evals.to_vectors e in
+          List.iter
+            Vector.([|x_hat|] :: (to_list xs @ to_list ys))
+            ~f:(Array.iter ~f:absorb)
         in
         Double.(iter ~f:absorb_evals (map2 prev_x_hat evals ~f:Tuple2.create)) ;
         let xi_actual = squeeze () in

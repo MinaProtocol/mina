@@ -3,7 +3,7 @@
   (name zexe_backend_common)
   (public_name zexe_backend.common)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
   (libraries
     hex
     digestif

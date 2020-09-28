@@ -31,9 +31,9 @@ let combined_inner_product (type actual_branching)
       ~f:(fun chals -> unstage (b_poly (Vector.to_array chals)))
       old_bulletproof_challenges
   in
-  let pi = AB.add Nat.N9.n in
+  let pi = AB.add Nat.N8.n in
   let combine (x_hat : Tick.Field.t) pt e =
-    let a = Dlog_plonk_types.Evals.(to_vector (e : _ array t)) in
+    let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
     let v : (Tick.Field.t array, _) Vector.t =
       Vector.append
         (Vector.map b_polys ~f:(fun f -> [|f pt|]))
@@ -41,14 +41,15 @@ let combined_inner_product (type actual_branching)
     in
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations
-      (Common.dlog_pcs_batch (AB.add Nat.N9.n))
+      (Common.dlog_pcs_batch (AB.add Nat.N8.n)
+         ~max_quot_size:Int.((5 * (Domain.size step_branch_domains.h + 2)) - 5))
       ~xi ~init:Fn.id ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt
       ~shifted_pow:(fun deg x ->
         Pcs_batch.pow ~one ~mul x
           Int.(Max_degree.step - (deg mod Max_degree.step)) )
-      v []
+      v b
   in
   let open Tick.Field in
   combine x_hat_1 zeta e1 + (r * combine x_hat_2 zetaw e2)
@@ -269,7 +270,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         ~domain:
           (Marlin_checks.domain
              (module Tick.Field)
-             domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts)
+             domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+             ~domain_generator:Backend.Tick.Field.domain_generator)
         {plonk0 with zeta= As_field.zeta}
         (Marlin_checks.evals_of_split_evals
            (module Tick.Field)

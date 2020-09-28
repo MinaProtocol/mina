@@ -123,7 +123,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
             ; r_comm= g lengths.r
             ; o_comm= g lengths.o
             ; z_comm= g lengths.z
-            ; t_comm= g lengths.t }
+            ; t_comm= {unshifted= g lengths.t; shifted= g0} }
         ; openings=
             { proof=
                 { lr=

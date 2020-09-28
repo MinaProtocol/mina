@@ -44,10 +44,11 @@ module Evals = struct
     ; sigma1= f t1.sigma1 t2.sigma1
     ; sigma2= f t1.sigma2 t2.sigma2 }
 
-  let to_vector {l; r; o; z; t; f; sigma1; sigma2} =
-    Vector.[l; r; o; z; t; f; sigma1; sigma2]
+  let to_vectors {l; r; o; z; t; f; sigma1; sigma2} =
+    (Vector.[l; r; o; z; f; sigma1; sigma2], Vector.[t])
 
-  let of_vector ([l; r; o; z; t; f; sigma1; sigma2] : ('a, _) Vector.t) : 'a t
+  let of_vectors
+      (([l; r; o; z; f; sigma1; sigma2] : ('a, _) Vector.t), Vector.[t]) : 'a t
       =
     {l; r; o; z; t; f; sigma1; sigma2}
 
@@ -64,9 +65,12 @@ module Evals = struct
                      (Array.create ~len:(length - Array.length arr) default))
                 ) } )
     in
-    let t = lengths |> to_vector |> v |> Vector.typ' in
-    Snarky_backendless.Typ.transport t ~there:to_vector ~back:of_vector
-    |> Snarky_backendless.Typ.transport_var ~there:to_vector ~back:of_vector
+    let t =
+      let l1, l2 = to_vectors lengths in
+      Snarky_backendless.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
+    in
+    Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
+    |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors
 end
 
 module Openings = struct
@@ -153,7 +157,7 @@ module Messages = struct
         ; r_comm: 'g Without_degree_bound.Stable.V1.t
         ; o_comm: 'g Without_degree_bound.Stable.V1.t
         ; z_comm: 'g Without_degree_bound.Stable.V1.t
-        ; t_comm: 'g Without_degree_bound.Stable.V1.t }
+        ; t_comm: 'g With_degree_bound.Stable.V1.t }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
@@ -172,8 +176,11 @@ module Messages = struct
             ) }
     in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let w n =
+      With_degree_bound.typ ~array g ~length:(Vector.reduce_exn n ~f:Int.max)
+    in
     of_hlistable
-      [wo l; wo r; wo o; wo z; wo t]
+      [wo l; wo r; wo o; wo z; w t]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end

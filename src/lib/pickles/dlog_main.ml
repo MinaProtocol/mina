@@ -394,11 +394,15 @@ struct
   let mask_messages (type n) ~(lengths : (int, n) Vector.t Evals.t)
       (choice : n One_hot_vector.t) (m : _ Messages.t) =
     let f lens = Array.zip_exn (mask lens choice) in
+    let g lg {Poly_comm.With_degree_bound.shifted; unshifted} =
+      { Poly_comm.With_degree_bound.shifted= (Boolean.true_, shifted)
+      ; unshifted= f lg unshifted }
+    in
     { Messages.l_comm= f lengths.l m.l_comm
     ; r_comm= f lengths.r m.r_comm
     ; o_comm= f lengths.o m.o_comm
     ; z_comm= f lengths.z m.z_comm
-    ; t_comm= f lengths.t m.t_comm }
+    ; t_comm= g lengths.t m.t_comm }
 
   module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
 
@@ -472,6 +476,7 @@ struct
              ))
         in
         let without = Type.Without_degree_bound in
+        let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;
         print_g1 "x_hat" x_hat ;
         let l_comm = receive without l_comm in
@@ -481,7 +486,7 @@ struct
         let gamma = sample () in
         let z_comm = receive without z_comm in
         let alpha = sample () in
-        let t_comm = receive without t_comm in
+        let t_comm = receive with_ t_comm in
         let zeta = sample_scalar () in
         (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
@@ -558,16 +563,19 @@ struct
               ; r_comm
               ; o_comm
               ; z_comm
-              ; t_comm
               ; f_comm
               ; [|(Boolean.true_, m.sigma_comm_0)|]
               ; [|(Boolean.true_, m.sigma_comm_1)|] ]
-              (snd (Max_branching.add Nat.N9.n))
+              (snd (Max_branching.add Nat.N8.n))
           in
           check_bulletproof
-            ~pcs_batch:(Common.dlog_pcs_batch (Max_branching.add Nat.N9.n))
+            ~pcs_batch:
+              (Common.dlog_pcs_batch
+                 (Max_branching.add Nat.N8.n)
+                 ~max_quot_size:())
             ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-            ~advice ~openings_proof ~polynomials:(without_degree_bound, [])
+            ~advice ~openings_proof
+            ~polynomials:(without_degree_bound, [t_comm])
         in
         assert_eq_marlin
           { alpha= plonk.alpha
@@ -607,14 +615,15 @@ struct
         Array.zip_exn (mask lengths choice) e )
 
   let combined_evaluation (type b b_plus_19) b_plus_19 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound) =
+      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+      ~max_quot_size =
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~shifted_pow:
         (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.wrap)
       ~init:Fn.id ~evaluation_point ~xi
-      (Common.dlog_pcs_batch b_plus_19)
+      (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
       without_degree_bound with_degree_bound
 
   let det_sqrt =
@@ -665,7 +674,7 @@ struct
    4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~domain ~input_domain ~sponge
+      ~domain ~input_domain ~max_quot_size ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; combined_inner_product; bulletproof_challenges; b; plonk} :
         _ Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
@@ -675,9 +684,9 @@ struct
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let absorb_evals x_hat e =
-      let xs = Evals.to_vector e in
+      let xs, ys = Evals.to_vectors e in
       List.iter
-        Vector.([|x_hat|] :: to_list xs)
+        Vector.([|x_hat|] :: (to_list xs @ to_list ys))
         ~f:(Array.iter ~f:(Sponge.absorb sponge))
     in
     (* A lot of hashing. *)
@@ -706,8 +715,8 @@ struct
               unstage (b_poly (Vector.to_array chals)) )
         in
         let combine pt x_hat e =
-          let pi = Branching.add Nat.N9.n in
-          let a = Evals.to_vector (e : Field.t array Evals.t) in
+          let pi = Branching.add Nat.N8.n in
+          let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
           let sg_evals =
             match actual_branching with
             | None ->
@@ -722,7 +731,7 @@ struct
                     [|Field.((b :> t) * f pt)|] )
           in
           let v = Vector.append sg_evals ([|x_hat|] :: a) (snd pi) in
-          combined_evaluation pi ~xi ~evaluation_point:pt (v, [])
+          combined_evaluation pi ~xi ~evaluation_point:pt (v, b) ~max_quot_size
         in
         combine plonk.zeta x_hat1 evals1 + (r * combine zetaw x_hat2 evals2)
       in

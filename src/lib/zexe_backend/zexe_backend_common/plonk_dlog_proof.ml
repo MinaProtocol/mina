@@ -302,12 +302,15 @@ module Make (Inputs : Inputs_intf) = struct
     let wo x =
       match pc x with `Without_degree_bound gs -> gs | _ -> assert false
     in
+    let w x =
+      match pc x with `With_degree_bound t -> t | _ -> assert false
+    in
     { messages=
         { l_comm= wo l_comm
         ; r_comm= wo r_comm
         ; o_comm= wo o_comm
         ; z_comm= wo z_comm
-        ; t_comm= wo t_comm }
+        ; t_comm= w t_comm }
     ; openings= {proof; evals} }
 
   let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2}
@@ -330,6 +333,7 @@ module Make (Inputs : Inputs_intf) = struct
        ; openings= {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1} } :
         t) : Backend.t =
     let g = G.Affine.to_backend in
+    let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr =
       let v = G.Affine.Backend.Pair.Vector.create () in
@@ -350,7 +354,7 @@ module Make (Inputs : Inputs_intf) = struct
       |> g_array_to_vec
     in
     Backend.make ~primary_input ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
-      ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcwo t_comm) ~lr
+      ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcw t_comm) ~lr
       ~z1:z_1 ~z2:z_2 ~delta:(g delta) ~sg:(g sg)
       ~evals0:(eval_to_backend evals0) ~evals1:(eval_to_backend evals1)
       ~prev_challenges:challenges ~prev_sgs:commitments

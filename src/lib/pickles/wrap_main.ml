@@ -124,6 +124,9 @@ let shifts ~log2_size =
   Backend.Tock.B.Field_verifier_index.shifts ~log2_size
   |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
 
+let domain_generator ~log2_size =
+  Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
+
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_branching branches prev_varss prev_valuess env
@@ -246,13 +249,17 @@ let wrap_main
         exists ty ~request:(fun () -> Req.Evals)
       in
       let chals =
-        let (wrap_domains : (_, Max_branching.n) Vector.t) =
+        let (wrap_domains : (_, Max_branching.n) Vector.t), max_quot_sizes =
           Vector.map domainses ~f:(fun ds ->
-              Vector.map
-                Domains.[h; x]
-                ~f:(fun f ->
-                  Pseudo.Domain.to_domain ~shifts
-                    (which_branch, Vector.map ds ~f) ) )
+              ( Vector.map
+                  Domains.[h; x]
+                  ~f:(fun f ->
+                    Pseudo.Domain.to_domain ~shifts ~domain_generator
+                      (which_branch, Vector.map ds ~f) )
+              , ( which_branch
+                , Vector.map ds ~f:(fun d -> (5 * (Domain.size d.h + 2)) - 5)
+                ) ) )
+          |> Vector.unzip
         in
         let actual_branchings =
           padded
@@ -268,14 +275,16 @@ let wrap_main
           ; actual_branchings
           ; evals
           ; eval_lengths
-          ; wrap_domains ]
+          ; wrap_domains
+          ; max_quot_sizes ]
           ~f:(fun [ ( {deferred_values; sponge_digest_before_evaluations}
                     , should_verify )
                   ; old_bulletproof_challenges
                   ; actual_branching
                   ; evals
                   ; eval_lengths
-                  ; [domain; input_domain] ]
+                  ; [domain; input_domain]
+                  ; max_quot_size ]
              ->
             let sponge =
               let s = Sponge.create sponge_params in
@@ -302,7 +311,7 @@ let wrap_main
             let verified, chals =
               finalize_other_proof
                 (Nat.Add.create max_local_max_branching)
-                ~actual_branching
+                ~max_quot_size ~actual_branching
                 ~input_domain:(input_domain :> _ Marlin_checks.plonk_domain)
                 ~domain:(domain :> _ Marlin_checks.plonk_domain)
                 ~sponge deferred_values ~old_bulletproof_challenges evals

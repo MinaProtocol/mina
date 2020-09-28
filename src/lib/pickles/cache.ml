@@ -23,18 +23,14 @@ module Step = struct
 
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun (_, _, t) ~path ->
-        let t =
+      (fun (_, _, cs) ~path ->
+        let index =
           Snarky_bn382.Tweedle.Dum.Plonk.Field_index.read
             (Backend.Tick.Keypair.load_urs ())
-            (*
-            t.m.a t.m.b t.m.c
-            (Unsigned.Size_t.of_int (1 + t.public_input_size))
-*)
             path
         in
-        t )
-      Snarky_bn382.Tweedle.Dum.Plonk.Field_index.write
+        {Tweedle.Dum_based_plonk.Keypair.index; cs} )
+      (fun t -> Snarky_bn382.Tweedle.Dum.Plonk.Field_index.write t.index)
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -108,18 +104,14 @@ module Wrap = struct
 
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
-      (fun (_, t) ~path ->
-        let t =
+      (fun (_, cs) ~path ->
+        let index =
           Snarky_bn382.Tweedle.Dee.Plonk.Field_index.read
             (Backend.Tock.Keypair.load_urs ())
-            (*
-            t.m.a t.m.b t.m.c
-            (Unsigned.Size_t.of_int (1 + t.public_input_size))
-*)
             path
         in
-        t )
-      Snarky_bn382.Tweedle.Dee.Plonk.Field_index.write
+        {Tweedle.Dee_based_plonk.Keypair.index; cs} )
+      (fun t -> Snarky_bn382.Tweedle.Dee.Plonk.Field_index.write t.index)
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
@@ -164,8 +156,8 @@ module Wrap = struct
                ; step_domains
                ; data=
                    (let open Snarky_bn382.Tweedle.Dee.Plonk.Field_index in
-                   {constraints= Unsigned.Size_t.to_int (domain_d1_size pk)})
-               }
+                   { constraints=
+                       Unsigned.Size_t.to_int (domain_d1_size pk.index) }) }
              in
              let _ = Key_cache.Sync.write cache s_v k_v vk in
              vk)

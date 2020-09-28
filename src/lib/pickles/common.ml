@@ -50,8 +50,8 @@ let hash_dlog_me_only (type n) (max_branching : n Nat.t)
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
-      total Nat.t * (n_branching, Nat.N9.n, total) Nat.Adds.t) =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
+      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
 
 module Pairing_pcs_batch = struct
   let beta_1 : (int, _, _) Pcs_batch.t =
