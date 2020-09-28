@@ -24,7 +24,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "buildkite/scripts/lint-helm.sh" ]
+          commands = [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
           , target = Size.Small

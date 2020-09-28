@@ -23,12 +23,12 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "buildkite/scripts/helm-release.sh" ]
+          commands = [ Cmd.run "HELM_RELEASE=true buildkite/scripts/helm-ci.sh" ]
           , label = "Helm chart release"
           , key = "release-helm-chart"
           , target = Size.Medium
           , docker = None Docker.Type
-          , artifact_paths = [ S.contains "sync_dir/*" ]
+          , artifact_paths = [ S.contains "updates/*" ]
           , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]
         }
     ]
