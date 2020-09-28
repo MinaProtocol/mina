@@ -151,19 +151,17 @@ let make = (~backgroundImg) => {
               </p>
             </span>
             <span className=Styles.heroButton>
-              //TODO: Add link to tech
-
-                <Button
-                  href="/"
-                  bgColor=Theme.Colors.white
-                  paddingX=1.
-                  width={`rem(13.5)}>
-                  <span> {React.string("See Behind The Tech")} </span>
-                  <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall />
-                  </span>
-                </Button>
-              </span>
+              <Button
+                href="/tech"
+                bgColor=Theme.Colors.white
+                paddingX=1.
+                width={`rem(13.5)}>
+                <span> {React.string("See Behind The Tech")} </span>
+                <span className=Styles.buttonIcon>
+                  <Icon kind=Icon.ArrowRightSmall />
+                </span>
+              </Button>
+            </span>
           </div>
           <div className=Styles.heroImageContainer>
             <img

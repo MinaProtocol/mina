@@ -1,16 +1,18 @@
 module Styles = {
   open Css;
-  let announcementBanner =
+  let announcementBanner = dark =>
     merge([
       Theme.Type.announcement,
       style([
-        color(Theme.Colors.digitalBlack),
+        color(dark ? white : Theme.Colors.digitalBlack),
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
         width(`percent(100.)),
         important(backgroundSize(`cover)),
-        backgroundImage(`url("/static/img/AnnouncementBanner.png")),
+        dark
+          ? backgroundColor(black)
+          : backgroundImage(`url("/static/img/AnnouncementBanner.png")),
         padding2(~v=`rem(0.5), ~h=`rem(0.5)),
       ]),
     ]);
@@ -60,8 +62,8 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~children) => {
-  <div className=Styles.announcementBanner>
+let make = (~children, ~dark=false) => {
+  <div className={Styles.announcementBanner(dark)}>
     <div className=Styles.flexCenter>
       <span className=Styles.announcementText> children </span>
       <Next.Link href="/">

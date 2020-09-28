@@ -322,7 +322,7 @@ let make = () => {
                 <Icon kind=Icon.Digital />
               </a>
             </Next.Link>
-            <Next.Link href="https://bit.ly/CodaDiscord">
+            <Next.Link href="https://bit.ly/MinaDiscord">
               <a className=Styles.link>
                 {React.string("Discord #Leaderboard Channel")}
                 <Icon kind=Icon.Digital />
