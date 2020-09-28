@@ -283,6 +283,7 @@ module GetStarted = {
           media(
             Theme.MediaQuery.tablet,
             [
+              textAlign(`left),
               textTransform(`none),
               letterSpacing(`zero),
               fontSize(`rem(1.3)),

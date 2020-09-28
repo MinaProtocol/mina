@@ -79,7 +79,7 @@ module Styles = {
         marginTop(`zero),
         marginBottom(`zero),
         maxWidth(`rem(19.)),
-        media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
+        media(Theme.MediaQuery.tablet, [maxWidth(`rem(40.))]),
       ]),
     ]);
 

@@ -186,10 +186,7 @@ module Section = {
                  {React.string(row.description)}
                </p>
                <Spacer height=1. />
-               <Button
-                 bgColor=Theme.Colors.white
-                 href={row.linkUrl}
-                 >
+               <Button bgColor=Theme.Colors.white href={row.linkUrl}>
                  {React.string(row.linkCopy)}
                  <Icon kind=Icon.ArrowRightMedium />
                </Button>
