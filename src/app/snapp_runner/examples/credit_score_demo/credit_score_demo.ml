@@ -7,7 +7,7 @@ type _ Snarky_backendless.Request.t +=
 
 let target_score = 700
 
-let main () =
+let main (_ : Coda_base.Snapp_statement.Checked.t) =
   let open Pickles.Impls.Step.Internal_Basic in
   let open Checked.Let_syntax in
   let%bind score = exists Field.typ ~request:As_prover.(return Get_score) in
@@ -28,20 +28,83 @@ let main () =
 include Snapp_runner_functor.Make_with_commands (struct
   module Public_input = struct
     module Value = struct
-      type t = unit
+      include Coda_base.Snapp_statement
 
-      let of_yojson _ = Ok ()
+      let if_not_given = `Raise
 
-      let t_of_sexp _ = ()
-
-      let to_field_elements () = [||]
-
-      let if_not_given = `Default_to ()
+      let args : t option Command.Spec.param =
+        let open Command in
+        let open Command.Let_syntax in
+        let%map snapp_pk =
+          Command.Param.flag "--snapp-public-key"
+            ~doc:"PK Public key of the snapp account"
+            (Flag.optional Cli_lib.Arg_type.public_key_compressed)
+        and receiver_pk =
+          Command.Param.flag "--receiver-public-key"
+            ~doc:"PK Public key of the receiver account"
+            (Flag.optional Cli_lib.Arg_type.public_key_compressed)
+        and fee =
+          Command.Param.flag "--fee"
+            ~doc:
+              "NUM The fee amount for the snapp account to pay the block \
+               producer"
+            (Flag.optional
+               (Arg_type.map ~f:Unsigned.UInt64.of_string Command.Param.string))
+        and amount =
+          Command.Param.flag "--amount"
+            ~doc:
+              "NUM The amount to transfer from the snapp account to the \
+               receiver"
+            (Flag.optional
+               (Arg_type.map ~f:Unsigned.UInt64.of_string Command.Param.string))
+        and account_creation_fee =
+          Command.Param.flag "--account-creation-fee"
+            ~doc:
+              "NUM The account creation fee, set by the network, to be paid \
+               by the snapp account (default: 100000)"
+            (Flag.optional_with_default
+               (Unsigned.UInt64.of_string "100000")
+               (Arg_type.map ~f:Unsigned.UInt64.of_string Command.Param.string))
+        in
+        let open Coda_base in
+        let open Option.Let_syntax in
+        let%map snapp_pk = snapp_pk
+        and receiver_pk = receiver_pk
+        and fee = fee
+        and amount = amount in
+        let fee = Currency.Amount.of_uint64 fee in
+        let amount = Currency.Amount.of_uint64 amount in
+        let account_creation_fee =
+          Currency.Amount.of_uint64 account_creation_fee
+        in
+        let snapp_amount =
+          match
+            Currency.Amount.(fee + amount >>= ( + ) account_creation_fee)
+          with
+          | Some snapp_amount ->
+              snapp_amount
+          | None ->
+              eprintf
+                "Error computing snapp account delta: fee + amount + \
+                 account_creation_fee overflowed." ;
+              exit 1
+        in
+        ( { predicate= Snapp_predicate.accept
+          ; body1=
+              { pk= snapp_pk
+              ; update= Snapp_command.Party.Body.dummy.update
+              ; delta=
+                  Currency.Amount.Signed.(negate (of_unsigned snapp_amount)) }
+          ; body2=
+              { pk= snapp_pk
+              ; update= Snapp_command.Party.Body.dummy.update
+              ; delta= Currency.Amount.Signed.of_unsigned amount } }
+          : Snapp_statement.t )
     end
 
-    module Var = Value
+    module Var = Coda_base.Snapp_statement.Checked
 
-    let typ = Snarky_backendless.Typ.unit ()
+    let typ = Coda_base.Snapp_statement.typ
   end
 
   module Request_data = struct

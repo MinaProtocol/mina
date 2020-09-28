@@ -10,6 +10,8 @@ module Intf = struct
 
         val if_not_given : [`Default_to of t | `Raise]
 
+        val args : t option Command.Spec.param
+
         include
           Pickles.Statement_intf
           with type field := Impls.Step.Field.Constant.t
@@ -172,7 +174,8 @@ module Make_commands (X : Intf.S) : Intf.Commands = struct
        and public_input =
          Spec.choose_one
            ~if_nothing_chosen:X.Input.Public_input.Value.if_not_given
-           [ Spec.flag "--public-input-sexp"
+           [ X.Input.Public_input.Value.args
+           ; Spec.flag "--public-input-sexp"
                ~doc:
                  "s-expression Enter the public input in the form of an \
                   s-expression"
