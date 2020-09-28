@@ -17,7 +17,7 @@ module Style = {
       display(`block),
       justifyContent(`center),
       margin(`auto),
-      marginTop(`rem(4.)),
+      marginTop(`rem(2.)),
       padding2(~v=`zero, ~h=`rem(2.)),
       media(Theme.MediaQuery.desktop, [display(`flex)]),
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
@@ -84,6 +84,7 @@ let make = (~metadata, ~children) => {
     <Next.Head>
       <link rel="stylesheet" href="/static/css/a11y-light.css" />
     </Next.Head>
+    <div className=Nav.Styles.spacer />
     <div className=Style.page>
       <DocsSideNav currentSlug />
       <div className=Style.content>

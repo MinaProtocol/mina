@@ -7,5 +7,5 @@
    coda_base secrets work_selector graphql_lib rosetta_coding)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx --
-    -conditional))
+    --conditional))
  (synopsis "Library to communicate with Coda as cli as the front-end"))

@@ -12,10 +12,12 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
+    href: string,
   };
 
   type t = {
     rowType,
+    copySize: [ | `Large | `Small],
     title: string,
     description: string,
     textColor: Css.color,
@@ -40,10 +42,17 @@ module SingleRow = {
         alignItems(`center),
       ]);
 
-    let contentBlock = (contentBackground: Row.backgroundType) => {
+    let contentBlock = (size, contentBackground: Row.backgroundType) => {
+      let additionalNotMobileStyles =
+        switch (size) {
+        | `Large => []
+        | `Small => [bottom(`percent(35.))]
+        };
       style([
         position(`absolute),
         width(`rem(21.)),
+        maxHeight(`rem(35.)),
+        overflow(`scroll),
         unsafe("height", "fit-content"),
         margin2(~h=`rem(5.), ~v=`zero),
         display(`flex),
@@ -54,7 +63,7 @@ module SingleRow = {
         important(backgroundSize(`cover)),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), bottom(`percent(35.))],
+          [margin(`zero), ...additionalNotMobileStyles],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -117,9 +126,9 @@ module SingleRow = {
           ]),
         ]);
 
-      let contentBlock = backgroundImg => {
+      let contentBlock = (size, backgroundImg) => {
         merge([
-          RowStyles.contentBlock(backgroundImg),
+          RowStyles.contentBlock(size, backgroundImg),
           style([
             bottom(`percent(6.)),
             media(
@@ -135,7 +144,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
@@ -171,9 +181,9 @@ module SingleRow = {
           ]),
         ]);
 
-      let contentBlock = contentBackground => {
+      let contentBlock = (size, contentBackground) => {
         merge([
-          RowStyles.contentBlock(contentBackground),
+          RowStyles.contentBlock(size, contentBackground),
           style([
             top(`percent(6.)),
             media(
@@ -193,7 +203,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
@@ -201,7 +212,10 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
                 <span className=Css.(style([marginTop(`rem(0.8))]))>
@@ -232,12 +246,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~row: Row.t) => {
+let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
     <Wrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
        }}
     </Wrapped>
   </div>;
