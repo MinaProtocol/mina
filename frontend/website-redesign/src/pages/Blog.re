@@ -142,12 +142,12 @@ module InternalCtaSection = {
       leftItem=InternalCtaSection.Item.{
         title: "About the Tech",
         img: "/static/img/AboutTechCta.png",
-        snippet: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        snippet: "Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
       }
       rightItem=InternalCtaSection.Item.{
         title: "Get Started",
         img: "/static/img/GetStartedCta.png",
-        snippet: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        snippet: "Mina makes it simple to run a node, build and join the community.",
       }
     />;
   };
@@ -158,7 +158,7 @@ let make = (~posts) => {
   switch (Array.to_list(posts)) {
   | [] => failwith("Didn't load blog posts")
   | [featured, ...posts] =>
-    <Page title="Coda Protocol Blog">
+    <Page title="Mina Protocol Blog">
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Nav.Styles.spacerLarge />
       <FeaturedSingleRow
