@@ -7,6 +7,7 @@ module Styles = {
       important(backgroundSize(`cover)),
       backgroundImage(`url("/static/img/BackgroundGlowCluster01.png")),
     ]);
+
   let container =
     style([
       display(`flex),
@@ -17,6 +18,8 @@ module Styles = {
         [
           position(`relative),
           flexDirection(`row),
+          maxWidth(`rem(96.)),
+          margin2(~v=`zero, ~h=`auto),
           padding2(~h=`rem(9.5), ~v=`rem(11.6)),
         ],
       ),
