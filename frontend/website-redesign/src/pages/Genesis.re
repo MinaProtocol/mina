@@ -225,6 +225,7 @@ module CultureFooter = {
 [@react.component]
 let make = () => {
   <Page title="Genesis Page">
+    <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
       header="Genesis Program"
