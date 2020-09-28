@@ -16,5 +16,9 @@ let make = () => {
         Theme.mobile: "/static/img/backgrounds04_GetStarted_1_750x1056_mobile.jpg",
       }
     />
+    <ButtonBar
+      kind=ButtonBar.GetStarted
+      backgroundImg="/static/img/ButtonBarBackground.png"
+    />
   </Page>;
 };
