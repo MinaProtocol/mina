@@ -1,3 +1,15 @@
+module Styles = {
+  open Css;
+
+  let background =
+    style([
+      backgroundImage(
+        `url("/static/img/BecomeAGenesisMemberBackground.png"),
+      ),
+      backgroundSize(`cover),
+    ]);
+};
+
 [@react.component]
 let make = () => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -55,5 +67,26 @@ let make = () => {
         |])
       }
     />
+    <div className=Styles.background>
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          title: "Become a Genesis Member",
+          copySize: `Small,
+          description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
+          textColor: Theme.Colors.white,
+          image: "/static/img/GenesisCopy.jpg",
+          background: Image("/static/img/BecomeAGenesisMemberBackground.png"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          button: {
+            FeaturedSingleRow.Row.buttonText: "Learn More",
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Theme.Colors.white,
+            dark: false,
+            href: "/genesis",
+          },
+        }
+      />
+    </div>
   </Page>;
 };
