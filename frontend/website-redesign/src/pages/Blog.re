@@ -77,13 +77,12 @@ module MorePosts = {
         listStyleType(`none),
         flexWrap(`wrap),
         display(`flex),
-        selector(
-          "li:nth-child(3n+2)",
-          [marginRight(`rem(4.)), marginLeft(`rem(4.))],
-        ),
+        justifyContent(`flexStart),
+        width(`percent(110.)),
+        marginLeft(`rem(-2.)),
       ]);
 
-    let postItem = style([width(`rem(21.)), marginBottom(`rem(3.25))]);
+    let postItem = style([width(`rem(25.)), marginBottom(`rem(3.25)), padding2(~h=`rem(2.), ~v=`zero)]);
   };
 
   module Content = {
@@ -143,12 +142,12 @@ module InternalCtaSection = {
       leftItem=InternalCtaSection.Item.{
         title: "About the Tech",
         img: "/static/img/AboutTechCta.png",
-        snippet: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        snippet: "Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
       }
       rightItem=InternalCtaSection.Item.{
         title: "Get Started",
         img: "/static/img/GetStartedCta.png",
-        snippet: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        snippet: "Mina makes it simple to run a node, build and join the community.",
       }
     />;
   };
