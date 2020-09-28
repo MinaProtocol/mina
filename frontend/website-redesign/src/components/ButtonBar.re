@@ -119,7 +119,7 @@ module ButtonBarStyles = {
       color(Theme.Colors.white),
     ]);
 
-  let icon = merge([style([marginLeft(`zero)])]);
+  let icon = style([marginLeft(`zero), paddingTop(`rem(0.5))]);
 };
 
 module CommunityLanding = {
@@ -278,6 +278,8 @@ module GetStarted = {
           textTransform(`uppercase),
           letterSpacing(`em(0.02)),
           marginBottom(`rem(0.5)),
+          textAlign(`center),
+          paddingTop(`rem(0.5)),
           media(
             Theme.MediaQuery.tablet,
             [
