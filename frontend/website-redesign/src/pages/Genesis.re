@@ -213,7 +213,7 @@ module CultureFooter = {
         <div className=Styles.link>
           <Link
             text="Read our Code of Conduct"
-            href="https://github.com/CodaProtocol/coda/blob/develop/CODE_OF_CONDUCT.md"
+            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
           />
         </div>
       </div>
@@ -260,7 +260,7 @@ let make = () => {
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
-            href: "/",
+            href: "https://docs.google.com/forms/u/1/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform?usp=send_form",
           },
         }
       />

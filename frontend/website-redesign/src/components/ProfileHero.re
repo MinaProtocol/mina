@@ -164,7 +164,7 @@ module Links = {
   let make = () => {
     <div className=Styles.buttonAndLinks>
       <Button
-        href="https://forums.codaprotocol.com/t/testnet-beta-release-3-2b-challenges/435"
+        href="https://forums.minaprotocol.com/t/testnet-beta-release-3-2b-challenges/435"
         bgColor=Theme.Colors.black>
         {React.string("Current Challenges")}
       </Button>
@@ -172,7 +172,7 @@ module Links = {
         <Next.Link href="https://bit.ly/leaderboardFAQ">
           <a className=Styles.link> {React.string("Leaderboard FAQ")} </a>
         </Next.Link>
-        <Next.Link href="https://bit.ly/CodaDiscord">
+        <Next.Link href="https://bit.ly/MinaDiscord">
           <a className=Styles.link>
             {React.string("Discord #leaderboard-qa Channel")}
           </a>

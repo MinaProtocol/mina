@@ -233,7 +233,7 @@ let make = () => {
           </p>
           <Spacer height=2. />
           <span className=Styles.button>
-            <Button bgColor=Theme.Colors.orange dark=true>
+            <Button bgColor=Theme.Colors.orange dark=true href="/docs">
               {React.string("Get Started")}
               <Icon kind=Icon.ArrowRightMedium />
             </Button>
