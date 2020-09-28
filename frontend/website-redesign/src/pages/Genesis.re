@@ -133,7 +133,7 @@ module HowItWorksGrid = {
           <GridItem label="What Members Do: Post-Mainnet">
             <p className=Theme.Type.paragraph>
               {React.string(
-                 "Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. ",
+                  {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
                )}
             </p>
           </GridItem>
@@ -151,7 +151,7 @@ module HowItWorksGrid = {
                )}
             </p>
             // TODO: Add link here to terms and conditions
-            <Next.Link href="/">
+            <Next.Link href="/tcGenesis">
               <a className=Styles.link>
                 {React.string("Read Terms and Conditions.")}
               </a>
@@ -298,6 +298,15 @@ module CultureFooter = {
         ),
         marginTop(`zero),
       ]);
+
+    let anchor =
+      style([
+        Theme.Typeface.monumentGrotesk,
+        cursor(`pointer),
+        color(Theme.Colors.orange),
+        display(`flex),
+        textDecoration(`none)
+      ]);
   };
   [@react.component]
   let make = () => {
@@ -310,10 +319,10 @@ module CultureFooter = {
            )}
         </p>
         <div className=Styles.link>
-          <Link
-            text="Read our Code of Conduct"
-            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
-          />
+          <a className=Styles.anchor href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
+            {React.string("Read our Code of Conduct")}
+            <Icon kind=Icon.ArrowRightMedium />
+          </a>
         </div>
       </div>
       <Spacer height=1. />

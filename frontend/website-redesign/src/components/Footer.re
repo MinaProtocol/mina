@@ -231,25 +231,16 @@ module Subfooter = {
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Mina Foundation")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Code of Conduct")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
+        <a href="https://o1labs.org/" className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
+        <a href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md" className=Styles.smallLinks>
+          {React.string("Code of Conduct")}
+        </a>
+        <Next.Link href="/privacy">
           <a className=Styles.smallLinks>
             {React.string("Privacy Policy")}
           </a>
         </Next.Link>
-        <Next.Link href="">
+        <Next.Link href="/tos">
           <a className=Styles.smallLinks>
             {React.string("Terms of Service")}
           </a>

@@ -220,23 +220,12 @@ let make = (~dark=false) => {
       <NavGroup label="Get Started" dark>
         <NavGroupLink icon=Icon.Box label="Overview" href="/get-started" />
         <NavGroupLink
-          icon=Icon.NodeOperators
-          label="Node Operators"
-          href="/node-operators"
-        />
-        <NavGroupLink
-          icon=Icon.Developers
-          label="Developers"
-          href="/developers"
-        />
-        <NavGroupLink
           icon=Icon.Documentation
           label="Documentation"
           href="/docs"
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
       </NavGroup>
-      <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>

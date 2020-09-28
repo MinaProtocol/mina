@@ -74,7 +74,6 @@ module MainListing = {
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.author)} </span>
       </div>
-      <img src=mainImg />
       <article>
         <h5 className=Styles.title> {React.string(item.title)} </h5>
         <p className=Styles.description> {React.string(item.snippet)} </p>
