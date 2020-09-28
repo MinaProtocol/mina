@@ -2,12 +2,12 @@
 
 set -eou pipefail
 
-echo "--- generate change DIFF"
+echo "--- Generating change DIFF"
 diff=$(
   ./buildkite/scripts/generate-diff.sh
 )
 
-echo "--- identify modifications to helm charts (based on existence of Chart.yaml at change root)"
+echo "--- Identifying modifications to helm charts (based on existence of Chart.yaml at change root)"
 charts=$(
   for val in $diff; do
     find $(dirname $val) -name 'Chart.yaml';
@@ -15,12 +15,12 @@ charts=$(
 )
 charts=$(echo $charts | xargs -n1 | sort -u | xargs)
 
-echo "--- filter duplicate Helm repos" 
+echo "--- Filtering duplicate Helm repos" 
 dirs=$(dirname $charts | xargs -n1 | sort -u | xargs)
 
 if [ -n "${HELM_LINT+x}" ]; then
-  echo "--- Linting: ${dirs}"
   for dir in $dirs; do
+    echo "--- Linting: ${dir}"
     helm lint $dir
 
     echo "--- Executing dry-run: ${dir}"
@@ -43,6 +43,16 @@ if [ -n "${HELM_RELEASE+x}" ]; then
 
     echo "--- Creating updated chart package: ${dir}/Chart.yaml"
     helm package $dir --destination $stageDir
+
+    if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
+      echo "--- Helm experimental OCI activated - deploying to GCR registry"
+      helm chart save $(basename $dir)
+
+      gcloud auth configure-docker
+      docker login "gcr.io/coda-charts/$(basename ${dir})"
+
+      helm chart push "gcr.io/coda-charts/$(basename ${dir})"
+    fi
   done
 
   echo "--- syncing staged chart updates"
