@@ -5,7 +5,7 @@ module Styles = {
 
 [@react.component]
 let make = (~posts) => {
-  <Page title="Coda Protocol Blog">
+  <Page title="Mina Protocol Blog">
     <Next.Head> Markdown.katexStylesheet </Next.Head>
     <div className=Nav.Styles.spacer />
     <Wrapped>
