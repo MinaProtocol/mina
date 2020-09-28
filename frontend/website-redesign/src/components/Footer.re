@@ -151,7 +151,7 @@ module LeftSide = {
       <div className=Styles.emailInputSection>
         <div className=Styles.label> {React.string("Get Updates")} </div>
         <p className=Styles.emailSubtext>
-          {React.string("Mina's growing fast! Sign up and stay in the loop.")}
+          {React.string("Mina is growing fast! Subscribe to stay updated")}
         </p>
         <EmailInput />
         <Spacer height=2. />
