@@ -159,7 +159,7 @@ let make = (~posts) => {
   switch (Array.to_list(posts)) {
   | [] => failwith("Didn't load blog posts")
   | [featured, ...posts] =>
-    <Page title="Coda Protocol Blog">
+    <Page title="Mina Protocol Blog">
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Nav.Styles.spacerLarge />
       <FeaturedSingleRow

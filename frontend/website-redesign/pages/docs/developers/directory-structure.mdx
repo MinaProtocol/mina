@@ -1,80 +1,79 @@
-import Page from '@reason/pages/Docs';
-export default Page({title: "Repository Structure"});
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Repository Structure" });
 
 # Repository Structure
 
-This document describes the file-structure of [the Coda repository](https://github.com/codaprotocol/coda), and what roles various
+This document describes the file-structure of [the Mina repository](https://github.com/minaprotocol/mina), and what roles various
 files play:
 
-- `dockerfiles/`    
-    Contains Docker related scripts - TODO explain this better
+- `dockerfiles/`  
+   Contains Docker related scripts - TODO explain this better
 
-- `docs/`    
-    Documentation for the code and processes for contributing are here. The documentation website with the walkthrough docs lives in `frontend/website/docs`.
- 
-- `frontend/`   
-    All code related to Coda frontend UIs and products
+- `docs/`  
+   Documentation for the code and processes for contributing are here. The documentation website with the walkthrough docs lives in `frontend/website/docs`.
 
-    - `wallet/`   
-        Source code for the Coda wallet
+- `frontend/`  
+   All code related to Mina frontend UIs and products
 
-    - `website/`    
-        Code for https://codaprotocol.com
+  - `wallet/`  
+     Source code for the Mina wallet
 
-        - `docs/`   
-            Documentation and instructions on joining the Coda network that live at https://codaprotocol.com/docs 
+  - `website/`  
+     Code for https://minaprotocol.com
 
-        - `jobs/`   
-            Current job openings at O(1) Labs - [we're hiring](https://codaprotocol.com/jobs.html)!
-        - `posts/`    
-            Markdown docs for blog posts
+    - `docs/`  
+       Documentation and instructions on joining the Mina network that live at https://minaprotocol.com/docs
 
-        - `src/`    
-            Source code for the website
+    - `jobs/`  
+       Current job openings at O(1) Labs - [we're hiring](https://minaprotocol.com/jobs.html)!
+    - `posts/`  
+       Markdown docs for blog posts
 
-        - `static/`   
-            Static files like images, etc.
+    - `src/`  
+       Source code for the website
 
-- `rfcs/`    
-    This directory contains all accepted RFCs (or "requests for comments") made according to the [RFC process](https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md#rfcs).
+    - `static/`  
+       Static files like images, etc.
+
+- `rfcs/`  
+   This directory contains all accepted RFCs (or "requests for comments") made according to the [RFC process](https://github.com/MinaProtocol/mina/blob/master/CONTRIBUTING.md#rfcs).
 
 - `scripts/`
 
-- `src/`    
-    All protocol source code, both application and library code, is in this directory.
-  
-    - `*.opam`    
-        These files are needed for our `dune` build system. There must be one for each
-        library in `lib`. When you create a library `lib/foo_lib` with a `dune` file giving
-        the library's name as `foo_lib`, you must create a `foo_lib.opam` file.
-    
-    - `config/`    
-        Build time config - these .mlh files define compile time constants and their values.
-    
-    - `app/`    
-        Applications live here.
-        
-        - `cli/`    
-            This is the coda client/daemon. It is what you use to run a staker, a snarker, or a simple client for sending and receiving transactions.
-        
-        - `website/`    
-            Soon to be deprecated directory for the website - most of the code has migrated over to `frontend/website/`
-        
-        - `reformat/`   
-            This program runs `ocamlformat` on most of the files in the source tree, with a few exceptions.
-        
-        - `logproc/`    
-            This utility reads from `stdin` and can filter and pretty print the log messages emitted by the coda daemon.
-        
-        - `libp2p_helper/`   
-            This program uses go-libp2p to implement the peer-to-peer plumbing that Coda daemons need.
+- `src/`  
+   All protocol source code, both application and library code, is in this directory.
 
-    - `external/`   
-        Local copies of external libraries which we've had to make some tweaks to.
-    
-    - `lib/`    
-        Libraries powering coda.
-        The libraries here basically fall into two categories.
-        1. General purpose data-types and functionality. This includes `snarky`, `fold_lib`, `vrf_lib`, `sgn`, and others.
-        2. Application specific functionality, structured as a library. This includes `syncable_ledger`, `staged_ledger`, `transaction_snark`, and others.
-    
+  - `*.opam`  
+     These files are needed for our `dune` build system. There must be one for each
+    library in `lib`. When you create a library `lib/foo_lib` with a `dune` file giving
+    the library's name as `foo_lib`, you must create a `foo_lib.opam` file.
+
+  - `config/`  
+     Build time config - these .mlh files define compile time constants and their values.
+
+  - `app/`  
+     Applications live here.
+
+    - `cli/`  
+       This is the mina client/daemon. It is what you use to run a staker, a snarker, or a simple client for sending and receiving transactions.
+
+    - `website/`  
+       Soon to be deprecated directory for the website - most of the code has migrated over to `frontend/website/`
+
+    - `reformat/`  
+       This program runs `ocamlformat` on most of the files in the source tree, with a few exceptions.
+
+    - `logproc/`  
+       This utility reads from `stdin` and can filter and pretty print the log messages emitted by the mina daemon.
+
+    - `libp2p_helper/`  
+       This program uses go-libp2p to implement the peer-to-peer plumbing that Mina daemons need.
+
+  - `external/`  
+     Local copies of external libraries which we've had to make some tweaks to.
+
+  - `lib/`  
+     Libraries powering mina.
+    The libraries here basically fall into two categories.
+    1. General purpose data-types and functionality. This includes `snarky`, `fold_lib`, `vrf_lib`, `sgn`, and others.
+    2. Application specific functionality, structured as a library. This includes `syncable_ledger`, `staged_ledger`, `transaction_snark`, and others.

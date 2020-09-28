@@ -96,7 +96,7 @@ module Style = {
 let make = (~post: option(ContentType.BlogPost.t)) => {
   switch (post) {
   | None =>
-    <Page title="Coda Protocol Blog">
+    <Page title="Mina Protocol Blog">
       <div> {React.string("Couldn't find that blog post!")} </div>
       <Next.Link href="/blog">
         <a> {React.string("Check out the rest of our posts instead")} </a>

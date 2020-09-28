@@ -1,16 +1,18 @@
-import Page from '@reason/pages/Docs';
-export default Page({title: "Hardware Wallet"});
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Hardware Wallet" });
 
 # Hardware Wallet
 
-Coda now supports the usage of hardware wallets such as Ledger to interact with
+Mina now supports the usage of hardware wallets such as Ledger to interact with
 the protocol, and sign transactions.
 
 <Alert kind="warning">
 
+
 Disclaimer: Ledger support is experimental. Don't use it on a Ledger device that is handling or has ever handled private keys associated with any accounts of value.
 
 </Alert>
+
 
 ## Requirements
 
@@ -27,6 +29,7 @@ instructions may change. Once the hardware wallet app is available on
 [Ledger Live](https://www.ledger.com/ledger-live), the installation steps will be stabilized.
 
 The following debian packages are needed to use hardware wallets on linux:
+
 ```
 sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 ```
@@ -42,6 +45,7 @@ sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 
 The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-python)
 and can be downloaded/installed with the following:
+
 ```
 sudo apt install -y libudev-dev libusb
 pip3 install ledgerblue
@@ -57,14 +61,15 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0001", MODE="0660
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0004", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
 ```
 
-### Build/download the Coda Ledger application
+### Build/download the Mina Ledger application
 
 Either download the precompiled app binary from
-[here](https://github.com/CodaProtocol/ledger-coda-app/releases/tag/v0.1.0), or follow the instructions
+[here](https://github.com/MinaProtocol/ledger-mina-app/releases/tag/v0.1.0), or follow the instructions
 at the end of this document to [build the app from source](/docs/hardware-wallet#building-from-source).
 
 To load the precompiled app onto the Ledger device, after downloading `ledger-precompile.zip`
 from the link above, navigate to the directory that `ledger-precompile.zip` is in, and run the following:
+
 ```
 unzip ledger-precompile.zip
 cd ledger-precompile
@@ -72,21 +77,24 @@ cd ledger-precompile
 ```
 
 To delete the app, you can run
+
 ```
 ./delete.sh
 ```
 
 # Using the hardware wallet
 
-The coda hardware wallet command line tool is a python package called `coda-ledger-cli`:
+The mina hardware wallet command line tool is a python package called `mina-ledger-cli`:
+
 ```
-python3 -mpip install coda-ledger-cli==0.0.5
+python3 -mpip install mina-ledger-cli==0.0.5
 ```
 
 If you have connection issues with your hardware wallet, please take a look at
 [the troubleshooting help on the Ledger support page](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
 Oftentimes, connectivity issues can be resolved by adding udev rules. Enter the
 following command to automatically add the rules and reload udev:
+
 ```
 wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_udev_rules.sh | sudo bash
 ```
@@ -95,7 +103,7 @@ wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_ud
 
 Run the following command which will create a public and private keypair in the hardware wallet:
 
-    coda accounts create-hd HD-index
+    mina accounts create-hd HD-index
 
 HD-index is a number that works like a seed that you give to the hardware wallet
 to create your public and private keypair. If you use the same HD-index with the
@@ -126,20 +134,21 @@ You can use the same commands to send payments found in
 There are 2 differences:
 
 1. You do not need to unlock your account before sending the transaction because
-  your account is protected by your hardware wallet already.
+   your account is protected by your hardware wallet already.
 2. Your hardware wallet may ask you to confirm the operation while signing the
-  transaction.
-
+   transaction.
 
 ## Troubleshooting
 
 ### What if I lose my hardware wallet?
+
 You can buy another `Ledger Nano S` and initialize it with the same 24-word
 seed to gain access to your existing account.
 
 ### What if I forget the public key of my account?
+
 If you remember the HD-index which you use to generate your account, then you
-can use `coda accounts create-hd HD-index` with the same HD-index to regenerate
+can use `mina accounts create-hd HD-index` with the same HD-index to regenerate
 the public_key.
 
 ## Building from source
@@ -152,6 +161,7 @@ to your `PATH`.
 ### Downloading precompiled gcc and clang
 
 Following the instructions at [the Ledger Wiki](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html):
+
 - Install standard gcc (for microcontroller firmware and secure device linking)
   (link from ledger link?), by downloading a precompiled binary from
   [here](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads)
@@ -173,21 +183,26 @@ Following the instructions at [the Ledger Wiki](https://ledger.readthedocs.io/en
   ```
 
 Next, to install the cross compilation headers required, use:
+
 ```
 sudo apt install gcc-multilib g++-multilib
 ```
+
 Then install the Nano S SDK with
+
 ```
 git clone git@github.com:LedgerHQ/nanos-secure-sdk.git
 ```
+
 and add `export BOLOS_SDK=<PATH-TO-SDK>` to your `~/.bashrc` or `~/.profile`.
 
-### Build and Load the Coda Ledger app
+### Build and Load the Mina Ledger app
 
-Running the following will install the Coda app on your Ledger device:
+Running the following will install the Mina app on your Ledger device:
+
 ```
-git clone git@github.com:CodaProtocol/ledger-coda-app.git
-cd ledger-coda-app
+git clone git@github.com:MinaProtocol/ledger-mina-app.git
+cd ledger-mina-app
 git checkout 4574d3c
 make load
 ```
