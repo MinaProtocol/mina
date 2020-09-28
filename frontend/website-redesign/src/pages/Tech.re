@@ -26,11 +26,13 @@ module Styles = {
 
   let sideNav = sticky =>
     style([
+      display(`none),
       position(sticky ? `fixed : `absolute),
       top(sticky ? `rem(3.5) : `rem(66.)),
       marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
       width(`rem(14.)),
       background(white),
+      media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
 
   let projects =
