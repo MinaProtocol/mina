@@ -75,17 +75,17 @@ let make = (~children, ~dark=false) => {
         </div>
       </Next.Link>
     </div>
-    <div className=Styles.changeRegionSection>
-      <Icon kind=Icon.World />
-      <span
-        className=Css.(
-          merge([Styles.flexCenter, Styles.hideIfMobileElseShow])
-        )>
-        <span className=Styles.changeRegionText>
-          {React.string("Change Region")}
-        </span>
-        <Icon kind=Icon.ChevronDown />
-      </span>
-    </div>
+    //<div className=Styles.changeRegionSection>
+    //  <Icon kind=Icon.World />
+    //  <span
+    //    className=Css.(
+    //      merge([Styles.flexCenter, Styles.hideIfMobileElseShow])
+    //    )>
+    //    <span className=Styles.changeRegionText>
+    //      {React.string("Change Region")}
+    //    </span>
+    //    <Icon kind=Icon.ChevronDown />
+    //  </span>
+    // </div>
   </div>;
 };

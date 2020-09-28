@@ -54,7 +54,7 @@ let make =
       </style>
     </Next.Head>
     <AnnouncementBanner dark=darkTheme>
-      {React.string("Mainnet is live!")}
+      {React.string("Mina is Growing Fast.")}
     </AnnouncementBanner>
     <Nav dark=darkTheme />
     <main> children </main>
