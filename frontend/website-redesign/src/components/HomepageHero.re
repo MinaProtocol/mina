@@ -4,10 +4,28 @@ module Styles = {
     style([
       height(`rem(120.)),
       width(`percent(100.)),
+      position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(140.))]),
       position(`relative),
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`zero),
+        left(`zero),
+        right(`zero),
+        height(`rem(30.)),
+        background(
+          linearGradient(
+            deg(0.),
+            [
+              (`percent(0.), white),
+              (`percent(100.), rgba(255, 255, 255, 0.)),
+            ],
+          ),
+        ),
+      ]),
     ]);
 
   let container =
@@ -27,7 +45,6 @@ module Styles = {
       marginTop(`rem(13.)),
       media("(min-width:65rem)", [flexDirection(`row)]),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
-      media(Theme.MediaQuery.desktop, [marginTop(`rem(50.))]),
     ]);
 
   let heroHeadline =
@@ -39,13 +56,12 @@ module Styles = {
         alignItems(`center),
         marginTop(`rem(23.)),
         media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
-        media(Theme.MediaQuery.desktop, [marginTop(`rem(37.))]),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(35.))]),
       ]),
     ]);
 
   let heroImageSize =
     style([
-      height(`rem(20.5)),
       width(`percent(100.)),
       media(
         "(min-width:38rem)",
@@ -82,7 +98,7 @@ module Styles = {
 
   let buttonIcon =
     style([
-      marginTop(`rem(0.65)),
+      height(`rem(1.5)),
       marginLeft(`rem(0.5)),
       color(hex("#FF603B")),
     ]);

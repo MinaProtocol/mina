@@ -171,6 +171,10 @@ let make = (~posts) => {
             buttonTextColor: Theme.Colors.white,
             buttonText: "Read more",
             dark: true,
+            href:  {
+              Js.log("/blog/" ++ featured.slug);
+              "/blog/" ++ featured.slug
+            }
           },
         }
       />

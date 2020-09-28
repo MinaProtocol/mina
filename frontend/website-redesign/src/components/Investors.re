@@ -20,8 +20,8 @@ module Styles = {
       display(`grid),
       gridTemplateColumns([`rem(10.), `rem(10.)]),
       gridAutoRows(`rem(5.5)),
-      gridColumnGap(`rem(1.)),
-      gridRowGap(`rem(1.)),
+      gridGap(`rem(1.)),
+      selector("div, img", [height(`rem(5.5)), width(`rem(10.))]),
       media(
         Theme.MediaQuery.tablet,
         [gridTemplateColumns([`repeat((`num(4), `rem(10.)))])],
@@ -40,7 +40,11 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(89.))],
+        [
+          margin2(~v=`zero, ~h=`auto),
+          padding2(~v=`rem(7.), ~h=`rem(9.5)),
+          maxWidth(`rem(84.)),
+        ],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -52,7 +56,10 @@ module Styles = {
       fontSize(`rem(1.125)),
       textAlign(`center),
       background(white),
-      padding2(~v=`rem(2.), ~h=`rem(1.)),
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
+      padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
   let investorGridItemLarge =
     style([
@@ -60,6 +67,9 @@ module Styles = {
       fontSize(`rem(1.125)),
       textAlign(`center),
       background(white),
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
       padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
   let rule =
@@ -70,7 +80,6 @@ module Styles = {
   let advisorGrid =
     style([
       display(`grid),
-      gridColumnGap(`rem(1.)),
       gridTemplateColumns([`repeat((`num(2), `rem(10.)))]),
       gridAutoRows(`rem(17.3)),
       media(
@@ -186,8 +195,6 @@ let make = () => {
             src="/static/img/headshots/sahai.jpg"
           />
         </div>
-      <Spacer height=2. />
-      <Rule color=Theme.Colors.black />
     </div>
   </div>;
 };

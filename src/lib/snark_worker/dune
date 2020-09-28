@@ -8,7 +8,7 @@
    core_kernel.hash_heap sparse_ledger_lib ledger_proof transaction_witness)
  (preprocess
   (pps
-   bisect_ppx -conditional
+   bisect_ppx --conditional
    ppx_bin_prot
    ppx_coda
    ppx_custom_printf

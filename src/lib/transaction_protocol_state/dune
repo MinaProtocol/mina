@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core snarky.backendless coda_state coda_base sgn)
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
+  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- --conditional))
  (synopsis "Transaction protocol state library"))
