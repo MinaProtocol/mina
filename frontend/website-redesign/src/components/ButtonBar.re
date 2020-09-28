@@ -9,13 +9,11 @@ module Card = {
     open Css;
     let container =
       style([
-        maxHeight(`rem(5.)), // bandaid for a bug on Safari
         display(`flex),
         justifyContent(`spaceBetween),
         flexDirection(`column),
-        padding2(~h=`rem(1.), ~v=`rem(0.5)),
+        padding2(~h=`rem(1.), ~v=`rem(1.)),
         width(`percent(100.)),
-        height(`percent(100.)),
         border(`px(1), `solid, Theme.Colors.white),
         backgroundColor(Theme.Colors.digitalBlack),
         borderTopLeftRadius(`px(4)),
@@ -66,10 +64,10 @@ module ButtonBarStyles = {
   let background = (kind, backgroundImg) => {
     let (mobileV, tabletV, desktopV) =
       switch (kind) {
-      | GetStarted => (1.5, 5.75, 16.)
-      | Developers => (1.5, 5.75, 16.)
+      | GetStarted => (1.5, 5.75, 6.)
+      | Developers => (1.5, 5.75, 6.)
       | CommunityLanding => (1.5, 4.25, 4.25)
-      | HelpAndSupport => (1.5, 5.75, 16.)
+      | HelpAndSupport => (1.5, 5.75, 6.)
       };
     let (mobileH, tabletH, desktopH) =
       switch (kind) {
@@ -121,7 +119,7 @@ module ButtonBarStyles = {
       color(Theme.Colors.white),
     ]);
 
-  let icon = merge([style([marginLeft(`zero)])]);
+  let icon = style([marginLeft(`zero), paddingTop(`rem(0.5))]);
 };
 
 module CommunityLanding = {
@@ -261,12 +259,101 @@ module HelpAndSupport = {
   };
 };
 
+module GetStarted = {
+  module Styles = {
+    open Css;
+    let content =
+      merge([
+        ButtonBarStyles.content,
+        style([media(Theme.MediaQuery.tablet, [alignItems(`flexStart)])]),
+      ]);
+
+    let title =
+      merge([
+        style([
+          Theme.Typeface.monumentGrotesk,
+          color(Theme.Colors.white),
+          fontSize(`rem(0.75)),
+          lineHeight(`rem(1.)),
+          textTransform(`uppercase),
+          letterSpacing(`em(0.02)),
+          marginBottom(`rem(0.5)),
+          textAlign(`center),
+          paddingTop(`rem(0.5)),
+          media(
+            Theme.MediaQuery.tablet,
+            [
+              textAlign(`left),
+              textTransform(`none),
+              letterSpacing(`zero),
+              fontSize(`rem(1.3)),
+              lineHeight(`rem(1.56)),
+            ],
+          ),
+        ]),
+      ]);
+
+    let description =
+      merge([
+        Theme.Type.paragraphSmall,
+        style([
+          display(`none),
+          color(Theme.Colors.white),
+          media(Theme.MediaQuery.tablet, [display(`block)]),
+        ]),
+      ]);
+
+    let icon =
+      merge([
+        ButtonBarStyles.icon,
+        style([media(Theme.MediaQuery.tablet, [marginLeft(`auto)])]),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    let renderCard = (kind, title, description) => {
+      <Card>
+        <div className=Styles.content>
+          <span className=Styles.icon> <Icon kind /> </span>
+          <h5 className=Styles.title> {React.string(title)} </h5>
+          <p className=Styles.description> {React.string(description)} </p>
+        </div>
+      </Card>;
+    };
+
+    <div className=ButtonBarStyles.container>
+      <div className=ButtonBarStyles.grid>
+        {renderCard(
+           Icon.NodeOperators,
+           "Run a node",
+           "Getting started is easier than you think.",
+         )}
+        {renderCard(
+           Icon.Developers,
+           "Build on Mina",
+           "Work on the protocol  and contribute to Mina's codebase.",
+         )}
+        {renderCard(
+           Icon.Community,
+           "Join the Community",
+           "Let's keep it positive and productive.",
+         )}
+        {renderCard(
+           Icon.GrantsProgram,
+           "Apply for a Grant",
+           "Roll up your sleeves and help build Mina.",
+         )}
+      </div>
+    </div>;
+  };
+};
+
 [@react.component]
 let make = (~kind, ~backgroundImg) => {
   <div className={ButtonBarStyles.background(kind, backgroundImg)}>
     <Wrapped>
       {switch (kind) {
-       | GetStarted => React.null
+       | GetStarted => <GetStarted />
        | Developers => React.null
        | CommunityLanding => <CommunityLanding />
        | HelpAndSupport => <HelpAndSupport />

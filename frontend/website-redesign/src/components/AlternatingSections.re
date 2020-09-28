@@ -62,9 +62,12 @@ module Section = {
     let image =
       style([
         width(`percent(100.)),
+        maxWidth(`rem(23.)),
         height(`auto),
-        maxWidth(`rem(29.)),
-        marginTop(`rem(2.)),
+        media(
+          Theme.MediaQuery.tablet,
+          [maxWidth(`rem(29.)), marginTop(`rem(2.))],
+        ),
       ]);
   };
   module SimpleRow = {

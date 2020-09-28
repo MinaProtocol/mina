@@ -45,20 +45,25 @@ module Styles = {
   let headerLabel =
     merge([
       Theme.Type.label,
-      style([color(black), marginTop(`zero), marginBottom(`zero)]),
+      style([
+        color(black),
+        marginTop(`zero),
+        marginBottom(`zero),
+        fontWeight(`light),
+      ]),
     ]);
   let header =
     merge([
       Theme.Type.h1,
       style([
-        maxWidth(`rem(46.25)),
         backgroundColor(white),
         marginRight(`rem(1.)),
         fontSize(`rem(1.5)),
         padding2(~v=`rem(1.3), ~h=`rem(1.3)),
+        unsafe("width", "max-content"),
         media(
           Theme.MediaQuery.desktop,
-          [padding2(~v=`rem(1.5), ~h=`rem(1.5))],
+          [padding2(~v=`rem(1.5), ~h=`rem(1.5)), maxWidth(`rem(46.25))],
         ),
         marginTop(`rem(1.)),
         marginBottom(`rem(1.5)),
@@ -71,9 +76,10 @@ module Styles = {
         backgroundColor(white),
         padding2(~v=`rem(1.5), ~h=`rem(1.5)),
         marginRight(`rem(1.)),
-        media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
         marginTop(`zero),
         marginBottom(`zero),
+        maxWidth(`rem(19.)),
+        media(Theme.MediaQuery.tablet, [maxWidth(`rem(40.))]),
       ]),
     ]);
 
