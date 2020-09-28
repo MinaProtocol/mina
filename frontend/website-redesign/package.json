@@ -30,7 +30,7 @@
     "react-cookie-consent": "^3.0.0",
     "react-dom": "^16.8.6",
     "react-gtm-module": "^2.0.8",
-    "reason-react": "^0.7.0",
+    "reason-react": "0.8.0",
     "rehype-katex": "^2.0.0",
     "rehype-raw": "^4.0.1",
     "rehype-react": "^4.0.1",
@@ -45,7 +45,7 @@
     "@2fd/graphdoc": "^2.4.0",
     "@babel/core": "^7.4.3",
     "@next/bundle-analyzer": "^9.1.4",
-    "bs-platform": "7.0.0-dev.1",
+    "bs-platform": "7.1.1",
     "concurrently": "^4.1.0",
     "rehype-highlight": "^3.1.0"
   },
