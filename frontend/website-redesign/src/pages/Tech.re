@@ -230,6 +230,7 @@ module HowMinaWorks = {
   };
 };
 
+<<<<<<< HEAD
 module Projects = {
   module ProjectCopy = {
     [@react.component]
