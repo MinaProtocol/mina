@@ -452,7 +452,7 @@ let make = () => {
       }
       title="Tech"
       header="An Elegant Solution"
-      copy="Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale."
+      copy=Some("Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.")
     />
     <TechSideNav />
     <HowMinaWorks />
@@ -483,11 +483,13 @@ let make = () => {
           that syncs in seconds, we’ll get you up and running in record time.
         |js},
         textColor: `currentColor,
+        copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
         background: Image("/static/img/MinaSpectrumPrimary3.png"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
+          href: "/docs",
           buttonText: "Run a Node",
           dark: false,
         },
@@ -510,6 +512,7 @@ let make = () => {
           coding skills to work at the protocol level?
         |js},
         textColor: `currentColor,
+        copySize: `Large,
         image: "/static/img/tech-touch.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
         button: {
@@ -517,6 +520,7 @@ let make = () => {
           buttonTextColor: Css.white,
           buttonText: "Opportunities",
           dark: false,
+          href: "/docs",
         },
         contentBackground: Color(Css.white),
       }

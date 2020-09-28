@@ -109,7 +109,6 @@ module Item = {
       | None => (slug, `Top)
       };
     let isCurrentItem = currentSlug == fullSlug;
-    Js.log4("currentSlug", currentSlug, "fullSlug", fullSlug);
     let href = fullSlug;
     <li
       className={
