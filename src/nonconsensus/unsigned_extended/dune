@@ -7,5 +7,5 @@
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare
-       ppx_inline_test ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
+       ppx_inline_test ppx_deriving.std ppx_deriving_yojson bisect_ppx -- --conditional))
  (synopsis "Unsigned integer functions"))

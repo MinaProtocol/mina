@@ -204,7 +204,7 @@ module ValuesSection = {
         h2="Open Source"
         p="We passionately believe in the open-source philosophy, and make our software free for the entire world to use."
         linkText={js|Take a look →|js}
-        url="https://github.com/CodaProtocol/coda"
+        url="https://github.com/MinaProtocol/mina"
       />
       <Spacer height=3.5 />
       <HeadingItem
