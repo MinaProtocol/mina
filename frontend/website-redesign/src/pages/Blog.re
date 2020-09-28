@@ -42,25 +42,31 @@ module Style = {
   let morePostsSpacing = style([marginTop(`rem(7.1875))]);
 
   let marginX = x => [marginLeft(x), marginRight(x)];
-  let _eyebrowSpacing = style(marginX(`rem(1.25)) @ [
-      maxWidth(`rem(71.)),
-      marginTop(`rem(4.2)),
-      marginBottom(`rem(1.9)),
-      media(
-        Theme.MediaQuery.tablet,
-        [ marginBottom(`rem(6.5)),
-          marginTop(`rem(7.)),
-         ...marginX(`rem(2.5)),
-        ]
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [ marginBottom(`rem(8.)),
-          marginTop(`rem(7.)),
-          ...marginX(`rem(9.5))
-        ]
-      ),
-  ]);
+  let _eyebrowSpacing =
+    style(
+      marginX(`rem(1.25))
+      @ [
+        maxWidth(`rem(71.)),
+        marginTop(`rem(4.2)),
+        marginBottom(`rem(1.9)),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            marginBottom(`rem(6.5)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(2.5)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            marginBottom(`rem(8.)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(9.5)),
+          ],
+        ),
+      ],
+    );
 };
 
 module MorePosts = {
@@ -171,10 +177,9 @@ let make = (~posts) => {
             buttonTextColor: Theme.Colors.white,
             buttonText: "Read more",
             dark: true,
-            href:  {
-              Js.log("/blog/" ++ featured.slug);
-              "/blog/" ++ featured.slug
-            }
+            href:
+              {Js.log("/blog/" ++ featured.slug);
+               "/blog/" ++ featured.slug},
           },
         }
       />

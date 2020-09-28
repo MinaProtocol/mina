@@ -20,27 +20,28 @@ module Styles = {
     ]);
   let marginX = x => [marginLeft(x), marginRight(x)];
   let heroContent =
-    style([
-      marginTop(`rem(4.2)),
-      marginBottom(`rem(1.9))
-    ] @ marginX(`rem(1.25)) @ [
-      media(
-        Theme.MediaQuery.tablet,
-        [
-          marginTop(`rem(7.)),
-          marginBottom(`rem(6.5)),
-          ...marginX(`rem(2.5))
-        ],
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [
-          marginTop(`rem(17.1)),
-          marginBottom(`rem(8.)),
-          ...marginX(`rem(9.5))
-        ],
-      ),
-    ]);
+    style(
+      [marginTop(`rem(4.2)), marginBottom(`rem(1.9))]
+      @ marginX(`rem(1.25))
+      @ [
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            marginTop(`rem(7.)),
+            marginBottom(`rem(6.5)),
+            ...marginX(`rem(2.5)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            marginTop(`rem(17.1)),
+            marginBottom(`rem(8.)),
+            ...marginX(`rem(9.5)),
+          ],
+        ),
+      ],
+    );
   let headerLabel =
     merge([
       Theme.Type.label,
@@ -82,7 +83,7 @@ module Styles = {
       marginTop(`rem(1.)),
       paddingTop(`rem(1.)),
       paddingBottom(`rem(0.5)),
-    ])
+    ]);
 };
 
 /**
@@ -91,17 +92,26 @@ module Styles = {
 
 [@react.component]
 let make =
-    (~title, ~metadata=None, ~header, ~copy, ~background: Theme.backgroundImage, ~children=?) => {
+    (
+      ~title,
+      ~metadata=None,
+      ~header,
+      ~copy,
+      ~background: Theme.backgroundImage,
+      ~children=?,
+    ) => {
   <div className={Styles.heroContainer(background)}>
     <div className=Styles.heroContent>
       <h4 className=Styles.headerLabel> {React.string(title)} </h4>
       {ReactExt.fromOpt(metadata, ~f=metadata =>
-          <div className=Styles.categoryDateSourceContainer>
-            <CategoryDateSourceText metadata />
-          </div>)}
+         <div className=Styles.categoryDateSourceContainer>
+           <CategoryDateSourceText metadata />
+         </div>
+       )}
       <h1 className=Styles.header> {React.string(header)} </h1>
       {ReactExt.fromOpt(copy, ~f=s =>
-         <p className=Styles.headerCopy> {React.string(s)} </p>)}
+         <p className=Styles.headerCopy> {React.string(s)} </p>
+       )}
       {switch (children) {
        | Some(children) => children
        | None => React.null

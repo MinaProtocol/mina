@@ -17,7 +17,7 @@ module Row = {
 
   type t = {
     rowType,
-    copySize: [`Large | `Small],
+    copySize: [ | `Large | `Small],
     title: string,
     description: string,
     textColor: Css.color,
@@ -144,7 +144,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.copySize, row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
@@ -202,7 +203,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.copySize, row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>

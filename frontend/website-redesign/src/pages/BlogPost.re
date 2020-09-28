@@ -6,24 +6,30 @@ module Style = {
   let date = Blog.Style.date;
 
   let marginX = x => [marginLeft(x), marginRight(x)];
-  let basicContainer = style(marginX(`rem(1.25)) @ [
-      marginTop(`rem(4.2)),
-      marginBottom(`rem(1.9)),
-      media(
-        Theme.MediaQuery.tablet,
-        [ marginBottom(`rem(6.5)),
-          marginTop(`rem(7.)),
-         ...marginX(`rem(2.5)),
-        ]
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [ marginBottom(`rem(8.)),
-          marginTop(`rem(7.)),
-          ...marginX(`rem(9.5))
-        ]
-      ),
-  ]);
+  let basicContainer =
+    style(
+      marginX(`rem(1.25))
+      @ [
+        marginTop(`rem(4.2)),
+        marginBottom(`rem(1.9)),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            marginBottom(`rem(6.5)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(2.5)),
+          ],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            marginBottom(`rem(8.)),
+            marginTop(`rem(7.)),
+            ...marginX(`rem(9.5)),
+          ],
+        ),
+      ],
+    );
 
   let mediaMedium = media("screen and (min-width:30em)");
   let mediaLarge = media("screen and (min-width:60em)");
@@ -104,15 +110,23 @@ let make = (~post: option(ContentType.BlogPost.t)) => {
     // Manually set the canonical route to remove .html
     <Page title description=snippet route={"/blog/" ++ slug}>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
-      <Hero metadata=Some(CategoryDateSourceText.{ category: "Post", date, source: author }) title="Blog" header=title copy=Js.Undefined.toOption(subtitle) background=Theme.{
-        desktop: "/static/img/BlogDetailImage.png",
-        tablet: "/static/img/BlogDetailImage.png",
-        mobile: "/static/img/BlogDetailImage.png"
+      <Hero
+        metadata={
+          Some(
+            CategoryDateSourceText.{category: "Post", date, source: author},
+          )
+        }
+        title="Blog"
+        header=title
+        copy={Js.Undefined.toOption(subtitle)}
+        background=Theme.{
+          desktop: "/static/img/BlogDetailImage.png",
+          tablet: "/static/img/BlogDetailImage.png",
+          mobile: "/static/img/BlogDetailImage.png",
           // TODO: Get non-desktop versions of this image
-      }  />
-      <div className=Style.container>
-        <Markdown content />
-      </div>
+        }
+      />
+      <div className=Style.container> <Markdown content /> </div>
     </Page>
   };
 };

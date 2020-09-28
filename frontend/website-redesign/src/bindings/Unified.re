@@ -38,7 +38,18 @@ module Transformers = {
         .
         "createElement": (. React.component('props), 'props) => React.element,
         "Fragment": React.component('a),
-        "components": {. "a": 'props0 => React.element, "p": 'props1 => React.element, "strong": 'props2 => React.element, "ol": 'props3 => React.element, "ul": 'props4 => React.element, "h2": 'props5 => React.element, "h3": 'props6 => React.element, "h4": 'props7 => React.element, "img": 'props10 => React.element }
+        "components": {
+          .
+          "a": 'props0 => React.element,
+          "p": 'props1 => React.element,
+          "strong": 'props2 => React.element,
+          "ol": 'props3 => React.element,
+          "ul": 'props4 => React.element,
+          "h2": 'props5 => React.element,
+          "h3": 'props6 => React.element,
+          "h4": 'props7 => React.element,
+          "img": 'props10 => React.element,
+        },
       },
     ) =
     "rehype-react";
