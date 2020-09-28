@@ -179,23 +179,18 @@ module Section = {
                (),
              )}>
              <div className=SectionStyles.textContainer>
-               <div
-                 className={Styles.seperator("0" ++ string_of_int(idx + 1))}
-               />
                <h2 className=SectionStyles.title>
                  {React.string(row.title)}
                </h2>
                <p className=SectionStyles.paragraphText>
                  {React.string(row.description)}
                </p>
-               <Next.Link href={row.linkUrl}>
-                 <span className=Styles.linkText>
-                   <span> {React.string(row.linkCopy)} </span>
-                   <span className=SectionStyles.icon>
-                     <Icon kind=Icon.ArrowRightMedium />
-                   </span>
-                 </span>
-               </Next.Link>
+               <Spacer height=1. />
+               <Button bgColor=Theme.Colors.white href={row.linkUrl}>
+                 {React.string(row.linkCopy)}
+                 <Icon kind=Icon.ArrowRightMedium />
+               </Button>
+               <Spacer height=1. />
              </div>
              <img src={row.image} className=SectionStyles.image />
            </div>

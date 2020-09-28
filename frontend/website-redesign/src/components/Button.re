@@ -17,6 +17,7 @@ module Styles = {
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
+        unsafe("width", "max-content"),
         width(buttonWidth),
         height(buttonHeight),
         border(`px(1), `solid, borderColor),
