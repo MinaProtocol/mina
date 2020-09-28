@@ -45,7 +45,12 @@ module Styles = {
   let headerLabel =
     merge([
       Theme.Type.label,
-      style([color(black), marginTop(`zero), marginBottom(`zero)]),
+      style([
+        color(black),
+        marginTop(`zero),
+        marginBottom(`zero),
+        fontWeight(`light),
+      ]),
     ]);
   let header =
     merge([
