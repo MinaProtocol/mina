@@ -77,13 +77,12 @@ module MorePosts = {
         listStyleType(`none),
         flexWrap(`wrap),
         display(`flex),
-        selector(
-          "li:nth-child(3n+2)",
-          [marginRight(`rem(4.)), marginLeft(`rem(4.))],
-        ),
+        justifyContent(`flexStart),
+        width(`percent(110.)),
+        marginLeft(`rem(-2.)),
       ]);
 
-    let postItem = style([width(`rem(21.)), marginBottom(`rem(3.25))]);
+    let postItem = style([width(`rem(25.)), marginBottom(`rem(3.25)), padding2(~h=`rem(2.), ~v=`zero)]);
   };
 
   module Content = {
