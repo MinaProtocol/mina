@@ -29,7 +29,7 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.strictlyStart (S.contains "src") ],
+      dirtyWhen = [ S.everything ],
       path = "Lint",
       name = "Fast"
     },
