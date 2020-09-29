@@ -374,7 +374,8 @@ let make = (~profiles) => {
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
-          background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
+          background:
+            Image("/static/img/backgrounds/SectionGenesisBackground.png"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
           button: {
             FeaturedSingleRow.Row.buttonText: "Apply Now",
