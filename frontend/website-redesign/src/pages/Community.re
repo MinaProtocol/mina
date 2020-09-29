@@ -11,9 +11,9 @@ let make = () => {
         )
       }
       background={
-        Theme.desktop: "/static/img/AboutHeroDesktopBackground.jpg",
-        Theme.tablet: "/static/img/AboutHeroTabletBackground.jpg",
-        Theme.mobile: "/static/img/AboutHeroMobileBackground.jpg",
+        Theme.desktop: "/static/img/community-page/09_Community_1_2880x1504.jpg",
+        Theme.tablet: "/static/img/community-page/09_Community_1_1536x1504_tablet.jpg",
+        Theme.mobile: "/static/img/community-page/09_Community_1_750x1056_mobile.jpg",
       }
     />
     <ButtonBar
