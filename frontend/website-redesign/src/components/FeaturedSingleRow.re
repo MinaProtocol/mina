@@ -101,13 +101,12 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
-        height(`percent(60.)),
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         top(`zero),
         media(
           Theme.MediaQuery.tablet,
-          [height(`percent(100.)), width(`percent(80.))],
+          [height(`percent(80.)), width(`percent(80.))],
         ),
         media(
           Theme.MediaQuery.desktop,
@@ -241,7 +240,7 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      height(`percent(100.)),
+      height(`rem(32.5)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {
