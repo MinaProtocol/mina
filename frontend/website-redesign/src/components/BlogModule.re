@@ -1,17 +1,23 @@
 type state = {blogs: array(ContentType.BlogPost.entries)};
 
-let fetchBlogs = () => {
-  Contentful.getEntries(
-    Lazy.force(Contentful.client),
-    {
-      "include": 0,
-      "content_type": ContentType.BlogPost.id,
-      "order": "-fields.date",
-    },
-  )
-  |> Promise.map((entries: ContentType.BlogPost.entries) => {
-       Array.map((e: ContentType.BlogPost.entry) => e.fields, entries.items)
-     });
+module Fetch(T: {
+  type t
+  let id: string;
+  let dateKeyName: string;
+}) = {
+  let run = () => {
+    Contentful.getEntries(
+      Lazy.force(Contentful.client),
+      {
+        "include": 0,
+        "content_type": T.id,
+        "order": "-fields." ++ T.dateKeyName,
+      },
+    )
+    |> Promise.map((entries: ContentType.System.entries(T.t)) => {
+         Array.map((e: ContentType.System.entry(T.t)) => e.fields, entries.items)
+       });
+  }
 };
 
 module Styles = {
@@ -42,12 +48,23 @@ module Title = {
   };
 };
 
+module FetchBlogs = Fetch(ContentType.BlogPost)
+module FetchPress = Fetch(ContentType.Press)
+
 [@react.component]
-let make = () => {
-  let (blogs, setBlogs) = React.useState(_ => [||]);
+let make = (~source) => {
+  let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
-    fetchBlogs() |> Promise.iter(blogs => setBlogs(_ => blogs));
+    switch (source) {
+      | `Blogs =>
+        FetchBlogs.run() |> Promise.iter(blogs => setContent(_ =>
+          blogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)));
+      | `Press =>
+        FetchPress.run() |> Promise.iter(press => setContent(_ =>
+          press |> Array.map(ContentType.NormalizedPressBlog.ofPress)));
+    }
+
     None;
   });
 
@@ -60,9 +77,8 @@ let make = () => {
       />
     </Wrapped>
     <ListModule
-      items=blogs
+      items=content
       itemKind=ListModule.Blog
-      mainImg="/static/img/ArticleImage.png"
     />
   </div>;
 };

@@ -79,7 +79,7 @@ module Styles = {
 module Link = {
   [@react.component]
   let make = (~href, ~children) => {
-    Js.Re.test_(Js.Re.fromString("/https?::/"), href) ? 
+    Js.Re.test_(Js.Re.fromString("https?::"), href) ? 
       <a href> children </a> :
       <Next.Link href> children </Next.Link>
   };

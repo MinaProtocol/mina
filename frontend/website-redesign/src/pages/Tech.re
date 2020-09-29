@@ -39,7 +39,7 @@ module Styles = {
 
   let projects =
     style([
-      background(`url("/static/img/tech-projects-bg.png")),
+      background(`url("/static/img/tech-projects-bg.jpg")),
       // For some reason `auto doesn't count as a Css.length so...
       unsafe("background-size", "100% auto"),
       backgroundRepeat(`noRepeat),
@@ -155,7 +155,7 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
   };
 };
@@ -164,7 +164,7 @@ module HowMinaWorks = {
   [@react.component]
   let make = () =>
     <div
-      className={Styles.sectionContainer("/static/img/tech-gradient-1.png")}>
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
       <Spacer height=6.5 />
       <hr className=Styles.divider />
       <Section
@@ -318,7 +318,7 @@ module Projects = {
   [@react.component]
   let make = () =>
     <div
-      className={Css.merge([Styles.sectionContainer("/static/img/tech-projects-bg.png"), Styles.fadeOut])}>
+      className={Css.merge([Styles.sectionContainer("/static/img/tech-projects-bg.jpg"), Styles.fadeOut])}>
       <Spacer height=5. />
       <Section
         title="Projects & Possibilities"
@@ -435,7 +435,7 @@ module Incentives = {
         <Spacer height=4. />
         <hr className=Styles.divider />
         <Spacer height=2. />
-        <h3 className=Theme.Type.h3> {React.string("Ways to Earn Mina")} </h3>
+        <h3 className=Theme.Type.h3> {React.string("Ways to Join Mina")} </h3>
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
@@ -486,7 +486,7 @@ let make = () => {
     <Projects />
     <Incentives />
     <div
-      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      className={Styles.sectionContainer("/static/img/tech-projects-bg.jpg")}>
       <Spacer height=1.5 />
       <Section
         title="Mina Milestones and the Road Ahead"
@@ -512,7 +512,7 @@ let make = () => {
         textColor: `currentColor,
         copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
-        background: Image("/static/img/MinaSpectrumPrimary3.png"),
+        background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
@@ -523,6 +523,7 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
+      /*
     <div className=Styles.sectionContainer("")>
       <Spacer height=6. />
       <div className=Styles.section id="knowledge">
@@ -530,6 +531,7 @@ let make = () => {
       </div>
     </div>
     <Spacer height=12. />
+    */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
@@ -541,7 +543,7 @@ let make = () => {
         textColor: `currentColor,
         copySize: `Large,
         image: "/static/img/tech-touch.jpg",
-        background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
+        background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,

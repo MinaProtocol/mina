@@ -99,8 +99,7 @@ module MorePosts = {
               <li
                 className=Styles.postItem key={item.ContentType.BlogPost.slug}>
                 <ListModule.MainListing
-                  item
-                  mainImg="/static/img/ArticleImageSmall.png"
+                  item=ContentType.NormalizedPressBlog.ofBlog(item)
                   itemKind=ListModule.Blog
                 />
               </li>
@@ -173,8 +172,8 @@ let make = (~posts) => {
           title: featured.ContentType.BlogPost.title,
           description: featured.snippet,
           textColor: Theme.Colors.white,
-          image: "/static/img/BlogLandingHero.png",
-          background: Image("/static/img/MinaSimplePattern1.png"),
+          image: "/static/img/BlogLandingHero.jpg",
+          background: Image("/static/img/MinaSimplePattern1.jpg"),
           contentBackground: Image("/static/img/MinaSepctrumSecondary.png"),
           button: {
             buttonColor: Theme.Colors.orange,
@@ -194,7 +193,7 @@ let make = (~posts) => {
       </Wrapped>
       <ButtonBar
         kind=ButtonBar.CommunityLanding
-        backgroundImg="/static/img/ButtonBarBackground.png"
+        backgroundImg="/static/img/ButtonBarBackground.jpg"
       />
       <InternalCtaSection />
     </Page>

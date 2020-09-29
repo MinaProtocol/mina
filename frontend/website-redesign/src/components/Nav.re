@@ -179,7 +179,12 @@ module NavGroup = {
         onClick={_ => setActive(_ => !active)}>
         {React.string(label)}
       </span>
-      {active ? <ul className=Styles.navGroup> children </ul> : React.null}
+      {active
+         ? <ul
+             onClick={_ => setActive(_ => !active)} className=Styles.navGroup>
+             children
+           </ul>
+         : React.null}
     </>;
   };
 };

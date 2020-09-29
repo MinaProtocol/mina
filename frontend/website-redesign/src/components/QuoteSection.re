@@ -14,7 +14,7 @@ module Styles = {
       media(
         Theme.MediaQuery.tablet,
         [
-          background(`url("/static/img/SectionQuoteTablet.png")),
+          background(`url("/static/img/SectionQuoteTablet.jpg")),
           height(`rem(42.)),
         ],
       ),
@@ -24,7 +24,7 @@ module Styles = {
           justifyContent(`flexEnd),
           alignContent(`spaceAround),
           padding2(~v=`zero, ~h=`rem(9.5)),
-          background(`url("/static/img/SectionQuoteDesktop.png")),
+          background(`url("/static/img/SectionQuoteDesktop.jpg")),
         ],
       ),
     ]);
