@@ -332,6 +332,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
           in
           Deferred.Or_error.return (acc, initial_state_hash) )
   in
+  [%log debug]
+    ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+    "verification of transitions complete" ;
   let trees_of_transitions =
     Option.fold
       (Non_empty_list.of_list_opt transitions_with_initial_validation)
@@ -345,8 +348,14 @@ let verify_transitions_and_build_breadcrumbs ~logger
       trees_of_transitions
   with
   | Ok result ->
+      [%log debug]
+        ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+        "build of breadcrumbs complete" ;
       Deferred.Or_error.return result
   | Error e ->
+      [%log debug]
+        ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+        "build of breadcrumbs failed" ;
       List.map transitions_with_initial_validation
         ~f:Cached.invalidate_with_failure
       |> ignore ;
@@ -399,6 +408,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     ~num_peers ~preferred_peer ~maximum_download_size
                     ~hashes_of_missing_transitions
               in
+              [%log debug]
+                ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+                "Download transitions complete" ;
               verify_transitions_and_build_breadcrumbs ~logger
                 ~precomputed_values ~trust_system ~verifier ~frontier
                 ~unprocessed_transition_cache ~transitions ~target_hash

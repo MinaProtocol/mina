@@ -480,13 +480,11 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_global_slot )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
@@ -510,8 +508,11 @@ module T = struct
       let exception Exit of Staged_ledger_error.t in
       try
         let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
+          Deferred.List.foldi ts ~init:(i, [], pending_coinbase_stack_state)
             ~f:(fun (acc, pending_coinbase_stack_state) t ->
+              let%bind () =
+                if i mod 10 == 0 then Async.Scheduler.yield () else return ()
+              in
               match%map.Async
                 apply_transaction_and_get_witness ~constraint_constants ledger
                   pending_coinbase_stack_state t.With_status.data
