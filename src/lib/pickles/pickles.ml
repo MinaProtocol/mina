@@ -23,6 +23,7 @@ module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Dirty = Dirty
 module Cache_handle = Cache_handle
+module Step_main_inputs = Step_main_inputs
 
 let verify = Verify.verify
 

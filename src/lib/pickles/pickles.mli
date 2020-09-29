@@ -1,6 +1,7 @@
 open Core_kernel
 open Pickles_types
 open Hlist
+module Step_main_inputs = Step_main_inputs
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls

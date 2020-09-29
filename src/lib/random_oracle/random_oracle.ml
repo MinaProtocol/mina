@@ -29,30 +29,24 @@ let params : Field.t Sponge.Params.t =
 module Inputs = struct
   module Field = Field
 
-  let rounds_full = 8
+  let rounds_full = 63
 
-  let rounds_partial = 30
+  let rounds_partial = 0
 
   [%%ifdef
   consensus_mechanism]
 
-  (* Computes x^17 *)
+  (* Computes x^5 *)
   let to_the_alpha x =
     let open Field in
     let res = square x in
     let open Pickles.Backend.Tick.Field in
-    Mutable.square res ;
-    (* x^4 *)
-    Mutable.square res ;
-    (* x^8 *)
-    Mutable.square res ;
-    (* x^16 *)
-    res *= x ;
-    res
+    Mutable.square res ; (* x^5 *)
+                         res *= x ; res
 
   [%%else]
 
-  (* Computes x^17 *)
+  (* Computes x^5 *)
   let to_the_alpha x =
     let open Field in
     let res = x in
@@ -60,10 +54,6 @@ module Inputs = struct
     (* x^2 *)
     let res = res * res in
     (* x^4 *)
-    let res = res * res in
-    (* x^8 *)
-    let res = res * res in
-    (* x^16 *)
     res * x
 
   [%%endif]
@@ -124,7 +114,7 @@ let hash ?init = hash ?init params
 consensus_mechanism]
 
 module Checked = struct
-  module Inputs = Pickles.Sponge_inputs.Make (Pickles.Impls.Step)
+  module Inputs = Pickles.Step_main_inputs.Sponge.Permutation
 
   module Digest = struct
     open Pickles.Impls.Step.Field
@@ -135,7 +125,7 @@ module Checked = struct
       List.take (choose_preimage_var ~length:Field.size_in_bits x) length
   end
 
-  include Sponge.Make_hash (Sponge.Poseidon (Inputs))
+  include Sponge.Make_hash (Inputs)
 
   let params = Sponge.Params.map ~f:Inputs.Field.constant params
 

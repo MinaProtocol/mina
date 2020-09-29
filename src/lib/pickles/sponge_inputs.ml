@@ -62,6 +62,9 @@ struct
     in
     (* TODO: Constraint state.(0) = start -> ark *)
     Array.iter2_exn init t.(0) ~f:Field.Assert.equal ;
+    (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
+    Impl.assert_
+      [{basic= T (Poseidon {state= t}); annotation= Some "plonk-poseidon"}]) ;
     t.(Int.(Array.length t - 1))
 
   (* TODO: experiment with sealing version of this *)

@@ -60,7 +60,7 @@ module Plonk_constraint = struct
   module T = struct
     type ('v, 'f) t =
       | Basic of {l: 'f * 'v; r: 'f * 'v; o: 'f * 'v; m: 'f; c: 'f}
-      | Poseidon of {start: 'v array; state: 'v array array}
+      | Poseidon of {state: 'v array array}
       | EC_add of {p1: 'v * 'v; p2: 'v * 'v; p3: 'v * 'v}
       | EC_scale of {state: 'v Scale_round.t array}
       | EC_endoscale of {state: 'v Endoscale_round.t array}
@@ -72,10 +72,8 @@ module Plonk_constraint = struct
       | Basic {l; r; o; m; c} ->
           let p (x, y) = (x, f y) in
           Basic {l= p l; r= p r; o= p o; m; c}
-      | Poseidon {start; state} ->
-          Poseidon
-            { start= Array.map ~f start
-            ; state= Array.map ~f:(fun x -> Array.map ~f x) state }
+      | Poseidon {state} ->
+          Poseidon {state= Array.map ~f:(fun x -> Array.map ~f x) state}
       | EC_add {p1; p2; p3} ->
           EC_add {p1= fp p1; p2= fp p2; p3= fp p3}
       | EC_scale {state} ->
@@ -212,10 +210,10 @@ struct
           let t = H.feed_string t "basic" in
           let pr (s, x) acc = fp s acc |> cvars [x] in
           t |> pr l |> pr r |> pr o |> fp m |> fp c
-      | Poseidon {start; state} ->
+      | Poseidon {state} ->
           let t = H.feed_string t "poseidon" in
           let row a = cvars (Array.to_list a) in
-          Array.fold state ~init:(row start t) ~f:(fun acc a -> row a acc)
+          Array.fold state ~init:t ~f:(fun acc a -> row a acc)
       | EC_add {p1; p2; p3} ->
           let t = H.feed_string t "ec_add" in
           let pr (x, y) = cvars [x; y] in
