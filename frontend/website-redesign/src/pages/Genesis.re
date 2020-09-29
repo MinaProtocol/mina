@@ -351,9 +351,7 @@ let make = (~profiles) => {
       }>
       <Spacer height=2. />
       <Button
-        onClick=[%bs.raw
-          "() => window.location = 'https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform'"
-        ]
+        href=`External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform")
         bgColor=Theme.Colors.black>
         {React.string("Apply Now")}
         <Icon kind=Icon.ArrowRightMedium />
@@ -375,7 +373,7 @@ let make = (~profiles) => {
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
-            href: "#",
+            href: `External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform"),
           },
         }
       />
@@ -404,7 +402,7 @@ let make = (~profiles) => {
                  "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
                )}
             </p>
-            <Button bgColor=Theme.Colors.orange href="/leaderboard">
+            <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
               {React.string("See The Full Leaderboard")}
               <Icon kind=Icon.ArrowRightSmall />
             </Button>

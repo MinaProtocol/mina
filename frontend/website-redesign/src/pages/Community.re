@@ -227,7 +227,7 @@ let make = (~profiles) => {
           buttonTextColor: Theme.Colors.white,
           buttonText: "Apply now",
           dark: true,
-          href: "/genesis",
+          href: `Internal("/genesis"),
         },
       }>
       <Spacer height=4. />
@@ -276,7 +276,7 @@ let make = (~profiles) => {
                "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
              )}
           </p>
-          <Button bgColor=Theme.Colors.orange href="/leaderboard">
+          <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
             {React.string("See The Full Leaderboard")}
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
@@ -310,7 +310,7 @@ let make = (~profiles) => {
             buttonColor: Theme.Colors.white,
             buttonTextColor: Theme.Colors.orange,
             dark: false,
-            href: Constants.codeOfConductUrl,
+            href: `External(Constants.codeOfConductUrl),
           },
         }
       />

@@ -72,7 +72,7 @@ module Section = {
       title: string,
       description: string,
       buttonCopy: string,
-      buttonUrl: string,
+      buttonUrl: [`External(string) | `Internal(string)],
       image: string,
     };
 

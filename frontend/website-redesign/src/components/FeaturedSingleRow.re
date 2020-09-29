@@ -12,7 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
-    href: string,
+    href: [`External(string) | `Internal(string)],
   };
 
   type t = {

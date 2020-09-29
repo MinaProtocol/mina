@@ -115,7 +115,7 @@ module MorePosts = {
       <BlogModule.Title
         copy="More Blog posts"
         buttonCopy="See all posts"
-        buttonHref="/blog/all"
+        buttonHref=`Internal("/blog/all")
       />
       <Content posts />
     </div>;
@@ -180,9 +180,7 @@ let make = (~posts) => {
             buttonTextColor: Theme.Colors.white,
             buttonText: "Read more",
             dark: true,
-            href:
-              {Js.log("/blog/" ++ featured.slug);
-               "/blog/" ++ featured.slug},
+            href: `Internal("/blog/" ++ featured.slug),
           },
         }
       />

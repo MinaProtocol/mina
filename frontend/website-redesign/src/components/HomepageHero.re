@@ -155,7 +155,7 @@ let make = (~backgroundImg) => {
             </span>
             <span className=Styles.heroButton>
               <Button
-                href="/tech"
+                href=`Internal("/tech")
                 bgColor=Theme.Colors.white
                 paddingX=1.
                 width={`rem(13.5)}>
