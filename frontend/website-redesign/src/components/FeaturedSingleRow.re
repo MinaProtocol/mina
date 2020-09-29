@@ -215,17 +215,17 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button
-              bgColor={row.button.buttonColor}
-              dark={row.button.dark}
-              href={row.button.href}>
-              <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
+              <Button
+                bgColor={row.button.buttonColor}
+                dark={row.button.dark}
+                href={row.button.href}>
+                <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                  {React.string(row.button.buttonText)}
+                  <span className=Css.(style([marginTop(`rem(0.8))]))>
+                    <Icon kind=Icon.ArrowRightSmall />
+                  </span>
                 </span>
-              </span>
-            </Button>
+              </Button>
           </div>
         </div>
       </div>;
