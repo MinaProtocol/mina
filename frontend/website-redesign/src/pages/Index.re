@@ -17,7 +17,7 @@ let make = () => {
       <HomepageHero backgroundImg="/static/img/HeroSectionBackground.jpg" />
       <BlockchainComparison />
       <AlternatingSections
-        backgroundImg="/static/img/MinaSimplePattern1.png"
+        backgroundImg="/static/img/MinaSimplePattern1.jpg"
         sections={
           AlternatingSections.Section.FeaturedRow([|
             {
@@ -66,7 +66,7 @@ let make = () => {
           description: "Why did we create the world's lightest blockchain? To rebalance the scales and give anyone with a smartphone the power to participate, build, exchange and thrive.",
           textColor: Theme.Colors.digitalBlack,
           image: "/static/img/homepage-cta.jpg",
-          background: Image("/static/img/MinaSpectrumPrimary3.png"),
+          background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
           contentBackground: Color(Theme.Colors.white),
           button: {
             FeaturedSingleRow.Row.buttonText: "More on Mina",

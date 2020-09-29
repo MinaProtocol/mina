@@ -144,7 +144,7 @@ let make = () => {
       <TestnetRetroModule />
       <ButtonBar
         kind=ButtonBar.HelpAndSupport
-        backgroundImg="/static/img/ButtonBarBackground.png"
+        backgroundImg="/static/img/ButtonBarBackground.jpg"
       />
     </div>
   </Page>;

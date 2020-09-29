@@ -152,11 +152,11 @@ let make = () => {
     </div>
     <ButtonBar
       kind=ButtonBar.HelpAndSupport
-      backgroundImg="/static/img/ButtonBarBackground.png"
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
     <ButtonBar
       kind=ButtonBar.CommunityLanding
-      backgroundImg="/static/img/ButtonBarBackground.png"
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
   </Page>;
 };
