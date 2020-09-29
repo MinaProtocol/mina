@@ -189,7 +189,7 @@ module Img =
   });
 
 module DaemonCommandExample = {
-  let defaultArgs = ["coda daemon", "-peer $SEED1"];
+  let defaultArgs = ["mina daemon", "-peer $SEED1"];
   [@react.component]
   let make = (~args: array(string)=[||]) => {
     let allArgs = defaultArgs @ Array.to_list(args);
@@ -200,6 +200,17 @@ module DaemonCommandExample = {
       String.concat(sep, defaultArgs @ Array.to_list(args));
     <Pre> <Code> {React.string(processedArgs)} </Code> </Pre>;
   };
+};
+
+module Blog = {
+  module Styles = {
+    let spacing = style([padding2(~v=`rem(1.), ~h=`zero)]);
+  };
+
+  module Img =
+    Wrap({
+      let element = <img className=Styles.spacing width="100%" />;
+    });
 };
 
 let allComponents = () => {

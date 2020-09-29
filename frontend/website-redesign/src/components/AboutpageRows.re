@@ -5,7 +5,7 @@ module Styles = {
       height(`percent(100.)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/BackgroundGlowCluster01.png")),
+      backgroundImage(`url("/static/img/BackgroundGlowCluster01.jpg")),
     ]);
 
   let container =

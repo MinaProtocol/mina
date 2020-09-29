@@ -31,7 +31,7 @@ module MediaQuery = {
   let desktop = "(min-width:90rem)";
 
   /** to add a style to tablet and desktop, but not mobile */
-  let notMobile = "(min-width:23.5rem)";
+  let notMobile = "(min-width:48rem)";
 
   /** to add a style just to mobile  */
   let mobile = "(max-width:48rem)";
@@ -90,6 +90,7 @@ module Type = {
     style([
       Typeface.monumentGrotesk,
       fontSize(`rem(1.6)),
+      fontWeight(`normal),
       lineHeight(`rem(2.1)),
       color(Colors.digitalBlack),
       media(
@@ -105,6 +106,7 @@ module Type = {
     style([
       Typeface.monumentGroteskMono,
       fontSize(`rem(1.125)),
+      fontWeight(`normal),
       lineHeight(`rem(1.7)),
       textTransform(`uppercase),
       letterSpacing(`em(0.02)),
@@ -206,6 +208,8 @@ module Type = {
       Typeface.monumentGrotesk,
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.7)),
+      textDecoration(`none),
+      cursor(`pointer),
       color(Colors.orange),
       hover([textDecoration(`underline)]),
     ]);
