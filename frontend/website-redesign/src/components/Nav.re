@@ -3,17 +3,22 @@ module Styles = {
 
   let container =
     style([
-      position(`absolute),
+      position(`sticky),
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
       padding2(~v=`zero, ~h=`rem(1.5)),
       height(`rem(4.25)),
+      marginBottom(`rem(-4.25)),
       width(`percent(100.)),
       zIndex(100),
       media(
         Theme.MediaQuery.tablet,
-        [height(`rem(6.25)), padding2(~v=`zero, ~h=`rem(2.5))],
+        [
+          position(`absolute),
+          height(`rem(6.25)),
+          padding2(~v=`zero, ~h=`rem(2.5)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -95,8 +100,8 @@ module Styles = {
   let navGroup =
     style([
       width(`percent(100.)),
-      top(`rem(2.)),
-      left(`rem(-6.5)),
+      top(`rem(4.5)),
+      left(`rem(1.)),
       listStyleType(`none),
       color(white),
       background(Theme.Colors.digitalBlack),
@@ -108,6 +113,7 @@ module Styles = {
           alignItems(`center),
           width(`percent(100.)),
           height(`rem(5.5)),
+          cursor(`pointer),
           borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
           hover([color(Theme.Colors.orange)]),
         ],
@@ -178,7 +184,7 @@ module NavGroupLink = {
           className=Css.(
             merge([
               Theme.Type.navLink,
-              style([color(white), flexGrow(1.)]),
+              style([color(currentColor), flexGrow(1.)]),
             ])
           )>
           {React.string(label)}
@@ -214,23 +220,12 @@ let make = (~dark=false) => {
       <NavGroup label="Get Started" dark>
         <NavGroupLink icon=Icon.Box label="Overview" href="/get-started" />
         <NavGroupLink
-          icon=Icon.NodeOperators
-          label="Node Operators"
-          href="/node-operators"
-        />
-        <NavGroupLink
-          icon=Icon.Developers
-          label="Developers"
-          href="/developers"
-        />
-        <NavGroupLink
           icon=Icon.Documentation
           label="Documentation"
           href="/docs"
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
       </NavGroup>
-      <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>
