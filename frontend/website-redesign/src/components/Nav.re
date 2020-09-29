@@ -226,6 +226,7 @@ let make = (~dark=false) => {
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
       </NavGroup>
+      <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>

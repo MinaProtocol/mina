@@ -158,7 +158,7 @@ module CultureGrid = {
         <GridItem label="Respect">
           <p className=Theme.Type.paragraph>
             {React.string(
-               "Above all, we respect each other. That's why we stand for equality and fairness. Why we’re committed to decentralization. And why we strive to always be inclusive and accessible.",
+               "Above all, we respect each other. That's why we stand for equality and fairness. Why we're committed to decentralization. And why we strive to always be inclusive and accessible.",
              )}
           </p>
         </GridItem>
