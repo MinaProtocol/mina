@@ -9,11 +9,16 @@ BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-origin/develop}
 #        <(git rev-list --first-parent $BASE) | \
 #        sed -ne 's/^ //p' | head -1)
 
-COMMIT=$(git log -1 --pretty=format:%H)
+BASECOMMIT=$(git log $BASE -1 --pretty=format:%H) # Finds the commit hash of HEAD of $BASE branch
+COMMIT=$(git log -1 --pretty=format:%H) # Finds the commit hash for the current commit
 
-if [[ $COMMIT != "" ]]; then
-  # Get the files that have changed since that shared commit
-  git diff $COMMIT --name-only
+# Print it for logging/debugging
+echo "Diffing against commit: ${COMMIT} from branch: ${BASE}"
+
+# Compare base to the current commit
+if [[ $BASECOMMIT != $COMMIT ]]; then
+  # Get the files that have diverged from $BASE
+  git diff $BASECOMMIT --name-only
 else
   # TODO: Dump commits as artifacts when build succeeds so we can diff against
   # that on develop instead of always running all the tests
