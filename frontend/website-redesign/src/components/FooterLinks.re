@@ -91,56 +91,7 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
-      /*<Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Telemetry Health Dashboard")}
-        </a>
-      </Next.Link>*/
     </div>
-    /*
-    <div className=Styles.linksGroup>
-      <h4 className=Styles.linksHeader> {React.string("Tools")} </h4>
-      <Next.Link href="/testnet">
-        <a className=Styles.linkStyle> {React.string("Testnet")} </a>
-      </Next.Link>
-      <Next.Link href="/">
-        <a className=Styles.linkStyle> {React.string("Block Explorers")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Node Operator Tools")}
-        </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Snarketplace")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Network Health")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Snarkers Dashboard")}
-        </a>
-      </Next.Link>
-    </div>
-    <div className=Styles.linksGroup>
-      <h4 className=Styles.linksHeader> {React.string("Project")} </h4>
-      <Next.Link href="/about">
-        <a className=Styles.linkStyle> {React.string("About Mina")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Team")} </a>
-      </Next.Link>
-      <Next.Link href="/jobs">
-        <a className=Styles.linkStyle> {React.string("Careers")} </a>
-      </Next.Link>
-      <Next.Link href="/blog">
-        <a className=Styles.linkStyle> {React.string("Media")} </a>
-      </Next.Link>
-      <Next.Link href="/blog">
-        <a className=Styles.linkStyle> {React.string("Blog")} </a>
-      </Next.Link>
-    </div>*/
     <div className=Css.(style([display(`none), media(Theme.MediaQuery.tablet, [display(`block)])])) />
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Community")} </h4>
