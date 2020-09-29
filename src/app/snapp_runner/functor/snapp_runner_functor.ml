@@ -78,9 +78,14 @@ module Intf = struct
   end
 
   module type Commands = sig
+    val cache_flag : Key_cache.Spec.t list Option.t Command.Param.t
+
+    val mode_flag : [> `Binary | `Json] Command.Spec.param
+
     val commands : (string * Command.t) list
 
-    val run_commands : unit -> unit
+    val run_commands :
+      ?additional_commands:(string * Command.t) list -> unit -> unit
   end
 
   module type S_with_commands = sig
@@ -219,7 +224,14 @@ module Make_commands (X : Intf.S) : Intf.Commands = struct
 
   let commands = [("verification-key", verification_key); ("prove", prove)]
 
-  let run_commands () =
+  let run_commands ?additional_commands () =
+    let commands =
+      match additional_commands with
+      | None ->
+          commands
+      | Some additional_commands ->
+          commands @ additional_commands
+    in
     Command.run
       (Command.group ~summary:"Coda snapp transaction runner"
          ~preserve_subcommand_order:() commands)

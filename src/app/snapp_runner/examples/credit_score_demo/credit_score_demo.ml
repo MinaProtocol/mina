@@ -138,4 +138,43 @@ include Snapp_runner_functor.Make_with_commands (struct
     ; main_value= (fun [] _ -> []) }
 end)
 
-let () = run_commands ()
+let verify =
+  let open Command in
+  let open Command.Let_syntax in
+  basic ~summary:"Verify a proof"
+    (let%map cache = cache_flag
+     and public_input =
+       Spec.choose_one ~if_nothing_chosen:Input.Public_input.Value.if_not_given
+         [ Input.Public_input.Value.args
+         ; Spec.flag "--public-input-sexp"
+             ~doc:
+               "s-expression Enter the public input in the form of an \
+                s-expression"
+             (Flag.optional
+                (Arg_type.Export.sexp_conv Input.Public_input.Value.t_of_sexp))
+         ; Spec.flag "--public-input-json"
+             ~doc:"json Enter the public input in the json format"
+             (Flag.optional
+                (Arg_type.create (fun str ->
+                     Yojson.Safe.from_string str
+                     |> Input.Public_input.Value.of_yojson
+                     |> Result.map_error ~f:(fun msg ->
+                            Error.createf
+                              "Could read the public input from the given \
+                               JSON: %s"
+                              msg )
+                     |> Or_error.ok_exn ))) ]
+     and proof =
+       Spec.flag "--proof" ~doc:"PROOF The proof to verify"
+         (Flag.required Arg_type.Export.string)
+     in
+     fun () ->
+       let _, _, (module Proof), _ = compile ?cache () in
+       let proof =
+         Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet proof
+         |> Binable.of_string (module Side_loaded.Proof.Stable.Latest)
+       in
+       Format.printf "Proof verified? %b@."
+         (Proof.verify [(public_input, proof)]))
+
+let () = run_commands ~additional_commands:[("verify", verify)] ()
