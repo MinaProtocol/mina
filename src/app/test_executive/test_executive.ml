@@ -140,7 +140,7 @@ let main inputs =
         let open Malleable_error.Let_syntax in
         let%bind net_manager =
           Deferred.bind ~f:Malleable_error.return
-            (Engine.Network_manager.create network_config)
+            (Engine.Network_manager.create ~logger network_config)
         in
         net_manager_ref := Some net_manager ;
         let%bind network =
