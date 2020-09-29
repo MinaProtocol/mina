@@ -93,11 +93,7 @@ let make = () => {
            />
            <div className=Styles.submitButton>
              <Button
-               onClick=[%bs.raw
-                 {j| () => window.location =
-                 "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul"
-               |j}
-               ]
+               onClick=[%bs.raw "() => window.location = 'https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul'"]
                height={`rem(3.25)}
                width={`rem(7.93)}
                href={
