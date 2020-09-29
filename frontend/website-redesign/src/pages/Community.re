@@ -49,7 +49,7 @@ module Styles = {
     ]);
   let leaderboardBackground =
     style([
-      backgroundImage(`url("/static/img/backgrounds/SectionBackground.png")),
+      backgroundImage(`url("/static/img/backgrounds/SectionBackground.jpg")),
       backgroundSize(`cover),
     ]);
 
@@ -209,7 +209,7 @@ let make = (~profiles) => {
     />
     <ButtonBar
       kind=ButtonBar.CommunityLanding
-      backgroundImg="/static/img/ButtonBarBackground.png"
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
     <FeaturedSingleRow
       row=FeaturedSingleRow.Row.{
