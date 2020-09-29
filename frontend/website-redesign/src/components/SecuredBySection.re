@@ -161,6 +161,7 @@ module Styles = {
     ]);
   let button = style([media(Theme.MediaQuery.tablet, [])]);
 };
+
 [@react.component]
 let make = () => {
   <div className=Styles.backgroundImage>
@@ -180,14 +181,14 @@ let make = () => {
         <Spacer height=3. />
         <div className=Styles.flexRow>
           <span className=Styles.imageColumn>
-            <img src="/static/img/IllustrationBlockProducers.png" />
+            <img src="/static/img/AboutBlockProducers.svg" />
             <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
             <p className=Theme.Type.label>
               {React.string("Block Producers")}
             </p>
           </span>
           <span className=Styles.imageColumn>
-            <img src="/static/img/IllustrationSnarkWorkers.png" />
+            <img src="/static/img/AboutSnarkProducers.svg" />
             <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
             <p className=Theme.Type.label>
               {React.string("Snark Workers")}

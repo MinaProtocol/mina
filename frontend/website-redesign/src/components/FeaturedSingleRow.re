@@ -63,7 +63,7 @@ module SingleRow = {
         important(backgroundSize(`cover)),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), ...additionalNotMobileStyles],
+          [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -159,9 +159,7 @@ module SingleRow = {
               href={row.button.href}>
               <span className=RowStyles.buttonText>
                 {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
+                <Icon kind=Icon.ArrowRightMedium size=1.5 />
               </span>
             </Button>
           </div>

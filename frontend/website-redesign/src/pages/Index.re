@@ -14,7 +14,7 @@ module Styles = {
 let make = () => {
   <Page title="Mina Protocol" footerColor=Theme.Colors.orange>
     <div className=Styles.page>
-      <HomepageHero backgroundImg="/static/img/HeroSectionBackground.png" />
+      <HomepageHero backgroundImg="/static/img/HeroSectionBackground.jpg" />
       <BlockchainComparison />
       <AlternatingSections
         backgroundImg="/static/img/MinaSimplePattern1.png"

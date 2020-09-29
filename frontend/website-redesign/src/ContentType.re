@@ -89,3 +89,18 @@ module GenesisProfile = {
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
+
+module Press = {
+  let id = "press";
+  type t = {
+    title: string,
+    image: Image.entry,
+    link: string,
+    featured: bool,
+    description: option(string),
+    publisher: string,
+    datePublished: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};

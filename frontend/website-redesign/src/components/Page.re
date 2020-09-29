@@ -1,3 +1,17 @@
+module Styles = {
+  open Css;
+
+  let fadeIn = keyframes([(0, [opacity(0.)]), (100, [opacity(1.)])]);
+
+  let main = style([
+    opacity(0.),
+    animationName(fadeIn),
+    animationDuration(1000),
+    animationDelay(200),
+    animationFillMode(`forwards),
+  ]);
+};
+
 let siteDescription = "Mina is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Mina directly from any device, in less data than a few tweets.";
 
 [@react.component]
@@ -15,7 +29,7 @@ let make =
   let router = Next.Router.useRouter();
   let route = Option.value(route, ~default=router.route);
 
-  <>
+  <div className=Styles.main>
     <Next.Head>
       <title> {React.string(title)} </title>
       <meta property="og:title" content=title />
@@ -60,5 +74,5 @@ let make =
     <main> children </main>
     <CookieWarning />
     {showFooter ? <Footer /> : React.null}
-  </>;
+  </div>;
 };
