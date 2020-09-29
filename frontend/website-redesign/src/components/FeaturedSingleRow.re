@@ -12,7 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
-    href: string,
+    href: [`External(string) | `Internal(string)],
   };
 
   type t = {
@@ -63,7 +63,7 @@ module SingleRow = {
         important(backgroundSize(`cover)),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), ...additionalNotMobileStyles],
+          [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -101,15 +101,16 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
-        height(`percent(60.)),
         maxWidth(`rem(53.)),
+        paddingTop(`rem(8.)),
+        bottom(`zero),
         media(
           Theme.MediaQuery.tablet,
-          [height(`percent(110.)), width(`percent(80.))],
+          [width(`percent(80.))],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [height(`percent(110.)), width(`percent(100.))],
+          [width(`percent(100.))],
         ),
       ]);
   };
@@ -130,10 +131,11 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, backgroundImg),
           style([
+            top(`rem(12.6)),
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [right(`zero), width(`rem(29.))],
+              [bottom(`zero), top(`inherit_), right(`zero), width(`rem(29.))],
             ),
           ]),
         ]);
@@ -153,12 +155,13 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
               <span className=RowStyles.buttonText>
                 {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
+                <Icon kind=Icon.ArrowRightMedium size=1.5 />
               </span>
             </Button>
           </div>
@@ -185,7 +188,7 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, contentBackground),
           style([
-            top(`percent(6.)),
+            top(`rem(12.6)),
             media(
               Theme.MediaQuery.tablet,
               [left(`zero), width(`rem(32.))],
@@ -212,17 +215,17 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button
-              bgColor={row.button.buttonColor}
-              dark={row.button.dark}
-              href={row.button.href}>
-              <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
+              <Button
+                bgColor={row.button.buttonColor}
+                dark={row.button.dark}
+                href={row.button.href}>
+                <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                  {React.string(row.button.buttonText)}
+                  <span className=Css.(style([marginTop(`rem(0.8))]))>
+                    <Icon kind=Icon.ArrowRightSmall />
+                  </span>
                 </span>
-              </span>
-            </Button>
+              </Button>
           </div>
         </div>
       </div>;
@@ -235,7 +238,7 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      height(`percent(100.)),
+      minHeight(`rem(32.5)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {

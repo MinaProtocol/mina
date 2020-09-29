@@ -86,9 +86,9 @@ let make = () => {
           )
         }
         background={
-          Theme.desktop: "/static/img/TestnetBackground.png",
-          tablet: "/static/img/TestnetBackground.png",
-          mobile: "/static/img/TestnetBackground.png",
+          Theme.desktop: "/static/img/TestnetBackground.jpg",
+          tablet: "/static/img/TestnetBackground.jpg",
+          mobile: "/static/img/TestnetBackground.jpg",
         }>
         <p className=Styles.statusBadge>
           {React.string("Testnet Status: ")}
@@ -105,7 +105,7 @@ let make = () => {
                "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
              )}
           </p>
-          <Button bgColor=Theme.Colors.orange href="/leaderboard">
+          <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
             {React.string("See The Full Leaderboard")}
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
@@ -126,10 +126,10 @@ let make = () => {
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
           copySize: `Small,
           title: "Testnet Challenges",
-          description: "Learn how to operate the protocol, while contributing to Coda's network resilience.",
+          description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,
           image: "/static/img/AboutHeroDesktopBackground.jpg",
-          background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
+          background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
           contentBackground:
             Image("/static/img/TestnetContentBlockBackground.png"),
           button: {
@@ -137,14 +137,14 @@ let make = () => {
             buttonColor: Theme.Colors.mint,
             buttonTextColor: Theme.Colors.digitalBlack,
             dark: true,
-            href: "#",
+            href: `External("http://bit.ly/TestnetChallenges"),
           },
         }
       />
       <TestnetRetroModule />
       <ButtonBar
         kind=ButtonBar.HelpAndSupport
-        backgroundImg="/static/img/ButtonBarBackground.png"
+        backgroundImg="/static/img/ButtonBarBackground.jpg"
       />
     </div>
   </Page>;

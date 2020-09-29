@@ -207,16 +207,16 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
   INNER JOIN chain
   ON b.id = chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.timestamp, c.coinbase_id, pk.value as creator FROM chain c
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   WHERE c.height = ?
@@ -224,7 +224,7 @@ WITH RECURSIVE chain AS (
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? |}
@@ -233,14 +233,14 @@ WITH RECURSIVE chain AS (
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
@@ -248,7 +248,7 @@ WITH RECURSIVE chain AS (
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
         {|
-SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
       INNER JOIN public_keys pk
       ON pk.id = b.creator_id
       WHERE b.height = (select MAX(b.height) from blocks b)
@@ -484,11 +484,10 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
           ; failure_status= Some failure_status } )
     in
     { Block_info.block_identifier=
-        { Block_identifier.index= Int64.of_int raw_block.height
-        ; hash= raw_block.state_hash }
+        {Block_identifier.index= raw_block.height; hash= raw_block.state_hash}
     ; creator= Block.Extras.creator block_extras
     ; parent_block_identifier=
-        { Block_identifier.index= Int64.of_int raw_parent_block.height
+        { Block_identifier.index= raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
     ; timestamp= raw_block.timestamp
     ; internal_info= internal_commands
