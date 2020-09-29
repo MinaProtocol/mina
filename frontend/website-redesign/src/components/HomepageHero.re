@@ -2,12 +2,11 @@ module Styles = {
   open Css;
   let heroBackgroundImage = backgroundImg =>
     style([
-      height(`rem(120.)),
       width(`percent(100.)),
       position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.desktop, [height(`rem(140.))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
       after([
         contentRule(""),
@@ -15,7 +14,7 @@ module Styles = {
         bottom(`zero),
         left(`zero),
         right(`zero),
-        height(`rem(30.)),
+        height(`rem(20.)),
         background(
           linearGradient(
             deg(0.),
@@ -42,21 +41,30 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      marginTop(`rem(13.)),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
+      marginBottom(`rem(12.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginTop(`rem(12.))],
+      ),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
+    ]);
+
+  let heroHeadlineContainr =
+    style([
+      height(`vh(100.)),
+      minHeight(`rem(32.)),
+      position(`relative),
     ]);
 
   let heroHeadline =
     merge([
       Theme.Type.h1jumbo,
       style([
+        position(`absolute),
         display(`flex),
         justifyContent(`center),
         alignItems(`center),
-        marginTop(`rem(23.)),
-        media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
-        media(Theme.MediaQuery.desktop, [marginTop(`rem(35.))]),
+        bottom(`rem(12.)),
       ]),
     ]);
 
@@ -100,7 +108,7 @@ module Styles = {
     style([
       height(`rem(1.5)),
       marginLeft(`rem(0.5)),
-      color(hex("#FF603B")),
+      color(Theme.Colors.orange),
     ]);
 
   let heroText =
@@ -136,11 +144,13 @@ let make = (~backgroundImg) => {
   <div className={Styles.heroBackgroundImage(backgroundImg)}>
     <Wrapped>
       <div className=Styles.container>
-        <h1 className=Styles.heroHeadline>
-          {React.string(
-             "The world's lightest blockchain, powered by participants.",
-           )}
-        </h1>
+        <div className=Styles.heroHeadlineContainr>
+          <h1 className=Styles.heroHeadline>
+            {React.string(
+               "The world's lightest blockchain, powered by participants.",
+             )}
+          </h1>
+        </div>
         <div className=Styles.heroContentContainer>
           <div className=Styles.heroTextButtonContainer>
             <span>
@@ -152,13 +162,13 @@ let make = (~backgroundImg) => {
             </span>
             <span className=Styles.heroButton>
               <Button
-                href="/tech"
+                href=`Internal("/tech")
                 bgColor=Theme.Colors.white
                 paddingX=1.
                 width={`rem(13.5)}>
                 <span> {React.string("See Behind The Tech")} </span>
                 <span className=Styles.buttonIcon>
-                  <Icon kind=Icon.ArrowRightSmall />
+                  <Icon kind=Icon.ArrowRightMedium />
                 </span>
               </Button>
             </span>

@@ -7,14 +7,14 @@ module Styles = {
       bottom(`zero),
       height(`rem(106.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      backgroundImage(`url("/static/img/Small.png")),
+      backgroundImage(`url("/static/img/Small.jpg")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
         [
           padding2(~v=`rem(4.), ~h=`rem(2.68)),
           height(`rem(75.)),
-          backgroundImage(`url("/static/img/Medium.png")),
+          backgroundImage(`url("/static/img/Medium.jpg")),
         ],
       ),
       media(
@@ -22,13 +22,13 @@ module Styles = {
         [
           padding2(~v=`rem(5.5), ~h=`rem(9.5)),
           height(`auto),
-          backgroundImage(`url("/static/img/Large.png")),
+          backgroundImage(`url("/static/img/Large.jpg")),
         ],
       ),
     ]);
   let backToTopButton =
     style([
-      position(`absolute),
+      position(`fixed),
       right(`rem(1.2)),
       bottom(`rem(1.2)),
       media(
@@ -45,7 +45,7 @@ module Styles = {
       display(`flex),
       height(`rem(2.62)),
       flexDirection(`column),
-      alignContent(`center),
+      alignItems(`center),
       justifyContent(`spaceBetween),
       color(white),
     ]);
@@ -80,24 +80,30 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
+        selector("a", [width(`rem(2.)), color(white), hover([color(Theme.Colors.orange)])]),
       ]);
+
+    let anchor = style([
+      textDecoration(`none)
+    ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <Next.Link href="https://discord.com/invite/Vexf4ED">
+      <a className=Styles.anchor href="https://discord.com/invite/Vexf4ED">
         <Icon kind=Icon.Discord size=2. />
-      </Next.Link>
-      <Next.Link href="https://twitter.com/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://twitter.com/minaprotocol">
         <Icon kind=Icon.Twitter size=2. />
-      </Next.Link>
-      <Next.Link href="https://facebook.com/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://facebook.com/minaprotocol">
         <Icon kind=Icon.Facebook size=2. />
-      </Next.Link>
-      <Next.Link href="https://t.me/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://t.me/minaprotocol">
         <Icon kind=Icon.Telegram size=2. />
-      </Next.Link>
-      <Next.Link href=""> <Icon kind=Icon.WeChat size=2. /> </Next.Link>
+      </a>
+      <a className=Styles.anchor href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200"> <Icon kind=Icon.WeChat size=2. /> </a>
     </div>;
   };
 };
@@ -231,8 +237,12 @@ module Subfooter = {
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <a href="https://o1labs.org/" className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
-        <a href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md" className=Styles.smallLinks>
+        <a href="https://o1labs.org/" className=Styles.smallLinks>
+          {React.string("O(1) Labs")}
+        </a>
+        <a
+          href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
+          className=Styles.smallLinks>
           {React.string("Code of Conduct")}
         </a>
         <Next.Link href="/privacy">
@@ -261,6 +271,7 @@ let make = () => {
     <Subfooter />
     <div className=Styles.backToTopButton>
       <Button
+        href=`Scroll_to_top
         height={`rem(4.125)}
         width={`rem(3.75)}
         bgColor=Theme.Colors.black
@@ -268,10 +279,10 @@ let make = () => {
         paddingX=1.1
         paddingY=0.75
         dark=true>
-        <span className=Styles.backToTopButtonContent>
+        <div className=Styles.backToTopButtonContent>
           <Icon kind=Icon.ArrowUpMedium size=1. />
           {React.string("Top")}
-        </span>
+        </div>
       </Button>
     </div>
   </footer>;
