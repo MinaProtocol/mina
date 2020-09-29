@@ -55,6 +55,10 @@ module Cached = struct
 
     val original : (_, 'b) t -> 'b
 
+    (** Debugging. Do not merge
+     *)
+    val value : ('t, _) t -> 't
+
     (** [peek c] inspects the value of [c] without consuming
      *  [c].
      *)
