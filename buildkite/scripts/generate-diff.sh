@@ -16,12 +16,11 @@ else
   if [ -n "${INCREMENTAL_BUILD+x}" ]; then
     # base DIFF on last successful Buildkite `develop` RUN
     ci_recent_pass_commit=$(
-      curl https://graphql.buildkite.com/v1  -H "Authorization: Bearer $TOKEN"
-        -d'{"query": "query { pipeline(slug: \"o-1-labs-2/coda\") { builds(first: 1 branch: \"develop\" state: PASSED) { edges { node { commit } } } } }"}' | jq '.data.pipeline.builds.edges[0].node.commit'
+      curl https://graphql.buildkite.com/v1  -H "Authorization: Bearer $TOKEN" -d'{"query": "query { pipeline(slug: \"o-1-labs-2/coda\") { builds(first: 1 branch: \"develop\" state: PASSED) { edges { node { commit } } } } }"}' | jq '.data.pipeline.builds.edges[0].node.commit' | tr -d '"'
     )
 
-    echo "--- Generating diff against: $ci_recent_pass_commit"
-    git diff HEAD $ci_recent_pass_commit
+    #echo "--- Generating diff against: ${ci_recent_pass_commit}"
+    git diff "${ci_recent_pass_commit}" --name-only
   else
     # TODO: Dump commits as artifacts when build succeeds so we can diff against
     # that on develop instead of always running all the tests
