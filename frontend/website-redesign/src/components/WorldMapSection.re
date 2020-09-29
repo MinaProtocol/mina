@@ -1,6 +1,11 @@
 module Styles = {
   open Css;
-  let container = style([position(`relative), height(`rem(32.8))]);
+  let container =
+    style([
+      position(`relative),
+      width(`percent(100.)),
+      height(`rem(32.8)),
+    ]);
   let text =
     style([
       top(`rem(4.)),
@@ -79,41 +84,39 @@ module Styles = {
 };
 [@react.component]
 let make = () => {
-  <Wrapped>
-    <div className=Styles.container>
-      <>
-        <div className=Styles.text>
-          <h2 className=Styles.header>
-            {React.string("A Growing Global Community")}
-          </h2>
-          <span className=Styles.sectionSubhead>
-            {React.string("See where Genesis members are around the world ->")}
+  <div className=Styles.container>
+    <>
+      <div className=Styles.text>
+        <h2 className=Styles.header>
+          {React.string("A Growing Global Community")}
+        </h2>
+        <span className=Styles.sectionSubhead>
+          {React.string("See where Genesis members are around the world ->")}
+        </span>
+      </div>
+      <div className=Styles.remainingSpots>
+        <div>
+          <p className=Styles.number> {React.string("850")} </p>
+          <span className=Styles.label>
+            {React.string("Genesis Spots Remaining")}
           </span>
         </div>
-        <div className=Styles.remainingSpots>
-          <div>
-            <p className=Styles.number> {React.string("850")} </p>
-            <span className=Styles.label>
-              {React.string("Genesis Spots Remaining")}
-            </span>
-          </div>
-          <span className=Styles.icon>
-            <Icon kind=Icon.GenesisProgram size=6.25 />
-          </span>
-        </div>
-      </>
-      <>
-        <img
-          className=Styles.worldMapImage
-          src="/static/svg/World_Map_Illustration.svg"
-        />
-        <div className=Styles.activeMembers>
-          <p className=Styles.mintNumber> {React.string("150")} </p>
-          <span className=Styles.whiteLabel>
-            {React.string("Active Genesis Members")}
-          </span>
-        </div>
-      </>
-    </div>
-  </Wrapped>;
+        <span className=Styles.icon>
+          <Icon kind=Icon.GenesisProgram size=6.25 />
+        </span>
+      </div>
+    </>
+    <>
+      <img
+        className=Styles.worldMapImage
+        src="/static/svg/World_Map_Illustration.svg"
+      />
+      <div className=Styles.activeMembers>
+        <p className=Styles.mintNumber> {React.string("150")} </p>
+        <span className=Styles.whiteLabel>
+          {React.string("Active Genesis Members")}
+        </span>
+      </div>
+    </>
+  </div>;
 };
