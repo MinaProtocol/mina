@@ -22,6 +22,10 @@ let coda_container_filter = "resource.labels.container_name=\"coda\""
 
 let block_producer_filter = "resource.labels.pod_name:\"block-producer\""
 
+let structured_event_filter event_id =
+  Printf.sprintf "jsonPayload.event_id=\"%s\""
+    (Structured_log_events.string_of_id event_id)
+
 module Subscription = struct
   type t = {name: string; topic: string; sink: string}
 
@@ -297,7 +301,7 @@ module Error_query = struct
   let filter testnet_log_filter =
     String.concat ~sep:"\n"
       [ testnet_log_filter
-      ; "resource.labels.container_name=\"coda\""
+      ; coda_container_filter
       ; "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")" ]
 
@@ -325,7 +329,9 @@ module Initialization_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; "\"Starting Transition Frontier Controller phase\"" ]
+      ; structured_event_filter
+          Transition_router
+          .starting_transition_frontier_controller_structured_events_id ]
 
   let parse log =
     let open Json_parsing in
@@ -365,8 +371,9 @@ module Transition_frontier_diff_application_query = struct
   let filter testnet_log_filter =
     String.concat ~sep:"\n"
       [ testnet_log_filter
-      ; "resource.labels.container_name=\"coda\""
-      ; "\"Applying diffs: $diffs\"" ]
+      ; coda_container_filter
+      ; structured_event_filter
+          Transition_frontier.applying_diffs_structured_events_id ]
 
   let parse log =
     let open Json_parsing in
@@ -469,7 +476,8 @@ module Block_produced_query = struct
       [ testnet_log_filter
       ; block_producer_filter
       ; coda_container_filter
-      ; "\"Successfully produced a new block\"" ]
+      ; structured_event_filter
+          Block_producer.block_produced_structured_events_id ]
 
   (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
   let parse log =
@@ -511,7 +519,7 @@ module Breadcrumb_added_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; Structured_log_events.string_of_id
+      ; structured_event_filter
           Transition_frontier
           .added_breadcrumb_user_commands_structured_events_id ]
 
