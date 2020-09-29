@@ -92,7 +92,7 @@ let make = (~post: option(ContentType.JobPost.t)) => {
           </p>
           <p>
             {React.string(
-               "We're bringing Coda Protocol to market, a cryptocurrency that compresses the blockchain from hundreds of gigabytes down to the size of a few tweets. It can scale to thousands of transactions per second and millions of users while remaining decentralized enough for cellphones to be fully verifying nodes.",
+               "We're bringing Mina Protocol to market, a cryptocurrency that compresses the blockchain from hundreds of gigabytes down to the size of a few tweets. It can scale to thousands of transactions per second and millions of users while remaining decentralized enough for cellphones to be fully verifying nodes.",
              )}
           </p>
           <p>

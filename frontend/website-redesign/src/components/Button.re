@@ -17,6 +17,7 @@ module Styles = {
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
+        unsafe("width", "max-content"),
         width(buttonWidth),
         height(buttonHeight),
         border(`px(1), `solid, borderColor),
@@ -44,7 +45,10 @@ module Styles = {
           borderBottomLeftRadius(`px(1)),
           border(`px(1), `solid, dark ? bgColor : borderColor),
           transform(translateZ(`px(-1))),
-          transition("transform", ~duration=200, ~timingFunction=`easeIn),
+          transitions([
+            `transition("200ms ease-in 0ms transform"),
+            `transition("50ms ease-in 100ms border"),
+          ]),
         ]),
         color(
           {
@@ -55,7 +59,10 @@ module Styles = {
         textAlign(`center),
         hover([
           color(white),
-          after([transform(translate(`rem(-0.25), `rem(-0.25)))]),
+          after([
+            border(`zero, `solid, `rgba(0, 0, 0, 0.)),
+            transform(translate(`rem(-0.25), `rem(-0.25))),
+          ]),
           backgrounds([
             {
               dark
@@ -82,7 +89,7 @@ let make =
       ~width=`rem(10.9),
       ~borderColor=Theme.Colors.black,
       ~paddingX=1.5,
-      ~paddingY=1.,
+      ~paddingY=0.,
       ~bgColor=Theme.Colors.orange,
       ~dark=false,
       ~onClick=?,

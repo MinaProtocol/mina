@@ -3,17 +3,22 @@ module Styles = {
 
   let container =
     style([
-      position(`absolute),
+      position(`sticky),
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
       padding2(~v=`zero, ~h=`rem(1.5)),
       height(`rem(4.25)),
+      marginBottom(`rem(-4.25)),
       width(`percent(100.)),
       zIndex(100),
       media(
         Theme.MediaQuery.tablet,
-        [height(`rem(6.25)), padding2(~v=`zero, ~h=`rem(2.5))],
+        [
+          position(`absolute),
+          height(`rem(6.25)),
+          padding2(~v=`zero, ~h=`rem(2.5)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -26,6 +31,13 @@ module Styles = {
       height(`rem(4.25)),
       media(Theme.MediaQuery.tablet, [height(`rem(6.25))]),
       media(Theme.MediaQuery.desktop, [height(`rem(7.))]),
+    ]);
+
+  let spacerLarge =
+    style([
+      height(`rem(6.25)),
+      media(Theme.MediaQuery.tablet, [height(`rem(9.5))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(14.))]),
     ]);
 
   let logo = style([cursor(`pointer), height(`rem(2.25))]);
@@ -59,8 +71,8 @@ module Styles = {
       style([
         display(`flex),
         alignItems(`center),
-        height(`rem(5.5)),
         padding2(~v=`zero, ~h=`rem(1.5)),
+        minHeight(`rem(5.5)),
         color(white),
         borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
         hover([color(Theme.Colors.orange)]),
@@ -79,11 +91,17 @@ module Styles = {
       ]),
     ]);
 
+  let navLabel = dark =>
+    merge([
+      navLink,
+      style([important(color(dark ? white : Theme.Colors.digitalBlack))]),
+    ]);
+
   let navGroup =
     style([
       width(`percent(100.)),
-      top(`rem(2.)),
-      left(`rem(-6.5)),
+      top(`rem(4.5)),
+      left(`rem(1.)),
       listStyleType(`none),
       color(white),
       background(Theme.Colors.digitalBlack),
@@ -95,6 +113,7 @@ module Styles = {
           alignItems(`center),
           width(`percent(100.)),
           height(`rem(5.5)),
+          cursor(`pointer),
           borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
           hover([color(Theme.Colors.orange)]),
         ],
@@ -132,25 +151,24 @@ module Styles = {
 
 module NavLink = {
   [@react.component]
-  let make = (~href, ~label) => {
+  let make = (~href, ~label, ~dark) => {
     <Next.Link href>
-      <span className=Styles.navLink> {React.string(label)} </span>
+      <span className={Styles.navLabel(dark)}> {React.string(label)} </span>
     </Next.Link>;
   };
 };
 
 module NavGroup = {
   [@react.component]
-  let make = (~label, ~children) => {
+  let make = (~label, ~children, ~dark=false) => {
     let (active, setActive) = React.useState(() => false);
     <>
       <span
-        className=Styles.navLink
-        onMouseOver={_ => setActive(_ => true)}
-        onMouseLeave={_ => setActive(_ => false)}>
+        className={Styles.navLabel(dark)}
+        onClick={_ => setActive(_ => !active)}>
         {React.string(label)}
-        {active ? <ul className=Styles.navGroup> children </ul> : React.null}
       </span>
+      {active ? <ul className=Styles.navGroup> children </ul> : React.null}
     </>;
   };
 };
@@ -162,7 +180,13 @@ module NavGroupLink = {
       <li>
         <Icon kind=icon size=2. />
         <Spacer width=1. />
-        <span className=Css.(style([flexGrow(1.)]))>
+        <span
+          className=Css.(
+            merge([
+              Theme.Type.navLink,
+              style([color(currentColor), flexGrow(1.)]),
+            ])
+          )>
           {React.string(label)}
         </span>
         <Icon kind=Icon.ArrowRightSmall size=1.5 />
@@ -172,10 +196,18 @@ module NavGroupLink = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~dark=false) => {
   <header className=Styles.container>
     <Next.Link href="/">
-      <img src="/static/img/mina-wordmark.svg" className=Styles.logo />
+      {dark
+         ? <img
+             src="/static/img/mina-wordmark-dark.svg"
+             className=Styles.logo
+           />
+         : <img
+             src="/static/img/mina-wordmark-light.svg"
+             className=Styles.logo
+           />}
     </Next.Link>
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
@@ -183,20 +215,10 @@ let make = () => {
       <span id="close-nav"> <Icon kind=Icon.CloseMenu /> </span>
     </label>
     <nav className=Styles.nav>
-      <NavLink label="About" href="/about" />
-      <NavLink label="Tech" href="/tech" />
-      <NavGroup label="Get Started">
+      <NavLink label="About" href="/about" dark />
+      <NavLink label="Tech" href="/tech" dark />
+      <NavGroup label="Get Started" dark>
         <NavGroupLink icon=Icon.Box label="Overview" href="/get-started" />
-        <NavGroupLink
-          icon=Icon.NodeOperators
-          label="Node Operators"
-          href="/node-operators"
-        />
-        <NavGroupLink
-          icon=Icon.Developers
-          label="Developers"
-          href="/developers"
-        />
         <NavGroupLink
           icon=Icon.Documentation
           label="Documentation"
@@ -204,12 +226,12 @@ let make = () => {
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
       </NavGroup>
-      <NavLink label="Community" href="/community" />
-      <NavLink label="Blog" href="/blog" />
+      <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
-      <Button href="/genesis" width={`rem(10.75)} paddingX=1.>
+      <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>
         <img src="/static/img/promo-logo.svg" height="40" />
-        <span> {React.string("Join Genesis + Earn Mina")} </span>
+        <Spacer width=0.5 />
+        <span> {React.string("Join Genesis Token Program")} </span>
       </Button>
     </nav>
   </header>;

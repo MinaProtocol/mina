@@ -12,9 +12,8 @@ module Card = {
         display(`flex),
         justifyContent(`spaceBetween),
         flexDirection(`column),
-        padding2(~h=`rem(1.), ~v=`rem(0.5)),
+        padding2(~h=`rem(1.), ~v=`rem(1.)),
         width(`percent(100.)),
-        height(`percent(100.)),
         border(`px(1), `solid, Theme.Colors.white),
         backgroundColor(Theme.Colors.digitalBlack),
         borderTopLeftRadius(`px(4)),
@@ -62,20 +61,35 @@ module Card = {
 module ButtonBarStyles = {
   open Css;
 
-  let background = backgroundImg =>
+  let background = (kind, backgroundImg) => {
+    let (mobileV, tabletV, desktopV) =
+      switch (kind) {
+      | GetStarted => (1.5, 5.75, 2.5)
+      | Developers => (1.5, 5.75, 6.)
+      | CommunityLanding => (1.5, 4.25, 4.25)
+      | HelpAndSupport => (1.5, 5.75, 2.5)
+      };
+    let (mobileH, tabletH, desktopH) =
+      switch (kind) {
+      | GetStarted => (1.25, 2.75, 9.5)
+      | Developers => (1.25, 2.75, 9.5)
+      | CommunityLanding => (1.25, 1.25, 1.25)
+      | HelpAndSupport => (1.25, 2.75, 9.5)
+      };
     style([
-      padding2(~v=`rem(1.5), ~h=`rem(1.25)),
+      padding2(~v=`rem(mobileV), ~h=`rem(mobileH)),
       backgroundImage(`url(backgroundImg)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.25), ~h=`rem(2.75))],
+        [padding2(~v=`rem(tabletV), ~h=`rem(tabletH))],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(16.), ~h=`rem(9.5))],
+        [padding2(~v=`rem(desktopV), ~h=`rem(desktopH))],
       ),
     ]);
+  };
 
   let container =
     style([
@@ -105,7 +119,7 @@ module ButtonBarStyles = {
       color(Theme.Colors.white),
     ]);
 
-  let icon = merge([style([marginLeft(`zero)])]);
+  let icon = style([marginLeft(`zero), paddingTop(`rem(0.5))]);
 };
 
 module CommunityLanding = {
@@ -245,12 +259,101 @@ module HelpAndSupport = {
   };
 };
 
+module GetStarted = {
+  module Styles = {
+    open Css;
+    let content =
+      merge([
+        ButtonBarStyles.content,
+        style([media(Theme.MediaQuery.tablet, [alignItems(`flexStart)])]),
+      ]);
+
+    let title =
+      merge([
+        style([
+          Theme.Typeface.monumentGrotesk,
+          color(Theme.Colors.white),
+          fontSize(`rem(0.75)),
+          lineHeight(`rem(1.)),
+          textTransform(`uppercase),
+          letterSpacing(`em(0.02)),
+          marginBottom(`rem(0.5)),
+          textAlign(`center),
+          paddingTop(`rem(0.5)),
+          media(
+            Theme.MediaQuery.tablet,
+            [
+              textAlign(`left),
+              textTransform(`none),
+              letterSpacing(`zero),
+              fontSize(`rem(1.3)),
+              lineHeight(`rem(1.56)),
+            ],
+          ),
+        ]),
+      ]);
+
+    let description =
+      merge([
+        Theme.Type.paragraphSmall,
+        style([
+          display(`none),
+          color(Theme.Colors.white),
+          media(Theme.MediaQuery.tablet, [display(`block)]),
+        ]),
+      ]);
+
+    let icon =
+      merge([
+        ButtonBarStyles.icon,
+        style([media(Theme.MediaQuery.tablet, [marginLeft(`auto)])]),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    let renderCard = (kind, title, description) => {
+      <Card>
+        <div className=Styles.content>
+          <span className=Styles.icon> <Icon kind /> </span>
+          <h5 className=Styles.title> {React.string(title)} </h5>
+          <p className=Styles.description> {React.string(description)} </p>
+        </div>
+      </Card>;
+    };
+
+    <div className=ButtonBarStyles.container>
+      <div className=ButtonBarStyles.grid>
+        {renderCard(
+           Icon.NodeOperators,
+           "Run a node",
+           "Getting started is easier than you think.",
+         )}
+        {renderCard(
+           Icon.Developers,
+           "Build on Mina",
+           "Work on the protocol  and contribute to Mina's codebase.",
+         )}
+        {renderCard(
+           Icon.Community,
+           "Join the Community",
+           "Let's keep it positive and productive.",
+         )}
+        {renderCard(
+           Icon.GrantsProgram,
+           "Apply for a Grant",
+           "Roll up your sleeves and help build Mina.",
+         )}
+      </div>
+    </div>;
+  };
+};
+
 [@react.component]
 let make = (~kind, ~backgroundImg) => {
-  <div className={ButtonBarStyles.background(backgroundImg)}>
+  <div className={ButtonBarStyles.background(kind, backgroundImg)}>
     <Wrapped>
       {switch (kind) {
-       | GetStarted => React.null
+       | GetStarted => <GetStarted />
        | Developers => React.null
        | CommunityLanding => <CommunityLanding />
        | HelpAndSupport => <HelpAndSupport />
