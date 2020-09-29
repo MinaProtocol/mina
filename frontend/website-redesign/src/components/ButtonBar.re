@@ -12,7 +12,7 @@ module Card = {
         display(`flex),
         justifyContent(`spaceBetween),
         flexDirection(`column),
-        padding2(~h=`rem(1.), ~v=`rem(0.5)),
+        padding2(~h=`rem(1.), ~v=`rem(1.)),
         width(`percent(100.)),
         border(`px(1), `solid, Theme.Colors.white),
         backgroundColor(Theme.Colors.digitalBlack),
@@ -65,7 +65,7 @@ module ButtonBarStyles = {
     let (mobileV, tabletV, desktopV) =
       switch (kind) {
       | GetStarted => (1.5, 5.75, 2.5)
-      | Developers => (1.5, 5.75, 16.)
+      | Developers => (1.5, 5.75, 6.)
       | CommunityLanding => (1.5, 4.25, 4.25)
       | HelpAndSupport => (1.5, 5.75, 2.5)
       };

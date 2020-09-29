@@ -85,11 +85,19 @@ module SocialIcons = {
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <Icon kind=Icon.Discord size=2. />
-      <Icon kind=Icon.Twitter size=2. />
-      <Icon kind=Icon.Facebook size=2. />
-      <Icon kind=Icon.Telegram size=2. />
-      <Icon kind=Icon.WeChat size=2. />
+      <Next.Link href="https://discord.com/invite/Vexf4ED">
+        <Icon kind=Icon.Discord size=2. />
+      </Next.Link>
+      <Next.Link href="https://twitter.com/minaprotocol">
+        <Icon kind=Icon.Twitter size=2. />
+      </Next.Link>
+      <Next.Link href="https://facebook.com/minaprotocol">
+        <Icon kind=Icon.Facebook size=2. />
+      </Next.Link>
+      <Next.Link href="https://t.me/minaprotocol">
+        <Icon kind=Icon.Telegram size=2. />
+      </Next.Link>
+      <Next.Link href=""> <Icon kind=Icon.WeChat size=2. /> </Next.Link>
     </div>;
   };
 };
@@ -143,7 +151,7 @@ module LeftSide = {
       <div className=Styles.emailInputSection>
         <div className=Styles.label> {React.string("Get Updates")} </div>
         <p className=Styles.emailSubtext>
-          {React.string("Mina's growing fast! Sign up and stay in the loop.")}
+          {React.string("Mina is growing fast! Subscribe to stay updated")}
         </p>
         <EmailInput />
         <Spacer height=2. />
@@ -223,25 +231,16 @@ module Subfooter = {
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Mina Foundation")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Code of Conduct")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
+        <a href="https://o1labs.org/" className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
+        <a href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md" className=Styles.smallLinks>
+          {React.string("Code of Conduct")}
+        </a>
+        <Next.Link href="/privacy">
           <a className=Styles.smallLinks>
             {React.string("Privacy Policy")}
           </a>
         </Next.Link>
-        <Next.Link href="">
+        <Next.Link href="/tos">
           <a className=Styles.smallLinks>
             {React.string("Terms of Service")}
           </a>

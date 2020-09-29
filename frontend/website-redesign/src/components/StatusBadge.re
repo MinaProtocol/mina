@@ -43,7 +43,7 @@ module Styles = {
   let icon = style([display(`inlineFlex), alignItems(`center)]);
 };
 
-let url = "https://status.codaprotocol.com";
+let url = "https://status.minaprotocol.com";
 let apiPath = "/api/v2/summary.json";
 
 type component = {
@@ -83,7 +83,7 @@ let parseServiceName = name =>
   | "Faucet" => `Faucet
   | "Echo Bot" => `EchoBot
   | "GraphQL Proxy" => `GraphQLProxy
-  | "Coda Testnet"
+  | "Mina Testnet"
   | "Summary" => `Summary
   | s =>
     Js.Console.warn("Unknown status service `" ++ s ++ "`");

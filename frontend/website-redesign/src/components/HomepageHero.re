@@ -43,8 +43,8 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`center),
       marginTop(`rem(13.)),
-      media("(min-width:65rem)", [flexDirection(`row)]),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
+      media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
 
   let heroHeadline =
@@ -146,24 +146,22 @@ let make = (~backgroundImg) => {
             <span>
               <p className=Styles.heroText>
                 {React.string(
-                   "By design, the entire Coda blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
+                   "By design, the entire Mina blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
                  )}
               </p>
             </span>
             <span className=Styles.heroButton>
-              //TODO: Add link to tech
-
-                <Button
-                  href="/"
-                  bgColor=Theme.Colors.white
-                  paddingX=1.
-                  width={`rem(13.5)}>
-                  <span> {React.string("See Behind The Tech")} </span>
-                  <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall />
-                  </span>
-                </Button>
-              </span>
+              <Button
+                href="/tech"
+                bgColor=Theme.Colors.white
+                paddingX=1.
+                width={`rem(13.5)}>
+                <span> {React.string("See Behind The Tech")} </span>
+                <span className=Styles.buttonIcon>
+                  <Icon kind=Icon.ArrowRightSmall />
+                </span>
+              </Button>
+            </span>
           </div>
           <div className=Styles.heroImageContainer>
             <img

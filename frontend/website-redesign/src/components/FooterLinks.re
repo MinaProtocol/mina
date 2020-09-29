@@ -54,31 +54,33 @@ let make = () => {
   <div className=Styles.linksGrid>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Get Started")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/docs/getting-started">
         <a className=Styles.linkStyle> {React.string("Documentation")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/docs/node-operator">
         <a className=Styles.linkStyle> {React.string("Run a Node")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/tech">
         <a className=Styles.linkStyle> {React.string("Build on Mina")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Join Genesis")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link
+        href="https://github.com/MinaProtocol/mina-grants#how-to-apply">
         <a className=Styles.linkStyle> {React.string("Apply for Grants")} </a>
       </Next.Link>
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Resources")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/tech">
         <a className=Styles.linkStyle> {React.string("About the Tech")} </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link
+        href="/blog/mina-protocol-the-worlds-lightest-blockchain-releases-its-economics">
         <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
       </Next.Link>
       <Next.Link href="">
@@ -97,10 +99,10 @@ let make = () => {
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Tools")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/testnet">
         <a className=Styles.linkStyle> {React.string("Testnet")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/">
         <a className=Styles.linkStyle> {React.string("Block Explorers")} </a>
       </Next.Link>
       <Next.Link href="">
@@ -115,9 +117,6 @@ let make = () => {
         <a className=Styles.linkStyle> {React.string("Network Health")} </a>
       </Next.Link>
       <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Network Health")} </a>
-      </Next.Link>
-      <Next.Link href="">
         <a className=Styles.linkStyle>
           {React.string("Snarkers Dashboard")}
         </a>
@@ -125,34 +124,34 @@ let make = () => {
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Project")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/about">
         <a className=Styles.linkStyle> {React.string("About Mina")} </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Team")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/jobs">
         <a className=Styles.linkStyle> {React.string("Careers")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/blog">
         <a className=Styles.linkStyle> {React.string("Media")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/blog">
         <a className=Styles.linkStyle> {React.string("Blog")} </a>
       </Next.Link>
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Community")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/about">
         <a className=Styles.linkStyle> {React.string("Welcome")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Genesis Program")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/leaderboard">
         <a className=Styles.linkStyle> {React.string("Leaderboard")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina-grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
       </Next.Link>
       <Next.Link href="">
@@ -163,19 +162,19 @@ let make = () => {
       <h4 className=Styles.linksHeader>
         {React.string("Help and Support")}
       </h4>
-      <Next.Link href="">
+      <Next.Link href="https://discord.com/invite/Vexf4ED">
         <a className=Styles.linkStyle> {React.string("Discord")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://forums.minaprotocol.com/">
         <a className=Styles.linkStyle> {React.string("Forums")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina">
         <a className=Styles.linkStyle> {React.string("Github")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://minawiki.com/Main_Page">
         <a className=Styles.linkStyle> {React.string("Wiki")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina/issues">
         <a className=Styles.linkStyle> {React.string("Report a Bug")} </a>
       </Next.Link>
     </div>

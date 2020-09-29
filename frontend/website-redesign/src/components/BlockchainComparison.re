@@ -27,10 +27,9 @@ module Styles = {
       height(`percent(100.)),
       marginTop(`rem(5.)),
       media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`flexEnd)],
+        Theme.MediaQuery.tablet,
+        [flexDirection(`row), alignItems(`flexEnd), maxWidth(`rem(30.))],
       ),
-      media(Theme.MediaQuery.tablet, [maxWidth(`rem(30.))]),
       media(Theme.MediaQuery.desktop, [maxWidth(`rem(40.))]),
     ]);
 
@@ -42,10 +41,14 @@ module Styles = {
       flexDirection(`column),
       height(`percent(100.)),
       width(`percent(100.)),
-      media(Theme.MediaQuery.notMobile, [height(`rem(14.))]),
       media(
         Theme.MediaQuery.tablet,
-        [flexDirection(`row), marginTop(`zero), height(`rem(20.))],
+        [
+          flexDirection(`row),
+          marginTop(`zero),
+          width(`percent(50.)),
+          height(`rem(20.)),
+        ],
       ),
     ]);
 
@@ -98,7 +101,7 @@ module Styles = {
       overflow(`hidden),
       media(
         Theme.MediaQuery.notMobile,
-        [width(`rem(26.)), height(`rem(14.))],
+        [width(`percent(50.)), maxWidth(`rem(26.)), height(`rem(14.))],
       ),
       media(Theme.MediaQuery.tablet, [height(`rem(20.))]),
     ]);
