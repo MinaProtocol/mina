@@ -155,7 +155,7 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
   };
 };
@@ -523,6 +523,7 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
+      /*
     <div className=Styles.sectionContainer("")>
       <Spacer height=6. />
       <div className=Styles.section id="knowledge">
@@ -530,6 +531,7 @@ let make = () => {
       </div>
     </div>
     <Spacer height=12. />
+    */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
