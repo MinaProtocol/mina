@@ -75,7 +75,7 @@ module Section = {
       title: string,
       description: string,
       buttonCopy: string,
-      buttonUrl: string,
+      buttonUrl: [`External(string) | `Internal(string)],
       image: string,
     };
 
@@ -114,7 +114,7 @@ module Section = {
                  {React.string(row.description)}
                </p>
                <div className=Styles.button>
-                 <Button bgColor=Theme.Colors.white>
+                 <Button href=row.buttonUrl bgColor=Theme.Colors.white>
                    {React.string(row.buttonCopy)}
                    <span className=SectionStyles.icon>
                      <Icon kind=Icon.ArrowRightMedium />
@@ -134,7 +134,7 @@ module Section = {
       title: string,
       description: string,
       linkCopy: string,
-      linkUrl: string,
+      linkUrl: [`External(string) | `Internal(string)],
       image: string,
     };
 

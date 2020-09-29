@@ -73,7 +73,7 @@ let make = (~source) => {
       <Title
         copy="In the News"
         buttonCopy="See All Press"
-        buttonHref="/blog"
+        buttonHref=`Internal("/blog")
       />
     </Wrapped>
     <ListModule

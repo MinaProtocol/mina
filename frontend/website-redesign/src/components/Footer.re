@@ -81,24 +81,28 @@ module SocialIcons = {
         height(`rem(2.)),
         color(white),
       ]);
+
+    let anchor = style([
+      textDecoration(`none)
+    ]);
   };
 
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <Next.Link href="https://discord.com/invite/Vexf4ED">
+      <a className=Styles.anchor href="https://discord.com/invite/Vexf4ED">
         <Icon kind=Icon.Discord size=2. />
-      </Next.Link>
-      <Next.Link href="https://twitter.com/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://twitter.com/minaprotocol">
         <Icon kind=Icon.Twitter size=2. />
-      </Next.Link>
-      <Next.Link href="https://facebook.com/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://facebook.com/minaprotocol">
         <Icon kind=Icon.Facebook size=2. />
-      </Next.Link>
-      <Next.Link href="https://t.me/minaprotocol">
+      </a>
+      <a className=Styles.anchor href="https://t.me/minaprotocol">
         <Icon kind=Icon.Telegram size=2. />
-      </Next.Link>
-      <Next.Link href=""> <Icon kind=Icon.WeChat size=2. /> </Next.Link>
+      </a>
+      <a className=Styles.anchor href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200"> <Icon kind=Icon.WeChat size=2. /> </a>
     </div>;
   };
 };
@@ -266,6 +270,7 @@ let make = () => {
     <Subfooter />
     <div className=Styles.backToTopButton>
       <Button
+        href=`Scroll_to_top
         height={`rem(4.125)}
         width={`rem(3.75)}
         bgColor=Theme.Colors.black
