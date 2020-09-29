@@ -240,7 +240,7 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      height(`rem(32.5)),
+      minHeight(`rem(32.5)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {
