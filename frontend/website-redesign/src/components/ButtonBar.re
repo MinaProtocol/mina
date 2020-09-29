@@ -152,14 +152,12 @@ module CommunityLanding = {
 
     <div className=ButtonBarStyles.container>
       <h2 className=Theme.Type.pageLabel>
-        {React.string("All The Things")}
+        {React.string("Connect")}
       </h2>
       <div className=ButtonBarStyles.grid>
         {renderCard(Icon.Twitter, "Twitter")}
         {renderCard(Icon.Forums, "Forums")}
         {renderCard(Icon.Wiki, "Wiki")}
-        {renderCard(Icon.Discord, "Discord")}
-        {renderCard(Icon.Telegram, "Telegram")}
         {renderCard(Icon.Facebook, "Facebook")}
         {renderCard(Icon.WeChat, "Wechat")}
       </div>
