@@ -155,7 +155,7 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
   };
 };
@@ -530,8 +530,8 @@ let make = () => {
         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
       </div>
     </div>
-    */
     <Spacer height=12. />
+    */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
