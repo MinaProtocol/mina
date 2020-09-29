@@ -14,11 +14,13 @@ if [[ $COMMIT != "" ]]; then
   git diff $COMMIT --name-only
 else
   if [ -n "${INCREMENTAL_BUILD+x}" ]; then
-    # based DIFF on last successful `develop` RUN as anchor
+    # base DIFF on last successful Buildkite `develop` RUN
     ci_recent_pass_commit=$(
       curl https://graphql.buildkite.com/v1  -H "Authorization: Bearer $TOKEN"
         -d'{"query": "query { pipeline(slug: \"o-1-labs-2/coda\") { builds(first: 1 branch: \"develop\" state: PASSED) { edges { node { commit } } } } }"}' | jq '.data.pipeline.builds.edges[0].node.commit'
     )
+
+    echo "--- Generating diff against: $ci_recent_pass_commit"
     git diff HEAD $ci_recent_pass_commit
   else
     # TODO: Dump commits as artifacts when build succeeds so we can diff against
