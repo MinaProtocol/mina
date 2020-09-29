@@ -3,15 +3,15 @@ module Styles = {
   let backgroundImage =
     style([
       backgroundSize(`cover),
-      backgroundImage(url("/static/img/InvestorsBackgroundMobile.png")),
+      backgroundImage(url("/static/img/InvestorsBackgroundMobile.jpg")),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(url("/static/img/InvestorsBackgroundTablet.png"))],
+        [backgroundImage(url("/static/img/InvestorsBackgroundTablet.jpg"))],
       ),
       media(
         Theme.MediaQuery.desktop,
         [
-          backgroundImage(url("/static/img/InvestorsBackgroundDesktop.png")),
+          backgroundImage(url("/static/img/InvestorsBackgroundDesktop.jpg")),
         ],
       ),
     ]);

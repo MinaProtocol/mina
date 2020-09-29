@@ -3,9 +3,9 @@ module Styles = {
   let container = style([position(`relative), height(`rem(32.8))]);
   let text =
     style([
-      position(`absolute),
-      top(`zero),
+      top(`rem(4.)),
       left(`zero),
+      position(`absolute),
       backgroundColor(Theme.Colors.purple),
       padding2(~v=`rem(2.5), ~h=`rem(2.5)),
       width(`rem(23.)),
@@ -40,6 +40,8 @@ module Styles = {
     ]);
   let worldMapImage =
     style([
+      display(`none),
+      media(Theme.MediaQuery.desktop, [display(`grid)]),
       position(`absolute),
       right(`rem(-5.)),
       width(`rem(50.)),
@@ -53,6 +55,8 @@ module Styles = {
       height(`rem(9.375)),
       zIndex(99),
       width(`rem(8.375)),
+      display(`none),
+      media(Theme.MediaQuery.desktop, [display(`grid)]),
     ]);
   let number =
     style([

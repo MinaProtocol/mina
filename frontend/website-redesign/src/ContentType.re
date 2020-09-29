@@ -26,6 +26,7 @@ module System = {
 
 module BlogPost = {
   let id = "test";
+  let dateKeyName = "date";
   type t = {
     title: string,
     snippet: string,
@@ -89,3 +90,58 @@ module GenesisProfile = {
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
+
+module Press = {
+  let id = "press";
+  let dateKeyName = "datePublished";
+  type t = {
+    title: string,
+    image: Image.entry,
+    link: string,
+    featured: bool,
+    description: Js.Undefined.t(string),
+    publisher: string,
+    datePublished: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module NormalizedPressBlog = {
+  type t = {
+    title: string,
+    image: option(Image.entry),
+    link: [`Slug(string) | `Remote(string)],
+    featured: bool,
+    description: option(string),
+    publisher: string,
+    date: string,
+  };
+
+  let ofBlog = (blog : BlogPost.t) => {
+    {
+      title: blog.title,
+      image: None,
+      link: `Slug(blog.slug),
+      featured: true,
+      description: Some(blog.snippet),
+      publisher: blog.author,
+      date: blog.date
+    }
+  };
+
+  let ofPress = (press : Press.t) => {
+    {
+      title: press.title,
+      image: Some(press.image),
+      link: `Remote(press.link),
+      featured: press.featured,
+      description: Js.Undefined.toOption(press.description),
+      publisher: press.publisher,
+      date: press.datePublished,
+    }
+  };
+
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+}

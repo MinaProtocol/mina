@@ -59,6 +59,14 @@ module Styles = {
       hideIfMobileElseShow,
       style([paddingLeft(`rem(0.5)), paddingRight(`rem(0.5))]),
     ]);
+
+  let linkAnchor =
+    merge([
+      orangeText,
+      style([
+        textDecoration(`none)
+      ])
+    ]);
 };
 
 [@react.component]
@@ -66,26 +74,26 @@ let make = (~children, ~dark=false) => {
   <div className={Styles.announcementBanner(dark)}>
     <div className=Styles.flexCenter>
       <span className=Styles.announcementText> children </span>
-      <Next.Link href="/">
+      <a className=Styles.linkAnchor href="https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul">
         <div className=Styles.link>
           <span className=Styles.learnMoreText>
-            {React.string("Learn More")}
+            {React.string("Subscribe to stay updated")}
           </span>
           <Icon kind=Icon.ArrowRightMedium />
         </div>
-      </Next.Link>
+      </a>
     </div>
-    <div className=Styles.changeRegionSection>
-      <Icon kind=Icon.World />
-      <span
-        className=Css.(
-          merge([Styles.flexCenter, Styles.hideIfMobileElseShow])
-        )>
-        <span className=Styles.changeRegionText>
-          {React.string("Change Region")}
-        </span>
-        <Icon kind=Icon.ChevronDown />
-      </span>
-    </div>
+    //<div className=Styles.changeRegionSection>
+    //  <Icon kind=Icon.World />
+    //  <span
+    //    className=Css.(
+    //      merge([Styles.flexCenter, Styles.hideIfMobileElseShow])
+    //    )>
+    //    <span className=Styles.changeRegionText>
+    //      {React.string("Change Region")}
+    //    </span>
+    //    <Icon kind=Icon.ChevronDown />
+    //  </span>
+    // </div>
   </div>;
 };
