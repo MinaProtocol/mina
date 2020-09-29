@@ -45,14 +45,15 @@ struct
     for i = 1 to rounds_full do
       res.(i) <- apply_round i res.(i - 1)
     done ;
-    res
+    res 
 
   open Impl
   open Field
   module Field = Field
 
-  let block_cipher ({round_constants; mds} as params : _ Sponge.Params.t) init
+  let block_cipher (_ : _ Sponge.Params.t) init
       =
+    Impl.with_label __LOC__ (fun () ->
     let t =
       exists
         (Typ.array
@@ -65,7 +66,7 @@ struct
     (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
     Impl.assert_
       [{basic= T (Poseidon {state= t}); annotation= Some "plonk-poseidon"}]) ;
-    t.(Int.(Array.length t - 1))
+    t.(Int.(Array.length t - 1)) )
 
   (* TODO: experiment with sealing version of this *)
   let add_assign ~state i x = state.(i) <- state.(i) + x

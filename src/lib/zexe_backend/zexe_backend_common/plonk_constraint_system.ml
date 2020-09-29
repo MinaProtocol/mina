@@ -1,7 +1,5 @@
 open Sponge
 open Unsigned.Size_t
-include Scale_round
-include Endoscale_round
 
 module Gate = struct
   type g =

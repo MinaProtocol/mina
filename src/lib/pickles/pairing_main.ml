@@ -98,7 +98,8 @@ struct
   module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dee)
 
   let squeeze_scalar sponge : Scalar_challenge.t =
-    Scalar_challenge (Sponge.squeeze sponge ~length:Challenge.length)
+    Scalar_challenge 
+      (Sponge.squeeze sponge ~length:Challenge.length)
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
@@ -276,9 +277,10 @@ struct
         let sample_scalar () = squeeze_scalar sponge in
         let open Dlog_plonk_types.Messages in
         let x_hat =
+          with_label __LOC__ (fun () ->
           multiscale
             (Array.mapi public_input ~f:(fun i x ->
-                 (x, lagrange_commitment ~domain i) ))
+                 (x, lagrange_commitment ~domain i) )) )
         in
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in

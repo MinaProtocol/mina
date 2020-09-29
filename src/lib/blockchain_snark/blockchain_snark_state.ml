@@ -280,6 +280,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
   ; main=
       (fun [x1; x2] x ->
         let b1, b2 =
+           Core.printf "%s\n%!" __LOC__ ;
           Run.run_checked
             (step ~proof_level ~constraint_constants ~logger:(Logger.create ())
                [x1; x2] x)

@@ -1,4 +1,3 @@
-module Scale_round = struct
   open Core_kernel
 
   [%%versioned
@@ -34,4 +33,3 @@ module Scale_round = struct
     ; yp= f t1.yp t2.yp
     ; xs= f t1.xs t2.xs
     ; ys= f t1.ys t2.ys }
-end

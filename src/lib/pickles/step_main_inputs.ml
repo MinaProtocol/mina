@@ -168,7 +168,9 @@ module Inner_curve = struct
 
   let ( + ) = T.add_exn
 
-  let scale t bs = T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs)
+  let scale t bs = 
+    with_label __LOC__ (fun () ->
+    T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [x; y]
 

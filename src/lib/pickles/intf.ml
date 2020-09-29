@@ -150,6 +150,8 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
     module Constant : sig
       type t [@@deriving sexp]
 
+      val ( + ) : t -> t -> t
+
       module Scalar : Marlin_checks.Field_intf
 
       val scale : t -> Scalar.t -> t

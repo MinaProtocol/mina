@@ -1,4 +1,3 @@
-module Endoscale_round = struct
   open Core_kernel
   module H_list = Snarky_backendless.H_list
 
@@ -49,4 +48,3 @@ module Endoscale_round = struct
     ; yp= f t1.yp t2.yp
     ; xs= f t1.xs t2.xs
     ; ys= f t1.ys t2.ys }
-end

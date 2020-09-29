@@ -2808,9 +2808,22 @@ module Base = struct
     { prevs= []
     ; main=
         (fun [] x ->
+           Core.printf "%s\n%!" __LOC__ ;
           Run.run_checked (main ~constraint_constants x) ;
           [] )
     ; main_value= (fun [] _ -> []) }
+
+  let () =
+    let module Constraints = Snarky_log.Constraints (Impl.Internal_Basic) in
+    let log =
+      Constraints.log (
+            let%bind x = exists  Statement.With_sok.typ in
+            main ~constraint_constants:Genesis_constants.Constraint_constants.compiled 
+              x
+      )
+    in 
+    Snarky_log.to_file "base-snark.json" log ;
+    ()
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
       (state_body : Coda_state.Protocol_state.Body.Value.t)
@@ -2897,6 +2910,7 @@ module Merge = struct
     { prevs= [self; self]
     ; main=
         (fun ps x ->
+           Core.printf "%s\n%!" __LOC__ ;
           Run.run_checked (main ps x) ;
           [b; b] )
     ; main_value= (fun _ _ -> [prev_should_verify; prev_should_verify]) }
