@@ -96,6 +96,7 @@ struct
       ty t
 
   module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dee)
+  module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
   let squeeze_scalar sponge : Scalar_challenge.t =
     Scalar_challenge 
