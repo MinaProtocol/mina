@@ -28,7 +28,7 @@ module Styles = {
     ]);
   let backToTopButton =
     style([
-      position(`absolute),
+      position(`fixed),
       right(`rem(1.2)),
       bottom(`rem(1.2)),
       media(
@@ -45,7 +45,7 @@ module Styles = {
       display(`flex),
       height(`rem(2.62)),
       flexDirection(`column),
-      alignContent(`center),
+      alignItems(`center),
       justifyContent(`spaceBetween),
       color(white),
     ]);
