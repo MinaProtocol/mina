@@ -104,7 +104,7 @@ let make = (~small=true) => {
             {React.string("Naval Ravikant")}
           </p>
           <p className=Theme.Type.contributorLabel>
-            {React.string("AngelList Co-Founder")}
+            {React.string("AngelList Co-Founder, O(1) Labs Investor")}
           </p>
         </div>
       </div>
