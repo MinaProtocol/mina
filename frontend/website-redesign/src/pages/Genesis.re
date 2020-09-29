@@ -168,11 +168,11 @@ module FoundingMembersSection = {
     open Css;
     let container =
       style([
-        padding2(~v=`rem(4.), ~h=`rem(0.)),
         backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
         backgroundSize(`cover),
       ]);
-    let h2 = merge([Theme.Type.h2, style([color(white)])]);
+    let h2 =
+      merge([Theme.Type.h2, style([paddingTop(`rem(4.)), color(white)])]);
     let sectionSubhead =
       merge([
         Theme.Type.paragraphMono,
@@ -398,8 +398,8 @@ let make = (~profiles) => {
     <div className=Styles.genesisSection>
       <FoundingMembersSection profiles>
         <WorldMapSection />
+        <Spacer height=7.25 />
       </FoundingMembersSection>
-      <Spacer height=4. />
       <div className=Styles.leaderboardBackground>
         <Wrapped>
           <div className=Styles.leaderboardTextContainer>

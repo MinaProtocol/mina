@@ -4,7 +4,7 @@ module Styles = {
     style([
       position(`relative),
       width(`percent(100.)),
-      height(`rem(32.8)),
+      height(`rem(35.8)),
     ]);
   let text =
     style([
