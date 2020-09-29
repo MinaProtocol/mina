@@ -13,67 +13,100 @@ module Styles = {
     merge([
       Theme.Type.buttonLabel,
       style([
+        position(`relative),
         display(`flex),
-        justifyContent(`center),
+        justifyContent(`spaceBetween),
         alignItems(`center),
+        unsafe("width", "max-content"),
         width(buttonWidth),
         height(buttonHeight),
         border(`px(1), `solid, borderColor),
-        boxShadow(~x=`px(4), ~y=`px(4), black),
         backgroundColor(bgColor),
         borderTopLeftRadius(`px(4)),
         borderBottomRightRadius(`px(4)),
         borderTopRightRadius(`px(1)),
         borderBottomLeftRadius(`px(1)),
+        cursor(`pointer),
         textDecoration(`none),
         fontSize(`px(12)),
+        transformStyle(`preserve3d),
+        transition("background", ~duration=200, ~timingFunction=`easeIn),
+        //transition("transform", ~duration=500, ~timingFunction=`easeIn),
+        after([
+          position(`absolute),
+          contentRule(""),
+          top(`rem(0.25)),
+          left(`rem(0.25)),
+          right(`rem(-0.25)),
+          bottom(`rem(-0.25)),
+          borderTopLeftRadius(`px(4)),
+          borderBottomRightRadius(`px(4)),
+          borderTopRightRadius(`px(1)),
+          borderBottomLeftRadius(`px(1)),
+          border(`px(1), `solid, dark ? bgColor : borderColor),
+          transform(translateZ(`px(-1))),
+          transitions([
+            `transition("200ms ease-in 0ms transform"),
+            `transition("50ms ease-in 100ms border"),
+          ]),
+        ]),
         color(
           {
-            bgColor === Theme.Colors.white ? black : white;
+            bgColor === Theme.Colors.white ? Theme.Colors.digitalBlack : white;
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
         textAlign(`center),
-        alignSelf(`center),
         hover([
           color(white),
-          boxShadow(~x=`px(0), ~y=`px(0), black),
-          unsafe(
-            "transition",
-            "box-shadow 0.2s ease-in, transform 0.5s ease-in",
-          ),
-          background(
+          after([
+            border(`zero, `solid, `rgba(0, 0, 0, 0.)),
+            transform(translate(`rem(-0.25), `rem(-0.25))),
+          ]),
+          backgrounds([
             {
               dark
                 ? `url("/static/ButtonHoverDark.png")
                 : `url("/static/ButtonHoverLight.png");
             },
-          ),
+            black,
+          ]),
         ]),
       ]),
     ]);
 };
 
+module Link = {
+  [@react.component]
+  let make = (~href, ~children) => {
+    switch (href) {
+    | `Scroll_to_top => <Next.Link href=""> children </Next.Link>
+    | `External(href) => <a className=Css.(style([textDecoration(`none)])) href> children </a>
+    | `Internal(href) =>
+      <Next.Link href> children </Next.Link>
+    }
+  };
+};
+
 /**
  * Button is light by default, and setting dark to true as a prop will make the background image change accordingly.
  * Buttons have four different colors: orange, mint, black, and white.
- *
  */
 [@react.component]
 let make =
     (
-      ~href="",
+      ~href,
       ~children=?,
       ~height=`rem(3.25),
       ~width=`rem(10.9),
       ~borderColor=Theme.Colors.black,
       ~paddingX=1.5,
-      ~paddingY=1.,
+      ~paddingY=0.,
       ~bgColor=Theme.Colors.orange,
       ~dark=false,
       ~onClick=?,
     ) => {
-  <Next.Link href>
+  <Link href>
     <button
       ?onClick
       className={Styles.button(
@@ -90,5 +123,5 @@ let make =
        | None => React.null
        }}
     </button>
-  </Next.Link>;
+  </Link>;
 };

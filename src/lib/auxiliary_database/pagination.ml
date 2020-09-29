@@ -221,10 +221,10 @@ end
 let%test_module "Pagination" =
   ( module struct
     let assert_same_set expected_values actual_values =
-      User_command.Set.(
+      Signed_command.Set.(
         [%test_eq: t] (of_list expected_values) (of_list actual_values))
 
-    module Pagination = Make (User_command) (User_command) (Int)
+    module Pagination = Make (Signed_command) (Signed_command) (Int)
 
     let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
 
@@ -245,9 +245,9 @@ let%test_module "Pagination" =
            ~f:(fun next_available_token (txn, time) ->
              if Option.is_none @@ Hashtbl.find t.all_values.table txn then
                Pagination.add t
-                 (User_command.accounts_accessed ~next_available_token txn)
+                 (Signed_command.accounts_accessed ~next_available_token txn)
                  txn txn time ;
-             User_command.next_available_token txn next_available_token )
+             Signed_command.next_available_token txn next_available_token )
 
     let%test_unit "We can get all values associated with a public key" =
       let trials = 10 in
@@ -255,7 +255,7 @@ let%test_module "Pagination" =
       Quickcheck.test ~trials
         Quickcheck.Generator.(
           list
-          @@ User_command.Gen.payment_with_random_participants
+          @@ Signed_command.Gen.payment_with_random_participants
                ~keys:(Array.of_list [keypair1; keypair2])
                ~max_amount:10000 ~max_fee:1000 ())
         ~f:(fun user_commands ->
@@ -266,11 +266,11 @@ let%test_module "Pagination" =
           let pk1_expected_transactions =
             List.filter user_commands ~f:(fun user_command ->
                 let participants =
-                  User_command.accounts_accessed
+                  Signed_command.accounts_accessed
                     ~next_available_token:!next_available_token user_command
                 in
                 next_available_token :=
-                  User_command.next_available_token user_command
+                  Signed_command.next_available_token user_command
                     !next_available_token ;
                 List.mem participants account_id1 ~equal:Account_id.equal )
           in
@@ -289,12 +289,12 @@ let%test_module "Pagination" =
 
       module Payment = struct
         let same_sender_same_receiver =
-          User_command.Gen.payment ~key_gen:key ~max_amount:10000 ~max_fee:1000
-            ()
+          Signed_command.Gen.payment ~key_gen:key ~max_amount:10000
+            ~max_fee:1000 ()
 
         let different_participants =
           let keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
-          User_command.Gen.payment_with_random_participants ~keys
+          Signed_command.Gen.payment_with_random_participants ~keys
             ~max_amount:10000 ~max_fee:1000 ()
       end
 
@@ -509,7 +509,7 @@ let%test_module "Pagination" =
         ~compare:
           (Comparable.lift
              ~f:(fun (txn, date) -> (-1 * date, txn))
-             [%compare: int * User_command.t])
+             [%compare: int * Signed_command.t])
 
     let%test_unit "Get all values that were added before an arbitrary value" =
       test_amount_input_omitted ~trials:5
@@ -580,7 +580,7 @@ let%test_module "Pagination" =
     let compare_txns_with_dates =
       Comparable.lift
         ~f:(fun (txn, date) -> (date, txn))
-        [%compare: int * User_command.t]
+        [%compare: int * Signed_command.t]
 
     let%test_unit "Get the n most earliest values if a cursor is not provided"
         =

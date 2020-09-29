@@ -116,3 +116,5 @@ let map = One_or_two.map
 let fold = One_or_two.fold
 
 let to_list = One_or_two.to_list
+
+let to_numbered_list = One_or_two.to_numbered_list

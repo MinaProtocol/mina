@@ -24,7 +24,7 @@ type t =
   ; account: Account.t option
   ; status: string
   ; _type: string
-  ; target: string option }
+  ; target: [`Ignore | `Check of string option] }
 [@@deriving show]
 
 (** Returns a validation of the reasons it is not similar or unit if it is *)
@@ -63,12 +63,17 @@ let similar ~logger:_ t (op : Operation.t) =
         () )
   and () = test String.(equal t.status op.status) Status
   and () =
-    opt_eq t.target op.metadata ~err:Target ~f:(fun target metadata ->
-        match metadata with
-        | `Assoc [("delegate_change_target", `String y)] ->
-            test String.(equal y target) Target
-        | _ ->
-            fail Target )
+    match t.target with
+    | `Ignore ->
+        return ()
+    | `Check target ->
+        opt_eq target op.metadata ~err:Target ~f:(fun target metadata ->
+            match metadata with
+            | `Assoc [("delegate_change_target", `String y)]
+            | `Assoc [("token_owner_pk", `String y)] ->
+                test String.(equal y target) Target
+            | _ ->
+                fail Target )
   and () = test String.(equal t._type op._type) Type in
   ()
 

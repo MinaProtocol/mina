@@ -34,16 +34,20 @@ module type Triple = sig
   val f2 : t -> elt
 end
 
-module type Pair = sig
+module type Pair_basic = sig
   type elt
 
   type t
 
-  module Vector : Vector with type elt = t
-
-  val make : elt -> elt -> t
-
   val f0 : t -> elt
 
   val f1 : t -> elt
+end
+
+module type Pair = sig
+  include Pair_basic
+
+  module Vector : Vector with type elt = t
+
+  val make : elt -> elt -> t
 end

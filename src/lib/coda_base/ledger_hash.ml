@@ -107,20 +107,23 @@ let%snarkydef modify_account ~depth t aid
 let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      let%bind account_already_there =
-        Account_id.Checked.equal (Account.identifier_of_var account) aid
-      in
-      let%bind account_not_there =
-        Public_key.Compressed.Checked.equal account.public_key
-          Public_key.Compressed.(var_of_t empty)
-      in
-      let%bind not_there_but_writeable =
-        Boolean.(account_not_there && is_writeable)
-      in
-      let%bind () =
-        Boolean.Assert.any [account_already_there; not_there_but_writeable]
-      in
-      return not_there_but_writeable )
+      [%with_label "modify_account_send filter"]
+        (let%bind account_already_there =
+           Account_id.Checked.equal (Account.identifier_of_var account) aid
+         in
+         let%bind account_not_there =
+           Public_key.Compressed.Checked.equal account.public_key
+             Public_key.Compressed.(var_of_t empty)
+         in
+         let%bind not_there_but_writeable =
+           Boolean.(account_not_there && is_writeable)
+         in
+         let%bind () =
+           [%with_label "account is either present or empty and writeable"]
+             (Boolean.Assert.any
+                [account_already_there; not_there_but_writeable])
+         in
+         return not_there_but_writeable) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -134,15 +137,17 @@ let%snarkydef modify_account_send ~depth t aid ~is_writeable ~f =
 let%snarkydef modify_account_recv ~depth t aid ~f =
   modify_account ~depth t aid
     ~filter:(fun account ->
-      let%bind account_already_there =
-        Account_id.Checked.equal (Account.identifier_of_var account) aid
-      in
-      let%bind account_not_there =
-        Public_key.Compressed.Checked.equal account.public_key
-          Public_key.Compressed.(var_of_t empty)
-      in
-      let%bind () =
-        Boolean.Assert.any [account_already_there; account_not_there]
-      in
-      return account_not_there )
+      [%with_label "modify_account_recv filter"]
+        (let%bind account_already_there =
+           Account_id.Checked.equal (Account.identifier_of_var account) aid
+         in
+         let%bind account_not_there =
+           Public_key.Compressed.Checked.equal account.public_key
+             Public_key.Compressed.(var_of_t empty)
+         in
+         let%bind () =
+           [%with_label "account is either present or empty"]
+             (Boolean.Assert.any [account_already_there; account_not_there])
+         in
+         return account_not_there) )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)

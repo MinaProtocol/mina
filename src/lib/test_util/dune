@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries snark_params fold_lib core_kernel snarky.backendless)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "test utils"))

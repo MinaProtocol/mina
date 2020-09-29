@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+# execute pre-processing steps like zexe-standardize.sh if set
+if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
+
 eval `opam config env`
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go

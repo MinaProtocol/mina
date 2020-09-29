@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-daemon' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
+VALID_SERVICES=('coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -33,13 +33,15 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
+# Debug prints for visability
+echo 'service="'$SERVICE'" version="'$VERSION'"'
 echo $EXTRA
 
 # Verify Required Parameters are Present
 if [ -z "$SERVICE" ]; then usage "Service is not set!"; fi;
 if [ -z "$VERSION" ]; then usage "Version is not set!"; fi;
 if [ -z "$EXTRA" ]; then EXTRA=""; fi;
-if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
+if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
 bot)
@@ -48,16 +50,15 @@ bot)
   ;;
 coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
-  DOCKER_CONTEXT="."
+  ;;
+coda-daemon-puppeteered)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
   ;;
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
-  DOCKER_CONTEXT="."
   ;;
 coda-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
-  mkdir some_empty_dir
-  DOCKER_CONTEXT="./some_empty_dir"
   ;;
 leaderboard)
   DOCKERFILE_PATH="frontend/leaderboard/Dockerfile"
@@ -66,6 +67,11 @@ leaderboard)
 *)
 esac
 
+# If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
+if [ -z "$DOCKER_CONTEXT" ]; then
+cat $DOCKERFILE_PATH | docker build $EXTRA -t codaprotocol/$SERVICE:$VERSION -
+else
 docker build $EXTRA $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+fi
 
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then docker push codaprotocol/$SERVICE:$VERSION; fi;

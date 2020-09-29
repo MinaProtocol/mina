@@ -16,10 +16,10 @@ module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
 open Rosetta_models
-module User_command = Coda_base.User_command
+module Signed_command = Coda_base.Signed_command
 module Token_id = Coda_base.Token_id
 module Public_key = Signature_lib.Public_key
-module User_command_memo = Coda_base.User_command_memo
+module Signed_command_memo = Coda_base.Signed_command_memo
 module Payment_payload = Coda_base.Payment_payload
 module Stake_delegation = Coda_base.Stake_delegation
 
@@ -146,7 +146,7 @@ module Partial = struct
   let to_user_command_payload :
          t
       -> nonce:Unsigned_extended.UInt32.t
-      -> (User_command.Payload.t, Errors.t) Result.t =
+      -> (Signed_command.Payload.t, Errors.t) Result.t =
    fun t ~nonce ->
     let open Result.Let_syntax in
     let%bind fee_payer_pk =
@@ -170,26 +170,48 @@ module Partial = struct
             ; token_id= Token_id.of_uint64 t.token
             ; amount= Amount_currency.of_uint64 amount }
           in
-          User_command.Payload.Body.Payment payload
+          Signed_command.Payload.Body.Payment payload
       | `Delegation ->
           let payload =
             Stake_delegation.Set_delegate
               {delegator= source_pk; new_delegate= receiver_pk}
           in
-          Result.return @@ User_command.Payload.Body.Stake_delegation payload
+          Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
       | `Create_token ->
           let payload =
             { Coda_base.New_token_payload.token_owner_pk= receiver_pk
             ; disable_new_accounts= false }
           in
-          Result.return @@ User_command.Payload.Body.Create_new_token payload
-      | _ ->
-          Result.fail (Errors.create `Unsupported_operation_for_construction)
+          Result.return @@ Signed_command.Payload.Body.Create_new_token payload
+      | `Create_token_account ->
+          let payload =
+            { Coda_base.New_account_payload.token_id= Token_id.of_uint64 t.token
+            ; token_owner_pk= source_pk
+            ; receiver_pk
+            ; account_disabled= false }
+          in
+          Result.return
+          @@ Signed_command.Payload.Body.Create_token_account payload
+      | `Mint_tokens ->
+          let%map amount =
+            Result.of_option t.amount
+              ~error:
+                (Errors.create
+                   (`Operations_not_valid
+                     [Errors.Partial_reason.Amount_not_some]))
+          in
+          let payload =
+            { Coda_base.Minting_payload.token_id= Token_id.of_uint64 t.token
+            ; token_owner_pk= source_pk
+            ; receiver_pk
+            ; amount= Amount_currency.of_uint64 amount }
+          in
+          Signed_command.Payload.Body.Mint_tokens payload
     in
-    User_command.Payload.create
+    Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_token:(Token_id.of_uint64 t.fee_token)
-      ~fee_payer_pk ~nonce ~body ~memo:User_command_memo.empty
+      ~fee_payer_pk ~nonce ~body ~memo:Signed_command_memo.empty
       ~valid_until:None
 end
 
@@ -421,6 +443,13 @@ let of_operations (ops : Operation.t list) :
           V.fail Invalid_metadata
       | Error _ ->
           V.return ()
+    (* distinguish from mint tokens ops *)
+    and () =
+      match find_kind `Mint_tokens ops with
+      | Ok _ ->
+          V.fail Invalid_metadata
+      | Error _ ->
+          V.return ()
     in
     { Partial.kind= `Create_token
     ; fee_payer= `Pk account_a.address
@@ -479,18 +508,95 @@ let of_operations (ops : Operation.t list) :
     ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount= None }
   in
-  match (payment, delegation, create_token, create_token_account) with
-  | Ok _, Error _, Error _, Error _ ->
-      payment
-  | Error _, Ok _, Error _, Error _ ->
-      delegation
-  | Error _, Error _, Ok _, Error _ ->
-      create_token
-  | Error _, Error _, Error _, Ok _ ->
-      create_token_account
-  | Error err1, Error err2, Error err3, Error err4 ->
-      Error (err1 @ err2 @ err3 @ err4)
-  | _ ->
+  (* For token minting, we demand:
+    *
+    * ops = length exactly 2
+    *
+    * fee_payer_dec with account 'a, some amount 'y, status="Pending"
+    * mint_tokens with account 'a, some amount 'y with the minted token id, metadata={token_owner_pk:'b}, status=Pending
+  *)
+  let mint_tokens =
+    let%map () =
+      if Int.equal (List.length ops) 2 then V.return ()
+      else V.fail Length_mismatch
+    and account_a =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and fee_token =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Fee_payer_dec ops in
+      match account with
+      | Some account -> (
+        match token_id_of_account account with
+        | Some token_id ->
+            V.return token_id
+        | None ->
+            V.fail Incorrect_token_id )
+      | None ->
+          V.fail Account_not_some
+    and () =
+      if List.for_all ops ~f:(fun op -> String.equal op.status "Pending") then
+        V.return ()
+      else V.fail Status_not_pending
+    and payment_amount_y =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Fee_payer_dec ops in
+      match amount with
+      | Some x ->
+          V.return (Amount_of.negated x)
+      | None ->
+          V.fail Amount_not_some
+    and account_b =
+      let open Result.Let_syntax in
+      let%bind {account; _} = find_kind `Mint_tokens ops in
+      Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
+    and amount_b =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Mint_tokens ops in
+      Option.value_map amount ~default:(V.fail Amount_not_some) ~f:V.return
+    and account_c =
+      let open Result.Let_syntax in
+      let%bind {metadata; _} = find_kind `Mint_tokens ops in
+      match metadata with
+      | Some metadata -> (
+        match metadata with
+        | `Assoc [("token_owner_pk", `String s)] ->
+            return s
+        | _ ->
+            V.fail Invalid_metadata )
+      | None ->
+          V.fail Account_not_some
+    and token =
+      let open Result.Let_syntax in
+      let%bind {amount; _} = find_kind `Mint_tokens ops in
+      (* check for Amount_not_some already done for amount_b *)
+      let Amount.{currency= {symbol; _}; _} = Option.value_exn amount in
+      if String.equal symbol "CODA+" then return (Unsigned.UInt64.of_int 2)
+      else V.fail Incorrect_token_id
+    in
+    { Partial.kind= `Mint_tokens
+    ; fee_payer= `Pk account_a.address
+    ; source= `Pk account_c
+    ; receiver= `Pk account_b.address
+    ; fee_token
+    ; token
+    ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
+    ; amount= Some (amount_b.Amount.value |> Unsigned.UInt64.of_string) }
+  in
+  let partials =
+    [payment; delegation; create_token; create_token_account; mint_tokens]
+  in
+  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  match (oks, errs) with
+  | [], errs ->
+      (* no Oks *)
+      Error (List.concat errs)
+  | [partial], _ ->
+      (* exactly one Ok *)
+      Ok partial
+  | _, _ ->
+      (* more than one Ok, a bug in our implementation *)
       failwith
         "A sequence of operations must represent exactly one user command"
 
@@ -518,7 +624,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
     @
     match t.kind with
     | `Payment -> (
-      (* When amount is not none, we move the amount from source to receiver *)
+      (* When amount is not none, we move the amount from source to receiver -- unless it's a failure, we will capture that below *)
       match t.amount with
       | Some amount ->
           [ {Op.label= `Payment_source_dec amount; related_to= None}
@@ -547,16 +653,21 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
         | `Payment_source_dec of Unsigned.UInt64.t
         | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
     ~f:(fun ~related_operations ~operation_identifier op ->
-      let status, metadata =
+      let status, metadata, did_fail =
         match (op.label, failure_status) with
         (* If we're looking at mempool transactions, it's always pending *)
         | _, None ->
-            (Operation_statuses.name `Pending, None)
+            (`Pending, None, false)
         | _, Some (`Applied _) ->
-            (Operation_statuses.name `Success, None)
+            (`Success, None, false)
         | _, Some (`Failed reason) ->
-            ( Operation_statuses.name `Failed
-            , Some (`Assoc [("reason", `String reason)]) )
+            (`Failed, Some (`Assoc [("reason", `String reason)]), true)
+      in
+      let pending_or_success_only = function
+        | `Pending ->
+            `Pending
+        | `Success | `Failed ->
+            `Success
       in
       let merge_metadata m1 m2 =
         match (m1, m2) with
@@ -573,7 +684,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Fee_payer_dec ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status=
+              status |> pending_or_success_only |> Operation_statuses.name
           ; account= Some (account_id t.fee_payer t.fee_token)
           ; _type= Operation_types.name `Fee_payer_dec
           ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
@@ -582,25 +694,28 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Payment_source_dec amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.source t.token)
           ; _type= Operation_types.name `Payment_source_dec
-          ; amount= Some Amount_of.(negated @@ token t.token amount)
+          ; amount=
+              ( if did_fail then None
+              else Some Amount_of.(negated @@ token t.token amount) )
           ; coin_change= None
           ; metadata }
       | `Payment_receiver_inc amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Payment_receiver_inc
-          ; amount= Some (Amount_of.token t.token amount)
+          ; amount=
+              (if did_fail then None else Some (Amount_of.token t.token amount))
           ; coin_change= None
           ; metadata }
       | `Account_creation_fee_via_payment account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Account_creation_fee_via_payment
           ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
@@ -609,7 +724,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Account_creation_fee_via_fee_payer account_creation_fee ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.fee_payer t.fee_token)
           ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
@@ -618,7 +733,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Create_token ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= None
           ; _type= Operation_types.name `Create_token
           ; amount= None
@@ -627,7 +742,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Delegate_change ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.source Amount_of.Token_id.default)
           ; _type= Operation_types.name `Delegate_change
           ; amount= None
@@ -643,7 +758,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
       | `Mint_tokens amount ->
           { Operation.operation_identifier
           ; related_operations
-          ; status
+          ; status= Operation_statuses.name status
           ; account= Some (account_id t.receiver t.token)
           ; _type= Operation_types.name `Mint_tokens
           ; amount= Some (Amount_of.token t.token amount)

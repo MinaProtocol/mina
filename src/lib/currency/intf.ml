@@ -90,6 +90,8 @@ module type Arithmetic_intf = sig
   val ( + ) : t -> t -> t option
 
   val ( - ) : t -> t -> t option
+
+  val scale : t -> int -> t option
 end
 
 module type Signed_intf = sig
@@ -197,6 +199,9 @@ module type Checked_arithmetic_intf = sig
   val ( - ) : var -> var -> (var, _) Checked.t
 
   val add_signed : var -> signed_var -> (var, _) Checked.t
+
+  val add_signed_flagged :
+    var -> signed_var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
   val assert_equal : var -> var -> (unit, _) Checked.t
 

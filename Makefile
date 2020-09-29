@@ -88,7 +88,7 @@ build_archive: git_hooks reformat-diff
 
 build_rosetta:
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/rosetta/rosetta.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 client_sdk :
@@ -234,6 +234,12 @@ deb:
 	@cp _build/coda*.deb /tmp/artifacts/.
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
 
+deb_optimized:
+	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
+	@mkdir -p /tmp/artifacts
+	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+
 build_pv_keys:
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
@@ -292,29 +298,23 @@ benchmarks:
 
 test-coverage: SHELL := /bin/bash
 test-coverage:
-	source scripts/test_all.sh ; run_unit_tests_with_coverage
+	scripts/create_coverage_profiles.sh
 
 # we don't depend on test-coverage, which forces a run of all unit tests
 coverage-html:
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+	bisect-ppx-report html --source-path=_build/default --coverage-path=_build/default
 endif
 
-coverage-text:
+coverage-summary:
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+	bisect-ppx-report summary --coverage-path=_build/default --per-file
 endif
 
-coverage-coveralls:
-ifeq ($(shell find _build/default -name bisect\*.out),"")
-	echo "No coverage output; run make test-coverage"
-else
-	bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
-endif
 
 ########################################
 # Diagrams for documentation

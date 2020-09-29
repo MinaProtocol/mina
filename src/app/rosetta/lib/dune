@@ -20,6 +20,7 @@
     yojson
     archive_lib
     signature_lib
+    secrets
     unsigned_extended
     )
   (preprocess (pps

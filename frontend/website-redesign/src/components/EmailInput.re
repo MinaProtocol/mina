@@ -4,7 +4,7 @@ module Styles = {
     style([
       display(`inlineFlex),
       alignItems(`center),
-      height(`rem(1.3)),
+      height(`rem(3.25)),
       borderRadius(px(4)),
       width(`rem(14.5)),
       fontSize(rem(1.)),
@@ -56,7 +56,7 @@ external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
 let make = () => {
   let (successState, showSuccess) = React.useState(() => false);
   let (email, setEmail) = React.useState(() => "");
-  let submitForm = e => {
+  let _submitForm = e => {
     ReactEvent.Mouse.preventDefault(e);
     ReFetch.fetch(
       "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
@@ -77,7 +77,7 @@ let make = () => {
     {successState
        ? <div className=Styles.successState>
            <span className=Styles.successText>
-             {React.string({"Check your email!"})}
+             {React.string([@reason.preserve_braces] "Check your email!")}
            </span>
          </div>
        : <div className=Styles.inputContainer>
@@ -95,7 +95,10 @@ let make = () => {
              <Button
                height={`rem(3.25)}
                width={`rem(7.93)}
-               onClick={e => submitForm(e)}
+               href={
+                 `External("https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul?email="
+                 ++ email)
+               }
                dark=true>
                {React.string("Submit")}
                <Icon kind=Icon.ArrowRightMedium />
