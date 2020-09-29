@@ -7,14 +7,14 @@ module Styles = {
       bottom(`zero),
       height(`rem(106.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      backgroundImage(`url("/static/img/Small.png")),
+      backgroundImage(`url("/static/img/Small.jpg")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
         [
           padding2(~v=`rem(4.), ~h=`rem(2.68)),
           height(`rem(75.)),
-          backgroundImage(`url("/static/img/Medium.png")),
+          backgroundImage(`url("/static/img/Medium.jpg")),
         ],
       ),
       media(
@@ -22,13 +22,13 @@ module Styles = {
         [
           padding2(~v=`rem(5.5), ~h=`rem(9.5)),
           height(`auto),
-          backgroundImage(`url("/static/img/Large.png")),
+          backgroundImage(`url("/static/img/Large.jpg")),
         ],
       ),
     ]);
   let backToTopButton =
     style([
-      position(`absolute),
+      position(`fixed),
       right(`rem(1.2)),
       bottom(`rem(1.2)),
       media(

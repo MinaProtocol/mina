@@ -17,6 +17,7 @@ module Styles = {
 
   let sectionContainer = bg =>
     style([
+      position(`relative),
       background(`url(bg)),
       unsafe("background-size", "100% auto"),
       backgroundRepeat(`noRepeat),
@@ -31,6 +32,7 @@ module Styles = {
       top(sticky ? `rem(3.5) : `rem(66.)),
       marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
       width(`rem(14.)),
+      zIndex(100),
       background(white),
       media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
@@ -87,6 +89,27 @@ module Styles = {
     merge([
       Theme.Type.link,
       style([display(`inlineFlex), alignItems(`center)]),
+    ]);
+
+  let fadeOut =
+    style([
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`zero),
+        left(`zero),
+        right(`zero),
+        height(`rem(10.)),
+        background(
+          linearGradient(
+            deg(0.),
+            [
+              (`percent(0.), white),
+              (`percent(100.), rgba(255, 255, 255, 0.)),
+            ],
+          ),
+        ),
+      ]),
     ]);
 };
 
@@ -295,12 +318,13 @@ module Projects = {
   [@react.component]
   let make = () =>
     <div
-      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      className={Css.merge([Styles.sectionContainer("/static/img/tech-projects-bg.png"), Styles.fadeOut])}>
       <Spacer height=5. />
       <Section
         title="Projects & Possibilities"
         subhead={js|Developers are already building powerful applications on Mina — but this is just the beginning.|js}
         slug="projects">
+        /*
         <hr className=Styles.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3> {React.string("Built on Mina")} </h3>
@@ -313,6 +337,7 @@ module Projects = {
           url="/"
         />
         <Spacer height=2. />
+
         <div className=Styles.projectContainer>
           <img src="/static/img/AboutHeroTabletBackground.jpg" />
           <ProjectCopy
@@ -330,7 +355,7 @@ module Projects = {
             url="/"
           />
         </div>
-        <Spacer height=4. />
+        <Spacer height=4. /> */
         <hr className=Styles.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3>
@@ -403,7 +428,7 @@ module Incentives = {
         title="Incentive Structure"
         subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
         slug="incentives">
-        <Button width={`rem(15.25)}>
+        <Button width={`rem(15.25)} href="/static/pdf/economicsWP.pdf">
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
@@ -520,7 +545,7 @@ let make = () => {
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          buttonText: "Opportunities",
+          buttonText: "Get Started",
           dark: false,
           href: "/docs",
         },

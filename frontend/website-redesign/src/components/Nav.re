@@ -73,7 +73,7 @@ module Styles = {
         alignItems(`center),
         padding2(~v=`zero, ~h=`rem(1.5)),
         minHeight(`rem(5.5)),
-        color(white),
+        important(color(white)),
         borderBottom(`px(1), `solid, Theme.Colors.digitalGray),
         hover([color(Theme.Colors.orange)]),
         media(
@@ -94,7 +94,12 @@ module Styles = {
   let navLabel = dark =>
     merge([
       navLink,
-      style([important(color(dark ? white : Theme.Colors.digitalBlack))]),
+      style([
+        media(
+          Theme.MediaQuery.desktop,
+          [important(color(dark ? white : Theme.Colors.digitalBlack))],
+        ),
+      ]),
     ]);
 
   let navGroup =
@@ -146,6 +151,12 @@ module Styles = {
         Theme.MediaQuery.desktop,
         [selector("~ nav", [display(`flex)])],
       ),
+    ]);
+
+  let ctaContainer =
+    style([
+      padding2(~v=`rem(1.5), ~h=`rem(1.5)),
+      media(Theme.MediaQuery.desktop, [padding(`zero)]),
     ]);
 };
 
@@ -229,11 +240,13 @@ let make = (~dark=false) => {
       <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
-      <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>
-        <img src="/static/img/promo-logo.svg" height="40" />
-        <Spacer width=0.5 />
-        <span> {React.string("Join Genesis Token Program")} </span>
-      </Button>
+      <div className=Styles.ctaContainer>
+        <Button href="/genesis" width={`rem(13.)} paddingX=1. dark>
+          <img src="/static/img/promo-logo.svg" height="40" />
+          <Spacer width=0.5 />
+          <span> {React.string("Join Genesis Token Program")} </span>
+        </Button>
+      </div>
     </nav>
   </header>;
 };

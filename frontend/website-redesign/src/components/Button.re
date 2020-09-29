@@ -76,6 +76,15 @@ module Styles = {
     ]);
 };
 
+module Link = {
+  [@react.component]
+  let make = (~href, ~children) => {
+    Js.Re.test_(Js.Re.fromString("/https?::/"), href) ? 
+      <a href> children </a> :
+      <Next.Link href> children </Next.Link>
+  };
+};
+
 /**
  * Button is light by default, and setting dark to true as a prop will make the background image change accordingly.
  * Buttons have four different colors: orange, mint, black, and white.
@@ -94,7 +103,7 @@ let make =
       ~dark=false,
       ~onClick=?,
     ) => {
-  <Next.Link href>
+  <Link href>
     <button
       ?onClick
       className={Styles.button(
@@ -111,5 +120,5 @@ let make =
        | None => React.null
        }}
     </button>
-  </Next.Link>;
+  </Link>;
 };

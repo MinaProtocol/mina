@@ -86,9 +86,9 @@ let make = () => {
           )
         }
         background={
-          Theme.desktop: "/static/img/TestnetBackground.png",
-          tablet: "/static/img/TestnetBackground.png",
-          mobile: "/static/img/TestnetBackground.png",
+          Theme.desktop: "/static/img/TestnetBackground.jpg",
+          tablet: "/static/img/TestnetBackground.jpg",
+          mobile: "/static/img/TestnetBackground.jpg",
         }>
         <p className=Styles.statusBadge>
           {React.string("Testnet Status: ")}
@@ -129,7 +129,7 @@ let make = () => {
           description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,
           image: "/static/img/AboutHeroDesktopBackground.jpg",
-          background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
+          background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
           contentBackground:
             Image("/static/img/TestnetContentBlockBackground.png"),
           button: {

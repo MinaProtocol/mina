@@ -88,7 +88,7 @@ module GenesisMembersGrid = {
         </p>
         <Button bgColor=Theme.Colors.orange width={`rem(13.5)}>
           {React.string("See More Members ")}
-          <Icon kind=Icon.ArrowRightSmall size=1. />
+          <Icon kind=Icon.ArrowRightMedium size=1. />
         </Button>
       </div>
       <TeamMember

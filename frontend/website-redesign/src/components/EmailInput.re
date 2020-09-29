@@ -56,7 +56,7 @@ external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
 let make = () => {
   let (successState, showSuccess) = React.useState(() => false);
   let (email, setEmail) = React.useState(() => "");
-  let submitForm = e => {
+  let _submitForm = e => {
     ReactEvent.Mouse.preventDefault(e);
     ReFetch.fetch(
       "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
@@ -93,9 +93,17 @@ let make = () => {
            />
            <div className=Styles.submitButton>
              <Button
+               onClick=[%bs.raw
+                 {j| () => window.location =
+                 "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul"
+               |j}
+               ]
                height={`rem(3.25)}
                width={`rem(7.93)}
-               onClick={e => submitForm(e)}
+               href={
+                 "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul?email="
+                 ++ email
+               }
                dark=true>
                {React.string("Submit")}
                <Icon kind=Icon.ArrowRightMedium />
