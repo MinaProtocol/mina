@@ -98,18 +98,20 @@ module Styles = {
       flexDirection(`column),
       marginTop(`rem(3.)),
       media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), justifyContent(`flexStart)],
+        Theme.MediaQuery.tablet,
+        [
+          flexDirection(`row),
+          marginTop(`zero),
+          justifyContent(`flexStart),
+        ],
       ),
-      media(Theme.MediaQuery.tablet, [marginTop(`zero)]),
     ]);
 
   let heroLeft =
     style([
-      media(Theme.MediaQuery.tablet, [marginBottom(`rem(3.))]),
       media(
-        Theme.MediaQuery.desktop,
-        [maxWidth(`rem(38.)), marginRight(`rem(7.))],
+        Theme.MediaQuery.tablet,
+        [width(`rem(39.)), marginRight(`rem(6.))],
       ),
     ]);
   let heroRight =
@@ -118,13 +120,7 @@ module Styles = {
       position(`relative),
       top(`zero),
       flexDirection(`column),
-      paddingLeft(`rem(1.)),
-      alignItems(`center),
-      unsafe("width", "fit-content"),
-      media(
-        Theme.MediaQuery.tablet,
-        [paddingLeft(`zero), marginBottom(`rem(8.)), alignItems(`center)],
-      ),
+      width(`rem(40.)),
     ]);
   let flexColumn =
     style([

@@ -238,6 +238,7 @@ let make = () => {
   <Page title="Testnet Leaderboard">
     <Wrapped>
       <div className=Styles.page> <Summary /> </div>
+      <Spacer height=5. />
       <div className=Styles.filters>
         <SearchBar onUsernameEntered username={state.username} />
         <ToggleButtons
@@ -246,14 +247,6 @@ let make = () => {
           toggleLabels={Array.map(
             toggle => {string_of_toggle(toggle)},
             toggles,
-          )}
-        />
-        <FilterDropdown
-          currentFilter={string_of_filter(state.currentFilter)}
-          onFilterPress
-          filterLabels={Array.map(
-            filter => {string_of_filter(filter)},
-            filters,
           )}
         />
       </div>
