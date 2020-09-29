@@ -3867,7 +3867,8 @@ let%test_module "transaction_snark" =
                   ~consensus_state:consensus_state_at_slot
                   ~constants:
                     (Protocol_constants_checked.value_of_t
-                       Genesis_constants.compiled.protocol))
+                       Genesis_constants.compiled.protocol)
+                  ~fork_state:(fork_state state))
                 .body
             in
             let state_body_hash =

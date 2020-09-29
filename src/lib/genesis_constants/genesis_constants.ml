@@ -192,10 +192,11 @@ module Protocol = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('k, 'delta, 'genesis_state_timestamp) t =
+        type ('k, 'delta, 'genesis_state_timestamp, 'bool) t =
           { k: 'k
           ; delta: 'delta
-          ; genesis_state_timestamp: 'genesis_state_timestamp }
+          ; genesis_state_timestamp: 'genesis_state_timestamp
+          ; accept_arbitrary_unsafe_forks: 'bool }
         [@@deriving eq, ord, hash, sexp, yojson, hlist]
       end
     end]
@@ -204,7 +205,8 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t = (int, int, Time.t, bool) Poly.Stable.V1.t
+      [@@deriving eq, ord, hash]
 
       let to_latest = Fn.id
 
@@ -221,10 +223,16 @@ module Protocol = struct
         | `Assoc
             [ ("k", `Int k)
             ; ("delta", `Int delta)
-            ; ("genesis_state_timestamp", `String time_str) ] -> (
+            ; ("genesis_state_timestamp", `String time_str)
+            ; ( "accept_arbitrary_unsafe_forks"
+              , `Bool accept_arbitrary_unsafe_forks ) ] -> (
           match validate_time time_str with
           | Ok genesis_state_timestamp ->
-              Ok {Poly.k; delta; genesis_state_timestamp}
+              Ok
+                { Poly.k
+                ; delta
+                ; genesis_state_timestamp
+                ; accept_arbitrary_unsafe_forks }
           | Error e ->
               Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
         | _ ->
@@ -234,14 +242,14 @@ module Protocol = struct
 
       let sexp_of_t (t : t) =
         let module T = struct
-          type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
+          type t = (int, int, string, bool) Poly.Stable.V1.t [@@deriving sexp]
         end in
         let t' : T.t =
           { k= t.k
           ; delta= t.delta
           ; genesis_state_timestamp=
               Time.to_string_abs t.genesis_state_timestamp ~zone:Time.Zone.utc
-          }
+          ; accept_arbitrary_unsafe_forks= t.accept_arbitrary_unsafe_forks }
         in
         T.sexp_of_t t'
     end
@@ -252,7 +260,8 @@ module Protocol = struct
           { k= 1
           ; delta= 100
           ; genesis_state_timestamp=
-              Time.of_string "2019-10-08 17:51:23.050849Z" }
+              Time.of_string "2019-10-08 17:51:23.050849Z"
+          ; accept_arbitrary_unsafe_forks= false }
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
@@ -302,7 +311,8 @@ let compiled : t =
       { k
       ; delta
       ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string }
+          genesis_timestamp_of_string genesis_state_timestamp_string
+      ; accept_arbitrary_unsafe_forks= false }
   ; txpool_max_size= pool_max_size
   ; num_accounts= None }
 

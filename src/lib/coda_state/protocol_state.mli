@@ -18,12 +18,47 @@ val hash_abstract :
   -> (State_hash.t, 'body) Poly.t
   -> State_hash.t
 
+module Fork_state : sig
+  module Value : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, eq, to_yojson]
+      end
+    end]
+  end
+
+  type var
+
+  val typ : (var, Value.t) Typ.t
+
+  val var_of_value : Value.t -> var
+
+  val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
+
+  val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+
+  val genesis : Value.t Lazy.t
+
+  val record_fork : unit -> Value.t -> Value.t
+
+  val record_fork_checked : unit -> var -> (var, _) Checked.t
+
+  val set_not_fork : Value.t -> Value.t
+
+  val set_not_fork_checked : var -> var
+
+  val is_fork : Value.t -> bool
+
+  val is_fork_checked : var -> Boolean.var
+end
+
 module Body : sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('a, 'b, 'c, 'd) t [@@deriving sexp]
+        type ('a, 'b, 'c, 'd, 'e) t [@@deriving sexp]
       end
     end]
   end
@@ -36,7 +71,8 @@ module Body : sig
           ( State_hash.Stable.V1.t
           , Blockchain_state.Value.Stable.V1.t
           , Consensus.Data.Consensus_state.Value.Stable.V1.t
-          , Protocol_constants_checked.Value.Stable.V1.t )
+          , Protocol_constants_checked.Value.Stable.V1.t
+          , Fork_state.Value.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving eq, ord, hash, sexp, to_yojson]
       end
@@ -47,10 +83,11 @@ module Body : sig
     ( State_hash.var
     , Blockchain_state.var
     , Consensus.Data.Consensus_state.var
-    , Protocol_constants_checked.var )
+    , Protocol_constants_checked.var
+    , Fork_state.var )
     Poly.t
 
-  type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) Poly.t
+  type ('a, 'b, 'c, 'd, 'e) t = ('a, 'b, 'c, 'd, 'e) Poly.t
 
   val typ :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -60,7 +97,7 @@ module Body : sig
 
   val hash_checked : var -> (State_body_hash.var, _) Checked.t
 
-  val consensus_state : (_, _, 'a, _) Poly.t -> 'a
+  val consensus_state : (_, _, 'a, _, _) Poly.t -> 'a
 
   val view : Value.t -> Snapp_predicate.Protocol_state.View.t
 
@@ -96,6 +133,7 @@ val create_value :
   -> blockchain_state:Blockchain_state.Value.t
   -> consensus_state:Consensus.Data.Consensus_state.Value.t
   -> constants:Protocol_constants_checked.Value.t
+  -> fork_state:Fork_state.Value.t
   -> Value.t
 
 val create_var :
@@ -104,13 +142,14 @@ val create_var :
   -> blockchain_state:Blockchain_state.var
   -> consensus_state:Consensus.Data.Consensus_state.var
   -> constants:Protocol_constants_checked.var
+  -> fork_state:Fork_state.var
   -> var
 
 val previous_state_hash : ('a, _) Poly.t -> 'a
 
 val body : (_, 'a) Poly.t -> 'a
 
-val blockchain_state : (_, (_, 'a, _, _) Body.t) Poly.t -> 'a
+val blockchain_state : (_, (_, 'a, _, _, _) Body.t) Poly.t -> 'a
 
 val genesis_state_hash :
   ?state_hash:State_hash.t option -> Value.t -> State_hash.t
@@ -118,9 +157,11 @@ val genesis_state_hash :
 val genesis_state_hash_checked :
   state_hash:State_hash.var -> var -> (State_hash.var, _) Checked.t
 
-val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
+val consensus_state : (_, (_, _, 'a, _, _) Body.t) Poly.t -> 'a
 
-val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
+val constants : (_, (_, _, _, 'a, _) Body.t) Poly.t -> 'a
+
+val fork_state : (_, (_, _, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
      genesis_ledger:Coda_base.Ledger.t Lazy.t

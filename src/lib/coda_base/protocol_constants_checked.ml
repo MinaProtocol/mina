@@ -33,7 +33,11 @@ module Value = struct
   module Stable = struct
     module V1 = struct
       type t =
-        (T.Stable.V1.t, T.Stable.V1.t, Block_time.Stable.V1.t) Poly.Stable.V1.t
+        ( T.Stable.V1.t
+        , T.Stable.V1.t
+        , Block_time.Stable.V1.t
+        , bool )
+        Poly.Stable.V1.t
       [@@deriving eq, ord, hash, sexp, to_yojson, compare]
 
       let to_latest = Fn.id
@@ -51,7 +55,10 @@ module Value = struct
     let%map genesis_state_timestamp =
       Block_time.(gen_incl (of_int64 ms) end_time)
     in
-    {Poly.k= T.of_int k; delta= T.of_int delta; genesis_state_timestamp}
+    { Poly.k= T.of_int k
+    ; delta= T.of_int delta
+    ; genesis_state_timestamp
+    ; accept_arbitrary_unsafe_forks= false }
 end
 
 type value = Value.t
@@ -59,26 +66,31 @@ type value = Value.t
 let value_of_t (t : Genesis_constants.Protocol.t) : value =
   { k= T.of_int t.k
   ; delta= T.of_int t.delta
-  ; genesis_state_timestamp= Block_time.of_time t.genesis_state_timestamp }
+  ; genesis_state_timestamp= Block_time.of_time t.genesis_state_timestamp
+  ; accept_arbitrary_unsafe_forks= t.accept_arbitrary_unsafe_forks }
 
 let t_of_value (v : value) : Genesis_constants.Protocol.t =
   { k= T.to_int v.k
   ; delta= T.to_int v.delta
-  ; genesis_state_timestamp= Block_time.to_time v.genesis_state_timestamp }
+  ; genesis_state_timestamp= Block_time.to_time v.genesis_state_timestamp
+  ; accept_arbitrary_unsafe_forks= v.accept_arbitrary_unsafe_forks }
 
 let to_input (t : value) =
   Random_oracle.Input.bitstrings
     [| T.to_bits t.k
      ; T.to_bits t.delta
-     ; Block_time.Bits.to_bits t.genesis_state_timestamp |]
+     ; Block_time.Bits.to_bits t.genesis_state_timestamp
+     ; [t.accept_arbitrary_unsafe_forks] |]
 
 [%%if
 defined consensus_mechanism]
 
-type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) Poly.t
+type var =
+  (T.Checked.t, T.Checked.t, Block_time.Unpacked.var, Boolean.var) Poly.t
 
 let data_spec =
-  Data_spec.[T.Checked.typ; T.Checked.typ; Block_time.Unpacked.typ]
+  Data_spec.
+    [T.Checked.typ; T.Checked.typ; Block_time.Unpacked.typ; Boolean.typ]
 
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
@@ -93,7 +105,12 @@ let var_to_input (var : var) =
     Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
   in
   Random_oracle.Input.bitstrings
-    (Array.map ~f:s [|k; delta; genesis_state_timestamp|])
+    (Array.map ~f:s
+       [| k
+        ; delta
+        ; genesis_state_timestamp
+        ; Bitstring_lib.Bitstring.Lsb_first.of_list
+            [var.accept_arbitrary_unsafe_forks] |])
 
 let%test_unit "value = var" =
   let compiled = Genesis_constants.for_unit_tests.protocol in

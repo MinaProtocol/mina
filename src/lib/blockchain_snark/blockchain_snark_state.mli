@@ -24,6 +24,24 @@ val check :
   -> State_hash.t
   -> unit Or_error.t
 
+module Fork : sig
+  module Witness : sig
+    type t =
+      { prev_state: Protocol_state.Value.t
+      ; new_blockchain_state: Blockchain_state.Value.t option
+      ; new_consensus_state: Consensus.Data.Consensus_state.Value.t option
+      ; new_constants: Protocol_constants_checked.Value.t option }
+  end
+
+  val check :
+       Witness.t
+    -> ?handler:(   Snarky_backendless.Request.request
+                 -> Snarky_backendless.Request.response)
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> State_hash.t
+    -> unit Or_error.t
+end
+
 module type S = sig
   module Proof :
     Pickles.Proof_intf
@@ -45,6 +63,12 @@ module type S = sig
        , Protocol_state.Value.t
        , Proof.t )
        Pickles.Prover.t
+
+  val fork :
+       Fork.Witness.t
+    -> (Protocol_state.Value.t, N2.n, N1.n) Pickles.Statement_with_proof.t
+    -> Proof.statement
+    -> Proof.t
 end
 
 module Make (T : sig

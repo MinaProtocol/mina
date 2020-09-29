@@ -355,6 +355,7 @@ module For_tests = struct
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
+          ~fork_state:(Lazy.force Protocol_state.Fork_state.genesis)
       in
       Protocol_version.(set_current zero) ;
       let next_external_transition =

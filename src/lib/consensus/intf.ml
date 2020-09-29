@@ -84,6 +84,19 @@ module type Protocol_state = sig
 
   type consensus_state_var
 
+  module Fork_state : sig
+    module Value : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving sexp, compare, eq, to_yojson]
+        end
+      end]
+    end
+
+    type var
+  end
+
   module Poly : sig
     [%%versioned:
     module Stable : sig
@@ -98,7 +111,12 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
+          type ( 'state_hash
+               , 'blockchain_state
+               , 'consensus_state
+               , 'constants
+               , 'fork_state )
+               t
           [@@deriving sexp]
         end
       end]
@@ -112,7 +130,8 @@ module type Protocol_state = sig
             ( State_hash.t
             , blockchain_state
             , consensus_state
-            , Protocol_constants_checked.Value.Stable.V1.t )
+            , Protocol_constants_checked.Value.Stable.V1.t
+            , Fork_state.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
@@ -123,7 +142,8 @@ module type Protocol_state = sig
       ( State_hash.var
       , blockchain_state_var
       , consensus_state_var
-      , Protocol_constants_checked.var )
+      , Protocol_constants_checked.var
+      , Fork_state.var )
       Poly.Stable.Latest.t
   end
 
@@ -145,6 +165,7 @@ module type Protocol_state = sig
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
     -> constants:Protocol_constants_checked.Value.t
+    -> fork_state:Fork_state.Value.t
     -> Value.t
 
   val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
@@ -152,15 +173,20 @@ module type Protocol_state = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, (_, 'blockchain_state, _, _) Body.Poly.t) Poly.t -> 'blockchain_state
+       (_, (_, 'blockchain_state, _, _, _) Body.Poly.t) Poly.t
+    -> 'blockchain_state
 
   val genesis_state_hash :
     ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
-    (_, (_, _, 'consensus_state, _) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state, _, _) Body.Poly.t) Poly.t -> 'consensus_state
 
-  val constants : (_, (_, _, _, 'constants) Body.Poly.t) Poly.t -> 'constants
+  val constants :
+    (_, (_, _, _, 'constants, _) Body.Poly.t) Poly.t -> 'constants
+
+  val fork_state :
+    (_, (_, _, _, _, 'fork_state) Body.Poly.t) Poly.t -> 'fork_state
 
   val hash : Value.t -> State_hash.t
 end

@@ -134,10 +134,15 @@ module Json_layout = struct
     type t =
       { k: (int option[@default None])
       ; delta: (int option[@default None])
-      ; genesis_state_timestamp: (string option[@default None]) }
+      ; genesis_state_timestamp: (string option[@default None])
+      ; accept_arbitrary_unsafe_forks: (bool option[@default None]) }
     [@@deriving yojson, dhall_type]
 
-    let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
+    let fields =
+      [| "k"
+       ; "delta"
+       ; "genesis_state_timestamp"
+       ; "accept_arbitrary_unsafe_forks" |]
 
     let of_yojson json =
       dump_on_error json @@ of_yojson
@@ -484,7 +489,10 @@ end
 
 module Genesis = struct
   type t = Json_layout.Genesis.t =
-    {k: int option; delta: int option; genesis_state_timestamp: string option}
+    { k: int option
+    ; delta: int option
+    ; genesis_state_timestamp: string option
+    ; accept_arbitrary_unsafe_forks: bool option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
@@ -502,7 +510,10 @@ module Genesis = struct
     ; delta= opt_fallthrough ~default:t1.delta t2.delta
     ; genesis_state_timestamp=
         opt_fallthrough ~default:t1.genesis_state_timestamp
-          t2.genesis_state_timestamp }
+          t2.genesis_state_timestamp
+    ; accept_arbitrary_unsafe_forks=
+        opt_fallthrough ~default:t1.accept_arbitrary_unsafe_forks
+          t2.accept_arbitrary_unsafe_forks }
 end
 
 module Daemon = struct

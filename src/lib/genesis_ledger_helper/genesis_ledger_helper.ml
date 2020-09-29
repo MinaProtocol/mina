@@ -772,7 +772,11 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
             (config.genesis >>= fun cfg -> cfg.delta)
       ; genesis_state_timestamp=
           Option.value ~default:default.protocol.genesis_state_timestamp
-            genesis_state_timestamp }
+            genesis_state_timestamp
+      ; accept_arbitrary_unsafe_forks=
+          Option.value ~default:default.protocol.accept_arbitrary_unsafe_forks
+            (config.genesis >>= fun cfg -> cfg.accept_arbitrary_unsafe_forks)
+      }
   ; txpool_max_size=
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
@@ -970,7 +974,9 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; genesis_state_timestamp=
             Some
               (Time.to_string_abs ~zone:Time.Zone.utc
-                 genesis_constants.protocol.genesis_state_timestamp) }
+                 genesis_constants.protocol.genesis_state_timestamp)
+        ; accept_arbitrary_unsafe_forks=
+            Some genesis_constants.protocol.accept_arbitrary_unsafe_forks }
   ; proof=
       Some
         { level=

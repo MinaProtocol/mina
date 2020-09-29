@@ -28,5 +28,6 @@ let t ~genesis_ledger ~constraint_constants ~consensus_constants =
         (Blockchain_state.genesis ~constraint_constants ~genesis_ledger_hash
            ~snarked_next_available_token)
       ~consensus_state:genesis_consensus_state ~constants:protocol_constants
+      ~fork_state:(Lazy.force Protocol_state.Fork_state.genesis)
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state

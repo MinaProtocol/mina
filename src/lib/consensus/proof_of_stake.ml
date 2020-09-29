@@ -2941,6 +2941,7 @@ module Hooks = struct
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
+          ~fork_state:(Protocol_state.fork_state previous_protocol_state)
       in
       (protocol_state, consensus_transition)
 

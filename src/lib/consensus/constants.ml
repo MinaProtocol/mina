@@ -8,7 +8,7 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('length, 'time, 'timespan) t =
+      type ('length, 'time, 'timespan, 'bool) t =
         { k: 'length
         ; c: 'length
         ; delta: 'length
@@ -23,7 +23,8 @@ module Poly = struct
         ; slot_duration_ms: 'timespan
         ; epoch_duration: 'timespan
         ; delta_duration: 'timespan
-        ; genesis_state_timestamp: 'time }
+        ; genesis_state_timestamp: 'time
+        ; accept_arbitrary_unsafe_forks: 'bool }
       [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
     end
   end]
@@ -35,7 +36,8 @@ module Stable = struct
     type t =
       ( Length.Stable.V1.t
       , Block_time.Stable.V1.t
-      , Block_time.Span.Stable.V1.t )
+      , Block_time.Span.Stable.V1.t
+      , bool )
       Poly.Stable.V1.t
     [@@deriving eq, ord, hash, sexp, to_yojson]
 
@@ -46,7 +48,8 @@ end]
 type var =
   ( Length.Checked.t
   , Block_time.Unpacked.var
-  , Block_time.Span.Unpacked.var )
+  , Block_time.Span.Unpacked.var
+  , Boolean.var )
   Poly.t
 
 module type M_intf = sig
@@ -85,7 +88,8 @@ module Constants_UInt32 :
   M_intf
   with type length = Length.t
    and type time = Block_time.t
-   and type timespan = Block_time.Span.t = struct
+   and type timespan = Block_time.Span.t
+   and type bool_type = bool = struct
   type t = UInt32.t
 
   type length = Length.t
@@ -121,7 +125,8 @@ module Constants_checked :
   M_intf
   with type length = Length.Checked.t
    and type time = Block_time.Unpacked.var
-   and type timespan = Block_time.Span.Unpacked.var = struct
+   and type timespan = Block_time.Span.Unpacked.var
+   and type bool_type = Boolean.var = struct
   open Snarky_integer
 
   type t = field Integer.t
@@ -160,14 +165,15 @@ module Constants_checked :
   let ( * ) = Integer.mul ~m
 end
 
-let create' (type a b c)
+let create' (type a b c d)
     (module M : M_intf
       with type length = a
        and type time = b
-       and type timespan = c)
+       and type timespan = c
+       and type bool_type = d)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
-    (a, b, c) Poly.t =
+    ~(protocol_constants : (a, a, b, d) Genesis_constants.Protocol.Poly.t) :
+    (a, b, c, d) Poly.t =
   let open M in
   let c = constant constraint_constants.c in
   let block_window_duration_ms =
@@ -192,7 +198,7 @@ let create' (type a b c)
     let duration = Slot.duration_ms * size
   end in
   let delta_duration = Slot.duration_ms * delta in
-  let res : (a, b, c) Poly.t =
+  let res : (a, b, c, d) Poly.t =
     { Poly.k= to_length k
     ; c= to_length c
     ; delta= to_length delta
@@ -207,7 +213,9 @@ let create' (type a b c)
     ; checkpoint_window_slots_per_year= to_length zero
     ; checkpoint_window_size_in_slots= to_length zero
     ; delta_duration= to_timespan delta_duration
-    ; genesis_state_timestamp= protocol_constants.genesis_state_timestamp }
+    ; genesis_state_timestamp= protocol_constants.genesis_state_timestamp
+    ; accept_arbitrary_unsafe_forks=
+        protocol_constants.accept_arbitrary_unsafe_forks }
   in
   res
 
@@ -243,8 +251,13 @@ let for_unit_tests =
          Genesis_constants.Constraint_constants.for_unit_tests
        ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
 
-let to_protocol_constants ({k; delta; genesis_state_timestamp; _} : _ Poly.t) =
-  {Coda_base.Protocol_constants_checked.Poly.k; delta; genesis_state_timestamp}
+let to_protocol_constants
+    ({k; delta; genesis_state_timestamp; accept_arbitrary_unsafe_forks; _} :
+      _ Poly.t) =
+  { Coda_base.Protocol_constants_checked.Poly.k
+  ; delta
+  ; accept_arbitrary_unsafe_forks
+  ; genesis_state_timestamp }
 
 let data_spec =
   Data_spec.
@@ -262,7 +275,8 @@ let data_spec =
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
-    ; Block_time.Unpacked.typ ]
+    ; Block_time.Unpacked.typ
+    ; Boolean.typ ]
 
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist

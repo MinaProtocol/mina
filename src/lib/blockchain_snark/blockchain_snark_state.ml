@@ -18,6 +18,13 @@ module Witness = struct
     {prev_state: Protocol_state.Value.t; transition: Snark_transition.Value.t}
 end
 
+let handle_opt handler =
+  match handler with
+  | Some handler ->
+      fun c -> handle c handler
+  | None ->
+      Fn.id
+
 let blockchain_handler on_unhandled {Witness.prev_state; transition} =
   let open Snarky_backendless.Request in
   fun (With {request; respond} as r) ->
@@ -103,9 +110,27 @@ let%snarkydef step ~(logger : Logger.t)
     |> Staged_ledger_hash.pending_coinbase_hash_var
   in
   let%bind genesis_state_hash =
-    (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
+    (* Get the genesis state hash from previous state unless previous state is
+       the genesis state itself.
+    *)
     Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
       previous_state
+  in
+  let%bind fork_state =
+    let fork_state = Protocol_state.fork_state previous_state in
+    (* TODO: This can be removed when the fork state above exposes a fork
+       history chain.
+    *)
+    let accept_arbitrary_unsafe_forks =
+      (Protocol_state.constants previous_state).accept_arbitrary_unsafe_forks
+    in
+    let%map () =
+      Boolean.(
+        Assert.any
+          [ not (Protocol_state.Fork_state.is_fork_checked fork_state)
+          ; accept_arbitrary_unsafe_forks ])
+    in
+    Protocol_state.Fork_state.set_not_fork_checked fork_state
   in
   let%bind new_state =
     let t =
@@ -113,6 +138,7 @@ let%snarkydef step ~(logger : Logger.t)
         ~blockchain_state:(Snark_transition.blockchain_state transition)
         ~consensus_state
         ~constants:(Protocol_state.constants previous_state)
+        ~fork_state
     in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in
@@ -303,6 +329,177 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
                 txn.pending_coinbase_stack_state.target ]
           |> not ] ) }
 
+module Fork = struct
+  type _ Snarky_backendless.Request.t +=
+    | New_blockchain_state :
+        Blockchain_state.Value.t Snarky_backendless.Request.t
+    | New_consensus_state :
+        Consensus.Data.Consensus_state.Value.t Snarky_backendless.Request.t
+    | New_constants :
+        Protocol_constants_checked.Value.t Snarky_backendless.Request.t
+
+  module Witness = struct
+    type t =
+      { prev_state: Protocol_state.Value.t
+      ; new_blockchain_state: Blockchain_state.Value.t option
+      ; new_consensus_state: Consensus.Data.Consensus_state.Value.t option
+      ; new_constants: Protocol_constants_checked.Value.t option }
+
+    let blockchain_state {prev_state; new_blockchain_state; _} =
+      match new_blockchain_state with
+      | Some new_blockchain_state ->
+          new_blockchain_state
+      | None ->
+          Protocol_state.blockchain_state prev_state
+
+    let consensus_state {prev_state; new_consensus_state; _} =
+      match new_consensus_state with
+      | Some new_consensus_state ->
+          new_consensus_state
+      | None ->
+          Protocol_state.consensus_state prev_state
+
+    let constants {prev_state; new_constants; _} =
+      match new_constants with
+      | Some new_constants ->
+          new_constants
+      | None ->
+          Protocol_state.constants prev_state
+  end
+
+  let fork_handler (w : Witness.t)
+      (Snarky_backendless.Request.With {request; respond}) =
+    match request with
+    | Prev_state ->
+        respond (Provide w.prev_state)
+    | New_blockchain_state ->
+        respond (Provide (Witness.blockchain_state w))
+    | New_consensus_state ->
+        respond (Provide (Witness.consensus_state w))
+    | New_constants ->
+        respond (Provide (Witness.constants w))
+    | _ ->
+        respond Unhandled
+
+  let%snarkydef fork
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      Hlist.HlistId.[previous_state_hash; _] new_state_hash :
+      (_, _) Tick.Checked.t =
+    let%bind previous_state, _previous_state_body_hash =
+      let%bind t =
+        with_label __LOC__
+          (exists
+             (Protocol_state.typ ~constraint_constants)
+             ~request:(As_prover.return Prev_state))
+      in
+      let%bind h, body = Protocol_state.hash_checked t in
+      let%map () =
+        with_label __LOC__ (State_hash.assert_equal h previous_state_hash)
+      in
+      (t, body)
+    in
+    let%bind genesis_state_hash =
+      Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
+        previous_state
+    in
+    let%bind blockchain_state =
+      exists Blockchain_state.typ
+        ~request:As_prover.(return New_blockchain_state)
+    in
+    let%bind consensus_state =
+      exists
+        (Consensus.Data.Consensus_state.typ ~constraint_constants)
+        ~request:As_prover.(return New_consensus_state)
+    in
+    let%bind constants =
+      exists Protocol_constants_checked.typ
+        ~request:As_prover.(return New_constants)
+    in
+    let%bind fork_state =
+      let fork_details =
+        (* TODO: Compute unsafe flags here, record them in the fork state. *)
+        ()
+      in
+      Protocol_state.Fork_state.record_fork_checked fork_details
+        (Protocol_state.fork_state previous_state)
+    in
+    let%bind () =
+      (* TODO: This can be removed when the fork state above exposes a fork
+         history chain.
+      *)
+      let old_arbitrary_unsafe_forks =
+        (Protocol_state.constants previous_state).accept_arbitrary_unsafe_forks
+      in
+      Checked.all_unit
+        [ [%with_label
+            "Check that arbitrary unsafe forks are not enabled by an \
+             arbitrary unsafe fork"]
+            (Boolean.Assert.( = ) constants.accept_arbitrary_unsafe_forks
+               old_arbitrary_unsafe_forks)
+        ; [%with_label
+            "Check that arbitrary unsafe forks were enabled at genesis"]
+            (Boolean.Assert.is_true old_arbitrary_unsafe_forks) ]
+    in
+    let new_state =
+      Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
+        ~blockchain_state ~consensus_state ~constants ~fork_state
+    in
+    let%bind h, _body = Protocol_state.hash_checked new_state in
+    [%with_label "New state hash matches"]
+      (State_hash.assert_equal h new_state_hash)
+
+  let check (w : Witness.t) ?handler ~constraint_constants next_state_hash :
+      unit Or_error.t =
+    let open Tick in
+    let prev_hash = Protocol_state.hash w.prev_state in
+    let fork_details =
+      (* TODO: Compute unsafe flags here, record them in the fork state. *)
+      ()
+    in
+    let fork_state =
+      Protocol_state.fork_state w.prev_state
+      |> Protocol_state.Fork_state.record_fork fork_details
+    in
+    let next =
+      Protocol_state.create_value ~previous_state_hash:prev_hash
+        ~genesis_state_hash:
+          (Protocol_state.genesis_state_hash ~state_hash:(Some prev_hash)
+             w.prev_state)
+        ~blockchain_state:(Witness.blockchain_state w)
+        ~consensus_state:(Witness.consensus_state w)
+        ~constants:(Witness.constants w) ~fork_state
+    in
+    let next_hash = Protocol_state.hash next in
+    let%bind.Or_error.Let_syntax () =
+      if State_hash.equal next_state_hash next_hash then Or_error.return ()
+      else
+        Or_error.errorf
+          !"Next state hashes are inconsistent: given %{sexp: State_hash.t} \
+            but computed %{sexp: State_hash.t}"
+          next_state_hash next_hash
+    in
+    check
+      ( handle_opt handler
+      @@ handle_opt (Some (fork_handler w))
+      @@ let%bind prev_hash =
+           exists State_hash.typ ~compute:As_prover.(return prev_hash)
+         and next_hash =
+           exists State_hash.typ ~compute:As_prover.(return next_hash)
+         in
+         fork ~constraint_constants [prev_hash; prev_hash] next_hash )
+      ()
+
+  let rule ~constraint_constants self : _ Pickles.Inductive_rule.t =
+    { prevs=
+        [self; self]
+        (* Second argument is a dummy, we pass the same proof twice. *)
+    ; main=
+        (fun [x1; x2] x ->
+          Run.run_checked (fork ~constraint_constants [x1; x2] x) ;
+          [Boolean.true_; Boolean.false_] )
+    ; main_value= (fun [_; _] _curr -> [true; false]) }
+end
+
 module Statement = struct
   type t = Protocol_state.Value.t
 
@@ -343,6 +540,12 @@ module type S = sig
        , Protocol_state.Value.t
        , Proof.t )
        Pickles.Prover.t
+
+  val fork :
+       Fork.Witness.t
+    -> (Protocol_state.Value.t, N2.n, N1.n) Pickles.Statement_with_proof.t
+    -> Proof.statement
+    -> Proof.t
 end
 
 let verify state proof ~key =
@@ -355,7 +558,7 @@ end) : S = struct
 
   let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-  let tag, cache_handle, p, Pickles.Provers.[step] =
+  let tag, cache_handle, p, Pickles.Provers.[step; fork] =
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
@@ -364,9 +567,13 @@ end) : S = struct
       ~max_branching:(module Nat.N2)
       ~name:"blockchain-snark"
       ~choices:(fun ~self ->
-        [rule ~proof_level ~constraint_constants T.tag self] )
+        [ rule ~proof_level ~constraint_constants T.tag self
+        ; Fork.rule ~constraint_constants self ] )
 
   let step = with_handler step
+
+  let fork w proof stmt =
+    fork ~handler:(Fork.fork_handler w) [proof; proof] stmt
 
   module Proof = (val p)
 end
