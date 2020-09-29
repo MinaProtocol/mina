@@ -47,10 +47,7 @@ module Card = {
         ]),
       ]);
 
-     let anchor =
-       style([
-          textDecoration(`none)
-       ]);
+    let anchor = style([textDecoration(`none)]);
   };
   [@react.component]
   let make = (~href, ~children=?) => {
@@ -63,13 +60,9 @@ module Card = {
       </div>;
 
     switch (href) {
-    | `Internal(href) => 
-      <Next.Link href> {inner} </Next.Link>
-    | `External(href) =>
-      <a href className=Styles.anchor>
-        {inner}
-      </a>
-    }
+    | `Internal(href) => <Next.Link href> inner </Next.Link>
+    | `External(href) => <a href className=Styles.anchor> inner </a>
+    };
   };
 };
 
@@ -166,15 +159,31 @@ module CommunityLanding = {
     };
 
     <div className=ButtonBarStyles.container>
-      <h2 className=Theme.Type.pageLabel>
-        {React.string("Connect")}
-      </h2>
+      <h2 className=Theme.Type.pageLabel> {React.string("Connect")} </h2>
       <div className=ButtonBarStyles.grid>
-        {renderCard(Icon.Twitter, `External("https://twitter.com/minaprotocol"), "Twitter")}
-        {renderCard(Icon.Forums, `External("https://forums.minaprotocol.com/"), "Forums")}
+        {renderCard(
+           Icon.Twitter,
+           `External("https://twitter.com/minaprotocol"),
+           "Twitter",
+         )}
+        {renderCard(
+           Icon.Forums,
+           `External("https://forums.minaprotocol.com/"),
+           "Forums",
+         )}
         {renderCard(Icon.Wiki, `External("https://minawiki.com"), "Wiki")}
-        {renderCard(Icon.Facebook, `External("https://facebook.com/minaprotocol"), "Facebook")}
-        {renderCard(Icon.WeChat, `External("https://forums.minaprotocol.com/t/coda-protocol-chinese-resources/200"), "Wechat")}
+        {renderCard(
+           Icon.Facebook,
+           `External("https://facebook.com/minaprotocol"),
+           "Facebook",
+         )}
+        {renderCard(
+           Icon.WeChat,
+           `External(
+             "https://forums.minaprotocol.com/t/mina-protocol-chinese-resources/200",
+           ),
+           "Wechat",
+         )}
       </div>
     </div>;
   };

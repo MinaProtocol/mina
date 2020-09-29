@@ -40,28 +40,28 @@ let make = () => {
             AlternatingSections.Section.SimpleRow.title: "Run a Node",
             description: "Other protocols are so heavy they require intermediaries to run nodes, recreating the same old power dynamics. But Mina is light, so anyone can connect peer-to-peer and sync and verify the chain in seconds. Built on a consistent-sized cryptographic proof, the blockchain will stay accessible - even as it scales to millions of users.",
             buttonCopy: "Explore the Tech",
-            buttonUrl: "/tech",
+            buttonUrl: `Internal("/tech"),
             image: "/static/img/rowImages/RunANode.jpg",
           },
           {
             title: "Build on Mina",
             description: "Interested in building decentralized apps that use SNARKs to verify off-chain data with full verifiability, privacy and scaling? Just download the SDK, follow our step-by-step documentation and put your imagination to work.",
             buttonCopy: "Run a node",
-            buttonUrl: "/docs",
+            buttonUrl: `Internal("/docs"),
             image: "/static/img/rowImages/BuildOnMina.jpg",
           },
           {
             title: "Join the Community",
             description: "Mina is an inclusive open source project uniting people around the world with a passion for decentralized technology and building what's next.",
             buttonCopy: "See what we're up to",
-            buttonUrl: "/community",
+            buttonUrl: `Internal("/community"),
             image: "/static/img/rowImages/JoinCommunity.jpg",
           },
           {
             title: "Apply for a Grant",
             description: "From front-end sprints and protocol development to community building initiatives and content creation, our Grants Program invites you to help strengthen the network in exchange for Mina tokens.",
             buttonCopy: "Learn More",
-            buttonUrl: "/docs/contributing#mina-grants",
+            buttonUrl: `Internal("/docs/contributing#mina-grants"),
             image: "/static/img/rowImages/ApplyForGrant.jpg",
           },
         |])
@@ -83,7 +83,7 @@ let make = () => {
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
-            href: "/genesis",
+            href: `Internal("/genesis"),
           },
         }
       />
