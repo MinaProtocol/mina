@@ -16,7 +16,7 @@ module Styles = {
   let disclaimer =
     merge([
       Theme.Type.disclaimer,
-      style([paddingBottom(`rem(14.)), paddingTop(`rem(3.))]),
+      style([paddingBottom(`rem(5.)), paddingTop(`rem(3.))]),
     ]);
   let leaderboardBackground =
     style([
@@ -133,7 +133,7 @@ module HowItWorksGrid = {
           <GridItem label="What Members Do: Post-Mainnet">
             <p className=Theme.Type.paragraph>
               {React.string(
-                  {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
+                 {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
                )}
             </p>
           </GridItem>
@@ -305,7 +305,7 @@ module CultureFooter = {
         cursor(`pointer),
         color(Theme.Colors.orange),
         display(`flex),
-        textDecoration(`none)
+        textDecoration(`none),
       ]);
   };
   [@react.component]
@@ -319,7 +319,9 @@ module CultureFooter = {
            )}
         </p>
         <div className=Styles.link>
-          <a className=Styles.anchor href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
+          <a
+            className=Styles.anchor
+            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
             {React.string("Read our Code of Conduct")}
             <Icon kind=Icon.ArrowRightMedium />
           </a>
@@ -414,8 +416,9 @@ let make = (~profiles) => {
              )}
           </p>
         </Wrapped>
+        <CultureFooter />
+        <Spacer height=4. />
       </div>
-      <CultureFooter />
     </div>
   </Page>;
 };

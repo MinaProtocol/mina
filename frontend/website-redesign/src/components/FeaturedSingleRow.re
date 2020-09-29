@@ -101,15 +101,16 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
-        height(`percent(60.)),
         maxWidth(`rem(53.)),
+        paddingTop(`rem(8.)),
+        top(`zero),
         media(
           Theme.MediaQuery.tablet,
-          [height(`percent(110.)), width(`percent(80.))],
+          [height(`percent(80.)), width(`percent(80.))],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [height(`percent(110.)), width(`percent(100.))],
+          [height(`percent(80.)), width(`percent(100.))],
         ),
       ]);
   };
@@ -130,6 +131,7 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, backgroundImg),
           style([
+            top(`rem(12.6)),
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
@@ -188,7 +190,7 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, contentBackground),
           style([
-            top(`percent(6.)),
+            top(`rem(12.6)),
             media(
               Theme.MediaQuery.tablet,
               [left(`zero), width(`rem(32.))],
@@ -238,7 +240,7 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      height(`percent(100.)),
+      minHeight(`rem(32.5)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {

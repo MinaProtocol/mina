@@ -45,7 +45,7 @@ module Styles = {
       display(`flex),
       height(`rem(2.62)),
       flexDirection(`column),
-      alignContent(`center),
+      alignItems(`center),
       justifyContent(`spaceBetween),
       color(white),
     ]);
@@ -231,8 +231,12 @@ module Subfooter = {
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <a href="https://o1labs.org/" className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
-        <a href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md" className=Styles.smallLinks>
+        <a href="https://o1labs.org/" className=Styles.smallLinks>
+          {React.string("O(1) Labs")}
+        </a>
+        <a
+          href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
+          className=Styles.smallLinks>
           {React.string("Code of Conduct")}
         </a>
         <Next.Link href="/privacy">
@@ -268,10 +272,10 @@ let make = () => {
         paddingX=1.1
         paddingY=0.75
         dark=true>
-        <span className=Styles.backToTopButtonContent>
+        <div className=Styles.backToTopButtonContent>
           <Icon kind=Icon.ArrowUpMedium size=1. />
           {React.string("Top")}
-        </span>
+        </div>
       </Button>
     </div>
   </footer>;
