@@ -1,5 +1,12 @@
 module Styles = {
   open Css;
+  let background =
+    style([
+      backgroundImage(
+        `url("/static/img/community-page/SectionCulture&Values.png"),
+      ),
+      backgroundSize(`cover),
+    ]);
   let rowContainer = style([]);
   let h2 = merge([Theme.Type.h2, style([color(white)])]);
   let sectionSubhead =
@@ -90,6 +97,98 @@ module Styles = {
     style([width(`percent(100.)), textDecoration(`none)]);
 };
 
+module CultureGrid = {
+  module Styles = {
+    open Css;
+    let container =
+      style([
+        display(`flex),
+        flexDirection(`column),
+        media(
+          Theme.MediaQuery.desktop,
+          [flexDirection(`row), justifyContent(`spaceBetween)],
+        ),
+      ]);
+    let grid =
+      style([
+        display(`grid),
+        gridTemplateColumns([`rem(21.)]),
+        gridAutoRows(`rem(15.43)),
+        gridRowGap(`rem(1.)),
+        marginTop(`rem(2.)),
+        marginBottom(`rem(4.)),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            gridTemplateColumns([`rem(21.), `rem(21.)]),
+            gridColumnGap(`rem(1.)),
+          ],
+        ),
+        media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
+      ]);
+    let h2 =
+      merge([
+        Theme.Type.h2,
+        style([color(black), width(`rem(13.)), fontWeight(`light)]),
+      ]);
+    let h4 = merge([Theme.Type.h4, style([fontWeight(`normal)])]);
+    let gridItem = style([backgroundColor(white), padding(`rem(1.5))]);
+    let link = merge([Theme.Type.link, style([textDecoration(`none)])]);
+  };
+
+  module GridItem = {
+    [@react.component]
+    let make = (~label="", ~children=?) => {
+      <div className=Styles.gridItem>
+        <h4 className=Styles.h4> {React.string(label)} </h4>
+        <Spacer height=1. />
+        {switch (children) {
+         | Some(children) => children
+         | None => <> </>
+         }}
+      </div>;
+    };
+  };
+
+  [@react.component]
+  let make = () => {
+    <div className=Styles.container>
+      <h2 className=Styles.h2> {React.string("What Unites Us")} </h2>
+      <div className=Styles.grid>
+        <GridItem label="Respect">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "Above all, we respect each other. That's why we stand for equality and fairness. Why we’re committed to decentralization. And why we strive to always be inclusive and accessible.",
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="Curiosity">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "
+                 It's our obsession to understand and solve. Our attraction to big questions and impossible problems. Our love of collaboration and exploration. It's our imagination, at work.",
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="Excellence">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "We demand the best of ourselves. Elegant solutions. Symphonic systems. Technical beauty. We're committed to creating tech people can depend on. We enjoy the process and deliver results.",
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="Openness">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "We're all about being there for our community. Empowering people with helpful information. Sharing where we are. Owning our mistakes. And serving our vision with humility. ",
+             )}
+          </p>
+        </GridItem>
+      </div>
+    </div>;
+  };
+};
+
 [@react.component]
 let make = (~profiles) => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -134,38 +233,36 @@ let make = (~profiles) => {
       <Spacer height=4. />
       <Rule color=Theme.Colors.white />
       <Spacer height=4. />
-      <Wrapped>
-        <h2 className=Styles.h2>
-          {React.string("Genesis Founding Members")}
-        </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Get to know some of the founding members working to strengthen the protocol and build our community.",
-           )}
-        </p>
-        <Spacer height=6. />
-        <div className=Styles.profileRow>
-          {React.array(
-             Array.map(
-               (p: ContentType.GenesisProfile.t) => {
-                 <div className=Styles.profile>
-                   <GenesisMemberProfile
-                     key={p.name}
-                     name={p.name}
-                     photo={p.profilePhoto.fields.file.url}
-                     quote={"\"" ++ p.quote ++ "\""}
-                     location={p.memberLocation}
-                     twitter={p.twitter}
-                     github={p.github}
-                     blogPost={p.blogPost.fields.slug}
-                   />
-                 </div>
-               },
-               profiles,
-             ),
-           )}
-        </div>
-      </Wrapped>
+      <h2 className=Styles.h2>
+        {React.string("Genesis Founding Members")}
+      </h2>
+      <p className=Styles.sectionSubhead>
+        {React.string(
+           "Get to know some of the founding members working to strengthen the protocol and build our community.",
+         )}
+      </p>
+      <Spacer height=6. />
+      <div className=Styles.profileRow>
+        {React.array(
+           Array.map(
+             (p: ContentType.GenesisProfile.t) => {
+               <div className=Styles.profile>
+                 <GenesisMemberProfile
+                   key={p.name}
+                   name={p.name}
+                   photo={p.profilePhoto.fields.file.url}
+                   quote={"\"" ++ p.quote ++ "\""}
+                   location={p.memberLocation}
+                   twitter={p.twitter}
+                   github={p.github}
+                   blogPost={p.blogPost.fields.slug}
+                 />
+               </div>
+             },
+             profiles,
+           ),
+         )}
+      </div>
     </FeaturedSingleRow>
     <div className=Styles.leaderboardBackground>
       <Wrapped>
@@ -194,6 +291,35 @@ let make = (~profiles) => {
              "Testnet Points are designed solely to track contributions to the Testnet and are non-transferable. Testnet Points have no cash or monetary value and are not redeemable for any cryptocurrency or digital assets. We may amend or eliminate Testnet Points at any time.",
            )}
         </p>
+      </Wrapped>
+    </div>
+    <div className=Styles.background>
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
+          title: "Our Culture",
+          copySize: `Small,
+          description: "It's hard to quantify, but it's not hard to see: in any community, culture is everything. It's the values that drive us. It's how we see the world and how we show up. Culture is who we are and becomes what we create.",
+          textColor: Theme.Colors.black,
+          image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
+          background:
+            Image("/static/img/community-page/SectionCulture&Values.png"),
+          contentBackground: Color(Theme.Colors.white),
+          button: {
+            FeaturedSingleRow.Row.buttonText: "Read the Code of Conduct",
+            buttonColor: Theme.Colors.white,
+            buttonTextColor: Theme.Colors.orange,
+            dark: false,
+            href: Constants.codeOfConductUrl,
+          },
+        }
+      />
+      <Wrapped>
+        <Spacer height=4. />
+        <Rule color=Theme.Colors.white />
+        <Spacer height=4. />
+        <CultureGrid />
+        <Spacer height=7. />
       </Wrapped>
     </div>
   </Page>;

@@ -110,7 +110,7 @@ module SingleRow = {
         ),
         media(
           Theme.MediaQuery.desktop,
-          [height(`percent(100.)), width(`percent(100.))],
+          [height(`percent(80.)), width(`percent(100.))],
         ),
       ]);
   };
