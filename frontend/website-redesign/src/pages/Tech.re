@@ -17,6 +17,7 @@ module Styles = {
 
   let sectionContainer = bg =>
     style([
+      position(`relative),
       background(`url(bg)),
       unsafe("background-size", "100% auto"),
       backgroundRepeat(`noRepeat),
@@ -31,13 +32,14 @@ module Styles = {
       top(sticky ? `rem(3.5) : `rem(66.)),
       marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
       width(`rem(14.)),
+      zIndex(100),
       background(white),
       media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
 
   let projects =
     style([
-      background(`url("/static/img/tech-projects-bg.png")),
+      background(`url("/static/img/tech-projects-bg.jpg")),
       // For some reason `auto doesn't count as a Css.length so...
       unsafe("background-size", "100% auto"),
       backgroundRepeat(`noRepeat),
@@ -88,6 +90,27 @@ module Styles = {
       Theme.Type.link,
       style([display(`inlineFlex), alignItems(`center)]),
     ]);
+
+  let fadeOut =
+    style([
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`zero),
+        left(`zero),
+        right(`zero),
+        height(`rem(10.)),
+        background(
+          linearGradient(
+            deg(0.),
+            [
+              (`percent(0.), white),
+              (`percent(100.), rgba(255, 255, 255, 0.)),
+            ],
+          ),
+        ),
+      ]),
+    ]);
 };
 
 module Section = {
@@ -132,7 +155,7 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
   };
 };
@@ -141,7 +164,7 @@ module HowMinaWorks = {
   [@react.component]
   let make = () =>
     <div
-      className={Styles.sectionContainer("/static/img/tech-gradient-1.png")}>
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
       <Spacer height=6.5 />
       <hr className=Styles.divider />
       <Section
@@ -295,12 +318,13 @@ module Projects = {
   [@react.component]
   let make = () =>
     <div
-      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      className={Css.merge([Styles.sectionContainer("/static/img/tech-projects-bg.jpg"), Styles.fadeOut])}>
       <Spacer height=5. />
       <Section
         title="Projects & Possibilities"
         subhead={js|Developers are already building powerful applications on Mina — but this is just the beginning.|js}
         slug="projects">
+        /*
         <hr className=Styles.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3> {React.string("Built on Mina")} </h3>
@@ -313,6 +337,7 @@ module Projects = {
           url="/"
         />
         <Spacer height=2. />
+
         <div className=Styles.projectContainer>
           <img src="/static/img/AboutHeroTabletBackground.jpg" />
           <ProjectCopy
@@ -330,7 +355,7 @@ module Projects = {
             url="/"
           />
         </div>
-        <Spacer height=4. />
+        <Spacer height=4. /> */
         <hr className=Styles.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3>
@@ -341,32 +366,32 @@ module Projects = {
           <Possibility
             title="Build Snapps: Privacy-Enabled apps"
             description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users' data to a public blockchain."
-            image="/static/img/tech-build-snapps.png"
+            image="/static/img/tech-build-snapps.svg"
           />
           <Possibility
             title="Power Enterprise Interoperability"
             description="Use Mina to combine the cost-efficiency and privacy of a private chain with the interoperability of a public chain."
-            image="/static/img/tech-power-interop.png"
+            image="/static/img/tech-power-interop.svg"
           />
           <Possibility
             title="Minimize Transaction Fees"
             description="Power trustless e-commerce and global peer-to-peer transactions without using centralized intermediaries, or paying costly transaction fees."
-            image="/static/img/tech-txn-fees.png"
+            image="/static/img/tech-txn-fees.svg"
           />
           <Possibility
             title="Power secure & Fair Financial services"
             description="Ensure lenders only use fair criteria to make decisions and securely verify relevant information without accessing  private user data."
-            image="/static/img/tech-power-fair.png"
+            image="/static/img/tech-power-fair.svg"
           />
           <Possibility
             title="Enable private & auditable elections "
             description="Guarantee fully verifiable and auditable elections, while keeping the process private and  protecting individuals' voting information. "
-            image="/static/img/tech-audit.png"
+            image="/static/img/tech-audit.svg"
           />
           <Possibility
             title="Access Money from Anywhere in the world"
             description="With a 22kb Mina chain, access peer-to-peer stablecoins and tokens via smartphone and bring hard-earned money anywhere you go."
-            image="/static/img/tech-access.png"
+            image="/static/img/tech-access.svg"
           />
         </div>
       </Section>
@@ -384,12 +409,14 @@ module Incentives = {
           <Spacer height=0.5 />
           <p className=Theme.Type.paragraph> {React.string(description)} </p>
           <Spacer height=0.5 />
-          <a href=url className=Styles.actionLink>
-            <span className=Theme.Type.link>
-              {React.string("Run a Node")}
-            </span>
-            <Icon size=1.5 kind=Icon.ArrowRightLarge />
-          </a>
+          <Next.Link href=url>
+            <a className=Styles.actionLink>
+              <span className=Theme.Type.link>
+                {React.string("Run a Node")}
+              </span>
+              <Icon size=1.5 kind=Icon.ArrowRightLarge />
+            </a>
+          </Next.Link>
         </div>
       </div>;
   };
@@ -403,14 +430,14 @@ module Incentives = {
         title="Incentive Structure"
         subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
         slug="incentives">
-        <Button width={`rem(15.25)}>
+        <Button width={`rem(15.25)} href=`Internal("/static/pdf/economicsWP.pdf")>
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
         <Spacer height=4. />
         <hr className=Styles.divider />
         <Spacer height=2. />
-        <h3 className=Theme.Type.h3> {React.string("Ways to Earn Mina")} </h3>
+        <h3 className=Theme.Type.h3> {React.string("Ways to Join Mina")} </h3>
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
@@ -422,21 +449,21 @@ module Incentives = {
           title="As a Block Producer"
           description="Block producers are akin to miners or stakers in other protocols. By staking Mina, they can be selected to produce a block and earn block rewards in the form of coinbase, transaction fees and network fees. Block producers can decide to also be SNARK producers."
           image="/static/img/tech-block-producer.png"
-          url="/"
+          url="/docs"
         />
         <Spacer height=3. />
         <Incentive
           title="As a Snark Producer"
           description="The second type of consensus node operator on Mina, snark producers help compress data in the network by generating SNARK proofs of transactions. They then sell those proofs to block producers in return for a portion of the block rewards."
           image="/static/img/tech-snark-producer.png"
-          url="/"
+          url="/docs"
         />
         <Spacer height=3. />
         <Incentive
           title="As a Professional Block Producer"
           description="Because staking requires nodes to be online, some may choose to delegate their Mina to staking pools. These groups run staking services in exchange for a fee, which is automatically deducted when the delegator gets selected to be a block producer."
           image="/static/img/tech-pro-delegator.png"
-          url="/"
+          url="/docs"
         />
       </Section>
     </div>;
@@ -461,7 +488,7 @@ let make = () => {
     <Projects />
     <Incentives />
     <div
-      className={Styles.sectionContainer("/static/img/tech-projects-bg.png")}>
+      className={Styles.sectionContainer("/static/img/tech-projects-bg.jpg")}>
       <Spacer height=1.5 />
       <Section
         title="Mina Milestones and the Road Ahead"
@@ -487,17 +514,18 @@ let make = () => {
         textColor: `currentColor,
         copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
-        background: Image("/static/img/MinaSpectrumPrimary3.png"),
+        background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          href: "/docs",
+          href: `Internal("/docs"),
           buttonText: "Run a Node",
           dark: false,
         },
         contentBackground: Color(Css.white),
       }
     />
+      /*
     <div className=Styles.sectionContainer("")>
       <Spacer height=6. />
       <div className=Styles.section id="knowledge">
@@ -505,6 +533,7 @@ let make = () => {
       </div>
     </div>
     <Spacer height=12. />
+    */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
@@ -516,13 +545,13 @@ let make = () => {
         textColor: `currentColor,
         copySize: `Large,
         image: "/static/img/tech-touch.jpg",
-        background: Image("/static/img/MinaSpectrumPrimarySilver.png"),
+        background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          buttonText: "Opportunities",
+          buttonText: "Get Started",
           dark: false,
-          href: "/docs",
+          href: `Internal("/docs"),
         },
         contentBackground: Color(Css.white),
       }

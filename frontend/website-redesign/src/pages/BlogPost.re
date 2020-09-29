@@ -120,9 +120,9 @@ let make = (~post: option(ContentType.BlogPost.t)) => {
         header=title
         copy={Js.Undefined.toOption(subtitle)}
         background=Theme.{
-          desktop: "/static/img/BlogDetailImage.png",
-          tablet: "/static/img/BlogDetailImage.png",
-          mobile: "/static/img/BlogDetailImage.png",
+          desktop: "/static/img/BlogDetailImage.jpg",
+          tablet: "/static/img/BlogDetailImage.jpg",
+          mobile: "/static/img/BlogDetailImage.jpg",
           // TODO: Get non-desktop versions of this image
         }
       />

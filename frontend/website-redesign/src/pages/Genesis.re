@@ -2,13 +2,13 @@ module Styles = {
   open Css;
   let genesisSection =
     style([
-      backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
+      backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
       backgroundSize(`cover),
     ]);
   let background =
     style([
       backgroundImage(
-        `url("/static/img/BecomeAGenesisMemberBackground.png"),
+        `url("/static/img/BecomeAGenesisMemberBackground.jpg"),
       ),
       backgroundSize(`cover),
     ]);
@@ -16,11 +16,11 @@ module Styles = {
   let disclaimer =
     merge([
       Theme.Type.disclaimer,
-      style([paddingBottom(`rem(14.)), paddingTop(`rem(3.))]),
+      style([paddingBottom(`rem(5.)), paddingTop(`rem(3.))]),
     ]);
   let leaderboardBackground =
     style([
-      backgroundImage(`url("/static/img/backgrounds/SectionBackground.png")),
+      backgroundImage(`url("/static/img/backgrounds/SectionBackground.jpg")),
       backgroundSize(`cover),
     ]);
 
@@ -133,7 +133,7 @@ module HowItWorksGrid = {
           <GridItem label="What Members Do: Post-Mainnet">
             <p className=Theme.Type.paragraph>
               {React.string(
-                  {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
+                 {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
                )}
             </p>
           </GridItem>
@@ -169,7 +169,7 @@ module FoundingMembersSection = {
     let container =
       style([
         padding2(~v=`rem(4.), ~h=`rem(0.)),
-        backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
+        backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
         backgroundSize(`cover),
       ]);
     let h2 = merge([Theme.Type.h2, style([color(white)])]);
@@ -305,7 +305,7 @@ module CultureFooter = {
         cursor(`pointer),
         color(Theme.Colors.orange),
         display(`flex),
-        textDecoration(`none)
+        textDecoration(`none),
       ]);
   };
   [@react.component]
@@ -319,7 +319,9 @@ module CultureFooter = {
            )}
         </p>
         <div className=Styles.link>
-          <a className=Styles.anchor href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
+          <a
+            className=Styles.anchor
+            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
             {React.string("Read our Code of Conduct")}
             <Icon kind=Icon.ArrowRightMedium />
           </a>
@@ -348,7 +350,9 @@ let make = (~profiles) => {
         desktop: "/static/img/GenesisLarge.jpg",
       }>
       <Spacer height=2. />
-      <Button bgColor=Theme.Colors.black>
+      <Button
+        href=`External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform")
+        bgColor=Theme.Colors.black>
         {React.string("Apply Now")}
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
@@ -362,14 +366,14 @@ let make = (~profiles) => {
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
-          background: Image("/static/img/BecomeAGenesisMemberBackground.png"),
+          background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
           button: {
             FeaturedSingleRow.Row.buttonText: "Apply Now",
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
-            href: "https://docs.google.com/forms/u/1/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform?usp=send_form",
+            href: `External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform"),
           },
         }
       />
@@ -398,7 +402,7 @@ let make = (~profiles) => {
                  "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
                )}
             </p>
-            <Button bgColor=Theme.Colors.orange href="/leaderboard">
+            <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
               {React.string("See The Full Leaderboard")}
               <Icon kind=Icon.ArrowRightSmall />
             </Button>
@@ -414,8 +418,9 @@ let make = (~profiles) => {
              )}
           </p>
         </Wrapped>
+        <CultureFooter />
+        <Spacer height=4. />
       </div>
-      <CultureFooter />
     </div>
   </Page>;
 };

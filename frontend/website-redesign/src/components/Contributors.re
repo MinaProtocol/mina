@@ -86,10 +86,6 @@ module GenesisMembersGrid = {
              "Meet the node operators, developers, and community builders making Mina happen.",
            )}
         </p>
-        <Button bgColor=Theme.Colors.orange width={`rem(13.5)}>
-          {React.string("See More Members ")}
-          <Icon kind=Icon.ArrowRightSmall size=1. />
-        </Button>
       </div>
       <TeamMember
         fullName="Greg | DeFidog"
