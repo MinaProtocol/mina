@@ -10,13 +10,12 @@ BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-origin/develop}
 #        sed -ne 's/^ //p' | head -1)
 
 BASECOMMIT=$(git log $BASE -1 --pretty=format:%H) # Finds the commit hash of HEAD of $BASE branch
-COMMIT=$(git log -1 --pretty=format:%H) # Finds the commit hash for the current commit
 
 # Print it for logging/debugging
-echo "Diffing against commit: ${COMMIT} from branch: ${BASE}"
+echo "Diffing current commit: ${BUILDKITE_COMMIT} against commit: ${BASECOMMIT} from branch: ${BASE} ."
 
 # Compare base to the current commit
-if [[ $BASECOMMIT != $COMMIT ]]; then
+if [[ $BASECOMMIT != $BUILDKITE_COMMIT ]]; then
   # Get the files that have diverged from $BASE
   git diff $BASECOMMIT --name-only
 else
