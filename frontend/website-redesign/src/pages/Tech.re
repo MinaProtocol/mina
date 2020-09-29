@@ -428,7 +428,7 @@ module Incentives = {
         title="Incentive Structure"
         subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
         slug="incentives">
-        <Button width={`rem(15.25)}>
+        <Button width={`rem(15.25)} href="/static/pdf/economicsWP.pdf">
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
