@@ -2,7 +2,6 @@ module Styles = {
   open Css;
   let heroBackgroundImage = backgroundImg =>
     style([
-      height(`rem(100.)),
       width(`percent(100.)),
       position(`relative),
       important(backgroundSize(`cover)),
@@ -42,12 +41,20 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(12.))]),
+      marginBottom(`rem(12.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginTop(`rem(12.))],
+      ),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
 
   let heroHeadlineContainr =
-    style([height(`vh(100.)), minHeight(`rem(32.)), position(`relative)]);
+    style([
+      height(`vh(100.)),
+      minHeight(`rem(32.)),
+      position(`relative),
+    ]);
 
   let heroHeadline =
     merge([

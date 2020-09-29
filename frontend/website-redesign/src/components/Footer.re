@@ -80,6 +80,7 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
+        selector("a", [width(`rem(2.)), color(white), hover([color(Theme.Colors.orange)])]),
       ]);
 
     let anchor = style([
