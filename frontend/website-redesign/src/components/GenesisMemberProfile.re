@@ -121,14 +121,6 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
            }}
         </div>
       </div>
-      <div className=Styles.button>
-        <Button bgColor=Theme.Colors.white>
-          <a className=Styles.buttonLink href=blogPost>
-            {React.string("Learn More")}
-          </a>
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-      </div>
     </div>
   </div>;
 };

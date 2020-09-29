@@ -79,9 +79,12 @@ module Styles = {
 module Link = {
   [@react.component]
   let make = (~href, ~children) => {
-    Js.Re.test_(Js.Re.fromString("https?::"), href) ? 
-      <a href> children </a> :
+    switch (href) {
+    | `Scroll_to_top => <Next.Link href=""> children </Next.Link>
+    | `External(href) => <a className=Css.(style([textDecoration(`none)])) href> children </a>
+    | `Internal(href) =>
       <Next.Link href> children </Next.Link>
+    }
   };
 };
 
@@ -92,7 +95,7 @@ module Link = {
 [@react.component]
 let make =
     (
-      ~href="",
+      ~href,
       ~children=?,
       ~height=`rem(3.25),
       ~width=`rem(10.9),

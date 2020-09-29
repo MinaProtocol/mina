@@ -409,12 +409,14 @@ module Incentives = {
           <Spacer height=0.5 />
           <p className=Theme.Type.paragraph> {React.string(description)} </p>
           <Spacer height=0.5 />
-          <a href=url className=Styles.actionLink>
-            <span className=Theme.Type.link>
-              {React.string("Run a Node")}
-            </span>
-            <Icon size=1.5 kind=Icon.ArrowRightLarge />
-          </a>
+          <Next.Link href=url>
+            <a className=Styles.actionLink>
+              <span className=Theme.Type.link>
+                {React.string("Run a Node")}
+              </span>
+              <Icon size=1.5 kind=Icon.ArrowRightLarge />
+            </a>
+          </Next.Link>
         </div>
       </div>;
   };
@@ -428,7 +430,7 @@ module Incentives = {
         title="Incentive Structure"
         subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
         slug="incentives">
-        <Button width={`rem(15.25)} href="/static/pdf/economicsWP.pdf">
+        <Button width={`rem(15.25)} href=`Internal("/static/pdf/economicsWP.pdf")>
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
@@ -447,21 +449,21 @@ module Incentives = {
           title="As a Block Producer"
           description="Block producers are akin to miners or stakers in other protocols. By staking Mina, they can be selected to produce a block and earn block rewards in the form of coinbase, transaction fees and network fees. Block producers can decide to also be SNARK producers."
           image="/static/img/tech-block-producer.png"
-          url="/"
+          url="/docs"
         />
         <Spacer height=3. />
         <Incentive
           title="As a Snark Producer"
           description="The second type of consensus node operator on Mina, snark producers help compress data in the network by generating SNARK proofs of transactions. They then sell those proofs to block producers in return for a portion of the block rewards."
           image="/static/img/tech-snark-producer.png"
-          url="/"
+          url="/docs"
         />
         <Spacer height=3. />
         <Incentive
           title="As a Professional Block Producer"
           description="Because staking requires nodes to be online, some may choose to delegate their Mina to staking pools. These groups run staking services in exchange for a fee, which is automatically deducted when the delegator gets selected to be a block producer."
           image="/static/img/tech-pro-delegator.png"
-          url="/"
+          url="/docs"
         />
       </Section>
     </div>;
@@ -516,7 +518,7 @@ let make = () => {
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          href: "/docs",
+          href: `Internal("/docs"),
           buttonText: "Run a Node",
           dark: false,
         },
@@ -549,7 +551,7 @@ let make = () => {
           buttonTextColor: Css.white,
           buttonText: "Get Started",
           dark: false,
-          href: "/docs",
+          href: `Internal("/docs"),
         },
         contentBackground: Color(Css.white),
       }
