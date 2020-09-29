@@ -10,7 +10,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [backgroundImage(url("/static/img/SecuredByLarge.png"))],
+        [backgroundImage(url("/static/img/SecuredByLarge.jpg"))],
       ),
     ]);
   let grid =

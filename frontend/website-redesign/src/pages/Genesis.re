@@ -2,13 +2,13 @@ module Styles = {
   open Css;
   let genesisSection =
     style([
-      backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
+      backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
       backgroundSize(`cover),
     ]);
   let background =
     style([
       backgroundImage(
-        `url("/static/img/BecomeAGenesisMemberBackground.png"),
+        `url("/static/img/BecomeAGenesisMemberBackground.jpg"),
       ),
       backgroundSize(`cover),
     ]);
@@ -20,7 +20,7 @@ module Styles = {
     ]);
   let leaderboardBackground =
     style([
-      backgroundImage(`url("/static/img/backgrounds/SectionBackground.png")),
+      backgroundImage(`url("/static/img/backgrounds/SectionBackground.jpg")),
       backgroundSize(`cover),
     ]);
 
@@ -169,7 +169,7 @@ module FoundingMembersSection = {
     let container =
       style([
         padding2(~v=`rem(4.), ~h=`rem(0.)),
-        backgroundImage(`url("/static/img/GenesisMiddleBackground.png")),
+        backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
         backgroundSize(`cover),
       ]);
     let h2 = merge([Theme.Type.h2, style([color(white)])]);
@@ -364,7 +364,7 @@ let make = (~profiles) => {
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
-          background: Image("/static/img/BecomeAGenesisMemberBackground.png"),
+          background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
           button: {
             FeaturedSingleRow.Row.buttonText: "Apply Now",
