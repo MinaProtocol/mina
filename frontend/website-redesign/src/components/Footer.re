@@ -82,6 +82,7 @@ module SocialIcons = {
         color(white),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>

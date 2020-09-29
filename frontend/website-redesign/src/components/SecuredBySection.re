@@ -221,7 +221,7 @@ let make = () => {
         </div>
       </div>
       <div className=Styles.gridItem3>
-        <img className=Styles.dotsImage src="/static/img/SecuredByDots.png" />
+        <img className=Styles.dotsImage src="/static/img/SecuredByDots.svg" />
         <span className=Styles.textColumn>
           <Rule color=Theme.Colors.white />
           <h3 className=Styles.h3White>
