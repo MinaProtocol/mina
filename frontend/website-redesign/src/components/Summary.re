@@ -33,7 +33,8 @@ let fetchStatistics = () => {
 
 module Styles = {
   open Css;
-  let container = style([marginTop(`rem(5.))]);
+  let container =
+    style([media(Theme.MediaQuery.tablet, [marginTop(`rem(5.))])]);
   let header =
     merge([
       Theme.Type.h1,
@@ -49,7 +50,8 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      paddingTop(`rem(2.8)),
+      padding2(~v=`rem(2.8), ~h=`rem(2.5)),
+      media(Theme.MediaQuery.tablet, [padding2(~v=`zero, ~h=`zero)]),
       media(
         Theme.MediaQuery.desktop,
         [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
@@ -60,33 +62,30 @@ module Styles = {
     merge([
       Theme.Type.paragraphSmall,
       style([
-        display(none),
         textAlign(`left),
         fontWeight(`normal),
         color(Theme.Colors.black),
+        marginTop(`rem(4.)),
         media(
           Theme.MediaQuery.notMobile,
-          [
-            display(`block),
-            marginTop(`rem(3.5)),
-            marginBottom(`rem(1.5)),
-          ],
+          [marginTop(`rem(3.5)), marginBottom(`rem(1.5))],
         ),
       ]),
     ]);
 
   let disclaimer =
     merge([
-      Theme.Type.paragraphSmall,
+      Theme.Type.paragraph,
       style([
         marginTop(`rem(3.6)),
+        fontSize(`rem(1.)),
         color(Theme.Colors.greyScale),
         media(
           Theme.MediaQuery.notMobile,
           [
             display(`inline),
             marginTop(`rem(4.6)),
-            important(fontSize(`px(13))),
+            marginBottom(`rem(4.6)),
             lineHeight(`rem(1.)),
           ],
         ),
@@ -121,6 +120,8 @@ module Styles = {
       top(`zero),
       flexDirection(`column),
       width(`rem(40.)),
+      media(Theme.MediaQuery.tablet, [marginTop(`rem(4.))]),
+      media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
     ]);
   let flexColumn =
     style([
@@ -165,8 +166,11 @@ module StatisticsRow = {
 
     let value =
       merge([
-        statistic,
+        Theme.Type.h2,
         style([
+          fontSize(`px(40)),
+          marginBottom(`rem(0.5)),
+          fontWeight(`light),
           display(`flex),
           media(
             Theme.MediaQuery.tablet,
@@ -178,6 +182,7 @@ module StatisticsRow = {
           ),
         ]),
       ]);
+
     let container =
       style([
         display(`flex),
@@ -193,14 +198,6 @@ module StatisticsRow = {
         display(`flex),
         flexDirection(`column),
         justifyContent(`flexStart),
-      ]);
-    let lastStatistic =
-      merge([
-        flexColumn,
-        style([
-          marginTop(`rem(1.)),
-          media("(min-width: 26.8rem)", [marginTop(`zero)]),
-        ]),
       ]);
   };
   [@react.component]
@@ -220,7 +217,7 @@ module StatisticsRow = {
           {React.string("Genesis Members")}
         </span>
       </div>
-      <div className=Styles.lastStatistic>
+      <div className=Styles.statistic>
         <div className=Styles.value>
           {React.string(statistics.blockCount)}
         </div>
@@ -292,7 +289,7 @@ let make = () => {
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            href=`External("https://bit.ly/3dNmPle")
+            href={`External("https://bit.ly/3dNmPle")}
             bgColor=Theme.Colors.black
             width={`rem(15.)}
             paddingX=1.5>
@@ -302,7 +299,11 @@ let make = () => {
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
           <Spacer width=2.0 height=1.0 />
-          <Button href=`Internal("/genesis") bgColor=Theme.Colors.black width={`rem(13.)} paddingX=1.5>
+          <Button
+            href={`Internal("/genesis")}
+            bgColor=Theme.Colors.black
+            width={`rem(13.)}
+            paddingX=1.5>
             <p className=Theme.Type.buttonLabel>
               {React.string("Genesis Program")}
             </p>

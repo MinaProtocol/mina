@@ -1,13 +1,5 @@
 module Styles = {
   open Css;
-  let page =
-    style([
-      maxWidth(`rem(58.0)),
-      media(
-        Theme.MediaQuery.tablet,
-        [maxWidth(`rem(89.)), paddingTop(`rem(4.))],
-      ),
-    ]);
   let filters =
     style([
       display(`flex),
@@ -116,7 +108,7 @@ module ToggleButtons = {
         style([
           display(`flex),
           position(`relative),
-          width(`rem(40.5)),
+          media(Theme.MediaQuery.tablet, [width(`rem(40.5))]),
           borderTopLeftRadius(`px(4)),
           borderBottomRightRadius(`px(4)),
           borderTopRightRadius(`px(1)),
@@ -236,8 +228,9 @@ let make = () => {
   };
 
   <Page title="Testnet Leaderboard">
+    <div className=Nav.Styles.spacer />
     <Wrapped>
-      <div className=Styles.page> <Summary /> </div>
+      <Summary />
       <Spacer height=5. />
       <div className=Styles.filters>
         <SearchBar onUsernameEntered username={state.username} />
