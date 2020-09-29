@@ -99,8 +99,7 @@ module MorePosts = {
               <li
                 className=Styles.postItem key={item.ContentType.BlogPost.slug}>
                 <ListModule.MainListing
-                  item
-                  mainImg="/static/img/ArticleImageSmall.png"
+                  item=ContentType.NormalizedPressBlog.ofBlog(item)
                   itemKind=ListModule.Blog
                 />
               </li>
