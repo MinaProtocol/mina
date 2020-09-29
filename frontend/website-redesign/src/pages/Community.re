@@ -218,7 +218,7 @@ let make = (~profiles) => {
         title: "Genesis Program",
         description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
         textColor: Theme.Colors.white,
-        image: "/static/img/BlogLandingHero.png",
+        image: "/static/img/BlogLandingHero.jpg",
         background:
           Image("/static/img/community-page/CommunityBackground.png"),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
