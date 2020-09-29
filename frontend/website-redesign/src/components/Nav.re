@@ -237,6 +237,7 @@ let make = (~dark=false) => {
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
       </NavGroup>
+      <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <div className=Styles.ctaContainer>
