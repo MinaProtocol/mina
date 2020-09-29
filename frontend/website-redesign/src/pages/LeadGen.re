@@ -170,7 +170,7 @@ let make = () => {
           <div>
             <img
               className=Styles.logo
-              src="/static/img/logos/LogoTestWorld.png"
+              src="/static/img/logos/LogoTestWorld.svg"
             />
           </div>
           <div className=Styles.textContainer> <SignUpWidget /> </div>
