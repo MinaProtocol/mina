@@ -46,15 +46,30 @@ module Card = {
           after([transform(translate(`rem(-0.25), `rem(-0.25)))]),
         ]),
       ]);
+
+     let anchor =
+       style([
+          textDecoration(`none)
+       ]);
   };
   [@react.component]
-  let make = (~children=?) => {
-    <div className=Styles.container>
-      {switch (children) {
-       | Some(children) => children
-       | None => React.null
-       }}
-    </div>;
+  let make = (~href, ~children=?) => {
+    let inner =
+      <div className=Styles.container>
+        {switch (children) {
+         | Some(children) => children
+         | None => React.null
+         }}
+      </div>;
+
+    switch (href) {
+    | `Internal(href) => 
+      <Next.Link href> {inner} </Next.Link>
+    | `External(href) =>
+      <a href className=Styles.anchor>
+        {inner}
+      </a>
+    }
   };
 };
 
@@ -141,8 +156,8 @@ module CommunityLanding = {
   };
   [@react.component]
   let make = () => {
-    let renderCard = (kind, title) => {
-      <Card>
+    let renderCard = (kind, href, title) => {
+      <Card href>
         <div className=ButtonBarStyles.content>
           <span className=ButtonBarStyles.icon> <Icon kind /> </span>
           <h5 className=Styles.title> {React.string(title)} </h5>
@@ -155,11 +170,11 @@ module CommunityLanding = {
         {React.string("Connect")}
       </h2>
       <div className=ButtonBarStyles.grid>
-        {renderCard(Icon.Twitter, "Twitter")}
-        {renderCard(Icon.Forums, "Forums")}
-        {renderCard(Icon.Wiki, "Wiki")}
-        {renderCard(Icon.Facebook, "Facebook")}
-        {renderCard(Icon.WeChat, "Wechat")}
+        {renderCard(Icon.Twitter, `External("https://twitter.com/minaprotocol"), "Twitter")}
+        {renderCard(Icon.Forums, `External("https://forums.minaprotocol.com/"), "Forums")}
+        {renderCard(Icon.Wiki, `External("https://minawiki.com"), "Wiki")}
+        {renderCard(Icon.Facebook, `External("https://facebook.com/minaprotocol"), "Facebook")}
+        {renderCard(Icon.WeChat, `External("https://forums.minaprotocol.com/t/coda-protocol-chinese-resources/200"), "Wechat")}
       </div>
     </div>;
   };
@@ -214,8 +229,8 @@ module HelpAndSupport = {
   };
   [@react.component]
   let make = () => {
-    let renderCard = (kind, title, description) => {
-      <Card>
+    let renderCard = (kind, href, title, description) => {
+      <Card href>
         <div className=Styles.content>
           <span className=Styles.icon> <Icon kind /> </span>
           <h5 className=Styles.title> {React.string(title)} </h5>
@@ -229,26 +244,31 @@ module HelpAndSupport = {
       <div className=ButtonBarStyles.grid>
         {renderCard(
            Icon.Discord,
+           `External("https://discord.com/invite/Vexf4ED"),
            "Discord",
            "Interact with other users, ask questions and get feedback.",
          )}
         {renderCard(
            Icon.Forums,
+           `External("https://forums.minaprotocol.com/"),
            "Forums",
            "Explore tech topics in-depth. Good for reference.",
          )}
         {renderCard(
            Icon.Github,
+           `External("https://github.com/minaprotocol/mina"),
            "Github",
            "Work on the protocol  and contribute to Mina's codebase.",
          )}
         {renderCard(
            Icon.Wiki,
+           `External("https://minawiki.com"),
            "Wiki",
            "Resources from the O(1) Labs team and community members.",
          )}
         {renderCard(
            Icon.Email,
+           `External("https://github.com/minaprotocol/mina"),
            "Report A Bug",
            "Share any issues with the protocol, website or anything else.",
          )}
@@ -309,8 +329,8 @@ module GetStarted = {
   };
   [@react.component]
   let make = () => {
-    let renderCard = (kind, title, description) => {
-      <Card>
+    let renderCard = (kind, href, title, description) => {
+      <Card href>
         <div className=Styles.content>
           <span className=Styles.icon> <Icon kind /> </span>
           <h5 className=Styles.title> {React.string(title)} </h5>
@@ -323,21 +343,25 @@ module GetStarted = {
       <div className=ButtonBarStyles.grid>
         {renderCard(
            Icon.NodeOperators,
+           `Internal("/tech"),
            "Run a node",
            "Getting started is easier than you think.",
          )}
         {renderCard(
            Icon.Developers,
+           `Internal("/docs"),
            "Build on Mina",
            "Work on the protocol  and contribute to Mina's codebase.",
          )}
         {renderCard(
            Icon.Community,
+           `Internal("/community"),
            "Join the Community",
            "Let's keep it positive and productive.",
          )}
         {renderCard(
            Icon.GrantsProgram,
+           `Internal("/docs/contributing#mina-grants"),
            "Apply for a Grant",
            "Roll up your sleeves and help build Mina.",
          )}

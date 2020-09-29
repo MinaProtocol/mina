@@ -61,7 +61,7 @@ let make = () => {
             title: "Apply for a Grant",
             description: "From front-end sprints and protocol development to community building initiatives and content creation, our Grants Program invites you to help strengthen the network in exchange for Mina tokens.",
             buttonCopy: "Learn More",
-            buttonUrl: "/docs",
+            buttonUrl: "/docs/contributing#mina-grants",
             image: "/static/img/rowImages/ApplyForGrant.jpg",
           },
         |])
