@@ -435,7 +435,7 @@ module Incentives = {
         <Spacer height=4. />
         <hr className=Styles.divider />
         <Spacer height=2. />
-        <h3 className=Theme.Type.h3> {React.string("Ways to Earn Mina")} </h3>
+        <h3 className=Theme.Type.h3> {React.string("Ways to Join Mina")} </h3>
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
