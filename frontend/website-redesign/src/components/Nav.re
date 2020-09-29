@@ -227,7 +227,7 @@ let make = (~dark=false) => {
     </Next.Link>
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
-      <span id="open-nav"> <Icon kind=Icon.BurgerMenu /> </span>
+      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2./> </span>
       <span id="close-nav"> <Icon kind=Icon.CloseMenu /> </span>
     </label>
     <nav className=Styles.nav>
