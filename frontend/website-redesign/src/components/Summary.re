@@ -110,7 +110,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.tablet,
-        [width(`rem(39.)), marginRight(`rem(6.))],
+        [width(`rem(39.)), marginTop(`rem(4.)), marginRight(`rem(6.))],
       ),
     ]);
   let heroRight =
