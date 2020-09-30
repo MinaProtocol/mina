@@ -461,7 +461,6 @@ module T = struct
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s txn_global_slot state_and_body_hash =
-    let open Deferred.Let_syntax in
     let account_ids = function
       | Transaction.Fee_transfer t ->
           Fee_transfer.receivers t
@@ -494,6 +493,13 @@ module T = struct
       ; statement }
     , updated_pending_coinbase_stack_state )
 
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
+
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_global_slot state_and_body_hash =
     let open Deferred.Result.Let_syntax in
@@ -507,21 +513,21 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       try
+        let tss = partition 10 ts in
         let%bind.Async ret =
-          Deferred.List.foldi ts ~init:(i, [], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              let%bind () =
-                if i mod 10 == 0 then Async.Scheduler.yield () else return ()
-              in
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_global_slot state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      current_global_slot state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) )
         in
         return ret
       with Exit err -> Deferred.Result.fail err
