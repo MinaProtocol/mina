@@ -52,7 +52,7 @@ in Pipeline.build Pipeline.Config::{
       key = "cmds",
       target = Size.Small,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "_computed_diff.txt" ]
+      artifact_paths = [ SelectFiles.contains "_computed_diff.txt" ]
     }
   ]
 }
