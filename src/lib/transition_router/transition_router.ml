@@ -6,6 +6,13 @@ open Coda_transition
 open O1trace
 open Network_peer
 
+type Structured_log_events.t += Starting_transition_frontier_controller
+  [@@deriving
+    register_event {msg= "Starting transition frontier controller phase"}]
+
+type Structured_log_events.t += Starting_bootstrap_controller
+  [@@deriving register_event {msg= "Starting bootstrap controller phase"}]
+
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
@@ -32,7 +39,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w
     ~precomputed_values frontier =
-  [%log info] "Starting Transition Frontier Controller phase" ;
+  [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -59,6 +66,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~consensus_local_state ~frontier_w ~initial_root_transition
     ~persistent_root ~persistent_frontier ~best_seen_transition
     ~precomputed_values =
+  [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     create_bufferred_pipe ~name:"bootstrap controller pipe" ()
