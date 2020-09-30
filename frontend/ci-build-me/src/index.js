@@ -18,7 +18,7 @@ const runCircleBuild = async (github) => {
   const options = {
     hostname: "circleci.com",
     port: 443,
-    path: `/api/v2/project/github/CodaProtocol/coda/pipeline`,
+    path: `/api/v2/project/github/MinaProtocol/mina/pipeline`,
     method: "POST",
     headers: {
       "Circle-token": circleApiKey,
@@ -45,7 +45,7 @@ const runBuild = async (github) => {
   const options = {
     hostname: "api.buildkite.com",
     port: 443,
-    path: `/v2/organizations/o-1-labs-2/pipelines/coda/builds`,
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds`,
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -96,7 +96,7 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-        orgData.data.filter((org) => org.login == "CodaProtocol").length > 0
+        orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild({
