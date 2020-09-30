@@ -36,12 +36,12 @@ end)
       if Resource_pool.Diff.is_empty diff' then (
         [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
-        valid_cb false ;
+        valid_cb `Ignore ;
         Deferred.unit )
       else (
         [%log' trace t.logger] "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
-        valid_cb true ;
+        valid_cb `Accept ;
         Linear_pipe.write t.write_broadcasts diff' )
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
@@ -50,7 +50,7 @@ end)
     | Error (`Locally_generated res) ->
         rebroadcast res
     | Error (`Other e) ->
-        valid_cb false ;
+        valid_cb `Reject ;
         result_cb (Error e) ;
         [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: %s"

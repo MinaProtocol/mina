@@ -1081,7 +1081,7 @@ let create (config : Config.t) =
                          in
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
-                             if v then
+                             if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
                                   .forget_validation_with_hash et ) ;

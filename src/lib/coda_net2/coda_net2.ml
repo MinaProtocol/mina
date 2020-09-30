@@ -129,7 +129,8 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
+    ; validator:
+        'a Envelope.Incoming.t -> [`Accept | `Reject | `Ignore] Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -788,10 +789,20 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return false
+                  return `Reject
             in
             match%map
-              do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid= match is_valid with `Accept -> "accept" | `Reject -> "reject" | `Ignore -> "ignore" }
+              do_rpc t
+                (module Rpcs.Validation_complete)
+                { seqno
+                ; action=
+                    ( match action with
+                    | `Accept ->
+                        "accept"
+                    | `Reject ->
+                        "reject"
+                    | `Ignore ->
+                        "ignore" ) }
             with
             | Ok "validationComplete success" ->
                 ()
@@ -973,7 +984,8 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
+      ; validator:
+          'a Envelope.Incoming.t -> [`Accept | `Reject | `Ignore] Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -1101,7 +1113,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~flooding ~direct_peers ~peer_exchange ~unsafe_no_trust_ip ~seed_peers =
+    ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange ~seed_peers =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1442,16 +1454,14 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
-          ~peer_exchange:true ~direct_peers:[] ~seed_peers:[] ~on_new_peer:Fn.ignore
-          ~flooding:false ~unsafe_no_trust_ip:true
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
+          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
-        configure b ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
-          ~peer_exchange:true ~direct_peers:[] ~seed_peers:[] ~on_new_peer:Fn.ignore
-          ~flooding:false ~unsafe_no_trust_ip:true
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
+          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a

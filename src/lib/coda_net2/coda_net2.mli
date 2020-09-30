@@ -142,7 +142,8 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(string Envelope.Incoming.t -> [`Accept|`Reject|`Ignore] Deferred.t)
+    -> should_forward_message:(   string Envelope.Incoming.t
+                               -> [`Accept | `Reject | `Ignore] Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -159,7 +160,8 @@ module Pubsub : sig
   val subscribe_encode :
        net
     -> string
-    -> should_forward_message:('a Envelope.Incoming.t -> bool Deferred.t)
+    -> should_forward_message:(   'a Envelope.Incoming.t
+                               -> [`Accept | `Reject | `Ignore] Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of

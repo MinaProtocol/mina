@@ -53,7 +53,8 @@ module type External_transition_common_intf = sig
 
   val don't_broadcast : t -> unit
 
-  val poke_validation_callback : t -> (bool -> unit) -> unit
+  val poke_validation_callback :
+    t -> ([`Accept | `Reject | `Ignore] -> unit) -> unit
 end
 
 module type External_transition_base_intf = sig
