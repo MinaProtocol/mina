@@ -199,7 +199,9 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	GossipType      string   `json:"gossip_type"`
+	Flood           bool     `json:"flood"`
+	PeerExchange    bool     `json:"peer_exchange"`
+	DirectPeers     []string `json:"direct_peers"`
 	SeedPeers       []string `json:"seed_peers"`
 }
 
@@ -228,8 +230,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 
-	seeds := make([]peer.AddrInfo, len(m.SeedPeers))
-	for i, v := range m.SeedPeers {
+	seeds := make([]peer.AddrInfo, 0, len(m.SeedPeers))
+	for _, v := range m.SeedPeers {
 		addr, err := addrInfoOfString(v)
 		if err != nil {
 			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
@@ -237,7 +239,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 			// But more likely, it is an RPC error.
 			return nil, badRPC(err)
 		}
-		seeds[i] = *addr
+		seeds = append(seeds, *addr)
+	}
+
+	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
+	for _, v := range m.DirectPeers {
+		addr, err := addrInfoOfString(v)
+		if err != nil {
+			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+			// isn't supported by this version of libp2p.
+			// But more likely, it is an RPC error.
+			return nil, badRPC(err)
+		}
+		directPeers = append(directPeers, *addr)
 	}
 
 	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
@@ -252,19 +266,10 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
-	// - bigger than 16MiB block size?
-	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
+	// - bigger than 32MiB block size?
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
 	var ps *pubsub.PubSub
-	if m.GossipType == "gossipsub" {
-		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "flood" {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "random" {
-		// networks of size 100 aren't very large, but we shouldn't be using randomsub!
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, 10, opts)
-	} else {
-		return nil, badHelper(errors.New("unknown gossip type"))
-	}
+	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
 
 	if err != nil {
 		return nil, badHelper(err)

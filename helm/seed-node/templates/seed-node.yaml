@@ -43,6 +43,15 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-seed",
+          {{- if $.Values.coda.enableFlooding }}
+          "-enable-flooding true"
+          {{- end -}}
+          {{- if $.Values.coda.peerExchange }}
+          "-peer-exchange true"
+          {{- end -}}
+          {{- range $.Values.coda.directPeers }}
+          "-direct-peers", {{ . | quote }},
+          {{- end -}
           "-discovery-keypair", "{{ $.Values.seed.discoveryKeypair }}",
           {{- if (ne $.Values.coda.runtimeConfig "") }}
           "-config-file", "/config/daemon.json",

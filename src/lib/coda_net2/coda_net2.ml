@@ -272,7 +272,9 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; gossip_type: string
+        ; flooding: bool
+        ; direct_peers: string list
+        ; peer_exchange: bool
         ; seed_peers: string list }
       [@@deriving yojson]
 
@@ -1099,7 +1101,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~gossip_type ~seed_peers =
+    ~flooding ~direct_peers ~peer_exchange ~unsafe_no_trust_ip ~seed_peers =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1109,15 +1111,10 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
+      ; flooding
+      ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
-      ; gossip_type=
-          ( match gossip_type with
-          | `Gossipsub ->
-              "gossipsub"
-          | `Flood ->
-              "flood"
-          | `Random ->
-              "random" ) }
+      ; peer_exchange }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1447,12 +1444,14 @@ let%test_module "coda network tests" =
       let%bind () =
         configure a ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~bootstrapper:true ~seed_peers:[] ~on_new_peer:Fn.ignore
+          ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
         configure b ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~bootstrapper:true ~seed_peers:[] ~on_new_peer:Fn.ignore
+          ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a

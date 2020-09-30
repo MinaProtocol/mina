@@ -164,6 +164,15 @@ spec:
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
+          {{- if $.Values.coda.enableFlooding }}
+          "-enable-flooding true"
+          {{- end -}}
+          {{- if $.Values.coda.peerExchange }}
+          "-peer-exchange true"
+          {{- end -}}
+          {{- range $.Values.coda.directPeers }}
+          "-direct-peers", {{ . | quote }},
+          {{- end -}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",

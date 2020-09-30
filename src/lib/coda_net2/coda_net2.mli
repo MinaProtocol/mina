@@ -200,7 +200,9 @@ val configure :
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
-  -> gossip_type:[`Gossipsub | `Flood | `Random]
+  -> flooding:bool
+  -> direct_peers:Multiaddr.t list
+  -> peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> unit Deferred.Or_error.t
 

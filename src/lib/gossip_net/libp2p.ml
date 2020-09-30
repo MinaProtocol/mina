@@ -28,7 +28,9 @@ module Config = struct
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
     ; trust_system: Trust_system.t
-    ; gossip_type: [`Gossipsub | `Flood | `Random]
+    ; flooding: bool
+    ; direct_peers: Coda_net2.Multiaddr.t list
+    ; peer_exchange: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -146,6 +148,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:config.initial_peers
+                ~direct_peers:config.direct_peers
+                ~peer_exchange:config.peer_exchange ~flooding:config.flooding
                 ~on_new_peer:(fun _ ->
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
