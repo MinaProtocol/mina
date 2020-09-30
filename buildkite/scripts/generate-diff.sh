@@ -3,6 +3,8 @@
 # Base against origin/develop by default, but use pull-request base otherwise
 BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-origin/develop}
 
+echo "Buildkite incremental setting: ${BUILDKITE_INCREMENTAL}"
+
 # Finds the greatest common commit that is shared between these two branches
 # Or nothing if there isn't one
 COMMIT=$(diff -u <(git rev-list --first-parent HEAD) \
