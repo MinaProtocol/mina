@@ -98,6 +98,8 @@ end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
+type validation_result = [`Accept | `Reject | `Ignore]
+
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
@@ -143,7 +145,7 @@ module Pubsub : sig
        net
     -> string
     -> should_forward_message:(   string Envelope.Incoming.t
-                               -> [`Accept | `Reject | `Ignore] Deferred.t)
+                               -> validation_result Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -161,7 +163,7 @@ module Pubsub : sig
        net
     -> string
     -> should_forward_message:(   'a Envelope.Incoming.t
-                               -> [`Accept | `Reject | `Ignore] Deferred.t)
+                               -> validation_result Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of

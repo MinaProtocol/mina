@@ -54,7 +54,7 @@ module type External_transition_common_intf = sig
   val don't_broadcast : t -> unit
 
   val poke_validation_callback :
-    t -> ([`Accept | `Reject | `Ignore] -> unit) -> unit
+    t -> (Coda_net2.validation_result -> unit) -> unit
 end
 
 module type External_transition_base_intf = sig

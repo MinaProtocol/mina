@@ -9,6 +9,8 @@ open Network_peer
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+type validation_result = [`Accept | `Reject | `Ignore]
+
 let peer_of_peer_info peer_info =
   Peer.create
     (Unix.Inet_addr.of_string peer_info.host)
@@ -129,8 +131,7 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator:
-        'a Envelope.Incoming.t -> [`Accept | `Reject | `Ignore] Deferred.t
+    ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -984,8 +985,7 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator:
-          'a Envelope.Incoming.t -> [`Accept | `Reject | `Ignore] Deferred.t
+      ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
