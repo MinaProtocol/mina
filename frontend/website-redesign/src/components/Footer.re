@@ -91,16 +91,16 @@ module SocialIcons = {
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <a className=Styles.anchor href="https://discord.com/invite/Vexf4ED">
+      <a className=Styles.anchor href="https://bit.ly/MinaDiscord">
         <Icon kind=Icon.Discord size=2. />
       </a>
       <a className=Styles.anchor href="https://twitter.com/minaprotocol">
         <Icon kind=Icon.Twitter size=2. />
       </a>
-      <a className=Styles.anchor href="https://facebook.com/minaprotocol">
+      <a className=Styles.anchor href="http://bit.ly/MinaProtocolFacebook">
         <Icon kind=Icon.Facebook size=2. />
       </a>
-      <a className=Styles.anchor href="https://t.me/minaprotocol">
+      <a className=Styles.anchor href="http://bit.ly/MinaTelegram">
         <Icon kind=Icon.Telegram size=2. />
       </a>
       <a className=Styles.anchor href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200"> <Icon kind=Icon.WeChat size=2. /> </a>
