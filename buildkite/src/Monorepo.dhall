@@ -51,7 +51,10 @@ in Pipeline.build Pipeline.Config::{
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,
-      docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = Some Docker::{
+        image = (./Constants/ContainerImages.dhall).toolchainBase,
+        environment = ["BUILDKITE_INCREMENTAL"]
+      }
     }
   ]
 }
