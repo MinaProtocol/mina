@@ -1033,21 +1033,7 @@ let create (config : Config.t)
               [%str_log debug]
                 (Transactions_received
                    {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
-            let diff' =
-              List.filter diff ~f:(fun cmd ->
-                  if User_command.has_insufficient_fee cmd then (
-                    [%log debug]
-                      "Filtering user command with insufficient fee from \
-                       transaction-pool diff $cmd from $sender"
-                      ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
-                        ; ( "sender"
-                          , Envelope.(
-                              Sender.to_yojson (Incoming.sender envelope)) ) ] ;
-                    false )
-                  else true )
-            in
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff'), valid_cb)
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
     )
   in
   { gossip_net

@@ -45,6 +45,11 @@ module Make
 
   let compact_json t = compact_to_yojson (to_compact t)
 
+  (* snark pool diffs are not bundled, so size is always 1 *)
+  let size _ = 1
+
+  let verified_size _ = 1
+
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
         Printf.sprintf

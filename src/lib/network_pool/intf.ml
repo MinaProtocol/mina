@@ -50,6 +50,13 @@ module type Resource_pool_diff_intf = sig
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
 
+  (** Used to check whether or not information was filtered out of diffs
+   *  during diff application. Assumes that diff size will be the equal or
+   *  smaller after application is completed. *)
+  val size : t -> int
+
+  val verified_size : verified -> int
+
   val summary : t -> string
 
   (** Warning: It must be safe to call this function asynchronously! *)
@@ -119,7 +126,8 @@ module type Network_pool_base_intf = sig
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -134,7 +142,8 @@ module type Network_pool_base_intf = sig
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
