@@ -5,9 +5,7 @@ BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-origin/develop}
 
 # Finds the greatest common commit that is shared between these two branches
 # Or nothing if there isn't one
-COMMIT=$(diff -u <(git rev-list --first-parent HEAD) \
-        <(git rev-list --first-parent $BASE) | \
-        sed -ne 's/^ //p' | head -1)
+COMMIT=$(git merge-base $BASE ${BUILDKITE_COMMIT:-HEAD})
 
 if [[ $COMMIT != "" ]]; then
   # Get the files that have changed since that shared commit
