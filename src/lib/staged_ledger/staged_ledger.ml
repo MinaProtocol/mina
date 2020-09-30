@@ -517,6 +517,7 @@ module T = struct
         let%bind.Async ret =
           Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
             ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
               let%map () = Async.Scheduler.yield () in
               List.fold ts ~init:(acc, pending_coinbase_stack_state)
                 ~f:(fun (acc, pending_coinbase_stack_state) t ->
