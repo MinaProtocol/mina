@@ -138,7 +138,7 @@ module Full : sig
   type 'mutant t = (full, 'mutant) diff
 
   module E : sig
-    type t = E : (full, 'mutant) diff -> t
+    type t = E : (full, 'mutant) diff -> t [@@deriving to_yojson]
 
     val to_lite : t -> Lite.E.t
   end
