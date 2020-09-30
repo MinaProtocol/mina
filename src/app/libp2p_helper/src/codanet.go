@@ -42,17 +42,17 @@ type Helper struct {
 	Rendezvous      string
 	Discovery       *discovery.RoutingDiscovery
 	Me              peer.ID
-	GaterState      *codaGaterState
+	GatingState      *codaGatingState
 }
 
 type customValidator struct {
 	Base record.Validator
 }
 
-// this type implements the ConnectionGater interface 
-// https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGater
+// this type implements the ConnectionGating interface 
+// https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
-type codaGaterState struct {
+type codaGatingState struct {
 	AddrFilters *ma.Filters
 	DeniedPeers *peer.Set
 	AllowedPeers *peer.Set
@@ -61,7 +61,7 @@ type codaGaterState struct {
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
 //
 // This is called by the network.Network implementation when dialling a peer.
-func (gs *codaGaterState) InterceptPeerDial(p peer.ID) (allow bool) {
+func (gs *codaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
 	
 	return
@@ -72,8 +72,8 @@ func (gs *codaGaterState) InterceptPeerDial(p peer.ID) (allow bool) {
 //
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
-func (gs *codaGaterState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(p)) && !gs.AddrFilters.AddrBlocked(addr)
+func (gs *codaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
+	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(addr)
 	return
 }
 
@@ -81,7 +81,7 @@ func (gs *codaGaterState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allo
 //
 // This is called by the upgrader, or by the transport directly (e.g. QUIC,
 // Bluetooth), straight after it has accepted a connection from its socket.
-func (gs *codaGaterState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *codaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
 	remoteAddr := addrs.RemoteMultiaddr()
 	allow = !gs.AddrFilters.AddrBlocked(remoteAddr)
 	return
@@ -93,7 +93,7 @@ func (gs *codaGaterState) InterceptAccept(addrs network.ConnMultiaddrs) (allow b
 // This is called by the upgrader, after it has performed the security
 // handshake, and before it negotiates the muxer, or by the directly by the
 // transport, at the exact same checkpoint.
-func (gs *codaGaterState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *codaGatingState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) (allow bool) {
 	// note: we don't care about the direction (inbound/outbound). all
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
@@ -106,10 +106,10 @@ func (gs *codaGaterState) InterceptSecured(_ network.Direction, id peer.ID, addr
 //
 // At this point, the connection a multiplexer has been selected.
 // When rejecting a connection, the gater can return a DisconnectReason.
-// Refer to the godoc on the ConnectionGater type for more information.
+// Refer to the godoc on the ConnectionGating type for more information.
 //
 // NOTE: the go-libp2p implementation currently IGNORES the disconnect reason.
-func (gs *codaGaterState) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
+func (gs *codaGatingState) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	allow = true
 	reason = control.DisconnectReason(0)
 	return
@@ -165,7 +165,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
 	kadch := make(chan *dual.DHT)
 
-	gater := codaGaterState{}
+	gater := codaGatingState{}
 
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
@@ -207,6 +207,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:      rendezvousString,
 		Discovery:       nil,
 		Me:              me,
-		GaterState:      &gater,
+		GatingState:      &gater,
 	}, nil
 }

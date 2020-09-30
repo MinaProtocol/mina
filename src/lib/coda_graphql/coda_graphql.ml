@@ -450,14 +450,6 @@ module Types = struct
               (Coda_lib.config coda).precomputed_values.constraint_constants
                 .coinbase_amount |> Currency.Amount.to_uint64 ) ] )
 
-  let connection_gating_config =
-    obj "ConnectionGatingConfig" ~fields:(fun _ ->
-        [ field "trustedPeers"
-            ~typ:(non_null (list (non_null DaemonStatus.peer)))
-            ~doc:"Peers we will always allow connections from"
-            ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} () -> []) ] )
-
   module AccountObj = struct
     module AnnotatedBalance = struct
       type t =
@@ -1228,6 +1220,20 @@ module Types = struct
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
+    let peer : ('context, Network_peer.Peer.t option) typ =
+      obj "NetworkPeer" ~fields:(fun _ ->
+          [ field "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
+          ; field "host" ~doc:"IP address of the remote host"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer ->
+                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+          ; field "libp2p_port" ~typ:(non_null int)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port) ] )
+
     let create_account : (Coda_lib.t, Account.key option) typ =
       obj "AddAccountPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
@@ -1386,6 +1392,27 @@ module Types = struct
               ~typ:public_key
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
+
+    let set_connection_gating_config =
+      obj "SetConnectionGatingConfigPayload" ~fields:(fun _ ->
+          [ field "trustedPeers"
+              ~typ:(non_null (list (non_null peer)))
+              ~doc:"Peers we will always allow connections from"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.trusted_peers)
+          ; field "bannedPeers"
+              ~typ:(non_null (list (non_null peer)))
+              ~doc:
+                "Peers we will never allow connections from (unless they are \
+                 also trusted!)"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.banned_peers)
+          ; field "isolate" ~typ:(non_null bool)
+              ~doc:
+                "If true, no connections will be allowed unless they are from \
+                 a trusted peer"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.isolate) ] )
   end
 
   module Arguments = struct
@@ -1396,6 +1423,21 @@ module Types = struct
 
   module Input = struct
     open Schema.Arg
+
+    let peer : (Network_peer.Peer.t, string) result option arg_typ =
+      obj "NetworkPeer"
+        ~doc:"Network identifiers for another protocol participant"
+        ~coerce:(fun peer_id host libp2p_port ->
+          try
+            Ok
+              Network_peer.Peer.
+                {peer_id; host= Unix.Inet_addr.of_string host; libp2p_port}
+          with _ -> Error "Invalid format for NetworkPeer.host" )
+        ~fields:
+          [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          ; arg "host" ~doc:"IP address of the remote host"
+              ~typ:(non_null string)
+          ; arg "libp2p_port" ~typ:(non_null int) ]
 
     let public_key_arg =
       scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
@@ -1710,6 +1752,28 @@ module Types = struct
                      "Time that a payment gets added to another clients \
                       transaction database") ]
     end
+
+    let set_connection_gating_config =
+      obj "SetConnectionGatingConfigInput"
+        ~coerce:(fun trusted_peers banned_peers isolate ->
+          let open Result.Let_syntax in
+          let%bind trusted_peers = Result.all trusted_peers in
+          let%map banned_peers = Result.all banned_peers in
+          Coda_net2.{isolate; trusted_peers; banned_peers} )
+        ~fields:
+          Arg.
+            [ arg "trustedPeers"
+                ~typ:(non_null (list (non_null peer)))
+                ~doc:"Peers we will always allow connections from"
+            ; arg "bannedPeers"
+                ~typ:(non_null (list (non_null peer)))
+                ~doc:
+                  "Peers we will never allow connections from (unless they \
+                   are also trusted!)"
+            ; arg "isolate" ~typ:(non_null bool)
+                ~doc:
+                  "If true, no connections will be allowed unless they are \
+                   from a trusted peer" ]
   end
 
   module Pagination = struct
@@ -2297,7 +2361,10 @@ module Mutations = struct
         Ok old_snark_worker_key )
 
   let set_snark_work_fee =
-    result_field "setSnarkWorkFee" ~doc:"Set fee that you will like to receive for doing snark work" ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)] ~typ:(non_null Types.Payload.set_snark_work_fee)
+    result_field "setSnarkWorkFee"
+      ~doc:"Set fee that you will like to receive for doing snark work"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)]
+      ~typ:(non_null Types.Payload.set_snark_work_fee)
       ~resolve:(fun {ctx= coda; _} () raw_fee ->
         let open Result.Let_syntax in
         let%map fee =
@@ -2308,15 +2375,21 @@ module Mutations = struct
         Coda_lib.set_snark_work_fee coda fee ;
         Currency.Fee.to_uint64 last_fee )
 
-  let set_connection_gating =
-    result_field "setConnectionGating"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.connection_gating_config)]
-      ~doc:"Set the connection gating config, returning the current config after the application (which may have failed)"
-      ~typ:(non_null Types.connection_gating_config)
+  let set_connection_gating_config =
+    io_field "setConnectionGatingConfig"
+      ~args:
+        Arg.
+          [arg "input" ~typ:(non_null Types.Input.set_connection_gating_config)]
+      ~doc:
+        "Set the connection gating config, returning the current config after \
+         the application (which may have failed)"
+      ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun {ctx= coda; _} () config ->
-              let%bind () = Coda_networking.set_connection_gating_config (Coda_lib.net coda) config in
-              Coda_networking.connection_gating_config (Coda_lib.net coda)
-        )
+        let open Deferred.Result.Let_syntax in
+        let%bind config = Deferred.return config in
+        let open Deferred.Let_syntax in
+        Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
+        >>| Result.return )
 
   let commands =
     [ add_wallet
@@ -2339,7 +2412,7 @@ module Mutations = struct
     ; set_staking
     ; set_snark_worker
     ; set_snark_work_fee
-    ; set_connection_gating ]
+    ; set_connection_gating_config ]
 end
 
 module Queries = struct
@@ -2714,15 +2787,17 @@ module Queries = struct
                |> Staged_ledger.ledger |> Ledger.next_available_token )
         |> Option.value ~default:Token_id.(next default) )
 
-  let connection_gating =
-    field "conneectionGating"
+  let connection_gating_config =
+    io_field "connectionGatingConfig"
       ~doc:
         "The rules that the libp2p helper will use to determine which \
          connections to permit"
       ~args:Arg.[]
-      ~typ:(non_null Types.connection_gating_config)
-      ~resulve:(fun {ctx= coda; _} _ ->
-        coda |> Coda_lib.net |> Coda_networking.connection_gating_config )
+      ~typ:(non_null Types.Payload.set_connection_gating_config)
+      ~resolve:(fun {ctx= coda; _} _ ->
+        let net = Coda_lib.net coda in
+        let%map config = Coda_networking.connection_gating_config net in
+        Ok config )
 
   let commands =
     [ sync_state
@@ -2731,7 +2806,7 @@ module Queries = struct
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
-    ; connection_gating
+    ; connection_gating_config
     ; account
     ; accounts_for_pk
     ; token_owner

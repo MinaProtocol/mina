@@ -381,13 +381,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               banned_peers=
                 List.filter !ban_configuration.banned_peers ~f:(fun p ->
                     not (Peer.equal p banned_peer) ) } ;
-          Coda_net2.configure_connection_gating net2 !ban_configuration
+          Coda_net2.set_connection_gating_config net2 !ban_configuration
           |> Deferred.ignore ) ;
         (let%bind net2 = !net2_ref in
          ban_configuration :=
            { !ban_configuration with
              banned_peers= banned_peer :: !ban_configuration.banned_peers } ;
-         Coda_net2.configure_connection_gating net2 !ban_configuration)
+         Coda_net2.set_connection_gating_config net2 !ban_configuration)
         |> Deferred.ignore
       in
       let%map () =
@@ -566,11 +566,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let connection_gating t =
       let%bind net2 = !(t.net2) in
-      Coda_net2.connection_gating net2
+      Coda_net2.connection_gating_config net2
 
     let set_connection_gating t config =
       let%bind net2 = !(t.net2) in
-      Coda_net2.configure_connection_gating net2 config
+      Coda_net2.set_connection_gating_config net2 config
   end
 
   include T

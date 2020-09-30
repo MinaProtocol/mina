@@ -27,7 +27,7 @@ var (
 		"beginAdvertising":    beginAdvertising,
 		"findPeer":            findPeer,
 		"listPeers":           listPeers,
-		"setGaterConfig":      setGaterConfig,
+		"setGatingConfig":     setGatingConfig,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -49,7 +49,7 @@ var (
 		beginAdvertising:    "beginAdvertising",
 		findPeer:            "findPeer",
 		listPeers:           "listPeers",
-		setGaterConfig:      "setGaterConfig",
+		setGatingConfig:     "setGatingConfig",
 	}
 )
 
@@ -75,7 +75,7 @@ func init() {
 			interface{}(beginAdvertising).(fmt.Stringer).String():    beginAdvertising,
 			interface{}(findPeer).(fmt.Stringer).String():            findPeer,
 			interface{}(listPeers).(fmt.Stringer).String():           listPeers,
-			interface{}(setGaterConfig).(fmt.Stringer).String():      setGaterConfig,
+			interface{}(setGatingConfig).(fmt.Stringer).String():     setGatingConfig,
 		}
 	}
 }

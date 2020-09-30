@@ -225,7 +225,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let set_connection_gating t config =
       t.connection_gating := config ;
-      Deferred.unit
+      Deferred.return config
   end
 
   type network = Network.t

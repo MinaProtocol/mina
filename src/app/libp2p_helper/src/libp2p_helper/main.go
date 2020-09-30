@@ -86,7 +86,7 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
-	setGaterConfig
+	setGatingConfig
 )
 
 const validationTimeout = 5 * time.Minute
@@ -969,7 +969,7 @@ type unbanIPMsg struct {
 	IP string `json:"ip"`
 }
 
-type setGaterConfigMsg struct {
+type setGatingConfigMsg struct {
 	BannedIPs     []string `json:"banned_ips"`
 	BannedPeerIDs []string `json:"banned_peers"`
 	TrustedPeerIDs []string `json:"trusted_peers"`
@@ -977,7 +977,7 @@ type setGaterConfigMsg struct {
 	Isolate       bool     `json:"isolate"`
 }
 
-func (gc *setGaterConfigMsg) run(app *app) (interface{}, error) {
+func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	newFilter := ma.NewFilters()
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
@@ -1008,8 +1008,8 @@ func (gc *setGaterConfigMsg) run(app *app) (interface{}, error) {
 		bannedPeers.Add(id)
 	}
 
-	app.P2p.GaterState.AddrFilters = newFilter
-	app.P2p.GaterState.DeniedPeers = bannedPeers
+	app.P2p.GatingState.AddrFilters = newFilter
+	app.P2p.GatingState.DeniedPeers = bannedPeers
 
 	return "ok", nil
 }
@@ -1033,7 +1033,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
-	setGaterConfig:      func() action { return &setGaterConfigMsg{} },
+	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
 }
 
 type errorResult struct {

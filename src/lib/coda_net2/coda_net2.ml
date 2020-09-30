@@ -377,7 +377,7 @@ module Helper = struct
 
       type output = string [@@deriving yojson]
 
-      let name = "setGaterConfig"
+      let name = "setGatingConfig"
     end
   end
 
@@ -1276,9 +1276,9 @@ let begin_advertising net =
 
 let lookup_peerid = Helper.lookup_peerid
 
-let connection_gating net = Deferred.return net.Helper.connection_gating
+let connection_gating_config net = Deferred.return net.Helper.connection_gating
 
-let configure_connection_gating net (config : connection_gating) =
+let set_connection_gating_config net (config : connection_gating) =
   match%map
     Helper.(
       do_rpc net
@@ -1297,11 +1297,11 @@ let configure_connection_gating net (config : connection_gating) =
   with
   | Ok "ok" ->
       net.connection_gating <- config ;
-      ()
+      config
   | Ok v ->
-      failwithf "helper broke RPC protocol: setGaterConfig got %s" v ()
+      failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      failwithf "unexpected error doing setGaterConfig: %s"
+      failwithf "unexpected error doing setGatingConfig: %s"
         (Error.to_string_hum e) ()
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
