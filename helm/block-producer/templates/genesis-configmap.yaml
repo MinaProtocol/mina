@@ -1,0 +1,12 @@
+{{ if (ne $.Values.coda.runtimeConfig "") -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: block-producer-daemon-config
+  labels:
+    app: block-producer
+    heritage: {{ $.Release.Service }}
+    release: {{ $.Release.Name }}
+data:
+  daemon.json: {{ $.Values.coda.runtimeConfig | quote }}
+{{- end }}
