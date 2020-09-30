@@ -551,6 +551,12 @@ struct
       (*Remove any expired user commands*)
       let expired_commands, pool = Indexed_pool.remove_expired t.pool in
       Sequence.iter expired_commands ~f:(fun cmd ->
+          [%log' debug t.logger]
+            "Dropping expired user command from the pool $cmd"
+            ~metadata:
+              [ ( "cmd"
+                , Transaction_hash.User_command_with_valid_signature.to_yojson
+                    cmd ) ] ;
           Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
       ) ;
       t.pool <- pool ;
@@ -1159,7 +1165,7 @@ let%test_module _ =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let logger = Logger.null ()
+    let consensus_constants = precomputed_values.consensus_constants
 
     let logger = Logger.null ()
 

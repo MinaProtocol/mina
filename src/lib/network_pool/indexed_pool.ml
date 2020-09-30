@@ -19,6 +19,7 @@ let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
    * Iff a command is at the head of its sender's queue it is also in
      applicable_by_fee.
    * Sequences in all_by_sender are ordered by nonce and "dense".
+   * Only commands with an expiration <> Global_slot.max_value is added to transactions_with_expiration.
    * There are no empty sets or sequences.
    * Fee indices are correct.
    * Total currency required is correct.
@@ -45,6 +46,11 @@ type t =
   ; all_by_hash:
       Transaction_hash.User_command_with_valid_signature.t
       Transaction_hash.Map.t
+  ; transactions_with_expiration:
+      Transaction_hash.User_command_with_valid_signature.t Account_nonce.Map.t
+      Account_id.Map.t
+      Global_slot.Map.t
+        (*All the transactions that have an expiry categorized by expiration and sender*)
   ; size: int
   ; constraint_constants: Genesis_constants.Constraint_constants.t
   ; consensus_constants: Consensus.Constants.t
@@ -281,6 +287,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
   ; all_by_hash= Transaction_hash.Map.empty
+  ; transactions_with_expiration= Global_slot.Map.empty
   ; size= 0
   ; constraint_constants
   ; consensus_constants
@@ -332,6 +339,64 @@ let check_expiry ~consensus_constants ~time_controller (cmd : User_command.t) =
          (`Valid_until valid_until, `Current_global_slot current_global_slot))
   else Ok ()
 
+let update_expiration_map expiration_map cmd op =
+  let user_cmd =
+    Transaction_hash.User_command_with_valid_signature.command cmd
+  in
+  let expiry = User_command.valid_until user_cmd in
+  if Global_slot.(expiry <> max_value) then
+    let account_id = User_command.fee_payer user_cmd in
+    let nonce = User_command.nonce_exn user_cmd in
+    let add_or_fail map ~key ~data =
+      match op with
+      | `Add ->
+          Some (Map.add_exn map ~key ~data)
+      | `Del ->
+          failwith "transaction with expiry not found in the expiration map"
+    in
+    Map.change expiration_map expiry ~f:(fun sender_map_opt ->
+        match sender_map_opt with
+        | None ->
+            add_or_fail
+              (Map.empty (module Account_id))
+              ~key:account_id
+              ~data:(Map.singleton (module Account_nonce) nonce cmd)
+        | Some sender_map ->
+            let sender_map' =
+              Map.change sender_map account_id ~f:(fun nonce_map_opt ->
+                  match nonce_map_opt with
+                  | None ->
+                      add_or_fail
+                        (Map.empty (module Account_nonce))
+                        ~key:nonce ~data:cmd
+                  | Some nonce_map -> (
+                    match op with
+                    | `Add ->
+                        Some (Map.add_exn nonce_map ~key:nonce ~data:cmd)
+                    | `Del -> (
+                      match Map.find nonce_map nonce with
+                      | None ->
+                          failwith
+                            "transaction with expiry not found in the \
+                             expiration map"
+                      | Some cmd' ->
+                          [%test_eq:
+                            Transaction_hash.User_command_with_valid_signature
+                            .t] cmd' cmd ;
+                          let nonce_map' = Map.remove nonce_map nonce in
+                          if Map.is_empty nonce_map' then None
+                          else Some nonce_map' ) ) )
+            in
+            if Map.is_empty sender_map' then None else Some sender_map' )
+  else expiration_map
+
+(* a cmd is in the transactions_with_expiration map only if it has an expiry*)
+let remove_from_expiration_exn expiration_map cmd =
+  update_expiration_map expiration_map cmd `Del
+
+let add_to_expiration expiration_map cmd =
+  update_expiration_map expiration_map cmd `Add
+
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
 let remove_applicable_exn :
@@ -345,7 +410,7 @@ let remove_applicable_exn :
 
 (* Remove a command from the all_by_fee and all_by_hash fields, and decrement
    size. This may break an invariant. *)
-let remove_all_by_fee_and_hash_exn :
+let remove_all_by_fee_and_hash_and_expiration_exn :
     t -> Transaction_hash.User_command_with_valid_signature.t -> t =
  fun t cmd ->
   let fee =
@@ -357,6 +422,8 @@ let remove_all_by_fee_and_hash_exn :
   ; all_by_hash=
       Map.remove t.all_by_hash
         (Transaction_hash.User_command_with_valid_signature.hash cmd)
+  ; transactions_with_expiration=
+      remove_from_expiration_exn t.transactions_with_expiration cmd
   ; size= t.size - 1 }
 
 (* Remove a given command from the pool, as well as any commands that depend on
@@ -400,7 +467,7 @@ let remove_with_dependents_exn :
   in
   let t' =
     F_sequence.foldl
-      (fun acc cmd' -> remove_all_by_fee_and_hash_exn acc cmd')
+      (fun acc cmd' -> remove_all_by_fee_and_hash_and_expiration_exn acc cmd')
       t drop_queue
   in
   ( F_sequence.to_seq drop_queue
@@ -504,10 +571,10 @@ let revalidate :
             let t'' =
               Sequence.fold tail
                 ~init:
-                  (remove_all_by_fee_and_hash_exn
+                  (remove_all_by_fee_and_hash_and_expiration_exn
                      (remove_applicable_exn t' head)
                      head)
-                ~f:remove_all_by_fee_and_hash_exn
+                ~f:remove_all_by_fee_and_hash_and_expiration_exn
             in
             ( { t'' with
                 all_by_sender=
@@ -517,26 +584,35 @@ let revalidate :
 
 let remove_expired t :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
-  Map.fold t.all_by_sender ~init:(Sequence.empty, t)
-    ~f:(fun ~key:_ ~data:(queue, _) acc ->
-      match
-        F_sequence.find queue ~f:(fun cmd ->
-            match
-              check_expiry ~consensus_constants:t.consensus_constants
-                ~time_controller:t.time_controller
-                (Transaction_hash.User_command_with_valid_signature.command cmd)
-            with
-            | Error (Expired _) ->
-                true
-            | _ ->
-                false )
-      with
-      | None ->
-          acc
-      | Some expired_cmd ->
-          let dropped_acc, t = acc in
-          let removed, t' = remove_with_dependents_exn t expired_cmd in
-          (Sequence.append dropped_acc removed, t') )
+  let current_global_slot =
+    current_global_slot ~time_controller:t.time_controller
+      t.consensus_constants
+  in
+  let expired, _, _ =
+    Map.split t.transactions_with_expiration current_global_slot
+  in
+  (*get the earliest command per sender so that all the dependents can be removed without breaking any constraints*)
+  let earliest_cmds = Account_id.Table.create () in
+  Map.iter expired ~f:(fun sender_map ->
+      Map.iteri sender_map ~f:(fun ~key:fee_payer ~data:nonce_map ->
+          Option.value_map ~default:() (Map.min_elt nonce_map)
+            ~f:(fun (nonce, cmd) ->
+              match Hashtbl.find earliest_cmds fee_payer with
+              | None ->
+                  Hashtbl.set earliest_cmds ~key:fee_payer ~data:cmd
+              | Some cmd' ->
+                  let nonce' =
+                    Transaction_hash.User_command_with_valid_signature.command
+                      cmd'
+                    |> User_command.nonce_exn
+                  in
+                  if Account_nonce.(nonce < nonce') then
+                    Hashtbl.set earliest_cmds ~key:fee_payer ~data:cmd ) ) ) ;
+  List.fold (Hashtbl.data earliest_cmds) ~init:(Sequence.empty, t)
+    ~f:(fun acc cmd ->
+      let dropped_acc, t = acc in
+      let removed, t' = remove_with_dependents_exn t cmd in
+      (Sequence.append dropped_acc removed, t') )
 
 let handle_committed_txn :
        t
@@ -583,7 +659,7 @@ let handle_committed_txn :
         let t1 =
           t
           |> Fn.flip remove_applicable_exn first_cmd
-          |> Fn.flip remove_all_by_fee_and_hash_exn first_cmd
+          |> Fn.flip remove_all_by_fee_and_hash_and_expiration_exn first_cmd
         in
         let new_queued_cmds, currency_reserved'', dropped_cmds =
           drop_until_sufficient_balance ~constraint_constants
@@ -591,7 +667,8 @@ let handle_committed_txn :
             fee_payer_balance
         in
         let t2 =
-          Sequence.fold dropped_cmds ~init:t1 ~f:remove_all_by_fee_and_hash_exn
+          Sequence.fold dropped_cmds ~init:t1
+            ~f:remove_all_by_fee_and_hash_and_expiration_exn
         in
         let set_all_by_sender account_id commands currency_reserved t =
           match F_sequence.uncons commands with
@@ -719,6 +796,8 @@ let rec add_from_gossip_exn :
                 ~key:
                   (Transaction_hash.User_command_with_valid_signature.hash cmd)
                 ~data:cmd
+          ; transactions_with_expiration=
+              add_to_expiration t.transactions_with_expiration cmd
           ; size= t.size + 1
           ; constraint_constants
           ; consensus_constants
@@ -760,6 +839,8 @@ let rec add_from_gossip_exn :
                     (Transaction_hash.User_command_with_valid_signature.hash
                        cmd)
                   ~data:cmd
+            ; transactions_with_expiration=
+                add_to_expiration t.transactions_with_expiration cmd
             ; size= t.size + 1 }
           , Sequence.empty )
       else
@@ -870,6 +951,8 @@ let add_from_backtrack :
           Map_set.insert
             (module Transaction_hash.User_command_with_valid_signature)
             t.applicable_by_fee fee cmd
+      ; transactions_with_expiration=
+          add_to_expiration t.transactions_with_expiration cmd
       ; size= t.size + 1
       ; constraint_constants
       ; consensus_constants
@@ -910,6 +993,8 @@ let add_from_backtrack :
               ( F_sequence.cons cmd queue
               , Option.value_exn Currency.Amount.(currency_reserved + consumed)
               )
+      ; transactions_with_expiration=
+          add_to_expiration t.transactions_with_expiration cmd
       ; size= t.size + 1
       ; constraint_constants
       ; consensus_constants
