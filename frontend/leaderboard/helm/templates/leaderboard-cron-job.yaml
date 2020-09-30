@@ -1,0 +1,27 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ .Values.leaderboard.name }}
+spec:
+  schedule: "{{ .Values.leaderboard.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          volumes:
+            - name: {{ .Values.volume.name }}
+              secret:
+                secretName: {{ .Values.volume.secretName }}
+          containers:
+            - name: {{ .Values.leaderboard.containerName }}
+              image: {{ .Values.leaderboard.image }}
+              imagePullPolicy: Always
+              env:
+                - name: PGCONN
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
+              volumeMounts:
+                - name: {{ .Values.volume.name }}
+                  mountPath: {{ .Values.volume.mountPath }}
+                  subPath: {{ .Values.volume.subPath }}
+                  readOnly: true

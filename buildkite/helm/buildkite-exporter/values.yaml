@@ -1,0 +1,10 @@
+exporter:
+  pipeline: coda
+  name: "buildkite-{{ .Values.exporter.pipeline }}-exporter"
+  image: codaprotocol/buildkite-exporter:0.1.0
+  listeningPort: 8000
+  optionalEnv:
+#  - name: BUILDKITE_EXPORTER_SCAN_INTERVAL
+#    value: 1800
+#  - name: BUILDKITE_BRANCH
+#    value: develop
