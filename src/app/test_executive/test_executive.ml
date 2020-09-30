@@ -20,9 +20,8 @@ let engines : engine list =
 let tests : test list =
   [ ( "block-production"
     , (module Block_production_test.Make : Test_functor_intf) )
+  ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf))
   ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
-
-let to_or_error = Deferred.map ~f:Or_error.return
 
 let report_test_errors error_set =
   let open Test_error in
@@ -141,7 +140,7 @@ let main inputs =
         let open Malleable_error.Let_syntax in
         let%bind net_manager =
           Deferred.bind ~f:Malleable_error.return
-            (Engine.Network_manager.create network_config)
+            (Engine.Network_manager.create ~logger network_config)
         in
         net_manager_ref := Some net_manager ;
         let%bind network =
