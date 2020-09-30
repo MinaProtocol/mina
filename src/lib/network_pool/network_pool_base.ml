@@ -28,9 +28,10 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t
-      ( (pool_diff : Resource_pool.Diff.verified Envelope.Incoming.t)
+      ( (diff : Resource_pool.Diff.verified Envelope.Incoming.t)
       , valid_cb
       , result_cb ) =
+    let open Envelope.Incoming in
     let rebroadcast (diff', rejected) =
       result_cb (Ok (diff', rejected)) ;
       if Resource_pool.Diff.is_empty diff' then (
@@ -38,13 +39,20 @@ end)
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
         valid_cb `Ignore ;
         Deferred.unit )
+      else if
+        Resource_pool.Diff.verified_size diff.data
+        = Resource_pool.Diff.size diff'
+      then (
+        [%log' trace t.logger] "Rebroadcasting diff" ;
+        valid_cb `Accept ;
+        Deferred.unit )
       else (
         [%log' trace t.logger] "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
-        valid_cb `Accept ;
+        valid_cb `Ignore ;
         Linear_pipe.write t.write_broadcasts diff' )
     in
-    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
     | Ok res ->
         rebroadcast res
     | Error (`Locally_generated res) ->
