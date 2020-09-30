@@ -8,6 +8,23 @@ open Core
 open Coda_base
 open Coda_numbers
 
+module Command_error : sig
+  type t =
+    | Invalid_nonce of
+        [ `Expected of Account.Nonce.t
+        | `Between of Account.Nonce.t * Account.Nonce.t ]
+        * Account.Nonce.t
+    | Insufficient_funds of [`Balance of Currency.Amount.t] * Currency.Amount.t
+    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
+          each other that way! *)
+        Insufficient_replace_fee of
+        [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
+    | Overflow
+    | Bad_token
+    | Unwanted_fee_token of Token_id.t
+  [@@deriving sexp_of, to_yojson]
+end
+
 val replace_fee : Currency.Fee.t
 
 (** Transaction pool. This is a purely functional data structure. *)
@@ -64,19 +81,7 @@ val add_from_gossip_exn :
   -> Account_nonce.t
   -> Currency.Amount.t
   -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-     , [> `Invalid_nonce of
-          [ `Expected of Account.Nonce.t
-          | `Between of Account.Nonce.t * Account.Nonce.t ]
-          * Account.Nonce.t
-       | `Insufficient_funds of
-         [`Balance of Currency.Amount.t] * Currency.Amount.t
-       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
-          each other that way! *)
-         `Insufficient_replace_fee of
-         [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-       | `Overflow
-       | `Bad_token
-       | `Unwanted_fee_token of Token_id.t ] )
+     , Command_error.t )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
     be empty unless we're replacing one. *)
