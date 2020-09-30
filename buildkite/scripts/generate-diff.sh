@@ -15,7 +15,7 @@ if [[ $COMMIT != "" ]]; then
 else
   if [ -n "${BUILDKITE_INCREMENTAL+x}" ]; then
     # TODO: remove (temporarily install network tooling)
-    sudo apt-get install --yes curl jq
+    apt-get install --yes curl jq
 
     # base DIFF on last successful Buildkite `develop` RUN
     ci_recent_pass_commit=$(
