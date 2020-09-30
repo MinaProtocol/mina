@@ -11,7 +11,6 @@ COMMIT=$(diff -u <(git rev-list --first-parent HEAD) \
 
 if [[ $COMMIT != "" ]]; then
   # Get the files that have changed since that shared commit
-  echo "--- Generating diff based on shared commit: ${COMMIT}"
   git diff $COMMIT --name-only
 else
   if [ -n "${BUILDKITE_INCREMENTAL+x}" ]; then
@@ -22,7 +21,6 @@ else
       | jq '.data.pipeline.builds.edges[0].node.commit' | tr -d '"'
     )
 
-    echo "--- Generating incremental diff against: ${ci_recent_pass_commit}"
     git diff "${ci_recent_pass_commit}" --name-only
   else
     # TODO: Dump commits as artifacts when build succeeds so we can diff against
@@ -30,4 +28,3 @@ else
     git ls-files
   fi
 fi
-
