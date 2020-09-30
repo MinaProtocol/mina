@@ -25,7 +25,7 @@ details and links to the failures.
 
 Where you have a bugfix for failing CI, or are seeing a CI failure across
 multiple PRs, the best people to contact are:
-* @bkase (bkase#2492 on discord) (US East Coast)
+* @bkase (bkase#2492 on discord) (Europe - misc.)
 * @lk86 (linuskrom#2287 on discord) (US West Coast)
 * @OxO1 (awilson#6424 on discord) (US West Coast)
 * @mrmr1993 (matthew#4797 on discord) (UK)
