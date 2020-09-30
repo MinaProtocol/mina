@@ -103,14 +103,14 @@ module SingleRow = {
         width(`percent(100.)),
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
-        top(`zero),
+        bottom(`zero),
         media(
           Theme.MediaQuery.tablet,
-          [height(`percent(80.)), width(`percent(80.))],
+          [width(`percent(80.))],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [height(`percent(80.)), width(`percent(100.))],
+          [width(`percent(100.))],
         ),
       ]);
   };
@@ -135,7 +135,7 @@ module SingleRow = {
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [right(`zero), width(`rem(29.))],
+              [bottom(`zero), top(`inherit_), right(`zero), width(`rem(29.))],
             ),
           ]),
         ]);

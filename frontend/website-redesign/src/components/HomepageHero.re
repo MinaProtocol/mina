@@ -2,11 +2,12 @@ module Styles = {
   open Css;
   let heroBackgroundImage = backgroundImg =>
     style([
-      height(`rem(100.)),
+      minHeight(`vh(200.)),
       width(`percent(100.)),
       position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
+      media(Theme.MediaQuery.tablet, [height(`auto)]),
       media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
       after([
@@ -42,12 +43,20 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(12.))]),
+      marginBottom(`rem(12.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginTop(`rem(12.))],
+      ),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
 
   let heroHeadlineContainr =
-    style([height(`vh(100.)), minHeight(`rem(32.)), position(`relative)]);
+    style([
+      height(`vh(100.)),
+      minHeight(`rem(32.)),
+      position(`relative),
+    ]);
 
   let heroHeadline =
     merge([

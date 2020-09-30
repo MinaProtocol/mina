@@ -21,6 +21,9 @@ include Frontier_intf.S
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
 
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event]
+
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
  * frontier as long as the `For_tests.load_with_max_length` is not used *)

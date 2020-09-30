@@ -366,32 +366,32 @@ module Projects = {
           <Possibility
             title="Build Snapps: Privacy-Enabled apps"
             description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users' data to a public blockchain."
-            image="/static/img/tech-build-snapps.png"
+            image="/static/img/tech-build-snapps.svg"
           />
           <Possibility
             title="Power Enterprise Interoperability"
             description="Use Mina to combine the cost-efficiency and privacy of a private chain with the interoperability of a public chain."
-            image="/static/img/tech-power-interop.png"
+            image="/static/img/tech-power-interop.svg"
           />
           <Possibility
             title="Minimize Transaction Fees"
             description="Power trustless e-commerce and global peer-to-peer transactions without using centralized intermediaries, or paying costly transaction fees."
-            image="/static/img/tech-txn-fees.png"
+            image="/static/img/tech-txn-fees.svg"
           />
           <Possibility
             title="Power secure & Fair Financial services"
             description="Ensure lenders only use fair criteria to make decisions and securely verify relevant information without accessing  private user data."
-            image="/static/img/tech-power-fair.png"
+            image="/static/img/tech-power-fair.svg"
           />
           <Possibility
             title="Enable private & auditable elections "
             description="Guarantee fully verifiable and auditable elections, while keeping the process private and  protecting individuals' voting information. "
-            image="/static/img/tech-audit.png"
+            image="/static/img/tech-audit.svg"
           />
           <Possibility
             title="Access Money from Anywhere in the world"
             description="With a 22kb Mina chain, access peer-to-peer stablecoins and tokens via smartphone and bring hard-earned money anywhere you go."
-            image="/static/img/tech-access.png"
+            image="/static/img/tech-access.svg"
           />
         </div>
       </Section>
