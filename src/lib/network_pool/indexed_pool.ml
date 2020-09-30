@@ -47,10 +47,9 @@ type t =
       Transaction_hash.User_command_with_valid_signature.t
       Transaction_hash.Map.t
   ; transactions_with_expiration:
-      Transaction_hash.User_command_with_valid_signature.t Account_nonce.Map.t
-      Account_id.Map.t
+      Transaction_hash.User_command_with_valid_signature.Set.t
       Global_slot.Map.t
-        (*All the transactions that have an expiry categorized by expiration and sender*)
+        (*Only transactions that have an expiry*)
   ; size: int
   ; constraint_constants: Genesis_constants.Constraint_constants.t
   ; consensus_constants: Consensus.Constants.t
@@ -339,58 +338,22 @@ let check_expiry ~consensus_constants ~time_controller (cmd : User_command.t) =
          (`Valid_until valid_until, `Current_global_slot current_global_slot))
   else Ok ()
 
+(* a cmd is in the transactions_with_expiration map only if it has an expiry*)
 let update_expiration_map expiration_map cmd op =
   let user_cmd =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
   let expiry = User_command.valid_until user_cmd in
   if Global_slot.(expiry <> max_value) then
-    let account_id = User_command.fee_payer user_cmd in
-    let nonce = User_command.nonce_exn user_cmd in
-    let add_or_fail map ~key ~data =
-      match op with
-      | `Add ->
-          Some (Map.add_exn map ~key ~data)
-      | `Del ->
-          failwith "transaction with expiry not found in the expiration map"
-    in
-    Map.change expiration_map expiry ~f:(fun sender_map_opt ->
-        match sender_map_opt with
-        | None ->
-            add_or_fail
-              (Map.empty (module Account_id))
-              ~key:account_id
-              ~data:(Map.singleton (module Account_nonce) nonce cmd)
-        | Some sender_map ->
-            let sender_map' =
-              Map.change sender_map account_id ~f:(fun nonce_map_opt ->
-                  match nonce_map_opt with
-                  | None ->
-                      add_or_fail
-                        (Map.empty (module Account_nonce))
-                        ~key:nonce ~data:cmd
-                  | Some nonce_map -> (
-                    match op with
-                    | `Add ->
-                        Some (Map.add_exn nonce_map ~key:nonce ~data:cmd)
-                    | `Del -> (
-                      match Map.find nonce_map nonce with
-                      | None ->
-                          failwith
-                            "transaction with expiry not found in the \
-                             expiration map"
-                      | Some cmd' ->
-                          [%test_eq:
-                            Transaction_hash.User_command_with_valid_signature
-                            .t] cmd' cmd ;
-                          let nonce_map' = Map.remove nonce_map nonce in
-                          if Map.is_empty nonce_map' then None
-                          else Some nonce_map' ) ) )
-            in
-            if Map.is_empty sender_map' then None else Some sender_map' )
+    match op with
+    | `Add ->
+        Map_set.insert
+          (module Transaction_hash.User_command_with_valid_signature)
+          expiration_map expiry cmd
+    | `Del ->
+        Map_set.remove_exn expiration_map expiry cmd
   else expiration_map
 
-(* a cmd is in the transactions_with_expiration map only if it has an expiry*)
 let remove_from_expiration_exn expiration_map cmd =
   update_expiration_map expiration_map cmd `Del
 
@@ -591,28 +554,14 @@ let remove_expired t :
   let expired, _, _ =
     Map.split t.transactions_with_expiration current_global_slot
   in
-  (*get the earliest command per sender so that all the dependents can be removed without breaking any constraints*)
-  let earliest_cmds = Account_id.Table.create () in
-  Map.iter expired ~f:(fun sender_map ->
-      Map.iteri sender_map ~f:(fun ~key:fee_payer ~data:nonce_map ->
-          Option.value_map ~default:() (Map.min_elt nonce_map)
-            ~f:(fun (nonce, cmd) ->
-              match Hashtbl.find earliest_cmds fee_payer with
-              | None ->
-                  Hashtbl.set earliest_cmds ~key:fee_payer ~data:cmd
-              | Some cmd' ->
-                  let nonce' =
-                    Transaction_hash.User_command_with_valid_signature.command
-                      cmd'
-                    |> User_command.nonce_exn
-                  in
-                  if Account_nonce.(nonce < nonce') then
-                    Hashtbl.set earliest_cmds ~key:fee_payer ~data:cmd ) ) ) ;
-  List.fold (Hashtbl.data earliest_cmds) ~init:(Sequence.empty, t)
-    ~f:(fun acc cmd ->
-      let dropped_acc, t = acc in
-      let removed, t' = remove_with_dependents_exn t cmd in
-      (Sequence.append dropped_acc removed, t') )
+  Map.fold expired ~init:(Sequence.empty, t) ~f:(fun ~key:_ ~data:cmds acc ->
+      Set.fold cmds ~init:acc ~f:(fun acc' cmd ->
+          let dropped_acc, t = acc' in
+          (*[cmd] would not be in [t] if it depended on an expired transaction already handled*)
+          if member t cmd then
+            let removed, t' = remove_with_dependents_exn t cmd in
+            (Sequence.append dropped_acc removed, t')
+          else acc' ) )
 
 let handle_committed_txn :
        t
