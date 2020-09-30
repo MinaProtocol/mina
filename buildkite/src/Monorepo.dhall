@@ -51,7 +51,8 @@ in Pipeline.build Pipeline.Config::{
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,
-      docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = None Docker.Type,
+      artifact_paths = [ S.contains "_computed_diff.txt" ]
     }
   ]
 }
