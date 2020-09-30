@@ -47,6 +47,8 @@ module Make (Field : Zexe_backend.Field.S) = struct
         include Inputs.Field
 
         let high_entropy_bits = high_entropy_bits
+
+        let finalize_discarded = ignore
       end)
       (Inputs.Field)
       (Field)

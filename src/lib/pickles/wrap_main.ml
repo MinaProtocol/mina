@@ -106,11 +106,8 @@ module Old_bulletproof_chals = struct
 end
 
 let pack_statement max_branching =
-  let pack_fq (x : Field.t) =
-    let low_bits, high_bit =
-      Util.split_last
-        (Bitstring_lib.Bitstring.Lsb_first.to_list (Field.unpack_full x))
-    in
+  let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
+    let low_bits, high_bit = Util.split_last (Unsafe.unpack_unboolean x) in
     [|low_bits; [high_bit]|]
   in
   fun t ->
@@ -142,7 +139,17 @@ let wrap_main
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
     (max_branching, max_local_max_branchings) Requests.Wrap.t
-    * (   (_, _, _, _, _, _, _, _, _, _) Types.Dlog_based.Statement.In_circuit.t
+    * (   ( _
+          , _
+          , _ Shifted_value.t
+          , _
+          , _
+          , _
+          , _
+          , _
+          , _
+          , _ )
+          Types.Dlog_based.Statement.In_circuit.t
        -> unit) =
   Timer.clock __LOC__ ;
   let wrap_domains =
@@ -175,11 +182,23 @@ let wrap_main
            ; me_only= me_only_digest
            ; was_base_case }
        ; pass_through } :
-        _ Types.Dlog_based.Statement.In_circuit.t) =
+        ( _
+        , _
+        , _ Shifted_value.t
+        , _
+        , _
+        , _
+        , _
+        , _
+        , _
+        , _ )
+        Types.Dlog_based.Statement.In_circuit.t) =
     let which_branch = One_hot_vector.of_index which_branch ~length:branches in
     let prev_proof_state =
       let open Types.Pairing_based.Proof_state in
-      let typ = typ (module Impl) Max_branching.n Field.typ in
+      let typ =
+        typ (module Impl) Max_branching.n (Shifted_value.typ Field.typ)
+      in
       exists typ ~request:(fun () -> Req.Proof_state)
     in
     let pairing_plonk_index =
@@ -336,8 +355,26 @@ let wrap_main
       ; proof_state= prev_proof_state }
     in
     let openings_proof =
+      let shift = Shifts.tick in
       exists
-        (Dlog_plonk_types.Openings.Bulletproof.typ Other_field.Packed.typ
+        (Dlog_plonk_types.Openings.Bulletproof.typ
+           ( Typ.transport Other_field.Packed.typ
+               ~there:(fun x ->
+                 (* When storing, make it a shifted value *)
+                 match
+                   Shifted_value.of_field (module Backend.Tick.Field) ~shift x
+                 with
+                 | Shifted_value x ->
+                     x )
+               ~back:(fun x ->
+                 Shifted_value.to_field
+                   (module Backend.Tick.Field)
+                   ~shift (Shifted_value x) )
+           (* When reading, unshift *)
+           |> Typ.transport_var
+              (* For the var, we just wrap the now shifted underlying value. *)
+                ~there:(fun (Shifted_value.Shifted_value x) -> x)
+                ~back:(fun x -> Shifted_value x) )
            Inner_curve.typ
            ~length:(Nat.to_int Backend.Tick.Rounds.n))
         ~request:(fun () -> Req.Openings_proof)
@@ -375,9 +412,9 @@ let wrap_main
           (Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit
            .map_fields
              plonk
-             (* TODO: Don't use a boolean-constraining unpacking function. It's not
+             (* We don't use a boolean-constraining unpacking function. It's not
    necessary with PLONK. *)
-             ~f:Other_field.Packed.to_bits)
+             ~f:(Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe))
     in
     Boolean.Assert.is_true bulletproof_success ;
     Field.Assert.equal me_only_digest

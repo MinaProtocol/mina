@@ -64,6 +64,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ~scalar:sc statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
+        let alpha = sc plonk0.alpha in
         let step_domains = key.step_domains.(Index.to_int which_branch) in
         let w =
           Tick.Field.domain_generator
@@ -75,7 +76,7 @@ let verify_heterogenous (ts : Instance.t list) =
           let p =
             Marlin_checks.derive_plonk
               (module Tick.Field)
-              ~endo:Endo.Dee.base
+              ~endo:Endo.Dee.base ~shift:Shifts.tick
               ~domain:
                 (* TODO: Cache the shifts and domain_generator *)
                 (Marlin_checks.domain
@@ -83,10 +84,7 @@ let verify_heterogenous (ts : Instance.t list) =
                    step_domains.h
                    ~shifts:Backend.Tick.B.Field_verifier_index.shifts
                    ~domain_generator:Backend.Tick.Field.domain_generator)
-              { zeta
-              ; beta= chal plonk0.beta
-              ; gamma= chal plonk0.gamma
-              ; alpha= chal plonk0.alpha }
+              {zeta; beta= chal plonk0.beta; gamma= chal plonk0.gamma; alpha}
               (Marlin_checks.evals_of_split_evals
                  (module Tick.Field)
                  evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
@@ -172,7 +170,9 @@ let verify_heterogenous (ts : Instance.t list) =
    anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , combined_inner_product
+            , Shifted_value.to_field
+                (module Tick.Field)
+                combined_inner_product ~shift:Shifts.tick
             , combined_inner_product_actual ) ] ;
         plonk )
   in

@@ -71,7 +71,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let scalar_challenge f t = Pickles_types.Scalar_challenge.create (field f t)
 
-  let alpha = field alpha
+  let alpha = scalar_challenge alpha
 
   let beta = field beta
 

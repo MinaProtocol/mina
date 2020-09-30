@@ -198,7 +198,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let sponge_digest_before_evaluations = O.digest_before_evaluations o in
     let plonk0 =
       { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
-          O.alpha o
+          scalar_chal O.alpha
       ; beta= O.beta o
       ; gamma= O.gamma o
       ; zeta= scalar_chal O.zeta }
@@ -214,6 +214,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       let xi = to_field xi
 
       let zeta = to_field plonk0.zeta
+
+      let alpha = to_field plonk0.alpha
     end in
     let domain, w =
       Tweedle.Dum_based_plonk.B.Field_verifier_index.
@@ -266,31 +268,34 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let plonk =
       Marlin_checks.derive_plonk
         (module Tick.Field)
-        ~endo:Endo.Dee.base
+        ~shift:Shifts.tick ~endo:Endo.Dee.base
         ~domain:
           (Marlin_checks.domain
              (module Tick.Field)
              domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
              ~domain_generator:Backend.Tick.Field.domain_generator)
-        {plonk0 with zeta= As_field.zeta}
+        {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
         (Marlin_checks.evals_of_split_evals
            (module Tick.Field)
            proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
            ~zeta:As_field.zeta ~zetaw)
     in
+    let shift_value =
+      Shifted_value.of_field (module Tick.Field) ~shift:Shifts.tick
+    in
     { proof_state=
         { deferred_values=
             { xi
-            ; b
+            ; b= shift_value b
             ; bulletproof_challenges=
                 Vector.of_array_and_length_exn new_bulletproof_challenges
                   Tick.Rounds.n
-            ; combined_inner_product
+            ; combined_inner_product= shift_value combined_inner_product
             ; which_branch= which_index
             ; plonk=
                 { plonk with
                   zeta= plonk0.zeta
-                ; alpha= chal plonk0.alpha
+                ; alpha= plonk0.alpha
                 ; beta= chal plonk0.beta
                 ; gamma= chal plonk0.gamma } }
         ; was_base_case=

@@ -53,7 +53,9 @@ module type Inputs_intf = sig
 
     module Backend : Type_with_delete
 
-    val of_backend : Backend.t -> t
+    val of_backend_with_degree_bound : Backend.t -> t
+
+    val of_backend_without_degree_bound : Backend.t -> t
 
     val to_backend : t -> Backend.t
   end
@@ -213,6 +215,8 @@ module Make (Inputs : Inputs_intf) = struct
     module V1 = struct
       type t =
         ( G.Affine.Stable.V1.t
+        , G.Affine.Stable.V1.t
+        , G.Affine.Stable.V1.t option
         , Fq.Stable.V1.t
         , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
         Dlog_plonk_types.Proof.Stable.V1.t
@@ -298,12 +302,19 @@ module Make (Inputs : Inputs_intf) = struct
              ; sigma1= fqv sigma1_eval
              ; sigma2= fqv sigma2_eval } )
     in
-    let pc f = Poly_comm.of_backend (f t) in
     let wo x =
-      match pc x with `Without_degree_bound gs -> gs | _ -> assert false
+      match Poly_comm.of_backend_without_degree_bound (x t) with
+      | `Without_degree_bound gs ->
+          gs
+      | _ ->
+          assert false
     in
     let w x =
-      match pc x with `With_degree_bound t -> t | _ -> assert false
+      match Poly_comm.of_backend_with_degree_bound (x t) with
+      | `With_degree_bound t ->
+          t
+      | _ ->
+          assert false
     in
     { messages=
         { l_comm= wo l_comm

@@ -63,7 +63,7 @@ struct
     let to_field = to_field_constant ~endo:Endo.scalar (module Scalar)
   end
 
-  let typ : (t, Constant.t) Typ.t = SC.typ Challenge.typ
+  let typ_unchecked : (t, Constant.t) Typ.t = SC.typ Challenge.typ_unchecked
 
   (* TODO-someday: Combine this and the identical definition in the
      snarky_curve library.
@@ -118,65 +118,78 @@ struct
     assert_r1cs (x1 - x4) lambda_2 (y4 + y1) ;
     (x4, y4)
 
-  let endo (xt, yt) (SC.Scalar_challenge bits) =
+  let endo (t : Field.t * Field.t) (SC.Scalar_challenge bits) =
+    let xt, yt = Tuple_lib.Double.map t ~f:(Util.seal (module Impl)) in
     let bits = Array.of_list bits in
     let n = Array.length bits in
     assert (n = 128) ;
     let rec go rows (xp, yp) i =
-      if i < 0
-      then (Array.of_list_rev rows, (xp, yp))
+      if i < 0 then (Array.of_list_rev rows, (xp, yp))
       else
         let b2i = bits.(Int.(2 * i)) in
-        let b2i1 = bits.(Int.(2 * i + 1)) in
+        let b2i1 = bits.(Int.((2 * i) + 1)) in
         let xq =
           exists Field.typ
-            ~compute:As_prover.(fun () ->
-                let xt = read_var xt in
-                if read Boolean.typ b2i1
-                then Field.Constant.mul Endo.base xt
-                else xt )
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let xt = read_var xt in
+                  if read Boolean.typ b2i1 then Field.Constant.mul Endo.base xt
+                  else xt)
         in
         let l1 =
           exists Field.typ
-            ~compute:As_prover.(fun () ->
-                let open Field.Constant in
-                let yt = read_var yt in
-                let xq = read_var xq in
-                let yq = if read Boolean.typ b2i then yt else negate yt in
-                (yq - read_var yp) / (xq - read_var xp)
-              )
-        in 
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let open Field.Constant in
+                  let yt = read_var yt in
+                  let xq = read_var xq in
+                  let yq = if read Boolean.typ b2i then yt else negate yt in
+                  (yq - read_var yp) / (xq - read_var xp))
+        in
         let xr =
-          As_prover.Ref.create As_prover.(fun () ->
-              (* B l1^2 - A - xp - xq *)
-              let open Field.Constant in
-              G.Params.b * read_var l1 - G.Params.a - read_var xp - read_var xq
-            )
+          As_prover.Ref.create
+            As_prover.(
+              fun () ->
+                (* B l1^2 - A - xp - xq *)
+                let open Field.Constant in
+                (G.Params.b * read_var l1)
+                - G.Params.a - read_var xp - read_var xq)
         in
         let l2 =
-          As_prover.Ref.create As_prover.(fun () ->
-              (* 2 yp / (xp - xr) - l1 *)
-              let open Field.Constant in
-              let yp = read_var yp in
-              (yp + yp) / (read_var xp - As_prover.Ref.get xr) - read_var l1
-          )
-        in 
+          As_prover.Ref.create
+            As_prover.(
+              fun () ->
+                (* 2 yp / (xp - xr) - l1 *)
+                let open Field.Constant in
+                let yp = read_var yp in
+                ((yp + yp) / (read_var xp - As_prover.Ref.get xr))
+                - read_var l1)
+        in
         let xs =
-          exists Field.typ ~compute:As_prover.(fun () ->
-              (* B l2^2 - A - xr - xp *)
-              let open Field.Constant in
-              G.Params.b * square (As_prover.Ref.get l2) - G.Params.a - As_prover.Ref.get xr - read_var xp
-            )
+          exists Field.typ
+            ~compute:
+              As_prover.(
+                fun () ->
+                  (* B l2^2 - A - xr - xp *)
+                  let open Field.Constant in
+                  (G.Params.b * square (As_prover.Ref.get l2))
+                  - G.Params.a - As_prover.Ref.get xr - read_var xp)
         in
         let ys =
-          exists Field.typ ~compute:As_prover.(fun () ->
-              (* (xp - xs) * l2 - yp *)
-              let open Field.Constant in
-              (read_var xp - read_var xs) * As_prover.Ref.get l2 - read_var yp )
+          exists Field.typ
+            ~compute:
+              As_prover.(
+                fun () ->
+                  (* (xp - xs) * l2 - yp *)
+                  let open Field.Constant in
+                  ((read_var xp - read_var xs) * As_prover.Ref.get l2)
+                  - read_var yp)
         in
         let row =
           { Zexe_backend_common.Endoscale_round.b2i1= (b2i1 :> Field.t)
-          ; b2i = (b2i :> Field.t)
+          ; b2i= (b2i :> Field.t)
           ; xt
           ; xq
           ; yt
@@ -184,23 +197,20 @@ struct
           ; l1
           ; yp
           ; xs
-          ; ys
-          }
-        in 
+          ; ys }
+        in
         go (row :: rows) (xs, ys) (i - 1)
-    in 
+    in
     with_label __LOC__ (fun () ->
-    let phi (x, y) = (Field.scale x Endo.base, y) in
-    let t = (xt, yt) in
-    let rows, res = go [] (G.double (G.( + ) (phi t) t)) ((n / 2) - 1) in
-    assert_ [
-      { annotation= Some __LOC__
-      ; basic= 
-          Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (EC_endoscale { state= rows })
-      }
-    ] ;
-    res )
+        let phi (x, y) = (Field.scale x Endo.base, y) in
+        let t = (xt, yt) in
+        let rows, res = go [] (G.double (G.( + ) (phi t) t)) ((n / 2) - 1) in
+        assert_
+          [ { annotation= Some __LOC__
+            ; basic=
+                Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                  (EC_endoscale {state= rows}) } ] ;
+        res )
 
   let endo_inv ((gx, gy) as g) chal =
     let res =
@@ -208,7 +218,7 @@ struct
         ~compute:
           As_prover.(
             fun () ->
-              let x = Constant.to_field (read typ chal) in
+              let x = Constant.to_field (read typ_unchecked chal) in
               G.Constant.scale (read G.typ g) Scalar.(one / x))
     in
     let x, y = endo res chal in

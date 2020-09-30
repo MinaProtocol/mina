@@ -36,6 +36,17 @@ end
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
+module Unsafe = struct
+  let unpack_unboolean ?(length = Field.size_in_bits) x =
+    let res =
+      exists
+        (Typ.list Boolean.typ_unchecked ~length)
+        ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+    in
+    Field.Assert.equal x (Field.project res) ;
+    res
+end
+
 module Sponge = struct
   module Permutation =
     Sponge_inputs.Make
@@ -52,13 +63,13 @@ module Sponge = struct
               type t = Impl.Boolean.var
             end)
             (struct
-              include Impl.Field
+              type t = Impl.Field.t
 
               let high_entropy_bits = high_entropy_bits
 
-              let to_bits t =
-                Bitstring_lib.Bitstring.Lsb_first.to_list
-                  (Impl.Field.unpack_full t)
+              let finalize_discarded = Util.boolean_constrain (module Impl)
+
+              let to_bits t = Unsafe.unpack_unboolean t
             end)
             (Impl.Field)
             (S)
@@ -160,7 +171,7 @@ module Inner_curve = struct
 
   let ( + ) = T.add_exn
 
-  let scale t bs = 
+  let scale t bs =
     with_label __LOC__ (fun () ->
         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 

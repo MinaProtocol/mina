@@ -34,8 +34,7 @@ module type Inputs_intf = sig
 
     val write : t -> string -> unit
 
-    val create :
-      Unsigned.Size_t.t -> Unsigned.Size_t.t -> Unsigned.Size_t.t -> t
+    val create : Unsigned.Size_t.t -> t
   end
 
   module Scalar_field : sig
@@ -55,7 +54,7 @@ module type Inputs_intf = sig
 
     val delete : t -> unit
 
-    val create : Gate_vector.t -> Unsigned.Size_t.t -> Urs.t -> t
+    val create : Gate_vector.t -> Urs.t -> t
   end
 
   module Curve : sig
@@ -69,7 +68,7 @@ module type Inputs_intf = sig
 
     type t = Curve.Affine.t Poly_comm.t
 
-    val of_backend : Backend.t -> t
+    val of_backend_without_degree_bound : Backend.t -> t
   end
 
   module Verifier_index : sig
@@ -129,10 +128,6 @@ module Make (Inputs : Inputs_intf) = struct
     let urs_info = Set_once.create () in
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-    (* TODO *)
-    let public_inputs = Unsigned.Size_t.of_int 0 in
-    (* TODO *)
-    let size = Unsigned.Size_t.of_int 0 in
     let set_urs_info specs =
       Set_once.set_exn urs_info Lexing.dummy_pos specs
     in
@@ -159,9 +154,7 @@ module Make (Inputs : Inputs_intf) = struct
             | Ok (u, _) ->
                 u
             | Error _e ->
-                let urs =
-                  Urs.create (Unsigned.Size_t.of_int degree) public_inputs size
-                in
+                let urs = Urs.create (Unsigned.Size_t.of_int degree) in
                 let _ =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function
@@ -179,14 +172,24 @@ module Make (Inputs : Inputs_intf) = struct
     (set_urs_info, load)
 
   let create cs =
-    let {Plonk_constraint_system.gates; equivalence_classes} = cs in
-    Plonk_constraint_system.V.Table.iter equivalence_classes ~f:(fun x ->
+    let gates =
+      match cs.Plonk_constraint_system.gates with
+      | `Finalized g ->
+          g
+      | `Unfinalized_rev _ ->
+          failwith
+            "Must finalize constraint system before Keypair.create is called"
+    in
+    let conv =
+      Plonk_constraint_system.Row.to_absolute
+        ~public_input_size:(Set_once.get_exn cs.public_input_size [%here])
+    in
+    Plonk_constraint_system.V.Table.iter cs.equivalence_classes ~f:(fun x ->
         if List.length x > 1 then
           let h = List.hd_exn x in
           let t = List.last_exn x in
-          Gate_vector.wrap_gate gates (of_int t.row) t.col (of_int h.row) h.col
-    ) ;
-    let index = Index.create gates (Unsigned.Size_t.of_int 0) (load_urs ()) in
+          Gate_vector.wrap_gate gates (conv t.row) t.col (conv h.row) h.col ) ;
+    let index = Index.create gates (load_urs ()) in
     Caml.Gc.finalise Index.delete index ;
     Core.printf "rows = %d\n%!" (List.length cs.rows_rev) ;
     {index; cs}
@@ -198,10 +201,10 @@ module Make (Inputs : Inputs_intf) = struct
   open Pickles_types
 
   let vk_commitments t :
-      Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+      Curve.Affine.t Dlog_plonk_types.Poly_comm.Without_degree_bound.t
       Plonk_verification_key_evals.t =
     let f (t : Poly_comm.Backend.t) =
-      match Poly_comm.of_backend t with
+      match Poly_comm.of_backend_without_degree_bound t with
       | `Without_degree_bound a ->
           a
       | _ ->

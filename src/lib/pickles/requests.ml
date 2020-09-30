@@ -30,7 +30,7 @@ module Wrap = struct
       | Proof_state :
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
-              , Field.Constant.t
+              , Field.Constant.t Shifted_value.t
               , ( ( Challenge.Constant.t Scalar_challenge.t
                   , bool )
                   Bulletproof_challenge.t
@@ -45,7 +45,11 @@ module Wrap = struct
           Types.Pairing_based.Proof_state.t
           t
       | Messages :
-          (Tock.Inner_curve.Affine.t, Tick.Field.t) Dlog_plonk_types.Messages.t
+          ( Tock.Inner_curve.Affine.t
+          , Tock.Inner_curve.Affine.t
+          , Tock.Inner_curve.Affine.t option
+          , Tick.Field.t )
+          Dlog_plonk_types.Messages.t
           t
       | Openings_proof :
           ( Tock.Inner_curve.Affine.t
@@ -82,7 +86,7 @@ module Wrap = struct
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Tock.Field.t
+                , Tock.Field.t Shifted_value.t
                 , ( ( Challenge.Constant.t Scalar_challenge.t
                     , bool )
                     Bulletproof_challenge.t
@@ -98,6 +102,8 @@ module Wrap = struct
             t
         | Messages :
             ( Tock.Inner_curve.Affine.t
+            , Tock.Inner_curve.Affine.t
+            , Tock.Inner_curve.Affine.t option
             , Tick.Field.t )
             Dlog_plonk_types.Messages.t
             t

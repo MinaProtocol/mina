@@ -20,6 +20,8 @@ let debug = false
 module type Field_intf = sig
   type t
 
+  val size_in_bits : int
+
   val one : t
 
   val of_int : int -> t
@@ -84,7 +86,7 @@ let evals_of_split_evals field ~zeta ~zetaw
 
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
-let derive_plonk (type t) (module F : Field_intf with type t = t) ~endo
+let derive_plonk (type t) (module F : Field_intf with type t = t) ~shift ~endo
     ~(domain : t plonk_domain) =
   let open F in
   let square x = x * x in
@@ -156,30 +158,32 @@ let derive_plonk (type t) (module F : Field_intf with type t = t) ~endo
       , ((square u - (square t * (xr + e0.l + e1.l))) * alphas.(1))
         + ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2)) )
     in
-    { In_circuit.alpha
-    ; beta
-    ; gamma
-    ; zeta
-    ; perm0
-    ; perm1
-    ; gnrc_l
-    ; gnrc_r
-    ; gnrc_o
-    ; psdn0
-    ; ecad0
-    ; vbmul0
-    ; vbmul1
-    ; endomul0
-    ; endomul1
-    ; endomul2 }
+    In_circuit.map_fields
+      ~f:(Shifted_value.of_field (module F) ~shift)
+      { alpha
+      ; beta
+      ; gamma
+      ; zeta
+      ; perm0
+      ; perm1
+      ; gnrc_l
+      ; gnrc_r
+      ; gnrc_o
+      ; psdn0
+      ; ecad0
+      ; vbmul0
+      ; vbmul1
+      ; endomul0
+      ; endomul1
+      ; endomul2 }
 
 let checked (type t)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-    ~domain ~endo (plonk : _ In_circuit.t) evals =
+    ~domain ~shift ~endo (plonk : _ In_circuit.t) evals =
   let actual =
     derive_plonk
       (module Impl.Field)
-      ~endo ~domain
+      ~endo ~domain ~shift
       { alpha= plonk.alpha
       ; beta= plonk.beta
       ; gamma= plonk.gamma
@@ -188,21 +192,22 @@ let checked (type t)
   in
   let open Impl in
   let open In_circuit in
-  List.map
-    ~f:(fun f -> Field.equal (f plonk) (f actual))
-    [ perm0
-    ; perm1
-    ; gnrc_l
-    ; gnrc_r
-    ; gnrc_o
-    ; psdn0
-    ; ecad0
-    ; vbmul0
-    ; vbmul1
-    ; endomul0
-    ; endomul1
-    ; endomul2 ]
-  |> Boolean.all
+  with_label __LOC__ (fun () ->
+      List.map
+        ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
+        [ perm0
+        ; perm1
+        ; gnrc_l
+        ; gnrc_r
+        ; gnrc_o
+        ; psdn0
+        ; ecad0
+        ; vbmul0
+        ; vbmul1
+        ; endomul0
+        ; endomul1
+        ; endomul2 ]
+      |> Boolean.all )
 
 (*
 let checked (type t)

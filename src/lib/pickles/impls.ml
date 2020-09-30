@@ -38,7 +38,10 @@ module Step = struct
     let open Types.Pairing_based.Statement in
     let spec = spec branching wrap_rounds in
     let (T (typ, f)) =
-      Spec.packed_typ (module Impl) (T (Other_field.typ, Fn.id)) spec
+      Spec.packed_typ
+        (module Impl)
+        (T (Shifted_value.typ Other_field.typ, Fn.id))
+        spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, fun x -> of_data (f x))
@@ -62,7 +65,10 @@ module Wrap = struct
     in
     let open Types.Dlog_based.Statement in
     let (T (typ, f)) =
-      Spec.packed_typ (module Impl) (T (fp, Fn.id)) In_circuit.spec
+      Spec.packed_typ
+        (module Impl)
+        (T (Shifted_value.typ fp, Fn.id))
+        In_circuit.spec
     in
     let typ =
       Typ.transport typ ~there:In_circuit.to_data ~back:In_circuit.of_data

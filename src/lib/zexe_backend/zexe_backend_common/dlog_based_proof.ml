@@ -53,7 +53,9 @@ module type Inputs_intf = sig
 
     module Backend : Type_with_delete
 
-    val of_backend : Backend.t -> t
+    val of_backend_with_degree_bound : Backend.t -> t
+
+    val of_backend_without_degree_bound : Backend.t -> t
 
     val to_backend : t -> Backend.t
   end
@@ -352,12 +354,19 @@ module Make (Inputs : Inputs_intf) = struct
              ; g_3= fqv g3 } )
     in
     let fq = fq t in
-    let pc f = Poly_comm.of_backend (f t) in
     let wo x =
-      match pc x with `Without_degree_bound gs -> gs | _ -> assert false
+      match Poly_comm.of_backend_without_degree_bound (x t) with
+      | `Without_degree_bound gs ->
+          gs
+      | _ ->
+          assert false
     in
     let w x =
-      match pc x with `With_degree_bound t -> t | _ -> assert false
+      match Poly_comm.of_backend_with_degree_bound (x t) with
+      | `With_degree_bound t ->
+          {t with shifted= Option.value_exn t.shifted}
+      | _ ->
+          assert false
     in
     { messages=
         { w_hat= wo w_comm
@@ -411,7 +420,10 @@ module Make (Inputs : Inputs_intf) = struct
            {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
         t) : Backend.t =
     let g = G.Affine.to_backend in
-    let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
+    let pcw (t : _ Dlog_plonk_types.Poly_comm.With_degree_bound.t) =
+      Poly_comm.to_backend
+        (`With_degree_bound {t with shifted= Some t.shifted})
+    in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr =
       let v = G.Affine.Backend.Pair.Vector.create () in

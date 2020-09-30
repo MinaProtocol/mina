@@ -38,9 +38,10 @@ module type Inputs_intf = sig
 end
 
 type 'a t =
-  [ `With_degree_bound of 'a Dlog_marlin_types.Poly_comm.With_degree_bound.t
+  [ `With_degree_bound of
+    ('a, 'a option) Dlog_plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
-    'a Dlog_marlin_types.Poly_comm.Without_degree_bound.t ]
+    'a Dlog_plonk_types.Poly_comm.Without_degree_bound.t ]
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
@@ -65,14 +66,17 @@ module Make (Inputs : Inputs_intf) = struct
 
   let with_degree_bound_to_backend
       (commitment :
-        (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.With_degree_bound.t) : Backend.t =
-    Backend.make (g_vec commitment.unshifted) (Some (g commitment.shifted))
+        ( Base_field.t * Base_field.t
+        , (Base_field.t * Base_field.t) option )
+        Dlog_plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
+    Backend.make
+      (g_vec commitment.unshifted)
+      (Option.map ~f:g commitment.shifted)
 
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.Without_degree_bound.t) : Backend.t =
+        Dlog_plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t =
     Backend.make (g_vec commitment) None
 
   let to_backend (t : t) : Backend.t =
@@ -86,7 +90,7 @@ module Make (Inputs : Inputs_intf) = struct
     Caml.Gc.finalise Backend.delete t ;
     t
 
-  let of_backend (t : Backend.t) =
+  let of_backend' (t : Backend.t) =
     let open Backend in
     let unshifted =
       (* TODO: Leaky? *)
@@ -96,11 +100,18 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* TODO: Leaky? *)
     let shifted = shifted t in
-    let open Dlog_marlin_types.Poly_comm in
-    match shifted with
-    | Some g ->
-        `With_degree_bound
-          {With_degree_bound.unshifted; shifted= Curve.Affine.of_backend g}
-    | None ->
+    (unshifted, Option.map shifted ~f:Curve.Affine.of_backend)
+
+  let of_backend_with_degree_bound t =
+    let open Dlog_plonk_types.Poly_comm in
+    let unshifted, shifted = of_backend' t in
+    `With_degree_bound {With_degree_bound.unshifted; shifted}
+
+  let of_backend_without_degree_bound t =
+    let open Dlog_plonk_types.Poly_comm in
+    match of_backend' t with
+    | unshifted, None ->
         `Without_degree_bound unshifted
+    | _ ->
+        assert false
 end

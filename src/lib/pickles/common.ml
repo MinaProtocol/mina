@@ -186,6 +186,14 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
       let res = Field.mul (project_h c) (inj d) in
       assert_square res t ; res )
 
+module Shifts = struct
+  let tock : Tock.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tock.Field)
+
+  let tick : Tick.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tick.Field)
+end
+
 module Ipa = struct
   open Backend
 

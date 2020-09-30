@@ -449,34 +449,41 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, conv)) = etyp in
-              let main x () : unit = b.main (conv x) ~step_domains in
+              let main x () : unit =
+                b.main
+                  (Impls.Step.with_label "conv" (fun () -> conv x))
+                  ~step_domains
+              in
               let () =
-                let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
+                let module Constraints =
+                  Snarky_log.Constraints (Impls.Step.Internal_Basic) in
                 let log =
                   let weight =
-                    let sys = Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create () in
+                    let sys =
+                      Zexe_backend.Tweedle.Dum_based_plonk
+                      .R1CS_constraint_system
+                      .create ()
+                    in
                     fun (c : Impls.Step.Constraint.t) ->
                       let prev = sys.next_row in
-                      List.iter c ~f:(fun { annotation; basic } ->
-                          Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.add_constraint
-                            sys
-                            ?label:annotation
-                            basic ) ;
+                      List.iter c ~f:(fun {annotation; basic} ->
+                          Zexe_backend.Tweedle.Dum_based_plonk
+                          .R1CS_constraint_system
+                          .add_constraint sys ?label:annotation basic ) ;
                       let next = sys.next_row in
                       next - prev
-                  in 
-                  Constraints.log 
-                    ~weight
-                    (
-                    Impls.Step.(make_checked (fun () : unit ->
-                        let x = exists typ in
-                        main x ()
-                      )
-                  ))
-                in 
-                Snarky_log.to_file (sprintf "step-snark-%d.json" (Index.to_int b.index))
+                  in
+                  Constraints.log ~weight
+                    Impls.Step.(
+                      make_checked (fun () ->
+                          ( let x = with_label __LOC__ (fun () -> exists typ) in
+                            main x ()
+                            : unit ) ))
+                in
+                Snarky_log.to_file
+                  (sprintf "step-snark-%d.json" (Index.to_int b.index))
                   log
-              in 
+              in
               let open Impls.Step in
               let k_p =
                 lazy

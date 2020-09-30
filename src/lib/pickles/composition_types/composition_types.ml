@@ -147,8 +147,8 @@ module Dlog_based = struct
         ]
            *)
         module Minimal = struct
-          type ('challenge, 'scalar_challenge, 'fp) t =
-            { alpha: 'challenge
+          type ('challenge, 'scalar_challenge) t =
+            { alpha: 'scalar_challenge
             ; beta: 'challenge
             ; gamma: 'challenge
             ; zeta: 'scalar_challenge }
@@ -159,7 +159,7 @@ module Dlog_based = struct
 
         module In_circuit = struct
           type ('challenge, 'scalar_challenge, 'fp) t =
-            { alpha: 'challenge
+            { alpha: 'scalar_challenge
             ; beta: 'challenge
             ; gamma: 'challenge
             ; zeta: 'scalar_challenge
@@ -179,7 +179,7 @@ module Dlog_based = struct
 
           let map_challenges t ~f ~scalar =
             { t with
-              alpha= f t.alpha
+              alpha= scalar t.alpha
             ; beta= f t.beta
             ; gamma= f t.gamma
             ; zeta= scalar t.zeta }
@@ -201,12 +201,13 @@ module Dlog_based = struct
 
           open Snarky_backendless.H_list
 
-          let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) =
+          let typ (type f fp) ~challenge ~scalar_challenge
+              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
-              [ chal
-              ; chal
-              ; chal
-              ; Scalar_challenge.typ chal
+              [ Scalar_challenge.typ scalar_challenge
+              ; challenge
+              ; challenge
+              ; Scalar_challenge.typ scalar_challenge
               ; fp
               ; fp
               ; fp
@@ -250,7 +251,7 @@ module Dlog_based = struct
              , 'bulletproof_challenges
              , 'index )
              t =
-          ( ('challenge, 'scalar_challenge, 'fp) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fp
           , 'fq
@@ -293,15 +294,15 @@ module Dlog_based = struct
 
         let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
-        let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) fq
-            index bool =
+        let typ (type f fp) ~challenge ~scalar_challenge
+            (fp : (fp, _, f) Snarky_backendless.Typ.t) fq index bool =
           Snarky_backendless.Typ.of_hlistable
-            [ Plonk.In_circuit.typ chal fp
+            [ Plonk.In_circuit.typ ~challenge ~scalar_challenge fp
             ; fp
             ; fp
-            ; Scalar_challenge.typ chal
+            ; Scalar_challenge.typ scalar_challenge
             ; Vector.typ
-                (Bulletproof_challenge.typ chal bool)
+                (Bulletproof_challenge.typ scalar_challenge bool)
                 Backend.Tick.Rounds.n
             ; index ]
             ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -366,7 +367,7 @@ module Dlog_based = struct
            , 'bp_chals
            , 'index )
            t =
-        ( ('challenge, 'scalar_challenge, 'fp) Deferred_values.Plonk.Minimal.t
+        ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
         , 'bool
@@ -407,10 +408,12 @@ module Dlog_based = struct
 
       let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
-      let typ (type f fp) chal (fp : (fp, _, f) Snarky_backendless.Typ.t) bool
-          fq me_only digest index =
+      let typ (type f fp) ~challenge ~scalar_challenge
+          (fp : (fp, _, f) Snarky_backendless.Typ.t) bool fq me_only digest
+          index =
         Snarky_backendless.Typ.of_hlistable
-          [ Deferred_values.In_circuit.typ chal fp fq index bool
+          [ Deferred_values.In_circuit.typ ~challenge ~scalar_challenge fp fq
+              index bool
           ; bool
           ; digest
           ; me_only ]
@@ -509,8 +512,7 @@ module Dlog_based = struct
            , 'index )
            t =
         ( ( 'challenge
-          , 'scalar_challenge
-          , 'fp )
+          , 'scalar_challenge )
           Proof_state.Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
@@ -558,8 +560,8 @@ module Dlog_based = struct
         Struct
           [ Vector (B Bool, Nat.N1.n)
           ; Vector (B Field, Nat.N14.n)
-          ; Vector (B Challenge, Nat.N3.n)
-          ; Vector (Scalar Challenge, Nat.N2.n)
+          ; Vector (B Challenge, Nat.N2.n)
+          ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Index, Nat.N1.n) ]
@@ -611,8 +613,8 @@ module Dlog_based = struct
           ; endomul1
           ; endomul2 ]
         in
-        let challenge = [alpha; beta; gamma] in
-        let scalar_challenge = [zeta; xi] in
+        let challenge = [beta; gamma] in
+        let scalar_challenge = [alpha; zeta; xi] in
         let bool = [was_base_case] in
         let digest =
           [sponge_digest_before_evaluations; me_only; pass_through]
@@ -653,8 +655,8 @@ module Dlog_based = struct
             ; endomul2 ] =
           fp
         in
-        let [alpha; beta; gamma] = challenge in
-        let [zeta; xi] = scalar_challenge in
+        let [beta; gamma] = challenge in
+        let [alpha; zeta; xi] = scalar_challenge in
         let [was_base_case] = bool in
         let [sponge_digest_before_evaluations; me_only; pass_through] =
           digest
@@ -742,7 +744,7 @@ module Pairing_based = struct
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
-          ( ('challenge, 'scalar_challenge, 'fq) Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges )
@@ -787,7 +789,7 @@ module Pairing_based = struct
              , 'bulletproof_challenges
              , 'digest )
              t =
-          ( ('challenge, 'scalar_challenge, 'fq) Deferred_values.Plonk.Minimal.t
+          ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
@@ -819,8 +821,8 @@ module Pairing_based = struct
           Struct
             [ Vector (B Field, Nat.N14.n)
             ; Vector (B Digest, Nat.N1.n)
-            ; Vector (B Challenge, Nat.N3.n)
-            ; Vector (Scalar Challenge, Nat.N2.n)
+            ; Vector (B Challenge, Nat.N2.n)
+            ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2) ]
 
         let to_data
@@ -865,8 +867,8 @@ module Pairing_based = struct
             ; endomul1
             ; endomul2 ]
           in
-          let challenge = [alpha; beta; gamma] in
-          let scalar_challenge = [zeta; xi] in
+          let challenge = [beta; gamma] in
+          let scalar_challenge = [alpha; zeta; xi] in
           let digest = [sponge_digest_before_evaluations] in
           let open Hlist.HlistId in
           [fq; digest; challenge; scalar_challenge; bulletproof_challenges]
@@ -889,8 +891,8 @@ module Pairing_based = struct
                   ; endomul1
                   ; endomul2 ]
               ; Vector.[sponge_digest_before_evaluations]
-              ; Vector.[alpha; beta; gamma]
-              ; Vector.[zeta; xi]
+              ; Vector.[beta; gamma]
+              ; Vector.[alpha; zeta; xi]
               ; bulletproof_challenges ] : _ t =
           { deferred_values=
               { xi
@@ -954,7 +956,8 @@ module Pairing_based = struct
           , branching )
       in
       spec unfinalized_proofs (B Spec.Digest)
-      |> Spec.typ impl fq
+      |> Spec.typ impl fq ~challenge:`Constrained
+           ~scalar_challenge:`Unconstrained
       |> Snarky_backendless.Typ.transport ~there:to_data ~back:of_data
       |> Snarky_backendless.Typ.transport_var ~there:to_data ~back:of_data
   end

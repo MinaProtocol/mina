@@ -14,8 +14,7 @@ module type Inputs_intf = sig
 
     val write : t -> string -> unit
 
-    val create :
-      Unsigned.Size_t.t -> Unsigned.Size_t.t -> Unsigned.Size_t.t -> t
+    val create : Unsigned.Size_t.t -> t
   end
 
   module Index : sig
@@ -95,14 +94,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t = Index.t
 
-  include Dlog_urs.Make (struct
-    include Inputs
-
-    (* TODO *)
-    let public_inputs = lazy Unsigned.Size_t.zero
-
-    let size = lazy Unsigned.Size_t.zero
-  end)
+  include Dlog_urs.Make (Inputs)
 
   let create (constraint_system : Constraint_system.t) =
     (* TODO: Make this flexible. *)
@@ -118,7 +110,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Pickles_types
 
   let vk_commitments t :
-      Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+      Curve.Affine.t Dlog_plonk_types.Poly_comm.Without_degree_bound.t
       Plonk_verification_key_evals.t =
     let f (t : Poly_comm.Backend.t) =
       match Poly_comm.of_backend t with

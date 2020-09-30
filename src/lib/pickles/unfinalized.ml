@@ -11,7 +11,7 @@ open Import
 type t =
   ( Field.t
   , Field.t Scalar_challenge.t
-  , Other_field.t
+  , Other_field.t Shifted_value.t
   , ( (Field.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t
@@ -25,17 +25,19 @@ module Constant = struct
   type t =
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t
-    , Tock.Field.t
+    , Tock.Field.t Shifted_value.t
     , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
       , Tock.Rounds.n )
       Vector.t
     , Digest.Constant.t )
     Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
 
+  let shift = Shifted_value.Shift.create (module Tock.Field)
+
   let dummy : t =
     let one_chal = Challenge.Constant.dummy in
     let open Ro in
-    let alpha = chal () in
+    let alpha = scalar_chal () in
     let beta = chal () in
     let gamma = chal () in
     let zeta = scalar_chal () in
@@ -43,13 +45,13 @@ module Constant = struct
         { plonk=
             { (Marlin_checks.derive_plonk
                  (module Tock.Field)
-                 ~endo:Endo.Dum.base (* I think this is right *)
+                 ~shift ~endo:Endo.Dum.base (* I think this is right *)
                  ~domain:
                    (Marlin_checks.domain
                       (module Tock.Field)
                       wrap_domains.h ~shifts:Tock.B.Field_verifier_index.shifts
                       ~domain_generator:Tock.Field.domain_generator)
-                 { alpha= Challenge.Constant.to_tock_field alpha
+                 { alpha= Common.Ipa.Wrap.endo_to_field alpha
                  ; beta= Challenge.Constant.to_tock_field beta
                  ; gamma= Challenge.Constant.to_tock_field gamma
                  ; zeta= Common.Ipa.Wrap.endo_to_field zeta }
@@ -59,9 +61,9 @@ module Constant = struct
             ; beta
             ; gamma
             ; zeta }
-        ; combined_inner_product= tock ()
+        ; combined_inner_product= Shifted_value (tock ())
         ; xi= Scalar_challenge one_chal
         ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges
-        ; b= tock () }
+        ; b= Shifted_value (tock ()) }
     ; sponge_digest_before_evaluations= Digest.Constant.dummy }
 end

@@ -14,8 +14,7 @@ module type Inputs_intf = sig
 
     val write : t -> string -> unit
 
-    val create :
-      Unsigned.Size_t.t -> Unsigned.Size_t.t -> Unsigned.Size_t.t -> t
+    val create : Unsigned.Size_t.t -> t
   end
 
   module Index : sig
@@ -44,7 +43,7 @@ module type Inputs_intf = sig
 
     type t = Curve.Affine.t Poly_comm.t
 
-    val of_backend : Backend.t -> t
+    val of_backend_without_degree_bound : Backend.t -> t
   end
 
   module Verifier_index : sig
@@ -84,13 +83,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t = Index.t
 
-  include Dlog_urs.Make (struct
-    include Inputs
-
-    let public_inputs = lazy (Unsigned.Size_t.of_int 0)
-
-    let size = lazy (Unsigned.Size_t.of_int 0)
-  end)
+  include Dlog_urs.Make (Inputs)
 
   let create
       { R1cs_constraint_system.public_input_size
@@ -115,10 +108,10 @@ module Make (Inputs : Inputs_intf) = struct
   open Pickles_types
 
   let vk_commitments t :
-      Curve.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t
+      Curve.Affine.t Dlog_plonk_types.Poly_comm.Without_degree_bound.t Abc.t
       Matrix_evals.t =
     let f (t : Poly_comm.Backend.t) =
-      match Poly_comm.of_backend t with
+      match Poly_comm.of_backend_without_degree_bound t with
       | `Without_degree_bound a ->
           a
       | _ ->

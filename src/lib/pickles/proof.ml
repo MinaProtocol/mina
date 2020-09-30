@@ -33,7 +33,7 @@ module Base = struct
       { statement:
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , Tick.Field.t
+          , Tick.Field.t Shifted_value.Stable.Latest.t
           , bool
           , Tock.Field.t
           , 'dlog_me_only
@@ -91,12 +91,12 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
         { proof_state=
             { deferred_values=
                 { xi= scalar_chal ()
-                ; combined_inner_product= tick ()
-                ; b= tick ()
+                ; combined_inner_product= Shifted_value (tick ())
+                ; b= Shifted_value (tick ())
                 ; which_branch= Option.value_exn (Index.of_int 0)
                 ; bulletproof_challenges= Dummy.Ipa.Step.challenges
                 ; plonk=
-                    { alpha= chal ()
+                    { alpha= scalar_chal ()
                     ; beta= chal ()
                     ; gamma= chal ()
                     ; zeta= scalar_chal () } }
@@ -123,7 +123,7 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
             ; r_comm= g lengths.r
             ; o_comm= g lengths.o
             ; z_comm= g lengths.z
-            ; t_comm= {unshifted= g lengths.t; shifted= g0} }
+            ; t_comm= {unshifted= g lengths.t; shifted= Some g0} }
         ; openings=
             { proof=
                 { lr=

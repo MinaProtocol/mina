@@ -8,7 +8,7 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
   'local_statement
   * ( Challenge.Make(Impl).t
     , Challenge.Make(Impl).t Scalar_challenge.t
-    , Impl.Field.t
+    , Impl.Field.t Shifted_value.t
     , Impl.Boolean.var
     , Pairing_main.Make(Step_main_inputs).Other_field.t
     , unit
@@ -32,7 +32,7 @@ module Constant = struct
     'local_statement
     * ( Challenge.Constant.t
       , Challenge.Constant.t Scalar_challenge.t
-      , Tick.Field.t
+      , Tick.Field.t Shifted_value.t
       , bool
       , Tock.Field.t
       , unit
@@ -63,8 +63,10 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
       ~back:(fun x -> Option.value_exn (Types.Index.of_int x))
   in
   Snarky_backendless.Typ.tuple6 statement
-    (Types.Dlog_based.Proof_state.In_circuit.typ Challenge.typ Fp.typ
-       Boolean.typ Other_field.typ
+    (Types.Dlog_based.Proof_state.In_circuit.typ
+       ~challenge:(Challenge.typ' `Constrained)
+       ~scalar_challenge:(Challenge.typ' `Unconstrained)
+       (Shifted_value.typ Fp.typ) Boolean.typ Other_field.typ
        (Snarky_backendless.Typ.unit ())
        Digest.typ index)
     (let lengths =

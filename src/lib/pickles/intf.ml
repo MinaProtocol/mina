@@ -152,6 +152,8 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
       val ( + ) : t -> t -> t
 
+      val negate : t -> t
+
       module Scalar : Marlin_checks.Field_intf
 
       val scale : t -> Scalar.t -> t

@@ -103,7 +103,7 @@ struct
       type t =
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
-        , Tick.Field.t
+        , Tick.Field.t Shifted_value.t
         , bool
         , Tock.Field.t
         , Digest.Constant.t
@@ -144,6 +144,7 @@ struct
           let to_field =
             SC.to_field_constant (module Tick.Field) ~endo:Endo.Dum.scalar
           in
+          let alpha = to_field plonk0.alpha in
           let zeta = to_field plonk0.zeta in
           let zetaw =
             Tick.Field.(
@@ -151,14 +152,14 @@ struct
           in
           Marlin_checks.derive_plonk
             (module Tick.Field)
-            ~endo:Endo.Dee.base
+            ~endo:Endo.Dee.base ~shift:Shifts.tick
             ~domain:
               (Marlin_checks.domain
                  (module Tick.Field)
                  domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
                  ~domain_generator:Backend.Tick.Field.domain_generator)
             { zeta
-            ; alpha= Challenge.Constant.to_tick_field plonk0.alpha
+            ; alpha
             ; beta= Challenge.Constant.to_tick_field plonk0.beta
             ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
             (Marlin_checks.evals_of_split_evals
@@ -223,7 +224,7 @@ struct
         in
         let plonk0 =
           { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
-              O.alpha o
+              scalar_chal O.alpha
           ; beta= O.beta o
           ; gamma= O.gamma o
           ; zeta= scalar_chal O.zeta }
@@ -240,6 +241,8 @@ struct
           let xi = to_field xi
 
           let zeta = to_field plonk0.zeta
+
+          let alpha = to_field plonk0.alpha
         end in
         let w =
           Tock.Field.domain_generator
@@ -328,31 +331,34 @@ struct
         let plonk =
           Marlin_checks.derive_plonk
             (module Tock.Field)
-            ~endo:Endo.Dum.base
+            ~shift:Shifts.tock ~endo:Endo.Dum.base
             ~domain:
               (Marlin_checks.domain
                  (module Tock.Field)
                  data.wrap_domains.h
                  ~shifts:Backend.Tock.B.Field_verifier_index.shifts
                  ~domain_generator:Backend.Tock.Field.domain_generator)
-            {plonk0 with zeta= As_field.zeta}
+            {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
             (Marlin_checks.evals_of_split_evals
                (module Tock.Field)
                t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
                ~zeta:As_field.zeta ~zetaw)
+        in
+        let shifted_value =
+          Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
         in
         ( `Sg sg
         , { Types.Pairing_based.Proof_state.Per_proof.deferred_values=
               { plonk=
                   { plonk with
                     zeta= plonk0.zeta
-                  ; alpha= chal plonk0.alpha
+                  ; alpha= plonk0.alpha
                   ; beta= chal plonk0.beta
                   ; gamma= chal plonk0.gamma }
-              ; combined_inner_product
+              ; combined_inner_product= shifted_value combined_inner_product
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
-              ; b }
+              ; b= shifted_value combined_inner_product }
           ; sponge_digest_before_evaluations=
               Digest.Constant.of_tock_field sponge_digest_before_evaluations }
         , prev_statement_with_hashes

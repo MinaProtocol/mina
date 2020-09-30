@@ -1,5 +1,14 @@
 open Core_kernel
 
+let padded_array_typ ~length ~dummy elt =
+  let typ = Snarky_backendless.Typ.array ~length elt in
+  { typ with
+    store=
+      (fun a ->
+        let n = Array.length a in
+        if n > length then failwithf "Expected %d <= %d" n length () ;
+        typ.store (Array.append a (Array.create ~len:(length - n) dummy)) ) }
+
 module Pc_array = struct
   [%%versioned
   module Stable = struct
@@ -122,13 +131,46 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
+        type ('g, 'g_opt) t =
+          {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g_opt}
         [@@deriving sexp, compare, yojson, hlist, hash, eq]
       end
     end]
 
-    let typ ?(array = Snarky_backendless.Typ.array) g ~length =
-      Snarky_backendless.Typ.of_hlistable [array ~length g; g]
+    let typ (type f g g_var bool_var)
+        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
+        ~dummy_group_element
+        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
+        ( (bool_var * g_var, bool_var * g_var) t
+        , (g, g option) t
+        , f )
+        Snarky_backendless.Typ.t =
+      let open Snarky_backendless.Typ in
+      let padded_array_typ =
+        let typ = array ~length (tuple2 bool g) in
+        { typ with
+          store=
+            (fun a ->
+              let a = Array.map a ~f:(fun x -> (true, x)) in
+              let n = Array.length a in
+              if n > length then failwithf "Expected %d <= %d" n length () ;
+              typ.store
+                (Array.append a
+                   (Array.create ~len:(length - n) (false, dummy_group_element)))
+              )
+        ; read=
+            (fun a ->
+              let open Snarky_backendless.Typ_monads.Read.Let_syntax in
+              let%map a = typ.read a in
+              Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None)
+              ) }
+      in
+      of_hlistable
+        [ padded_array_typ
+        ; transport (tuple2 bool g)
+            ~there:(function
+              | None -> (false, dummy_group_element) | Some x -> (true, x) )
+            ~back:(fun (_, x) -> Some x) ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -152,32 +194,26 @@ module Messages = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('g, 'a) t =
+      type ('g, 'g_wdb, 'g_opt, 'a) t =
         { l_comm: 'g Without_degree_bound.Stable.V1.t
         ; r_comm: 'g Without_degree_bound.Stable.V1.t
         ; o_comm: 'g Without_degree_bound.Stable.V1.t
         ; z_comm: 'g Without_degree_bound.Stable.V1.t
-        ; t_comm: 'g With_degree_bound.Stable.V1.t }
+        ; t_comm: ('g_wdb, 'g_opt) With_degree_bound.Stable.V1.t }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
 
-  let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t) =
+  let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t)
+      ~bool =
     let open Snarky_backendless.Typ in
     let {Evals.l; r; o; z; t} = commitment_lengths in
-    let array ~length elt =
-      let typ = Snarky_backendless.Typ.array ~length elt in
-      { typ with
-        store=
-          (fun a ->
-            let n = Array.length a in
-            if n > length then failwithf "Expected %d <= %d" n length () ;
-            typ.store (Array.append a (Array.create ~len:(length - n) dummy))
-            ) }
-    in
+    let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let w n =
-      With_degree_bound.typ ~array g ~length:(Vector.reduce_exn n ~f:Int.max)
+      With_degree_bound.typ g
+        ~length:(Vector.reduce_exn n ~f:Int.max)
+        ~dummy_group_element:dummy ~bool
     in
     of_hlistable
       [wo l; wo r; wo o; wo z; w t]
@@ -189,8 +225,8 @@ module Proof = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('g, 'fq, 'fqv) t =
-        { messages: ('g, 'fq) Messages.Stable.V1.t
+      type ('g, 'g_wdb, 'g_opt, 'fq, 'fqv) t =
+        { messages: ('g, 'g_wdb, 'g_opt, 'fq) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
       [@@deriving sexp, compare, yojson, hash, eq]
     end

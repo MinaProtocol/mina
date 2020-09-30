@@ -43,6 +43,32 @@ module type Gate_vector_intf = sig
   val wrap_gate : t -> size_t -> int -> size_t -> int -> unit
 end
 
+module Row = struct
+  type t = Public_input of int | After_public_input of int
+
+  let to_absolute ~public_input_size = function
+    | Public_input i ->
+        Unsigned.Size_t.of_int i
+    | After_public_input i ->
+        Unsigned.Size_t.of_int (i + public_input_size)
+end
+
+module Gate_spec = struct
+  type ('row, 'f) t =
+    { gate_enum: int
+    ; row: 'row
+    ; lrow: 'row
+    ; lcol: int
+    ; rrow: 'row
+    ; rcol: int
+    ; orow: 'row
+    ; ocol: int
+    ; coeffs: 'f array }
+
+  let map_rows t ~f =
+    {t with row= f t.row; lrow= f t.lrow; rrow= f t.rrow; orow= f t.orow}
+end
+
 module Hash_state = struct
   open Core_kernel
   module H = Digestif.SHA256
@@ -102,7 +128,7 @@ module Plonk_constraint = struct
 end
 
 module Position = struct
-  type t = {row: int; col: int}
+  type t = {row: Row.t; col: int}
 end
 
 module Internal_var = Core_kernel.Unique_id.Int ()
@@ -126,11 +152,12 @@ type ('a, 'f) t =
   { equivalence_classes: Position.t list V.Table.t
   ; internal_vars: (('f * V.t) list * 'f option) Internal_var.Table.t
   ; mutable rows_rev: V.t option array list
-  ; mutable gates: 'a
+  ; mutable gates:
+      [`Finalized of 'a | `Unfinalized_rev of (Row.t, 'f) Gate_spec.t list]
   ; mutable next_row: int
   ; mutable hash: Hash_state.t
   ; mutable constraints: int
-  ; mutable public_input_size: int
+  ; public_input_size: int Core_kernel.Set_once.t
   ; mutable auxiliary_input_size: int }
 
 module Hash = Core.Md5
@@ -233,9 +260,12 @@ struct
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
-    let res =
-      Array.init sys.next_row ~f:(fun _ -> Array.create ~len:3 Fp.zero)
-    in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    let num_rows = public_input_size + sys.next_row in
+    let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
+    for i = 0 to public_input_size - 1 do
+      res.(i).(0) <- external_values i
+    done ;
     let compute ((lc, c) : (Fp.t * V.t) list * Fp.t option) =
       List.fold lc ~init:(Option.value c ~default:Fp.zero)
         ~f:(fun acc (s, x) ->
@@ -276,9 +306,9 @@ struct
   end
 
   let create () =
-    { public_input_size= 0
+    { public_input_size= Set_once.create ()
     ; internal_vars= Internal_var.Table.create ()
-    ; gates= Gates.create ()
+    ; gates= `Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev= []
     ; next_row= 0
     ; equivalence_classes= V.Table.create ()
@@ -291,15 +321,42 @@ struct
 
   let get_auxiliary_input_size t = t.auxiliary_input_size
 
-  let get_primary_input_size t = t.public_input_size
+  let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
 
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
-  let set_primary_input_size t x = t.public_input_size <- x
+  let set_primary_input_size t x =
+    Set_once.set_exn t.public_input_size [%here] x
 
   let digest = digest
 
-  let finalize = ignore
+  let finalize sys =
+    match sys.gates with
+    | `Finalized _ ->
+        failwith "finalize called on already finalized constraint system"
+    | `Unfinalized_rev gates ->
+        let g = Gates.create () in
+        let n = Set_once.get_exn sys.public_input_size [%here] in
+        (* First, add gates for public input *)
+        let pub =
+          Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+        in
+        for row = 0 to n - 1 do
+          (* Add to the equivalence class *)
+          V.Table.add_multi sys.equivalence_classes ~key:(V.External row)
+            ~data:{row= Row.Public_input row; col= 0} ;
+          (* Add to the gate vector *)
+          let row = Unsigned.Size_t.of_int row in
+          Gates.add_raw g ~gate_enum:1 ~row ~lrow:row ~lcol:0 ~rrow:row ~rcol:1
+            ~orow:row ~ocol:2 pub
+        done ;
+        let offset_row = Row.to_absolute ~public_input_size:n in
+        List.iter
+          (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
+          ~f:
+            (fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
+            Gates.add_raw g ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol
+              (Fp.Vector.of_array coeffs) )
 
   let canonicalize x =
     let c, terms =
@@ -338,19 +395,27 @@ struct
     Printf.printf "o.row: %d, o.col: %d\n" o.row o.col; 
     Out_channel.flush stdout;
 *)
-    Gates.add_raw sys.gates ~gate_enum:t ~row:(of_int sys.next_row)
-      ~lrow:(of_int l.row) ~lcol:l.col ~rrow:(of_int r.row) ~rcol:r.col
-      ~orow:(of_int o.row) ~ocol:o.col
-      (*
-      (of_int sys.next_row) 0
-      (of_int sys.next_row) 1
-      (of_int sys.next_row) 2
-    *)
-      c ;
+    ( match sys.gates with
+    | `Finalized _ ->
+        failwith "add_row called on finalized constraint system"
+    | `Unfinalized_rev gates ->
+        sys.gates
+        <- `Unfinalized_rev
+             ( { gate_enum= t
+               ; row= After_public_input sys.next_row
+               ; lrow= l.row
+               ; lcol= l.col
+               ; rrow= r.row
+               ; rcol= r.col
+               ; orow= o.row
+               ; ocol= o.col
+               ; coeffs= c }
+             :: gates ) ) ;
     sys.next_row <- sys.next_row + 1 ;
     sys.rows_rev <- row :: sys.rows_rev
 
   let wire sys key row col =
+    let row = Row.After_public_input row in
     let prev =
       match V.Table.find sys.equivalence_classes key with
       | Some x -> (
@@ -362,26 +427,27 @@ struct
     prev
 
   let add_generic_constraint ?l ?r ?o c sys : unit =
+    let next_row = sys.next_row in
     let lp =
       match l with
       | Some (_, lx) ->
-          wire sys lx sys.next_row 0
+          wire sys lx next_row 0
       | None ->
-          {row= sys.next_row; col= 0}
+          {row= After_public_input next_row; col= 0}
     in
     let rp =
       match r with
       | Some (_, rx) ->
-          wire sys rx sys.next_row 1
+          wire sys rx next_row 1
       | None ->
-          {row= sys.next_row; col= 1}
+          {row= After_public_input next_row; col= 1}
     in
     let op =
       match o with
       | Some (_, ox) ->
-          wire sys ox sys.next_row 2
+          wire sys ox next_row 2
       | None ->
-          {row= sys.next_row; col= 2}
+          {row= After_public_input next_row; col= 2}
     in
     add_row sys
       [|Option.map l ~f:snd; Option.map r ~f:snd; Option.map o ~f:snd|]
@@ -400,7 +466,7 @@ struct
           let s1x1_plus_s2x2 = create_internal sys [(ls, lx); (rs, rx)] in
           add_generic_constraint ~l:(ls, lx) ~r:(rs, rx)
             ~o:(Fp.one, s1x1_plus_s2x2)
-            (Fp.Vector.of_array [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|])
+            [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|]
             sys ;
           (Fp.one, s1x1_plus_s2x2)
     in
@@ -443,12 +509,11 @@ struct
               (* res = ls * lx + c *)
               let res = create_internal ~constant:c sys [(ls, External lx)] in
               add_generic_constraint ~l:(ls, External lx) ~o:(Fp.one, res)
-                (Fp.Vector.of_array
-                   [| ls
-                    ; Fp.zero
-                    ; Fp.(negate one)
-                    ; Fp.zero
-                    ; (match constant with Some x -> x | None -> Fp.zero) |])
+                [| ls
+                 ; Fp.zero
+                 ; Fp.(negate one)
+                 ; Fp.zero
+                 ; (match constant with Some x -> x | None -> Fp.zero) |]
                 sys ;
               (Fp.one, `Var res) )
         | (ls, lx) :: tl ->
@@ -457,12 +522,11 @@ struct
             (* res = ls * lx + rs * rx *)
             add_generic_constraint ~l:(ls, External lx) ~r:(rs, rx)
               ~o:(Fp.one, res)
-              (Fp.Vector.of_array
-                 [| ls
-                  ; rs
-                  ; Fp.(negate one)
-                  ; Fp.zero
-                  ; (match constant with Some x -> x | None -> Fp.zero) |])
+              [| ls
+               ; rs
+               ; Fp.(negate one)
+               ; Fp.zero
+               ; (match constant with Some x -> x | None -> Fp.zero) |]
               sys ;
             (Fp.one, `Var res) )
 
@@ -481,15 +545,13 @@ struct
           else
             let sx = create_internal sys [(s, x)] in
             add_generic_constraint ~l:(s, x) ~o:(Fp.one, sx)
-              (Fp.Vector.of_array
-                 [|Fp.one; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|])
+              [|Fp.one; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
               sys ;
             x
       | `Constant ->
           let x = create_internal sys ~constant:s [] in
           add_generic_constraint ~l:(Fp.one, x)
-            (Fp.Vector.of_array
-               [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|])
+            [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]
             sys ;
           x
     in
@@ -499,18 +561,15 @@ struct
         match (xl, xo) with
         | `Var xl, `Var xo ->
             add_generic_constraint ~l:(sl, xl) ~r:(sl, xl) ~o:(so, xo)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|])
+              [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]
               sys
         | `Var xl, `Constant ->
             add_generic_constraint ~l:(sl, xl) ~r:(sl, xl)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|])
+              [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
               sys
         | `Constant, `Var xl ->
             add_generic_constraint ~l:(sl, xl)
-              (Fp.Vector.of_array
-                 [|sl; Fp.zero; Fp.zero; Fp.zero; Fp.negate (Fp.square so)|])
+              [|sl; Fp.zero; Fp.zero; Fp.zero; Fp.negate (Fp.square so)|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal (square sl) so)) )
@@ -519,38 +578,31 @@ struct
         match (x1, x2, x3) with
         | `Var x1, `Var x2, `Var x3 ->
             add_generic_constraint ~l:(s1, x1) ~r:(s2, x2) ~o:(s3, x3)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|])
+              [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]
               sys
         | `Var x1, `Var x2, `Constant ->
             add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|])
+              [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
               sys
         | `Var x1, `Constant, `Var x3 ->
             add_generic_constraint ~l:(s1, x1) ~o:(s3, x3)
-              (Fp.Vector.of_array
-                 [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|])
+              [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Constant, `Var x2, `Var x3 ->
             add_generic_constraint ~r:(s2, x2) ~o:(s3, x3)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|])
+              [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Var x1, `Constant, `Constant ->
             add_generic_constraint ~l:(s1, x1)
-              (Fp.Vector.of_array
-                 [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|])
+              [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Var x2, `Constant ->
             add_generic_constraint ~r:(s2, x2)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|])
+              [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Constant, `Var x3 ->
             add_generic_constraint ~o:(s3, x3)
-              (Fp.Vector.of_array
-                 [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|])
+              [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]
               sys
         | `Constant, `Constant, `Constant ->
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
@@ -559,8 +611,7 @@ struct
         match x with
         | `Var x ->
             add_generic_constraint ~l:(s, x) ~r:(s, x)
-              (Fp.Vector.of_array
-                 [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|])
+              [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|]
               sys
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
@@ -570,24 +621,20 @@ struct
         | `Var x1, `Var x2 ->
             if s1 <> s2 then
               add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
-                (Fp.Vector.of_array
-                   [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|])
+                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
                 sys
               (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
               add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
-                (Fp.Vector.of_array
-                   [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|])
+                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
                 sys
         | `Var x1, `Constant ->
             add_generic_constraint ~l:(s1, x1)
-              (Fp.Vector.of_array
-                 [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|])
+              [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]
               sys
         | `Constant, `Var x2 ->
             add_generic_constraint ~r:(s2, x2)
-              (Fp.Vector.of_array
-                 [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|])
+              [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
@@ -604,7 +651,7 @@ struct
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
             2 prev.(0) prev.(1) prev.(2)
-            (Fp.Vector.of_array Params.params.round_constants.(ind))
+            Params.params.round_constants.(ind)
         in
         Array.iteri ~f:(fun i state -> add_round_state state i) state ;
         ()
@@ -625,14 +672,14 @@ struct
           {row= (fst prev.(0)).row; col= (snd prev.(0)).col}
           {row= (fst prev.(1)).row; col= (snd prev.(1)).col}
           {row= (fst prev.(2)).row; col= (snd prev.(2)).col}
-          (Fp.Vector.create ()) ;
+          [||] ;
         add_row sys
           (Array.map red ~f:(fun (x, _) -> Some x))
           4
           {row= (snd prev.(0)).row; col= (fst prev.(0)).col}
           {row= (snd prev.(1)).row; col= (fst prev.(1)).col}
           {row= (snd prev.(2)).row; col= (fst prev.(2)).col}
-          (Fp.Vector.create ()) ;
+          [||] ;
         ()
     | Plonk_constraint.T (EC_scale {state}) ->
         let add_ecscale_round (round : V.t Scale_round.t) =
@@ -646,13 +693,13 @@ struct
           let ys = wire sys round.ys (sys.next_row + 2) 2 in
           add_row sys
             [|Some round.xt; Some round.b; Some round.yt|]
-            5 xt b yt (Fp.Vector.create ()) ;
+            5 xt b yt [||] ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
-            6 xp l1 yp (Fp.Vector.create ()) ;
+            6 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xt; Some round.ys|]
-            7 xs xt ys (Fp.Vector.create ())
+            7 xs xt ys [||]
         in
         Array.iter
           ~f:(fun round -> add_ecscale_round round)
@@ -673,17 +720,17 @@ struct
           add_row sys
             [|Some round.b2i1; Some round.xt; None|]
             8 b2i1 xt
-            {row= sys.next_row; col= 3}
-            (Fp.Vector.create ()) ;
+            {row= After_public_input sys.next_row; col= 3}
+            [||] ;
           add_row sys
             [|Some round.b2i; Some round.xq; Some round.yt|]
-            9 b2i xq yt (Fp.Vector.create ()) ;
+            9 b2i xq yt [||] ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
-            10 xp l1 yp (Fp.Vector.create ()) ;
+            10 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xq; Some round.ys|]
-            11 xs xq ys (Fp.Vector.create ())
+            11 xs xq ys [||]
         in
         Array.iter
           ~f:(fun round -> add_endoscale_round round)

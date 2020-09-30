@@ -35,6 +35,11 @@ module rec T : sig
     | Scalar :
         ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
         -> ('a Sc.t, 'b Sc.t, 'env) t
+    (*
+    | Shifted :
+        ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
+        -> ('a Shifted_value.t, 'b Shifted_value.t, 'env) t
+*)
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
         -> (('t1, 'n) Vector.t, ('t2, 'n) Vector.t, 'env) t
@@ -208,10 +213,41 @@ let pack_basic (type field other_field other_field_var)
   in
   {pack}
 
+let pack_basic_unboolean (type field other_field other_field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+    (field : other_field_var -> Impl.Boolean.var list array) =
+  let open Impl in
+  let module C = Common (Impl) in
+  let open C in
+  let pack : type a b.
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+      -> b
+      -> Boolean.var list array =
+   fun basic x ->
+    match basic with
+    | Field ->
+        field x
+    | Bool ->
+        [|[x]|]
+    | Digest ->
+        [|Digest.Unsafe.to_bits_unboolean x|]
+    | Challenge ->
+        [|Challenge.to_bits x|]
+    | Index ->
+        [|Vector.to_list x|]
+    | Bulletproof_challenge ->
+        let (Scalar_challenge pre) = x.prechallenge in
+        [|[x.is_square]; Challenge.to_bits pre|]
+    | _ ->
+        failwith "unknown basic spec"
+  in
+  {pack}
+
 let pack impl field t = pack (pack_basic impl field) t
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
+    ~challenge ~scalar_challenge
     (field : (other_field_var, other_field) Impl.Typ.t) =
   let open Impl in
   let module C = Common (Impl) in
@@ -230,15 +266,16 @@ let typ_basic (type field other_field other_field_var)
     | Digest ->
         Digest.typ
     | Challenge ->
-        Challenge.typ
+        Challenge.typ' challenge
     | Bulletproof_challenge ->
-        Bulletproof_challenge.typ Challenge.typ Boolean.typ
+        Bulletproof_challenge.typ (Challenge.typ' scalar_challenge) Boolean.typ
     | _ ->
         failwith "unknown basic spec"
   in
   {typ}
 
-let typ impl field t = typ (typ_basic impl field) t
+let typ ~challenge ~scalar_challenge impl field t =
+  typ (typ_basic ~challenge ~scalar_challenge impl field) t
 
 let packed_typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
