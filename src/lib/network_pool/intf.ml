@@ -159,7 +159,7 @@ module type Network_pool_base_intf = sig
   val apply_and_broadcast :
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
-       * (bool -> unit)
+       * (Coda_net2.validation_result -> unit)
        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
     -> unit Deferred.t
 end
