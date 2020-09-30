@@ -20,7 +20,8 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let create_ledger accounts =
   let open Coda_base in
-  let ledger = Ledger.create_ephemeral ~depth:42 () in
+  let depth = constraint_constants.ledger_depth in
+  let ledger = Ledger.create_ephemeral ~depth () in
   List.iter accounts ~f:(fun acct ->
       let pk = Account.public_key acct in
       let token_id = Account.token acct in
@@ -381,8 +382,9 @@ let main ~input_file ~output_file ~archive_uri () =
             match%map
               Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
             with
+            | Ok [] ->
+                failwithf "Expected at least one user command with id %d" id ()
             | Ok user_cmds ->
-                (* N.B.: may be empty list, if the command status is not 'applied' *)
                 user_cmds
             | Error msg ->
                 failwithf
@@ -419,7 +421,7 @@ let main ~input_file ~output_file ~archive_uri () =
               apply_commands ics user_cmds
         in
         (* choose command with least global slot, sequence number
-         TODO: check for gaps?
+           TODO: check for gaps?
         *)
         let cmp_ic_uc (ic : Sql.Internal_command.t) (uc : Sql.User_command.t) =
           [%compare: int64 * int]
