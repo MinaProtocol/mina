@@ -89,7 +89,6 @@ module User_command = struct
     in
     Caqti_type.custom ~encode ~decode rep
 
-  (* do we need to consider fee_payer/receiver_account creation fee paid? *)
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
