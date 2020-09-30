@@ -273,6 +273,33 @@ struct
             Currency.Fee.(User_command.fee_exn cmd > min_fee)
           else true
 
+    let of_indexed_pool_error = function
+      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+          let nonce_json = Account.Nonce.to_yojson in
+          ( "invalid_nonce"
+          , [ ( "between"
+              , `Assoc [("low", nonce_json low); ("hi", nonce_json hi)] )
+            ; ("nonce", nonce_json nonce) ] )
+      | Invalid_nonce (`Expected enonce, nonce) ->
+          let nonce_json = Account.Nonce.to_yojson in
+          ( "invalid_nonce"
+          , [("expected_nonce", nonce_json enonce); ("nonce", nonce_json nonce)]
+          )
+      | Insufficient_funds (`Balance bal, amt) ->
+          let amt_json = Currency.Amount.to_yojson in
+          ( "insufficient_funds"
+          , [("balance", amt_json bal); ("amount", amt_json amt)] )
+      | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
+          let fee_json = Currency.Fee.to_yojson in
+          ( "insufficient_replace_fee"
+          , [("replace_fee", fee_json rfee); ("fee", fee_json fee)] )
+      | Overflow ->
+          ("overflow", [])
+      | Bad_token ->
+          ("bad_token", [])
+      | Unwanted_fee_token fee_token ->
+          ("unwanted_fee_token", [("fee_token", Token_id.to_yojson fee_token)])
+
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
             Transition_frontier.best_tip_diff)
@@ -293,6 +320,17 @@ struct
       *)
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
+      let log_indexed_pool_error error_str ~metadata cmd =
+        [%log' debug t.logger]
+          "Couldn't re-add locally generated command $cmd, not valid against \
+           new ledger. Error: $error"
+          ~metadata:
+            ( [ ( "cmd"
+                , Transaction_hash.User_command_with_valid_signature.to_yojson
+                    cmd )
+              ; ("error", `String error_str) ]
+            @ metadata )
+      in
       [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
@@ -443,14 +481,8 @@ struct
               Option.is_some
               @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
           in
-          let log_invalid () =
-            [%log' debug t.logger]
-              "Couldn't re-add locally generated command $cmd, not valid \
-               against new ledger."
-              ~metadata:
-                [ ( "cmd"
-                  , Transaction_hash.User_command_with_valid_signature
-                    .to_yojson cmd ) ] ;
+          let log_and_remove ?(metadata = []) error_str =
+            log_indexed_pool_error error_str ~metadata cmd ;
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
@@ -470,12 +502,13 @@ struct
                       .to_yojson cmd ) ] ;
               remove_cmd () )
             else
+              let unchecked =
+                Transaction_hash.User_command_with_valid_signature.command cmd
+              in
               match
                 Option.bind
                   (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.fee_payer
-                        (Transaction_hash.User_command_with_valid_signature
-                         .command cmd)))
+                     (User_command.fee_payer unchecked))
                   ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (
@@ -483,8 +516,12 @@ struct
                   Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
                     (Currency.Balance.to_amount acct.balance)
                 with
-                | Error _ ->
-                    log_invalid ()
+                | Error e ->
+                    let error_str, metadata = of_indexed_pool_error e in
+                    log_and_remove error_str
+                      ~metadata:
+                        ( ("user_command", User_command.to_yojson unchecked)
+                        :: metadata )
                 | Ok (pool''', _) ->
                     [%log' debug t.logger]
                       "re-added locally generated command $cmd to transaction \
@@ -495,7 +532,9 @@ struct
                             .to_yojson cmd ) ] ;
                     t.pool <- pool''' )
               | None ->
-                  log_invalid () ) ;
+                  log_and_remove "Fee_payer_account not found"
+                    ~metadata:
+                      [("user_command", User_command.to_yojson unchecked)] ) ;
       Deferred.unit
 
     let create ~constraint_constants ~frontier_broadcast_pipe ~config ~logger
@@ -778,7 +817,8 @@ struct
                                  sender_account.balance
                           in
                           let of_indexed_pool_error = function
-                            | `Invalid_nonce (`Between (low, hi), nonce) ->
+                            | Indexed_pool.Command_error.Invalid_nonce
+                                (`Between (low, hi), nonce) ->
                                 let nonce_json = Account.Nonce.to_yojson in
                                 ( Diff_versioned.Diff_error.Invalid_nonce
                                 , [ ( "between"
@@ -786,27 +826,27 @@ struct
                                         [ ("low", nonce_json low)
                                         ; ("hi", nonce_json hi) ] )
                                   ; ("nonce", nonce_json nonce) ] )
-                            | `Invalid_nonce (`Expected enonce, nonce) ->
+                            | Invalid_nonce (`Expected enonce, nonce) ->
                                 let nonce_json = Account.Nonce.to_yojson in
                                 ( Diff_versioned.Diff_error.Invalid_nonce
                                 , [ ("expected_nonce", nonce_json enonce)
                                   ; ("nonce", nonce_json nonce) ] )
-                            | `Insufficient_funds (`Balance bal, amt) ->
+                            | Insufficient_funds (`Balance bal, amt) ->
                                 let amt_json = Currency.Amount.to_yojson in
                                 ( Insufficient_funds
                                 , [ ("balance", amt_json bal)
                                   ; ("amount", amt_json amt) ] )
-                            | `Insufficient_replace_fee (`Replace_fee rfee, fee)
+                            | Insufficient_replace_fee (`Replace_fee rfee, fee)
                               ->
                                 let fee_json = Currency.Fee.to_yojson in
                                 ( Insufficient_replace_fee
                                 , [ ("replace_fee", fee_json rfee)
                                   ; ("fee", fee_json fee) ] )
-                            | `Overflow ->
+                            | Overflow ->
                                 (Overflow, [])
-                            | `Bad_token ->
+                            | Bad_token ->
                                 (Bad_token, [])
-                            | `Unwanted_fee_token fee_token ->
+                            | Unwanted_fee_token fee_token ->
                                 ( Unwanted_fee_token
                                 , [("fee_token", Token_id.to_yojson fee_token)]
                                 )
@@ -815,17 +855,17 @@ struct
                             Fn.compose
                               (fun s -> `String s)
                               (function
-                                | `Invalid_nonce _ ->
+                                | Indexed_pool.Command_error.Invalid_nonce _ ->
                                     "invalid nonce"
-                                | `Insufficient_funds _ ->
+                                | Insufficient_funds _ ->
                                     "insufficient funds"
-                                | `Insufficient_replace_fee _ ->
+                                | Insufficient_replace_fee _ ->
                                     "insufficient replace fee"
-                                | `Overflow ->
+                                | Overflow ->
                                     "overflow"
-                                | `Bad_token ->
+                                | Bad_token ->
                                     "bad token"
-                                | `Unwanted_fee_token _ ->
+                                | Unwanted_fee_token _ ->
                                     "unwanted fee token" )
                           in
                           match add_res with
@@ -893,7 +933,7 @@ struct
                                              locally_generated_dropped) ) ] ;
                               go txs'' pool'' (tx :: accepted, rejected)
                           | Error
-                              (`Insufficient_replace_fee
+                              (Insufficient_replace_fee
                                 (`Replace_fee rfee, fee)) ->
                               (* We can't punish peers for this, since an
                              attacker can simultaneously send different
@@ -917,7 +957,7 @@ struct
                                   , Diff_versioned.Diff_error
                                     .Insufficient_replace_fee )
                                   :: rejected )
-                          | Error (`Unwanted_fee_token fee_token) ->
+                          | Error (Unwanted_fee_token fee_token) ->
                               (* We can't punish peers for this, since these
                                    are our specific preferences.
                                 *)
@@ -1081,8 +1121,11 @@ let%test_module _ =
 
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let logger = Logger.null ()
 
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
@@ -1166,7 +1209,6 @@ let%test_module _ =
         Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
       in
       let trust_system = Trust_system.null () in
-      let logger = Logger.null () in
       let%bind config =
         let%map verifier =
           Verifier.create ~logger ~proof_level
@@ -1428,7 +1470,6 @@ let%test_module _ =
           let local_diff_r, _local_diff_w =
             Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
           in
-          let logger = Logger.null () in
           let trust_system = Trust_system.null () in
           let%bind config =
             let%map verifier =

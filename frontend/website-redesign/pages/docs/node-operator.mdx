@@ -13,11 +13,11 @@ The Mina network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 Normally we'd want to have more funds before staking, but since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can try out staking its mina by issuing the following command:
 
-    mina client set-staking -public-key $CODA_PUBLIC_KEY
+    mina client set-staking -public-key $MINA_PUBLIC_KEY
 
 Alternatively, you can restart the daemon with the `-block-producer-pubkey` flag:
 
-<DaemonCommandExample args={["-block-producer-pubkey $CODA_PUBLIC_KEY"]} />
+<DaemonCommandExample args={["-block-producer-pubkey $MINA_PUBLIC_KEY"]} />
 
 We can always check which accounts we're currently staking with, by using the `mina client status` command:
 
@@ -69,13 +69,13 @@ Delegating mina is an alternative option to staking it directly, with the benefi
 
 First make sure you've unlocked your account:
 
-    mina account unlock -public-key $CODA_PUBLIC_KEY
+    mina account unlock -public-key $MINA_PUBLIC_KEY
 
 And then run this command to delegate your stake:
 
     mina client delegate-stake \
         -receiver <DELEGATE-PUBLIC-KEY> \
-        -sender $CODA_PUBLIC_KEY \
+        -sender $MINA_PUBLIC_KEY \
         -fee 0.1
 
 The fields in this command:
@@ -109,12 +109,12 @@ However, this isn't data encoding or compression in the traditional sense - rath
 You can start a snark-worker using these commands:
 
     mina client set-snark-work-fee <FEE>
-    mina client set-snark-worker -address $CODA_PUBLIC_KEY
+    mina client set-snark-worker -address $MINA_PUBLIC_KEY
 
 Alternatively, you can restart the daemon with these flags:
 
 <DaemonCommandExample
-  args={["-run-snark-worker $CODA_PUBLIC_KEY", "-snark-worker-fee <fee>"]}
+  args={["-run-snark-worker $MINA_PUBLIC_KEY", "-snark-worker-fee <fee>"]}
 />
 
 As a snark worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.

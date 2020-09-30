@@ -537,36 +537,16 @@ let make = (~kind, ~size=1.5) => {
        </>
      | Documentation =>
        <>
-         <g clipPath="url(#clip0)">
-           <rect
-             x="2.90002"
-             y="2.90002"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="none"
-             stroke="currentColor"
-           />
-           <rect
-             x="0.5"
-             y="0.5"
-             width="20.6"
-             height="20.6"
-             rx="0.5"
-             fill="none"
-             stroke="currentColor"
-           />
-           <path
-             fillRule="evenodd"
-             clipRule="evenodd"
-             d="M16.8 4.80005H4.79999V5.70005H16.8V4.80005ZM15 8.40005H4.79999V9.30005H15V8.40005ZM4.79999 12H16.8V12.9H4.79999V12ZM12.6 15.6H4.79999V16.5H12.6V15.6Z"
-           />
-         </g>
-         <defs>
-           <clipPath id="clip0">
-             <rect width="24" height="24" fill="none" />
-           </clipPath>
-         </defs>
+         <path
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M0.999997 0C0.447714 0 0 0.447715 0 0.999999V20.6C0 21.1523 0.447714 21.6 0.999997 21.6H2.40008V23C2.40008 23.5523 2.84779 24 3.40007 24H23C23.5523 24 24 23.5523 24 23V3.40001C24 2.84773 23.5523 2.40002 23 2.40002H21.5999V0.999999C21.5999 0.447715 21.1522 0 20.5999 0H0.999997ZM21.5999 3.40001V20.6C21.5999 21.1523 21.1522 21.6 20.5999 21.6H3.40007V23H23V3.40001H21.5999ZM0.999997 0.999999H20.5999V20.6H0.999997V0.999999Z"
+         />
+         <path
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M16.7999 4.80005H4.79997V5.70005H16.7999V4.80005ZM15 8.40005H4.79997V9.30004H15V8.40005ZM4.79997 12H16.7999V12.9H4.79997V12ZM12.6 15.6H4.79997V16.5H12.6V15.6Z"
+         />
        </>
      | GenesisProgram =>
        <>

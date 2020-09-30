@@ -106,9 +106,9 @@ If you are one of the selected Testnet 3.2b participants that has been delegated
 
 Since the public key is quite long and difficult to remember, let's save it as an environment variable:
 
-    export CODA_PUBLIC_KEY=<YOUR-PUBLIC-KEY>
+    export MINA_PUBLIC_KEY=<YOUR-PUBLIC-KEY>
 
-Now we can access this everywhere as `$CODA_PUBLIC_KEY` -- see if it saved properly by trying `echo $CODA_PUBLIC_KEY`.
+Now we can access this everywhere as `$MINA_PUBLIC_KEY` -- see if it saved properly by trying `echo $MINA_PUBLIC_KEY`.
 
 Note that these environment variables will only be saved for the current shell session, so if you want to save them for future use, you can add them to `~/.profile` or `~/.bash_profile`.
 
@@ -164,7 +164,7 @@ Hint: You can run `mina client status` to see the current block height updating.
 
 Finally we get to the good stuff, sending our first transaction! Before you send a payment, you'll need to unlock your account:
 
-    mina accounts unlock -public-key $CODA_PUBLIC_KEY
+    mina accounts unlock -public-key $MINA_PUBLIC_KEY
 
 For testing purposes, there's already an echo service set up that will immediately refund your payment minus the transaction fees. You can use the following public key for the echo bot.
 
@@ -188,7 +188,7 @@ Let's send some of our newly received mina to this service to see what a payment
       -amount 0.5 \
       -receiver B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9 \
       -fee 0.1 \
-      -sender $CODA_PUBLIC_KEY
+      -sender $MINA_PUBLIC_KEY
 
 If you're wondering what we passed in to the commands above:
 

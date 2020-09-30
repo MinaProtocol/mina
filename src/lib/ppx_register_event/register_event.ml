@@ -146,9 +146,10 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   , [%e
                       elist label_decls
                         ~f:(fun {pld_name= {txt= name; _}; pld_type; _} ->
-                          [%expr
-                            [%e estring name]
-                            , [%e to_yojson pld_type] [%e evar name]] )] )
+                          Ppx_deriving_yojson.wrap_runtime
+                            [%expr
+                              [%e estring name]
+                              , [%e to_yojson pld_type] [%e evar name]] )] )
             | _ ->
                 None )
         ; parse=
@@ -161,14 +162,15 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                     [%e
                       List.fold_right label_decls
                         ~f:(fun {pld_name= {txt= name; _}; pld_type; _} acc ->
-                          [%expr
-                            Core_kernel.Result.bind
-                              ([%e
-                                 of_yojson
-                                   ~path:(split_path @ [ctor; name])
-                                   pld_type]
-                                 [%e evar name])
-                              ~f:(fun [%p pvar name] -> [%e acc])] )
+                          Ppx_deriving_yojson.wrap_runtime
+                            [%expr
+                              Core_kernel.Result.bind
+                                ([%e
+                                   of_yojson
+                                     ~path:(split_path @ [ctor; name])
+                                     pld_type]
+                                   [%e evar name])
+                                ~f:(fun [%p pvar name] -> [%e acc])] )
                         ~init:
                           [%expr Core_kernel.Result.return [%e record_expr]]]
                 | _ ->

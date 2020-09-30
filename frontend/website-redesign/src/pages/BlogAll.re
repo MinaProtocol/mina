@@ -18,7 +18,7 @@ let make = (~posts) => {
     </Wrapped>
     <ButtonBar
       kind=ButtonBar.CommunityLanding
-      backgroundImg="/static/img/ButtonBarBackground.png"
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
     <Blog.InternalCtaSection />
   </Page>;
