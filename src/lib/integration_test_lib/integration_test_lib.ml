@@ -9,7 +9,7 @@ end
 
 module Test_config = struct
   module Block_producer = struct
-    type t = {balance: string}
+    type t = {balance: string; timing: Coda_base.Account_timing.t}
   end
 
   type t =

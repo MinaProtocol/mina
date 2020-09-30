@@ -123,25 +123,83 @@ module Node = struct
     }
   }
   |}]
+
+    module Get_balance =
+    [%graphql
+    {|
+    query ($public_key: PublicKey, $token: UInt64) {
+      account(publicKey: $public_key, token: $token) {
+        balance {
+          total @bsDecoder(fn: "Decoders.balance")
+        }
+      }
+    }
+  |}]
   end
 
+  let set_port_forwarding_exn ~logger t graphql_port =
+    match%map.Deferred.Let_syntax
+      Graphql.set_port_forwarding ~logger t graphql_port
+    with
+    | Ok _ ->
+        (* not reachable, port forwarder does not terminate *)
+        ()
+    | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
+        [%log fatal] "Error running k8s port forwarding"
+          ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
+        failwith "Could not run k8s port forwarding"
+
+  (*let retry ?(num_tries=10) ?(retry_delay_sec=30.0) ?(initial_delay_sec=30.0) ~logger ~graphql_port query_obj =
+        let go n =  
+          if n <= 0 then (
+          [%log fatal] "unlock_sender_account_graphql: too many tries" ;
+          failwith "unlock_sender_account_graphql: too many tries" )
+        else
+          (* let open Malleable_error.Let_syntax in *)
+          match%bind
+            Deferred.bind ~f:Malleable_error.return
+              ((Graphql.Client.query unlock_account_obj)
+                 (Graphql.uri graphql_port))
+          with
+          | Ok _ ->
+              [%log info] "unlock sender account succeeded" ;
+              return ()
+          | Error (`Failed_request err_string) ->
+              [%log warn]
+                "unlock_sender_account_graphql, Failed GraphQL request: %s, \
+                 %d tries left"
+                err_string (n - 1) ;
+              let%bind () =
+                Deferred.bind ~f:Malleable_error.return
+                  (after (Time.Span.of_sec retry_delay_sec))
+              in
+              go (n - 1)
+          | Error (`Graphql_error err_string) ->
+              [%log error] "unlock_sender_account_graphql, GraphQL error: %s"
+                err_string ;
+              Malleable_error.of_string_hard_error err_string
+      in
+      let%bind () =
+        Deferred.bind ~f:Malleable_error.return
+          (after (Time.Span.of_sec initial_delay_sec))
+      in
+      go num_tries
+
+  let get_balance ~logger t ~account_id =
+        [%log info] "Getting account balance"
+      ~metadata:
+        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id); ("account_id", Coda_base.Account_id.to_yojson account_id)] ;
+      let graphql_port = 3085 in
+      let pk = Coda_base.Account_id.public_key account_id in
+      let token = Coda_base.Account_id.token_id account_id in*)
+
   let send_payment ~logger t ~sender ~receiver ~amount ~fee =
-    [%log info] "Running send_payment test"
+    [%log info] "Sending a payment.."
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let graphql_port = 3085 in
     let open Malleable_error.Let_syntax in
-    Deferred.don't_wait_for
-      ( match%map.Deferred.Let_syntax
-          Graphql.set_port_forwarding ~logger t graphql_port
-        with
-      | Ok _ ->
-          (* not reachable, port forwarder does not terminate *)
-          ()
-      | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
-          [%log fatal] "Error running k8s port forwarding"
-            ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
-          failwith "Could not run k8s port forwarding" ) ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;

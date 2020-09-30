@@ -89,7 +89,19 @@ module Network_config = struct
       if List.length block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
-      let f index ({Test_config.Block_producer.balance}, (pk, sk)) =
+      let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
+        let timing =
+          match timing with
+          | Timed t ->
+              Some
+                { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                    t.initial_minimum_balance
+                ; cliff_time= t.cliff_time
+                ; vesting_period= t.vesting_period
+                ; vesting_increment= t.vesting_increment }
+          | Untimed ->
+              None
+        in
         let runtime_account =
           { Runtime_config.Accounts.pk=
               Some (Public_key.Compressed.to_string pk)
@@ -98,7 +110,7 @@ module Network_config = struct
               Balance.of_formatted_string balance
               (* delegation currently unsupported *)
           ; delegate= None
-          ; timing= None }
+          ; timing }
         in
         let secret_name = "test-keypair-" ^ Int.to_string index in
         let keypair =

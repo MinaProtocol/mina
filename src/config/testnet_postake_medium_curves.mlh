@@ -1,7 +1,7 @@
 [%%define ledger_depth 14]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/realistic.mlh"]
-[%%import "/src/config/scan_state/point2tps.mlh"]
+[%%import "/src/config/scan_state/small.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
 [%%import "/src/config/proof_level/full.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
@@ -12,7 +12,7 @@
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
-[%%define k 20]
+[%%define k 6]
 [%%define c 8]
 [%%define delta 3]
 

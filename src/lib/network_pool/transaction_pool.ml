@@ -273,6 +273,7 @@ struct
             Currency.Fee.(User_command.fee_exn cmd > min_fee)
           else true
 
+    (*Everytime there is best tip diff, (or some interval) go through the pool and evict expired transactions. calculate the slot for comparison using now ()*)
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
             Transition_frontier.best_tip_diff)

@@ -20,7 +20,9 @@ let engines : engine list =
 let tests : test list =
   [ ( "block-production"
     , (module Block_production_test.Make : Test_functor_intf) )
-  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
+  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf))
+  ; ( "bp-timed-accounts"
+    , (module Block_production_test.Make : Test_functor_intf) ) ]
 
 let to_or_error = Deferred.map ~f:Or_error.return
 

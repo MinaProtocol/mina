@@ -682,7 +682,14 @@ let wait_for' :
             n
       in
       let hard_timeout = estimated_time * 2L in
-      Time.add now (Time.Span.of_ms (Int64.to_float hard_timeout))
+      let ti = Time.add now (Time.Span.of_ms (Int64.to_float hard_timeout)) in
+      [%log' info t.logger]
+        "estimated timeout %s hard_timeout %s now %s timeout %s"
+        (Int64.to_string estimated_time)
+        (Int64.to_string hard_timeout)
+        (Time.to_string_abs ~zone:Time.Zone.utc now)
+        (Time.to_string_abs ~zone:Time.Zone.utc ti) ;
+      ti
     in
     let query_timeout_ms =
       match timeout with
