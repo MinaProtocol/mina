@@ -70,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list

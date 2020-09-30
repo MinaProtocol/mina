@@ -151,9 +151,11 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
           ; chain_id
+          ; flooding= false
+          ; direct_peers= []
+          ; peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost

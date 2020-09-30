@@ -652,14 +652,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
-      (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+      ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }

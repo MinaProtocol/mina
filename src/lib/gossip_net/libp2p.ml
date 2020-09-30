@@ -55,7 +55,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          ( Message.msg Envelope.Incoming.t
+          * (Coda_net2.validation_result -> unit) )
           Strict_pipe.Reader.t
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
@@ -137,7 +138,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[] ~gossip_type:config.gossip_type
+              configure net2 ~me ~maddrs:[]
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
