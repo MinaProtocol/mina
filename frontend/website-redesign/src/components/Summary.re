@@ -54,7 +54,7 @@ module Styles = {
       media(Theme.MediaQuery.tablet, [padding2(~v=`zero, ~h=`zero)]),
       media(
         Theme.MediaQuery.desktop,
-        [flexDirection(`row), paddingTop(`zero), marginTop(`rem(3.5))],
+        [flexDirection(`row), paddingTop(`zero)],
       ),
     ]);
 
@@ -95,14 +95,10 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      marginTop(`rem(3.)),
+      marginTop(`rem(4.)),
       media(
         Theme.MediaQuery.tablet,
-        [
-          flexDirection(`row),
-          marginTop(`zero),
-          justifyContent(`flexStart),
-        ],
+        [flexDirection(`row), justifyContent(`flexStart)],
       ),
     ]);
 
@@ -134,7 +130,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.notMobile,
-        [position(`absolute), top(`rem(7.)), left(`zero)],
+        [position(`absolute), top(`rem(10.)), left(`zero)],
       ),
     ]);
 
