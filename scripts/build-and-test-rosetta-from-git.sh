@@ -11,6 +11,6 @@ cat dockerfiles/Dockerfile-rosetta | docker build \
   --build-arg "MINA_BRANCH=${GITBRANCH}" -
   #--cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:${TAG} \
 
-docker run -it --entrypoint=./docker-test-start.sh gcr.io/o1labs-192920/minaa-rosetta:${TAG}
+docker run -it --entrypoint=./docker-test-start.sh gcr.io/o1labs-192920/mina-rosetta:${TAG}
 
 [[ $? -eq 0 ]] && docker push gcr.io/o1labs-192920/mina-rosetta:${TAG} || echo "Tests failed, not pushing"
