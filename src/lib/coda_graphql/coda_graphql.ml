@@ -453,10 +453,10 @@ module Types = struct
   let connection_gating_config =
     obj "ConnectionGatingConfig" ~fields:(fun _ ->
         [ field "trustedPeers"
-            ~typ:(list (non_null DaemonStatus.peer))
+            ~typ:(non_null (list (non_null DaemonStatus.peer)))
             ~doc:"Peers we will always allow connections from"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} () -> return []) ] )
+            ~resolve:(fun {ctx= coda; _} () -> []) ] )
 
   module AccountObj = struct
     module AnnotatedBalance = struct
@@ -2297,10 +2297,7 @@ module Mutations = struct
         Ok old_snark_worker_key )
 
   let set_snark_work_fee =
-    result_field "setSnarkWorkFee"
-      ~doc:"Set fee that you will like to receive for doing snark work"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)]
-      ~typ:(non_null Types.Payload.set_snark_work_fee)
+    result_field "setSnarkWorkFee" ~doc:"Set fee that you will like to receive for doing snark work" ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)] ~typ:(non_null Types.Payload.set_snark_work_fee)
       ~resolve:(fun {ctx= coda; _} () raw_fee ->
         let open Result.Let_syntax in
         let%map fee =
@@ -2314,9 +2311,11 @@ module Mutations = struct
   let set_connection_gating =
     result_field "setConnectionGating"
       ~args:Arg.[arg "input" ~typ:(non_null Types.connection_gating_config)]
-      ~typ:Arg.[]
+      ~doc:"Set the connection gating config, returning the current config after the application (which may have failed)"
+      ~typ:(non_null Types.connection_gating_config)
       ~resolve:(fun {ctx= coda; _} () config ->
-        Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
+              let%bind () = Coda_networking.set_connection_gating_config (Coda_lib.net coda) config in
+              Coda_networking.connection_gating_config (Coda_lib.net coda)
         )
 
   let commands =
