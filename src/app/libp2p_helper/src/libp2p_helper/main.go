@@ -43,7 +43,7 @@ type subscription struct {
 }
 
 type validationStatus struct {
-	Completion chan bool
+	Completion chan string
 	TimedOutAt *time.Time
 }
 
@@ -365,15 +365,15 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	app.P2p.Pubsub.Join(s.Topic)
-	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
-			return true
+			return pubsub.ValidationAccept
 		}
 
 		seqno := <-seqs
-		ch := make(chan bool, 1)
+		ch := make(chan string, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
@@ -388,7 +388,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.ValidatorMutex.Lock()
 			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
-			return false
+			return pubsub.ValidationIgnore
 		}
 
 		app.writeMsg(validateUpcall{
@@ -417,17 +417,24 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
-				return true
+				return pubsub.ValidationAccept
 			}
 			app.P2p.Logger.Info("unvalidated :(")
-			return false
+			return pubsub.ValidationReject
 		case res := <-ch:
-			if !res {
+			switch res {
+			case "reject":
 				app.P2p.Logger.Info("why u fail to validate :(")
-			} else {
+				return pubsub.ValidationReject
+			case "accept":
 				app.P2p.Logger.Info("validated!")
+				return pubsub.ValidationAccept
+			case "ignore":
+				app.P2p.Logger.Info("ignoring valid message!")
+				return pubsub.ValidationIgnore
 			}
-			return res
+			app.P2p.Logger.Info("ignoring message that falled off the end!")
+			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -503,8 +510,8 @@ type validateUpcall struct {
 }
 
 type validationCompleteMsg struct {
-	Seqno int  `json:"seqno"`
-	Valid bool `json:"is_valid"`
+	Seqno int    `json:"seqno"`
+	Valid string `json:"is_valid"`
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {

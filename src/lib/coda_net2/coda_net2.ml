@@ -324,7 +324,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; is_valid: bool} [@@deriving yojson]
+      type input = {seqno: int; action: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -771,7 +771,7 @@ module Helper = struct
             (let open Deferred.Let_syntax in
             let raw_data = Data.to_string m.data in
             let decoded = sub.decode raw_data in
-            let%bind is_valid =
+            let%bind action =
               match decoded with
               | Ok data ->
                   sub.validator (wrap m.sender data)
@@ -791,7 +791,7 @@ module Helper = struct
                   return false
             in
             match%map
-              do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid}
+              do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid= match is_valid with `Accept -> "accept" | `Reject -> "reject" | `Ignore -> "ignore" }
             with
             | Ok "validationComplete success" ->
                 ()
