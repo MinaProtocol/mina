@@ -17,9 +17,9 @@
   "author": "O(1) Labs (forked from Edwin Shin)",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/codaprotocol/coda/issues"
+    "url": "https://github.com/minaprotocol/mina/issues"
   },
-  "homepage": "https://github.com/codaprotocol/coda",
+  "homepage": "https://github.com/minaprotocol/mina",
   "dependencies": {
     "axios": "^0.19.2"
   },
