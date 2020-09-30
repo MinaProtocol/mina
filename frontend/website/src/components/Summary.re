@@ -140,7 +140,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.notMobile,
-        [padding2(~v=`rem(0.), ~h=`rem(6.0))],
+        [padding2(~v=`rem(0.), ~h=`rem(6.0)), width(`rem(25.))],
       ),
     ]);
 

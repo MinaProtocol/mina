@@ -1,5 +1,7 @@
 open Async
 open Core
+open Pipe_lib
+open Coda_base
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 
@@ -14,47 +16,15 @@ let project_id = "o1labs-192920"
 let prog = "gcloud"
 
 let load_config_json json_str =
-  Or_error.try_with (fun () -> Yojson.Safe.from_string json_str)
-
-let rec or_error_list_iter ls ~f =
-  let open Or_error.Let_syntax in
-  match ls with
-  | [] ->
-      return ()
-  | h :: t ->
-      let%bind () = f h in
-      or_error_list_iter t ~f
-
-let rec or_error_list_map ls ~f =
-  let open Or_error.Let_syntax in
-  match ls with
-  | [] ->
-      return []
-  | h :: t ->
-      let%bind h' = f h in
-      let%map t' = or_error_list_map t ~f in
-      h' :: t'
-
-let rec or_error_list_fold_left_while ls ~init ~f =
-  let open Or_error.Let_syntax in
-  match ls with
-  | [] ->
-      return init
-  | h :: t -> (
-      match%bind f init h with
-      | `Stop init' ->
-          return init'
-      | `Continue init' ->
-          or_error_list_fold_left_while t ~init:init' ~f )
-
-let or_error_of_option opt msg =
-  Option.value_map opt
-    ~default:(Error (Error.of_string msg))
-    ~f:Or_error.return
+  Malleable_error.try_with (fun () -> Yojson.Safe.from_string json_str)
 
 let coda_container_filter = "resource.labels.container_name=\"coda\""
 
 let block_producer_filter = "resource.labels.pod_name:\"block-producer\""
+
+let structured_event_filter event_id =
+  Printf.sprintf "jsonPayload.event_id=\"%s\""
+    (Structured_log_events.string_of_id event_id)
 
 module Subscription = struct
   type t = {name: string; topic: string; sink: string}
@@ -70,14 +40,15 @@ module Subscription = struct
      from the sink on your project's Activity page; you can ignore them.
   *)
   let create_sink ~topic ~filter ~key ~logger name =
-    let open Deferred.Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let url =
       "https://logging.googleapis.com/v2/projects/o1labs-192920/sinks?key="
       ^ key
     in
     let%bind authorization =
       let%map token =
-        Process.run ~prog ~args:["auth"; "print-access-token"] ()
+        Deferred.bind ~f:Malleable_error.of_or_error_hard
+          (Process.run ~prog ~args:["auth"; "print-access-token"] ())
       in
       let token = String.strip token in
       String.concat ["Authorization: Bearer "; token]
@@ -98,35 +69,38 @@ module Subscription = struct
       |> Yojson.Safe.to_string
     in
     let%bind response =
-      Process.run ~prog:"curl"
-        ~args:
-          [ "--request"
-          ; "POST"
-          ; url
-          ; header
-          ; authorization
-          ; header
-          ; req_type
-          ; header
-          ; content_type
-          ; "--data"
-          ; data
-          ; "--compressed" ]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog:"curl"
+           ~args:
+             [ "--request"
+             ; "POST"
+             ; url
+             ; header
+             ; authorization
+             ; header
+             ; req_type
+             ; header
+             ; content_type
+             ; "--data"
+             ; data
+             ; "--compressed" ]
+           ())
     in
-    let%bind response_json = Deferred.return @@ load_config_json response in
+    let%bind response_json = load_config_json response in
     [%log debug] "Create sink response: $response"
       ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
     with
     | Some _ ->
-        Deferred.Or_error.errorf !"Error when creating sink: %s" response
+        Malleable_error.of_string_hard_error_format
+          !"Error when creating sink: %s"
+          response
     | None ->
-        Deferred.Or_error.ok_unit
+        Malleable_error.ok_unit
 
   let create ~name ~filter ~logger =
-    let open Deferred.Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let uuid = Uuid_unix.create () in
     let name = name ^ "_" ^ Uuid.to_string uuid in
     let gcloud_key_file_env = "GCLOUD_API_KEY" in
@@ -135,26 +109,28 @@ module Subscription = struct
       | Some key ->
           return key
       | None ->
-          Deferred.Or_error.errorf
+          Malleable_error.of_string_hard_error_format
             "Set environment variable %s with the service account key to use \
              Stackdriver logging"
             gcloud_key_file_env
     in
     let create_topic name =
-      Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ())
     in
     let create_subscription name topic =
-      Process.run ~prog
-        ~args:
-          [ "pubsub"
-          ; "subscriptions"
-          ; "create"
-          ; name
-          ; "--topic"
-          ; topic
-          ; "--topic-project"
-          ; project_id ]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog
+           ~args:
+             [ "pubsub"
+             ; "subscriptions"
+             ; "create"
+             ; name
+             ; "--topic"
+             ; topic
+             ; "--topic-project"
+             ; project_id ]
+           ())
     in
     let topic = name ^ "_topic" in
     let sink = name ^ "_sink" in
@@ -165,65 +141,72 @@ module Subscription = struct
 
   let delete t =
     let delete_subscription () =
-      Process.run ~prog
-        ~args:
-          ["pubsub"; "subscriptions"; "delete"; t.name; "--project"; project_id]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog
+           ~args:
+             [ "pubsub"
+             ; "subscriptions"
+             ; "delete"
+             ; t.name
+             ; "--project"
+             ; project_id ]
+           ())
     in
     let delete_sink () =
-      Process.run ~prog
-        ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog
+           ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
+           ())
     in
     let delete_topic () =
-      Process.run ~prog
-        ~args:["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog
+           ~args:
+             ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
+           ())
     in
-    Deferred.Or_error.combine_errors
+    Malleable_error.combine_errors
       [delete_subscription (); delete_sink (); delete_topic ()]
 
   let pull t =
-    let open Deferred.Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let subscription_id =
       String.concat ~sep:"/" ["projects"; project_id; "subscriptions"; t.name]
     in
     (* The limit for messages we pull on each interval is currently not configurable. For now, it's set to 5 (which will hopefully be a sane for a while). *)
     let%bind result =
-      Process.run ~prog
-        ~args:
-          [ "pubsub"
-          ; "subscriptions"
-          ; "pull"
-          ; subscription_id
-          ; "--auto-ack"
-          ; "--limit"
-          ; string_of_int 5
-          ; "--format"
-          ; "table(DATA)" ]
-        ()
+      Deferred.bind ~f:Malleable_error.of_or_error_hard
+        (Process.run ~prog
+           ~args:
+             [ "pubsub"
+             ; "subscriptions"
+             ; "pull"
+             ; subscription_id
+             ; "--auto-ack"
+             ; "--limit"
+             ; string_of_int 5
+             ; "--format"
+             ; "table(DATA)" ]
+           ())
     in
     match String.split_lines result with
     | [] | ["DATA"] ->
         return []
     | "DATA" :: data ->
-        Deferred.return (or_error_list_map data ~f:load_config_json)
+        Malleable_error.List.map data ~f:load_config_json
     | _ ->
-        Deferred.return
-          (Error
-             (Error.of_string
-                (sprintf "Invalid subscription pull result: %s" result)))
+        Malleable_error.of_string_hard_error
+          (sprintf "Invalid subscription pull result: %s" result)
 end
 
 module Json_parsing = struct
   open Yojson.Safe.Util
 
-  (* convert from Yojson or_error format to Core or_error *)
-  let lift_json_or_error = function
+  let lift_json_malleable_error = function
     | Ok x ->
-        Ok x
+        Malleable_error.return x
     | Error err ->
-        Error (Error.of_string err)
+        Malleable_error.of_string_hard_error err
 
   type 'a parser = Yojson.Safe.t -> 'a
 
@@ -238,6 +221,18 @@ module Json_parsing = struct
 
   let float : float parser =
    fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
+
+  let list : 'a parser -> 'a list parser = fun f x -> List.map ~f (to_list x)
+
+  let state_hash : State_hash.t parser =
+    Fn.compose Result.ok_or_failwith State_hash.of_yojson
+
+  let parse (parser : 'a parser) (json : Yojson.Safe.t) : 'a Malleable_error.t
+      =
+    try Malleable_error.return (parser json)
+    with exn ->
+      Malleable_error.of_string_hard_error
+        (Printf.sprintf "failed to parse json value: %s" (Exn.to_string exn))
 
   let signed_commands_with_statuses :
       Coda_base.Signed_command.t Coda_base.With_status.t list parser = function
@@ -261,25 +256,27 @@ module Json_parsing = struct
         failwith "signed_commands_with_statuses: expected `List"
 
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
-      : 'a Or_error.t =
-    let open Or_error.Let_syntax in
+      : 'a Malleable_error.t =
+    let open Malleable_error.Let_syntax in
     match (path, json) with
-    | [], _ -> (
-      try Ok (parser json)
+    | [], _ ->
+        parse parser json
+    (* | [], _ -> (
+      try Malleable_error.return (parser json)
       with exn ->
-        Error
-          (Error.of_string
-             (Printf.sprintf "failed to parse json value: %s"
-                (Exn.to_string exn))) )
+        Malleable_error.of_string_hard_error
+          (Printf.sprintf "failed to parse json value: %s" (Exn.to_string exn))
+      ) *)
     | key :: path', `Assoc assoc ->
         let%bind entry =
-          or_error_of_option
+          Malleable_error.of_option
             (List.Assoc.find assoc key ~equal:String.equal)
             "failed to find path in json object"
         in
         find parser entry path'
     | _ ->
-        Error (Error.of_string "expected json object when searching for path")
+        Malleable_error.of_error_hard
+          (Error.of_string "expected json object when searching for path")
 end
 
 module type Query_intf = sig
@@ -291,7 +288,7 @@ module type Query_intf = sig
 
   val filter : string -> string
 
-  val parse : Yojson.Safe.t -> Result.t Or_error.t
+  val parse : Yojson.Safe.t -> Result.t Malleable_error.t
 end
 
 module Error_query = struct
@@ -304,16 +301,18 @@ module Error_query = struct
   let filter testnet_log_filter =
     String.concat ~sep:"\n"
       [ testnet_log_filter
-      ; "resource.labels.container_name=\"coda\""
+      ; coda_container_filter
       ; "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")" ]
 
   let parse log =
     let open Json_parsing in
-    let open Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
     let%bind payload = find json log ["jsonPayload"] in
-    let%map message = lift_json_or_error (Logger.Message.of_yojson payload) in
+    let%map message =
+      lift_json_malleable_error (Logger.Message.of_yojson payload)
+    in
     {Result.pod_id; message}
 end
 
@@ -330,13 +329,83 @@ module Initialization_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; "\"Starting Transition Frontier Controller phase\"" ]
+      ; structured_event_filter
+          Transition_router
+          .starting_transition_frontier_controller_structured_events_id ]
 
   let parse log =
     let open Json_parsing in
-    let open Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let%map pod_id = find string log ["labels"; "k8s-pod/app"] in
     {Result.pod_id}
+end
+
+module Transition_frontier_diff_application_query = struct
+  module Result = struct
+    type root_transitioned =
+      {new_root: State_hash.t; garbage: State_hash.t list}
+
+    type t =
+      { pod_id: string
+      ; new_node: State_hash.t option
+      ; best_tip_changed: State_hash.t option
+      ; root_transitioned: root_transitioned option }
+    [@@deriving lens]
+
+    let empty pod_id =
+      {pod_id; new_node= None; best_tip_changed= None; root_transitioned= None}
+
+    let register (lens : (t, 'a option) Lens.t) (result : t) (x : 'a) :
+        t Malleable_error.t =
+      match lens.get result with
+      | Some _ ->
+          Malleable_error.of_string_hard_error
+            "same transition frontier diff type unexpectedly encountered \
+             twice in single application"
+      | None ->
+          Malleable_error.return (lens.set (Some x) result)
+  end
+
+  let name = "transition_frontier_diff_application"
+
+  let filter testnet_log_filter =
+    String.concat ~sep:"\n"
+      [ testnet_log_filter
+      ; coda_container_filter
+      ; structured_event_filter
+          Transition_frontier.applying_diffs_structured_events_id ]
+
+  let parse log =
+    let open Json_parsing in
+    let open Result in
+    let open Malleable_error.Let_syntax in
+    let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
+    let%bind diffs =
+      find (list json) log ["jsonPayload"; "metadata"; "diffs"]
+    in
+    Malleable_error.List.fold diffs ~init:(Result.empty pod_id)
+      ~f:(fun res diff ->
+        match Yojson.Safe.Util.keys diff with
+        | [name] -> (
+            let%bind value = find json diff [name] in
+            match name with
+            | "New_node" ->
+                let%bind state_hash = parse state_hash value in
+                register new_node res state_hash
+            | "Best_tip_changed" ->
+                let%bind state_hash = parse state_hash value in
+                register best_tip_changed res state_hash
+            | "Root_transitioned" ->
+                let%bind new_root = find state_hash value ["new_root"] in
+                let%bind garbage = find (list state_hash) value ["garbage"] in
+                let data = {new_root; garbage} in
+                register root_transitioned res data
+            | _ ->
+                Malleable_error.of_string_hard_error
+                  "unexpected transition frontier diff name" )
+        | _ ->
+            Malleable_error.of_string_hard_error
+              "unexpected transition frontier diff format" )
 end
 
 module Block_produced_query = struct
@@ -407,12 +476,13 @@ module Block_produced_query = struct
       [ testnet_log_filter
       ; block_producer_filter
       ; coda_container_filter
-      ; "\"Successfully produced a new block\"" ]
+      ; structured_event_filter
+          Block_producer.block_produced_structured_events_id ]
 
   (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
   let parse log =
     let open Json_parsing in
-    let open Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let breadcrumb = ["jsonPayload"; "metadata"; "breadcrumb"] in
     let breadcrumb_consensus_state =
       breadcrumb
@@ -436,16 +506,6 @@ module Block_produced_query = struct
       find int log (breadcrumb_consensus_state @ ["epoch_count"])
     in
     {Result.block_height; global_slot; epoch; snarked_ledger_generated}
-
-  let%test_unit "parse json" =
-    (* TODO: paste me back (I was breaking Nathan's syntax highlighting) *)
-    (* TODO: the structured log message doesn't contain $breadcrumb *)
-    let log =
-      Yojson.Safe.from_string
-        {|{"insertId":"da1tjxlb148zg2r9m","jsonPayload":{"level":"Trace","message":"Successfully produced a new block: $breadcrumb","metadata":{"breadcrumb":{"just_emitted_a_proof":true,"staged_ledger":"<opaque>","validated_transition":{"data":{"current_protocol_version":"0.1.0","delta_transition_chain_proof":"<opaque>","proposed_protocol_version":"<None>","protocol_state":{"body":{"blockchain_state":{"snarked_ledger_hash":"4mKBT3x4peBudLp8p7ZV8D9qa4hXVu4Mtw8RnjnJUmuYVAmzuMB3qqG76WdN4o1bzBzkWGntjW3fskqGB7qEr14xEHGD23PqW53Pq4pac8vUBv9Wy9sYfNTXXQHUaTKs9Z3SZ4G683vWGiqrPD1CwNL1mfQcE1Y4rZs1PKXYr2Qxd1ysPSBzMdMhHRtCJ8yjL31gy8b5HLEB4TCnvmwcaFjrYqXmZ17iRTouYeAXTwiYa3QwwdLndAFS7Wf1YJwK2WavtqJjL3cHL37UP56bQdiUsDF33iRAX99LJGhFqDD4Ud765rcDrgM1yBdBkyJFAC","staged_ledger_hash":{"non_snark":{"aux_hash":"UDT5mwPQpaazURe2owQEkmhVzs89k5ZT4xiD4nShZ4qV6rPcdi","ledger_hash":"4mKBT3x7o11gxXfS2sukVKACTsUk5HsQUSWH48ycTzAymkW5G6BXLtSVfyFj7q8byjKy24VgLaEstVbke8WC8sQJPot5eBPi6BqTXQn83u2HsrFoYTrRfuC5uExzkvuEHWfg6mFCpsGntcNVvZHBZmCxckP37Ao2X29kWuhvRUjCnJ4zyEGY8Byu7Q5nzf13XXd2uzTwntQFkEUqZ5rVyVdB6KYW14E3vLjZdUF8ijbXkqGHVyLfogfdfBHauiCDsdEKMiQVCQpwVQSmonKxAV14Qvg2yUsCbSru7uLZjLz4rCeZ3A18D8TvUMKqooVEX1","pending_coinbase_aux":"WewbKnjz78S5g6GMgtv5AkaR54HuGAfAX7YHkoMxzZji8dDm82"},"pending_coinbase_hash":"A2UdxEssLAf7MRyLNuccHWj4J9Bsu1XpPVLsenZcQkHto6RkgLBg3kMZemKEaafH4E36sdzvTWQujcADhdMFHMTy2YqFrGWTVzjcQZApLCE91PyFo3Lup5tf3wa7aBTD7x2bSmCRudM93ieGXdASVHDtinSaLAcGMfaA7ioSJEH3nkkXd3zUafThJMcnQvpVR4oHeuYNbAF8dPpKhk3ZGaL6v6FmbyTKVExj3xDx8dr1P3QsAPPrVqhDCM6AU3EpLtvmrLXrzkjh2dvB8TaLgZwg85atjKhbHAX5RUR7395RvMuTLq4ae4gCPJSRhTwuS8"},"timestamp":"1593049680000"},"consensus_state":{"blockchain_length":"3005","curr_global_slot":{"slot_number":"7806","slots_per_epoch":"480"},"epoch_count":"16","has_ancestor_in_same_checkpoint_window":true,"last_vrf_output":"<opaque>","min_window_density":"160","next_epoch_data":{"epoch_length":"38","ledger":{"hash":"4mKBT3x4nFWDa4A67jeH71Jv5UY7xMdekTspnP4AF4rkhxtybgKjrb9dKkYMein6CUBcWTskzZJnZ9RN3HEod9JTWAqwk5CDCBYTVDfUpJRqHsuBZ8ezpCb9oHQfu7eFeGFjY9ijwAZqEwp3gNhNwgS31ed9TcQgEpEPGqRDRYmyCwSTvZHKG2iFqbzzPnkF8ob12R69zYnMcRZmmhpwKeoEHVU23brJmoBTCguZWPKgk7T66kTqB4wiCbrFgb1S8jJtjQynaeocXhV3mqi91hD8fdX6TikxT3YutFBGW92Bn1HfVNYDRybpnrSwH4jEUk","total_currency":"22961500002389927"},"lock_checkpoint":"3j7Fqw9d9wLyNdjTPBSVH3yPDPWMtqUC22L1JSeqnpYMBfHTK7UmtDbYbnCL9mYDccjspNy8vJEnmXMA72qgswFdMocqYWprdWRYCUmhZx2jBKQcjXMjyUm8yFFBU8HfbSHSWfWmFVEXLw15rTR5ELjFy5xQMpgaWWMELu4ArxRc4DBbDebX2ezU4AhXULwsRhgbXw3n8gf6Tfi8GFTMQ8aTfuwmGeLmDAzXY4UvaEFuzcZ4ZFrFHrLZhKXYTbYyKebTBbcYqZScQcBNp1CC76tMP6NJkAaANYMGnRC1atoBwxBx6iCAb8osx12mCYgi9","seed":"3DUfsm6DRo8H9B9evJWxP72s18BAmWbFPMjr1EphFQFF7Fjjas1H8Y3UHGLTCocUKga4Yzh9izSHTvPn7UXN8x87c6soskzRtxjzatt2nPVK7jJ3xB2jMQFKfkmXLh4baiuQkDogz8nzirjbrUDnPsGi85efffcdEdCfV9AazPpZSbJKdvxMY4KZYXmdmtASzyQxeDhfpfCgfuUwfKCdPWi2biXxTrX9GkKLVcJFVCgY1ZggSFGiMn6kB3zxtKqUEJ1KvXnfdsyLsRrQwDKGGfqGSaS2b5baosyBnML27GJUGUDhP7vNipc5EVu1BZUEL","start_checkpoint":"D2rcXVQYc5LPJkNGqsxFSD17vt9o3AkQz3zLhA4mH56MQd1mkbiyMWohyYF6XkraCxLLfrf4G28pkeM2CYCN6Xwu4Sec9jeLigUC25VYZq2N9nLDPtSR9Xrk7SfAVzjpckU9MsYoGXkzzXG6fSKC4DakPFkPy53U2uYhYR963Kypcpjg5qdzu86TzmribmSvf3QEBaxs6svLEodZesaUff8qb2xCswAoZS4FU32kn6ANqXLHZWJZbPomnav9Msmh38rC5o1CGMoYvoEEdkB1qz4PpDLCGxDyNbkJFMC75WVQXbZSMayQ6i6V1hUAsHa9fU"},"staking_epoch_data":{"epoch_length":"184","ledger":{"hash":"4mKBT3x3Jm4wrsafPgLndLRTUBPGStpddFUdyKwKSHLBQh4HfdVon9NsrTbtQBiRLbhyH3uEKgkMbVGTneBSRH1Ub6Rm17FG2JpRHmTEEjaTDFJqk3sfzSzeMA1xxz35gg2czw8Q8SUknoatQ843gkPuEyTiSBXbJTQbXgDmuJXmXSNQ4Xvy5enmAMZfX1Es7wSzjpETmpgSD7sGQXi6yv3F6DsLcHLnHrqoYiipvNvDLM7cr5axY2inWiQboPd2T3rZi2PK2jdJvFu1XRWA5sNMKSciUddq6fn62CzrCTszGm2qdnPWpCrsRLE85heDyz","total_currency":"22924300002389927"},"lock_checkpoint":"D2rcXVQbcpJXNSkH4PtMigWYCwgohjjvR5SzxQ1BXC8TB7aNi722Vd2Rzj4tUWAiZhtzVn4y35R7fJ86XSWign7Nk7uoQAstAuKT9rVsPzWC8tvaWtY21uHVWSFfN6FERmWbR8ESVYcFbMNKeXGeFEXBgiWX7qEQVReqVuapdR72YBitw3Yuh3zHy3TEhRPWecdGYELDXoqGv3H1C8MaWRTUZkXn6TddEfVdtD7SuoH3zQVTcKADBGK7BfJcrd6pU3ScgWBUoaCYND5teWD2fCHGxmjWHiLmgUbqpCaEXYjh6DrwMKdxek2T6XdBpi89Xh","seed":"3DUfsm6FqFmgdfqmKUJbZVWFE1vB3HZQithYfWitucdN24MVAATs2WkmuyLnRmmhAi2Mn7DeqARTCEZz4ZUSK8zP3uvzULWFqxyTR1AeuNwGEReySyDA2KPrTHZiSE6DFBPkxYVhTAxzCxr2s8Hg7DL4VGV36RHJqqzCJuNiur9XTt38zi2T8GEdrowfRgL7e2cKapivbCiVVE1X4XaoKZUHqEbht4YNFTCK6AndB27EvgFHZV3KoR1Ai8DYFasj1YoMw7LxRFn7DqnXnDkgyX3aKNdG2wKJKddB93pWNwgFXg1LnEMvVxjtJmBegyCvk","start_checkpoint":"D2rcXVQd7gciXqjsZrMyQVr2n5AG9vDzQnJMZxb5L8ijvX4iCVggYaaEUVdPALEaxY6uaXT9Jire3qPBb84QBfX8vQX6kV4ojvqxcTqt7gLi2GyupXS2p1u2JN6PMdciLCfmeogLSR2EaH3UdsS1TMoK72UBfFYsD6jvkFSyfNyMMHLJCjNWSwVo6apRtsG1GK7bn4g63zrvn16ezGbmgh8mCFqBzv3KM4c17QZHHEbLS2ya7U6SvtCMDwDaHPgE8Dg2QS1mEqG2DuJ2V9VNnYZshtQUPTLw4fRy4N9fDPLo73LFC1d7y3gMqEoqV2MYFa"},"sub_window_densities":["0","20","20","20","20","20","20","20"],"total_currency":"22969100.002389927"},"constants":{"delta":"3","genesis_state_timestamp":"1591644600000","k":"20"},"genesis_state_hash":"D2rcXVQa8eS14d6EWdpMVoys5aeqjiwJppFQRrdoZLpbsDUoq1a9AVYb1VQtqxPhxT87sQWHWwL7c1z7qWmC72GdedUy7RaqanKpJzCk5B4fMnxDTKFDVc53gZF3Z95pMauhWi12vAvuCK5bstGcAh3ZUJveK6RVmnN6aM2tHjTgcp1uvMfzXTjwBuxX6gGpsFKWZw5gDguQpDqhbMiYJw44Mc2ggKthUnfP2NsxJTkNzfJGknYaarK7wRZNEjHeNtrVfyxZDKyTGg6ZisfPemCYPTyXsvs9MmfmAtNhBAAUFuA1NuxnpfAjbdJ3RacHPW"},"previous_state_hash":"D2rcXVQa7HFVLxWV7V5mktEdnxK22Jp3bhfPtzaGcCmvkiFnxAtUtnfyY3CS1U4Z2qSmW7oNT3jBzGta2mTfGEALMA4NifmmoBJTWeFX1tN2FekYbjpiggBgQuGehoTtnN12w1kNRwm9KsRtqUojCsh4vWxJBk8fedsgvLKhJ8uyUybM3fqN748BTipGSrWZJg1KUgXUWXKK1QZN5xNT2CzgtN1bcDizQQMP16UUCZVgH5zY28RpzBsJYXFZbJK6pShYtiBqfMUTyY3ww2qPUBZAr7AA9buMrBCUXwT1etC5rsNp3iwpDB1feVWDAQgUvx"},"protocol_state_proof":"<opaque>","staged_ledger_diff":"<opaque>"},"hash":"D2rcXVQbc96heSMf2WYXidFqRWbQ1ktQhcjNRV86qm1YQmYGgkd3uSpgrGRb8XAT5JPiR2DdXrnkiYU9t9zpGx77mbe9G8ZW2ABi4X344R68kMamFB6fbnwMoQieVTyXLqXvFqck2cGXQcZYko8gBdusNELVyZxsgRw2pJAiAePADfy2zkxudo4P1iTaDySykXvrSNF8oekts6FcQp6fwCeePGcUm3ktomEjYWTfTwU2YCRgfx5Zn8jADmCbtAhkrX1LAM21EEbygrp2LW12QaZDUE98199UCsyVbJTG4GWswYZbbwR99twkZ3BkjbR98B"}},"host":"35.185.73.134","peer_id":"12D3KooWNqFYDkAseDUAhvTdt73iqex7ooQPKTmRByGiCBgbJvVq","pid":10,"port":10003},"source":{"location":"File \"src/lib/block_producer/block_producer.ml\", line 512, characters 44-51","module":"Block_producer"},"timestamp":"2020-06-25 01:58:02.803079Z"},"labels":{"k8s-pod/app":"whale-block-producer-3","k8s-pod/class":"whale","k8s-pod/pod-template-hash":"6cdf6f4b44","k8s-pod/role":"block-producer","k8s-pod/testnet":"joyous-occasion","k8s-pod/version":"0.0.12-beta-feature-bump-genesis-timestamp-3e9b174"},"logName":"projects/o1labs-192920/logs/stdout","receiveTimestamp":"2020-06-25T01:58:09.007727607Z","resource":{"labels":{"cluster_name":"coda-infra-east","container_name":"coda","location":"us-east1","namespace_name":"joyous-occasion","pod_name":"whale-block-producer-3-6cdf6f4b44-2nlkz","project_id":"o1labs-192920"},"type":"k8s_container"},"severity":"INFO","timestamp":"2020-06-25T01:58:03.766838494Z"}|}
-    in
-    let _ = parse log |> Or_error.ok_exn in
-    ()
 end
 
 module Breadcrumb_added_query = struct
@@ -459,13 +519,13 @@ module Breadcrumb_added_query = struct
     String.concat ~sep:"\n"
       [ testnet_log_filter
       ; coda_container_filter
-      ; Structured_log_events.string_of_id
+      ; structured_event_filter
           Transition_frontier
           .added_breadcrumb_user_commands_structured_events_id ]
 
-  let parse js : Result.t Or_error.t =
+  let parse js : Result.t Malleable_error.t =
     let open Json_parsing in
-    let open Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     (* JSON path to metadata entry *)
     let path = ["jsonPayload"; "metadata"; "user_commands"] in
     let parser = signed_commands_with_statuses in
@@ -489,6 +549,7 @@ type subscriptions =
   { errors: Subscription.t
   ; initialization: Subscription.t
   ; blocks_produced: Subscription.t
+  ; transition_frontier_diff_application: Subscription.t
   ; breadcrumb_added: Subscription.t }
 
 type constants =
@@ -502,14 +563,21 @@ type t =
   ; subscriptions: subscriptions
   ; cancel_background_tasks: unit -> unit Deferred.t
   ; error_accumulator: errors
-  ; initialization_table: unit Ivar.t String.Map.t }
+  ; initialization_table: unit Ivar.t String.Map.t
+  ; best_tip_map_reader: State_hash.t String.Map.t Broadcast_pipe.Reader.t
+  ; best_tip_map_writer: State_hash.t String.Map.t Broadcast_pipe.Writer.t }
 
 let delete_subscriptions
-    {errors; initialization; blocks_produced; breadcrumb_added} =
-  Deferred.Or_error.combine_errors
+    { errors
+    ; initialization
+    ; blocks_produced
+    ; transition_frontier_diff_application
+    ; breadcrumb_added } =
+  Malleable_error.combine_errors
     [ Subscription.delete errors
     ; Subscription.delete initialization
     ; Subscription.delete blocks_produced
+    ; Subscription.delete transition_frontier_diff_application
     ; Subscription.delete breadcrumb_added ]
 
 let rec pull_subscription_in_background ~logger ~subscription_name
@@ -518,16 +586,20 @@ let rec pull_subscription_in_background ~logger ~subscription_name
   let open Interruptible.Let_syntax in
   let%bind results =
     uninterruptible
-      (let open Deferred.Or_error.Let_syntax in
+      (let open Malleable_error.Let_syntax in
       let%bind logs = Subscription.pull subscription in
-      Deferred.return (or_error_list_map logs ~f:parse_subscription))
+      Malleable_error.List.map logs ~f:parse_subscription)
   in
   [%log info] "Pulling %s subscription" subscription_name ;
-  ( match results with
-  | Error err ->
-      Error.raise err
-  | Ok res ->
-      List.iter res ~f:(Fn.compose Or_error.ok_exn handle_result) ) ;
+  let%bind () =
+    uninterruptible
+      ( match results with
+      | Error err ->
+          Error.raise err.hard_error.error
+      | Ok res ->
+          Deferred.List.iter res.computation_result
+            ~f:(Fn.compose Malleable_error.ok_exn handle_result) )
+  in
   let%bind () = uninterruptible (after (Time.Span.of_ms 10000.0)) in
   (* this extra bind point allows the interruptible monad to interrupt after the timeout *)
   let%bind () = return () in
@@ -536,9 +608,10 @@ let rec pull_subscription_in_background ~logger ~subscription_name
 
 let start_background_query (type r)
     (module Query : Query_intf with type Result.t = r) ~logger
-    ~testnet_log_filter ~cancel_ivar ~(handle_result : r -> unit Or_error.t) =
+    ~testnet_log_filter ~cancel_ivar
+    ~(handle_result : r -> unit Malleable_error.t) =
   let open Interruptible in
-  let open Deferred.Or_error.Let_syntax in
+  let open Malleable_error.Let_syntax in
   let finished_ivar = Ivar.create () in
   let%map subscription =
     Subscription.create ~logger ~name:Query.name
@@ -555,7 +628,7 @@ let start_background_query (type r)
   (subscription, Ivar.read finished_ivar)
 
 let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
-  let open Deferred.Or_error.Let_syntax in
+  let open Malleable_error.Let_syntax in
   let%bind blocks_produced =
     Subscription.create ~logger ~name:"blocks_produced"
       ~filter:(Block_produced_query.filter network.testnet_log_filter)
@@ -588,73 +661,114 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         in
         DynArray.add acc result ;
         if result.message.level = Fatal then on_fatal_error () ;
-        Ok () )
+        Malleable_error.return () )
   in
   let initialization_table =
+    let open Kubernetes_network.Node in
     Kubernetes_network.all_nodes network
     |> List.map ~f:(fun (node : Kubernetes_network.Node.t) ->
            (node.pod_id, Ivar.create ()) )
     |> String.Map.of_alist_exn
   in
-  let%map initialization, initialization_task_finished =
+  let%bind initialization, initialization_task_finished =
     start_background_query
       (module Initialization_query)
       ~logger ~testnet_log_filter:network.testnet_log_filter
       ~cancel_ivar:cancel_background_tasks_ivar
       ~handle_result:(fun result ->
         let open Initialization_query.Result in
-        let open Or_error.Let_syntax in
-        [%log info] "Handling initialization log for \"%s\"" result.pod_id ;
+        let open Malleable_error.Let_syntax in
+        [%log info] "Handling initialization log for node \"%s\"" result.pod_id ;
         let%bind ivar =
-          or_error_of_option
+          Malleable_error.of_option
             (String.Map.find initialization_table result.pod_id)
-            (Printf.sprintf "node not found in initialization table: %s"
+            (Printf.sprintf "Node not found in initialization table: %s"
                result.pod_id)
         in
         if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
         else
-          Error
+          Malleable_error.of_error_hard
             (Error.of_string
                "received initialization for node that has already initialized")
         )
   in
+  let best_tip_map_reader, best_tip_map_writer =
+    Broadcast_pipe.create String.Map.empty
+  in
+  let%map ( transition_frontier_diff_application
+          , transition_frontier_diff_application_finished ) =
+    start_background_query
+      (module Transition_frontier_diff_application_query)
+      ~logger ~testnet_log_filter:network.testnet_log_filter
+      ~cancel_ivar:cancel_background_tasks_ivar
+      ~handle_result:(fun result ->
+        let open Transition_frontier_diff_application_query.Result in
+        Option.value_map result.best_tip_changed
+          ~default:Malleable_error.ok_unit ~f:(fun new_best_tip ->
+            let open Malleable_error.Let_syntax in
+            let best_tip_map =
+              Broadcast_pipe.Reader.peek best_tip_map_reader
+            in
+            let best_tip_map' =
+              String.Map.set best_tip_map ~key:result.pod_id ~data:new_best_tip
+            in
+            [%log debug]
+              ~metadata:
+                [ ( "best_tip_map"
+                  , `Assoc
+                      ( String.Map.to_alist best_tip_map'
+                      |> List.map ~f:(fun (k, v) -> (k, State_hash.to_yojson v))
+                      ) ) ]
+              "Updated best tip map: $best_tip_map" ;
+            let%map () =
+              Deferred.bind ~f:Malleable_error.return
+                (Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map')
+            in
+            () ) )
+  in
   let cancel_background_tasks () =
     if not (Ivar.is_full cancel_background_tasks_ivar) then
       Ivar.fill cancel_background_tasks_ivar () ;
-    Deferred.all_unit [errors_task_finished; initialization_task_finished]
+    Deferred.all_unit
+      [ errors_task_finished
+      ; initialization_task_finished
+      ; transition_frontier_diff_application_finished ]
   in
   { testnet_log_filter= network.testnet_log_filter
+  ; logger
   ; constants=
       { constraints= network.constraint_constants
       ; genesis= network.genesis_constants }
-  ; subscriptions= {errors; initialization; blocks_produced; breadcrumb_added}
+  ; subscriptions=
+      { errors
+      ; initialization
+      ; blocks_produced
+      ; transition_frontier_diff_application
+      ; breadcrumb_added }
   ; cancel_background_tasks
   ; error_accumulator
   ; initialization_table
-  ; logger }
+  ; best_tip_map_writer
+  ; best_tip_map_reader }
 
-let destroy t : Test_error.Set.t Deferred.Or_error.t =
-  let open Deferred.Or_error.Let_syntax in
+let destroy t : Test_error.Set.t Malleable_error.t =
+  let open Malleable_error.Let_syntax in
   let { testnet_log_filter= _
       ; constants= _
-      ; logger
+      ; logger= _
       ; subscriptions
       ; cancel_background_tasks
       ; initialization_table= _
+      ; best_tip_map_reader= _
+      ; best_tip_map_writer
       ; error_accumulator } =
     t
   in
-  let%bind () = Deferred.map (cancel_background_tasks ()) ~f:Or_error.return in
-  let%map () =
-    let open Deferred.Let_syntax in
-    match%map delete_subscriptions subscriptions with
-    | Ok _ ->
-        Ok ()
-    | Error e' ->
-        [%log fatal] "Error deleting subscriptions: $error"
-          ~metadata:[("error", `String (Error.to_string_hum e'))] ;
-        Ok ()
+  let%bind () =
+    Deferred.bind (cancel_background_tasks ()) ~f:Malleable_error.return
   in
+  Broadcast_pipe.Writer.close best_tip_map_writer ;
+  let%map _ = delete_subscriptions subscriptions in
   let lift error_array =
     DynArray.to_list error_array
     |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->
@@ -677,10 +791,10 @@ let wait_for' :
                | `Snarked_ledgers_generated of int
                | `Milliseconds of int64 ]
     -> t
-    -> unit Deferred.Or_error.t =
+    -> unit Malleable_error.t =
  fun ~blocks ~epoch_reached ~timeout t ->
   if blocks = 0 && epoch_reached = 0 && timeout = `Milliseconds 0L then
-    Deferred.Or_error.return ()
+    Malleable_error.return ()
   else
     let now = Time.now () in
     let timeout_safety =
@@ -736,11 +850,12 @@ let wait_for' :
       res.block_height >= blocks && res.epoch >= epoch_reached
     in
     (*TODO: this should be block window duration once the constraint constants are added to runtime config*)
-    let open Deferred.Or_error.Let_syntax in
-    let rec go aggregated_res : unit Deferred.Or_error.t =
+    let open Malleable_error.Let_syntax in
+    let rec go aggregated_res : unit Malleable_error.t =
       if Time.( > ) (Time.now ()) timeout_safety then
-        Deferred.Or_error.error_string "wait_for took too long to complete"
-      else if timed_out aggregated_res then Deferred.Or_error.ok_unit
+        Malleable_error.of_string_hard_error
+          "wait_for took too long to complete"
+      else if timed_out aggregated_res then Malleable_error.ok_unit
       else (
         [%log' info t.logger] "Pulling blocks produced subscription" ;
         let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
@@ -748,29 +863,27 @@ let wait_for' :
           ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
           "Pulled $n logs for blocks produced: $logs" ;
         let%bind finished, aggregated_res' =
-          Deferred.return
-            (or_error_list_fold_left_while logs ~init:(false, aggregated_res)
-               ~f:(fun (_, acc) log ->
-                 let open Or_error.Let_syntax in
-                 let%map result = Block_produced_query.parse log in
-                 if conditions_passed result then `Stop (true, acc)
-                 else
-                   `Continue
-                     (false, Block_produced_query.Result.aggregate acc result)
-             ))
+          Malleable_error.List.fold_left_while logs
+            ~init:(false, aggregated_res) ~f:(fun (_, acc) log ->
+              let open Malleable_error.Let_syntax in
+              let%map result = Block_produced_query.parse log in
+              if conditions_passed result then `Stop (true, acc)
+              else
+                `Continue
+                  (false, Block_produced_query.Result.aggregate acc result) )
         in
         if not finished then
           let%bind () =
-            Deferred.map
+            Deferred.bind
               (Async.after
                  (Time.Span.of_ms
                     ( Int.to_float
                         t.constants.constraints.block_window_duration_ms
                     /. 2.0 )))
-              ~f:Or_error.return
+              ~f:Malleable_error.return
           in
           go aggregated_res'
-        else Deferred.Or_error.return () )
+        else Malleable_error.return () )
     in
     go Block_produced_query.Result.Aggregated.empty
 
@@ -782,7 +895,7 @@ let wait_for :
                 | `Snarked_ledgers_generated of int
                 | `Milliseconds of int64 ]
     -> t
-    -> unit Deferred.Or_error.t =
+    -> unit Malleable_error.t =
  fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
   [%log' info t.logger]
     ~metadata:
@@ -802,40 +915,42 @@ let wait_for :
     "Waiting for $blocks blocks, $epoch epoch, with timeout $timeout" ;
   match%bind wait_for' ~blocks ~epoch_reached ~timeout t with
   | Ok _ ->
-      Deferred.Or_error.ok_unit
-  | Error e ->
+      Malleable_error.ok_unit
+  | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e))] ;
-      Deferred.return (Error e)
+        ~metadata:[("error", `String (Error.to_string_hum e.error))] ;
+      Deferred.return
+        (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
 
-let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
+let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
+    unit Malleable_error.t =
   let retry_delay_sec = 30.0 in
   let rec go n =
     if n <= 0 then
-      return
-        (Error
-           (Error.of_string
-              (sprintf
-                 "wait_for_payment: did not find matching payment after %d \
-                  trie(s)"
-                 num_tries)))
+      Malleable_error.of_string_hard_error
+        (sprintf
+           "wait_for_payment: did not find matching payment after %d trie(s)"
+           num_tries)
     else
       let%bind results =
-        let open Deferred.Or_error.Let_syntax in
+        let open Malleable_error.Let_syntax in
         let%bind user_cmds_json =
           Subscription.pull t.subscriptions.breadcrumb_added
         in
-        Deferred.return
-          (or_error_list_map user_cmds_json ~f:Breadcrumb_added_query.parse)
+        Malleable_error.List.map user_cmds_json ~f:Breadcrumb_added_query.parse
       in
       match results with
-      | Error err ->
-          Error.raise err
-      | Ok [] ->
+      | Error
+          { Malleable_error.Hard_fail.hard_error= err
+          ; Malleable_error.Hard_fail.soft_errors= _ } ->
+          Error.raise err.error
+      | Ok {Malleable_error.Accumulator.computation_result= []; soft_errors= _}
+        ->
           [%log info] "wait_for_payment: no added breadcrumbs, trying again" ;
           let%bind () = after Time.Span.(of_sec retry_delay_sec) in
           go (n - 1)
-      | Ok res ->
+      | Ok {Malleable_error.Accumulator.computation_result= res; soft_errors= _}
+        ->
           let open Coda_base in
           let open Signature_lib in
           (* res is a list of Breadcrumb_added_query.Result.t
@@ -877,7 +992,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
                 ; ( "receiver"
                   , `String (Public_key.Compressed.to_string receiver) )
                 ; ("amount", `String (Currency.Amount.to_string amount)) ] ;
-            return (Ok ()) )
+            Malleable_error.return () )
           else (
             [%log info]
               "wait_for_payment: found added breadcrumbs, but did not find \
@@ -887,23 +1002,52 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () =
   in
   go num_tries
 
+let await_timeout ~waiting_for ~timeout_duration deferred =
+  match%map Timeout.await ~timeout_duration () deferred with
+  | `Timeout ->
+      failwithf "timeout while waiting for %s" waiting_for ()
+  | `Ok x ->
+      x
+
 let wait_for_init (node : Kubernetes_network.Node.t) t =
-  let open Deferred.Or_error.Let_syntax in
+  let open Malleable_error.Let_syntax in
   [%log' info t.logger]
     ~metadata:[("node", `String node.pod_id)]
     "Waiting for $node to initialize" ;
   let%bind init =
-    Deferred.return
-      (or_error_of_option
-         (String.Map.find t.initialization_table node.pod_id)
-         "failed to find node in initialization table")
+    Malleable_error.of_option
+      (String.Map.find t.initialization_table node.pod_id)
+      "failed to find node in initialization table"
   in
   if Ivar.is_full init then return ()
   else
     (* TODO: make configurable (or ideally) compute dynamically from network configuration *)
-    Timeout.await_exn ()
-      (Deferred.map (Ivar.read init) ~f:Or_error.return)
+    Timeout.await_exn
       ~timeout_duration:(Time.Span.of_ms (15.0 *. 60.0 *. 1000.0))
+      ()
+      (Deferred.bind (Ivar.read init) ~f:Malleable_error.return)
+
+let wait_for_sync (nodes : Kubernetes_network.Node.t list) ~timeout t =
+  [%log' info t.logger]
+    ~metadata:[("nodes", `List (List.map ~f:(fun n -> `String n.pod_id) nodes))]
+    "Waiting for $nodes to synchronize" ;
+  let pod_ids = List.map nodes ~f:(fun node -> node.pod_id) in
+  let all_equal ls =
+    Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
+        [h] = List.find_all_dups ~compare:State_hash.compare ls )
+  in
+  let all_nodes_synced best_tip_map =
+    if List.for_all pod_ids ~f:(String.Map.mem best_tip_map) then
+      (* [lookup_exn] should never throw an exception here *)
+      all_equal (List.map pod_ids ~f:(String.Map.find_exn best_tip_map))
+    else false
+  in
+  [%log' info t.logger] "waiting for %f seconds" (Time.Span.to_sec timeout) ;
+  await_timeout
+    (Broadcast_pipe.Reader.iter_until t.best_tip_map_reader
+       ~f:(Fn.compose Deferred.return all_nodes_synced))
+    ~waiting_for:"synchronization" ~timeout_duration:timeout
+  |> Deferred.bind ~f:Malleable_error.return
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
 (*let%test_module "Log tests" =

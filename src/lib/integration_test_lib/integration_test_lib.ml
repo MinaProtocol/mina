@@ -1,5 +1,7 @@
 open Core_kernel
 open Async_kernel
+module Malleable_error = Malleable_error
+module Test_error = Test_error
 
 module Container_images = struct
   type t = {coda: string; user_agent: string; bots: string; points: string}
@@ -33,48 +35,6 @@ module Test_config = struct
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
-module Test_error = struct
-  type t =
-    | Remote_error of {node_id: string; error_message: Logger.Message.t}
-    | Internal_error of {occurrence_time: Time.t; error: Error.t}
-
-  let internal_error error =
-    Internal_error {occurrence_time= Time.now (); error}
-
-  let to_string = function
-    | Remote_error {node_id; error_message} ->
-        Printf.sprintf "[%s] %s: %s"
-          (Time.to_string error_message.timestamp)
-          node_id
-          (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))
-    | Internal_error {occurrence_time; error} ->
-        Printf.sprintf "[%s] test_executive: %s"
-          (Time.to_string occurrence_time)
-          (Error.to_string_hum error)
-
-  let occurrence_time = function
-    | Remote_error {error_message; _} ->
-        error_message.timestamp
-    | Internal_error {occurrence_time; _} ->
-        occurrence_time
-
-  module Set = struct
-    type nonrec t = {soft_errors: t list; hard_errors: t list}
-
-    let empty = {soft_errors= []; hard_errors= []}
-
-    let soft_singleton err = {empty with soft_errors= [err]}
-
-    let hard_singleton err = {empty with hard_errors= [err]}
-
-    let merge a b =
-      { soft_errors= a.soft_errors @ b.soft_errors
-      ; hard_errors= a.hard_errors @ b.hard_errors }
-
-    let combine = List.fold_left ~init:empty ~f:merge
-  end
-end
-
 (** The signature of integration test engines. An integration test engine
  *  provides the core functionality for deploying, monitoring, and
  *  interacting with networks.
@@ -93,9 +53,9 @@ module type Engine_intf = sig
   module Node : sig
     type t
 
-    val start : fresh_state:bool -> t -> unit Deferred.Or_error.t
+    val start : fresh_state:bool -> t -> unit Malleable_error.t
 
-    val stop : t -> unit Deferred.Or_error.t
+    val stop : t -> unit Malleable_error.t
 
     val send_payment :
          logger:Logger.t
@@ -104,7 +64,7 @@ module type Engine_intf = sig
       -> receiver:Signature_lib.Public_key.Compressed.t
       -> amount:Currency.Amount.t
       -> fee:Currency.Fee.t
-      -> unit Deferred.Or_error.t
+      -> unit Malleable_error.t
   end
 
   module Network : sig
@@ -134,7 +94,7 @@ module type Engine_intf = sig
   module Network_manager : sig
     type t
 
-    val create : Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
 
     val deploy : t -> Network.t Deferred.t
 
@@ -150,9 +110,9 @@ module type Engine_intf = sig
          logger:Logger.t
       -> network:Network.t
       -> on_fatal_error:(unit -> unit)
-      -> t Deferred.Or_error.t
+      -> t Malleable_error.t
 
-    val destroy : t -> Test_error.Set.t Deferred.Or_error.t
+    val destroy : t -> Test_error.Set.t Malleable_error.t
 
     (** waits until a block is produced with at least one of the following conditions being true
       1. Blockchain length = blocks
@@ -167,9 +127,12 @@ module type Engine_intf = sig
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> unit Deferred.Or_error.t
+      -> unit Malleable_error.t
 
-    val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
+    val wait_for_sync :
+      Node.t list -> timeout:Time.Span.t -> t -> unit Malleable_error.t
+
+    val wait_for_init : Node.t -> t -> unit Malleable_error.t
 
     (** wait until a payment transaction appears in an added breadcrumb
         num_tries is the maximum number of breadcrumbs to examine
@@ -182,35 +145,9 @@ module type Engine_intf = sig
       -> receiver:Signature_lib.Public_key.Compressed.t
       -> amount:Currency.Amount.t
       -> unit
-      -> unit Or_error.t Deferred.t
+      -> unit Malleable_error.t
   end
 end
-
-(** The DSL is a monad which is conceptually similar to `Deferred.Or_error.t`,
- *  except that there are 2 types of errors which can be returned at each bind
- *  point in a computation: soft errors, and hard errors. Soft errors do not
- *  effect the control flow of the monad, and are instead accumulated for later
- *  extraction. Hard errors effect the control flow of the monad in the same
- *  way an `Error` constructor for `Or_error.t` would.
- *)
-module type DSL_intf = Monad.S
-
-(*
-module Make_DSL (Engine : Engine_intf) : DSL_intf = struct
-end
-*)
-
-(** A test is a functor which produces a configuration and run function from an
- *  implementation of the DSL.
- *)
-
-(*
-module Test_intf : functor (DSL : DSL_intf) -> sig
-  val config : Test_config.t
-
-  val run : unit -> unit DSL.t
-end
-*)
 
 module type Test_intf = sig
   type network
@@ -219,7 +156,7 @@ module type Test_intf = sig
 
   val config : Test_config.t
 
-  val run : network -> log_engine -> unit Deferred.Or_error.t
+  val run : network -> log_engine -> unit Malleable_error.t
 end
 
 (* NB: until the DSL is actually implemented, a test just takes in the engine

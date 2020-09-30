@@ -11,15 +11,15 @@ const cryptr = new Cryptr(CRYPTR_SECRET);
 sgMail.setApiKey(SENDGRID_APIKEY);
 sendgrid.setApiKey(SENDGRID_APIKEY);
 
-module.exports.sendConfirmation = async event => {
+module.exports.sendConfirmation = async (event) => {
   if (event.httpMethod !== "POST" || !event.body) {
     return {
       statusCode: 400,
       body: "No email address was provided.",
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
     };
   }
 
@@ -31,13 +31,13 @@ module.exports.sendConfirmation = async event => {
   const message = {
     to: data.email,
     from: {
-      email: "no-reply@codaprotocol.com",
-      name: "Coda Protocol"
+      email: "no-reply@minaprotocol.com",
+      name: "Mina Protocol",
     },
     templateId: TEMPLATE_ID,
     dynamic_template_data: {
-      url: `${URL}/confirm?token=${encryptedEmail}`
-    }
+      url: `${URL}/confirm?token=${encryptedEmail}`,
+    },
   };
 
   try {
@@ -46,7 +46,7 @@ module.exports.sendConfirmation = async event => {
     console.error(e);
     return {
       statusCode: 500,
-      body: ""
+      body: "",
     };
   }
 
@@ -59,19 +59,19 @@ module.exports.sendConfirmation = async event => {
       "Content-Type": "application/json",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Max-Age": "2592000",
-      "Access-Control-Allow-Credentials": "true"
+      "Access-Control-Allow-Credentials": "true",
     },
-    body: "Please check your email"
+    body: "Please check your email",
   };
 };
 
-module.exports.confirmEmail = async event => {
+module.exports.confirmEmail = async (event) => {
   const encryptedEmail = event.queryStringParameters.token;
 
   if (!encryptedEmail) {
     return {
       statusCode: 400,
-      body: "Invalid confirmation token."
+      body: "Invalid confirmation token.",
     };
   }
 
@@ -82,8 +82,8 @@ module.exports.confirmEmail = async event => {
     url: "/v3/marketing/contacts",
     body: {
       list_ids: ["bcd755f4-53e9-4182-8c16-06d763408ffb"],
-      contacts: [{ email }]
-    }
+      contacts: [{ email }],
+    },
   };
 
   try {
@@ -92,7 +92,7 @@ module.exports.confirmEmail = async event => {
     console.error(e);
     return {
       statusCode: 500,
-      body: ""
+      body: "",
     };
   }
 
@@ -101,9 +101,9 @@ module.exports.confirmEmail = async event => {
     headers: {
       "Content-Type": "text/html",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Credentials": "true"
+      "Access-Control-Allow-Credentials": "true",
     },
     body:
-      '<html><head><meta http-equiv="Refresh" content="3; url=https://codaprotocol.com"></head><body><p>Thanks for subscribing!</p><p>You will be redirected shortly. If you are not redirected click <a href="https://codaprotocol.com">here</a>.</p></body></html>'
+      '<html><head><meta http-equiv="Refresh" content="3; url=https://minaprotocol.com"></head><body><p>Thanks for subscribing!</p><p>You will be redirected shortly. If you are not redirected click <a href="https://minaprotocol.com">here</a>.</p></body></html>',
   };
 };

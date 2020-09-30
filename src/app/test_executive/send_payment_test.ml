@@ -1,4 +1,4 @@
-open Async
+(* open Async *)
 open Integration_test_lib
 
 module Make (Engine : Engine_intf) = struct
@@ -15,7 +15,7 @@ module Make (Engine : Engine_intf) = struct
     ; num_snark_workers= 0 }
 
   let run network log_engine =
-    let open Deferred.Or_error.Let_syntax in
+    let open Malleable_error.Let_syntax in
     let block_producer = Caml.List.nth network.Network.block_producers 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
     let node = Core_kernel.List.nth_exn network.block_producers 0 in
