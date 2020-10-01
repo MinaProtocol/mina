@@ -14,6 +14,9 @@ if [[ $COMMIT != "" ]]; then
   git diff $COMMIT --name-only
 else
   if [ -n "${BUILDKITE_INCREMENTAL+x}" ]; then
+    # TODO: remove (temporarily install network tooling)
+    apt-get install --yes curl jq
+
     # base DIFF on last successful Buildkite `develop` RUN
     ci_recent_pass_commit=$(
       curl https://graphql.buildkite.com/v1 -H "Authorization: Bearer ${BUILDKITE_API_TOKEN:-$TOKEN}" \

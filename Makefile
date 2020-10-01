@@ -121,6 +121,11 @@ dhall_types :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
 	$(info Build complete)
 
+replayer :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -297,7 +302,7 @@ benchmarks:
 # Coverage testing and output
 
 test-coverage: SHELL := /bin/bash
-test-coverage:
+test-coverage: libp2p_helper
 	scripts/create_coverage_profiles.sh
 
 # we don't depend on test-coverage, which forces a run of all unit tests
