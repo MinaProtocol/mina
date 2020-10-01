@@ -5,4 +5,4 @@
  (libraries snark_params_nonconsensus rosetta_lib_nonconsensus coda_base_nonconsensus random_oracle_nonconsensus
             signature_lib_nonconsensus zarith_stubs_js integers integers_stubs_js js_of_ocaml digestif.ocaml)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))
+ (preprocess (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx bisect_ppx -- --conditional)))
