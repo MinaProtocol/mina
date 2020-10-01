@@ -4,5 +4,5 @@
  (libraries core_bench.inline_benchmarks vrf_lib_tests coda_base)
  ; the -w list here should be the same as in src/dune
  (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60)
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
  (modes native))

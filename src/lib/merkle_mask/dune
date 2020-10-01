@@ -10,5 +10,6 @@
    ppx_deriving.show
    ppx_deriving_yojson
    ppx_jane
-   ppx_version))
+   ppx_version
+   bisect_ppx -- --conditional))
  (synopsis "Implementation of Merkle tree masks"))
