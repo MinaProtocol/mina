@@ -3,10 +3,12 @@
   (name pickles)
   (public_name pickles)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx bisect_ppx -- --conditional))
   (libraries
     digestif
     zexe_backend
+    random_oracle_input
+    pickles_base
     pickles.composition_types
     pickles.limb_vector
     pickles.marlin_checks

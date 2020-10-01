@@ -26,6 +26,10 @@ module Time = struct
     end
   end]
 
+  let max_value = UInt64.max_int
+
+  let zero = UInt64.zero
+
   module Controller = struct
     [%%if
     time_offsets]
@@ -59,11 +63,29 @@ module Time = struct
     [%%endif]
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
+
+  module Checked = struct
+    type t = Unpacked.var
+
+    module N = Coda_numbers.Nat.Make_checked (UInt64) (Bits)
+
+    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
+      f (g x) (g y)
+
+    let ( = ) x = op N.( = ) x
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
+  end
 
   module Span = struct
     [%%versioned
@@ -75,8 +97,6 @@ module Time = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)

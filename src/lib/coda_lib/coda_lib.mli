@@ -10,6 +10,15 @@ module Subscriptions = Coda_subscriptions
 
 type t
 
+type Structured_log_events.t +=
+  | Connecting
+  | Listening
+  | Bootstrapping
+  | Ledger_catchup
+  | Synced
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -45,7 +54,7 @@ val add_block_subscriber :
      With_hash.t
      Pipe.Reader.t
 
-val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
 val snark_worker_key : t -> Public_key.Compressed.t option
 
@@ -103,12 +112,10 @@ module Root_diff : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { user_commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t

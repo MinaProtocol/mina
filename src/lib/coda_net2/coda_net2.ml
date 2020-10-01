@@ -43,8 +43,6 @@ module Keypair0 = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 type stream_state =

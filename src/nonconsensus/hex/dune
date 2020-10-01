@@ -1,0 +1,6 @@
+(library
+ (name hex_nonconsensus)
+ (public_name hex_nonconsensus)
+ (inline_tests)
+ (preprocess (pps ppx_jane ppx_version ppx_inline_test bisect_ppx -- --conditional))
+ (libraries core_kernel))

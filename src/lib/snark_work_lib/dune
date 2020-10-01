@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core_kernel currency one_or_two signature_lib transaction_snark)
  (preprocess
-  (pps ppx_jane ppx_deriving_yojson bisect_ppx ppx_version -- -conditional))
+  (pps ppx_jane ppx_deriving_yojson bisect_ppx ppx_version -- --conditional))
  (synopsis "Snark work types"))

@@ -276,12 +276,11 @@ let run_test () : unit Deferred.t =
         trace_recurring "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
-              User_command_memo.create_from_string_exn
+              Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo
-              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~fee_token:Token_id.default ~memo ~valid_until:None
               ~body:
                 (Payment
                    { source_pk= signer
@@ -324,7 +323,7 @@ let run_test () : unit Deferred.t =
            because the nonce is wrong *)
         let payment' =
           build_payment
-            ~nonce:(User_command.nonce user_cmd)
+            ~nonce:(Signed_command.nonce user_cmd)
             send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in

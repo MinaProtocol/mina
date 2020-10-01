@@ -12,6 +12,7 @@
     highestSnarkFeeCollected: x,
     transactionsReceivedByEcho: x,
     coinbaseReceiver: x,
+    createAndSendToken: x,
  }
 
   All the metrics to be computed are specified in calculateMetrics(). Each
@@ -72,7 +73,11 @@ let calculateTransactionSent = (map, block: Types.Block.t) => {
   block.userCommands
   |> Array.fold_left(
        (transactionMap, userCommand: Types.Block.UserCommand.t) => {
-         incrementMapValue(userCommand.fromAccount, transactionMap)
+         switch (userCommand.type_, userCommand.status) {
+         | (Payment, Some(Applied)) =>
+           incrementMapValue(userCommand.fromAccount, transactionMap)
+         | _ => transactionMap
+         }
        },
        map,
      );
@@ -80,6 +85,29 @@ let calculateTransactionSent = (map, block: Types.Block.t) => {
 
 let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
+};
+
+let calculateCreateTokenAndSend = (map, block: Types.Block.t) => {
+  block.userCommands
+  |> Array.fold_left(
+       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
+         switch (userCommand.type_, userCommand.status) {
+         | (Payment, Some(Applied)) =>
+           /* If tokenID is 1, that means it's native coda */
+           if (userCommand.token |> int_of_string != 1) {
+             incrementMapValue(userCommand.fromAccount, transactionMap);
+           } else {
+             transactionMap;
+           }
+         | _ => transactionMap
+         }
+       },
+       map,
+     );
+};
+
+let getCreateTokenAndSend = blocks => {
+  blocks |> calculateProperty(calculateCreateTokenAndSend);
 };
 
 /*
@@ -208,8 +236,7 @@ let calculateAllUsers = metrics => {
 };
 
 let echoBotPublicKeys = [
-  "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x",
-  "4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1",
+  "B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9",
 ];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
@@ -219,6 +246,7 @@ let calculateMetrics = blocks => {
   let transactionsReceivedByEcho =
     getTransactionsSentToAddress(blocks, echoBotPublicKeys);
   let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
+  let createAndSendToken = getCreateTokenAndSend(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
@@ -227,6 +255,7 @@ let calculateMetrics = blocks => {
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
     throwAwayValues(coinbaseReceiverChallenge),
+    throwAwayValues(createAndSendToken),
   ])
   |> StringMap.mapi((key, _) =>
        {
@@ -238,6 +267,7 @@ let calculateMetrics = blocks => {
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
          coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
+         createAndSendToken: StringMap.find_opt(key, createAndSendToken),
        }
      );
 };

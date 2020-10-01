@@ -1,0 +1,27 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "GraphQL API" });
+
+# GraphQL API
+
+<Alert kind="warning">
+
+
+- Mina APIs are still under construction, so these endpoints may change
+- By default, the GraphQL port is bound to localhost, but if you for some reason decide to expose it to the internet, be careful! Someone with access to this api can send mina from your wallets.
+
+</Alert>
+
+
+### Basic setup:
+
+1. Start your daemon as usual. By default an http server is available at port 3085 (configurable with `-rest-port`).
+2. Connect your GraphQL client to `http://localhost:3085/graphql` or [open it in your browser](http://localhost:3085/graphql) to use [GraphiQL](https://github.com/graphql/graphiql)
+3. [Optional] If you want to use an existing keypair with GraphQL, first import it from the command line using the following: `mina accounts import -privkey-path <keyfile>`.
+4. Look at the <a href="/graphql-docs" target="_blank">GraphQL schema docs</a>
+
+### Resources:
+
+- [5-minute introduction video on Mina GraphQL API](http://bit.ly/GraphQLAPIin5)
+- [First steps with the Mina GraphQL API](https://garethtdavies.com/crypto/first-steps-with-mina-graphql-api.html)
+- [Introduction to GraphQL](https://graphql.org/learn/)
+- [Public GraphQL proxy](http://graphql.o1test.net/graphql) (doesn't allow GraphQL mutations)

@@ -37,9 +37,11 @@ module type External_transition_common_intf = sig
     -> t
     -> Transaction.t With_status.t list
 
-  val user_commands : t -> User_command.t With_status.t list
+  val commands : t -> User_command.t With_status.t list
 
-  val payments : t -> User_command.t With_status.t list
+  val payments : t -> Signed_command.t With_status.t list
+
+  val global_slot : t -> Unsigned.uint32
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
@@ -59,6 +61,8 @@ module type External_transition_base_intf = sig
 
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
       type nonrec t = t [@@deriving sexp, to_yojson]
     end
@@ -270,6 +274,8 @@ module type S = sig
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 
     include External_transition_base_intf with type t := t
+
+    val commands : t -> User_command.Valid.t With_status.t list
 
     val to_initial_validated : t -> Initial_validated.t
   end

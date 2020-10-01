@@ -1,5 +1,5 @@
 (library
   (name transition_chain_verifier)
   (public_name transition_chain_verifier)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries core_kernel coda_base coda_state merkle_list_verifier))

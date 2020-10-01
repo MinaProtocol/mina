@@ -40,7 +40,7 @@ module Make (N : Vector.Nat_intf) = struct
     let t_of_sexp = Fn.compose of_hex String.t_of_sexp
   end
 
-  type t = Hex64.t A.t [@@deriving bin_io, sexp, compare, yojson]
+  type t = Hex64.t A.t [@@deriving bin_io, sexp, compare, yojson, hash, eq]
 
   let to_bits = to_bits
 

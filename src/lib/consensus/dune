@@ -21,13 +21,12 @@
    global_signer_private_key
    non_zero_curve_point
    yojson
-   staged_ledger_hash
    coda_metrics
    graphql_lib)
  (preprocessor_deps "../../config.mlh")
  (preprocess
   (pps
-   bisect_ppx -conditional
+   bisect_ppx --conditional
    h_list.ppx
    ppx_assert
    ppx_base

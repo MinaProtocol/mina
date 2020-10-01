@@ -60,7 +60,8 @@ let file_exists ?follow_symlinks filename =
 module Accounts = struct
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
-    List.mapi ~f:(fun i {Runtime_config.Accounts.pk; sk; balance; delegate} ->
+    List.mapi
+      ~f:(fun i {Runtime_config.Accounts.pk; sk; balance; delegate; timing} ->
         let pk =
           match pk with
           | Some pk ->
@@ -86,12 +87,25 @@ module Accounts = struct
         let delegate =
           Option.map ~f:Public_key.Compressed.of_base58_check_exn delegate
         in
+        let account_id = Account_id.create pk Token_id.default in
         let account =
-          Account.create (Account_id.create pk Token_id.default) balance
+          match timing with
+          | None ->
+              Account.create account_id balance
+          | Some
+              { initial_minimum_balance
+              ; cliff_time
+              ; vesting_period
+              ; vesting_increment } ->
+              Account.create_timed account_id balance ~initial_minimum_balance
+                ~cliff_time ~vesting_period ~vesting_increment
+              |> Or_error.ok_exn
         in
         ( sk
         , { account with
-            delegate= Option.value ~default:account.delegate delegate } ) )
+            delegate=
+              (if Option.is_some delegate then delegate else account.delegate)
+          } ) )
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -718,6 +732,9 @@ let make_constraint_constants
   ; pending_coinbase_depth
   ; coinbase_amount=
       Option.value ~default:default.coinbase_amount config.coinbase_amount
+  ; supercharged_coinbase_factor=
+      Option.value ~default:default.supercharged_coinbase_factor
+        config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
         config.account_creation_fee }
@@ -973,6 +990,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; transaction_capacity=
             Some (Log_2 constraint_constants.transaction_capacity_log_2)
         ; coinbase_amount= Some constraint_constants.coinbase_amount
+        ; supercharged_coinbase_factor=
+            Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
         }
   ; ledger=
@@ -981,14 +1000,28 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
             Accounts
               (List.map
                  (Lazy.force (Precomputed_values.accounts precomputed_values))
-                 ~f:(fun (sk, {public_key; balance; delegate; _}) ->
+                 ~f:(fun (sk, {public_key; balance; delegate; timing; _}) ->
+                   let timing =
+                     match timing with
+                     | Account.Timing.Untimed ->
+                         None
+                     | Timed t ->
+                         Some
+                           { Runtime_config.Accounts.Single.Timed
+                             .initial_minimum_balance=
+                               t.initial_minimum_balance
+                           ; cliff_time= t.cliff_time
+                           ; vesting_period= t.vesting_period
+                           ; vesting_increment= t.vesting_increment }
+                   in
                    { Runtime_config.Accounts.pk=
                        Some (Public_key.Compressed.to_base58_check public_key)
                    ; sk= Option.map ~f:Private_key.to_base58_check sk
                    ; balance
                    ; delegate=
-                       Some (Public_key.Compressed.to_base58_check delegate) }
-                   ))
+                       Option.map ~f:Public_key.Compressed.to_base58_check
+                         delegate
+                   ; timing } ))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
         ; hash=

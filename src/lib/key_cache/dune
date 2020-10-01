@@ -2,4 +2,5 @@
   (name key_cache)
   (public_name key_cache)
   (libraries core async logger)
-  (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf )))
+  (preprocessor_deps ../../config.mlh)
+  (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf ppx_optcomp bisect_ppx -- --conditional)))

@@ -11,6 +11,10 @@ let Size = ../../Command/Size.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let ValidationService = ../../Projects/ValidationService.dhall
 
+let B = ../../External/Buildkite.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let B/SoftFail/ExitStatus = B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
+
 let commands =
   let sigPath = "mix_cache.sig"
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
@@ -56,7 +60,10 @@ in Pipeline.build Pipeline.Config::{
       commands = commands,
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
-      target = Size.Large,
+      target = Size.Small,
+      soft_fail = Some (
+          B/SoftFail.ListSoft_fail/Type [{ exit_status = Some (B/SoftFail/ExitStatus.Number 1) }]
+        ),
       docker = None Docker.Type
     }
   ]

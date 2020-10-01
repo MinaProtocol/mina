@@ -39,14 +39,24 @@ let dump_on_error yojson x =
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
+      module Timed = struct
+        type t =
+          { initial_minimum_balance: Currency.Balance.t
+          ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
+          ; vesting_period: Coda_numbers.Global_slot.t (*slots*)
+          ; vesting_increment: Currency.Amount.t }
+        [@@deriving yojson, dhall_type]
+      end
+
       type t =
         { pk: (string option[@default None])
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
-        ; delegate: (string option[@default None]) }
+        ; delegate: (string option[@default None])
+        ; timing: (Timed.t option[@default None]) }
       [@@deriving yojson, dhall_type]
 
-      let fields = [|"pk"; "sk"; "balance"; "delegate"|]
+      let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
 
       let of_yojson json =
         dump_on_error json @@ of_yojson
@@ -100,6 +110,7 @@ module Json_layout = struct
       ; block_window_duration_ms: (int option[@default None])
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
       ; coinbase_amount: (Currency.Amount.t option[@default None])
+      ; supercharged_coinbase_factor: (int option[@default None])
       ; account_creation_fee: (Currency.Fee.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
@@ -111,6 +122,7 @@ module Json_layout = struct
        ; "block_window_duration_ms"
        ; "transaction_capacity"
        ; "coinbase_amount"
+       ; "supercharged_coinbase_factor"
        ; "account_creation_fee" |]
 
     let of_yojson json =
@@ -170,6 +182,7 @@ end
       , "block_window_duration_ms": 180000
       , "transaction_capacity": {"txns_per_second_x10": 2}
       , "coinbase_amount": "200"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "0.001" }
   , "ledger":
       { "name": "release"
@@ -194,11 +207,21 @@ end
 
 module Accounts = struct
   module Single = struct
+    module Timed = struct
+      type t = Json_layout.Accounts.Single.Timed.t =
+        { initial_minimum_balance: Currency.Balance.Stable.Latest.t
+        ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_increment: Currency.Amount.Stable.Latest.t }
+      [@@deriving bin_io_unversioned]
+    end
+
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
-      ; delegate: string option }
+      ; delegate: string option
+      ; timing: Timed.t option }
     [@@deriving bin_io_unversioned]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
@@ -218,7 +241,8 @@ module Accounts = struct
     { pk: string option
     ; sk: string option
     ; balance: Currency.Balance.t
-    ; delegate: string option }
+    ; delegate: string option
+    ; timing: Single.Timed.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 
@@ -382,6 +406,7 @@ module Proof_keys = struct
     ; block_window_duration_ms: int option
     ; transaction_capacity: Transaction_capacity.t option
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
+    ; supercharged_coinbase_factor: int option
     ; account_creation_fee: Currency.Fee.Stable.Latest.t option }
   [@@deriving bin_io_unversioned]
 
@@ -393,6 +418,7 @@ module Proof_keys = struct
       ; block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount
+      ; supercharged_coinbase_factor
       ; account_creation_fee } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; c
@@ -402,6 +428,7 @@ module Proof_keys = struct
     ; transaction_capacity=
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
+    ; supercharged_coinbase_factor
     ; account_creation_fee }
 
   let of_json_layout
@@ -412,6 +439,7 @@ module Proof_keys = struct
       ; block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount
+      ; supercharged_coinbase_factor
       ; account_creation_fee } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
@@ -425,6 +453,7 @@ module Proof_keys = struct
     ; block_window_duration_ms
     ; transaction_capacity
     ; coinbase_amount
+    ; supercharged_coinbase_factor
     ; account_creation_fee }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
@@ -445,6 +474,9 @@ module Proof_keys = struct
           t2.transaction_capacity
     ; coinbase_amount=
         opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
+    ; supercharged_coinbase_factor=
+        opt_fallthrough ~default:t1.supercharged_coinbase_factor
+          t2.supercharged_coinbase_factor
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
           t2.account_creation_fee }
@@ -553,6 +585,7 @@ module Test_configs = struct
       , "block_window_duration_ms": 1500
       , "transaction_capacity": {"2_to_the": 3}
       , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "1" }
   , "ledger": { "name": "test", "add_genesis_winner": false } }
       |json}
@@ -576,6 +609,7 @@ module Test_configs = struct
       , "block_window_duration_ms": 15000
       , "transaction_capacity": {"2_to_the": 3}
       , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "1" }
   , "ledger":
       { "name": "test_split_two_stakers"
@@ -601,6 +635,7 @@ module Test_configs = struct
       , "block_window_duration_ms": 10000
       , "transaction_capacity": {"2_to_the": 2}
       , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "1" }
   , "ledger":
       { "name": "test_split_two_stakers"
@@ -626,6 +661,7 @@ module Test_configs = struct
       , "block_window_duration_ms": 10000
       , "transaction_capacity": {"2_to_the": 2}
       , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "1" }
   , "ledger":
       { "name": "test_delegation"

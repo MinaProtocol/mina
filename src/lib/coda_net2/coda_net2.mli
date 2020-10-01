@@ -61,8 +61,6 @@ module Keypair : sig
     end
   end]
 
-  type t = Stable.Latest.t
-
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
 

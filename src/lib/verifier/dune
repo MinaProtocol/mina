@@ -3,4 +3,4 @@
   (public_name verifier)
   (libraries precomputed_values core_kernel async_kernel rpc_parallel coda_base coda_state blockchain_snark memory_stats snark_params ledger_proof logger child_processes)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_coda ppx_sexp_conv ppx_version ppx_optcomp ppx_bin_prot ppx_let ppx_deriving.std ppx_deriving_yojson)))
+  (preprocess (pps ppx_compare ppx_hash ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv bisect_ppx -- --conditional)))

@@ -1,0 +1,12 @@
+(library
+ (name rosetta_lib_nonconsensus)
+ (public_name rosetta_lib_nonconsensus)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel caqti rosetta_models coda_base_nonconsensus currency_nonconsensus
+            snark_params_nonconsensus signature_lib_nonconsensus unsigned_extended_nonconsensus)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_assert ppx_let ppx_sexp_conv
+                  ppx_compare ppx_deriving.std ppx_custom_printf
+                  ppx_deriving_yojson ppx_inline_test bisect_ppx -- --conditional))
+ (synopsis "Rosetta-related support code for nonconsensus"))

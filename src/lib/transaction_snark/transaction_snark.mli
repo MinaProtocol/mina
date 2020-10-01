@@ -14,9 +14,6 @@ module Pending_coinbase_stack_state : sig
         [@@deriving sexp, hash, compare, eq, yojson]
       end
     end]
-
-    type t = Stable.Latest.t = Base of Pending_coinbase.Stack.t | Merge
-    [@@deriving sexp, hash, compare, yojson]
   end
 
   module Poly : sig
@@ -34,10 +31,6 @@ module Pending_coinbase_stack_state : sig
       end
     end]
 
-    type 'pending_coinbase t = 'pending_coinbase Stable.Latest.t =
-      {source: 'pending_coinbase; target: 'pending_coinbase}
-    [@@deriving compare, eq, fields, hash, sexp, yojson]
-
     val typ :
          ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
       -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
@@ -54,8 +47,6 @@ module Pending_coinbase_stack_state : sig
       [@@deriving compare, eq, hash, sexp, yojson]
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
 
   type var = Pending_coinbase.Stack.var Poly.t
 
@@ -113,30 +104,6 @@ module Statement : sig
              t
       end
     end]
-
-    type ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'token_id
-         , 'sok_digest )
-         t =
-          ( 'ledger_hash
-          , 'amount
-          , 'pending_coinbase
-          , 'fee_excess
-          , 'token_id
-          , 'sok_digest )
-          Stable.Latest.t =
-      { source: 'ledger_hash
-      ; target: 'ledger_hash
-      ; supply_increase: 'amount
-      ; pending_coinbase_stack_state: 'pending_coinbase
-      ; fee_excess: 'fee_excess
-      ; next_available_token_before: 'token_id
-      ; next_available_token_after: 'token_id
-      ; sok_digest: 'sok_digest }
-    [@@deriving compare, equal, hash, sexp, yojson]
   end
 
   type ( 'ledger_hash
@@ -178,16 +145,6 @@ module Statement : sig
     end
   end]
 
-  type t =
-    ( Frozen_ledger_hash.t
-    , Currency.Amount.t
-    , Pending_coinbase_stack_state.t
-    , Fee_excess.t
-    , Token_id.t
-    , unit )
-    Poly.t
-  [@@deriving sexp, hash, compare, yojson]
-
   module With_sok : sig
     [%%versioned:
     module Stable : sig
@@ -203,16 +160,6 @@ module Statement : sig
         [@@deriving compare, equal, hash, sexp, to_yojson]
       end
     end]
-
-    type t =
-      ( Frozen_ledger_hash.t
-      , Currency.Amount.t
-      , Pending_coinbase_stack_state.t
-      , Fee_excess.t
-      , Token_id.t
-      , Sok_message.Digest.t )
-      Poly.t
-    [@@deriving sexp, hash, compare, to_yojson]
 
     type var =
       ( Frozen_ledger_hash.var
@@ -257,8 +204,6 @@ module Stable : sig
     type t [@@deriving compare, sexp, to_yojson]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 val create :
      source:Frozen_ledger_hash.t
@@ -313,7 +258,9 @@ val check_transaction :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> Transaction.t Transaction_protocol_state.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -326,7 +273,7 @@ val check_user_command :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> User_command.With_valid_signature.t Transaction_protocol_state.t
+  -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -340,7 +287,9 @@ val generate_transaction_witness :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> Transaction.t Transaction_protocol_state.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -357,7 +306,9 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> Transaction.t Transaction_protocol_state.t
+    -> snapp_account1:Snapp_account.t option
+    -> snapp_account2:Snapp_account.t option
+    -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -369,7 +320,7 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> User_command.With_valid_signature.t Transaction_protocol_state.t
+    -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 

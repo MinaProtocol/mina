@@ -14,7 +14,7 @@
     cohttp-async
     core_kernel
     logger
-    models
+    rosetta_models
     lib
     ppx_deriving_yojson.runtime
     yojson
@@ -27,5 +27,5 @@
     ppx_jane
     ppx_version
     ppx_deriving.eq
-    ))
+     bisect_ppx -- --conditional))
   )

@@ -21,18 +21,10 @@ PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
-if [ "$GITBRANCH" == "master" ]; then
-    VERSION="${GITTAG}-${GITHASH}"
-else
-    VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
-fi
+# Load in env vars for githash/branch/etc.
+source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
-# Export variables for use with downstream steps
-echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
+cd "${SCRIPTPATH}/../_build"
 
 if [[ "$1" == "optimized" ]] ; then
     echo "Optimized deb"
@@ -184,3 +176,11 @@ rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb
+
+
+# Export variables for use with downstream circle-ci steps (see buildkite/scripts/publish-deb.sh for BK DOCKER_DEPLOY_ENV)
+echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV

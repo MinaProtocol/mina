@@ -137,8 +137,9 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+  module B = Bits.Vector.Make (Vector)
+
+  include (B : Bits_intf.Convertible_bits with type t := t)
 
   [%%ifdef
   consensus_mechanism]
@@ -255,6 +256,8 @@ end = struct
         ~value_of_hlist:typ_of_hlist
 
     module Checked = struct
+      type t = var
+
       let to_bits {magnitude; sgn} =
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
@@ -294,24 +297,13 @@ end = struct
 
       let ( + ) = add
 
-      let assert_equal (t1 : var) (t2 : var) =
-        let%map () =
-          Field.Checked.Assert.equal (pack_var t1.magnitude)
-            (pack_var t2.magnitude)
-        and () =
-          Field.Checked.Assert.equal
-            (t1.sgn :> Field.Var.t)
-            (t2.sgn :> Field.Var.t)
-        in
-        ()
-
       let equal (t1 : var) (t2 : var) =
-        let%bind b1 =
-          Field.Checked.equal (pack_var t1.magnitude) (pack_var t2.magnitude)
-        and b2 =
-          Field.Checked.equal (t1.sgn :> Field.Var.t) (t2.sgn :> Field.Var.t)
-        in
-        Boolean.all [b1; b2]
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.equal t1 t2
+
+      let assert_equal (t1 : var) (t2 : var) =
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.Assert.equal t1 t2
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
@@ -355,6 +347,10 @@ end = struct
   consensus_mechanism]
 
   module Checked = struct
+    module N = Coda_numbers.Nat.Make_checked (Unsigned) (B)
+
+    type t = var
+
     let if_ = if_
 
     let if_value cond ~then_ ~else_ : var =
@@ -384,6 +380,20 @@ end = struct
 
     let equal x y = Field.Checked.equal (pack_var x) (pack_var y)
 
+    let ( = ) = equal
+
+    let op f (x : var) (y : var) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits var_to_bits in
+      f (g x) (g y)
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
+
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Var.add (pack_var x) (pack_var y))
@@ -402,6 +412,14 @@ end = struct
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
+
+    let add_signed_flagged (t : var) (d : Signed.var) =
+      let%bind d = Signed.Checked.to_field_var d in
+      let%map bits, `Success no_overflow =
+        Field.Var.add (pack_var t) d
+        |> Field.Checked.unpack_flagged ~length:length_in_bits
+      in
+      (bits, `Overflow (Boolean.not no_overflow))
 
     let scale (f : Field.Var.t) (t : var) =
       let%bind x = Field.Checked.mul (pack_var t) f in
@@ -493,7 +511,7 @@ end = struct
           qc_test_fast generator ~shrinker ~f:(fun num ->
               match of_formatted_string (to_formatted_string num) with
               | after_format ->
-                  if after_format = num then ()
+                  if Unsigned.equal after_format num then ()
                   else
                     Error.(
                       raise
@@ -543,6 +561,8 @@ module Fee = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
@@ -583,6 +603,8 @@ module Amount = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
@@ -633,11 +655,11 @@ module Balance = struct
   [%%ifdef
   consensus_mechanism]
 
-  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
-  include (Amount : Basic with type t = Amount.t)
+  include (Amount : Basic with type t := t)
 
   [%%endif]
 
@@ -655,21 +677,23 @@ module Balance = struct
   consensus_mechanism]
 
   module Checked = struct
-    let add_signed_amount = Amount.Checked.add_signed
+    include Amount.Checked
 
-    let add_amount = Amount.Checked.add
+    let add_signed_amount = add_signed
 
-    let sub_amount = Amount.Checked.sub
+    let add_amount = add
 
-    let add_amount_flagged = Amount.Checked.add_flagged
+    let sub_amount = sub
 
-    let sub_amount_flagged = Amount.Checked.sub_flagged
+    let add_amount_flagged = add_flagged
+
+    let add_signed_amount_flagged = add_signed_flagged
+
+    let sub_amount_flagged = sub_flagged
 
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
-
-    let if_ = Amount.Checked.if_
   end
 
   [%%endif]

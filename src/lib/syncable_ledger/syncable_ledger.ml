@@ -26,12 +26,6 @@ module Query = struct
       [@@deriving sexp, yojson]
     end
   end]
-
-  type 'addr t = 'addr Stable.Latest.t =
-    | What_child_hashes of 'addr
-    | What_contents of 'addr
-    | Num_accounts
-  [@@deriving sexp, yojson]
 end
 
 module Answer = struct
@@ -49,12 +43,6 @@ module Answer = struct
       [@@deriving sexp, yojson]
     end
   end]
-
-  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
-    | Child_hashes_are of 'hash * 'hash
-    | Contents_are of 'account list
-    | Num_accounts of int * 'hash
-  [@@deriving sexp, yojson]
 end
 
 module type Inputs_intf = sig

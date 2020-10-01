@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+open Rosetta_lib
 
 let graphql_error_to_string e =
   let error_obj_to_string obj =

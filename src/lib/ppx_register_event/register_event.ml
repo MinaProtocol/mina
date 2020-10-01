@@ -146,9 +146,10 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   , [%e
                       elist label_decls
                         ~f:(fun {pld_name= {txt= name; _}; pld_type; _} ->
-                          [%expr
-                            [%e estring name]
-                            , [%e to_yojson pld_type] [%e evar name]] )] )
+                          Ppx_deriving_yojson.wrap_runtime
+                            [%expr
+                              [%e estring name]
+                              , [%e to_yojson pld_type] [%e evar name]] )] )
             | _ ->
                 None )
         ; parse=
@@ -161,14 +162,15 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                     [%e
                       List.fold_right label_decls
                         ~f:(fun {pld_name= {txt= name; _}; pld_type; _} acc ->
-                          [%expr
-                            Core_kernel.Result.bind
-                              ([%e
-                                 of_yojson
-                                   ~path:(split_path @ [ctor; name])
-                                   pld_type]
-                                 [%e evar name])
-                              ~f:(fun [%p pvar name] -> [%e acc])] )
+                          Ppx_deriving_yojson.wrap_runtime
+                            [%expr
+                              Core_kernel.Result.bind
+                                ([%e
+                                   of_yojson
+                                     ~path:(split_path @ [ctor; name])
+                                     pld_type]
+                                   [%e evar name])
+                                ~f:(fun [%p pvar name] -> [%e acc])] )
                         ~init:
                           [%expr Core_kernel.Result.return [%e record_expr]]]
                 | _ ->
@@ -183,6 +185,20 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
         Structured_log_events.register_constructor
           [%e evar (event_name ^ "_structured_events_repr")]] ]
 
+let generate_signature_items ~loc ~path:_ ty_ext =
+  List.concat_map ty_ext.ptyext_constructors ~f:(fun {pext_name; _} ->
+      let event_name = String.lowercase pext_name.txt in
+      let (module Ast_builder) = Ast_builder.make loc in
+      let open Ast_builder in
+      [ psig_value
+          (value_description
+             ~name:(Located.mk (event_name ^ "_structured_events_id"))
+             ~type_:[%type: Structured_log_events.id] ~prim:[])
+      ; psig_value
+          (value_description
+             ~name:(Located.mk (event_name ^ "_structured_events_repr"))
+             ~type_:[%type: Structured_log_events.repr] ~prim:[]) ] )
+
 let str_type_ext =
   let args =
     let open Ppxlib.Deriving.Args in
@@ -190,4 +206,9 @@ let str_type_ext =
   in
   Ppxlib.Deriving.Generator.make args generate_loggers_and_parsers
 
-let () = Ppxlib.Deriving.add deriver ~str_type_ext |> Ppxlib.Deriving.ignore
+let sig_type_ext =
+  Ppxlib.Deriving.Generator.make_noarg generate_signature_items
+
+let () =
+  Ppxlib.Deriving.add deriver ~str_type_ext ~sig_type_ext
+  |> Ppxlib.Deriving.ignore

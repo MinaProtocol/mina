@@ -10,13 +10,12 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
     { transaction_with_info: Ledger.Undo.t
     ; state_hash: State_hash.t * State_body_hash.t
+    ; state_view: Coda_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement: Transaction_snark.Statement.t
     ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness: Sparse_ledger.t }
@@ -116,7 +115,7 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list
 
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :

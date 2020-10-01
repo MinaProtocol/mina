@@ -13,11 +13,14 @@
     cohttp-async
     core_kernel
     logger
-    models
     ppx_deriving_yojson.runtime
+    rosetta_lib
+    rosetta_models
+    rosetta_coding
     yojson
     archive_lib
     signature_lib
+    secrets
     unsigned_extended
     )
   (preprocess (pps
@@ -30,4 +33,4 @@
     ppx_inline_test
     ppx_assert
     ppx_version
-  )))
+   bisect_ppx -- --conditional)))

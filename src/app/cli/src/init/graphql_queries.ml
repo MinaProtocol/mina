@@ -1,4 +1,7 @@
-module Decoders = Graphql_client.Decoders
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
+module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
 [%graphql
@@ -151,8 +154,7 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $token: UInt64,
-          $fee: UInt64!,
+          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input:
@@ -266,7 +268,7 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+    memo @bsDecoder(fn: "Coda_base.Signed_command_memo.of_string")
   }
 }
 |}]

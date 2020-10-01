@@ -1,0 +1,78 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Troubleshooting" });
+
+# Troubleshooting
+
+Here are some common problems you might encounter while trying to set up the Mina daemon. If you can't find your issue here please ask for help on [Discord](https://bit.ly/MinaDiscord) or open an issue on [Github](https://github.com/MinaProtocol/mina/issues/new).
+
+## Port forwarding
+
+Your Mina node communicates with other nodes using a port (the external-port). [Port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) is the process of letting your router know that you're going to need to use a specific port.
+
+By default, your Mina node uses port 8302 to connect to the outside world. If you need to use a different port, you can do so by specifying one with the `-external-port <my-port>` flag.
+
+Note: When running Mina in the cloud, you should instead configure security groups for your cloud provider.
+
+### Manual port forwarding
+
+The Mina node does its best to configure itself to be able to connect to the outside world without you needing to do any extra work. However, this may fail, depending on your router and network setup. In this case, you may have to manually forward the external-port.
+
+A common cause of this is routers not supporting UPnP, a protocol that allows the node to configure the port forwarding automatically.
+
+If you experience this type of problem, find your router model and search for `<model> port forwarding` and follow the instructions to forward the ports from your router to your device running the Mina node. You'll need to open the TCP port 8303 by default.
+
+### Issues determining IP address
+
+If you see `couldn't determine our IP from the internet, use -external-ip flag`, then the daemon failed to determine its own IP from [these service providers](https://github.com/MinaProtocol/mina/blob/056d0203722ddfec1c7ad216846434648cd7af5e/src/app/cli/src/find_ip.ml#L7-L11). Your firewall may be blocking HTTP/S requests, or the network connection may not be working.
+
+To bypass this, pass in the flag `-external-ip <your-ip-address>` when starting the Mina daemon. To get your external IP address, run `curl ifconfig.me`.
+
+## macOS Hostname
+
+If you're running Mina on macOS and see the following time out error `monitor.ml.Error "Timed out getting connection from process"`, you'll need to add your hostname to `/etc/hosts` by running the following:
+
+- `$ hostname` to get your hostname
+- Open the `/etc/hosts` file and add the mapping:
+
+```
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1       localhost
+127.0.0.1       <ADD YOUR HOSTNAME HERE>
+```
+
+This is necessary because sometimes macOS doesn't resolve your hostname to your local IP address.
+
+## Connectivity Issues
+
+- If the number of peers is 0, there may be an issue with the IP address - make sure you typed in the IP address and port exactly as specified in [Start a Mina node](#start-a-mina-node).
+- If sync status is `Bootstrap`, you'll need to wait for a bit for your node to catch up to the rest of the network. In the Mina network, we do not have to download full transaction history from the genesis block, but nodes participating in block production and compression need to download recent history and the current account data in the network. Future versions of the client will allow non-operating nodes to avoid having to download this data.
+- If sync status is `Offline` or `Bootstrap` for more than 30 minutes, you may need to [configure port forwarding for your router](#port-forwarding). Otherwise you may need to resolve connectivity issues with your home network.
+
+## Other issues
+
+### Accepting incoming connections
+
+If you see one or more warnings like the below, then choose "Allow":
+
+```
+Do you want the application "mina" to accept incoming network connections?
+```
+
+### Failure on daemon restart
+
+If you restart the Mina daemon and it fails, then try deleting your config folder by running `rm -rf ~/.mina-config` directory and starting the daemon again.
+
+### Daemon restart on computer sleep
+
+If the machine running your Mina node enters sleep mode or hibernates, you will need to restart the Mina daemon once the machine becomes active.
+
+### Failed to connect to any initial peers
+
+Look in the logs for messages about "Chain ID mismatch". These messages mean your daemon was compiled for a different chain than the peers it tried to connect to. This can happen normally, but during startup at least one peer needs to have a matching chain ID.
+
+Otherwise, if there are messages about "Retrieving chain ID failed", or other errors, you may need to [configure port forwarding for your router](/docs/getting-started/#port-forwarding).

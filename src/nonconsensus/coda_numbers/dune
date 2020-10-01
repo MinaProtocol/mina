@@ -4,9 +4,9 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries fold_lib tuple_lib bignum_bigint snark_bits_nonconsensus unsigned_extended_nonconsensus random_oracle_nonconsensus
-   core_kernel codable)
+   core_kernel codable ppx_dhall_type)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_deriving.eq ppx_deriving_yojson
-       ppx_inline_test bisect_ppx -- -conditional))
+       ppx_inline_test bisect_ppx -- --conditional))
  (synopsis "Snark-friendly numbers used in Coda consensus"))

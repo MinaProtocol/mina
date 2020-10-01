@@ -8,7 +8,7 @@ module Transactions = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { user_commands:
+        { commands:
             ( User_command.Stable.V1.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
@@ -20,12 +20,6 @@ module Transactions = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { user_commands: (User_command.t, Transaction_hash.t) With_hash.t list
-    ; fee_transfers: Fee_transfer.Single.t list
-    ; coinbase: Currency.Amount.t
-    ; coinbase_receiver: Public_key.Compressed.t option }
 end
 
 module Protocol_state = struct
@@ -40,11 +34,6 @@ module Protocol_state = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    { previous_state_hash: State_hash.t
-    ; blockchain_state: Coda_state.Blockchain_state.Value.t
-    ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
 [%%versioned
@@ -61,18 +50,11 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { creator: Public_key.Compressed.t
-  ; protocol_state: Protocol_state.t
-  ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list
-  ; proof: Proof.t }
-
 let participants ~next_available_token
-    {transactions= {user_commands; fee_transfers; _}; creator; _} =
+    {transactions= {commands; fee_transfers; _}; creator; _} =
   let open Account_id.Set in
   let _next_available_token, user_command_set =
-    List.fold user_commands ~init:(next_available_token, empty)
+    List.fold commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
         ( User_command.next_available_token user_command.data
             next_available_token
@@ -89,11 +71,10 @@ let participants ~next_available_token
     (union user_command_set fee_transfer_participants)
     (Account_id.create creator Token_id.default)
 
-let participant_pks
-    {transactions= {user_commands; fee_transfers; _}; creator; _} =
+let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
   let open Public_key.Compressed.Set in
   let user_command_set =
-    List.fold user_commands ~init:empty ~f:(fun set user_command ->
+    List.fold commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_accessed
@@ -105,8 +86,7 @@ let participant_pks
   in
   add (union user_command_set fee_transfer_participants) creator
 
-let user_commands {transactions= {Transactions.user_commands; _}; _} =
-  user_commands
+let commands {transactions= {Transactions.commands; _}; _} = commands
 
 let validate_transactions external_transition =
   let staged_ledger_diff =
@@ -131,40 +111,38 @@ let of_transition external_transition tracked_participants
   let transactions, _next_available_token =
     List.fold calculated_transactions
       ~init:
-        ( { Transactions.user_commands= []
+        ( { Transactions.commands= []
           ; fee_transfers= []
           ; coinbase= Currency.Amount.zero
           ; coinbase_receiver= None }
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
-        | {data= User_command checked_user_command; _} -> (
-            let user_command =
-              User_command.forget_check checked_user_command
-            in
-            let should_include_transaction user_command participants =
+        | {data= Command (Snapp_command _); _} -> failwith "Not implemented"
+        | {data= Command command; _} -> (
+            let command = (command :> User_command.t) in
+            let should_include_transaction command participants =
               List.exists
-                (User_command.accounts_accessed ~next_available_token
-                   user_command) ~f:(fun account_id ->
+                (User_command.accounts_accessed ~next_available_token command)
+                ~f:(fun account_id ->
                   Public_key.Compressed.Set.mem participants
                     (Account_id.public_key account_id) )
             in
             match tracked_participants with
             | `Some interested_participants
               when not
-                     (should_include_transaction user_command
+                     (should_include_transaction command
                         interested_participants) ->
                 ( acc_transactions
-                , User_command.next_available_token user_command
+                , User_command.next_available_token command
                     next_available_token )
             | `All | `Some _ ->
                 (* Should include this command. *)
                 ( { acc_transactions with
-                    user_commands=
-                      { With_hash.data= user_command
-                      ; hash= Transaction_hash.hash_user_command user_command
-                      }
-                      :: acc_transactions.user_commands }
-                , User_command.next_available_token user_command
+                    commands=
+                      { With_hash.data= command
+                      ; hash= Transaction_hash.hash_command command }
+                      :: acc_transactions.commands }
+                , User_command.next_available_token command
                     next_available_token ) )
         | {data= Fee_transfer fee_transfer; _} ->
             let fee_transfer_list =

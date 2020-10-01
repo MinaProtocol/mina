@@ -158,6 +158,23 @@ module Make (Inputs : Intf.Inputs_intf) :
       k ()
     in
     let rec go () =
+      let%bind daemon_address =
+        let%bind cwd = Sys.getcwd () in
+        [%log debug]
+          !"Snark worker working directory $dir"
+          ~metadata:[("dir", `String cwd)] ;
+        let path = "snark_coordinator" in
+        match%bind Sys.file_exists path with
+        | `Yes -> (
+            let%map s = Reader.file_contents path in
+            try Host_and_port.of_string (String.strip s)
+            with _ -> daemon_address )
+        | `No | `Unknown ->
+            return daemon_address
+      in
+      [%log debug]
+        !"Snark worker using daemon $addr"
+        ~metadata:[("addr", `String (Host_and_port.to_string daemon_address))] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
@@ -170,6 +187,8 @@ module Make (Inputs : Intf.Inputs_intf) :
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
           (* No work to be done -- quietly take a brief nap *)
+          [%log info] "No jobs available. Napping for $time seconds"
+            ~metadata:[("time", `Float random_delay)] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some (work, public_key)) -> (

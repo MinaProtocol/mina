@@ -11,8 +11,6 @@ module Block_data = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp]
-
   type var = Coda_state.Protocol_state.Body.var
 
   let typ = Coda_state.Protocol_state.Body.typ
@@ -34,9 +32,6 @@ module Poly = struct
         {transaction; block_data}
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t = {transaction: 'a; block_data: Block_data.t}
-  [@@deriving sexp]
 end
 
 [%%versioned
@@ -49,8 +44,6 @@ module Stable = struct
     let of_latest = Poly.Stable.V1.of_latest
   end
 end]
-
-type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 
 let transaction t = t.Poly.transaction
 

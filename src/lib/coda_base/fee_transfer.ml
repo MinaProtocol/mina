@@ -19,12 +19,6 @@ module Single = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    { receiver_pk: Public_key.Compressed.t
-    ; fee: Currency.Fee.t
-    ; fee_token: Token_id.t }
-  [@@deriving sexp, compare, yojson, hash]
-
   include Comparable.Make (Stable.Latest)
   module Base58_check = Codable.Make_base58_check (Stable.Latest)
 
@@ -68,9 +62,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Single.Stable.Latest.t One_or_two.Stable.Latest.t
-[@@deriving sexp, compare, yojson, hash]
 
 type single = Single.t =
   { receiver_pk: Public_key.Compressed.t
@@ -125,3 +116,5 @@ let map = One_or_two.map
 let fold = One_or_two.fold
 
 let to_list = One_or_two.to_list
+
+let to_numbered_list = One_or_two.to_numbered_list

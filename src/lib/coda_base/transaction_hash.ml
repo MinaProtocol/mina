@@ -27,7 +27,7 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_user_command = Fn.compose digest_string User_command.to_base58_check
+let hash_command = Fn.compose digest_string User_command.to_base58_check
 
 let hash_fee_transfer =
   Fn.compose digest_string Fee_transfer.Single.to_base58_check
@@ -45,7 +45,7 @@ module User_command_with_valid_signature = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( (User_command.With_valid_signature.Stable.V1.t[@hash.ignore])
+        ( (User_command.Valid.Stable.V1.t[@hash.ignore])
         , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]
@@ -59,14 +59,8 @@ module User_command_with_valid_signature = struct
     end
   end]
 
-  type t =
-    ( User_command.With_valid_signature.t
-    , (T.t[@to_yojson hash_to_yojson]) )
-    With_hash.t
-  [@@deriving sexp, to_yojson]
-
-  let create (uc : User_command.With_valid_signature.t) : t =
-    {data= uc; hash= hash_user_command (User_command.forget_check uc)}
+  let create (c : User_command.Valid.t) : t =
+    {data= c; hash= hash_command (User_command.forget_check c)}
 
   let data ({data; _} : t) = data
 
@@ -76,6 +70,42 @@ module User_command_with_valid_signature = struct
 
   let forget_check ({data; hash} : t) =
     {With_hash.data= User_command.forget_check data; hash}
+
+  include Comparable.Make (Stable.Latest)
+end
+
+module User_command = struct
+  type hash = T.t [@@deriving sexp, compare, hash]
+
+  let hash_to_yojson = to_yojson
+
+  let hash_of_yojson = of_yojson
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( (User_command.Stable.V1.t[@hash.ignore])
+        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        With_hash.Stable.V1.t
+      [@@deriving sexp, hash, to_yojson]
+
+      let to_latest = Fn.id
+
+      (* Compare only on hashes, comparing on the data too would be slower and
+         add no value.
+      *)
+      let compare (x : t) (y : t) = T.compare x.hash y.hash
+    end
+  end]
+
+  let create (c : User_command.t) : t = {data= c; hash= hash_command c}
+
+  let data ({data; _} : t) = data
+
+  let command ({data; _} : t) = data
+
+  let hash ({hash; _} : t) = hash
 
   include Comparable.Make (Stable.Latest)
 end

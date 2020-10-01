@@ -1,5 +1,7 @@
 open Core_kernel
 open Async_kernel
+module Malleable_error = Malleable_error
+module Test_error = Test_error
 
 module Container_images = struct
   type t = {coda: string; user_agent: string; bots: string; points: string}
@@ -38,20 +40,37 @@ end
  *  interacting with networks.
  *)
 module type Engine_intf = sig
+  (* unique name identifying the engine (used in test executive cli) *)
+  val name : string
+
+  (* additional cli inputs available for this engine *)
+  module Cli_inputs : sig
+    type t
+
+    val term : t Cmdliner.Term.t
+  end
+
   module Node : sig
     type t
 
-    val start : t -> unit Deferred.t
+    val start : fresh_state:bool -> t -> unit Malleable_error.t
 
-    val stop : t -> unit Deferred.t
+    val stop : t -> unit Malleable_error.t
 
     val send_payment :
-      t -> User_command_input.t -> Coda_base.User_command.t Deferred.t
+         logger:Logger.t
+      -> t
+      -> sender:Signature_lib.Public_key.Compressed.t
+      -> receiver:Signature_lib.Public_key.Compressed.t
+      -> amount:Currency.Amount.t
+      -> fee:Currency.Fee.t
+      -> unit Malleable_error.t
   end
 
   module Network : sig
     type t =
-      { constraint_constants: Genesis_constants.Constraint_constants.t
+      { namespace: string
+      ; constraint_constants: Genesis_constants.Constraint_constants.t
       ; genesis_constants: Genesis_constants.t
       ; block_producers: Node.t list
       ; snark_coordinators: Node.t list
@@ -65,6 +84,7 @@ module type Engine_intf = sig
     val expand :
          logger:Logger.t
       -> test_name:string
+      -> cli_inputs:Cli_inputs.t
       -> test_config:Test_config.t
       -> images:Container_images.t
       -> t
@@ -74,7 +94,7 @@ module type Engine_intf = sig
   module Network_manager : sig
     type t
 
-    val create : Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
 
     val deploy : t -> Network.t Deferred.t
 
@@ -86,9 +106,13 @@ module type Engine_intf = sig
   module Log_engine : sig
     type t
 
-    val create : logger:Logger.t -> Network.t -> t Deferred.Or_error.t
+    val create :
+         logger:Logger.t
+      -> network:Network.t
+      -> on_fatal_error:(unit -> unit)
+      -> t Malleable_error.t
 
-    val delete : t -> unit Deferred.Or_error.t
+    val destroy : t -> Test_error.Set.t Malleable_error.t
 
     (** waits until a block is produced with at least one of the following conditions being true
       1. Blockchain length = blocks
@@ -103,37 +127,27 @@ module type Engine_intf = sig
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> unit Deferred.Or_error.t
+      -> unit Malleable_error.t
 
-    val wait_for_init : Node.t -> t -> unit Deferred.Or_error.t
+    val wait_for_sync :
+      Node.t list -> timeout:Time.Span.t -> t -> unit Malleable_error.t
+
+    val wait_for_init : Node.t -> t -> unit Malleable_error.t
+
+    (** wait until a payment transaction appears in an added breadcrumb
+        num_tries is the maximum number of breadcrumbs to examine
+    *)
+    val wait_for_payment :
+         ?num_tries:int
+      -> t
+      -> logger:Logger.t
+      -> sender:Signature_lib.Public_key.Compressed.t
+      -> receiver:Signature_lib.Public_key.Compressed.t
+      -> amount:Currency.Amount.t
+      -> unit
+      -> unit Malleable_error.t
   end
 end
-
-(** The DSL is a monad which is conceptually similar to `Deferred.Or_error.t`,
- *  except that there are 2 types of errors which can be returned at each bind
- *  point in a computation: soft errors, and hard errors. Soft errors do not
- *  effect the control flow of the monad, and are instead accumulated for later
- *  extraction. Hard errors effect the control flow of the monad in the same
- *  way an `Error` constructor for `Or_error.t` would.
- *)
-module type DSL_intf = Monad.S
-
-(*
-module Make_DSL (Engine : Engine_intf) : DSL_intf = struct
-end
-*)
-
-(** A test is a functor which produces a configuration and run function from an
- *  implementation of the DSL.
- *)
-
-(*
-module Test_intf : functor (DSL : DSL_intf) -> sig
-  val config : Test_config.t
-
-  val run : unit -> unit DSL.t
-end
-*)
 
 module type Test_intf = sig
   type network
@@ -142,7 +156,7 @@ module type Test_intf = sig
 
   val config : Test_config.t
 
-  val run : network -> log_engine -> unit Deferred.Or_error.t
+  val run : network -> log_engine -> unit Malleable_error.t
 end
 
 (* NB: until the DSL is actually implemented, a test just takes in the engine

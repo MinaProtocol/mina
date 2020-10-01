@@ -161,7 +161,9 @@ let str ~loc =
 [%%else]
 
 let str ~loc =
-  let e = [%expr Async.Deferred.return Pickles.Verification_key.dummy] in
+  let e =
+    [%expr Async.Deferred.return (Lazy.force Pickles.Verification_key.dummy)]
+  in
   return
     (str ~loc
        ~blockchain_verification_key_id:
@@ -171,6 +173,8 @@ let str ~loc =
 [%%endif]
 
 let main () =
+  if Array.mem ~equal:String.equal Sys.argv "--download-keys" then
+    Key_cache.set_downloads_enabled true ;
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "snark_keys.ml")
   in

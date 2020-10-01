@@ -1,25 +1,23 @@
 open Core_kernel
 open Async
-open Models
+open Rosetta_lib
+open Rosetta_models
 
-module Unsigned = struct
-  module UInt64 = struct
-    include Unsigned_extended.UInt64
-
-    let to_yojson i = `Intlit (to_string i)
-  end
-
-  module UInt32 = struct
-    include Unsigned_extended.UInt32
-
-    let to_yojson i = `Intlit (to_string i)
-  end
-end
-
-module Get_coinbase =
+module Get_coinbase_and_genesis =
 [%graphql
 {|
   query {
+    genesisBlock {
+      creatorAccount {
+        publicKey @bsDecoder(fn: "Decoders.public_key")
+      }
+      protocolState {
+        blockchainState {
+          utcDate
+        }
+      }
+      stateHash
+    }
     daemonStatus {
       peers
     }
@@ -30,16 +28,7 @@ module Get_coinbase =
   }
 |}]
 
-let account_id (`Pk pk) token_id =
-  { Account_identifier.address= pk
-  ; sub_account= None
-  ; metadata= Some (Amount_of.Token_id.encode token_id) }
-
-let token_id_of_account (account : Account_identifier.t) =
-  let module Decoder = Amount_of.Token_id.T (Result) in
-  Decoder.decode account.metadata
-  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
-  |> Result.ok
+let account_id = User_command_info.account_id
 
 module Block_query = struct
   type t = ([`Height of int64], [`Hash of string]) These.t option
@@ -55,572 +44,112 @@ module Block_query = struct
           M.return (Some (`That (`Hash hash)))
       | Some index, Some hash ->
           M.return (Some (`Those (`Height index, `Hash hash)))
+
+    let is_genesis ~hash = function
+      | Some (`This (`Height index)) ->
+          Int64.equal index Network.genesis_block_height
+      | Some (`That (`Hash hash')) ->
+          String.equal hash hash'
+      | Some (`Those (`Height index, `Hash hash')) ->
+          Int64.equal index Network.genesis_block_height
+          && String.equal hash hash'
+      | None ->
+          false
   end
 end
 
-module Op = struct
-  type 'a t = {label: 'a; related_to: 'a option} [@@deriving eq]
-
-  let build ~a_eq ~plan ~f =
-    List.mapi plan ~f:(fun i op ->
-        let operation_identifier i =
-          {Operation_identifier.index= Int64.of_int_exn i; network_index= None}
-        in
-        let related_operations =
-          match op.related_to with
-          | Some relate ->
-              List.findi plan ~f:(fun _ a -> a_eq relate a.label)
-              |> Option.map ~f:(fun (i, _) -> operation_identifier i)
-              |> Option.to_list
-          | None ->
-              []
-        in
-        f ~related_operations ~operation_identifier:(operation_identifier i) op
-    )
-end
+module Op = User_command_info.Op
 
 (* TODO: Populate postgres DB with at least one of each kind of transaction and then make sure ops make sense: #5501 *)
-module User_command_info = struct
-  module Kind = struct
-    type t =
-      [`Payment | `Delegation | `Create_token | `Create_account | `Mint_tokens]
-    [@@deriving yojson, eq, sexp, compare]
-  end
-
-  module Account_creation_fees_paid = struct
-    type t =
-      | By_no_one
-      | By_fee_payer of Unsigned.UInt64.t
-      | By_receiver of Unsigned.UInt64.t
-    [@@deriving eq, to_yojson, sexp, compare]
-  end
-
-  module Failure_status = struct
-    type t = [`Applied of Account_creation_fees_paid.t | `Failed of string]
-    [@@deriving eq, to_yojson, sexp, compare]
-  end
-
-  type t =
-    { kind: Kind.t
-    ; fee_payer: [`Pk of string]
-    ; source: [`Pk of string]
-    ; receiver: [`Pk of string]
-    ; fee_token: Unsigned.UInt64.t
-    ; token: Unsigned.UInt64.t
-    ; fee: Unsigned.UInt64.t
-    ; nonce: Unsigned.UInt32.t
-    ; amount: Unsigned.UInt64.t option
-    ; hash: string
-    ; failure_status: Failure_status.t option }
-  [@@deriving to_yojson, eq, sexp, compare]
-
-  module Partial = struct
-    type t =
-      { kind: Kind.t
-      ; fee_payer: [`Pk of string]
-      ; source: [`Pk of string]
-      ; receiver: [`Pk of string]
-      ; fee_token: Unsigned.UInt64.t
-      ; token: Unsigned.UInt64.t
-      ; fee: Unsigned.UInt64.t
-      ; amount: Unsigned.UInt64.t option }
-    [@@deriving to_yojson, sexp, compare]
-
-    module Reason = struct
-      type t =
-        | Length_mismatch
-        | Fee_payer_and_source_mismatch
-        | Amount_not_some
-        | Account_not_some
-        | Incorrect_token_id
-        | Amount_inc_dec_mismatch
-        | Status_not_pending
-        | Can't_find_kind of string
-      [@@deriving sexp]
-    end
-  end
-
-  let forget (t : t) : Partial.t =
-    { kind= t.kind
-    ; fee_payer= t.fee_payer
-    ; source= t.source
-    ; receiver= t.receiver
-    ; fee_token= t.fee_token
-    ; token= t.token
-    ; fee= t.fee
-    ; amount= t.amount }
-
-  let of_operations (ops : Operation.t list) :
-      (Partial.t, Partial.Reason.t) Validation.t =
-    (* TODO: If we care about DoS attacks, break early if length too large *)
-    (* For a payment we demand:
-      *
-      * ops = exactly 3
-      *
-      * payment_source_dec with account 'a, some amount 'x, status="Pending"
-      * fee_payer_dec with account 'a, some amount 'y, status="Pending"
-      * payment_receiver_inc with account 'b, some amount 'x, status="Pending"
-    *)
-    let payment =
-      let open Validation.Let_syntax in
-      let open Partial.Reason in
-      let module V = Validation in
-      (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
-      let find_kind k (ops : Operation.t list) =
-        let name = Operation_types.name k in
-        List.find ops ~f:(fun op -> String.equal op.Operation._type name)
-        |> Result.of_option ~error:[Can't_find_kind name]
-      in
-      let%map () =
-        if Int.equal (List.length ops) 3 then V.return ()
-        else V.fail Length_mismatch
-      and account_a =
-        let open Result.Let_syntax in
-        let%bind {account; _} = find_kind `Payment_source_dec ops
-        and {account= account'; _} = find_kind `Fee_payer_dec ops in
-        match (account, account') with
-        | Some x, Some y when Account_identifier.equal x y ->
-            V.return x
-        | Some _, Some _ ->
-            V.fail Fee_payer_and_source_mismatch
-        | None, _ | _, None ->
-            V.fail Account_not_some
-      and token =
-        let open Result.Let_syntax in
-        let%bind {account; _} = find_kind `Payment_source_dec ops in
-        match account with
-        | Some account -> (
-          match token_id_of_account account with
-          | None ->
-              V.fail Incorrect_token_id
-          | Some token ->
-              V.return token )
-        | None ->
-            V.fail Account_not_some
-      and fee_token =
-        let open Result.Let_syntax in
-        let%bind {account; _} = find_kind `Fee_payer_dec ops in
-        match account with
-        | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return token_id
-          | None ->
-              V.fail Incorrect_token_id )
-        | None ->
-            V.fail Account_not_some
-      and account_b =
-        let open Result.Let_syntax in
-        let%bind {account; _} = find_kind `Payment_receiver_inc ops in
-        Result.of_option account ~error:[Account_not_some]
-      and () =
-        if List.for_all ops ~f:(fun op -> String.equal op.status "Pending")
-        then V.return ()
-        else V.fail Status_not_pending
-      and payment_amount_x =
-        let open Result.Let_syntax in
-        let%bind {amount; _} = find_kind `Payment_source_dec ops
-        and {amount= amount'; _} = find_kind `Payment_receiver_inc ops in
-        match (amount, amount') with
-        | Some x, Some y when Amount.equal (Amount_of.negated x) y ->
-            V.return y
-        | Some _, Some _ ->
-            V.fail Amount_inc_dec_mismatch
-        | None, _ | _, None ->
-            V.fail Amount_not_some
-      and payment_amount_y =
-        let open Result.Let_syntax in
-        let%bind {amount; _} = find_kind `Fee_payer_dec ops in
-        match amount with
-        | Some x ->
-            V.return (Amount_of.negated x)
-        | None ->
-            V.fail Amount_not_some
-      in
-      { Partial.kind= `Payment
-      ; fee_payer= `Pk account_a.address
-      ; source= `Pk account_a.address
-      ; receiver= `Pk account_b.address
-      ; fee_token
-      ; token (* TODO: Catch exception properly on these uint64 decodes *)
-      ; fee= Unsigned.UInt64.of_string payment_amount_y.Amount.value
-      ; amount= Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
-      }
-    in
-    (* TODO: Handle delegation transactions *)
-    (* TODO: Handle all other  transactions *)
-    payment
-
-  let to_operations (t : t) : Operation.t list =
-    (* First build a plan. The plan specifies all operations ahead of time so
-       * we can later compute indices and relations when we're building the full
-       * models.
-       *
-       * For now, relations will be defined only on the two sides of a given
-       * transfer. ie. Source decreases, and receiver increases.
-    *)
-    let plan : 'a Op.t list =
-      (* The dec side of a user command's fee transfer is here *)
-      (* TODO: Relate fee_payer_dec here with fee_receiver_inc in internal commands *)
-      ( if not Unsigned.UInt64.(equal t.fee zero) then
-        [{Op.label= `Fee_payer_dec; related_to= None}]
-      else [] )
-      @ ( match t.failure_status with
-        | Some (`Applied (Account_creation_fees_paid.By_receiver amount)) ->
-            [ { Op.label= `Account_creation_fee_via_payment amount
-              ; related_to= None } ]
-        | Some (`Applied (Account_creation_fees_paid.By_fee_payer amount)) ->
-            [ { Op.label= `Account_creation_fee_via_fee_payer amount
-              ; related_to= None } ]
-        | _ ->
-            [] )
-      @
-      match t.kind with
-      | `Payment -> (
-        (* When amount is not none, we move the amount from source to receiver *)
-        match t.amount with
-        | Some amount ->
-            [ {Op.label= `Payment_source_dec amount; related_to= None}
-            ; { Op.label= `Payment_receiver_inc amount
-              ; related_to= Some (`Payment_source_dec amount) } ]
-        | None ->
-            [] )
-      | `Delegation ->
-          [{Op.label= `Delegate_change; related_to= None}]
-      | `Create_token ->
-          [{Op.label= `Create_token; related_to= None}]
-      | `Create_account ->
-          [] (* Covered by account creation fee *)
-      | `Mint_tokens -> (
-        (* When amount is not none, the amount goes to receiver's account *)
-        match t.amount with
-        | Some amount ->
-            [{Op.label= `Mint_tokens amount; related_to= None}]
-        | None ->
-            [] )
-    in
-    Op.build
-      ~a_eq:
-        [%eq:
-          [ `Fee_payer_dec
-          | `Payment_source_dec of Unsigned.UInt64.t
-          | `Payment_receiver_inc of Unsigned.UInt64.t ]] ~plan
-      ~f:(fun ~related_operations ~operation_identifier op ->
-        let status, metadata =
-          match (op.label, t.failure_status) with
-          (* If we're looking at mempool transactions, it's always pending *)
-          | _, None ->
-              (Operation_statuses.name `Pending, None)
-          (* Fee transfers always succeed even if the command fails, if it's in a block. *)
-          | `Fee_payer_dec, _ ->
-              (Operation_statuses.name `Success, None)
-          | _, Some (`Applied _) ->
-              (Operation_statuses.name `Success, None)
-          | _, Some (`Failed reason) ->
-              ( Operation_statuses.name `Failed
-              , Some (`Assoc [("reason", `String reason)]) )
-        in
-        let merge_metadata m1 m2 =
-          match (m1, m2) with
-          | None, None ->
-              None
-          | Some x, None | None, Some x ->
-              Some x
-          | Some (`Assoc xs), Some (`Assoc ys) ->
-              Some (`Assoc (xs @ ys))
-          | _ ->
-              failwith "Unexpected pattern"
-        in
-        match op.label with
-        | `Fee_payer_dec ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.fee_payer t.fee_token)
-            ; _type= Operation_types.name `Fee_payer_dec
-            ; amount= Some Amount_of.(negated @@ token t.fee_token t.fee)
-            ; coin_change= None
-            ; metadata }
-        | `Payment_source_dec amount ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.source t.token)
-            ; _type= Operation_types.name `Payment_source_dec
-            ; amount= Some Amount_of.(negated @@ token t.token amount)
-            ; coin_change= None
-            ; metadata }
-        | `Payment_receiver_inc amount ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Payment_receiver_inc
-            ; amount= Some (Amount_of.token t.token amount)
-            ; coin_change= None
-            ; metadata }
-        | `Account_creation_fee_via_payment account_creation_fee ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Account_creation_fee_via_payment
-            ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
-            ; coin_change= None
-            ; metadata }
-        | `Account_creation_fee_via_fee_payer account_creation_fee ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.fee_payer t.fee_token)
-            ; _type= Operation_types.name `Account_creation_fee_via_fee_payer
-            ; amount= Some Amount_of.(negated @@ coda account_creation_fee)
-            ; coin_change= None
-            ; metadata }
-        | `Create_token ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= None
-            ; _type= Operation_types.name `Create_token
-            ; amount= None
-            ; coin_change= None
-            ; metadata }
-        | `Delegate_change ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.source Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Delegate_change
-            ; amount= None
-            ; coin_change= None
-            ; metadata=
-                merge_metadata metadata
-                  (Some
-                     (`Assoc
-                       [ ( "delegate_change_target"
-                         , `String
-                             (let (`Pk r) = t.receiver in
-                              r) ) ])) }
-        | `Mint_tokens amount ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Mint_tokens
-            ; amount= Some (Amount_of.token t.token amount)
-            ; coin_change= None
-            ; metadata=
-                merge_metadata metadata
-                  (Some
-                     (`Assoc
-                       [ ( "token_owner_pk"
-                         , `String
-                             (let (`Pk r) = t.source in
-                              r) ) ])) } )
-
-  let%test_unit "payment_round_trip" =
-    let start =
-      { kind= `Payment (* default token *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 5_000_000_000)
-      ; failure_status= None
-      ; hash= "TXN_1_HASH" }
-    in
-    let ops = to_operations start in
-    match of_operations ops with
-    | Ok partial ->
-        [%test_eq: Partial.t] partial (forget start)
-    | Error e ->
-        failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
-
-  let dummies =
-    [ { kind= `Payment (* default token *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_1_HASH" }
-    ; { kind= `Payment (* new account created *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status=
-          Some
-            (`Applied
-              (Account_creation_fees_paid.By_receiver
-                 (Unsigned.UInt64.of_int 1_000_000)))
-      ; hash= "TXN_1new_HASH" }
-    ; { kind= `Payment (* failed payment *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some (`Failed "Failure")
-      ; hash= "TXN_1fail_HASH" }
-    ; { kind= `Payment (* custom token *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 3
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_1a_HASH" }
-    ; { kind= `Payment (* custom fee-token *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 3
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 2_000_000_000)
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_1b_HASH" }
-    ; { kind= `Delegation
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= None
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_2_HASH" }
-    ; { kind= `Create_token (* no new account *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= None
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_3a_HASH" }
-    ; { kind= `Create_token (* new account fee *)
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= None
-      ; failure_status=
-          Some
-            (`Applied
-              (Account_creation_fees_paid.By_fee_payer
-                 (Unsigned.UInt64.of_int 3_000)))
-      ; hash= "TXN_3b_HASH" }
-    ; { kind= `Create_account
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 1
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= None
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_4_HASH" }
-    ; { kind= `Mint_tokens
-      ; fee_payer= `Pk "Alice"
-      ; source= `Pk "Alice"
-      ; token= Unsigned.UInt64.of_int 10
-      ; fee= Unsigned.UInt64.of_int 2_000_000_000
-      ; receiver= `Pk "Bob"
-      ; fee_token= Unsigned.UInt64.of_int 1
-      ; nonce= Unsigned.UInt32.of_int 3
-      ; amount= Some (Unsigned.UInt64.of_int 30_000)
-      ; failure_status= Some (`Applied Account_creation_fees_paid.By_no_one)
-      ; hash= "TXN_5_HASH" } ]
-end
 
 module Internal_command_info = struct
   module Kind = struct
-    type t = [`Coinbase | `Fee_transfer] [@@deriving eq, to_yojson]
+    type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
+    [@@deriving eq, to_yojson]
   end
 
   type t =
     { kind: Kind.t
     ; receiver: [`Pk of string]
-    ; fee: Unsigned.UInt64.t
-    ; token: Unsigned.UInt64.t
+    ; fee: Unsigned_extended.UInt64.t
+    ; token: Unsigned_extended.UInt64.t
     ; hash: string }
   [@@deriving to_yojson]
 
-  let to_operations ~coinbase (t : t) : Operation.t list =
-    (* We choose to represent the dec-side of fee transfers from txns from the
-     * canonical user command that created them so we are able consistently
-     * produce more balance changing operations in the mempool or a block.
-     * *)
-    let plan : 'a Op.t list =
-      match t.kind with
-      | `Coinbase ->
-          (* The coinbase transaction is really incrementing by the coinbase
-         * amount and then decrementing by the fees paid. *)
-          [ {Op.label= `Coinbase_inc; related_to= None}
-          ; {Op.label= `Fee_payer_dec; related_to= Some `Coinbase_inc} ]
-      | `Fee_transfer ->
-          [{Op.label= `Fee_receiver_inc; related_to= None}]
-    in
-    Op.build ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]]
-      ~plan ~f:(fun ~related_operations ~operation_identifier op ->
-        (* All internal commands succeed if they're in blocks *)
-        let status = Operation_statuses.name `Success in
-        match op.label with
-        | `Coinbase_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Coinbase_inc
-            ; amount= Some (Amount_of.coda coinbase)
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_payer_dec ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver Amount_of.Token_id.default)
-            ; _type= Operation_types.name `Fee_payer_dec
-            ; amount= Some Amount_of.(negated (coda t.fee))
-            ; coin_change= None
-            ; metadata= None }
-        | `Fee_receiver_inc ->
-            { Operation.operation_identifier
-            ; related_operations
-            ; status
-            ; account= Some (account_id t.receiver t.token)
-            ; _type= Operation_types.name `Fee_receiver_inc
-            ; amount= Some (Amount_of.token t.token t.fee)
-            ; coin_change= None
-            ; metadata= None } )
+  module T (M : Monad_fail.S) = struct
+    module Op_build = Op.T (M)
+
+    let to_operations ~coinbase_receiver ~coinbase (t : t) :
+        (Operation.t list, Errors.t) M.t =
+      (* We choose to represent the dec-side of fee transfers from txns from the
+       * canonical user command that created them so we are able consistently
+       * produce more balance changing operations in the mempool or a block.
+       * *)
+      let plan : 'a Op.t list =
+        match t.kind with
+        | `Coinbase ->
+            (* The coinbase transaction is really incrementing by the coinbase
+           * amount  *)
+            [{Op.label= `Coinbase_inc; related_to= None}]
+        | `Fee_transfer ->
+            [{Op.label= `Fee_receiver_inc; related_to= None}]
+        | `Fee_transfer_via_coinbase ->
+            [ {Op.label= `Fee_receiver_inc; related_to= None}
+            ; {Op.label= `Fee_payer_dec; related_to= Some `Fee_receiver_inc} ]
+      in
+      Op_build.build
+        ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]] ~plan
+        ~f:(fun ~related_operations ~operation_identifier op ->
+          (* All internal commands succeed if they're in blocks *)
+          let status = Operation_statuses.name `Success in
+          match op.label with
+          | `Coinbase_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account=
+                    Some (account_id t.receiver Amount_of.Token_id.default)
+                ; _type= Operation_types.name `Coinbase_inc
+                ; amount= Some (Amount_of.coda coinbase)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_receiver_inc ->
+              M.return
+                { Operation.operation_identifier
+                ; related_operations
+                ; status
+                ; account= Some (account_id t.receiver t.token)
+                ; _type= Operation_types.name `Fee_receiver_inc
+                ; amount= Some (Amount_of.token t.token t.fee)
+                ; coin_change= None
+                ; metadata= None }
+          | `Fee_payer_dec ->
+              let open M.Let_syntax in
+              let%map coinbase_receiver =
+                match coinbase_receiver with
+                | Some r ->
+                    M.return r
+                | None ->
+                    M.fail
+                      (Errors.create
+                         ~context:
+                           "This operation existing (fee payer dec within \
+                            Internal_command) demands a coinbase receiver to \
+                            exist. Please report this bug."
+                         `Invariant_violation)
+              in
+              { Operation.operation_identifier
+              ; related_operations
+              ; status
+              ; account=
+                  Some
+                    (account_id coinbase_receiver Amount_of.Token_id.default)
+              ; _type= Operation_types.name `Fee_payer_dec
+              ; amount= Some Amount_of.(negated (coda t.fee))
+              ; coin_change= None
+              ; metadata= None } )
+  end
 
   let dummies =
     [ { kind= `Coinbase
@@ -678,14 +207,16 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp, coinbase_id FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  ORDER BY timestamp ASC
+  LIMIT 1)
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
   INNER JOIN chain
   ON b.id = chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.timestamp, c.coinbase_id, pk.value as creator FROM chain c
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   WHERE c.height = ?
@@ -693,7 +224,7 @@ WITH RECURSIVE chain AS (
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? |}
@@ -702,14 +233,14 @@ WITH RECURSIVE chain AS (
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
@@ -717,10 +248,12 @@ WITH RECURSIVE chain AS (
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
         {|
-SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.timestamp, b.coinbase_id, pk.value as creator FROM blocks b
+SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
       INNER JOIN public_keys pk
       ON pk.id = b.creator_id
       WHERE b.height = (select MAX(b.height) from blocks b)
+      ORDER BY timestamp ASC
+      LIMIT 1
         |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
@@ -758,15 +291,18 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
     end
 
     let typ =
-      Caqti_type.(tup3 int Archive_lib.Processor.User_command.typ Extras.typ)
+      Caqti_type.(
+        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
+          Extras.typ)
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
-        LEFT JOIN blocks_user_commands ON blocks_user_commands.block_id = ?
+        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
+        INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
         INNER JOIN public_keys pk2 ON pk2.id = u.source_id
         INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
+        WHERE blocks_user_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -786,9 +322,10 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
-        LEFT JOIN blocks_internal_commands ON blocks_internal_commands.block_id = ?
+        {| SELECT DISTINCT ON (i.hash) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
+        WHERE blocks_internal_commands.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -854,14 +391,16 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
                 M.return `Fee_transfer
             | "coinbase" ->
                 M.return `Coinbase
+            | "fee_transfer_via_coinbase" ->
+                M.return `Fee_transfer_via_coinbase
             | other ->
                 M.fail
                   (Errors.create
                      ~context:
                        (sprintf
                           "The archive database is storing internal commands \
-                           with %s; this is neither fee_transfer nor \
-                           coinbase. Please report a bug!"
+                           with %s; this is neither fee_transfer nor coinbase \
+                           not fee_transfer_via_coinbase. Please report a bug!"
                           other)
                      `Invariant_violation)
           in
@@ -875,7 +414,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       M.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
           let open M.Let_syntax in
           let%bind kind =
-            match uc.Archive_lib.Processor.User_command.typ with
+            match uc.Archive_lib.Processor.User_command.Signed_command.typ with
             | "payment" ->
                 M.return `Payment
             | "delegation" ->
@@ -883,7 +422,8 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
             | "create_token" ->
                 M.return `Create_token
             | "create_account" ->
-                M.return `Create_account
+                (* N.B.: not create_token_account *)
+                M.return `Create_token_account
             | "mint_tokens" ->
                 M.return `Mint_tokens
             | other ->
@@ -944,11 +484,10 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
           ; failure_status= Some failure_status } )
     in
     { Block_info.block_identifier=
-        { Block_identifier.index= Int64.of_int raw_block.height
-        ; hash= raw_block.state_hash }
+        {Block_identifier.index= raw_block.height; hash= raw_block.state_hash}
     ; creator= Block.Extras.creator block_extras
     ; parent_block_identifier=
-        { Block_identifier.index= Int64.of_int raw_parent_block.height
+        { Block_identifier.index= raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
     ; timestamp= raw_block.timestamp
     ; internal_info= internal_commands
@@ -978,7 +517,9 @@ module Specific = struct
         -> graphql_uri:Uri.t
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
-      { gql= (fun () -> Graphql.query (Get_coinbase.make ()) graphql_uri)
+      { gql=
+          (fun () ->
+            Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
       ; logger
       ; db_block=
           (fun query ->
@@ -992,6 +533,11 @@ module Specific = struct
           (fun () ->
             Result.return
             @@ object
+                 method genesisBlock =
+                   object
+                     method stateHash = "STATE_HASH_GENESIS"
+                   end
+
                  method genesisConstants =
                    object
                      method coinbase = Unsigned.UInt64.of_int 20_000_000_000
@@ -1005,6 +551,7 @@ module Specific = struct
 
   module Impl (M : Monad_fail.S) = struct
     module Query = Block_query.T (M)
+    module Internal_command_info_ops = Internal_command_info.T (M)
 
     let handle :
            env:'gql Env.T(M).t
@@ -1019,31 +566,66 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~gql_response:res
       in
+      let genesisBlock = res#genesisBlock in
+      let%bind block_info =
+        if Query.is_genesis ~hash:genesisBlock#stateHash query then
+          let genesis_block_identifier =
+            { Block_identifier.index= Network.genesis_block_height
+            ; hash= genesisBlock#stateHash }
+          in
+          M.return
+            { Block_info.block_identifier=
+                genesis_block_identifier
+                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
+            ; parent_block_identifier= genesis_block_identifier
+            ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
+            ; timestamp=
+                Int64.of_string
+                  ((genesisBlock#protocolState)#blockchainState)#utcDate
+            ; internal_info= []
+            ; user_commands= [] }
+        else env.db_block query
+      in
       let coinbase = (res#genesisConstants)#coinbase in
-      let%map block_info = env.db_block query in
+      let coinbase_receiver =
+        List.find block_info.internal_info ~f:(fun info ->
+            info.Internal_command_info.kind = `Coinbase )
+        |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
+      in
+      let%map internal_transactions =
+        List.fold block_info.internal_info ~init:(M.return [])
+          ~f:(fun macc info ->
+            let%bind acc = macc in
+            let%map operations =
+              Internal_command_info_ops.to_operations ~coinbase_receiver
+                ~coinbase info
+            in
+            [%log debug]
+              ~metadata:[("info", Internal_command_info.to_yojson info)]
+              "Block internal received $info" ;
+            { Transaction.transaction_identifier=
+                {Transaction_identifier.hash= info.hash}
+            ; operations
+            ; metadata= None }
+            :: acc )
+        |> M.map ~f:List.rev
+      in
       { Block_response.block=
-          { Block.block_identifier= block_info.block_identifier
-          ; parent_block_identifier= block_info.parent_block_identifier
-          ; timestamp= block_info.timestamp
-          ; transactions=
-              List.map block_info.internal_info ~f:(fun info ->
-                  [%log debug]
-                    ~metadata:[("info", Internal_command_info.to_yojson info)]
-                    "Block internal received $info" ;
-                  { Transaction.transaction_identifier=
-                      {Transaction_identifier.hash= info.hash}
-                  ; operations=
-                      Internal_command_info.to_operations ~coinbase info
-                  ; metadata= None } )
-              @ List.map block_info.user_commands ~f:(fun info ->
-                    [%log debug]
-                      ~metadata:[("info", User_command_info.to_yojson info)]
-                      "Block user received $info" ;
-                    { Transaction.transaction_identifier=
-                        {Transaction_identifier.hash= info.hash}
-                    ; operations= User_command_info.to_operations info
-                    ; metadata= None } )
-          ; metadata= Some (Block_info.creator_metadata block_info) }
+          Some
+            { Block.block_identifier= block_info.block_identifier
+            ; parent_block_identifier= block_info.parent_block_identifier
+            ; timestamp= block_info.timestamp
+            ; transactions=
+                internal_transactions
+                @ List.map block_info.user_commands ~f:(fun info ->
+                      [%log debug]
+                        ~metadata:[("info", User_command_info.to_yojson info)]
+                        "Block user received $info" ;
+                      { Transaction.transaction_identifier=
+                          {Transaction_identifier.hash= info.hash}
+                      ; operations= User_command_info.to_operations' info
+                      ; metadata= None } )
+            ; metadata= Some (Block_info.creator_metadata block_info) }
       ; other_transactions= [] }
   end
 

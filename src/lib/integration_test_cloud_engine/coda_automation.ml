@@ -62,8 +62,8 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(test_config : Test_config.t)
-      ~(images : Container_images.t) =
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+      ~(test_config : Test_config.t) ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
         ; proof_level
@@ -76,7 +76,6 @@ module Network_config = struct
     in
     let testnet_name = "integration-test-" ^ test_name in
     (* HARD CODED NETWORK VALUES *)
-    let coda_automation_location = "../automation" in
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
     let cluster_name = "coda-infra-east" in
@@ -98,7 +97,8 @@ module Network_config = struct
           ; balance=
               Balance.of_formatted_string balance
               (* delegation currently unsupported *)
-          ; delegate= None }
+          ; delegate= None
+          ; timing= None }
         in
         let secret_name = "test-keypair-" ^ Int.to_string index in
         let keypair =
@@ -111,7 +111,7 @@ module Network_config = struct
            (List.take keypairs (List.length block_producers)))
       |> List.unzip
     in
-    (* DEAMON CONFIG *)
+    (* DAEMON CONFIG *)
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
@@ -121,7 +121,8 @@ module Network_config = struct
       ; block_window_duration_ms= None
       ; transaction_capacity= None
       ; coinbase_amount= None
-      ; account_creation_fee= None }
+      ; account_creation_fee= None
+      ; supercharged_coinbase_factor= None }
     in
     let runtime_config =
       { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
@@ -161,7 +162,7 @@ module Network_config = struct
       ; run_with_bots= false }
     in
     (* NETWORK CONFIG *)
-    { coda_automation_location
+    { coda_automation_location= cli_inputs.coda_automation_location
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
@@ -201,7 +202,7 @@ module Network_config = struct
   let to_terraform network_config =
     let open Terraform in
     [ Block.Terraform
-        { Block.Terraform.required_version= "~> 0.12.0"
+        { Block.Terraform.required_version= "~> 0.13.0"
         ; backend=
             Backend.S3
               { Backend.S3.key=
@@ -244,79 +245,49 @@ end
 
 module Network_manager = struct
   type t =
-    { cluster: string
+    { logger: Logger.t
+    ; cluster: string
     ; namespace: string
     ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: string list
-    ; snark_coordinator_pod_names: string list
+    ; block_producer_pod_names: Kubernetes_network.Node.t list
+    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
     ; mutable deployed: bool }
 
-  let run_cmd' testnet_dir prog args =
-    Process.create_exn ~working_dir:testnet_dir ~prog ~args ()
-    >>= Process.collect_output_and_wait
+  let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn' testnet_dir prog args =
-    let open Process.Output in
-    let%bind output = run_cmd' testnet_dir prog args in
-    let print_output () =
-      let indent str =
-        String.split str ~on:'\n'
-        |> List.map ~f:(fun s -> "    " ^ s)
-        |> String.concat ~sep:"\n"
-      in
-      print_endline "=== COMMAND ===" ;
-      print_endline
-        (indent
-           ( prog ^ " "
-           ^ String.concat ~sep:" "
-               (List.map args ~f:(fun arg -> "\"" ^ arg ^ "\"")) )) ;
-      print_endline "=== STDOUT ===" ;
-      print_endline (indent output.stdout) ;
-      print_endline "=== STDERR ===" ;
-      print_endline (indent output.stderr) ;
-      Writer.(flushed (Lazy.force stdout))
-    in
-    match output.exit_status with
-    | Ok () ->
-        return ()
-    | Error (`Exit_non_zero status) ->
-        let%map () = print_output () in
-        failwithf "command exited with status code %d" status ()
-    | Error (`Signal signal) ->
-        let%map () = print_output () in
-        failwithf "command exited prematurely due to signal %d"
-          (Signal.to_system_int signal)
-          ()
+  let run_cmd_exn t prog args = Cmd_util.run_cmd_exn t.testnet_dir prog args
 
-  let run_cmd t prog args = run_cmd' t.testnet_dir prog args
-
-  let run_cmd_exn t prog args = run_cmd_exn' t.testnet_dir prog args
-
-  let create (network_config : Network_config.t) =
+  let create ~logger (network_config : Network_config.t) =
     let testnet_dir =
       network_config.coda_automation_location ^/ "terraform/testnets"
       ^/ network_config.terraform.testnet_name
     in
     (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
     let%bind () =
-      if%bind File_system.dir_exists testnet_dir then
-        let%bind () = run_cmd_exn' testnet_dir "terraform" ["refresh"] in
+      if%bind File_system.dir_exists testnet_dir then (
+        [%log warn]
+          "Old network deployment found; attempting to refresh and cleanup" ;
+        let%bind () =
+          Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
+        in
         let%bind () =
           let open Process.Output in
           let%bind state_output =
-            run_cmd' testnet_dir "terraform" ["state"; "list"]
+            Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
           in
           if not (String.is_empty state_output.stdout) then
-            run_cmd_exn' testnet_dir "terraform" ["destroy"; "-auto-approve"]
+            Cmd_util.run_cmd_exn testnet_dir "terraform"
+              ["destroy"; "-auto-approve"]
           else return ()
         in
-        File_system.remove_dir testnet_dir
+        File_system.remove_dir testnet_dir )
       else return ()
     in
+    [%log info] "Writing network configuration" ;
     let%bind () = Unix.mkdir testnet_dir in
     (* TODO: prebuild genesis proof and ledger *)
     (*
@@ -344,14 +315,20 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
+    let cons_node pod_id =
+      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      ; pod_id }
+    in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i -> Printf.sprintf "test-block-producer-%d" (i + 1))
+        ~f:(fun i ->
+          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = ["snark-coordinator-1"] in
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
-      { cluster= network_config.cluster_id
+      { logger
+      ; cluster= network_config.cluster_id
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
@@ -362,13 +339,16 @@ module Network_manager = struct
       ; snark_coordinator_pod_names
       ; deployed= false }
     in
+    [%log info] "Initializing terraform" ;
     let%bind () = run_cmd_exn t "terraform" ["init"] in
     let%map () = run_cmd_exn t "terraform" ["validate"] in
     t
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
+    [%log' info t.logger] "Deploying network" ;
     let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
+    [%log' info t.logger] "Uploading network secrets" ;
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
           run_cmd_exn t "kubectl"
@@ -382,7 +362,8 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    { Kubernetes_network.constraint_constants= t.constraint_constants
+    { Kubernetes_network.namespace= t.namespace
+    ; constraint_constants= t.constraint_constants
     ; genesis_constants= t.genesis_constants
     ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names
@@ -390,13 +371,15 @@ module Network_manager = struct
     ; testnet_log_filter= t.testnet_log_filter }
 
   let destroy t =
-    print_endline "destroying network" ;
+    [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
-    print_endline "network has been successfully destroyed" ;
-    t.deployed <- false
+    (* let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in *)
+    t.deployed <- false ;
+    Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
-    File_system.remove_dir t.testnet_dir
+    [%log' info t.logger] "Cleaning up network configuration" ;
+    (* File_system.remove_dir t.testnet_dir *)
+    Deferred.unit
 end

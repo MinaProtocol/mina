@@ -9,7 +9,7 @@ open Pipe_lib
 
 let refused_answer_query_string = "Refused to answer_query"
 
-type exn += No_initial_peers
+exception No_initial_peers
 
 type Structured_log_events.t +=
   | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
@@ -489,15 +489,6 @@ module Rpcs = struct
           let to_latest = Fn.id
         end
       end]
-
-      type t = Stable.Latest.t =
-        { node_ip_addr: Unix.Inet_addr.t
-        ; node_peer_id: Network_peer.Peer.Id.t
-        ; peers: Network_peer.Peer.t list
-        ; block_producers: Signature_lib.Public_key.Compressed.t list
-        ; protocol_state_hash: State_hash.t
-        ; ban_statuses: (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-        ; k_block_hashes: State_hash.t list }
     end
 
     module Master = struct

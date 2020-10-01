@@ -4,7 +4,7 @@ open Pickles_types
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson]
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
     end
 
     module Latest = V1
@@ -134,6 +134,8 @@ module type Inputs_intf = sig
 
   module Verifier_index : sig
     type t
+
+    module Vector : Vector with type elt := t
   end
 
   module Backend : sig
@@ -174,7 +176,7 @@ module type Inputs_intf = sig
       -> prev_sgs:Curve.Affine.Backend.Vector.t
       -> t
 
-    val batch_verify : Verifier_index.t -> Vector.t -> bool
+    val batch_verify : Verifier_index.Vector.t -> Vector.t -> bool
 
     val proof : t -> Opening_proof_backend.t
 
@@ -216,8 +218,6 @@ module Challenge_polynomial = struct
       let to_latest = Fn.id
     end
   end]
-
-  include Stable.Latest
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -234,13 +234,11 @@ module Make (Inputs : Inputs_intf) = struct
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t )
           Challenge_polynomial.Stable.V1.t
-        [@@deriving version, bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let to_latest = Fn.id
       end
     end]
-
-    include Stable.Latest
 
     type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
       {challenges: 'fq array; commitment: 'g}
@@ -250,13 +248,15 @@ module Make (Inputs : Inputs_intf) = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( G.Affine.Stable.V1.t
         , Fq.Stable.V1.t
-        , Fq.Stable.V1.t array )
+        , Fq.Stable.V1.t Dlog_marlin_types.Pc_array.Stable.V1.t )
         Dlog_marlin_types.Proof.Stable.V1.t
-      [@@deriving bin_io, version, compare, sexp, yojson]
+      [@@deriving compare, sexp, yojson, hash, eq]
 
       let to_latest = Fn.id
     end
@@ -462,13 +462,15 @@ module Make (Inputs : Inputs_intf) = struct
     Backend.delete res ; t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
-      (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =
+      (ts : (Verifier_index.t * t * 'a * message option) list) =
+    let vks = Verifier_index.Vector.create () in
     let v = Backend.Vector.create () in
-    List.iter ts ~f:(fun (t, xs, m) ->
+    List.iter ts ~f:(fun (vk, t, xs, m) ->
         let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+        Verifier_index.Vector.emplace_back vks vk ;
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
-    let res = Backend.batch_verify vk v in
+    let res = Backend.batch_verify vks v in
     Backend.Vector.delete v ; res
 
   let batch_verify =
@@ -483,5 +485,5 @@ module Make (Inputs : Inputs_intf) = struct
           Fq.Vector.emplace_back v (Fq.Vector.get xs i)
         done ;
         v )
-      [(t, xs, message)] vk
+      [(vk, t, xs, message)]
 end

@@ -2,9 +2,11 @@ open Core_kernel
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type ('a, 'h) t = {data: 'a; hash: 'h}
-    [@@deriving sexp, compare, hash, to_yojson]
+    [@@deriving sexp, eq, compare, hash, yojson]
 
     let to_latest data_latest hash_latest {data; hash} =
       {data= data_latest data; hash= hash_latest hash}
@@ -12,7 +14,7 @@ module Stable = struct
 end]
 
 type ('a, 'h) t = ('a, 'h) Stable.Latest.t = {data: 'a; hash: 'h}
-[@@deriving sexp, compare, hash, to_yojson]
+[@@deriving sexp, eq, compare, hash, yojson]
 
 let data {data; _} = data
 

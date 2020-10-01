@@ -92,7 +92,7 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Coda_base.User_command.of_base58_check_exn s
+      try Coda_base.Signed_command.of_base58_check_exn s
       with e ->
         failwithf "Couldn't decode transaction id: %s\n"
           (Error.to_string_hum (Error.of_exn e))
@@ -107,8 +107,6 @@ module Work_selection_method = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t = Sequence | Random
 end
 
 let work_selection_method_val = function

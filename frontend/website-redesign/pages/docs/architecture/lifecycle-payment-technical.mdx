@@ -1,0 +1,200 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Lifecycle of a Payment Technical Guide" });
+
+# The Lifecycle of a Payment - Technical Guide
+
+In Mina, payments pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single payment as it works its way through the codebase. For a more high-level overview aimed at users who want to understand how payments work on a macroscopic level, check out the [lifecycle of a payment](/docs/architecture/lifecycle-payment).
+
+Let's say you want to send a payment in Mina, assuming you've already created an account and have received funds.
+Your friend gives you her public key -- it's `KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA`.
+
+Then you invoke the following command:
+
+```bash
+$ mina client send-payment \
+    -amount 10 \
+    -receiver KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA \
+    -fee 3 \
+    -privkey-path keys/my-wallet
+```
+
+Where:
+
+- `amount` is the amount of mina you are sending
+- `receiver` is the public key of the intended recipient
+- `fee` is the fee to be paid to the network to process the transaction
+- `privkey-path` is the filepath to the private key for your account
+
+## Mina Client
+
+The [client.ml](https://github.com/MinaProtocol/mina/tree/master/src/app/cli/src/client.ml) file defines the CLI command parser for the `mina client` subcommands.
+We use [Jane Street](https://github.com/janestreet)'s standard libraries often.
+Specifically [Core](https://opensource.janestreet.com/core/) (common datastructures) and [Async](https://opensource.janestreet.com/async/) (asynchronous programming using the composable `Deferred.t` type) are used very often.
+On top of most files you'll see some variant of `open Core` and `open Async`.
+Here in [client.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/client.ml) we see that too. `Async` shadows the `Command` type and lets us declaratively express the details of each command.
+If you scroll to the bottom of [client.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/client.ml), you'll find we register the `send-payment` command to the function `send_payment`.
+Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [daemon_rpcs.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/daemon_rpcs.ml).
+In the body of `send_payment` we build a payment and send it over to the [daemon](#daemon).
+
+## Payment
+
+In [payment.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_base/payment.mli), you'll see a couple important things. (1) we break down payments into a [payment payload](#payment-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase.
+
+For more see:
+
+- [Parameterized records](/docs/developers/style-guide/#parameterized-records)
+- [Ppx deriving](/docs/developers/style-guide/#ppx_deriving)
+- [Stable.V1](/docs/developers/style-guide/#stable-v1)
+- [Property based tests](/docs/developers/style-guide/#quickcheck-gen)
+- [Typesafe Invariants](/docs/developers/style-guide/#typesafe-invariants)
+- [Unit Tests](/docs/developers/style-guide/#unit-tests)
+
+Let's dig into the payment payload:
+
+## Payment payload
+
+Check out [payment_payload.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_base/payment_payload.mli). Recall that a payload is the part of the payment the sender will sign with her private key. We see this is built up out of the receiver [public key](#public-key), [amount](#currency), [fee](#currency), and a [nonce](#account-nonce). Again the payload is SNARKable so it has a `type var`, and other important Snarkable functions (in a future RFC we will put this in a custom [ppx_deriving](#ppx-deriving).
+
+## Signatures
+
+(TODO: @ihm can you correct any details I mess up here)
+
+We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [elliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zero point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
+
+This is the first time we see heavily functored code, so see [functors](/docs/developers/style-guide/#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](/docs/developers/style-guide/#snark-checked) for more.
+
+## Private key
+
+In [private_key.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/signature_lib/private_key.ml) we see a private key is a `Tick.Inner_curve.Scalar.t` or a scalar on an elliptic curve. Let's break it down more precisely: Because we rely on [recursive zkSNARKs](https://eprint.iacr.org/2014/595) we actually have two elliptic curves called `Tick` and `Tock`. Most of our logic happens within `Tick` (TODO: @ihm expand on this). [Schnorr signatures](#signature) demand we use scalars for our private key.
+
+## Public key
+
+The public key corresponding to a [private key](#private-key) `p` is just $one^p$ in other words $one*one*one ...{p times}... one$. We can see this in [public_key.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/signature_lib/public_key.ml). Remember group elements are non-zero curve points which is why we also `include Non_zero_curve_point`
+
+Public keys can also be compressed -- see [public_key.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/signature_lib/public_key.mli). A point on an elliptic curve can unambiguously be represented by a single scalar field element and a boolean. This is the representation we use into the [payment payload](#payment-payload) because it's more efficient inside of SNARK circuits.
+
+## Currency
+
+In [currency.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/currency/currency.mli), we define [nominal types](https://en.wikipedia.org/wiki/Nominal_type_system) for fee, amount, and balance that handles overflow and underflow properly. Everything is backed by 64bit unsigned integers for now. Notice, that we again include SNARK circuit operations under the [Checked](#snark-checked) submodules within each of the types.
+
+## Account
+
+Payments are applied successfully only if certain properties hold of the account of the sender (and the receiver's balance doesn't overflow).
+
+Checkout [account.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_base/account.ml), an account is a record with a [public key](#public-key) (the owner of the account), a [balance](#currency), a [nonce](#account-nonce), and a [receipt chain hash](#receipt-chain-hash).
+
+A payment is valid if:
+
+1. The signature is valid w.r.t. the public key of the sender
+2. The sender has enough balance to pay out the fee and the amount
+3. The reciever has enough room for the amount s.t. there won't be an overflow
+4. The [account nonce](#account-nonce) matches the nonce inside the payment.
+
+When we apply a payment we also cons it onto the [receipt chain](#receipt-chain-hash), and increment the account nonce.
+
+Fees are handled out-of-band see the [fee excess system](#fee-excess).
+
+This is encoded inside the SNARK in [transaction_snark.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/transaction_snark/transaction_snark.ml), specifically the `apply_tagged_transaction` function, although you'll need to look at how the bool flags are set in the `is_normal` case.
+
+It's captured outside the SNARK here: (TODO: where is this? Staged_ledger somewhere?)
+
+### Account Nonce
+
+The [account_nonce.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_numbers/account_nonce.mli) is just a [nominal type](https://en.wikipedia.org/wiki/Nominal_type_system) around a natural number. This is used for protection against double-application of payments.
+The account nonce is incremented in the sender's the account whenever a payment is applied.
+
+### Receipt Chain Hash
+
+The [receipt.mli](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_base/receipt.mli) chain hash is the top hash of a [merkle list](#merkle-list) of payment payloads. This is used to prove that you actually made a payment to someone. Since Mina doesn't keep payment history, this is how you can prove to someone that your payment went through.
+
+How does it work?
+
+A merkle list is like a [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) but with one branch. As long as you keep your merkle list hashes, you can prove that any individual piece of data was part of the list if you know for sure what the top hash is.
+
+If it's important to prove your payment went through, you ask the receiver to start recording receipt chain hashs, and hand your payment payload over to the receiver. He can then check the top hash of their receipt chain to see if it includes your payload.
+
+## Take a break!
+
+We've fully described all the components of a `Payment.t`. Congrats on making it this far!
+
+After a break, we'll be ready to dive into the daemon code.
+
+## Daemon
+
+The mina daemon is defined inline in [mina.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/mina.ml). Search for the `daemon` function to see the CLI flags we use there. The daemon is optionally auto-started by the client if it doesn't already exist. We get configuration from a JSON configuration file (try first from `-f`, then from `$XDG_CONFIG_DIR/mina/daemon.json`, then from `/etc/mina/daemon.json`). We do a lot of setup here which leads up to invoking `Mina_main.Mina.Make` and then `Run`ing it. The details of those are described below.
+
+When we have the `Run` module, we can make an instance of the mina daemon at the value level, and set up any background processes and services.
+
+## Main
+
+By the time you're reading this, hopefully we've tamed the beast that is [mina_main.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/mina_main.ml). Here we wire the system together at the module level. What does this mean? We instantiate all the functors for the different subcomponents of the daemon. Eventually we create something that conforms to `Main_intf` (in this same file).
+
+### Run functor
+
+At the bottom of [mina_main.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/mina_main.ml), we define a `Run` functor that finally has the other side of the `rpc` call that the client makes to `send_payment`. Run contains the server-side implementations of all the RPC calls the client makes. It also is responsible for logic of setting up any RPC/webservers servers and background processes.
+
+Let's assume we have an instance of `Run.t` already created, and we'll circle back later.
+
+### Client_rpc
+
+In [daemon_rpcs.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/daemon_rpcs/daemon_rpcs.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
+
+### Schedule payment into Transaction pool
+
+Back in [mina_main.ml](https://github.com/minaprotocol/mina/tree/master/src/app/cli/src/mina_main.ml), we invoke `send_payment` in [Run](#run), that delegates to `schedule_payment` -- here we enqueue the payment into the [Transaction Pool](#transaction-pool).
+
+## Mina_lib
+
+To create a `Run` instance we'll need to go to [mina_lib.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/mina_lib/mina_lib.ml) where we wire all subsystems together at the value level. This is in contrast to [mina_main.ml](#main) where we wire all the subsystems together at the module level.
+
+It's here where we can trace the path of the payment from the transaction pool forwards. Let's sketch that out before diving deeper into each of the subsystems:
+
+1. The [transaction pool](#transaction-pool) broadcasts diffs from the transaction pool through to the [network](#network)
+2. The [proposer](#proposer) reads payments from the transaction pool when it's time to make a transition from one blockchain state to another, those payments are part of a diff to update a [staged-ledger](#staged-ledger) which is committed to inside the new blockchain state. [External transitions](#external-transition) are emitted.
+3. The [network](#network) and the [proposer](#proposer) feed [external transitions](#external-transition) containing information on how to update a [staged-ledger](#staged-ledger) with the new payment buffered to the [ledger builder controller](#ledger-builder-controller)
+4. The [ledger builder controller](#ledger-builder-controller) figures out where this [external transition](#external-transition) fits in it's tree of possible forks. If this happens to extend our "best" path (the state upon which we will propose later) then we do an expensive materialization step to create a [tip](#tip) holding the new [staged ledger](#staged-ledger) and emit this strongest tip over the [network](#network). Healthy clients only forward tips they locally think are the strongest.
+
+## Transaction Pool
+
+Open up [transaction_pool.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/transaction_poll/transaction_pool.ml)... TODO
+
+## Network
+
+TODO
+
+## Proposer
+
+TODO
+
+## External Transition
+
+TODO
+
+## Ledger-builder-controller
+
+TODO
+
+## Staged-ledger
+
+A staged ledger can be regarded as a "Pending accounts database" that has transactions(payments, coinbase, and proof-fees) applied for which there are no snarks available yet.
+A staged ledger consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](https://github.com/minaprotocol/mina/tree/master/src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the staged ledger.
+Parallel scan is a tree like structure that stores statements needed to be proved. A statement can be of applying a single transaction `Base` or of composing other statements `Merge`. Snarking of these statements is delegated to snark-workers. The snark workers submit snarks for the corresponding statements which are used by the proposer to update the parallel scan state.
+
+When the propser wins a block, the payments read from the transaction pool are sent to the staged ledger to create a diff `Staged_ledger_diff`.
+A diff consists of
+
+1. Payments included in the block
+2. A list of proofs that prove some of the transactions (payments, coinbase, and proof-fees) from previous blocks
+3. Coinbase
+
+There are two primary operations in staged ledger.
+
+1. Creating a diff :
+   To include a payment from the transaction pool, the proposer needs to include snarks generated by its own snark-workers (or buy it from someone) which certifies some of the transactions added in previous blocks. The number of snarks needs to be twice the number of transactions being included in the block (an invariant of the aux data structure). These proofs are included in the diff along with the payments and coinbase.
+   The diff is then included in the external transition and broadcasted to the network.
+
+2. Applying a diff: Diffs from the node itself (Internal transitions) or from the network (External transitions) are then used to update the staged ledger by applying the payments to the ledger and updating the parallel scan state with the proofs. Applying a diff may produce a proof for a sequence of transactions that were included in the previous blocks.
+
+## Ledger
+
+TODO
