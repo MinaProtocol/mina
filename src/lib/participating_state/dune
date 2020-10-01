@@ -1,5 +1,5 @@
 (library
   (name participating_state)
   (public_name participating_state)
-  (preprocess (pps ppx_version))
+  (preprocess (pps ppx_version bisect_ppx -- --conditional))
   (libraries async_kernel core_kernel))

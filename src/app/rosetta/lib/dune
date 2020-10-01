@@ -33,4 +33,4 @@
     ppx_inline_test
     ppx_assert
     ppx_version
-  )))
+   bisect_ppx -- --conditional)))

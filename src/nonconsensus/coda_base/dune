@@ -24,5 +24,5 @@
  (preprocess
   (pps ppx_coda ppx_version ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
     ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson h_list.ppx ppx_inline_test
-    bisect_ppx -- -conditional))
+    bisect_ppx -- --conditional))
  (synopsis "Snarks and friends necessary for keypair generation"))

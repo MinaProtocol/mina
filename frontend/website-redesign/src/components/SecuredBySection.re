@@ -10,7 +10,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [backgroundImage(url("/static/img/SecuredByLarge.png"))],
+        [backgroundImage(url("/static/img/SecuredByLarge.jpg"))],
       ),
     ]);
   let grid =
@@ -32,7 +32,8 @@ module Styles = {
       media(
         Theme.MediaQuery.desktop,
         [
-          width(`rem(90.)),
+          maxWidth(`rem(89.)),
+          margin2(~v=`zero, ~h=`auto),
           padding2(~v=rem(8.9), ~h=`rem(9.5)),
           gridTemplateColumns([`rem(31.5), `rem(29.)]),
           gridTemplateRows([`rem(31.5), `rem(36.)]),
@@ -43,7 +44,6 @@ module Styles = {
         ],
       ),
     ]);
-
   let gridItem1 = style([unsafe("grid-area", "1 / 1 / 2 / 2")]);
   let gridItem2 = style([unsafe("grid-area", "2 / 1 / 3 / 2")]);
   let gridItem3 =
@@ -161,6 +161,7 @@ module Styles = {
     ]);
   let button = style([media(Theme.MediaQuery.tablet, [])]);
 };
+
 [@react.component]
 let make = () => {
   <div className=Styles.backgroundImage>
@@ -180,14 +181,14 @@ let make = () => {
         <Spacer height=3. />
         <div className=Styles.flexRow>
           <span className=Styles.imageColumn>
-            <img src="/static/img/IllustrationBlockProducers.png" />
+            <img src="/static/img/AboutBlockProducers.svg" />
             <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
             <p className=Theme.Type.label>
               {React.string("Block Producers")}
             </p>
           </span>
           <span className=Styles.imageColumn>
-            <img src="/static/img/IllustrationSnarkWorkers.png" />
+            <img src="/static/img/AboutSnarkProducers.svg" />
             <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
             <p className=Theme.Type.label>
               {React.string("Snark Workers")}
@@ -220,7 +221,7 @@ let make = () => {
         </div>
       </div>
       <div className=Styles.gridItem3>
-        <img className=Styles.dotsImage src="/static/img/SecuredByDots.png" />
+        <img className=Styles.dotsImage src="/static/img/SecuredByDots.svg" />
         <span className=Styles.textColumn>
           <Rule color=Theme.Colors.white />
           <h3 className=Styles.h3White>
@@ -233,7 +234,7 @@ let make = () => {
           </p>
           <Spacer height=2. />
           <span className=Styles.button>
-            <Button bgColor=Theme.Colors.orange>
+            <Button bgColor=Theme.Colors.orange dark=true href=`Internal("/docs")>
               {React.string("Get Started")}
               <Icon kind=Icon.ArrowRightMedium />
             </Button>

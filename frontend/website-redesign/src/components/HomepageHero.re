@@ -2,12 +2,31 @@ module Styles = {
   open Css;
   let heroBackgroundImage = backgroundImg =>
     style([
-      height(`rem(120.)),
+      minHeight(`vh(200.)),
       width(`percent(100.)),
+      position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.desktop, [height(`rem(180.))]),
+      media(Theme.MediaQuery.tablet, [height(`auto)]),
+      media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
+      after([
+        contentRule(""),
+        position(`absolute),
+        bottom(`zero),
+        left(`zero),
+        right(`zero),
+        height(`rem(20.)),
+        background(
+          linearGradient(
+            deg(0.),
+            [
+              (`percent(0.), white),
+              (`percent(100.), rgba(255, 255, 255, 0.)),
+            ],
+          ),
+        ),
+      ]),
     ]);
 
   let container =
@@ -24,28 +43,35 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      marginTop(`rem(13.)),
-      media("(min-width:65rem)", [flexDirection(`row)]),
-      media(Theme.MediaQuery.tablet, [marginTop(`rem(17.))]),
-      media(Theme.MediaQuery.desktop, [marginTop(`rem(50.))]),
+      marginBottom(`rem(12.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginTop(`rem(12.))],
+      ),
+      media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
+    ]);
+
+  let heroHeadlineContainr =
+    style([
+      height(`vh(100.)),
+      minHeight(`rem(32.)),
+      position(`relative),
     ]);
 
   let heroHeadline =
     merge([
       Theme.Type.h1jumbo,
       style([
+        position(`absolute),
         display(`flex),
         justifyContent(`center),
         alignItems(`center),
-        marginTop(`rem(23.)),
-        media(Theme.MediaQuery.tablet, [marginTop(`rem(32.))]),
-        media(Theme.MediaQuery.desktop, [marginTop(`rem(37.))]),
+        bottom(`rem(12.)),
       ]),
     ]);
 
   let heroImageSize =
     style([
-      height(`rem(20.5)),
       width(`percent(100.)),
       media(
         "(min-width:38rem)",
@@ -82,9 +108,9 @@ module Styles = {
 
   let buttonIcon =
     style([
-      marginTop(`rem(0.65)),
+      height(`rem(1.5)),
       marginLeft(`rem(0.5)),
-      color(hex("#FF603B")),
+      color(Theme.Colors.orange),
     ]);
 
   let heroText =
@@ -120,34 +146,34 @@ let make = (~backgroundImg) => {
   <div className={Styles.heroBackgroundImage(backgroundImg)}>
     <Wrapped>
       <div className=Styles.container>
-        <h1 className=Styles.heroHeadline>
-          {React.string(
-             "The world's lightest blockchain, powered by participants.",
-           )}
-        </h1>
+        <div className=Styles.heroHeadlineContainr>
+          <h1 className=Styles.heroHeadline>
+            {React.string(
+               "The world's lightest blockchain, powered by participants.",
+             )}
+          </h1>
+        </div>
         <div className=Styles.heroContentContainer>
           <div className=Styles.heroTextButtonContainer>
             <span>
               <p className=Styles.heroText>
                 {React.string(
-                   "By design, the entire Coda blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
+                   "By design, the entire Mina blockchain is and will always be about 22kb - the size of a couple of tweets. So anyone with a smartphone will be able to sync and verify the network in seconds.",
                  )}
               </p>
             </span>
             <span className=Styles.heroButton>
-              //TODO: Add link to tech
-
-                <Button
-                  href="/"
-                  bgColor=Theme.Colors.white
-                  paddingX=1.
-                  width={`rem(13.5)}>
-                  <span> {React.string("See Behind The Tech")} </span>
-                  <span className=Styles.buttonIcon>
-                    <Icon kind=Icon.ArrowRightSmall />
-                  </span>
-                </Button>
-              </span>
+              <Button
+                href=`Internal("/tech")
+                bgColor=Theme.Colors.white
+                paddingX=1.
+                width={`rem(13.5)}>
+                <span> {React.string("See Behind The Tech")} </span>
+                <span className=Styles.buttonIcon>
+                  <Icon kind=Icon.ArrowRightMedium />
+                </span>
+              </Button>
+            </span>
           </div>
           <div className=Styles.heroImageContainer>
             <img

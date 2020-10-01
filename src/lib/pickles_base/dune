@@ -3,7 +3,7 @@
   (name pickles_base)
   (public_name pickles_base)
   (flags -warn-error -22)
-  (preprocess (pps h_list.ppx ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (preprocess (pps h_list.ppx ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx bisect_ppx -- --conditional))
   (libraries
     random_oracle_input
     pickles_types
@@ -17,4 +17,3 @@
 ;    snarky_group_map
 ;    snarky_curve
     core_kernel ))
-

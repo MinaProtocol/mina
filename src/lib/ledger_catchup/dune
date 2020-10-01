@@ -2,7 +2,7 @@
   (name ledger_catchup)
   (public_name ledger_catchup)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_version ppx_jane))
+  (preprocess (pps ppx_coda ppx_version ppx_jane bisect_ppx -- --conditional))
   (libraries
     async_kernel
     non_empty_list

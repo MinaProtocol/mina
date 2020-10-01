@@ -19,7 +19,7 @@ let make = (~currentSlug) => {
       <Item title="Getting Started" slug={f("getting-started")} />
       <Item title="My First Transaction" slug={f("my-first-transaction")} />
       <Item title="Become a Node Operator" slug={f("node-operator")} />
-      <Item title="Contributing to Coda" slug={f("contributing")} />
+      <Item title="Contributing to Mina" slug={f("contributing")} />
       <Section title="Developers" slug={f("developers")}>
         <Item title="Developers Overview" slug="" />
         <Item title="Codebase Overview" slug="codebase-overview" />
@@ -29,8 +29,8 @@ let make = (~currentSlug) => {
         <Item title="Sandbox Node" slug="sandbox-node" />
         <Item title="GraphQL API" slug="graphql-api" />
       </Section>
-      <Section title="Coda Protocol Architecture" slug={f("architecture")}>
-        <Item title="Coda Overview" slug="" />
+      <Section title="Mina Protocol Architecture" slug={f("architecture")}>
+        <Item title="Mina Overview" slug="" />
         <Item title="Lifecycle of a Payment" slug="lifecycle-payment" />
         <Item title="Consensus" slug="consensus" />
         <Item title="Proof of Stake" slug="proof-of-stake" />
