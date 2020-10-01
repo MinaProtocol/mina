@@ -94,6 +94,8 @@ module Multiaddr : sig
   val to_string : t -> string
 
   val of_string : string -> t
+
+  val to_peer : t -> Network_peer.Peer.t option
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}

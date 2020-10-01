@@ -962,6 +962,17 @@ module Multiaddr = struct
   let to_string t = t
 
   let of_string t = t
+
+  let to_peer t =
+    match String.split ~on:'/' t with
+    | [""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id] -> (
+      try
+        let host = Unix.Inet_addr.of_string ip4_str in
+        let libp2p_port = Int.of_string tcp_str in
+        Some (Network_peer.Peer.create host ~libp2p_port ~peer_id)
+      with _ -> None )
+    | _ ->
+        None
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}

@@ -755,7 +755,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
-             ; isolate
+             ; isolate= Option.value ~default:false isolate
              ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in
