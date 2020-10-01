@@ -3,4 +3,4 @@
  (public_name node_addrs_and_ports)
  (libraries core async network_peer yojson)
  (inline_tests)
- (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson)))
+ (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson bisect_ppx -- --conditional)))
