@@ -1,5 +1,5 @@
 (library
   (name coda_transition)
   (public_name coda_transition)
-  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- --conditional))
   (libraries core_kernel staged_ledger transition_chain_verifier truth coda_base coda_state precomputed_values consensus protocol_version staged_ledger_diff verifier))

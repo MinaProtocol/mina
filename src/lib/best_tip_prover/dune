@@ -1,5 +1,5 @@
 (library
   (name best_tip_prover)
   (public_name best_tip_prover)
-  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries core_kernel coda_intf coda_base transition_frontier consensus transition_chain_prover))

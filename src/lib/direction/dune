@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "Representation of direction in a binary tree"))

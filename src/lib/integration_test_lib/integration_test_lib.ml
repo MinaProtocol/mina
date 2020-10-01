@@ -94,7 +94,7 @@ module type Engine_intf = sig
   module Network_manager : sig
     type t
 
-    val create : Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
 
     val deploy : t -> Network.t Deferred.t
 
@@ -128,6 +128,9 @@ module type Engine_intf = sig
                   | `Milliseconds of int64 ]
       -> t
       -> unit Malleable_error.t
+
+    val wait_for_sync :
+      Node.t list -> timeout:Time.Span.t -> t -> unit Malleable_error.t
 
     val wait_for_init : Node.t -> t -> unit Malleable_error.t
 

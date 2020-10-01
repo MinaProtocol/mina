@@ -3,5 +3,5 @@
  (public_name ppx_register_event)
  (kind ppx_deriver)
  (libraries compiler-libs.common ppxlib core_kernel ppx_deriving_yojson logproc_lib)
- (preprocess (pps ppx_version ppxlib.metaquot))
+ (preprocess (pps ppx_version ppxlib.metaquot bisect_ppx -- --conditional))
  (ppx_runtime_libraries structured_log_events yojson))

@@ -1,0 +1,26 @@
+testnetName: "coda-testnet"
+coda:
+  runtimeConfig: ""
+  logLevel: "Trace"
+  logReceivedBlocks: false
+  logSnarkWorkGossip: false
+  image: codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898
+  privkeyPass: "naughty blue worm"
+  seedPeers:
+    - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
+    - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+
+archive: 
+  hostPort: "10909"
+  image: codaprotocol/coda-archive:0.0.12-beta-fix-archive-debs-62bae52
+  nodeName: "dev"
+  remoteSchemaFile: "https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql"
+  postgresHost: '{{ .Release.Name }}-postgresql'
+  postgresPort: "5432"
+  postgresDB: "archive"
+  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+
+
+postgresql:
+  postgresqlPassword: "foobar"
+  postgresqlUsername: "postgres"
