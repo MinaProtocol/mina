@@ -240,6 +240,8 @@ module Full = struct
     type t = E : (full, 'mutant) diff -> t
 
     let to_lite (E diff) = Lite.E.E (to_lite diff)
+
+    let to_yojson (E diff) = to_yojson diff
   end
 
   module With_mutant = struct

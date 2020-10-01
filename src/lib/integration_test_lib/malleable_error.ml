@@ -171,6 +171,15 @@ module List = struct
         let%map t' = map t ~f in
         h' :: t'
 
+  let rec fold ls ~init ~f =
+    let open T.Let_syntax in
+    match ls with
+    | [] ->
+        return init
+    | h :: t ->
+        let%bind init' = f init h in
+        fold t ~init:init' ~f
+
   let rec fold_left_while ls ~init ~f =
     let open T.Let_syntax in
     match ls with

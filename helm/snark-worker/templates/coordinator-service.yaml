@@ -1,0 +1,15 @@
+{{- if $.Values.coordinator.active }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{tpl $.Values.coordinator.fullname .}}
+  labels:
+    app: {{tpl $.Values.coordinator.fullname .}}
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ $.Values.coordinator.rpcPort }}
+      name: rpc
+  selector:
+    app: {{tpl $.Values.coordinator.fullname .}}
+{{ end }}
