@@ -3,5 +3,5 @@
   (public_name logproc_lib)
   (modules filter interpolator)
   (libraries core yojson angstrom re2)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.std bisect_ppx -- --conditional))
   (inline_tests))
