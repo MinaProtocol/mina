@@ -537,7 +537,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             , (new_frontier, sorted_filtered_collected_transitions) ) )
   in
   let%map time_elapsed, (cycles, result) = time_deferred (loop []) in
-  [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_cycle_stats"
+  [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
     ~metadata:
       [ ("time_elapsed", time_to_yojson time_elapsed)
       ; ( "bootstrap_stats"
