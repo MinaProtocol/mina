@@ -299,6 +299,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
     =
+  let verification_start_time = Core.Time.now () in
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
     fold_until (List.rev transitions) ~init:[]
@@ -332,8 +333,15 @@ let verify_transitions_and_build_breadcrumbs ~logger
           in
           Deferred.Or_error.return (acc, initial_state_hash) )
   in
+  let verification_end_time = Core.Time.now () in
   [%log debug]
-    ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+    ~metadata:
+      [ ("target_hash", State_hash.to_yojson target_hash)
+      ; ( "time_elapsed"
+        , `Int
+            Core.Time.(
+              Span.to_secs
+              @@ diff verification_end_time verification_start_time) ) ]
     "verification of transitions complete" ;
   let trees_of_transitions =
     Option.fold
@@ -349,12 +357,22 @@ let verify_transitions_and_build_breadcrumbs ~logger
   with
   | Ok result ->
       [%log debug]
-        ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+        ~metadata:
+          [ ("target_hash", State_hash.to_yojson target_hash)
+          ; ( "time_elapsed"
+            , `Int
+                Core.Time.(Span.to_secs @@ diff (now ()) verification_end_time)
+            ) ]
         "build of breadcrumbs complete" ;
       Deferred.Or_error.return result
   | Error e ->
       [%log debug]
-        ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+        ~metadata:
+          [ ("target_hash", State_hash.to_yojson target_hash)
+          ; ( "time_elapsed"
+            , `Int
+                Core.Time.(Span.to_secs @@ diff (now ()) verification_end_time)
+            ) ]
         "build of breadcrumbs failed" ;
       List.map transitions_with_initial_validation
         ~f:Cached.invalidate_with_failure
