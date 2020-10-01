@@ -2,10 +2,12 @@ module Styles = {
   open Css;
   let heroBackgroundImage = backgroundImg =>
     style([
+      minHeight(`vh(200.)),
       width(`percent(100.)),
       position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
+      media(Theme.MediaQuery.tablet, [height(`auto)]),
       media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
       after([

@@ -1,6 +1,6 @@
 (library
   (name proof_carrying_data)
-  (preprocess (pps ppx_version ppx_jane))
+  (preprocess (pps ppx_version ppx_jane bisect_ppx -- --conditional))
   (libraries core_kernel)
   (public_name proof_carrying_data)
 )
