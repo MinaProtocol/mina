@@ -42,19 +42,19 @@ type Helper struct {
 	Rendezvous      string
 	Discovery       *discovery.RoutingDiscovery
 	Me              peer.ID
-	GatingState      *codaGatingState
+	GatingState     *codaGatingState
 }
 
 type customValidator struct {
 	Base record.Validator
 }
 
-// this type implements the ConnectionGating interface 
+// this type implements the ConnectionGating interface
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
 type codaGatingState struct {
-	AddrFilters *ma.Filters
-	DeniedPeers *peer.Set
+	AddrFilters  *ma.Filters
+	DeniedPeers  *peer.Set
 	AllowedPeers *peer.Set
 }
 
@@ -63,7 +63,7 @@ type codaGatingState struct {
 // This is called by the network.Network implementation when dialling a peer.
 func (gs *codaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
-	
+
 	return
 }
 
@@ -165,7 +165,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
 	kadch := make(chan *dual.DHT)
 
-	gater := codaGatingState{}
+	gater := codaGatingState{DeniedPeers: peer.NewSet(), AllowedPeers: peer.NewSet(), AddrFilters: ma.NewFilters()}
 
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
@@ -207,6 +207,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:      rendezvousString,
 		Discovery:       nil,
 		Me:              me,
-		GatingState:      &gater,
+		GatingState:     &gater,
 	}, nil
 }
