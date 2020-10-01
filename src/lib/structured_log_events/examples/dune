@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core_kernel yojson)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_register_event ppx_inline_test))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_register_event ppx_inline_test bisect_ppx -- --conditional))
  (synopsis "Events, logging and parsing"))

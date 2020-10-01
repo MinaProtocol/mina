@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core_kernel snark_params signature_lib)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version ppx_optcomp ppx_assert ppx_let ppx_inline_test))
+ (preprocess (pps ppx_version ppx_optcomp ppx_assert ppx_let ppx_inline_test bisect_ppx -- --conditional))
  (synopsis "Encoders and decoders for Rosetta"))

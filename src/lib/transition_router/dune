@@ -1,7 +1,7 @@
 (library
   (name transition_router)
   (public_name transition_router)
-  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries
     core
     async
