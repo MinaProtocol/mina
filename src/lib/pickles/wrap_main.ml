@@ -107,16 +107,23 @@ end
 
 let pack_statement max_branching =
   let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
-    let low_bits, high_bit = Util.split_last (Unsafe.unpack_unboolean x) in
-    [|low_bits; [high_bit]|]
+    with_label __LOC__ (fun () ->
+        let low_bits, high_bit = Util.split_last (Unsafe.unpack_unboolean x) in
+        [|low_bits; [high_bit]|] )
   in
   fun t ->
     Core.printf "packing!\n%!" ;
-    Spec.pack
-      (module Impl)
-      pack_fq
-      (Types.Pairing_based.Statement.spec max_branching Backend.Tock.Rounds.n)
-      (Types.Pairing_based.Statement.to_data t)
+    with_label __LOC__ (fun () ->
+        let r =
+          Spec.pack
+            (module Impl)
+            pack_fq
+            (Types.Pairing_based.Statement.spec max_branching
+               Backend.Tock.Rounds.n)
+            (Types.Pairing_based.Statement.to_data t)
+        in
+        Core.printf "packed=%d\n%!" (Array.length r) ;
+        r )
 
 let shifts ~log2_size =
   Backend.Tock.B.Field_verifier_index.shifts ~log2_size
@@ -279,11 +286,20 @@ let wrap_main
             let (wrap_domains : (_, Max_branching.n) Vector.t), max_quot_sizes
                 =
               Vector.map domainses ~f:(fun ds ->
-                  ( Vector.map
-                      Domains.[h; x]
-                      ~f:(fun f ->
+                  let h =
+                    (*
+                      assert (
+                        Vector.for_all ds ~f:(fun { h; _ } ->
+                            Domain.equal wrap_domains.h h ) );
+*)
+                    Marlin_checks.domain
+                      (module Field)
+                      ~shifts ~domain_generator wrap_domains.h
+                  in
+                  ( (*let f = Domains.h in
                         Pseudo.Domain.to_domain ~shifts ~domain_generator
-                          (which_branch, Vector.map ds ~f) )
+                          (which_branch, Vector.map ds ~f)  *)
+                    h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
                           (5 * (Domain.size d.h + 2)) - 5 ) ) ) )
@@ -311,7 +327,7 @@ let wrap_main
                       ; actual_branching
                       ; evals
                       ; eval_lengths
-                      ; [domain; input_domain]
+                      ; domain
                       ; max_quot_size ]
                  ->
                 let sponge =
@@ -341,8 +357,6 @@ let wrap_main
                       finalize_other_proof
                         (Nat.Add.create max_local_max_branching)
                         ~max_quot_size ~actual_branching
-                        ~input_domain:
-                          (input_domain :> _ Marlin_checks.plonk_domain)
                         ~domain:(domain :> _ Marlin_checks.plonk_domain)
                         ~sponge deferred_values ~old_bulletproof_challenges
                         evals )
@@ -410,7 +424,7 @@ let wrap_main
       let xi =
         with_label __LOC__ (fun () ->
             Pickles_types.Scalar_challenge.map xi
-              ~f:(Field.unpack ~length:Challenge.length) )
+              ~f:(Unsafe.unpack_unboolean ~length:Challenge.length) )
       in
       with_label __LOC__ (fun () ->
           incrementally_verify_proof
@@ -424,13 +438,16 @@ let wrap_main
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
             ~messages ~which_branch ~openings_proof
             ~plonk:
-              (Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit
-               .map_fields
-                 plonk
-                 (* We don't use a boolean-constraining unpacking function. It's not
+              (with_label __LOC__ (fun () ->
+                   Types.Dlog_based.Proof_state.Deferred_values.Plonk
+                   .In_circuit
+                   .map_fields
+                     plonk
+                     (* We don't use a boolean-constraining unpacking function. It's not
    necessary with PLONK. *)
-                 ~f:(Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe))
-      )
+                     ~f:
+                       (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe)
+               )) )
     in
     Boolean.Assert.is_true bulletproof_success ;
     Field.Assert.equal me_only_digest

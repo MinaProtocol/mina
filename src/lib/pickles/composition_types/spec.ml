@@ -227,16 +227,23 @@ let pack_basic_unboolean (type field other_field other_field_var)
    fun basic x ->
     match basic with
     | Field ->
-        field x
+        let r = field x in
+        Core.printf "field:%d\n%!" (Array.length r) ;
+        r
     | Bool ->
+        Core.printf "bool:1\n%!" ;
         [|[x]|]
     | Digest ->
+        Core.printf "digest:1\n%!" ;
         [|Digest.Unsafe.to_bits_unboolean x|]
     | Challenge ->
+        Core.printf "challenge:1\n%!" ;
         [|Challenge.to_bits x|]
     | Index ->
+        Core.printf "index:1\n%!" ;
         [|Vector.to_list x|]
     | Bulletproof_challenge ->
+        Core.printf "bpchal:2\n%!" ;
         let (Scalar_challenge pre) = x.prechallenge in
         [|[x.is_square]; Challenge.to_bits pre|]
     | _ ->
@@ -244,7 +251,7 @@ let pack_basic_unboolean (type field other_field other_field_var)
   in
   {pack}
 
-let pack impl field t = pack (pack_basic impl field) t
+let pack impl field t = pack (pack_basic_unboolean impl field) t
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)

@@ -60,7 +60,7 @@ module type Inputs_intf = sig
 
     val delete : t -> unit
 
-    val create : Gate_vector.t -> Urs.t -> t
+    val create : Gate_vector.t -> Unsigned.size_t -> Urs.t -> t
   end
 
   module Curve : sig
@@ -188,7 +188,11 @@ module Make (Inputs : Inputs_intf) = struct
           let h = List.hd_exn x in
           let t = List.last_exn x in
           Gate_vector.wrap_gate gates (conv t.row) t.col (conv h.row) h.col ) ;
-    let index = Index.create gates (load_urs ()) in
+    let index =
+      Index.create gates
+        (Unsigned.Size_t.of_int (Set_once.get_exn cs.public_input_size [%here]))
+        (load_urs ())
+    in
     Caml.Gc.finalise Index.delete index ;
     Core.printf "rows = %d\n%!" (List.length cs.rows_rev) ;
     {index; cs}

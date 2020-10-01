@@ -62,10 +62,16 @@ struct
               As_prover.(fun () -> round_table (Array.map init ~f:read_var))
         in
         (* TODO: Constraint state.(0) = start -> ark *)
-        Array.iter2_exn init t.(0) ~f:Field.Assert.equal ;
+        (*
+        with_label __LOC__ (fun () ->
+          Array.iter2_exn init t.(0) ~f:Field.Assert.equal ) ;
+*)
+        t.(0) <- init ;
         (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
-        Impl.assert_
-          [{basic= T (Poseidon {state= t}); annotation= Some "plonk-poseidon"}]) ;
+        with_label __LOC__ (fun () ->
+            Impl.assert_
+              [ { basic= T (Poseidon {state= t})
+                ; annotation= Some "plonk-poseidon" } ] )) ;
         t.(Int.(Array.length t - 1)) )
 
   (* TODO: experiment with sealing version of this *)
