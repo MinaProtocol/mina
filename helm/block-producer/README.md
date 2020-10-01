@@ -24,28 +24,28 @@ Parameter | Description
 
 Parameter | Description | Default
 --- | --- | ---
-`userAgent.image` | Container image to use for a Coda protocol user-agent sidecar
-`bots.image` | Container image to use for a Codaprotocol faucet and echo service sidecars
+`userAgent.image` | Container image to use for a Coda protocol user-agent sidecar | ""
+`bots.image` | Container image to use for a Codaprotocol faucet and echo service sidecars | ""
 `coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.12-beta-new-genesis-01eca9b`
-`blockProducerConfigs` | list of Coda protocol block producer config and provisioning settings
-`blockProducerConfigs[].name` | Name of block producer configuration and deployment object
-`blockProducerConfigs[].class` | Testnet block producer class based on account balance (e.g. fish or whale)
-`blockProducerConfigs[].runWithBots` | Whether to run with certain Coda protocol testnet bots
-`blockProducerConfigs[].runWithUserAgent` | Whether to run with a user-agent which periodically sends transactions
-`blockProducerConfigs[].enableGossipFlooding` | Whether to enable gossip flooding
-`blockProducerConfigs[].privateKeySecret` | account wallet private key secret associated with Coda test account/wallet
-`blockProducerConfigs[].externalPort` | Port Coda clients use for connecting to the external network
+`blockProducerConfigs` | list of Coda protocol block producer config and provisioning settings | `see [default] values.yaml`
+`blockProducerConfigs[].name` | Name of block producer configuration and deployment object | `<item-data>`
+`blockProducerConfigs[].class` | Testnet block producer class based on account balance (e.g. fish or whale) | `<item-data>`
+`blockProducerConfigs[].runWithBots` | Whether to run with certain Coda protocol testnet bots | `<item-data>`
+`blockProducerConfigs[].runWithUserAgent` | Whether to run with a user-agent which periodically sends transactions | `<item-data>`
+`blockProducerConfigs[].enableGossipFlooding` | Whether to enable gossip flooding | `<item-data>`
+`blockProducerConfigs[].privateKeySecret` | account wallet private key secret associated with Coda test account/wallet | `<item-data>`
+`blockProducerConfigs[].externalPort` | Port Coda clients use for connecting to the external network | `<item-data>`
 `coda.logLevel` | log level to set for Coda daemon | `TRACE` 
 `coda.logReceivedBlocks` | whether the Coda daemon should log received blocks events | `false`
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
 `coda.privKeyPass` | public-private key-pair associated with Coda daemon account | `see [default] values.yaml`
-`userAgent.minFee` | Minimum fee to accept for sending network transactions
-`userAgent.maxFee` | Maximum fee to accept for sending network transactions
-`userAgent.minTx` | Minimum transaction amount to send by the user-agent
-`userAgent.maxTx` | Maxiumum transaction amount to send by the user-agent
-`bots.faucet.amount` | Amount to send in response to request for faucet funds 
-`bots.faucet.fee` | Fee to charge for sending faucet funds
+`userAgent.minFee` | Minimum fee to accept for sending network transactions | ""
+`userAgent.maxFee` | Maximum fee to accept for sending network transactions | ""
+`userAgent.minTx` | Minimum transaction amount to send by the user-agent | ""
+`userAgent.maxTx` | Maxiumum transaction amount to send by the user-agent | ""
+`bots.faucet.amount` | Amount to send in response to request for faucet funds | "10000000000"
+`bots.faucet.fee` | Fee to charge for sending faucet funds | "100000000"
 
 ## block-producer launch examples
 
