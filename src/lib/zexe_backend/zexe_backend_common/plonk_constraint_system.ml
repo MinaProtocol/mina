@@ -119,7 +119,10 @@ module Plonk_constraint = struct
             equal zero
               (List.reduce_exn ~f:add
                  [mul cl vl; mul cr vl; mul co vo; mul m (mul vl vr); c]))
-      | _ -> true (* TODO *)
+      | _ ->
+          true
+
+    (* TODO *)
   end
 
   include T
@@ -263,13 +266,14 @@ struct
     let num_rows = public_input_size + sys.next_row in
     let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
     for i = 0 to public_input_size - 1 do
-      res.(i).(0) <- external_values (i + 1) ;
+      res.(i).(0) <- external_values (i + 1)
     done ;
     let find t k =
       match Hashtbl.find t k with
       | None ->
-        failwithf !"Could not find %{sexp:Internal_var.t}\n%!" k ()
-      | Some x -> x
+          failwithf !"Could not find %{sexp:Internal_var.t}\n%!" k ()
+      | Some x ->
+          x
     in
     let compute ((lc, c) : (Fp.t * V.t) list * Fp.t option) =
       List.fold lc ~init:(Option.value c ~default:Fp.zero)
