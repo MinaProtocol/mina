@@ -35,23 +35,25 @@ no_preprocessing = sexpdata.loads('no_preprocessing')
 
 ppx_lint = sexpdata.loads('ppx_version')
 
+ppx_benchmark = sexpdata.loads('bisect_ppx')
+
 exit_code = 0
 
 
-def missing_ppx_error(dune, ppx):
+def missing_ppx_error(dune, ppxs):
     print(
         "In dune file " + dune +
         ", the preprocessing clause is missing; there should be one containing "
-        + (sexpdata.dumps(ppx)))
+        + (sexpdata.dumps(ppxs)))
     global exit_code
     exit_code = 1
 
 
-def no_ppx_error(dune, ppx):
+def no_ppx_error(dune, ppxs):
     print(
         "In dune file " + dune +
         ", the preprocessing clause indicates no preprocessing, but it should include "
-        + (sexpdata.dumps(ppx)))
+        + (sexpdata.dumps(ppxs)))
     global exit_code
     exit_code = 1
 
@@ -66,6 +68,8 @@ def get_ppx_ndx(dune, ppxs, ppx):
         global exit_code
         exit_code = 1
 
+# for libraries, require ppx_version and bisect_ppx
+# for executables, require only ppx_version, because bisect_ppx only applies to inline tests
 
 for dune in dune_paths:
     with open(dune) as fp:
@@ -75,6 +79,7 @@ for dune in dune_paths:
             if isinstance(sexp, list) and len(sexp) > 0 and (
                     sexpdata.car(sexp) == library
                     or sexpdata.car(sexp) == executable):
+                is_library = sexpdata.car(sexp) == library
                 clauses = sexpdata.cdr(sexp)
                 found_preprocess = False
                 for clause in clauses:
@@ -83,12 +88,20 @@ for dune in dune_paths:
                         subclause = sexpdata.car(sexpdata.cdr(clause))
                         if subclause == no_preprocessing:
                             # error if no preprocessing explicitly
-                            no_ppx_error(dune, ppx_lint)
+                            if is_library :
+                                no_ppx_error(dune, (ppx_lint,ppx_benchmark))
+                            else :
+                                no_ppx_error(dune, ppx_lint)
                         elif sexpdata.car(subclause) == pps:
                             ppxs = sexpdata.cdr(subclause)
                             lint_ppx_ndx = get_ppx_ndx(dune, ppxs, ppx_lint)
+                            if is_library :
+                                benchmark_ppx_ndx = get_ppx_ndx(dune, ppxs, ppx_benchmark)
                 if found_preprocess == False:
                     # error if no preprocessing implicitly
-                    missing_ppx_error(dune, ppx_lint)
+                    if is_library :
+                        missing_ppx_error(dune, (ppx_lint,ppx_benchmark))
+                    else :
+                        missing_ppx_error(dune, ppx_lint)
 
 exit(exit_code)

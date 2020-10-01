@@ -4,5 +4,5 @@
   (public_name generate_keypair)
   (modes native)
   (libraries cli_lib core_kernel)
-  (preprocess (pps ppx_version ppx_let ppx_sexp_conv ppx_optcomp))
+  (preprocess (pps ppx_version ppx_let ppx_sexp_conv ppx_optcomp bisect_ppx -- --conditional))
   (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60) )
