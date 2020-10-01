@@ -120,7 +120,9 @@ module Plonk_constraint = struct
               (List.reduce_exn ~f:add
                  [mul cl vl; mul cr vl; mul co vo; mul m (mul vl vr); c]))
       | _ ->
-          failwith "TODO"
+          true
+
+    (* TODO *)
   end
 
   include T
@@ -266,6 +268,13 @@ struct
     for i = 0 to public_input_size - 1 do
       res.(i).(0) <- external_values (i + 1)
     done ;
+    let find t k =
+      match Hashtbl.find t k with
+      | None ->
+          failwithf !"Could not find %{sexp:Internal_var.t}\n%!" k ()
+      | Some x ->
+          x
+    in
     let compute ((lc, c) : (Fp.t * V.t) list * Fp.t option) =
       List.fold lc ~init:(Option.value c ~default:Fp.zero)
         ~f:(fun acc (s, x) ->
@@ -274,11 +283,12 @@ struct
             | External x ->
                 external_values x
             | Internal x ->
-                Hashtbl.find_exn internal_values x
+                find internal_values x
           in
           Fp.(acc + (s * x)) )
     in
-    List.iteri (List.rev sys.rows_rev) ~f:(fun i row ->
+    List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input row ->
+        let i = i_after_input + public_input_size in
         Array.iteri row ~f:(fun j v ->
             match v with
             | None ->
@@ -286,7 +296,7 @@ struct
             | Some (External v) ->
                 res.(i).(j) <- external_values v
             | Some (Internal v) ->
-                let lc = Hashtbl.find_exn sys.internal_vars v in
+                let lc = find sys.internal_vars v in
                 let value = compute lc in
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
