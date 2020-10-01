@@ -250,6 +250,20 @@ module type S = sig
     -> Signed_command.With_valid_signature.t
     -> Undo.Signed_command_undo.t Or_error.t
 
+  val apply_fee_transfer :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
+    -> ledger
+    -> Fee_transfer.t
+    -> Undo.Fee_transfer_undo.t Or_error.t
+
+  val apply_coinbase :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
+    -> ledger
+    -> Coinbase.t
+    -> Undo.Coinbase_undo.t Or_error.t
+
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_state_view:Snapp_predicate.Protocol_state.View.t
@@ -1149,7 +1163,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           r.data.body.delta
         in
         (* TODO:
-           If there is an excess for the native token of the transaction, currently 
+           If there is an excess for the native token of the transaction, currently
            this just burns it. Probably we should assert that if another fee payer is
            present, the excess is 0. *)
         let f
