@@ -148,7 +148,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:config.initial_peers
                 ~initial_gating_config:
-                  { trusted_peers= config.seed_peers
+                  { trusted_peers= config.initial_peers
                   ; banned_peers=
                       Trust_system.peer_statuses config.trust_system
                       |> List.filter_map ~f:(fun (peer, status) ->
