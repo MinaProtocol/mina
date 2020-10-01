@@ -52,7 +52,7 @@ spec:
           {{- end -}}
           {{- range $.Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
-          {{- end -}
+          {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
