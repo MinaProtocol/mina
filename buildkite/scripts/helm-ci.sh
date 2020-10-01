@@ -10,7 +10,7 @@ diff=$(
 # Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
-    find $(dirname $val) -name 'Chart.yaml';
+    find $(dirname ${val:-""}) -name 'Chart.yaml';
   done
 )
 
