@@ -1,6 +1,6 @@
 (library
  (name webkit_trace_event)
   (public_name webkit_trace_event)
-  (preprocess (pps ppx_version))
+  (preprocess (pps ppx_version bisect_ppx -- --conditional))
   (libraries core async)
   (synopsis "Binary and JSON output of WebKit trace events"))

@@ -26,5 +26,5 @@
     ppx_deriving_yojson
     ppx_jane
     ppx_version
-    ))
+     bisect_ppx -- --conditional))
   )

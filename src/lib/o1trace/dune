@@ -4,4 +4,4 @@
   (libraries async core webkit_trace_event)
   (synopsis "Basic event tracing")
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_optcomp)))
+  (preprocess (pps ppx_version ppx_optcomp bisect_ppx -- --conditional)))

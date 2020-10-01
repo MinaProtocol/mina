@@ -3,7 +3,7 @@
   (name tweedle)
   (public_name zexe_backend.tweedle)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std bisect_ppx -- --conditional))
   (libraries
     zexe_backend_common
     hex
@@ -15,4 +15,3 @@
     sponge
     snarkette
     core ))
-
