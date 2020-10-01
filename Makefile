@@ -302,7 +302,7 @@ benchmarks:
 # Coverage testing and output
 
 test-coverage: SHELL := /bin/bash
-test-coverage:
+test-coverage: libp2p_helper
 	scripts/create_coverage_profiles.sh
 
 # we don't depend on test-coverage, which forces a run of all unit tests

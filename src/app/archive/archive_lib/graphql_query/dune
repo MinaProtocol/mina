@@ -3,5 +3,5 @@
   (public_name graphql_query)
   (libraries core coda_base coda_transition graphql_lib)
   (preprocessor_deps ../../archive_graphql_schema.json)
-  (preprocess (pps ppx_jane ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
+  (preprocess (pps ppx_jane ppx_version graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json bisect_ppx -- --conditional))
   )
