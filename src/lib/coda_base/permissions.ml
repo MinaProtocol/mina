@@ -208,7 +208,7 @@ module Auth_required = struct
       *)
       let open Pickles.Impls.Step.Boolean in
       signature_sufficient
-      &&& (constant ||| ((not constant) && signature_verifies))
+      &&& (constant ||| ((not constant) &&& signature_verifies))
 
     let spec_eval ({constant; signature_necessary; signature_sufficient} : t)
         ~signature_verifies =
