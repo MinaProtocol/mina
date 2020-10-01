@@ -1,5 +1,7 @@
 open Core_kernel
 
+let print = ref false
+
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
@@ -25,8 +27,34 @@ struct
   let scale_fast ((xt, yt) as t : Field.t * Field.t)
       (`Times_two_plus_1_plus_2_to_len r) : Field.t * Field.t =
     let n = Array.length r in
-    let acc = ref (G.double t) in
+    let acc = ref (with_label __LOC__ (fun () -> G.double t)) in
     let rows_rev = ref [] in
+    if !print then printf "scale_fast %d\n%!" n ;
+    let module Var = struct
+      type t = Var.t
+
+      include Sexpable.Of_sexpable
+                (Int)
+                (struct
+                  include Var
+
+                  let to_sexpable = index
+
+                  let of_sexpable = create
+                end)
+    end in
+    if !print then
+      Core.printf
+        !"xt = %{sexp: Field.Constant.t option * (Field.Constant.t * Var.t) \
+          list}\n\
+          %!"
+        (Field.to_constant_and_terms xt) ;
+    if !print then
+      Core.printf
+        !"yt = %{sexp: Field.Constant.t option * (Field.Constant.t * Var.t) \
+          list}\n\
+          %!"
+        (Field.to_constant_and_terms xt) ;
     let () =
       for i = 0 to n - 1 do
         let xp, yp = !acc in
@@ -104,7 +132,10 @@ struct
 
   let scale_fast t (`Plus_two_to_len_minus_1 k) =
     with_label __LOC__ (fun () ->
-        let t = Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t in
+        let t =
+          with_label __LOC__ (fun () ->
+              Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t )
+        in
         let m = Array.length k - 1 in
         let r = Array.init m ~f:(fun i -> k.(i + 1)) in
         let two_r_plus_1_plus_two_to_m =

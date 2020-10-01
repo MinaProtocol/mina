@@ -86,7 +86,8 @@ let evals_of_split_evals field ~zeta ~zetaw
 
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
-let derive_plonk (type t) (module F : Field_intf with type t = t) ~shift ~endo
+let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
+    (module F : Field_intf with type t = t) ~shift ~endo
     ~(domain : t plonk_domain) =
   let open F in
   let square x = x * x in
@@ -100,16 +101,22 @@ let derive_plonk (type t) (module F : Field_intf with type t = t) ~shift ~endo
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
     let bz = beta * zeta in
     let perm0 =
-      (e0.l + bz + gamma)
-      * (e0.r + (bz * r) + gamma)
-      * (e0.o + (bz * o) + gamma)
-      * alpha
-      + (alpha * alpha * domain#vanishing_polynomial zeta / (zeta - one))
+      with_label __LOC__ (fun () ->
+          (e0.l + bz + gamma)
+          * (e0.r + (bz * r) + gamma)
+          * (e0.o + (bz * o) + gamma)
+          * alpha
+          + (alpha * alpha * domain#vanishing_polynomial zeta / (zeta - one))
+      )
     in
     let perm1 =
-      negate (e0.l + (beta * e0.sigma1) + gamma)
-      * (e0.r + (beta * e0.sigma2) + gamma)
-      * (e1.z * beta * alpha)
+      let beta_sigma1 = with_label __LOC__ (fun () -> beta * e0.sigma1) in
+      let beta_sigma2 = with_label __LOC__ (fun () -> beta * e0.sigma2) in
+      let beta_alpha = with_label __LOC__ (fun () -> beta * alpha) in
+      with_label __LOC__ (fun () ->
+          negate (e0.l + beta_sigma1 + gamma)
+          * (e0.r + beta_sigma2 + gamma)
+          * (e1.z * beta_alpha) )
     in
     let gnrc_l = e0.l in
     let gnrc_r = e0.r in
@@ -118,45 +125,52 @@ let derive_plonk (type t) (module F : Field_intf with type t = t) ~shift ~endo
       let a2 = alpha * alpha in
       let a = Array.init 4 ~f:(fun _ -> a2) in
       for i = 1 to Int.(Array.length a - 1) do
-        a.(i) <- a.(Int.(i - 1)) * alpha
+        a.(i) <- with_label __LOC__ (fun () -> a.(Int.(i - 1)) * alpha)
       done ;
       a
     in
     let psdn0 =
       let l, r, o = (sbox e0.l, sbox e0.r, sbox e0.o) in
-      ((l + o - e1.l) * alphas.(1))
-      + ((l + r - e1.r) * alphas.(2))
-      + ((r + o - e1.o) * alphas.(3))
+      with_label __LOC__ (fun () ->
+          ((l + o - e1.l) * alphas.(1))
+          + ((l + r - e1.r) * alphas.(2))
+          + ((r + o - e1.o) * alphas.(3)) )
     in
     let ecad0 =
-      (((e1.r - e1.l) * (e0.o + e0.l)) - ((e1.l - e1.o) * (e0.r - e0.l)))
-      * alphas.(1)
-      + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
-        - ((e0.o + e0.l) * (e0.o + e0.l)) )
-        * alphas.(2)
+      with_label __LOC__ (fun () ->
+          (((e1.r - e1.l) * (e0.o + e0.l)) - ((e1.l - e1.o) * (e0.r - e0.l)))
+          * alphas.(1)
+          + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
+            - ((e0.o + e0.l) * (e0.o + e0.l)) )
+            * alphas.(2) )
     in
     let vbmul0, vbmul1 =
       let tmp = double e0.l - square e0.r + e1.r in
-      ( ((square e0.r - e0.r) * alphas.(1))
-        + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
-          * alphas.(2)
-      , ( square (double e0.o - (tmp * e0.r))
-        - ((square e0.r - e1.r + e1.l) * square tmp) )
-        * alphas.(1)
-        + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
-          - ((e1.o + e0.o) * tmp) )
-          * alphas.(2) )
+      ( with_label __LOC__ (fun () ->
+            ((square e0.r - e0.r) * alphas.(1))
+            + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
+              * alphas.(2) )
+      , with_label __LOC__ (fun () ->
+            ( square (double e0.o - (tmp * e0.r))
+            - ((square e0.r - e1.r + e1.l) * square tmp) )
+            * alphas.(1)
+            + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
+              - ((e1.o + e0.o) * tmp) )
+              * alphas.(2) ) )
     in
     let endomul0, endomul1, endomul2 =
       let xr = square e0.r - e0.l - e1.r in
       let t = e0.l - xr in
       let u = double e0.o - (t * e0.r) in
-      ( ((square e0.l - e0.l) * alphas.(1))
-        + ((square e1.l - e1.l) * alphas.(2))
-        + ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3))
-      , ((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one))
-      , ((square u - (square t * (xr + e0.l + e1.l))) * alphas.(1))
-        + ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2)) )
+      ( with_label __LOC__ (fun () ->
+            ((square e0.l - e0.l) * alphas.(1))
+            + ((square e1.l - e1.l) * alphas.(2))
+            + ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3)) )
+      , with_label __LOC__ (fun () ->
+            ((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one)) )
+      , with_label __LOC__ (fun () ->
+            ((square u - (square t * (xr + e0.l + e1.l))) * alphas.(1))
+            + ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2)) ) )
     in
     In_circuit.map_fields
       ~f:(Shifted_value.of_field (module F) ~shift)
@@ -181,7 +195,7 @@ let checked (type t)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
     ~domain ~shift ~endo (plonk : _ In_circuit.t) evals =
   let actual =
-    derive_plonk
+    derive_plonk ~with_label:Impl.with_label
       (module Impl.Field)
       ~endo ~domain ~shift
       { alpha= plonk.alpha

@@ -224,7 +224,23 @@ struct
       |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
       |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
 
-  let lagrange_commitment (type n) ~input_length
+  let lagrange (type n)
+      ~domain:( (which_branch : n One_hot_vector.t)
+              , (domains : (Domains.t, n) Vector.t) ) i =
+    Vector.map domains ~f:(fun d ->
+        let d = Domain.log2_size d.h - 12 in
+        match Precomputed.Lagrange_precomputations.dum.(d).(i) with
+        | [|g|] ->
+            let g = Inner_curve.Constant.of_affine g in
+            Inner_curve.constant g
+        | _ ->
+            assert false )
+    |> Vector.map2
+         (which_branch :> (Boolean.var, n) Vector.t)
+         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
+    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+
+  let lagrange_with_correction (type n) ~input_length
       ~domain:( (which_branch : n One_hot_vector.t)
               , (domains : (Domains.t, n) Vector.t) ) i =
     let rec pow2pow x i =
@@ -236,7 +252,8 @@ struct
         | [|g|] ->
             let g = Inner_curve.Constant.of_affine g in
             ( Inner_curve.constant g
-            , Inner_curve.constant (pow2pow g (input_length - 1)) )
+            , Inner_curve.constant
+                (Inner_curve.Constant.negate (pow2pow g (input_length - 1))) )
         | _ ->
             assert false )
     |> Vector.map2
@@ -508,23 +525,58 @@ struct
         in
         let open Dlog_plonk_types.Messages in
         let x_hat =
+          with_label __LOC__ (fun () ->
+              let domain = (which_branch, step_domains) in
+              let terms =
+                Array.mapi public_input ~f:(fun i x ->
+                    match Array.of_list x with
+                    | [|b|] ->
+                        `Cond_add (b, lagrange ~domain i)
+                    | x ->
+                        `Add_with_correction
+                          ( x
+                          , lagrange_with_correction
+                              ~input_length:(Array.length x) ~domain i ) )
+              in
+              let correction =
+                with_label __LOC__ (fun () ->
+                    Array.reduce_exn
+                      (Array.filter_map terms ~f:(function
+                        | `Cond_add _ ->
+                            None
+                        | `Add_with_correction (_, (_, corr)) ->
+                            Some corr ))
+                      ~f:Ops.add_fast )
+              in
+              Plonk_curve_ops.print := true ;
+              Array.fold terms ~init:correction ~f:(fun acc term ->
+                  match term with
+                  | `Cond_add (b, g) ->
+                      Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc
+                  | `Add_with_correction (x, (g, _)) ->
+                      Ops.add_fast acc
+                        (Ops.scale_fast g (`Plus_two_to_len_minus_1 x)) ) )
+          (*
           let input =
+            with_label __LOC__ (fun () ->
             Array.mapi public_input ~f:(fun i x ->
                 let x = Array.of_list x in
                 ( x
                 , lagrange_commitment ~input_length:(Array.length x)
                     ~domain:(which_branch, step_domains)
-                    i ) )
+                    i ) ) )
           in
           let add_up = Array.reduce_exn ~f:Ops.add_fast in
           let correction =
-            add_up (Array.map input ~f:(fun (_, (_, corr)) -> corr))
+            with_label __LOC__ (fun () ->
+            add_up (Array.map input ~f:(fun (_, (_, corr)) -> corr)) )
           in
           Array.map input ~f:(fun (x, (g, _)) ->
               Ops.scale_fast g (`Plus_two_to_len_minus_1 x) )
           |> add_up
-          |> Ops.add_fast (Inner_curve.negate correction)
+          |> Ops.add_fast (Inner_curve.negate correction) *)
         in
+        Plonk_curve_ops.print := false ;
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;
@@ -708,17 +760,40 @@ struct
 
   let actual_evaluation (e : Field.t array) (pt : Field.t) : Field.t =
     let pt_n =
-      let max_degree_log2 = Int.ceil_log2 Common.Max_degree.wrap in
-      let rec go acc i =
-        if i = 0 then acc else go (Field.square acc) (i - 1)
-      in
-      go pt max_degree_log2
+      with_label __LOC__ (fun () ->
+          let max_degree_log2 = Int.ceil_log2 Common.Max_degree.wrap in
+          let rec go acc i =
+            if i = 0 then acc else go (Field.square acc) (i - 1)
+          in
+          go pt max_degree_log2 )
     in
-    match List.rev (Array.to_list e) with
-    | e :: es ->
-        List.fold ~init:e es ~f:(fun acc y -> Field.(y + (pt_n * acc)))
-    | [] ->
-        failwith "empty list"
+    with_label __LOC__ (fun () ->
+        match List.rev (Array.to_list e) with
+        | e :: es ->
+            List.fold ~init:e es ~f:(fun acc y ->
+                let acc' =
+                  exists Field.typ ~compute:(fun () ->
+                      As_prover.read_var Field.(y + (pt_n * acc)) )
+                in
+                (* acc' = y + pt_n * acc *)
+                let pt_n_acc = Field.(pt_n * acc) in
+                let open Zexe_backend_common.Plonk_constraint_system
+                         .Plonk_constraint in
+                (* 0 = - acc' + y + pt_n_acc *)
+                let open Field.Constant in
+                assert_
+                  [ { annotation= None
+                    ; basic=
+                        T
+                          (Basic
+                             { l= (one, y)
+                             ; r= (one, pt_n_acc)
+                             ; o= (negate one, acc')
+                             ; m= zero
+                             ; c= zero }) } ] ;
+                acc' )
+        | [] ->
+            failwith "empty list" )
 
   let shift =
     Field.constant (Shifted_value.Shift.create (module Field.Constant))
@@ -734,7 +809,7 @@ struct
    4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~domain ~input_domain ~max_quot_size ~sponge
+      ~domain ~max_quot_size ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; combined_inner_product; bulletproof_challenges; b; plonk} :
         ( _
@@ -774,7 +849,12 @@ struct
     let plonk =
       with_label __LOC__ (fun () ->
           Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
-          .map_challenges ~f:Field.pack ~scalar plonk )
+          .map_challenges
+            ~f:(Fn.compose (Util.seal (module Impl)) Field.pack)
+            ~scalar plonk
+          |> Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
+             .map_fields
+               ~f:(Shifted_value.map ~f:(Util.seal (module Impl))) )
     in
     let xi = scalar xi in
     (* TODO: r actually does not need to be a scalar challenge. *)

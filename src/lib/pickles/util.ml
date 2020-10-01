@@ -80,13 +80,8 @@ let seal (type f)
     (x : Impl.Field.t) : Impl.Field.t =
   let open Impl in
   match Field.to_constant_and_terms x with
-  | None, [] ->
-      Field.zero
-  | Some c, [] ->
-      Field.constant c
-  | None, [(x, i)] ->
-      let v = Snarky_backendless.Cvar.Var (Impl.Var.index i) in
-      if Field.Constant.(equal x one) then v else Field.scale v x
+  | None, [(x, i)] when Field.Constant.(equal x one) ->
+      Snarky_backendless.Cvar.Var (Impl.Var.index i)
   | _ ->
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
