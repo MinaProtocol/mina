@@ -26,7 +26,7 @@
  (preprocessor_deps "../../config.mlh")
  (preprocess
   (pps
-   bisect_ppx -conditional
+   bisect_ppx --conditional
    h_list.ppx
    ppx_assert
    ppx_base

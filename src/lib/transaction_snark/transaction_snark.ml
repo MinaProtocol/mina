@@ -985,7 +985,7 @@ module Base = struct
           Snarky_integer.Integer.equal ~m curr_min_balance zero_int )
     in
     (* if current min balance is zero, then timing becomes untimed *)
-    let%bind is_untimed = Boolean.((not is_timed) || is_timed_balance_zero) in
+    let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
     let%map timing =
       Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
         ~else_:account.timing
@@ -1148,15 +1148,15 @@ module Base = struct
       let update_authorized (type a) perm ~is_keep
           ~(updated : [`Ok of a | `Flagged of a * Boolean.var]) =
         let speculative_success, `proof_must_verify x = check_auth perm in
-        r := lazy Boolean.((not is_keep) && x) :: !r ;
+        r := lazy Boolean.((not is_keep) &&& x) :: !r ;
         match updated with
         | `Ok res ->
             add_check ?label:(Some __LOC__)
-              Boolean.(speculative_success || is_keep) ;
+              Boolean.(speculative_success ||| is_keep) ;
             res
         | `Flagged (res, failed) ->
             add_check ?label:(Some __LOC__)
-              Boolean.(((not failed) && speculative_success) || is_keep) ;
+              Boolean.((not failed) &&& speculative_success ||| is_keep) ;
             res
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
@@ -1206,7 +1206,7 @@ module Base = struct
                        !(Balance.Checked.if_ is_new ~then_:balance_when_new
                            ~else_:balance)
                      in
-                     let failed = Boolean.(failed1 || (is_new && failed2)) in
+                     let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
                      `Flagged (res, failed)) )
       in
       let snapp =
@@ -1284,8 +1284,8 @@ module Base = struct
             Public_key.Compressed.Checked.equal acct.public_key
               Public_key.Compressed.(var_of_t empty)
           in
-          let%bind there_ok = (not is_new) && account_there in
-          let%bind empty_ok = is_new && is_empty in
+          let%bind there_ok = (not is_new) &&& account_there in
+          let%bind empty_ok = is_new &&& is_empty in
           with_label __LOC__ (Assert.any [there_ok; empty_ok])
       | `No ->
           Assert.is_true account_there
@@ -1437,7 +1437,7 @@ module Base = struct
       let proof_must_verify = Set_once.create () in
       let public_key = body.pk in
       let body =
-        (* 
+        (*
           delta = second_delta + (if is_fee_payer then -fee else 0)
           second_delta = delta - (if is_fee_payer then -fee else 0)
           second_delta = delta + (if is_fee_payer then fee else 0)
@@ -1523,8 +1523,8 @@ module Base = struct
       let account1_is_sender = Sgn.Checked.is_neg body1.delta.sgn in
       let account1_is_fee_payer, account2_is_fee_payer =
         Boolean.
-          ( (not fee_payer_is_other) && account1_is_sender
-          , (not fee_payer_is_other) && not account1_is_sender )
+          ( (not fee_payer_is_other) &&& account1_is_sender
+          , (not fee_payer_is_other) &&& not account1_is_sender )
       in
       let fee_payer_id =
         !(Account_id.Checked.if_ fee_payer_is_other
@@ -1781,7 +1781,7 @@ module Base = struct
                 Permissions.Auth_required.Checked.eval_no_proof perm
                   ~signature_verifies
               in
-              ( Boolean.(res || second_starts_empty)
+              ( Boolean.(res ||| second_starts_empty)
               , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
@@ -1792,7 +1792,7 @@ module Base = struct
         in
         (* No deleting accounts for now. *)
         Boolean.(
-          Assert.is_true (not (second_ends_empty && not second_starts_empty))) ;
+          Assert.is_true (not (second_ends_empty &&& not second_starts_empty))) ;
         let root =
           let checks_succeeded1 = checks_succeeded1 () in
           let checks_succeeded2 = checks_succeeded2 () in
@@ -1803,7 +1803,7 @@ module Base = struct
                     ~else_:root_after_fee_payer)
               ~else_:
                 !(if_
-                    Boolean.(checks_succeeded1 && checks_succeeded2)
+                    Boolean.(checks_succeeded1 &&& checks_succeeded2)
                     ~then_:root_after_account2 ~else_:root_after_fee_payer))
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
@@ -1918,7 +1918,7 @@ module Base = struct
                 Permissions.Auth_required.Checked.eval_no_proof perm
                   ~signature_verifies
               in
-              ( Boolean.(res || second_starts_empty)
+              ( Boolean.(res ||| second_starts_empty)
               , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
@@ -1933,7 +1933,7 @@ module Base = struct
         in
         (* No deleting accounts for now. *)
         Boolean.(
-          Assert.is_true (not (second_ends_empty && not second_starts_empty))) ;
+          Assert.is_true (not (second_ends_empty &&& not second_starts_empty))) ;
         let checks_succeeded1 = checks_succeeded1 () in
         let checks_succeeded2 = checks_succeeded2 () in
         let root =
@@ -1944,7 +1944,7 @@ module Base = struct
                     ~else_:root_after_fee_payer)
               ~else_:
                 !(if_
-                    Boolean.(checks_succeeded1 && checks_succeeded2)
+                    Boolean.(checks_succeeded1 &&& checks_succeeded2)
                     ~then_:root_after_account2 ~else_:root_after_fee_payer))
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
@@ -2074,7 +2074,7 @@ module Base = struct
       |> Consensus.Data.Consensus_state.curr_global_slot_var
     in
     let%bind creating_new_token =
-      Boolean.(is_create_account && token_invalid)
+      Boolean.(is_create_account &&& token_invalid)
     in
     (* Query user command predicted failure/success. *)
     let%bind user_command_failure =
@@ -2091,7 +2091,7 @@ module Base = struct
           ~else_:token
       in
       let%bind will_create_new_token =
-        Boolean.(creating_new_token && not user_command_fails)
+        Boolean.(creating_new_token &&& not user_command_fails)
       in
       let%map next_available_token =
         Token_id.Checked.next_if next_available_token will_create_new_token
@@ -2176,7 +2176,7 @@ module Base = struct
                   pending_coinbase_stack_with_state
                   pending_coinbase_stack_before
               in
-              Boolean.(equal_source || equal_source_with_state)
+              Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all [correct_coinbase_target_stack; valid_init_state]))
     in
@@ -2201,12 +2201,12 @@ module Base = struct
         (* TODO: Predicates. *)
         Boolean.false_
       in
-      Boolean.(is_own_account || predicate_result)
+      Boolean.(is_own_account ||| predicate_result)
     in
     let%bind () =
       [%with_label "Check predicate failure against predicted"]
         (let%bind predicate_failed =
-           Boolean.((not predicate_result) && not predicate_deferred)
+           Boolean.((not predicate_result) &&& not predicate_deferred)
          in
          assert_r1cs
            (predicate_failed :> Field.Var.t)
@@ -2230,9 +2230,9 @@ module Base = struct
         (* If the fee is zero, we do not create the account at all, so we allow
            this through. Otherwise, the fee must be the default.
         *)
-        Boolean.(token_default || is_zero_fee)
+        Boolean.(token_default ||| is_zero_fee)
       in
-      Boolean.(is_coinbase_or_fee_transfer && fee_may_be_charged)
+      Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
@@ -2272,7 +2272,7 @@ module Base = struct
                (* If this is a coinbase with zero fee, do not create the
                   account, since the fee amount won't be enough to pay for it.
                *)
-               Boolean.(is_empty_and_writeable && not is_zero_fee)
+               Boolean.(is_empty_and_writeable &&& not is_zero_fee)
              in
              let%bind should_pay_to_create =
                (* Coinbases and fee transfers may create, or we may be creating
@@ -2280,9 +2280,9 @@ module Base = struct
                   encode this as a boolean.
                *)
                let%bind is_create_account =
-                 Boolean.(is_create_account && not user_command_fails)
+                 Boolean.(is_create_account &&& not user_command_fails)
                in
-               Boolean.(is_empty_and_writeable || is_create_account)
+               Boolean.(is_empty_and_writeable ||| is_create_account)
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
@@ -2394,9 +2394,9 @@ module Base = struct
              *)
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
-                 Boolean.(is_stake_delegation || is_mint_tokens)
+                 Boolean.(is_stake_delegation ||| is_mint_tokens)
                in
-               Boolean.(is_empty_and_writeable && must_not_be_empty)
+               Boolean.(is_empty_and_writeable &&& must_not_be_empty)
              in
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
@@ -2406,7 +2406,8 @@ module Base = struct
              let%bind () =
                [%with_label "Receiver creation failure matches predicted"]
                  (let%bind is_nonempty_creating =
-                    Boolean.((not is_empty_and_writeable) && is_create_account)
+                    Boolean.(
+                      (not is_empty_and_writeable) &&& is_create_account)
                   in
                   Boolean.Assert.( = ) is_nonempty_creating
                     user_command_failure.receiver_exists)
@@ -2418,16 +2419,17 @@ module Base = struct
                     sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
              in
              let%bind should_pay_to_create =
-               Boolean.(is_empty_and_writeable && not is_create_account)
+               Boolean.(is_empty_and_writeable &&& not is_create_account)
              in
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]
                  (let%bind token_should_not_create =
-                    Boolean.(should_pay_to_create && Boolean.not token_default)
+                    Boolean.(
+                      should_pay_to_create &&& Boolean.not token_default)
                   in
                   let%bind token_cannot_create =
-                    Boolean.(token_should_not_create && is_user_command)
+                    Boolean.(token_should_not_create &&& is_user_command)
                   in
                   let%bind () =
                     [%with_label
@@ -2499,15 +2501,15 @@ module Base = struct
                  ~else_:balance
              in
              let%bind user_command_fails =
-               Boolean.(!receiver_overflow || user_command_fails)
+               Boolean.(!receiver_overflow ||| user_command_fails)
              in
              let%bind is_empty_and_writeable =
                (* Do not create a new account if the user command will fail. *)
-               Boolean.(is_empty_and_writeable && not user_command_fails)
+               Boolean.(is_empty_and_writeable &&& not user_command_fails)
              in
              let%bind may_delegate =
                (* Only default tokens may participate in delegation. *)
-               Boolean.(is_empty_and_writeable && token_default)
+               Boolean.(is_empty_and_writeable &&& token_default)
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
@@ -2541,7 +2543,7 @@ module Base = struct
              ; snapp= account.snapp } ))
     in
     let%bind user_command_fails =
-      Boolean.(!receiver_overflow || user_command_fails)
+      Boolean.(!receiver_overflow ||| user_command_fails)
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -2607,9 +2609,9 @@ module Base = struct
                       (let%bind ok =
                          Boolean.(
                            ok
-                           && not
-                                user_command_failure
-                                  .source_insufficient_balance)
+                           &&& not
+                                 user_command_failure
+                                   .source_insufficient_balance)
                        in
                        Boolean.Assert.( = ) ok
                          (Boolean.not user_command_failure.source_bad_timing))
@@ -2632,7 +2634,7 @@ module Base = struct
                [%with_label "Check not_token_owner failure matches predicted"]
                  (let%bind token_owner_ok =
                     let%bind command_needs_token_owner =
-                      Boolean.(is_create_account || is_mint_tokens)
+                      Boolean.(is_create_account ||| is_mint_tokens)
                     in
                     Boolean.(
                       any
@@ -2739,7 +2741,7 @@ module Base = struct
 
   (* spec for [main statement]:
    constraints pass iff there exists
-      t : Tagged_transaction.t 
+      t : Tagged_transaction.t
    such that
     - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
     - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]

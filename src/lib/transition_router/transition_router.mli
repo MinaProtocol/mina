@@ -1,3 +1,9 @@
+type Structured_log_events.t += Starting_transition_frontier_controller
+  [@@deriving register_event]
+
+type Structured_log_events.t += Starting_bootstrap_controller
+  [@@deriving register_event]
+
 include
   Coda_intf.Transition_router_intf
   with type transition_frontier := Transition_frontier.t

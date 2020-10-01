@@ -3,9 +3,7 @@ module Styles = {
   let linksGrid =
     style([
       display(`grid),
-      gridTemplateColumns([
-        `repeat((`num(2), `minmax((`rem(11.), `rem(11.5))))),
-      ]),
+      gridTemplateColumns([`repeat((`num(2), `fr(1.)))]),
       gridColumnGap(`rem(0.5)),
       gridRowGap(`rem(3.1)),
       marginTop(`rem(4.)),
@@ -22,7 +20,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [marginTop(`rem(0.)), width(`rem(36.5)), height(`rem(30.))],
+        [marginTop(`rem(0.)), height(`rem(30.))],
       ),
     ]);
   let linksGroup =
@@ -56,31 +54,33 @@ let make = () => {
   <div className=Styles.linksGrid>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Get Started")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/docs/getting-started">
         <a className=Styles.linkStyle> {React.string("Documentation")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/docs/node-operator">
         <a className=Styles.linkStyle> {React.string("Run a Node")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/tech">
         <a className=Styles.linkStyle> {React.string("Build on Mina")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Join Genesis")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link
+        href="https://github.com/MinaProtocol/mina-grants#how-to-apply">
         <a className=Styles.linkStyle> {React.string("Apply for Grants")} </a>
       </Next.Link>
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Resources")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/tech">
         <a className=Styles.linkStyle> {React.string("About the Tech")} </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link
+        href="/blog/mina-protocol-the-worlds-lightest-blockchain-releases-its-economics">
         <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
       </Next.Link>
       <Next.Link href="">
@@ -91,95 +91,43 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Telemetry Health Dashboard")}
-        </a>
-      </Next.Link>
     </div>
-    <div className=Styles.linksGroup>
-      <h4 className=Styles.linksHeader> {React.string("Tools")} </h4>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Testnet")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Block Explorers")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Node Operator Tools")}
-        </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Snarketplace")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Network Health")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Network Health")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Snarkers Dashboard")}
-        </a>
-      </Next.Link>
-    </div>
-    <div className=Styles.linksGroup>
-      <h4 className=Styles.linksHeader> {React.string("Project")} </h4>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("About Mina")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Team")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Careers")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Media")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Blog")} </a>
-      </Next.Link>
-    </div>
+    <div className=Css.(style([display(`none), media(Theme.MediaQuery.tablet, [display(`block)])])) />
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Community")} </h4>
-      <Next.Link href="">
+      <Next.Link href="/about">
         <a className=Styles.linkStyle> {React.string("Welcome")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Genesis Program")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="/leaderboard">
         <a className=Styles.linkStyle> {React.string("Leaderboard")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina-grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Events")} </a>
       </Next.Link>
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader>
         {React.string("Help and Support")}
       </h4>
-      <Next.Link href="">
+      <Next.Link href="https://discord.com/invite/Vexf4ED">
         <a className=Styles.linkStyle> {React.string("Discord")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://forums.minaprotocol.com/">
         <a className=Styles.linkStyle> {React.string("Forums")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina">
         <a className=Styles.linkStyle> {React.string("Github")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://minawiki.com/Main_Page">
         <a className=Styles.linkStyle> {React.string("Wiki")} </a>
       </Next.Link>
-      <Next.Link href="">
+      <Next.Link href="https://github.com/MinaProtocol/mina/issues">
         <a className=Styles.linkStyle> {React.string("Report a Bug")} </a>
       </Next.Link>
     </div>
+    <div />
   </div>;
 };

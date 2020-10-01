@@ -1,0 +1,14 @@
+testnetName: "coda-testnet"
+coda:
+  runtimeConfig: ""
+  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  seedPeers:
+    - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
+    - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
+
+seed:
+  active: true
+  fullname: "seed-node"
+  hostPort: 10001
+  rpcPort: 8301
+  discoveryKeypair: "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"

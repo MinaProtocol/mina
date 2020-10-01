@@ -8,5 +8,5 @@
     )
  (preprocess
   (pps ppx_version ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
-    ppx_base ppx_bench ppx_let ppx_sexp_conv ppx_bin_prot))
+    ppx_base ppx_bench ppx_let ppx_sexp_conv ppx_bin_prot bisect_ppx -- --conditional))
  (synopsis "Get telemetry from other nodes"))

@@ -36,7 +36,17 @@ module Styles = {
         marginTop(`rem(1.)),
       ]),
     ]);
+
+  let mainListingContainer =
+    style([
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
+    ]);
 };
+
+type itemKind =
+  | Blog
+  | TestnetRetro;
 
 module MainListing = {
   module MainListingStyles = {
@@ -46,34 +56,51 @@ module MainListing = {
         display(`flex),
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
-        width(`percent(100.)),
         height(`percent(100.)),
         selector("img", [marginTop(`rem(1.))]),
-        media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
+      ]);
+
+    let anchor =
+      style([
+        textDecoration(`none)
       ]);
   };
 
   [@react.component]
-  let make = (~item: ContentType.BlogPost.t, ~mainImg) => {
+  let make = (~item: ContentType.NormalizedPressBlog.t, ~itemKind) => {
     <div className=MainListingStyles.container>
       <div className=Styles.metadata>
-        <span> {React.string("Press")} </span>
+        {switch (itemKind) {
+         | Blog => <span> {React.string("Press")} </span>
+         | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+         }}
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.date)} </span>
         <span> {React.string(" / ")} </span>
-        <span> {React.string(item.author)} </span>
+        <span> {React.string(item.publisher)} </span>
       </div>
-      <img src=mainImg />
+      {ReactExt.fromOpt(item.image, ~f=src =>
+        <img src=src.ContentType.System.fields.ContentType.Image.file.url />)}
       <article>
         <h5 className=Styles.title> {React.string(item.title)} </h5>
-        <p className=Styles.description> {React.string(item.snippet)} </p>
+        {ReactExt.fromOpt(item.description, ~f=copy =>
+          <p className=Styles.description> {React.string(copy)} </p>)}
       </article>
-      <Next.Link href="/blog/[slug]" _as={"/blog/" ++ item.slug} passHref=true>
+      {let inner =
         <div className=Styles.link>
           <span> {React.string("Read more")} </span>
           <Icon kind=Icon.ArrowRightMedium />
-        </div>
-      </Next.Link>
+        </div>;
+        switch (item.link) {
+       | `Slug(slug) =>
+        <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
+          {inner}
+        </Next.Link>
+       | `Remote(href) =>
+        <a className=MainListingStyles.anchor href>
+          {inner}
+        </a>
+       }}
     </div>;
   };
 };
@@ -98,42 +125,63 @@ module Listing = {
   };
 
   [@react.component]
-  let make = (~items) => {
+  let make = (~items, ~itemKind) => {
+    let button = (item: ContentType.NormalizedPressBlog.t) => {
+      let inner =
+          <div className=ListingStyles.link>
+            <span> {React.string("Read more")} </span>
+            <Icon kind=Icon.ArrowRightMedium />
+          </div>;
+          switch (item.link) {
+         | `Slug(slug) =>
+          <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
+            {inner}
+          </Next.Link>
+         | `Remote(href) =>
+          <a className=MainListing.MainListingStyles.anchor href>
+            {inner}
+          </a>
+         }
+    };
+
     items
-    |> Array.map((item: ContentType.BlogPost.t) => {
+    |> Array.map((item: ContentType.NormalizedPressBlog.t) => {
          <div className=ListingStyles.container key={item.title}>
            <div className=Styles.metadata>
-             <span> {React.string("Press")} </span>
+             {switch (itemKind) {
+              | Blog => <span> {React.string("Press")} </span>
+              | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+              }}
              <span> {React.string(" / ")} </span>
              <span> {React.string(item.date)} </span>
              <span> {React.string(" / ")} </span>
-             <span> {React.string(item.author)} </span>
+             <span> {React.string(item.publisher)} </span>
            </div>
            <h5 className=Styles.title> {React.string(item.title)} </h5>
-           <Next.Link
-             href="/blog/[slug]" _as={"/blog/" ++ item.slug} passHref=true>
-             <div className=ListingStyles.link>
-               <span> {React.string("Read more")} </span>
-               <Icon kind=Icon.ArrowRightMedium />
-             </div>
-           </Next.Link>
-         </div>
+           { button(item) }
+          </div>
        })
     |> React.array;
   };
 };
 
 [@react.component]
-let make = (~items, ~mainImg) => {
+let make = (~items, ~itemKind) => {
   <Wrapped>
     <div className=Styles.container>
       {switch (Belt.Array.get(items, 0)) {
-       | Some(item) => <MainListing item mainImg />
+       | Some(item) =>
+         <div className=Styles.mainListingContainer>
+           <MainListing item itemKind />
+         </div>
        | None =>
          <div className=Theme.Type.label> {React.string("Loading...")} </div>
        }}
       <div className=Styles.listingContainer>
-        <Listing items={Belt.Array.slice(items, ~offset=1, ~len=3)} />
+        <Listing
+          items={Belt.Array.slice(items, ~offset=1, ~len=3)}
+          itemKind
+        />
       </div>
     </div>
   </Wrapped>;

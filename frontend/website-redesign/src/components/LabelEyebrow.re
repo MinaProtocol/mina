@@ -19,5 +19,5 @@ module Styles = {
 
 [@react.component]
 let make = (~copy) => {
-  <h4 className=Theme.Type.h4>{React.string(copy)}</h4>
+  <h4 className=Theme.Type.h4> {React.string(copy)} </h4>;
 };

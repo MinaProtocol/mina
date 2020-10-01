@@ -1,17 +1,23 @@
 type state = {blogs: array(ContentType.BlogPost.entries)};
 
-let fetchBlogs = () => {
-  Contentful.getEntries(
-    Lazy.force(Contentful.client),
-    {
-      "include": 0,
-      "content_type": ContentType.BlogPost.id,
-      "order": "-fields.date",
-    },
-  )
-  |> Promise.map((entries: ContentType.BlogPost.entries) => {
-       Array.map((e: ContentType.BlogPost.entry) => e.fields, entries.items)
-     });
+module Fetch(T: {
+  type t
+  let id: string;
+  let dateKeyName: string;
+}) = {
+  let run = () => {
+    Contentful.getEntries(
+      Lazy.force(Contentful.client),
+      {
+        "include": 0,
+        "content_type": T.id,
+        "order": "-fields." ++ T.dateKeyName,
+      },
+    )
+    |> Promise.map((entries: ContentType.System.entries(T.t)) => {
+         Array.map((e: ContentType.System.entry(T.t)) => e.fields, entries.items)
+       });
+  }
 };
 
 module Styles = {
@@ -29,25 +35,50 @@ module Styles = {
     ]);
 };
 
+module Title = {
+  [@react.component]
+  let make = (~copy, ~buttonCopy, ~buttonHref) => {
+    <div className=Styles.header>
+      <h2 className=Theme.Type.h2> {React.string(copy)} </h2>
+      <Button bgColor=Theme.Colors.digitalBlack href=buttonHref>
+        {React.string(buttonCopy)}
+        <Icon kind=Icon.ArrowRightMedium />
+      </Button>
+    </div>;
+  };
+};
+
+module FetchBlogs = Fetch(ContentType.BlogPost)
+module FetchPress = Fetch(ContentType.Press)
+
 [@react.component]
-let make = () => {
-  let (blogs, setBlogs) = React.useState(_ => [||]);
+let make = (~source) => {
+  let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
-    fetchBlogs() |> Promise.iter(blogs => setBlogs(_ => blogs));
+    switch (source) {
+      | `Blogs =>
+        FetchBlogs.run() |> Promise.iter(blogs => setContent(_ =>
+          blogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)));
+      | `Press =>
+        FetchPress.run() |> Promise.iter(press => setContent(_ =>
+          press |> Array.map(ContentType.NormalizedPressBlog.ofPress)));
+    }
+
     None;
   });
 
   <div className=Styles.container>
     <Wrapped>
-      <div className=Styles.header>
-        <h2 className=Theme.Type.h2> {React.string("In the News")} </h2>
-        <Button bgColor=Theme.Colors.digitalBlack href="/blog">
-          {React.string("See All Press")}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-      </div>
+      <Title
+        copy="In the News"
+        buttonCopy="See All Press"
+        buttonHref=`Internal("/blog")
+      />
     </Wrapped>
-    <ListModule items=blogs mainImg="/static/img/ArticleImage.png" />
+    <ListModule
+      items=content
+      itemKind=ListModule.Blog
+    />
   </div>;
 };
