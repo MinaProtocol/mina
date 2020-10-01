@@ -245,7 +245,14 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds)
+	gatingConfig, err := gatingConfigFromJson(&m.GatingConfig)
+
+	if err != nil {
+		return nil, badRPC(err)
+	}
+
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, *gatingConfig)
+
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -274,12 +281,6 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	app.P2p = helper
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
-
-	_, err = m.GatingConfig.run(app)
-
-	if err != nil {
-		return nil, badHelper(err)
-	}
 
 	return "configure success", nil
 }
@@ -984,12 +985,10 @@ type setGatingConfigMsg struct {
 	Isolate        bool     `json:"isolate"`
 }
 
-func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
+func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
 	newFilter := ma.NewFilters()
+	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
+
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
 		if err != nil {
@@ -1013,14 +1012,36 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	for _, peerID := range gc.BannedPeerIDs {
 		id, err := peer.IDB58Decode(peerID)
 		if err != nil {
-			app.P2p.Logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
 			continue
 		}
 		bannedPeers.Add(id)
 	}
+	trustedPeers := peer.NewSet()
+	for _, peerID := range gc.TrustedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		trustedPeers.Add(id)
+	}
 
-	app.P2p.GatingState.AddrFilters = newFilter
-	app.P2p.GatingState.DeniedPeers = bannedPeers
+	return &codanet.CodaGatingState{AddrFilters: newFilter, AllowedPeers: trustedPeers, DeniedPeers: bannedPeers}, nil
+}
+
+func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	newState, err := gatingConfigFromJson(gc)
+
+	if err != nil {
+		return nil, badRPC(err)
+	}
+
+	*app.P2p.GatingState = *newState
 
 	return "ok", nil
 }
