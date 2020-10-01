@@ -1,4 +1,4 @@
 (executable
   (name decoder)
   (libraries coda_base)
-  (preprocess (pps ppx_version)))
+  (preprocess (pps ppx_version bisect_ppx -- --conditional)))

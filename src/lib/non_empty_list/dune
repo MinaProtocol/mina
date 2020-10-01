@@ -2,4 +2,4 @@
   (name non_empty_list)
   (public_name non_empty_list)
   (libraries core_kernel async_kernel)
-  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional)))
