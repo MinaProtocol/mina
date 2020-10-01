@@ -70,7 +70,8 @@ let rec pack : type t v env.
       [||]
   | Struct (spec :: specs) ->
       let (hd :: tl) = t in
-      Array.append (pack p spec hd) (pack p (Struct specs) tl)
+      let hd = pack p spec hd in
+      Array.append hd (pack p (Struct specs) tl)
   | Array (spec, _) ->
       Array.concat_map t ~f:(pack p spec)
 

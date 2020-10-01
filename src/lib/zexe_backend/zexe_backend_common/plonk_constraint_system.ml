@@ -264,7 +264,7 @@ struct
     let num_rows = public_input_size + sys.next_row in
     let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
     for i = 0 to public_input_size - 1 do
-      res.(i).(0) <- external_values i
+      res.(i).(0) <- external_values (i + 1)
     done ;
     let compute ((lc, c) : (Fp.t * V.t) list * Fp.t option) =
       List.fold lc ~init:(Option.value c ~default:Fp.zero)
@@ -330,10 +330,10 @@ struct
 
   let digest = digest
 
-  let finalize sys =
+  let finalize_and_get_gates sys =
     match sys.gates with
-    | `Finalized _ ->
-        failwith "finalize called on already finalized constraint system"
+    | `Finalized g ->
+        g
     | `Unfinalized_rev gates ->
         let g = Gates.create () in
         let n = Set_once.get_exn sys.public_input_size [%here] in
@@ -356,7 +356,10 @@ struct
           ~f:
             (fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
             Gates.add_raw g ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol
-              (Fp.Vector.of_array coeffs) )
+              (Fp.Vector.of_array coeffs) ) ;
+        g
+
+  let finalize t = ignore (finalize_and_get_gates t)
 
   let canonicalize x =
     let c, terms =
@@ -638,6 +641,40 @@ struct
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
+    | Plonk_constraint.T (Basic {l; r; o; m; c}) ->
+        (* l.s * l.x 
+         + r.s * r.x 
+         + o.s * o.x 
+         + m * (l.x * r.x)
+         + c
+         = 0
+      *)
+        (* TODO: This is sub-optimal *)
+        let c = ref c in
+        let red_pr (s, x) =
+          match red x with
+          | s', `Constant ->
+              c := Fp.add !c Fp.(s * s') ;
+              (* No need to have a real term. *)
+              (s', None)
+          | s', `Var x ->
+              (s', Some (Fp.(s * s'), x))
+        in
+        let l_s', l = red_pr l in
+        let r_s', r = red_pr r in
+        let _, o = red_pr o in
+        let coeff = Option.value_map ~default:Fp.zero ~f:fst in
+        let m =
+          match (l, r) with
+          | Some _, Some _ ->
+              Fp.(l_s' * r_s' * m)
+          | _ ->
+              (* TODO: Figure this out later. *)
+              failwith "Must use non-constant cvar in plonk constraints"
+        in
+        add_generic_constraint ?l ?r ?o
+          [|coeff l; coeff r; coeff o; m; !c|]
+          sys
     | Plonk_constraint.T (Poseidon {state}) ->
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =

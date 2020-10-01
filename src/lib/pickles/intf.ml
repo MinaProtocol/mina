@@ -163,6 +163,8 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
       val of_affine : field * field -> t
     end
 
+    val typ_unchecked : (t, Constant.t, field) Snarky_backendless.Typ.t
+
     val typ : (t, Constant.t, field) Snarky_backendless.Typ.t
 
     val ( + ) : t -> t -> t

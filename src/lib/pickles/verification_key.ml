@@ -103,6 +103,4 @@ let dummy =
      { Repr.commitments= dummy_commitments g
      ; step_domains= [||]
      ; data= {constraints= rows} }
-     |> of_repr
-          (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one
-             Unsigned.Size_t.one Unsigned.Size_t.one))
+     |> of_repr (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one))

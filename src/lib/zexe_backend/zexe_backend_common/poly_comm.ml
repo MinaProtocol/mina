@@ -16,12 +16,14 @@ module type Inputs_intf = sig
       module Backend : sig
         include Type_with_delete
 
+        val zero : unit -> t
+
         val create : Base_field.t -> Base_field.t -> t
 
         module Vector : Vector with type elt := t
       end
 
-      val of_backend : Backend.t -> t
+      val of_backend : Backend.t -> t Or_infinity.t
     end
   end
 
@@ -39,7 +41,7 @@ end
 
 type 'a t =
   [ `With_degree_bound of
-    ('a, 'a option) Dlog_plonk_types.Poly_comm.With_degree_bound.t
+    'a Or_infinity.t Dlog_plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
     'a Dlog_plonk_types.Poly_comm.Without_degree_bound.t ]
 
@@ -66,12 +68,20 @@ module Make (Inputs : Inputs_intf) = struct
 
   let with_degree_bound_to_backend
       (commitment :
-        ( Base_field.t * Base_field.t
-        , (Base_field.t * Base_field.t) option )
+        (Base_field.t * Base_field.t) Or_infinity.t
         Dlog_plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
-    Backend.make
-      (g_vec commitment.unshifted)
-      (Option.map ~f:g commitment.shifted)
+    let mk x =
+      match x with
+      | Or_infinity.Finite x ->
+          g x
+      | Infinity ->
+          Curve.Affine.Backend.zero ()
+    in
+    let unshifted = G_affine.Vector.create () in
+    Array.iter commitment.unshifted ~f:(fun c ->
+        G_affine.Vector.emplace_back unshifted (mk c) ) ;
+    Caml.Gc.finalise G_affine.Vector.delete unshifted ;
+    Backend.make unshifted (Some (mk commitment.shifted))
 
   let without_degree_bound_to_backend
       (commitment :
@@ -105,13 +115,22 @@ module Make (Inputs : Inputs_intf) = struct
   let of_backend_with_degree_bound t =
     let open Dlog_plonk_types.Poly_comm in
     let unshifted, shifted = of_backend' t in
-    `With_degree_bound {With_degree_bound.unshifted; shifted}
+    match shifted with
+    | None ->
+        assert false
+    | Some shifted ->
+        `With_degree_bound {With_degree_bound.unshifted; shifted}
 
   let of_backend_without_degree_bound t =
     let open Dlog_plonk_types.Poly_comm in
     match of_backend' t with
     | unshifted, None ->
-        `Without_degree_bound unshifted
+        `Without_degree_bound
+          (Array.map unshifted ~f:(function
+            | Infinity ->
+                assert false
+            | Finite g ->
+                g ))
     | _ ->
         assert false
 end

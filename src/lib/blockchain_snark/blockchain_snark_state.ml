@@ -356,6 +356,8 @@ end) : S = struct
 
   let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
+  include Crypto_params
+
   let tag, cache_handle, p, Pickles.Provers.[step] =
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)

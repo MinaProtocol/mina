@@ -251,15 +251,15 @@ module Messages = struct
         ; z_hat_a: 'g Without_degree_bound.Stable.V1.t
         ; z_hat_b: 'g Without_degree_bound.Stable.V1.t
         ; gh_1:
-            ('g, 'g) With_degree_bound.Stable.V1.t
+            'g With_degree_bound.Stable.V1.t
             * 'g Without_degree_bound.Stable.V1.t
         ; sigma_gh_2:
             'fq
-            * ( ('g, 'g) With_degree_bound.Stable.V1.t
+            * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t )
         ; sigma_gh_3:
             'fq
-            * ( ('g, 'g) With_degree_bound.Stable.V1.t
+            * ( 'g With_degree_bound.Stable.V1.t
               * 'g Without_degree_bound.Stable.V1.t ) }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end

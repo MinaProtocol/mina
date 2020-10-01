@@ -62,7 +62,7 @@ let of_backend t : t =
     let aff = f t in
     let res = G1.Affine.of_backend aff in
     Snarky_bn382.G1.Affine.delete aff ;
-    res
+    res |> Or_infinity.finite_exn
   in
   let fp' x =
     Caml.Gc.finalise Snarky_bn382.Fp.delete x ;
@@ -87,7 +87,8 @@ let of_backend t : t =
     let g_i = f t in
     let t =
       Commitment_with_degree_bound.(f0 g_i, f1 g_i)
-      |> Tuple_lib.Double.map ~f:G1.Affine.of_backend
+      |> Tuple_lib.Double.map
+           ~f:(Fn.compose Or_infinity.finite_exn G1.Affine.of_backend)
     in
     t
   in

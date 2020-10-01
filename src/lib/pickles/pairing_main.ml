@@ -97,10 +97,18 @@ struct
       ~absorb_scalar:(fun (low_bits, high_bit) ->
         Sponge.absorb sponge (`Field low_bits) ;
         Sponge.absorb sponge (`Bits [high_bit]) )
+      ~mask_g1_opt:(fun ((b : Boolean.var), (x, y)) ->
+        Field.((b :> t) * x, (b :> t) * y) )
       ty t
 
   module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dee)
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
+
+  module Inner_curve = struct
+    include Inner_curve
+
+    let ( + ) = Ops.add_fast
+  end
 
   let multiscale_known ts =
     with_label __LOC__ (fun () ->
@@ -221,9 +229,48 @@ struct
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label __LOC__ (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
-                ~scale_and_add:(fun ~acc ~xi p ->
-                  p + Scalar_challenge.endo acc xi )
-                ~xi ~init:Fn.id without_degree_bound with_degree_bound )
+                ~scale_and_add:
+                  (fun ~(acc :
+                          [ `Maybe_finite of Boolean.var * Inner_curve.t
+                          | `Finite of Inner_curve.t ]) ~xi p ->
+                  match acc with
+                  | `Maybe_finite (acc_is_finite, (acc : Inner_curve.t)) -> (
+                    match p with
+                    | `Maybe_finite (p_is_finite, p) ->
+                        let is_finite =
+                          Boolean.(p_is_finite || acc_is_finite)
+                        in
+                        let xi_acc = Scalar_challenge.endo acc xi in
+                        `Maybe_finite
+                          ( is_finite
+                          , if_ acc_is_finite ~then_:(p + xi_acc) ~else_:p )
+                    | `Finite p ->
+                        let xi_acc = Scalar_challenge.endo acc xi in
+                        `Finite
+                          (if_ acc_is_finite ~then_:(p + xi_acc) ~else_:p) )
+                  | `Finite acc ->
+                      let xi_acc = Scalar_challenge.endo acc xi in
+                      `Finite
+                        ( match p with
+                        | `Finite p ->
+                            p + xi_acc
+                        | `Maybe_finite (p_is_finite, p) ->
+                            if_ p_is_finite ~then_:(p + xi_acc) ~else_:xi_acc
+                        ) )
+                ~xi
+                ~init:(function
+                  | `Finite x -> `Finite x | `Maybe_finite x -> `Maybe_finite x
+                  )
+                (Vector.map without_degree_bound
+                   ~f:(Array.map ~f:(fun x -> `Finite x)))
+                (Vector.map with_degree_bound
+                   ~f:
+                     (let open Dlog_plonk_types.Poly_comm.With_degree_bound in
+                     fun {shifted; unshifted} ->
+                       let f x = `Maybe_finite x in
+                       {unshifted= Array.map ~f unshifted; shifted= f shifted}))
+          )
+          |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
@@ -286,8 +333,7 @@ struct
       ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~xi
       ~sponge ~public_input ~(sg_old : (_, Branching.n) Vector.t)
       ~combined_inner_product ~advice
-      ~(messages :
-         (_, Boolean.var * _, Boolean.var * _, _) Dlog_plonk_types.Messages.t)
+      ~(messages : (_, Boolean.var * _, _) Dlog_plonk_types.Messages.t)
       ~openings_proof
       ~(plonk :
          ( _
@@ -422,6 +468,7 @@ struct
     unstage
       (Common.det_sqrt
          (module Impl)
+         ~det_sqrt:Backend.Tick.Field.det_sqrt
          ~two_adic_root_of_unity:(Backend.Tick.Field.two_adic_root_of_unity ())
          ~two_adicity:34 ~det_sqrt_witness:Backend.Tick.Field.det_sqrt_witness)
 
@@ -1064,7 +1111,8 @@ struct
       in
       with_label __LOC__ (fun () ->
           Array.append
-            [|[Boolean.true_]|]
+            (* [|[Boolean.true_]|] *)
+            [||]
             (Spec.pack
                (module Impl)
                fp Types.Dlog_based.Statement.In_circuit.spec

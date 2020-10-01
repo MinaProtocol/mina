@@ -112,12 +112,12 @@ let group_map m ~a ~b =
    where g ([two_adic_root_of_unity] below) has order 2^two_adicity.
 *)
 let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
-    ~(two_adic_root_of_unity : f) ~two_adicity
+    ~(two_adic_root_of_unity : f) ~two_adicity ~(det_sqrt : f -> f)
     ~(det_sqrt_witness :
        f -> f Zexe_backend_common.Field.Det_sqrt_witness.t option) =
   let open Impl in
   (* This maps n (as a bitstring) to g^n *)
-  let inj =
+  let _inj =
     (* "double and add" *)
     let rec go acc bits =
       match bits with
@@ -137,7 +137,7 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
   (* This projects onto the H subgroup by the map
      x -> x^|< g >|
   *)
-  let project_h =
+  let _project_h =
     (* Compute x^(2^i) *)
     let rec pow2_pow x i =
       if i = 0 then x (* x^(2^0) = x^1 = x *)
@@ -148,7 +148,7 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
     fun x -> pow2_pow x two_adicity
   in
   stage (fun t ->
-      let n = two_adicity - 1 in
+      let _n = two_adicity - 1 in
       (* t has two square roots, y and -y.
 
          Consider how they appear in < g > ⊕ H.
@@ -169,6 +169,9 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
 
          As a deterministic square root, we choose the one with top bit = 0.
       *)
+      (* TODO: Turn back on for mainnet if it's not eliminated by the improved
+         IPA by then. *)
+      (*
       let c, d =
         exists
           Typ.(field * list ~length:n Boolean.typ)
@@ -182,8 +185,12 @@ let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
                         equal one (logand (shift_right r.d i) one)) )
                 in
                 (r.c, bits))
-      in
+      in 
       let res = Field.mul (project_h c) (inj d) in
+      *)
+      let res =
+        exists Field.typ ~compute:As_prover.(fun () -> det_sqrt (read_var t))
+      in
       assert_square res t ; res )
 
 module Shifts = struct
@@ -230,7 +237,7 @@ module Ipa = struct
              (Pickles_types.Vector.to_array (compute_challenges chals)))
       in
       Backend.Tock.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tock.Curve.Affine.of_backend
+      |> Backend.Tock.Curve.Affine.of_backend |> Or_infinity.finite_exn
   end
 
   module Step = struct
@@ -252,7 +259,7 @@ module Ipa = struct
              (Pickles_types.Vector.to_array (compute_challenges chals)))
       in
       Backend.Tick.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tick.Curve.Affine.of_backend
+      |> Backend.Tick.Curve.Affine.of_backend |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
       let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
@@ -268,7 +275,7 @@ module Ipa = struct
         let open Backend.Vector in
         let v = create () in
         List.iter comm_chals ~f:(fun (comm, _) ->
-            emplace_back v (to_backend comm) ) ;
+            emplace_back v (to_backend (Finite comm)) ) ;
         v
       in
       Snarky_bn382.Tweedle.Dum.Field_urs.batch_accumulator_check

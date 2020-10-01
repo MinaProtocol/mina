@@ -7,6 +7,20 @@ struct
   open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint
   open Impl
 
+  let add_fast p1 p2 =
+    let p3 =
+      exists G.typ_unchecked
+        ~compute:
+          As_prover.(
+            fun () -> G.Constant.( + ) (read G.typ p1) (read G.typ p2))
+    in
+    assert_
+      [ { annotation= Some __LOC__
+        ; basic=
+            Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (EC_add {p1; p2; p3}) } ] ;
+    p3
+
   (* TODO: Make sure (xt, yt) is a pure var *)
   let scale_fast ((xt, yt) as t : Field.t * Field.t)
       (`Times_two_plus_1_plus_2_to_len r) : Field.t * Field.t =

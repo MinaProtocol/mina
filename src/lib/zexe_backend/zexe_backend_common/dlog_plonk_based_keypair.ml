@@ -49,6 +49,12 @@ module type Inputs_intf = sig
     end
   end
 
+  module Constraint_system : sig
+    type t = (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t
+
+    val finalize_and_get_gates : t -> Gate_vector.t
+  end
+
   module Index : sig
     type t
 
@@ -172,14 +178,7 @@ module Make (Inputs : Inputs_intf) = struct
     (set_urs_info, load)
 
   let create cs =
-    let gates =
-      match cs.Plonk_constraint_system.gates with
-      | `Finalized g ->
-          g
-      | `Unfinalized_rev _ ->
-          failwith
-            "Must finalize constraint system before Keypair.create is called"
-    in
+    let gates = Constraint_system.finalize_and_get_gates cs in
     let conv =
       Plonk_constraint_system.Row.to_absolute
         ~public_input_size:(Set_once.get_exn cs.public_input_size [%here])

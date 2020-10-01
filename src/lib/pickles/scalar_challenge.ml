@@ -11,18 +11,120 @@ let to_field_checked (type f)
     (SC.Scalar_challenge bits) =
   let bits = Array.of_list bits in
   let module F = Impl.Field in
-  let two = F.Constant.of_int 2 in
-  let a = ref (F.of_int 2) in
-  let b = ref (F.of_int 2) in
-  let one = F.of_int 1 in
-  let neg_one = F.(of_int 0 - one) in
+  let two =
+    (* Hack for plonk constraints *)
+    let x = Impl.exists F.typ ~compute:(fun () -> F.Constant.of_int 2) in
+    F.Assert.equal x (F.of_int 2) ;
+    x
+  in
+  let a = ref two in
+  let b = ref two in
+  let one = F.Constant.one in
+  let neg_one = F.Constant.(negate one) in
+  let zero = F.Constant.zero in
   for i = (128 / 2) - 1 downto 0 do
-    let s = F.if_ bits.(2 * i) ~then_:one ~else_:neg_one in
-    (a := F.(scale !a two)) ;
-    (b := F.(scale !b two)) ;
-    let r_2i1 = bits.((2 * i) + 1) in
-    a := F.if_ r_2i1 ~then_:F.(!a + s) ~else_:!a ;
-    b := F.if_ r_2i1 ~then_:!b ~else_:F.(!b + s)
+    (* s = -1 + 2 * r_2i
+       a_next = 
+        if r_2i1 
+        then 2 a_prev + s
+        else 2 a_prev
+       =
+       2 a_prev + r_2i1 * s
+       =
+       2 a_prev + r_2i1 * (-1 + 2 r_2i)
+       <->
+       0 = 2 a_prev + r_2i1 * (-1 + 2 r_2i) - a_next
+       <->
+       0 = 2 a_prev - r_2i1 + 2 r_2i1 r_2i - a_next
+       <->
+       two_a_prev_minus_a_next = 2 a_prev - a_next
+       &&
+       0 = - r_2i1 + 2 r_2i1 r_2i + two_a_prev_minus_a_next
+
+       b_next =
+        if r_2i1
+        then 2 b_prev
+        else 2 b_prev + s
+       =
+       2 b_prev + (1 - r_2i1) * s
+       =
+       2 b_prev + (1 - r_2i1) * (2 * r_2i - 1)
+       =
+       2 b_prev - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
+       <->
+       0 = 2 b_prev - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i - b_next
+       <->
+       0 = (2 b_prev - b_next) - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
+       <->
+       two_b_prev_minus_b_next = 2 b_prev - b_next
+       &&
+       0 
+       = two_b_prev_minus_b_next - 1 + 2 r_2i + r_2i1 - 2 r_2i1 r_2i
+       = 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1 
+    *)
+    let open Impl in
+    let a_next =
+      exists Field.typ
+        ~compute:
+          As_prover.(
+            fun () ->
+              let s : F.Constant.t =
+                if read Boolean.typ bits.(Int.(2 * i)) then F.Constant.one
+                else F.Constant.(negate one)
+              in
+              let a_prev = read_var !a in
+              let two_a_prev = F.Constant.(a_prev + a_prev) in
+              if read Boolean.typ bits.(Int.((2 * i) + 1)) then
+                F.Constant.(two_a_prev + s)
+              else two_a_prev)
+    in
+    let b_next =
+      exists Field.typ
+        ~compute:
+          As_prover.(
+            fun () ->
+              let s : F.Constant.t =
+                if read Boolean.typ bits.(Int.(2 * i)) then F.Constant.one
+                else F.Constant.(negate one)
+              in
+              let b_prev = read_var !b in
+              let two_b_prev = F.Constant.(b_prev + b_prev) in
+              if read Boolean.typ bits.(Int.((2 * i) + 1)) then two_b_prev
+              else F.Constant.(two_b_prev + s))
+    in
+    let two_a_prev_minus_a_next =
+      exists Field.typ
+        ~compute:As_prover.(fun () -> read_var F.(!a + !a - a_next))
+    in
+    let two_b_prev_minus_b_next =
+      exists Field.typ
+        ~compute:As_prover.(fun () -> read_var F.(!b + !b - b_next))
+    in
+    let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
+    let p l r o m c =
+      { Snarky_backendless.Constraint.annotation= None
+      ; basic= T (Basic {l; r; o; m; c}) }
+    in
+    let two = F.Constant.of_int 2 in
+    let r_2i = (bits.(2 * i) :> F.t) in
+    let r_2i1 = (bits.((2 * i) + 1) :> F.t) in
+    assert_
+      [ (* 0 = 2 a_prev - a_next - two_a_prev_minus_a_next  *)
+        p (two, !a) (neg_one, a_next)
+          (neg_one, two_a_prev_minus_a_next)
+          zero zero
+      ; (* 0 = 2 b_prev - b_next - two_b_prev_minus_b_next  *)
+        p (two, !b) (neg_one, b_next)
+          (neg_one, two_b_prev_minus_b_next)
+          zero zero
+        (* 0 = - r_2i1 + 2 r_2i1 r_2i + two_a_prev_minus_a_next *)
+      ; p (neg_one, r_2i1) (zero, r_2i) (one, two_a_prev_minus_a_next) two zero
+        (* 2 r_2i + r_2i1 - 2 r_2i1 r_2i + two_b_prev_minus_b_next + -1  *)
+      ; p (two, r_2i) (one, r_2i1)
+          (one, two_b_prev_minus_b_next)
+          (F.Constant.negate two) neg_one ] ;
+    a := a_next ;
+    b := b_next
   done ;
   F.(scale !a endo + !b)
 

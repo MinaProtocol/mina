@@ -4,6 +4,7 @@ open Backend
 module Me = Tock
 module Other = Tick
 module Impl = Impls.Wrap
+open Pickles_types
 open Import
 
 let high_entropy_bits = 128
@@ -85,7 +86,7 @@ module Input_domain = struct
               (Tick.Keypair.load_urs ()) (u domain_size) (u i)
             |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
             |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
-            |> Me.Inner_curve.Affine.of_backend ) )
+            |> Me.Inner_curve.Affine.of_backend |> Or_infinity.finite_exn ) )
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
@@ -225,7 +226,8 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Tweedle.Dum.Field_urs.h
-          (Zexe_backend.Tweedle.Dum_based.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dum.Affine.of_backend )
+      ( Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.h
+          (Zexe_backend.Tweedle.Dum_based_plonk.Keypair.load_urs ())
+      |> Zexe_backend.Tweedle.Dum.Affine.of_backend |> Or_infinity.finite_exn
+      )
 end

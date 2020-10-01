@@ -182,7 +182,9 @@ module Keypair = struct
     ; col= {a= a_col_comm t; b= b_col_comm t; c= c_col_comm t}
     ; value= {a= a_val_comm t; b= b_val_comm t; c= c_val_comm t}
     ; rc= {a= a_rc_comm t; b= b_rc_comm t; c= c_rc_comm t} }
-    |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
+    |> Matrix_evals.map
+         ~f:
+           (Abc.map ~f:(Fn.compose Or_infinity.finite_exn G1.Affine.of_backend))
 end
 
 module Proof = Pairing_based_proof

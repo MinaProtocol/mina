@@ -5,7 +5,7 @@ open Zexe_backend_common
 module Rounds = struct
   open Pickles_types.Nat
 
-  module Wrap : Add.Intf_transparent = N18
+  module Wrap : Add.Intf_transparent = N17
 
   module Step : Add.Intf_transparent = N18
 end

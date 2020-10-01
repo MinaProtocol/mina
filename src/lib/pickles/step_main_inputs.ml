@@ -1,6 +1,7 @@
 open Core_kernel
 open Common
 open Backend
+open Pickles_types
 module Impl = Impls.Step
 open Import
 
@@ -97,7 +98,8 @@ module Input_domain = struct
                in
                assert (Tick.Inner_curve.Affine.Backend.Vector.length v = 1) ;
                Tick.Inner_curve.Affine.Backend.Vector.get v 0
-               |> Tick.Inner_curve.Affine.of_backend ) ))
+               |> Tick.Inner_curve.Affine.of_backend |> Or_infinity.finite_exn
+           ) ))
 end
 
 module Inner_curve = struct
@@ -237,5 +239,6 @@ module Generators = struct
     lazy
       ( Snarky_bn382.Tweedle.Dee.Plonk.Field_urs.h
           (Zexe_backend.Tweedle.Dee_based_plonk.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dee.Affine.of_backend )
+      |> Zexe_backend.Tweedle.Dee.Affine.of_backend |> Or_infinity.finite_exn
+      )
 end

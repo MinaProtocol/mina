@@ -50,7 +50,7 @@ val combine_split_commitments :
   -> init:('g -> 'g_acc)
   -> xi:'f
   -> ('g Without_degree_bound.t, 'n) Vector.t
-  -> (('g, 'g) With_degree_bound.t, 'm) Vector.t
+  -> ('g With_degree_bound.t, 'm) Vector.t
   -> 'g_acc
 
 val combine_split_evaluations :

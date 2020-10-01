@@ -481,7 +481,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                             : unit ) ))
                 in
                 Snarky_log.to_file
-                  (sprintf "step-snark-%d.json" (Index.to_int b.index))
+                  (sprintf "step-snark-%s-%d.json" name (Index.to_int b.index))
                   log
               in
               let open Impls.Step in
@@ -561,6 +561,37 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
+      let () =
+        let module Constraints =
+          Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
+        let log =
+          let weight =
+            let sys =
+              Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system
+              .create ()
+            in
+            fun (c : Impls.Wrap.Constraint.t) ->
+              let prev = sys.next_row in
+              List.iter c ~f:(fun {annotation; basic} ->
+                  Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
+                  .add_constraint sys ?label:annotation basic ) ;
+              let next = sys.next_row in
+              next - prev
+          in
+          Constraints.log ~weight
+            Impls.Wrap.(
+              make_checked (fun () ->
+                  ( let x = with_label __LOC__ (fun () -> exists typ) in
+                    main x ()
+                    : unit ) ))
+        in
+        Snarky_log.to_file
+          (sprintf
+             !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
+             name
+             (Type_equal.Id.uid self.id))
+          log
+      in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy (self_id, constraint_system ~exposing:[typ] main)

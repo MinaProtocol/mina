@@ -123,7 +123,10 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
             ; r_comm= g lengths.r
             ; o_comm= g lengths.o
             ; z_comm= g lengths.z
-            ; t_comm= {unshifted= g lengths.t; shifted= Some g0} }
+            ; t_comm=
+                { unshifted=
+                    Array.map (g lengths.t) ~f:(fun x -> Or_infinity.Finite x)
+                ; shifted= Finite g0 } }
         ; openings=
             { proof=
                 { lr=

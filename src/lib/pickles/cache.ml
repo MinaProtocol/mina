@@ -55,7 +55,10 @@ module Step = struct
                 (Keypair.create ~pk ~vk:(Backend.Tick.Keypair.vk pk), dirty) )
         | Error _e ->
             Timer.clock __LOC__ ;
-            let r = generate_keypair ~exposing:[typ] main in
+            let r =
+              Common.time "stepkeygen" (fun () ->
+                  generate_keypair ~exposing:[typ] main )
+            in
             Timer.clock __LOC__ ;
             let _ =
               Key_cache.Sync.write cache s_p (Lazy.force k_p) (Keypair.pk r)
@@ -132,7 +135,10 @@ module Wrap = struct
          | Ok (pk, d) ->
              (Keypair.create ~pk ~vk:(Backend.Tock.Keypair.vk pk), d)
          | Error _e ->
-             let r = generate_keypair ~exposing:[typ] main in
+             let r =
+               Common.time "wrapkeygen" (fun () ->
+                   generate_keypair ~exposing:[typ] main )
+             in
              let _ = Key_cache.Sync.write cache s_p k (Keypair.pk r) in
              (r, `Generated_something))
     in

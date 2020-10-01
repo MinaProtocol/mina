@@ -23,9 +23,9 @@ let unwrap = function
       Array.to_list a
 
 let dee =
-  let pub = 128 in
+  let pub = 150 in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 12 19)
+    (List.range ~start:`inclusive ~stop:`inclusive 10 18)
     ~f:(fun d ->
       List.init pub ~f:(fun i ->
           ksprintf time "dee %d" i (fun () ->
@@ -33,12 +33,13 @@ let dee =
                 (Dee_based_plonk.Keypair.load_urs ())
                 (Unsigned.Size_t.of_int (1 lsl d))
                 (Unsigned.Size_t.of_int i) )
-          |> Zexe_backend.Tweedle.Fp_poly_comm.of_backend |> unwrap ) )
+          |> Zexe_backend.Tweedle.Fp_poly_comm.of_backend_without_degree_bound
+          |> unwrap ) )
 
 let dum =
-  let pub = 128 in
+  let pub = 150 in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 12 19)
+    (List.range ~start:`inclusive ~stop:`inclusive 10 18)
     ~f:(fun d ->
       List.init pub ~f:(fun i ->
           ksprintf time "dum %d" i (fun () ->
@@ -46,7 +47,8 @@ let dum =
                 (Dum_based_plonk.Keypair.load_urs ())
                 (Unsigned.Size_t.of_int (1 lsl d))
                 (Unsigned.Size_t.of_int i) )
-          |> Zexe_backend.Tweedle.Fq_poly_comm.of_backend |> unwrap ) )
+          |> Zexe_backend.Tweedle.Fq_poly_comm.of_backend_without_degree_bound
+          |> unwrap ) )
 
 let mk xss ~f =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -71,9 +73,9 @@ let structure =
   in
   [%str
     module Lagrange_precomputations = struct
-      let index_of_domain_log2 d = d - 12
+      let index_of_domain_log2 d = d - 10
 
-      let max_public_input_size = 128
+      let max_public_input_size = 150
 
       open Zexe_backend.Tweedle
 

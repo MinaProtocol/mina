@@ -42,9 +42,9 @@ module type Inputs_intf = sig
         module Pair : Intf.Pair with type elt := t
       end
 
-      val of_backend : Backend.t -> t
+      val of_backend : Backend.t -> t Or_infinity.t
 
-      val to_backend : t -> Backend.t
+      val to_backend : t Or_infinity.t -> Backend.t
     end
   end
 
@@ -266,7 +266,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   include Stable.Latest
 
-  let g t f = G.Affine.of_backend (f t)
+  let g t f = G.Affine.of_backend (f t) |> Or_infinity.finite_exn
 
   let fq t f =
     let t = f t in
@@ -301,7 +301,7 @@ module Make (Inputs : Inputs_intf) = struct
       G.Affine.t * G.Affine.t =
     (* TODO: Leak? *)
     let t = f t in
-    let g = G.Affine.of_backend in
+    let g = Fn.compose Or_infinity.finite_exn G.Affine.of_backend in
     G.Affine.Backend.Pair.(g (f0 t), g (f1 t))
 
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
@@ -364,7 +364,8 @@ module Make (Inputs : Inputs_intf) = struct
     let w x =
       match Poly_comm.of_backend_with_degree_bound (x t) with
       | `With_degree_bound t ->
-          {t with shifted= Option.value_exn t.shifted}
+          Dlog_plonk_types.Poly_comm.With_degree_bound.map t
+            ~f:Or_infinity.finite_exn
       | _ ->
           assert false
     in
@@ -419,10 +420,13 @@ module Make (Inputs : Inputs_intf) = struct
        ; openings=
            {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
         t) : Backend.t =
-    let g = G.Affine.to_backend in
+    let g x = G.Affine.to_backend (Finite x) in
     let pcw (t : _ Dlog_plonk_types.Poly_comm.With_degree_bound.t) =
       Poly_comm.to_backend
-        (`With_degree_bound {t with shifted= Some t.shifted})
+        (`With_degree_bound
+          (Dlog_plonk_types.Poly_comm.With_degree_bound.map
+             ~f:(fun x -> Or_infinity.Finite x)
+             t))
     in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr =
@@ -441,7 +445,7 @@ module Make (Inputs : Inputs_intf) = struct
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun {Challenge_polynomial.commitment; challenges= _} ->
-          G.Affine.to_backend commitment )
+          G.Affine.to_backend (Finite commitment) )
       |> g_array_to_vec
     in
     Backend.make primary_input (pcwo w_comm) (pcwo za_comm) (pcwo zb_comm)
@@ -466,7 +470,7 @@ module Make (Inputs : Inputs_intf) = struct
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun {Challenge_polynomial.commitment; _} ->
-          G.Affine.to_backend commitment )
+          G.Affine.to_backend (Finite commitment) )
       |> g_array_to_vec
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
