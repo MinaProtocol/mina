@@ -1,0 +1,14 @@
+apiVersion: v2
+name: buildkite-exporter
+description: A Helm chart for O(1) Lab's Buildkite graphql exporter
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+icon: https://pbs.twimg.com/profile_images/968998928241733632/Rhxmu_9O_400x400.jpg
+keywords:
+- buildkite
+- prometheus exporter
+- graphql
+home: https://o1labs.org/
+sources:
+- https://github.com/CodaProtocol
