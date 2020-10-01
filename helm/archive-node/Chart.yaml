@@ -1,0 +1,17 @@
+apiVersion: v2
+name: archive-node
+description: A Helm chart for Coda Protocol's archive node
+type: application
+version: 0.1.0
+appVersion: 1.16.0
+dependencies:
+  - name: postgresql
+    version: "*"
+    repository: "@bitnami"
+icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+keywords:
+- archive
+- postgres
+home: https://codaprotocol.com/
+sources:
+- https://github.com/CodaProtocol/coda/tree/develop/src/app/archive

@@ -1,7 +1,7 @@
 (library
   (name snarky_pairing)
   (public_name snarky_pairing)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries
     sgn_type
     snarky_field_extensions

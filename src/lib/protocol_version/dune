@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core_kernel)
  (preprocess
-  (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_deriving.eq))
+  (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "Protocol version representation"))

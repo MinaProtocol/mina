@@ -1,5 +1,5 @@
 (library
   (name truth)
   (public_name truth)
-  (preprocess (pps ppx_version ppx_jane))
+  (preprocess (pps ppx_version ppx_jane bisect_ppx -- --conditional))
   (libraries core_kernel))

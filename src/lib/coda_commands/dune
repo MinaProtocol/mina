@@ -6,4 +6,4 @@
     core
     ; libs
     coda_base user_command_input coda_lib coda_version daemon_rpcs node_addrs_and_ports)
-  (preprocess (pps ppx_coda ppx_version ppx_jane)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane bisect_ppx -- --conditional)))

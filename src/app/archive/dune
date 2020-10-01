@@ -4,5 +4,5 @@
   (public_name archive)
   (modes native)
   (libraries core async archive_lib cli_lib caqti caqti-async caqti-driver-postgresql)
-  (preprocess (pps ppx_version ppx_jane ppx_coda))
+  (preprocess (pps ppx_version ppx_jane ppx_coda bisect_ppx -- --conditional))
   )
