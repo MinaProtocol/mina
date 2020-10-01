@@ -3,4 +3,4 @@
   (public_name coda_compile_config)
   (libraries currency)
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_version ppx_base ppx_optcomp)))
+  (preprocess (pps ppx_version ppx_base ppx_optcomp bisect_ppx -- --conditional)))
