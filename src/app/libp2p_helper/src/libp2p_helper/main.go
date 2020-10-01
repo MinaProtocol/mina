@@ -192,14 +192,15 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 }
 
 type configureMsg struct {
-	Statedir        string   `json:"statedir"`
-	Privk           string   `json:"privk"`
-	NetworkID       string   `json:"network_id"`
-	ListenOn        []string `json:"ifaces"`
-	External        string   `json:"external_maddr"`
-	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	GossipType      string   `json:"gossip_type"`
-	SeedPeers       []string `json:"seed_peers"`
+	Statedir        string             `json:"statedir"`
+	Privk           string             `json:"privk"`
+	NetworkID       string             `json:"network_id"`
+	ListenOn        []string           `json:"ifaces"`
+	External        string             `json:"external_maddr"`
+	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
+	GossipType      string             `json:"gossip_type"`
+	SeedPeers       []string           `json:"seed_peers"`
+	GatingConfig    setGatingConfigMsg `json:"gating_config"`
 }
 
 type discoveredPeerUpcall struct {
@@ -273,6 +274,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	app.P2p = helper
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+
+	_, err = m.GatingConfig.run(app)
+
+	if err != nil {
+		return nil, badHelper(err)
+	}
 
 	return "configure success", nil
 }
@@ -970,14 +977,18 @@ type unbanIPMsg struct {
 }
 
 type setGatingConfigMsg struct {
-	BannedIPs     []string `json:"banned_ips"`
-	BannedPeerIDs []string `json:"banned_peers"`
+	BannedIPs      []string `json:"banned_ips"`
+	BannedPeerIDs  []string `json:"banned_peers"`
 	TrustedPeerIDs []string `json:"trusted_peers"`
-	TrustedIPs    []string `json:"trusted_ips"`
-	Isolate       bool     `json:"isolate"`
+	TrustedIPs     []string `json:"trusted_ips"`
+	Isolate        bool     `json:"isolate"`
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
 	newFilter := ma.NewFilters()
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
@@ -1033,7 +1044,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
-	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
+	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
 }
 
 type errorResult struct {

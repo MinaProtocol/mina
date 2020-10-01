@@ -214,6 +214,12 @@ let daemon logger =
      and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
      and _enable_flooding =
        flag "enable-flooding" ~doc:"true|false Deprecated and unused" no_arg
+     and isolate =
+       flag "isolate-network"
+         ~doc:
+           "true|false Only allow connections to the peers passed on the \
+            command line or configured through GraphQL. (default: false)"
+         (optional bool)
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -749,6 +755,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; isolate
              ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in

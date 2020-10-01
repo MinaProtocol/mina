@@ -179,12 +179,18 @@ val create :
   -> conf_dir:string
   -> net Deferred.Or_error.t
 
+(** State for the connection gateway. It will disallow connections from IPs
+    or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
+    [isolate] is true, only connections to [trusted_peers] are allowed. *)
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
+
 (** Configure the network connection.
   *
   * Listens on each address in [maddrs].
   *
   * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
-  * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
+  * will be called for each peer we connect to. [unsafe_no_trust_ip], if true, will not attempt to
   * report trust actions for the IPs of observed connections.
   *
   * Whenever the connection list gets too small, [seed_peers] will be
@@ -202,6 +208,7 @@ val configure :
   -> unsafe_no_trust_ip:bool
   -> gossip_type:[`Gossipsub | `Flood | `Random]
   -> seed_peers:Multiaddr.t list
+  -> initial_gating_config:connection_gating
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
@@ -325,12 +332,6 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
-
-(** State for the connection gateway. It will disallow connections from IPs
-    or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
-    [isolate] is true, only connections to [trusted_peers] are allowed. *)
-type connection_gating =
-  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 
 (** Configure the connection gateway. 
 

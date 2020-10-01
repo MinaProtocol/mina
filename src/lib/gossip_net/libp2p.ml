@@ -27,6 +27,7 @@ module Config = struct
     ; chain_id: string
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
+    ; isolate: bool
     ; trust_system: Trust_system.t
     ; gossip_type: [`Gossipsub | `Flood | `Random]
     ; keypair: Coda_net2.Keypair.t option }
@@ -146,6 +147,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:config.initial_peers
+                ~initial_gating_config:
+                  { trusted_peers= config.seed_peers
+                  ; banned_peers=
+                      Trust_system.peer_statuses config.trust_system
+                      |> List.filter_map ~f:(fun (peer, status) ->
+                             match status.banned with
+                             | Banned_until _ ->
+                                 Some peer
+                             | _ ->
+                                 None )
+                  ; isolate= config.isolate }
                 ~on_new_peer:(fun _ ->
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
