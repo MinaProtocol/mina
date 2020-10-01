@@ -26,11 +26,12 @@ Parameter | Description | Default
 --- | --- | ---
 `seed.active` | Whether to activate client as a Coda protocol seed node | `true`
 `seed.fullname` | k8s pod name of seed node to deploy | `seed-node`
-`seed.hostPort` | Coda daemon external port | `10001`
+`seed.hostPort` | Coda client external port | `10001`
 `seed.rpcPort` | Coda client peer communication port | `8301`
 `seed.discoveryKeyPair` | Key pair used for identifying and connecting to the seed by external clients 
 `coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.12-beta-develop-589b507`
 `coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon
+`coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
 
 ## seed-node launch examples
 
