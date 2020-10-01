@@ -1,7 +1,7 @@
 pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
-          - "status-success=buildkite/coda/pr"
+          - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"
           - "status-success=ci/circleci: test--dev--coda-shared-state-test"
@@ -16,7 +16,7 @@ pull_request_rules:
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
       conditions:
-          - "status-success=buildkite/coda/pr"
+          - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"
           - "status-success=ci/circleci: test--dev--coda-shared-state-test"
