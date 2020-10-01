@@ -3,5 +3,5 @@
  (public_name exit_handlers)
  (library_flags -linkall)
  (libraries core_kernel async_kernel async_unix logger)
- (preprocess (pps ppx_coda ppx_version ppx_let))
+ (preprocess (pps ppx_coda ppx_version ppx_let bisect_ppx -- --conditional))
  (synopsis "Exit handlers"))

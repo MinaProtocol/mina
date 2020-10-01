@@ -6,4 +6,4 @@
   (modules test_encodings)
   (libraries core_kernel signature_lib_nonconsensus rosetta_lib_nonconsensus)
   (preprocessor_deps ../../../config.mlh)
-  (preprocess (pps ppx_version ppx_optcomp)))
+  (preprocess (pps ppx_version ppx_optcomp bisect_ppx -- --conditional)))
