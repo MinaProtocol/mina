@@ -55,8 +55,8 @@ CREATE TABLE blocks
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
 , height                 bigint NOT NULL
+, global_slot            bigint NOT NULL
 , timestamp              bigint NOT NULL
-, coinbase_id            int                    REFERENCES internal_commands(id)
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
@@ -66,11 +66,14 @@ CREATE INDEX idx_blocks_height     ON blocks(height);
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
+, sequence_no     int NOT NULL
 , PRIMARY KEY (block_id, user_command_id)
 );
 
 CREATE TABLE blocks_internal_commands
-( block_id            int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, internal_command_id int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
+( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
+, internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
+, sequence_no           int NOT NULL
+, secondary_sequence_no int
 , PRIMARY KEY (block_id, internal_command_id)
 );

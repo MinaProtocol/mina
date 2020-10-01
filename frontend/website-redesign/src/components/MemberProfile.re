@@ -84,22 +84,6 @@ module Styles = {
       selector("p", [marginTop(`zero), marginBottom(`zero)]),
     ]);
 
-  let ctaButton =
-    merge([
-      Theme.Type.buttonLabel,
-      style([
-        width(`rem(14.)),
-        height(`rem(3.)),
-        backgroundColor(Theme.Colors.black),
-        borderRadius(`px(6)),
-        textDecoration(`none),
-        color(white),
-        padding2(~v=`px(12), ~h=`px(24)),
-        textAlign(`center),
-        alignSelf(`center),
-      ]),
-    ]);
-
   let link =
     merge([
       Theme.Type.link,

@@ -1,51 +1,53 @@
-import Page from '@reason/pages/Docs';
-export default Page({title: "CLI Reference"});
+import Page from "@reason/pages/Docs";
+export default Page({ title: "CLI Reference" });
 
 # CLI Reference
 
-The Coda CLI (command-line interface) is the primary way for users to interact with the Coda network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
+The Mina CLI (command-line interface) is the primary way for users to interact with the Mina network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
 
-The CLI is installed when you [install coda](/docs/getting-started#installation).
+The CLI is installed when you [install mina](/docs/getting-started#installation).
 
 <Alert kind="warning">
 
-Coda APIs are still under construction, so these commands will likely change. See `coda help` for the most up-to-date version.
 
-</Alert> 
+Mina APIs are still under construction, so these commands will likely change. See `mina help` for the most up-to-date version.
 
-### Coda Accounts
+</Alert>
+
+
+### Mina Accounts
 
 ```
-$ coda accounts help
+$ mina accounts help
 
 Client commands concerning account management
 
-  coda accounts SUBCOMMAND
+  mina accounts SUBCOMMAND
 
 === subcommands ===
 
   list    List all owned accounts
   create  Create new account
   import  Import a password protected private key to be tracked by the daemon.
-          Set CODA_PRIVKEY_PASS environment variable to use non-interactively
+          Set MINA_PRIVKEY_PASS environment variable to use non-interactively
           (key will be imported using the same password).
   export  Export a tracked account so that it can be saved or transferred
           between machines.
-          Set CODA_PRIVKEY_PASS environment variable to use non-interactively
+          Set MINA_PRIVKEY_PASS environment variable to use non-interactively
           (key will be exported using the same password).
   unlock  Unlock a tracked account
   lock    Lock a tracked account
   help    explain a given subcommand (perhaps recursively)
 ```
 
-### Coda Client
+### Mina Client
 
 ```
-$ coda client help
+$ mina client help
 
 Lightweight client commands
 
-  coda client SUBCOMMAND
+  mina client SUBCOMMAND
 
 === subcommands ===
 
@@ -64,15 +66,14 @@ Lightweight client commands
   help                explain a given subcommand (perhaps recursively)
 ```
 
-
-### Coda Daemon
+### Mina Daemon
 
 ```
-$ coda daemon -help
+$ mina daemon -help
 
-Coda daemon
+Mina daemon
 
-  coda.exe daemon 
+  mina.exe daemon
 
 === flags ===
 
@@ -94,7 +95,7 @@ Coda daemon
   [-block-producer-password PASSWORD]          Password associated with the
                                                block-producer key. Setting this
                                                is equivalent to setting the
-                                               CODA_PRIVKEY_PASS environment
+                                               MINA_PRIVKEY_PASS environment
                                                variable. Be careful when setting
                                                it in the commandline as it will
                                                likely get tracked in your
@@ -121,7 +122,7 @@ Coda daemon
   [-demo-mode]                                 Run the daemon in demo-mode --
                                                assume we're "synced" to the
                                                network instantly
-  [-discovery-keypair KEYFILE]                 Keypair (generated from `coda
+  [-discovery-keypair KEYFILE]                 Keypair (generated from `mina
                                                advanced
                                                generate-libp2p-keypair`) to use
                                                with libp2p discovery (default:
@@ -190,14 +191,14 @@ Coda daemon
 
 ```
 
-### Coda Advanced
+### Mina Advanced
 
 ```
-$ coda advanced help
+$ mina advanced help
 
 Advanced client commands
 
-  coda advanced SUBCOMMAND
+  mina advanced SUBCOMMAND
 
 === subcommands ===
 
@@ -232,7 +233,7 @@ Advanced client commands
   stop-tracing               Stop async tracing
   telemetry                  Get the trust status associated with an IP address
   verify-receipt             Verify a receipt of a sent payment
-  visualization              Visualize data structures special to Coda
+  visualization              Visualize data structures special to Mina
   wrap-key                   Wrap a private key into a private key file
   help                       explain a given subcommand (perhaps recursively)
 ```

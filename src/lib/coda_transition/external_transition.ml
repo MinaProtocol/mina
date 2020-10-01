@@ -107,6 +107,9 @@ module Stable = struct
         | _ ->
             None )
 
+    let global_slot t =
+      consensus_state t |> Consensus.Data.Consensus_state.curr_global_slot
+
     let equal =
       Comparable.lift Consensus.Data.Consensus_state.Value.equal
         ~f:consensus_state
@@ -142,6 +145,7 @@ Stable.Latest.
   , transactions
   , commands
   , payments
+  , global_slot
   , to_yojson )]
 
 let equal = Stable.Latest.equal
@@ -717,6 +721,8 @@ module With_validation = struct
 
   let payments t = lift payments t
 
+  let global_slot t = lift global_slot t
+
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
 
   let current_protocol_version t = lift current_protocol_version t
@@ -877,6 +883,7 @@ module Validated = struct
     , transactions
     , commands
     , payments
+    , global_slot
     , erase
     , to_yojson )]
 

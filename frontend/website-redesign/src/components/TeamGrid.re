@@ -158,10 +158,5 @@ let make = () => {
       title="Lead Product Designer, O(1) Labs"
       src="/static/img/headshots/ChrisPryor.jpg"
     />
-    <TeamMember
-      fullName="Matthew Ryan"
-      title="Protocol Engineer, O(1) Labs"
-      src="/static/img/headshots/MatthewRyan.jpg"
-    />
   </div>;
 };

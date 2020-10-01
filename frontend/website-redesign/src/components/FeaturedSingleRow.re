@@ -12,10 +12,12 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
+    href: [`External(string) | `Internal(string)],
   };
 
   type t = {
     rowType,
+    copySize: [ | `Large | `Small],
     title: string,
     description: string,
     textColor: Css.color,
@@ -40,10 +42,18 @@ module SingleRow = {
         alignItems(`center),
       ]);
 
-    let contentBlock = (contentBackground: Row.backgroundType) => {
+    let contentBlock = (size, contentBackground: Row.backgroundType) => {
+      let additionalNotMobileStyles =
+        switch (size) {
+        | `Large => []
+        | `Small => [bottom(`percent(35.))]
+        };
       style([
         position(`absolute),
         width(`rem(21.)),
+        maxHeight(`rem(35.)),
+        overflow(`scroll),
+        unsafe("height", "fit-content"),
         margin2(~h=`rem(5.), ~v=`zero),
         display(`flex),
         flexDirection(`column),
@@ -53,7 +63,7 @@ module SingleRow = {
         important(backgroundSize(`cover)),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), bottom(`percent(35.))],
+          [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -68,6 +78,10 @@ module SingleRow = {
         flexDirection(`column),
         alignItems(`flexStart),
         selector("h2,p", [color(textColor)]),
+        selector(
+          "p",
+          [Theme.Typeface.monumentGroteskMono, letterSpacing(`px(-1))],
+        ),
       ]);
     };
 
@@ -87,11 +101,16 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
-        height(`percent(60.)),
         maxWidth(`rem(53.)),
+        paddingTop(`rem(8.)),
+        bottom(`zero),
         media(
-          Theme.MediaQuery.notMobile,
-          [height(`percent(110.)), width(`percent(80.))],
+          Theme.MediaQuery.tablet,
+          [width(`percent(80.))],
+        ),
+        media(
+          Theme.MediaQuery.desktop,
+          [width(`percent(100.))],
         ),
       ]);
   };
@@ -108,14 +127,15 @@ module SingleRow = {
           ]),
         ]);
 
-      let contentBlock = backgroundImg => {
+      let contentBlock = (size, backgroundImg) => {
         merge([
-          RowStyles.contentBlock(backgroundImg),
+          RowStyles.contentBlock(size, backgroundImg),
           style([
+            top(`rem(12.6)),
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [right(`zero), height(`auto), width(`rem(29.))],
+              [bottom(`zero), top(`inherit_), right(`zero), width(`rem(29.))],
             ),
           ]),
         ]);
@@ -126,7 +146,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
@@ -134,12 +155,13 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
               <span className=RowStyles.buttonText>
                 {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
+                <Icon kind=Icon.ArrowRightMedium size=1.5 />
               </span>
             </Button>
           </div>
@@ -162,14 +184,14 @@ module SingleRow = {
           ]),
         ]);
 
-      let contentBlock = contentBackground => {
+      let contentBlock = (size, contentBackground) => {
         merge([
-          RowStyles.contentBlock(contentBackground),
+          RowStyles.contentBlock(size, contentBackground),
           style([
-            top(`percent(6.)),
+            top(`rem(12.6)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), height(`auto), width(`rem(32.))],
+              [left(`zero), width(`rem(32.))],
             ),
           ]),
         ]);
@@ -184,7 +206,8 @@ module SingleRow = {
     let make = (~row: Row.t) => {
       <div className=RowStyles.container>
         <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.contentBackground)}>
+        <div
+          className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
             <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
@@ -192,14 +215,17 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button bgColor={row.button.buttonColor} dark={row.button.dark}>
-              <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
+              <Button
+                bgColor={row.button.buttonColor}
+                dark={row.button.dark}
+                href={row.button.href}>
+                <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                  {React.string(row.button.buttonText)}
+                  <span className=Css.(style([marginTop(`rem(0.8))]))>
+                    <Icon kind=Icon.ArrowRightSmall />
+                  </span>
                 </span>
-              </span>
-            </Button>
+              </Button>
           </div>
         </div>
       </div>;
@@ -212,7 +238,7 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      height(`percent(100.)),
+      minHeight(`rem(32.5)),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {
@@ -223,12 +249,16 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~row: Row.t) => {
+let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
     <Wrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
+       }}
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
        }}
     </Wrapped>
   </div>;

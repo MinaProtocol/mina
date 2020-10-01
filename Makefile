@@ -121,6 +121,11 @@ dhall_types :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
 	$(info Build complete)
 
+replayer :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -298,29 +303,23 @@ benchmarks:
 
 test-coverage: SHELL := /bin/bash
 test-coverage:
-	source scripts/test_all.sh ; run_unit_tests_with_coverage
+	scripts/create_coverage_profiles.sh
 
 # we don't depend on test-coverage, which forces a run of all unit tests
 coverage-html:
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+	bisect-ppx-report html --source-path=_build/default --coverage-path=_build/default
 endif
 
-coverage-text:
+coverage-summary:
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+	bisect-ppx-report summary --coverage-path=_build/default --per-file
 endif
 
-coverage-coveralls:
-ifeq ($(shell find _build/default -name bisect\*.out),"")
-	echo "No coverage output; run make test-coverage"
-else
-	bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
-endif
 
 ########################################
 # Diagrams for documentation
