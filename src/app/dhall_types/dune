@@ -8,4 +8,4 @@
     runtime_config
     ppx_dhall_type)
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_version ppx_let)))
+  (preprocess (pps ppx_version ppx_let bisect_ppx -- --conditional)))
