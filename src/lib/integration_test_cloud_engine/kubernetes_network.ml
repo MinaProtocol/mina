@@ -108,22 +108,57 @@ module Node = struct
     module Send_payment =
     [%graphql
     {|
-          mutation ($sender: PublicKey!,
+        mutation 
+        (
+          $sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
           $token: UInt64,
           $fee: UInt64!,
           $nonce: UInt32,
-          $memo: String) {
-          sendPayment(input:
-            {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-              payment {
-        id
-      }
-    }
-  }
-  |}]
+          $memo: String
+        ) 
+        {
+          sendPayment(
+            input: {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}
+          ) 
+          {
+            payment {
+              id
+            }
+          }
+        }
+    |}]
+
+    module Unlock_account =
+    [%graphql
+    {|
+        query MyQuery {
+          daemonStatus {
+            addrsAndPorts {
+            peer {
+              peerId
+            }
+          }
+          peers
+        }
+    |}]
   end
+
+  (* let get_peers_id ~logger (node : t) : unit Malleable_error.t =
+    let graphql_port = 3085 in
+    let open Malleable_error.Let_syntax in
+    Deferred.don't_wait_for
+      ( match%map.Deferred.Let_syntax
+          Graphql.set_port_forwarding ~logger node graphql_port
+        with
+      | Ok _ ->
+          (* not reachable, port forwarder does not terminate *)
+          ()
+      | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
+          [%log fatal] "Error running k8s port forwarding"
+            ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
+          failwith "Could not run k8s port forwarding" ) ; *)
 
   let send_payment ~logger t ~sender ~receiver ~amount ~fee =
     [%log info] "Running send_payment test"
