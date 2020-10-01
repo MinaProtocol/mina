@@ -306,7 +306,9 @@ struct
   end
 
   let create () =
-    { public_input_size= Set_once.create ()
+    let public_input_size = Set_once.create () in
+    Set_once.set_exn public_input_size [%here] 0;
+    { public_input_size
     ; internal_vars= Internal_var.Table.create ()
     ; gates= `Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev= []
@@ -326,7 +328,8 @@ struct
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
   let set_primary_input_size t x =
-    Set_once.set_exn t.public_input_size [%here] x
+    (* Set_once.set_exn t.public_input_size [%here] x *)
+    ()
 
   let digest = digest
 
