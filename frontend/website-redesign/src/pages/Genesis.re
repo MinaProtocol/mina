@@ -168,11 +168,11 @@ module FoundingMembersSection = {
     open Css;
     let container =
       style([
-        padding2(~v=`rem(4.), ~h=`rem(0.)),
         backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
         backgroundSize(`cover),
       ]);
-    let h2 = merge([Theme.Type.h2, style([color(white)])]);
+    let h2 =
+      merge([Theme.Type.h2, style([paddingTop(`rem(4.)), color(white)])]);
     let sectionSubhead =
       merge([
         Theme.Type.paragraphMono,
@@ -209,7 +209,7 @@ module FoundingMembersSection = {
       ]);
   };
   [@react.component]
-  let make = (~profiles) => {
+  let make = (~profiles, ~children=?) => {
     <div className=Styles.container>
       <Wrapped>
         <h2 className=Styles.h2>
@@ -242,6 +242,10 @@ module FoundingMembersSection = {
              ),
            )}
         </div>
+        {switch (children) {
+         | Some(children) => children
+         | None => React.null
+         }}
       </Wrapped>
     </div>;
   };
@@ -351,7 +355,11 @@ let make = (~profiles) => {
       }>
       <Spacer height=2. />
       <Button
-        href=`External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform")
+        href={
+               `External(
+                 "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
+               )
+             }
         bgColor=Theme.Colors.black>
         {React.string("Apply Now")}
         <Icon kind=Icon.ArrowRightMedium />
@@ -366,30 +374,33 @@ let make = (~profiles) => {
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
-          background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
+          background:
+            Image("/static/img/backgrounds/SectionGenesisBackground.png"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
           button: {
             FeaturedSingleRow.Row.buttonText: "Apply Now",
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
             dark: false,
-            href: `External("https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform"),
+            href:
+              `External(
+                "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
+              ),
           },
-        }
-      />
-      <Wrapped>
+        }>
         <Spacer height=4. />
         <Rule color=Theme.Colors.white />
         <Spacer height=4. />
         <HowItWorksGrid />
         <Rule color=Theme.Colors.white />
         <Spacer height=7. />
-      </Wrapped>
+      </FeaturedSingleRow>
     </div>
     <div className=Styles.genesisSection>
-      <FoundingMembersSection profiles />
-      <WorldMapSection />
-      <Spacer height=4. />
+      <FoundingMembersSection profiles>
+        <WorldMapSection />
+        <Spacer height=7.25 />
+      </FoundingMembersSection>
       <div className=Styles.leaderboardBackground>
         <Wrapped>
           <div className=Styles.leaderboardTextContainer>
@@ -402,7 +413,8 @@ let make = (~profiles) => {
                  "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
                )}
             </p>
-            <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
+            <Button
+              bgColor=Theme.Colors.orange href={`Internal("/leaderboard")}>
               {React.string("See The Full Leaderboard")}
               <Icon kind=Icon.ArrowRightSmall />
             </Button>
@@ -418,6 +430,7 @@ let make = (~profiles) => {
              )}
           </p>
         </Wrapped>
+        <Spacer height=4. />
         <CultureFooter />
         <Spacer height=4. />
       </div>
