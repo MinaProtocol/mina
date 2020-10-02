@@ -281,10 +281,11 @@ let%test_module "peer_trust" =
 
     let peer0 = ip_of_id 0
 
-    let%test "Peers are unbanned and have 0 trust at initialization" =
+    let%test "Peers are not present in the db on initialization and have no \
+              statuss" =
       let db = setup_mock_db () in
       match Peer_trust_test.lookup_ip db peer0 with
-      | [(_, {trust= 0.0; banned= Unbanned})] ->
+      | [] ->
           assert_ban_pipe [] ; true
       | _ ->
           false
