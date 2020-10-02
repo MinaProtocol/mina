@@ -116,9 +116,9 @@ let main inputs =
     | Some deferred ->
         [%log error]
           "additional call to cleanup testnet while already cleaning up \
-           ($reason, $hard_error)"
+           ($reason, $error)"
           ~metadata:
-            [("reason", `String reason); ("hard_error", `String test_error_str)] ;
+            [("reason", `String reason); ("error", `String test_error_str)] ;
         deferred
     | None ->
         [%log info] "cleaning up testnet ($reason, $error)"
