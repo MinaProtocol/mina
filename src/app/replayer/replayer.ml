@@ -29,6 +29,9 @@ let create_ledger accounts =
       Ledger.create_new_account_exn ledger acct_id acct ) ;
   ledger
 
+let json_ledger_hash_of_ledger ledger =
+  Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
+
 let create_output target_state_hash target_proof ledger =
   let target_ledger = Ledger.to_list ledger in
   {target_state_hash; target_proof; target_ledger}
@@ -401,24 +404,33 @@ let main ~input_file ~output_file ~archive_uri () =
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
-          (user_cmds : Sql.User_command.t list) =
+          (user_cmds : Sql.User_command.t list) ~last_global_slot =
+        let log_on_slot_change curr_global_slot =
+          if Int64.( > ) curr_global_slot last_global_slot then
+            [%log info] "Applied all commands at global slot %Ld, ledger hash"
+              ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)]
+              last_global_slot
+        in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
           match ics with
           | ic2 :: ics2
-            when Int.equal ic.sequence_no ic2.sequence_no
+            when Int64.equal ic.global_slot ic2.global_slot
+                 && Int.equal ic.sequence_no ic2.sequence_no
                  && String.equal ic.type_ "fee_transfer"
                  && String.equal ic.type_ ic2.type_ ->
               (* combining situation 2
-             two fee transfer commands with same sequence number
-          *)
+                 two fee transfer commands with same global slot, sequence number
+              *)
+              log_on_slot_change ic.global_slot ;
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
               in
-              apply_commands ics2 user_cmds
+              apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
           | _ ->
+              log_on_slot_change ic.global_slot ;
               let%bind () = run_internal_command ~logger ~pool ~ledger ic in
-              apply_commands ics user_cmds
+              apply_commands ics user_cmds ~last_global_slot:ic.global_slot
         in
         (* choose command with least global slot, sequence number
            TODO: check for gaps?
@@ -432,11 +444,13 @@ let main ~input_file ~output_file ~archive_uri () =
         | [], [] ->
             Deferred.unit
         | [], uc :: ucs ->
+            log_on_slot_change uc.global_slot ;
             let%bind () = run_user_command ~logger ~pool ~ledger uc in
-            apply_commands [] ucs
+            apply_commands [] ucs ~last_global_slot:uc.global_slot
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
+            log_on_slot_change uc.global_slot ;
             let%bind () = run_user_command ~logger ~pool ~ledger uc in
-            apply_commands internal_cmds ucs
+            apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
         | ic :: ics, [] ->
             combine_or_run_internal_cmds ic ics
         | ic :: ics, uc :: _ when cmp_ic_uc ic uc < 0 ->
@@ -447,7 +461,14 @@ let main ~input_file ~output_file ~archive_uri () =
                slot %Ld and sequence number %d"
               ic.global_slot ic.sequence_no ()
       in
-      let%bind () = apply_commands sorted_internal_cmds sorted_user_cmds in
+      [%log info] "At genesis, ledger hash"
+        ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
+      let%bind () =
+        apply_commands sorted_internal_cmds sorted_user_cmds
+          ~last_global_slot:0L
+      in
+      [%log info] "After applying all commands, ledger hash"
+        ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =

@@ -708,6 +708,30 @@ let daemon logger =
            Precomputed_values.genesis_ledger precomputed_values
            |> Lazy.force |> Ledger.merkle_root
          in
+         let genesis_ledger =
+           Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+         in
+         let account_ids =
+           Ledger.accounts genesis_ledger |> Account_id.Set.to_list
+         in
+         let accounts =
+           List.map account_ids ~f:(fun acct_id ->
+               match Ledger.location_of_account genesis_ledger acct_id with
+               | None ->
+                   failwith "BAD 1\n%!"
+               | Some loc -> (
+                 match Ledger.get genesis_ledger loc with
+                 | None ->
+                     failwith "BAD 2\n%!"
+                 | Some acct ->
+                     acct ) )
+         in
+         eprintf "GEN LEDGER:\n%!" ;
+         List.iter accounts ~f:(fun acct ->
+             eprintf "%s\n%!" (Yojson.Safe.to_string (Account.to_yojson acct))
+         ) ;
+         eprintf "\nGEN LEDGER HASH: %s\n%!"
+           (Yojson.Safe.to_string (Ledger_hash.to_yojson genesis_ledger_hash)) ;
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
