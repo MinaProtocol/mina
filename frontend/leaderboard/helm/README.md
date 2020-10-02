@@ -5,7 +5,7 @@ This chart bootstraps a Coda Protocol Testnet leaderboard service
 ## Add Coda Helm chart repository:
 
  ```console
- helm repo add coda <insert-repository-url>
+ helm repo add coda https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
