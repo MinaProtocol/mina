@@ -152,9 +152,13 @@ let main inputs =
         in
         [%log info] "Network deployed" ;
         let%bind log_engine =
-          Engine.Log_engine.create ~logger ~network ~on_fatal_error:(fun message ->
+          Engine.Log_engine.create ~logger ~network
+            ~on_fatal_error:(fun message ->
               don't_wait_for
-                (dispatch_cleanup (sprintf !"log engine fatal error: %s" (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
+                (dispatch_cleanup
+                   (sprintf
+                      !"log engine fatal error: %s"
+                      (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
                    (Malleable_error.return ())) )
         in
         log_engine_ref := Some log_engine ;

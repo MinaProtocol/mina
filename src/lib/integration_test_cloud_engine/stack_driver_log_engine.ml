@@ -432,22 +432,17 @@ module Block_produced_query = struct
       type t =
         { last_seen_result: T.t
         ; blocks_generated: int
-        ; slots_passed: int
-        ; epochs_passed: int
         ; snarked_ledgers_generated: int }
+      [@@deriving to_yojson]
 
       let empty =
         { last_seen_result= empty
         ; blocks_generated= 0
-        ; slots_passed= 0
-        ; epochs_passed= 0
         ; snarked_ledgers_generated= 0 }
 
       let init (result : T.t) =
         { last_seen_result= result
         ; blocks_generated= 1
-        ; slots_passed= 1
-        ; epochs_passed= 0
         ; snarked_ledgers_generated=
             (if result.snarked_ledger_generated then 1 else 0) }
     end
@@ -457,12 +452,6 @@ module Block_produced_query = struct
       if result.block_height > aggregated.last_seen_result.block_height then
         { Aggregated.last_seen_result= result
         ; blocks_generated= aggregated.blocks_generated + 1
-        ; slots_passed=
-            aggregated.slots_passed
-            + (result.global_slot - aggregated.last_seen_result.global_slot)
-        ; epochs_passed=
-            aggregated.epochs_passed
-            + (result.epoch - aggregated.last_seen_result.epoch)
         ; snarked_ledgers_generated=
             ( if result.snarked_ledger_generated then
               aggregated.snarked_ledgers_generated + 1
@@ -617,6 +606,8 @@ let start_background_query (type r)
     Subscription.create ~logger ~name:Query.name
       ~filter:(Query.filter testnet_log_filter)
   in
+  [%log info] "Subscription created for $query"
+    ~metadata:[("query", `String Query.name)] ;
   let subscription_task =
     let open Interruptible.Let_syntax in
     let%bind () = lift Deferred.unit (Ivar.read cancel_ivar) in
@@ -633,10 +624,12 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
     Subscription.create ~logger ~name:"blocks_produced"
       ~filter:(Block_produced_query.filter network.testnet_log_filter)
   in
+  [%log info] "Subscription created for blocks produced" ;
   let%bind breadcrumb_added =
     Subscription.create ~logger ~name:"breadcrumb_added"
       ~filter:(Breadcrumb_added_query.filter network.testnet_log_filter)
   in
+  [%log info] "Subscription created for breadcrumbs added" ;
   let cancel_background_tasks_ivar = Ivar.create () in
   let error_accumulator = empty_errors () in
   let%bind errors, errors_task_finished =
@@ -660,7 +653,10 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
               failwith "unexpected log level encountered"
         in
         DynArray.add acc result ;
-        if result.message.level = Fatal then on_fatal_error () ;
+        if result.message.level = Fatal then (
+          [%log fatal] "Error occured $error"
+            ~metadata:[("error", Logger.Message.to_yojson result.message)] ;
+          on_fatal_error result.message ) ;
         Malleable_error.return () )
   in
   let initialization_table =
@@ -791,10 +787,11 @@ let wait_for' :
                | `Snarked_ledgers_generated of int
                | `Milliseconds of int64 ]
     -> t
-    -> unit Malleable_error.t =
+    -> ([> `Blocks_produced of int] * [> `Slots_passed of int])
+       Malleable_error.t =
  fun ~blocks ~epoch_reached ~timeout t ->
   if blocks = 0 && epoch_reached = 0 && timeout = `Milliseconds 0L then
-    Malleable_error.return ()
+    Malleable_error.return (`Blocks_produced 0, `Slots_passed 0)
   else
     let now = Time.now () in
     let timeout_safety =
@@ -838,9 +835,9 @@ let wait_for' :
     let timed_out (res : Block_produced_query.Result.Aggregated.t) =
       match timeout with
       | `Slots x ->
-          res.slots_passed >= x
+          res.last_seen_result.global_slot >= x
       | `Epochs x ->
-          res.epochs_passed >= x
+          res.last_seen_result.epoch >= x
       | `Snarked_ledgers_generated x ->
           res.snarked_ledgers_generated >= x
       | `Milliseconds _ ->
@@ -854,15 +851,15 @@ let wait_for' :
           ; ("epoch_reached", `Int epoch_reached) ]
         "Checking if conditions passed for $result [blocks=$blocks, \
          epoch_reached=$epoch_reached]" ;
-      res.block_height >= blocks && res.epoch >= epoch_reached
+      res.block_height > blocks && res.epoch >= epoch_reached
     in
-    (*TODO: this should be block window duration once the constraint constants are added to runtime config*)
     let open Malleable_error.Let_syntax in
-    let rec go aggregated_res : unit Malleable_error.t =
+    let rec go aggregated_res =
       if Time.( > ) (Time.now ()) timeout_safety then
         Malleable_error.of_string_hard_error
           "wait_for took too long to complete"
-      else if timed_out aggregated_res then Malleable_error.ok_unit
+      else if timed_out aggregated_res then
+        Malleable_error.of_string_hard_error "wait_for timedout"
       else (
         [%log' info t.logger] "Pulling blocks produced subscription" ;
         let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
@@ -874,10 +871,9 @@ let wait_for' :
             ~init:(false, aggregated_res) ~f:(fun (_, acc) log ->
               let open Malleable_error.Let_syntax in
               let%map result = Block_produced_query.parse log in
+              let acc = Block_produced_query.Result.aggregate acc result in
               if conditions_passed result then `Stop (true, acc)
-              else
-                `Continue
-                  (false, Block_produced_query.Result.aggregate acc result) )
+              else `Continue (false, acc) )
         in
         if not finished then
           let%bind () =
@@ -890,7 +886,10 @@ let wait_for' :
               ~f:Malleable_error.return
           in
           go aggregated_res'
-        else Malleable_error.return () )
+        else
+          Malleable_error.return
+            ( `Blocks_produced aggregated_res'.blocks_generated
+            , `Slots_passed aggregated_res'.last_seen_result.global_slot ) )
     in
     go Block_produced_query.Result.Aggregated.empty
 
@@ -902,7 +901,8 @@ let wait_for :
                 | `Snarked_ledgers_generated of int
                 | `Milliseconds of int64 ]
     -> t
-    -> unit Malleable_error.t =
+    -> ([> `Blocks_produced of int] * [> `Slots_passed of int])
+       Malleable_error.t =
  fun ?(blocks = 0) ?(epoch_reached = 0) ?(timeout = `Milliseconds 300000L) t ->
   [%log' info t.logger]
     ~metadata:
@@ -921,13 +921,13 @@ let wait_for :
                 Printf.sprintf "%Ld ms" n ) ) ]
     "Waiting for $blocks blocks, $epoch epoch, with timeout $timeout" ;
   match%bind wait_for' ~blocks ~epoch_reached ~timeout t with
-  | Ok _ ->
-      Malleable_error.ok_unit
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
         ~metadata:[("error", `String (Error.to_string_hum e.error))] ;
       Deferred.return
         (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
+  | res ->
+      Deferred.return res
 
 let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
     unit Malleable_error.t =
@@ -1009,12 +1009,14 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
   in
   go num_tries
 
-let await_timeout ~waiting_for ~timeout_duration deferred =
-  match%map Timeout.await ~timeout_duration () deferred with
+let await_timeout ~waiting_for ~timeout_duration ~logger deferred =
+  match%bind Timeout.await ~timeout_duration () deferred with
   | `Timeout ->
-      failwithf "timeout while waiting for %s" waiting_for ()
+      Malleable_error.of_string_hard_error_format
+        "timeout while waiting for %s" waiting_for
   | `Ok x ->
-      x
+      [%log info] "%s completed" waiting_for ;
+      Malleable_error.return x
 
 let wait_for_init (node : Kubernetes_network.Node.t) t =
   let open Malleable_error.Let_syntax in
@@ -1029,10 +1031,9 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
   if Ivar.is_full init then return ()
   else
     (* TODO: make configurable (or ideally) compute dynamically from network configuration *)
-    Timeout.await_exn
+    await_timeout ~waiting_for:"initialization"
       ~timeout_duration:(Time.Span.of_ms (15.0 *. 60.0 *. 1000.0))
-      ()
-      (Deferred.bind (Ivar.read init) ~f:Malleable_error.return)
+      (Ivar.read init) ~logger:t.logger
 
 let wait_for_sync (nodes : Kubernetes_network.Node.t list) ~timeout t =
   [%log' info t.logger]
@@ -1053,8 +1054,7 @@ let wait_for_sync (nodes : Kubernetes_network.Node.t list) ~timeout t =
   await_timeout
     (Broadcast_pipe.Reader.iter_until t.best_tip_map_reader
        ~f:(Fn.compose Deferred.return all_nodes_synced))
-    ~waiting_for:"synchronization" ~timeout_duration:timeout
-  |> Deferred.bind ~f:Malleable_error.return
+    ~waiting_for:"synchronization" ~timeout_duration:timeout ~logger:t.logger
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
 (*let%test_module "Log tests" =

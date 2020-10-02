@@ -149,49 +149,89 @@ module Node = struct
           ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
         failwith "Could not run k8s port forwarding"
 
-  (*let retry ?(num_tries=10) ?(retry_delay_sec=30.0) ?(initial_delay_sec=30.0) ~logger ~graphql_port query_obj =
-        let go n =  
-          if n <= 0 then (
-          [%log fatal] "unlock_sender_account_graphql: too many tries" ;
-          failwith "unlock_sender_account_graphql: too many tries" )
-        else
-          (* let open Malleable_error.Let_syntax in *)
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query unlock_account_obj)
-                 (Graphql.uri graphql_port))
-          with
-          | Ok _ ->
-              [%log info] "unlock sender account succeeded" ;
-              return ()
-          | Error (`Failed_request err_string) ->
-              [%log warn]
-                "unlock_sender_account_graphql, Failed GraphQL request: %s, \
-                 %d tries left"
-                err_string (n - 1) ;
+  (* GraphQL not immediately available, retry as needed *)
+  let retry ?(num_tries = 10) ?(retry_delay_sec = 30.0)
+      ?(initial_delay_sec = 30.0) ~logger ~graphql_port
+      ?(retry_on_graphql_error = false) ~query_name query_obj =
+    let open Malleable_error.Let_syntax in
+    let err_str str = sprintf "%s: %s" query_name str in
+    let rec go n =
+      if n <= 0 then (
+        let err_str = err_str "too many tries" in
+        [%log fatal] "%s" err_str ;
+        Malleable_error.of_string_hard_error err_str )
+      else
+        (* let open Malleable_error.Let_syntax in *)
+        match%bind
+          Deferred.bind ~f:Malleable_error.return
+            ((Graphql.Client.query query_obj) (Graphql.uri graphql_port))
+        with
+        | Ok result ->
+            let err_str = err_str "succeeded" in
+            [%log info] "%s" err_str ;
+            return result
+        | Error (`Failed_request err_string) ->
+            let err_str =
+              err_str
+                (sprintf "Failed GraphQL request: %s, %d tries left" err_string
+                   (n - 1))
+            in
+            [%log warn] "%s" err_str ;
+            let%bind () =
+              Deferred.bind ~f:Malleable_error.return
+                (after (Time.Span.of_sec retry_delay_sec))
+            in
+            go (n - 1)
+        | Error (`Graphql_error err_string) ->
+            let err_str = err_str (sprintf "GraphQL error: %s" err_string) in
+            [%log error] "%s" err_str ;
+            if retry_on_graphql_error then (
               let%bind () =
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              go (n - 1)
-          | Error (`Graphql_error err_string) ->
-              [%log error] "unlock_sender_account_graphql, GraphQL error: %s"
-                err_string ;
-              Malleable_error.of_string_hard_error err_string
-      in
-      let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
-      in
-      go num_tries
+              [%log info] "%d tries left" (n - 1) ;
+              go (n - 1) )
+            else Malleable_error.of_string_hard_error err_string
+    in
+    let%bind () =
+      Deferred.bind ~f:Malleable_error.return
+        (after (Time.Span.of_sec initial_delay_sec))
+    in
+    go num_tries
 
   let get_balance ~logger t ~account_id =
-        [%log info] "Getting account balance"
+    let open Malleable_error.Let_syntax in
+    [%log info] "Getting account balance"
       ~metadata:
-        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id); ("account_id", Coda_base.Account_id.to_yojson account_id)] ;
-      let graphql_port = 3085 in
-      let pk = Coda_base.Account_id.public_key account_id in
-      let token = Coda_base.Account_id.token_id account_id in*)
+        [ ("namespace", `String t.namespace)
+        ; ("pod_id", `String t.pod_id)
+        ; ("account_id", Coda_base.Account_id.to_yojson account_id) ] ;
+    let graphql_port = 3085 in
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
+    let pk = Coda_base.Account_id.public_key account_id in
+    let token = Coda_base.Account_id.token_id account_id in
+    let get_balance () =
+      let get_balance_obj =
+        Graphql.Get_balance.make
+          ~public_key:(Graphql_lib.Encoders.public_key pk)
+          ~token:(Graphql_lib.Encoders.token token)
+          ()
+      in
+      let%bind balance_obj =
+        retry ~logger ~graphql_port ~retry_on_graphql_error:true
+          ~query_name:"get_balance_graphql" get_balance_obj
+      in
+      match balance_obj#account with
+      | None ->
+          Malleable_error.of_string_hard_error
+            (sprintf
+               !"Account with %{sexp:Coda_base.Account_id.t} not found"
+               account_id)
+      | Some acc ->
+          Malleable_error.return (acc#balance)#total
+    in
+    get_balance ()
 
   let send_payment ~logger t ~sender ~receiver ~amount ~fee =
     [%log info] "Sending a payment.."
@@ -203,56 +243,17 @@ module Node = struct
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
-    let unlock_sender_account_graphql () : unit Malleable_error.t =
-      let num_tries = 10 in
-      let initial_delay_sec = 30.0 in
-      let retry_delay_sec = 30.0 in
+    let unlock_sender_account_graphql () =
       let unlock_account_obj =
         Graphql.Unlock_account.make ~password:"naughty blue worm"
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      (* GraphQL not immediately available, retry as needed *)
-      let rec go n =
-        if n <= 0 then (
-          [%log fatal] "unlock_sender_account_graphql: too many tries" ;
-          failwith "unlock_sender_account_graphql: too many tries" )
-        else
-          (* let open Malleable_error.Let_syntax in *)
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query unlock_account_obj)
-                 (Graphql.uri graphql_port))
-          with
-          | Ok _ ->
-              [%log info] "unlock sender account succeeded" ;
-              return ()
-          | Error (`Failed_request err_string) ->
-              [%log warn]
-                "unlock_sender_account_graphql, Failed GraphQL request: %s, \
-                 %d tries left"
-                err_string (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-          | Error (`Graphql_error err_string) ->
-              [%log error] "unlock_sender_account_graphql, GraphQL error: %s"
-                err_string ;
-              Malleable_error.of_string_hard_error err_string
-      in
-      let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
-      in
-      go num_tries
+      retry ~logger ~graphql_port ~query_name:"unlock_sender_account_graphql"
+        unlock_account_obj
     in
-    let%bind () = unlock_sender_account_graphql () in
+    let%bind _ = unlock_sender_account_graphql () in
     let send_payment_graphql () =
-      let num_tries = 10 in
-      let initial_delay_sec = 30.0 in
-      let retry_delay_sec = 30.0 in
       let send_payment_obj =
         Graphql.Send_payment.make
           ~sender:(Graphql_lib.Encoders.public_key sender)
@@ -261,47 +262,9 @@ module Node = struct
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
       in
-      (* may have to retry if bootstrapping *)
-      let rec go n =
-        if n <= 0 then (
-          [%log error] "send_payment_graphql: too many tries" ;
-          Malleable_error.of_string_hard_error
-            "send_payment_graphql: too many tries" )
-        else
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query send_payment_obj)
-                 (Graphql.uri graphql_port))
-          with
-          | Ok result ->
-              [%log info] "send payment GraphQL succeeded" ;
-              return result
-          | Error (`Failed_request err) ->
-              [%log warn]
-                "send_payment_graphql, Failed GraphQL request: %s, %d tries \
-                 left"
-                err (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-          | Error (`Graphql_error err) ->
-              (* errors are not fatal here, like "still bootstrapping" *)
-              [%log info]
-                "send_payment_graphql, GraphQL error: %s, %d tries left" err
-                (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-      in
-      let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
-      in
-      go num_tries
+      (* retry_on_graphql_error=true because the node might be bootstrapping *)
+      retry ~logger ~graphql_port ~retry_on_graphql_error:true
+        ~query_name:"send_payment_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
@@ -318,7 +281,8 @@ type t =
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
-  ; testnet_log_filter: string }
+  ; testnet_log_filter: string
+  ; keypairs: Signature_lib.Keypair.t list }
 
 let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
   block_producers @ snark_coordinators @ archive_nodes
