@@ -102,7 +102,7 @@ struct
       ty t
 
   module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dee)
-  module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
+  module Ops = Step_main_inputs.Ops
 
   module Inner_curve = struct
     include Inner_curve
@@ -321,7 +321,10 @@ struct
     scalar_chal m1.zeta m2.zeta
 
   let lagrange_commitment ~domain i =
-    let d = Domain.log2_size domain - 12 in
+    let d =
+      Zexe_backend.Tweedle.Precomputed.Lagrange_precomputations
+      .index_of_domain_log2 (Domain.log2_size domain)
+    in
     match Precomputed.Lagrange_precomputations.dee.(d).(i) with
     | [|g|] ->
         Inner_curve.Constant.of_affine g

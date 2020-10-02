@@ -222,21 +222,20 @@ let univ : t =
   { compiled= Type_equal.Id.Uid.Table.create ()
   ; side_loaded= Type_equal.Id.Uid.Table.create () }
 
+let find t k =
+  match Hashtbl.find t k with None -> failwith "key not found" | Some x -> x
+
 let lookup_compiled : type a b n m.
     (a, b, n, m) Tag.tag -> (a, b, n, m) Compiled.t =
  fun t ->
-  let (T (other_id, d)) =
-    Hashtbl.find_exn univ.compiled (Type_equal.Id.uid t)
-  in
+  let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
 let lookup_side_loaded : type a b n m.
     (a, b, n, m) Tag.tag -> (a, b, n, m) Side_loaded.t =
  fun t ->
-  let (T (other_id, d)) =
-    Hashtbl.find_exn univ.side_loaded (Type_equal.Id.uid t)
-  in
+  let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
@@ -305,14 +304,12 @@ let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t) ~self ~default
   | None -> (
     match t.kind with
     | Compiled ->
-        let (T (other_id, d)) =
-          Hashtbl.find_exn univ.compiled (Type_equal.Id.uid t.id)
-        in
+        let (T (other_id, d)) = find univ.compiled (Type_equal.Id.uid t.id) in
         let T = Type_equal.Id.same_witness_exn t.id other_id in
         f (`Compiled d)
     | Side_loaded ->
         let (T (other_id, d)) =
-          Hashtbl.find_exn univ.side_loaded (Type_equal.Id.uid t.id)
+          find univ.side_loaded (Type_equal.Id.uid t.id)
         in
         let T = Type_equal.Id.same_witness_exn t.id other_id in
         f (`Side_loaded d) )
