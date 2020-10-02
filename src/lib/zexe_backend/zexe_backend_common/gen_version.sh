@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e -o pipefail
 
 marlin_submodule_dir=$(git submodule | grep marlin | cut -d' ' -f3)
