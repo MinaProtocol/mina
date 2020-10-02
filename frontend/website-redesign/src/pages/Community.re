@@ -220,7 +220,7 @@ let make = (~profiles) => {
         textColor: Theme.Colors.white,
         image: "/static/img/BlogLandingHero.jpg",
         background:
-          Image("/static/img/community-page/CommunityBackground.png"),
+          Image("/static/img/community-page/CommunityBackground.jpg"),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
         button: {
           buttonColor: Theme.Colors.mint,
@@ -276,7 +276,8 @@ let make = (~profiles) => {
                "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
              )}
           </p>
-          <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
+          <Button
+            bgColor=Theme.Colors.orange href={`Internal("/leaderboard")}>
             {React.string("See The Full Leaderboard")}
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
@@ -303,7 +304,7 @@ let make = (~profiles) => {
           textColor: Theme.Colors.black,
           image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
           background:
-            Image("/static/img/community-page/SectionCulture&Values.png"),
+            Image("/static/img/community-page/SectionCulture_Values.jpg"),
           contentBackground: Color(Theme.Colors.white),
           button: {
             FeaturedSingleRow.Row.buttonText: "Read the Code of Conduct",
@@ -312,15 +313,15 @@ let make = (~profiles) => {
             dark: false,
             href: `External(Constants.codeOfConductUrl),
           },
-        }
-      />
-      <Wrapped>
-        <Spacer height=4. />
-        <Rule color=Theme.Colors.white />
-        <Spacer height=4. />
-        <CultureGrid />
-        <Spacer height=7. />
-      </Wrapped>
+        }>
+        <Wrapped>
+          <Spacer height=4. />
+          <Rule color=Theme.Colors.white />
+          <Spacer height=4. />
+          <CultureGrid />
+          <Spacer height=7. />
+        </Wrapped>
+      </FeaturedSingleRow>
     </div>
   </Page>;
 };
