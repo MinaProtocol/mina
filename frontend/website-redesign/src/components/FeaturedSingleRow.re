@@ -12,7 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
-    href: [`External(string) | `Internal(string)],
+    href: [ | `External(string) | `Internal(string)],
   };
 
   type t = {
@@ -104,14 +104,8 @@ module SingleRow = {
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(
-          Theme.MediaQuery.tablet,
-          [width(`percent(80.))],
-        ),
-        media(
-          Theme.MediaQuery.desktop,
-          [width(`percent(100.))],
-        ),
+        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
   module ImageLeftCopyRight = {
@@ -135,7 +129,12 @@ module SingleRow = {
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [bottom(`zero), top(`inherit_), right(`zero), width(`rem(29.))],
+              [
+                bottom(`zero),
+                top(`inherit_),
+                right(`zero),
+                width(`rem(29.)),
+              ],
             ),
           ]),
         ]);
@@ -215,17 +214,17 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-              <Button
-                bgColor={row.button.buttonColor}
-                dark={row.button.dark}
-                href={row.button.href}>
-                <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                  {React.string(row.button.buttonText)}
-                  <span className=Css.(style([marginTop(`rem(0.8))]))>
-                    <Icon kind=Icon.ArrowRightSmall />
-                  </span>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
+              <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                {React.string(row.button.buttonText)}
+                <span className=Css.(style([marginTop(`rem(0.8))]))>
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
-              </Button>
+              </span>
+            </Button>
           </div>
         </div>
       </div>;

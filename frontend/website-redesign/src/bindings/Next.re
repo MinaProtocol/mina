@@ -25,7 +25,7 @@ module Router = {
     query: Js.Dict.t('a),
     route: string,
     asPath: string,
-    events: events,
+    events,
   };
 
   [@bs.module "next/router"] [@bs.val]
@@ -36,7 +36,6 @@ module Router = {
     [@bs.send] external on: (events, string, handler) => unit = "on";
     [@bs.send] external off: (events, string, handler) => unit = "off";
   };
-
 };
 
 module Config = {

@@ -3,13 +3,14 @@ module Styles = {
 
   let fadeIn = keyframes([(0, [opacity(0.)]), (100, [opacity(1.)])]);
 
-  let main = style([
-    opacity(0.),
-    animationName(fadeIn),
-    animationDuration(1000),
-    animationDelay(200),
-    animationFillMode(`forwards),
-  ]);
+  let main =
+    style([
+      opacity(0.),
+      animationName(fadeIn),
+      animationDuration(1000),
+      animationDelay(200),
+      animationFillMode(`forwards),
+    ]);
 };
 
 let siteDescription = "Mina is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Mina directly from any device, in less data than a few tweets.";

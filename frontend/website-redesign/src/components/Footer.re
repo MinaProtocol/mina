@@ -80,12 +80,17 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
-        selector("a", [width(`rem(2.)), color(white), hover([color(Theme.Colors.orange)])]),
+        selector(
+          "a",
+          [
+            width(`rem(2.)),
+            color(white),
+            hover([color(Theme.Colors.orange)]),
+          ],
+        ),
       ]);
 
-    let anchor = style([
-      textDecoration(`none)
-    ]);
+    let anchor = style([textDecoration(`none)]);
   };
 
   [@react.component]
@@ -103,7 +108,11 @@ module SocialIcons = {
       <a className=Styles.anchor href="http://bit.ly/MinaTelegram">
         <Icon kind=Icon.Telegram size=2. />
       </a>
-      <a className=Styles.anchor href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200"> <Icon kind=Icon.WeChat size=2. /> </a>
+      <a
+        className=Styles.anchor
+        href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200">
+        <Icon kind=Icon.WeChat size=2. />
+      </a>
     </div>;
   };
 };

@@ -243,6 +243,14 @@ let make = () => {
           )}
         />
       </div>
+      <FilterDropdown
+        currentFilter={string_of_filter(state.currentFilter)}
+        onFilterPress
+        filterLabels={Array.map(
+          filter => {string_of_filter(filter)},
+          filters,
+        )}
+      />
       <Spacer height=1.5 />
       <Leaderboard
         search={state.username}

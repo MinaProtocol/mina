@@ -92,7 +92,14 @@ let make = () => {
         <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
     </div>
-    <div className=Css.(style([display(`none), media(Theme.MediaQuery.tablet, [display(`block)])])) />
+    <div
+      className=Css.(
+        style([
+          display(`none),
+          media(Theme.MediaQuery.tablet, [display(`block)]),
+        ])
+      )
+    />
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Community")} </h4>
       <Next.Link href="/about">

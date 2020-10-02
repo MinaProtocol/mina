@@ -276,7 +276,8 @@ let make = (~profiles) => {
                "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
              )}
           </p>
-          <Button bgColor=Theme.Colors.orange href=`Internal("/leaderboard")>
+          <Button
+            bgColor=Theme.Colors.orange href={`Internal("/leaderboard")}>
             {React.string("See The Full Leaderboard")}
             <Icon kind=Icon.ArrowRightSmall />
           </Button>
