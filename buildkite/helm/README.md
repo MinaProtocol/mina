@@ -1,6 +1,6 @@
 ## Introduction
 
-This chart bootstraps a Buildkite GraphQL API metrics exporter providing job and agent statistics to a Prometheus compatible endpoint.
+This chart bootstraps a Buildkite GraphQL API metrics exporter providing job and agent statistics to a Prometheus compatible endpoint. TESTING
 
 ## Add Coda Helm chart repository:
 
