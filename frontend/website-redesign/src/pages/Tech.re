@@ -518,22 +518,22 @@ let make = () => {
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          href: `Internal("/docs"),
+          href: `Internal("/docs/getting-started"),
           buttonText: "Run a Node",
           dark: false,
         },
         contentBackground: Color(Css.white),
       }
     />
-      /*
-    <div className=Styles.sectionContainer("")>
-      <Spacer height=6. />
-      <div className=Styles.section id="knowledge">
-        <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-      </div>
-    </div>
-    <Spacer height=12. />
-    */
+    /*
+     <div className=Styles.sectionContainer("")>
+       <Spacer height=6. />
+       <div className=Styles.section id="knowledge">
+         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
+       </div>
+     </div>
+     <Spacer height=12. />
+     */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,

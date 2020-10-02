@@ -32,6 +32,7 @@ module Styles = {
       alignItems(`center),
       width(`percent(100.)),
       marginBottom(`rem(3.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(93.))]),
     ]);
 };
 
