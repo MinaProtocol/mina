@@ -340,8 +340,8 @@ let verify_transitions_and_build_breadcrumbs ~logger
       ; ( "time_elapsed"
         , `Int
             Core.Time.(
-              Span.to_secs
-              @@ diff verification_end_time verification_start_time) ) ]
+              Span.to_sec @@ diff verification_end_time verification_start_time)
+        ) ]
     "verification of transitions complete" ;
   let trees_of_transitions =
     Option.fold
@@ -361,7 +361,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
             , `Int
-                Core.Time.(Span.to_secs @@ diff (now ()) verification_end_time)
+                Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
             ) ]
         "build of breadcrumbs complete" ;
       Deferred.Or_error.return result
@@ -371,7 +371,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
             , `Int
-                Core.Time.(Span.to_secs @@ diff (now ()) verification_end_time)
+                Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
             ) ]
         "build of breadcrumbs failed" ;
       List.map transitions_with_initial_validation
