@@ -993,7 +993,8 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~constraint_constants ~logger:config.logger
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1198,7 +1199,8 @@ let create (config : Config.t) =
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~constraint_constants ~logger:config.logger
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader

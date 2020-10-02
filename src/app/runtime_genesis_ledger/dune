@@ -17,7 +17,7 @@
     snarky.backendless
     staged_ledger)
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
+  (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson bisect_ppx -- --conditional)))
 
 (rule
  (targets genesis_filename.txt)

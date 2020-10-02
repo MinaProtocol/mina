@@ -64,7 +64,8 @@ module Go_log = struct
     | "warn" ->
         Warn
     | "info" ->
-        Info
+        (* this is intentionally debug, because the go info logs are too verbose for our info *)
+        Debug
     | "debug" ->
         Debug
     | _ ->

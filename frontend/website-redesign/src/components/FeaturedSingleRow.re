@@ -12,7 +12,7 @@ module Row = {
     buttonTextColor: Css.color,
     buttonText: string,
     dark: bool,
-    href: [`External(string) | `Internal(string)],
+    href: [ | `External(string) | `Internal(string)],
   };
 
   type t = {
@@ -60,7 +60,7 @@ module SingleRow = {
         alignItems(`flexStart),
         justifyContent(`spaceBetween),
         padding(`rem(3.)),
-        important(backgroundSize(`cover)),
+        backgroundSize(`cover),
         media(
           Theme.MediaQuery.notMobile,
           [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
@@ -135,7 +135,12 @@ module SingleRow = {
             bottom(`percent(6.)),
             media(
               Theme.MediaQuery.tablet,
-              [bottom(`zero), top(`inherit_), right(`zero), width(`rem(29.))],
+              [
+                bottom(`zero),
+                top(`inherit_),
+                right(`zero),
+                width(`rem(29.)),
+              ],
             ),
           ]),
         ]);
@@ -215,17 +220,17 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-              <Button
-                bgColor={row.button.buttonColor}
-                dark={row.button.dark}
-                href={row.button.href}>
-                <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                  {React.string(row.button.buttonText)}
-                  <span className=Css.(style([marginTop(`rem(0.8))]))>
-                    <Icon kind=Icon.ArrowRightSmall />
-                  </span>
+            <Button
+              bgColor={row.button.buttonColor}
+              dark={row.button.dark}
+              href={row.button.href}>
+              <span className={Styles.buttonText(row.button.buttonTextColor)}>
+                {React.string(row.button.buttonText)}
+                <span className=Css.(style([marginTop(`rem(0.8))]))>
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
-              </Button>
+              </span>
+            </Button>
           </div>
         </div>
       </div>;
