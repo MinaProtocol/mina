@@ -21,6 +21,9 @@ module Command_error : sig
         [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
     | Overflow
     | Bad_token
+    | Expired of
+        [`Valid_until of Coda_numbers.Global_slot.t]
+        * [`Current_global_slot of Coda_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
   [@@deriving sexp_of, to_yojson]
 end
@@ -33,7 +36,11 @@ type t [@@deriving sexp_of]
 (* TODO sexp is debug only, remove *)
 
 (** Empty pool *)
-val empty : constraint_constants:Genesis_constants.Constraint_constants.t -> t
+val empty :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
+  -> time_controller:Block_time.Controller.t
+  -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
@@ -44,6 +51,10 @@ val min_fee : t -> Currency.Fee.t option
 (** Remove the lowest fee command from the pool, along with any others from the
     same account with higher nonces. *)
 val remove_lowest_fee :
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
+
+(** Remove all the user commands that are expired. (Valid-until < Current-global-slot) *)
+val remove_expired :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
 (** Get the highest fee applicable command in the pool *)
@@ -90,7 +101,9 @@ val add_from_gossip_exn :
     switching chains. Must be called in reverse order i.e. newest-to-oldest.
 *)
 val add_from_backtrack :
-  t -> Transaction_hash.User_command_with_valid_signature.t -> t
+     t
+  -> Transaction_hash.User_command_with_valid_signature.t
+  -> (t, Command_error.t) Result.t
 
 (** Check whether a command is in the pool *)
 val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
