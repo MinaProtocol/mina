@@ -855,10 +855,15 @@ let dump_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         (* TODO: Allow these to be configurable. *)
+         let proof_level = Genesis_constants.Proof_level.compiled in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
          let all =
-           Transaction_snark.constraint_system_digests ()
+           Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ()
+               ~proof_level ~constraint_constants ()
          in
          let all =
            List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
