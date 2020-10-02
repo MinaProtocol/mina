@@ -226,7 +226,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Transition_frontier.Persistent_root.Instance.snarked_ledger
         temp_persistent_root_instance
     in
-    let%bind hash, sender, expected_staged_ledger_hash =
+    let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
       time_deferred
         (let root_sync_ledger =
            Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
@@ -249,7 +249,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                , staged_ledger_data_download_result ) =
         time_deferred
           (Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-             t.network sender_peer_id hash)
+             t.network sender.peer_id hash)
       in
       match staged_ledger_data_download_result with
       | Error err ->
@@ -420,9 +420,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                       let%map peers =
                         Coda_networking.random_peers t.network n
                       in
-                      Network_peer.Peer.create sender_host ~libp2p_port:0
-                        ~peer_id:sender_peer_id
-                      :: peers )
+                      sender :: peers )
                     ~query_peer:
                       { Consensus.Hooks.Rpcs.query=
                           (fun peer rpc query ->
