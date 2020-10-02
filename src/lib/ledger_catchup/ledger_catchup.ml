@@ -338,7 +338,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
     ~metadata:
       [ ("target_hash", State_hash.to_yojson target_hash)
       ; ( "time_elapsed"
-        , `Int
+        , `Float
             Core.Time.(
               Span.to_sec @@ diff verification_end_time verification_start_time)
         ) ]
@@ -360,7 +360,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         ~metadata:
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
-            , `Int
+            , `Float
                 Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
             ) ]
         "build of breadcrumbs complete" ;
@@ -370,7 +370,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         ~metadata:
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
-            , `Int
+            , `Float
                 Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
             ) ]
         "build of breadcrumbs failed" ;
