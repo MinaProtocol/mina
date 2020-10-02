@@ -60,7 +60,7 @@ module SingleRow = {
         alignItems(`flexStart),
         justifyContent(`spaceBetween),
         padding(`rem(3.)),
-        important(backgroundSize(`cover)),
+        backgroundSize(`cover),
         media(
           Theme.MediaQuery.notMobile,
           [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],

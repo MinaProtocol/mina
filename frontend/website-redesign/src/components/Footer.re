@@ -130,14 +130,9 @@ module LeftSide = {
       ]);
 
     let emailInputSection =
-      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
+      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))])]);
 
-    let logo =
-      style([
-        height(`rem(3.1)),
-        width(`rem(11.)),
-        marginBottom(`rem(4.)),
-      ]);
+    let logo = style([height(`rem(3.1)), width(`rem(11.))]);
 
     let label =
       merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);

@@ -8,4 +8,4 @@
    genesis_constants
    runtime_config
    with_hash)
- (preprocess (pps ppx_version)))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))

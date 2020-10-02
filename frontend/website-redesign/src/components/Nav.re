@@ -48,9 +48,11 @@ module Styles = {
       flexDirection(`column),
       position(`absolute),
       left(`zero),
+      right(`zero),
       top(`rem(4.25)),
-      width(`percent(100.)),
+      width(`percent(90.)),
       background(Theme.Colors.digitalBlack),
+      margin2(~h=`auto, ~v=`zero),
       media(Theme.MediaQuery.tablet, [top(`rem(6.25))]),
       media(
         Theme.MediaQuery.desktop,
@@ -80,7 +82,7 @@ module Styles = {
           Theme.MediaQuery.desktop,
           [
             position(`relative),
-            marginRight(`rem(1.25)),
+            marginRight(`rem(2.5)),
             width(`auto),
             height(`auto),
             padding(`zero),
@@ -227,8 +229,8 @@ let make = (~dark=false) => {
     </Next.Link>
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
-      <span id="open-nav"> <Icon kind=Icon.BurgerMenu /> </span>
-      <span id="close-nav"> <Icon kind=Icon.CloseMenu /> </span>
+      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2./> </span>
+      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=2./> </span>
     </label>
     <nav className=Styles.nav>
       <NavLink label="About" href="/about" dark />

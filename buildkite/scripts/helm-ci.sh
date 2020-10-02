@@ -10,7 +10,7 @@ diff=$(
 # Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
-    find $(dirname $val) -name 'Chart.yaml';
+    find $(dirname ${val:-""}) -name 'Chart.yaml';
   done
 )
 
@@ -36,19 +36,19 @@ if [ -n "${HELM_RELEASE+x}" ]; then
   echo "--- Syncing with remote GCS Helm chart repository"
   gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
 
-  echo "--- Preparing the following charts for Release: ${charts}"
   for dir in $dirs; do
-    git diff develop... "${dir}/Chart.yaml" | grep version
-
+    echo "--- Preparing chart for Release: ${dir}"
     helm package $dir --destination $stageDir
 
     if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
       echo "--- Helm experimental OCI activated - deploying to GCR registry"
       helm chart save $(basename $dir)
 
+      echo "--- Configuring Docker auth"
       gcloud auth configure-docker
       docker login "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
 
+      echo "--- Pushing chart"
       helm chart push "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
     fi
   done

@@ -16,6 +16,7 @@ module Styles = {
           gridTemplateColumns([
             `repeat((`num(3), `minmax((`rem(11.), `rem(11.5))))),
           ]),
+          gridTemplateRows([`repeat((`num(2), `rem(15.1)))]),
         ],
       ),
       media(

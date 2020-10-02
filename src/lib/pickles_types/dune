@@ -2,7 +2,7 @@
   (inline_tests)
   (name pickles_types)
   (public_name pickles_types)
-  (preprocess (pps ppx_coda ppx_version -lint-version-syntax-warnings ppx_deriving_yojson ppx_jane ppx_deriving.std h_list.ppx))
+  (preprocess (pps ppx_coda ppx_version -lint-version-syntax-warnings ppx_deriving_yojson ppx_jane ppx_deriving.std h_list.ppx bisect_ppx -- --conditional))
   (libraries
     snarky.backendless
     core_kernel))
