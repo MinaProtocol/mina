@@ -1,3 +1,6 @@
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
 module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
