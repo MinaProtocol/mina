@@ -51,7 +51,7 @@ spec:
           {{- end -}}
           {{- range $.Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
-          {{- end -}
+          {{- end -}}
           "-discovery-keypair", "{{ $.Values.seed.discoveryKeypair }}",
           {{- if (ne $.Values.coda.runtimeConfig "") }}
           "-config-file", "/config/daemon.json",

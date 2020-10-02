@@ -172,7 +172,7 @@ spec:
           {{- end -}}
           {{- range $.Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
-          {{- end -}
+          {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
