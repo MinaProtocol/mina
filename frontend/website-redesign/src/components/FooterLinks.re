@@ -16,6 +16,7 @@ module Styles = {
           gridTemplateColumns([
             `repeat((`num(3), `minmax((`rem(11.), `rem(11.5))))),
           ]),
+          gridTemplateRows([`repeat((`num(2), `rem(15.1)))]),
         ],
       ),
       media(
@@ -92,7 +93,14 @@ let make = () => {
         <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
     </div>
-    <div className=Css.(style([display(`none), media(Theme.MediaQuery.tablet, [display(`block)])])) />
+    <div
+      className=Css.(
+        style([
+          display(`none),
+          media(Theme.MediaQuery.tablet, [display(`block)]),
+        ])
+      )
+    />
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader> {React.string("Community")} </h4>
       <Next.Link href="/about">
