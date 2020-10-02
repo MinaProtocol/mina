@@ -104,14 +104,8 @@ module SingleRow = {
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(
-          Theme.MediaQuery.tablet,
-          [width(`percent(80.))],
-        ),
-        media(
-          Theme.MediaQuery.desktop,
-          [width(`percent(100.))],
-        ),
+        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
   module ImageLeftCopyRight = {
@@ -131,12 +125,11 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, backgroundImg),
           style([
-            top(`rem(12.6)),
-            bottom(`percent(6.)),
+            bottom(`zero),
             media(
               Theme.MediaQuery.tablet,
               [
-                bottom(`zero),
+                bottom(`percent(6.)),
                 top(`inherit_),
                 right(`zero),
                 width(`rem(29.)),
@@ -226,9 +219,7 @@ module SingleRow = {
               href={row.button.href}>
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
+                <Icon kind=Icon.ArrowRightSmall />
               </span>
             </Button>
           </div>
