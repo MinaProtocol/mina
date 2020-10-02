@@ -2,6 +2,9 @@ open Core
 open Async
 open Integration_test_lib
 
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
 module Node = struct
   type t = {namespace: string; pod_id: string}
 

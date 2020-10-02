@@ -332,7 +332,7 @@ module State_stack = struct
       let%bind eq_src = equal_var s1 s2
       and eq_target = equal_var t1 t2
       and correct_transition = equal_var t1 s2 in
-      let%bind same_update = Boolean.(eq_src && eq_target) in
+      let%bind same_update = Boolean.(eq_src &&& eq_target) in
       Boolean.any [same_update; correct_transition]
   end
 end
@@ -430,12 +430,12 @@ module Update = struct
         ~there:to_bits ~back:of_bits
 
     module Checked = struct
-      let no_update (b0, b1) = Boolean.((not b0) && not b1)
+      let no_update (b0, b1) = Boolean.((not b0) &&& not b1)
 
       let update_two_stacks_coinbase_in_first (b0, b1) =
-        Boolean.((not b0) && b1)
+        Boolean.((not b0) &&& b1)
 
-      let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 && b1)
+      let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 &&& b1)
     end
   end
 
@@ -632,7 +632,7 @@ module T = struct
       let%bind b1 = Coinbase_stack.equal_var var1.Poly.data var2.Poly.data in
       let%bind b2 = State_stack.equal_var var1.Poly.state var2.Poly.state in
       let open Tick0.Boolean in
-      b1 && b2
+      b1 &&& b2
 
     let empty = {Poly.data= Coinbase_stack.empty; state= State_stack.empty}
 
@@ -873,7 +873,7 @@ module T = struct
              Boolean.Assert.is_true check)
         in
         let%bind no_coinbase =
-          Boolean.(no_update || no_coinbase_in_this_stack)
+          Boolean.(no_update ||| no_coinbase_in_this_stack)
         in
         (* TODO: Optimize here since we are pushing twice to the same stack *)
         let%bind stack_with_amount1 =
@@ -898,7 +898,7 @@ module T = struct
           let%bind update_second_stack =
             Update.Action.Checked.update_two_stacks_coinbase_in_first action
           in
-          Boolean.(update_second_stack || add_coinbase)
+          Boolean.(update_second_stack ||| add_coinbase)
         in
         let%bind stack =
           let%bind stack_with_state =

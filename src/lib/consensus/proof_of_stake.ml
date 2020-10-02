@@ -1104,6 +1104,8 @@ module Data = struct
         Global_slot.diff ~constants t (gc_width_epoch, gc_width_slot)
 
     let to_uint32 t = Global_slot.slot_number t
+
+    let to_global_slot = slot_number
   end
 
   [%%if
