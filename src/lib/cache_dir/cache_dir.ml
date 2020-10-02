@@ -25,10 +25,7 @@ let cache =
   let dir d w = Key_cache.Spec.On_disk {directory= d; should_write= w} in
   [ dir manual_install_path false
   ; dir brew_install_path false
-  ; dir s3_install_path false
-  ; dir autogen_path true
-  ; Key_cache.Spec.S3
-      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} ]
+  ; dir autogen_path true ]
 
 let env_path =
   match Sys.getenv "CODA_KEYS_PATH" with
