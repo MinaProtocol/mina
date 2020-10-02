@@ -39,7 +39,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Core.Time.t -> [`Expired | `Ok])
+      -> has_timed_out:(Core.Time.t -> [`Timed_out | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -63,6 +63,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (Coda_net2.validation_result -> unit) )

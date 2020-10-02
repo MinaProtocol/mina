@@ -50,6 +50,7 @@ module Styles = {
         marginLeft(`rem(0.4)),
         marginRight(`rem(0.2)),
         cursor(`pointer),
+        hover([borderBottom(`px(1), `solid, Theme.Colors.orange)]),
       ]),
     ]);
 
