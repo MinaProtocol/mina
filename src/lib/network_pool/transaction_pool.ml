@@ -1269,7 +1269,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys))
-              ~max_amount:100_000_000_000 ~max_fee:10_000_000_000 ()
+              ~max_amount:100_000_000_000 ~fee_range:10_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
@@ -1456,7 +1456,7 @@ let%test_module _ =
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
                  ~nonce:(Account.Nonce.of_int 1) ~max_amount:100_000_000_000
-                 ~max_fee:10_000_000_000 ())
+                 ~fee_range:10_000_000_000 ())
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool

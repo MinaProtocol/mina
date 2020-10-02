@@ -94,7 +94,7 @@ let%test_module "transaction_status" =
         ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
-      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
+      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
     let proof_level = Genesis_constants.Proof_level.for_unit_tests
