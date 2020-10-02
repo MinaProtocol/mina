@@ -396,7 +396,7 @@ let run_test () : unit Deferred.t =
         in
         let%bind updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
-              Currency.Amount.of_int ((i + 1) * 10) )
+              Currency.Amount.of_int (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + (i + 1) * 10) )
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
         let%map () = wait_for_proof_or_timeout timeout_min () in
