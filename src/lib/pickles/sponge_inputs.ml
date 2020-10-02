@@ -33,6 +33,7 @@ struct
   *)
   let round_table start =
     let ({round_constants; mds} : _ Sponge.Params.t) = B.params in
+    (* sbox -> mds -> ark *)
     let apply_round i s =
       let s' = Array.map s ~f:B.to_the_alpha in
       B.Operations.apply_affine_map (mds, round_constants.(i)) s'
@@ -51,8 +52,9 @@ struct
   open Field
   module Field = Field
 
-  let block_cipher (_ : _ Sponge.Params.t) init =
+  let block_cipher (params : _ Sponge.Params.t) init =
     Impl.with_label __LOC__ (fun () ->
+        let init = Array.map2_exn ~f:( + ) init params.round_constants.(0) in
         let t =
           exists
             (Typ.array

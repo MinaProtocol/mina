@@ -228,7 +228,10 @@ struct
       ~domain:( (which_branch : n One_hot_vector.t)
               , (domains : (Domains.t, n) Vector.t) ) i =
     Vector.map domains ~f:(fun d ->
-        let d = Domain.log2_size d.h - 12 in
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
         match Precomputed.Lagrange_precomputations.dum.(d).(i) with
         | [|g|] ->
             let g = Inner_curve.Constant.of_affine g in
@@ -247,15 +250,19 @@ struct
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
     in
     Vector.map domains ~f:(fun d ->
-        let d = Domain.log2_size d.h - 12 in
+        let d =
+          Precomputed.Lagrange_precomputations.index_of_domain_log2
+            (Domain.log2_size d.h)
+        in
         match Precomputed.Lagrange_precomputations.dum.(d).(i) with
         | [|g|] ->
             let g = Inner_curve.Constant.of_affine g in
             ( Inner_curve.constant g
             , Inner_curve.constant
                 (Inner_curve.Constant.negate (pow2pow g (input_length - 1))) )
-        | _ ->
-            assert false )
+        | xs ->
+            failwithf "expected commitment to have length 1. got %d"
+              (Array.length xs) () )
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
          ~f:(fun b pr ->
@@ -548,7 +555,6 @@ struct
                             Some corr ))
                       ~f:Ops.add_fast )
               in
-              Plonk_curve_ops.print := true ;
               Array.fold terms ~init:correction ~f:(fun acc term ->
                   match term with
                   | `Cond_add (b, g) ->
@@ -556,27 +562,7 @@ struct
                   | `Add_with_correction (x, (g, _)) ->
                       Ops.add_fast acc
                         (Ops.scale_fast g (`Plus_two_to_len_minus_1 x)) ) )
-          (*
-          let input =
-            with_label __LOC__ (fun () ->
-            Array.mapi public_input ~f:(fun i x ->
-                let x = Array.of_list x in
-                ( x
-                , lagrange_commitment ~input_length:(Array.length x)
-                    ~domain:(which_branch, step_domains)
-                    i ) ) )
-          in
-          let add_up = Array.reduce_exn ~f:Ops.add_fast in
-          let correction =
-            with_label __LOC__ (fun () ->
-            add_up (Array.map input ~f:(fun (_, (_, corr)) -> corr)) )
-          in
-          Array.map input ~f:(fun (x, (g, _)) ->
-              Ops.scale_fast g (`Plus_two_to_len_minus_1 x) )
-          |> add_up
-          |> Ops.add_fast (Inner_curve.negate correction) *)
         in
-        Plonk_curve_ops.print := false ;
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;

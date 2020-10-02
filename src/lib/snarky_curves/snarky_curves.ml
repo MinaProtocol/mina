@@ -140,7 +140,10 @@ module Make_weierstrass_checked
 
       val scale : t -> Scalar.t -> t
     end)
-    (Params : Params_intf with type field := F.Unchecked.t) :
+    (Params : Params_intf with type field := F.Unchecked.t) (Override : sig
+        val add :
+          (F.t * F.t -> F.t * F.t -> (F.t * F.t, _) F.Impl.Checked.t) option
+    end) :
   Weierstrass_checked_intf
   with module Impl := F.Impl
    and type unchecked := Curve.t
@@ -214,6 +217,9 @@ module Make_weierstrass_checked
     in
     let%map () = assert_r1cs lambda (ax - cx) (cy + ay) in
     (cx, cy)
+
+  let add' ~div p1 p2 =
+    match Override.add with Some add -> add p1 p2 | None -> add' ~div p1 p2
 
   (* This function MUST NOT be called UNLESS you are certain the two points
    on which it is called are not equal. If it is called on equal points,

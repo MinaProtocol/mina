@@ -1,7 +1,5 @@
 open Core_kernel
 
-let print = ref false
-
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
@@ -29,7 +27,6 @@ struct
     let n = Array.length r in
     let acc = ref (with_label __LOC__ (fun () -> G.double t)) in
     let rows_rev = ref [] in
-    if !print then printf "scale_fast %d\n%!" n ;
     let module Var = struct
       type t = Var.t
 
@@ -43,18 +40,6 @@ struct
                   let of_sexpable = create
                 end)
     end in
-    if !print then
-      Core.printf
-        !"xt = %{sexp: Field.Constant.t option * (Field.Constant.t * Var.t) \
-          list}\n\
-          %!"
-        (Field.to_constant_and_terms xt) ;
-    if !print then
-      Core.printf
-        !"yt = %{sexp: Field.Constant.t option * (Field.Constant.t * Var.t) \
-          list}\n\
-          %!"
-        (Field.to_constant_and_terms xt) ;
     let () =
       for i = 0 to n - 1 do
         let xp, yp = !acc in

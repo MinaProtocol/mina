@@ -102,13 +102,13 @@ let to_field_checked (type f)
     in
     let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
     let p l r o m c =
-      { Snarky_backendless.Constraint.annotation= None
-      ; basic= T (Basic {l; r; o; m; c}) }
+      [ { Snarky_backendless.Constraint.annotation= None
+        ; basic= T (Basic {l; r; o; m; c}) } ]
     in
     let two = F.Constant.of_int 2 in
     let r_2i = (bits.(2 * i) :> F.t) in
     let r_2i1 = (bits.((2 * i) + 1) :> F.t) in
-    assert_
+    List.iter ~f:assert_
       [ (* 0 = 2 a_prev - a_next - two_a_prev_minus_a_next  *)
         p (two, !a) (neg_one, a_next)
           (neg_one, two_a_prev_minus_a_next)

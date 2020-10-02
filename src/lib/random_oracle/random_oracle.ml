@@ -25,26 +25,19 @@ module Input = Random_oracle_input
 let params : Field.t Sponge.Params.t =
   Sponge.Params.(map tweedle_q ~f:Field.of_string)
 
-(* TODO: Unify with Bn382_inputs in the sponge lib *)
+[%%ifdef
+consensus_mechanism]
+
+module Inputs = Pickles.Tick_field_sponge.Inputs
+
+[%%else]
+
 module Inputs = struct
   module Field = Field
 
   let rounds_full = 63
 
   let rounds_partial = 0
-
-  [%%ifdef
-  consensus_mechanism]
-
-  (* Computes x^5 *)
-  let to_the_alpha x =
-    let open Field in
-    let res = square x in
-    let open Pickles.Backend.Tick.Field in
-    Mutable.square res ; (* x^5 *)
-                         res *= x ; res
-
-  [%%else]
 
   (* Computes x^5 *)
   let to_the_alpha x =
@@ -56,40 +49,21 @@ module Inputs = struct
     (* x^4 *)
     res * x
 
-  [%%endif]
-
   module Operations = struct
-    [%%ifdef
-    consensus_mechanism]
-
-    let add_assign ~state i x = Field.(state.(i) += x)
-
-    let apply_affine_map (_rows, c) v =
-      let open Field in
-      let res = [|v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2)|] in
-      Array.iteri res ~f:(fun i ri -> ri += c.(i)) ;
-      res
-
-    (* TODO: Have an explicit function for making a copy of a field element. *)
-    let copy a = Array.map a ~f:(fun x -> Field.(x + zero))
-
-    [%%else]
-
     let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
 
-    (* TODO: Clean this up to use the near mds matrix properly *)
-    let apply_affine_map (_matrix, constants) v =
-      let open Field in
-      let near_mds_matrix_v =
-        [|v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2)|]
+    let apply_affine_map (matrix, constants) v =
+      let dotv row =
+        Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
       in
-      Array.mapi near_mds_matrix_v ~f:(fun i x -> constants.(i) + x)
+      let res = Array.map matrix ~f:dotv in
+      Array.map2_exn res constants ~f:Field.( + )
 
     let copy a = Array.map a ~f:Fn.id
-
-    [%%endif]
   end
 end
+
+[%%endif]
 
 module Digest = struct
   open Field

@@ -25,7 +25,7 @@ let unwrap = function
 let dee =
   let pub = 150 in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 10 18)
+    (List.range ~start:`inclusive ~stop:`inclusive 1 18)
     ~f:(fun d ->
       List.init pub ~f:(fun i ->
           ksprintf time "dee %d" i (fun () ->
@@ -39,7 +39,7 @@ let dee =
 let dum =
   let pub = 150 in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 10 18)
+    (List.range ~start:`inclusive ~stop:`inclusive 1 18)
     ~f:(fun d ->
       List.init pub ~f:(fun i ->
           ksprintf time "dum %d" i (fun () ->
@@ -73,7 +73,7 @@ let structure =
   in
   [%str
     module Lagrange_precomputations = struct
-      let index_of_domain_log2 d = d - 10
+      let index_of_domain_log2 d = d - 1
 
       let max_public_input_size = 150
 
