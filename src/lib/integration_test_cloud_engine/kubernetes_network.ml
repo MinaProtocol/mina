@@ -161,7 +161,6 @@ module Node = struct
         [%log fatal] "%s" err_str ;
         Malleable_error.of_string_hard_error err_str )
       else
-        (* let open Malleable_error.Let_syntax in *)
         match%bind
           Deferred.bind ~f:Malleable_error.return
             ((Graphql.Client.query query_obj) (Graphql.uri graphql_port))

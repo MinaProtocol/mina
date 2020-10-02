@@ -233,7 +233,6 @@ let fetch_ledger, register_ledger =
 
 let fetch_ledger_exn name = Option.value_exn (fetch_ledger name)
 
-(*TODO: takes time to load?*)
 module Register (Accounts : Intf.Named_accounts_intf) :
   Intf.Named_accounts_intf = struct
   let () = register_ledger (module Accounts)
