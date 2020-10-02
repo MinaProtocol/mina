@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda protocol archive node and associated Postgres database.
+This chart bootstraps a Coda protocol Testnet archive node and associated Postgres database.
 
 ## Add Coda Helm chart repository:
 
  ```console
- helm repo add coda <insert-repository-url>
+ helm repo add coda https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,7 +17,7 @@ The following table lists the configurable parameters of the `archive-node` char
 
 Parameter | Description
 --- | ---
-`testnetName` | Coda protocol testnet name
+`testnetName` | Coda protocol testnet name to deploy to
 `coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon 
 `archive.nodeName` | name identifier of archive node pod
 
@@ -40,7 +40,7 @@ Parameter | Description | Default
 `coda.logReceivedBlocks` | whether the Coda daemon should log received blocks events | `false`
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
-`coda.privKeyPass` | public-private key-pair associated with Coda daemon account | `see [default] values.yaml`
+`coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`
 
 ## archive-node launch examples
 
