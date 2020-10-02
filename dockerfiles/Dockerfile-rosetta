@@ -167,7 +167,7 @@ RUN git clone \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/CodaProtocol/coda ${HOME}/${CODA_DIR}
+  https://github.com/MinaProtocol/mina ${HOME}/${CODA_DIR}
 
 WORKDIR $HOME/$CODA_DIR
 
@@ -233,7 +233,7 @@ RUN cd $HOME && rm -rf $HOME/${CODA_DIR} \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/CodaProtocol/coda ${HOME}/${CODA_DIR}
+  https://github.com/MinaProtocol/mina ${HOME}/${CODA_DIR}
 
 WORKDIR $HOME/${CODA_DIR}
 
