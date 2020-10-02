@@ -34,7 +34,7 @@ module Time = struct
     [%%if
     time_offsets]
 
-    type t = Time.Span.t Lazy.t
+    type t = Time.Span.t Lazy.t [@@deriving sexp]
 
     let create offset = offset
 
@@ -54,7 +54,7 @@ module Time = struct
 
     [%%else]
 
-    type t = unit
+    type t = unit [@@deriving sexp]
 
     let create () = ()
 
