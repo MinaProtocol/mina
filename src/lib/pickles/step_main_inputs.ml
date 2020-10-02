@@ -40,7 +40,9 @@ module Unsafe = struct
     let res =
       exists
         (Typ.list Boolean.typ_unchecked ~length)
-        ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+        ~compute:
+          As_prover.(
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
     in
     Field.Assert.equal x (Field.project res) ;
     res
@@ -80,6 +82,11 @@ module Sponge = struct
     | `Bits bs ->
         absorb t (Field.pack bs)
 end
+
+let%test_unit "sponge" =
+  let module T = Make_sponge.Test (Impl) (Tick_field_sponge.Field) (Sponge.S)
+  in
+  T.test Tick_field_sponge.params
 
 module Input_domain = struct
   let domain = Domain.Pow_2_roots_of_unity 6

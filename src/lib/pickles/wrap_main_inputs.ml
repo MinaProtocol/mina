@@ -76,6 +76,11 @@ module Sponge = struct
             (S)
 end
 
+let%test_unit "sponge" =
+  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S)
+  in
+  T.test Tock_field_sponge.params
+
 module Input_domain = struct
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
     let domain_size = Domain.size domain in

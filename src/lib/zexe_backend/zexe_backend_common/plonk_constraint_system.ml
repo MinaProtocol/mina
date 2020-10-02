@@ -115,10 +115,22 @@ module Plonk_constraint = struct
           let vl = eval_one vl in
           let vr = eval_one vr in
           let vo = eval_one vo in
-          F.(
-            equal zero
-              (List.reduce_exn ~f:add
-                 [mul cl vl; mul cr vl; mul co vo; mul m (mul vl vr); c]))
+          let open F in
+          let res =
+            List.reduce_exn ~f:add
+              [mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c]
+          in
+          if not (equal zero res) then (
+            Core.eprintf
+              !"%{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t}\n\
+                = %{sexp:t}%!"
+              cl vl cr vr co vo m (mul vl vr) c res ;
+            false )
+          else true
       | _ ->
           true
 
