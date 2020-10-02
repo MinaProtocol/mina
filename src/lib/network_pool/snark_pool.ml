@@ -46,7 +46,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Time.t -> [`Expired | `Ok])
+      -> has_timed_out:(Time.t -> [`Timed_out | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -70,6 +70,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
@@ -207,8 +209,9 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~constraint_constants:_ ~frontier_broadcast_pipe ~config
-          ~logger ~tf_diff_writer =
+      let create ~constraint_constants:_ ~consensus_constants:_
+          ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
+          ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
@@ -343,11 +346,11 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     include T
     module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
-    let get_rebroadcastable t ~is_expired =
+    let get_rebroadcastable t ~has_timed_out =
       Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
         ~f:(fun ~key:stmt ~data:(_proof, time) ->
-          match is_expired time with
-          | `Expired ->
+          match has_timed_out time with
+          | `Timed_out ->
               [%log' debug t.logger]
                 "No longer rebroadcasting SNARK with statement $stmt, it was \
                  added at $time its rebroadcast period is now expired"
@@ -383,8 +386,9 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~config ~logger ~constraint_constants ~disk_location ~incoming_diffs
-      ~local_diffs ~frontier_broadcast_pipe =
+  let load ~config ~logger ~constraint_constants ~consensus_constants
+      ~time_controller ~disk_location ~incoming_diffs ~local_diffs
+      ~frontier_broadcast_pipe =
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
@@ -403,8 +407,9 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           pool ~tf_diff_writer ;
         network_pool
     | Error _e ->
-        create ~config ~logger ~constraint_constants ~incoming_diffs
-          ~local_diffs ~frontier_broadcast_pipe
+        create ~config ~logger ~constraint_constants ~consensus_constants
+          ~time_controller ~incoming_diffs ~local_diffs
+          ~frontier_broadcast_pipe
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -445,12 +450,17 @@ let%test_module "random set test" =
 
     let trust_system = Mocks.trust_system
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let proof_level = precomputed_values.proof_level
 
     let logger = Logger.null ()
+
+    let time_controller = Block_time.Controller.basic ~logger
 
     module Mock_snark_pool = Make (Mocks.Transition_frontier)
     open Ledger_proof.For_tests
@@ -504,6 +514,7 @@ let%test_module "random set test" =
         let config = config verifier in
         let resource_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
+            ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -660,7 +671,8 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader ~logger
+              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -748,6 +760,7 @@ let%test_module "random set test" =
             let config = config verifier in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
+                ~consensus_constants ~time_controller
                 ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
@@ -805,8 +818,8 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~constraint_constants ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader
+              ~constraint_constants ~consensus_constants ~time_controller
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
@@ -824,7 +837,7 @@ let%test_module "random set test" =
           ok_exn res1 |> ignore ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const `Ok)
+              ~has_timed_out:(Fn.const `Ok)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable1 [] ;
@@ -833,14 +846,14 @@ let%test_module "random set test" =
           ok_exn res2 |> ignore ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const `Ok)
+              ~has_timed_out:(Fn.const `Ok)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable2
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~is_expired:(Fn.const `Expired)
+              ~has_timed_out:(Fn.const `Timed_out)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable3 [] ;
