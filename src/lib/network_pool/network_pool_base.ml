@@ -119,12 +119,12 @@ end)
    fun t logger ->
     let rebroadcast_interval = Time.Span.of_min 10. in
     let rebroadcast_window = Time.Span.scale rebroadcast_interval 5. in
-    let is_expired time =
-      if Time.(add time rebroadcast_window < now ()) then `Expired else `Ok
+    let has_timed_out time =
+      if Time.(add time rebroadcast_window < now ()) then `Timed_out else `Ok
     in
     let rec go () =
       let rebroadcastable =
-        Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
+        Resource_pool.get_rebroadcastable t.resource_pool ~has_timed_out
       in
       if List.is_empty rebroadcastable then
         [%log trace] "Nothing to rebroadcast"
@@ -146,8 +146,9 @@ end)
     in
     go ()
 
-  let create ~config ~constraint_constants ~incoming_diffs ~local_diffs
-      ~frontier_broadcast_pipe ~logger =
+  let create ~config ~constraint_constants ~consensus_constants
+      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
+      ~logger =
     (*Diffs from tansition frontier extensions*)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -155,8 +156,9 @@ end)
     in
     let t =
       of_resource_pool_and_diffs
-        (Resource_pool.create ~constraint_constants ~config ~logger
-           ~frontier_broadcast_pipe ~tf_diff_writer)
+        (Resource_pool.create ~constraint_constants ~consensus_constants
+           ~time_controller ~config ~logger ~frontier_broadcast_pipe
+           ~tf_diff_writer)
         ~constraint_constants ~incoming_diffs ~local_diffs ~logger
         ~tf_diffs:tf_diff_reader
     in
