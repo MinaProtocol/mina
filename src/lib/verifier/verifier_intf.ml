@@ -7,8 +7,8 @@ module Base = struct
 
     type ledger_proof
 
-    val verify_blockchain_snark :
-      t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
+    val verify_blockchain_snarks :
+      t -> Blockchain_snark.Blockchain.t list -> bool Or_error.t Deferred.t
 
     val verify_transaction_snarks :
          t

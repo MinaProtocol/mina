@@ -56,37 +56,32 @@ module Catchup_jobs = struct
   let decr () = update (( - ) 1)
 end
 
-let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
+    ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
-    let open Deferred.Result.Let_syntax in
+    let open Result.Let_syntax in
     let%bind initially_validated_transition =
-      External_transition.Validation.wrap transition_with_hash
+      transition_with_hash
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> Fn.compose Deferred.return
-           (External_transition.validate_genesis_protocol_state
-              ~genesis_state_hash)
-      >>= External_transition.validate_proof ~verifier
-      >>= Fn.compose Deferred.return
-            External_transition.validate_protocol_versions
-      >>= Fn.compose Deferred.return
-            External_transition.validate_delta_transition_chain
+      |> External_transition.validate_genesis_protocol_state
+           ~genesis_state_hash
+      >>= External_transition.validate_protocol_versions
+      >>= External_transition.validate_delta_transition_chain
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Deferred.return
-    @@ Transition_handler.Validator.validate_transition ~logger ~frontier
-         ~consensus_constants ~unprocessed_transition_cache
-         enveloped_initially_validated_transition
+    Transition_handler.Validator.validate_transition ~logger ~frontier
+      ~consensus_constants ~unprocessed_transition_cache
+      enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
-  match%bind cached_initially_validated_transition_result with
+  match cached_initially_validated_transition_result with
   | Ok x ->
       Deferred.return @@ Ok (`Building_path x)
   | Error (`In_frontier hash) ->
@@ -97,7 +92,10 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
       [%log trace]
         ~metadata:
           [ ( "state_hash"
-            , With_hash.hash transition_with_hash |> State_hash.to_yojson ) ]
+            , With_hash.hash
+                (External_transition.Validation.forget_validation_with_hash
+                   transition_with_hash)
+              |> State_hash.to_yojson ) ]
         "transition queried during ledger catchup is still in process in one \
          of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
@@ -138,7 +136,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
       in
       Error (Error.of_string "invalid delta transition chain witness")
   | Error `Invalid_protocol_version ->
-      let transition = With_hash.data transition_with_hash in
+      let transition =
+        External_transition.Validation.forget_validation transition_with_hash
+      in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_invalid_protocol_version
@@ -157,7 +157,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~verifier
       in
       Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
-      let transition = With_hash.data transition_with_hash in
+      let transition =
+        External_transition.Validation.forget_validation transition_with_hash
+      in
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Sent_mismatched_protocol_version
@@ -302,14 +304,42 @@ let verify_transitions_and_build_breadcrumbs ~logger
   let verification_start_time = Core.Time.now () in
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
-    fold_until (List.rev transitions) ~init:[]
+    let%bind tvs =
+      let open Deferred.Let_syntax in
+      match%bind
+        External_transition.validate_proofs ~verifier
+          (List.map transitions ~f:(fun t ->
+               External_transition.Validation.wrap (Envelope.Incoming.data t)
+           ))
+      with
+      | Ok tvs ->
+          return
+            (Ok
+               (List.map2_exn transitions tvs ~f:(fun e data -> {e with data})))
+      | Error (`Verifier_error error) ->
+          [%log warn]
+            ~metadata:[("error", `String (Error.to_string_hum error))]
+            "verifier threw an error while verifying transiton queried during \
+             ledger catchup: $error" ;
+          return
+            (Error
+               (Error.of_string
+                  (sprintf "verifier threw an error: %s"
+                     (Error.to_string_hum error))))
+      | Error `Invalid_proof ->
+          let%map () =
+            (* TODO: Isolate and punish the evil sender *)
+            Deferred.unit
+          in
+          Error (Error.of_string "invalid proof")
+    in
+    fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
           verify_transition ~logger
             ~consensus_constants:precomputed_values.consensus_constants
-            ~trust_system ~verifier ~frontier ~unprocessed_transition_cache
-            transition
+            ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
             List.map acc ~f:Cached.invalidate_with_failure |> ignore ;

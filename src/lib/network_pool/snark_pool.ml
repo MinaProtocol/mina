@@ -148,9 +148,11 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         t.state <- Verifying {next_finished; out_for_verification} ;
         Queue.clear t.queue ;
         let res = call_verifier t out_for_verification in
-        upon res (fun x ->
-            Ivar.fill finished x ;
-            start_verifier t next_finished )
+        don't_wait_for
+          (let%bind x = res in
+           Ivar.fill finished x ;
+           let%map () = after (Time.Span.of_ms 50.) in
+           start_verifier t next_finished)
 
     let verify t proofs =
       if List.is_empty proofs then Deferred.return (Ok true)

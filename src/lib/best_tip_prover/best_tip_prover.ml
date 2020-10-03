@@ -88,10 +88,12 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> validate_proof ~verifier
+      |> (fun x -> validate_proofs ~verifier [x])
       >>= Fn.compose Deferred.Result.return
-            (skip_delta_transition_chain_validation
-               `This_transition_was_not_received_via_gossip)
+            (Fn.compose
+               (skip_delta_transition_chain_validation
+                  `This_transition_was_not_received_via_gossip)
+               List.hd_exn)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))

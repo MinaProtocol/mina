@@ -13,7 +13,7 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
   | Check | None ->
       Deferred.return ()
 
-let verify_blockchain_snark _ _ = Deferred.Or_error.return true
+let verify_blockchain_snarks _ = Deferred.Or_error.return true
 
 let verify_transaction_snarks _ ts =
   (*Don't check if the proof has default sok becasue they were probably not

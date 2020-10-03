@@ -422,7 +422,7 @@ module type S = sig
        , [> `Invalid_genesis_protocol_state] )
        Result.t
 
-  val validate_proof :
+  val validate_proofs :
        ( 'time_received
        , 'genesis_state
        , [`Proof] * unit Truth.false_t
@@ -431,6 +431,7 @@ module type S = sig
        , 'staged_ledger_diff
        , 'protocol_versions )
        Validation.with_transition
+       list
     -> verifier:Verifier.t
     -> ( ( 'time_received
          , 'genesis_state
@@ -440,6 +441,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          Validation.with_transition
+         list
        , [> `Invalid_proof | `Verifier_error of Error.t] )
        Deferred.Result.t
 

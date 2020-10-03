@@ -10,7 +10,8 @@ type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
-    val verify_blockchain_snark : Protocol_state.Value.t -> Proof.t -> bool
+    val verify_blockchain_snarks :
+      (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool
@@ -33,9 +34,8 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_blockchain_snark state proof =
-               Blockchain_snark.Blockchain_snark_state.verify state proof
-                 ~key:bc_vk
+             let verify_blockchain_snarks ts =
+               Blockchain_snark.Blockchain_snark_state.verify ts ~key:bc_vk
 
              let verify_transaction_snarks ts =
                match
@@ -55,7 +55,7 @@ module Worker_state = struct
     | Check | None ->
         Deferred.return
         @@ ( module struct
-             let verify_blockchain_snark _ _ = true
+             let verify_blockchain_snarks _ = true
 
              let verify_transaction_snarks _ = true
            end
@@ -69,7 +69,7 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { verify_blockchain: ('w, Blockchain.t, bool) F.t
+      { verify_blockchains: ('w, Blockchain.t list, bool) F.t
       ; verify_transaction_snarks:
           ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t }
 
@@ -87,9 +87,12 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
+      let verify_blockchains (w : Worker_state.t) (chains : Blockchain.t list)
+          =
         let (module M) = Worker_state.get w in
-        Deferred.return (M.verify_blockchain_snark chain.state chain.proof)
+        Deferred.return
+          (M.verify_blockchain_snarks
+             (List.map chains ~f:(fun {state; proof} -> (state, proof))))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
@@ -101,8 +104,11 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain=
-            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchains=
+            f
+              ( [%bin_type_class: Blockchain.Stable.Latest.t list]
+              , Bool.bin_t
+              , verify_blockchains )
         ; verify_transaction_snarks=
             f
               ( [%bin_type_class:
@@ -225,11 +231,11 @@ let with_retry ~logger f =
   in
   go 4
 
-let verify_blockchain_snark {worker; logger} chain =
+let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-        ~arg:chain )
+      Worker.Connection.run connection ~f:Worker.functions.verify_blockchains
+        ~arg:chains )
 
 module Id = Unique_id.Int ()
 
