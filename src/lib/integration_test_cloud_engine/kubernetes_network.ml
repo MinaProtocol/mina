@@ -100,19 +100,27 @@ module Node = struct
     module Unlock_account =
     [%graphql
     {|
-          mutation ($password: String!,
-          $public_key: PublicKey!) {
-             unlockAccount(input: {password: $password, publicKey: $public_key }) {
-                 public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
-             }
+          mutation (
+            $password: String!,
+            $public_key: PublicKey!
+          )
+          {
+            unlockAccount(
+              input: {
+                password: $password, 
+                publicKey: $public_key 
+              }
+            )
+            {
+              public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+            }
           }
     |}]
 
     module Send_payment =
     [%graphql
     {|
-        mutation 
-        (
+        mutation (
           $sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
@@ -120,11 +128,19 @@ module Node = struct
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String
-        ) 
+        )
         {
           sendPayment(
-            input: {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}
-          ) 
+            input: {
+              from: $sender, 
+              to: $receiver, 
+              amount: $amount, 
+              token: $token, 
+              fee: $fee, 
+              nonce: $nonce, 
+              memo: $memo
+            }
+          )
           {
             payment {
               id
@@ -133,17 +149,19 @@ module Node = struct
         }
     |}]
 
-    module Unlock_account =
+    module Query_peer_id =
     [%graphql
     {|
-        query MyQuery {
+        query
+        {
           daemonStatus {
             addrsAndPorts {
-            peer {
-              peerId
+              peer {
+                peerId
+              }
             }
+            peers
           }
-          peers
         }
     |}]
   end
@@ -162,6 +180,45 @@ module Node = struct
           [%log fatal] "Error running k8s port forwarding"
             ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
           failwith "Could not run k8s port forwarding" ) ; *)
+
+  let rec retry_graphql ~logger ~graphql_port ~retry_delay_sec
+      ~gql_err_is_fatal ~graphql_object ~descr ~num_tries =
+    let open Malleable_error.Let_syntax in
+    if num_tries <= 0 then (
+      [%log fatal] "%s: too many tries" descr ;
+      failwith (sprintf "%s: too many tries" descr) )
+    else
+      (* let open Malleable_error.Let_syntax in *)
+      match%bind
+        Deferred.bind ~f:Malleable_error.return
+          ((Graphql.Client.query graphql_object) (Graphql.uri graphql_port))
+      with
+      | Ok result ->
+          [%log info] "%s succeeded" descr ;
+          return result
+      | Error (`Failed_request err_string) ->
+          [%log warn] "%s, Failed GraphQL request: %s, %d tries left" descr
+            err_string (num_tries - 1) ;
+          let%bind () =
+            Deferred.bind ~f:Malleable_error.return
+              (after (Time.Span.of_sec retry_delay_sec))
+          in
+          retry_graphql ~logger ~graphql_port ~retry_delay_sec
+            ~gql_err_is_fatal ~graphql_object ~descr ~num_tries:(num_tries - 1)
+      | Error (`Graphql_error err_string) ->
+          if gql_err_is_fatal then (
+            [%log error] "%s, GraphQL error: %s" descr err_string ;
+            Malleable_error.of_string_hard_error err_string )
+          else (
+            [%log warn] "%s, Failed GraphQL request: %s, %d tries left" descr
+              err_string (num_tries - 1) ;
+            let%bind () =
+              Deferred.bind ~f:Malleable_error.return
+                (after (Time.Span.of_sec retry_delay_sec))
+            in
+            retry_graphql ~logger ~graphql_port ~retry_delay_sec
+              ~gql_err_is_fatal ~graphql_object ~descr
+              ~num_tries:(num_tries - 1) )
 
   let send_payment ~logger t ~sender ~receiver ~amount ~fee =
     [%log info] "Running send_payment test"
@@ -184,55 +241,26 @@ module Node = struct
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () : unit Malleable_error.t =
-      let num_tries = 10 in
-      let initial_delay_sec = 30.0 in
-      let retry_delay_sec = 30.0 in
       let unlock_account_obj =
         Graphql.Unlock_account.make ~password:"naughty blue worm"
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      (* GraphQL not immediately available, retry as needed *)
-      let rec go n =
-        if n <= 0 then (
-          [%log fatal] "unlock_sender_account_graphql: too many tries" ;
-          failwith "unlock_sender_account_graphql: too many tries" )
-        else
-          (* let open Malleable_error.Let_syntax in *)
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query unlock_account_obj)
-                 (Graphql.uri graphql_port))
-          with
-          | Ok _ ->
-              [%log info] "unlock sender account succeeded" ;
-              return ()
-          | Error (`Failed_request err_string) ->
-              [%log warn]
-                "unlock_sender_account_graphql, Failed GraphQL request: %s, \
-                 %d tries left"
-                err_string (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-          | Error (`Graphql_error err_string) ->
-              [%log error] "unlock_sender_account_graphql, GraphQL error: %s"
-                err_string ;
-              Malleable_error.of_string_hard_error err_string
-      in
       let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
+        (* initial delay *)
+        Deferred.bind ~f:Malleable_error.return (after (Time.Span.of_sec 30.0))
       in
-      go num_tries
+      (* GraphQL not immediately available, retry as needed *)
+      let%bind _ =
+        retry_graphql ~logger ~graphql_port ~retry_delay_sec:30.0
+          ~gql_err_is_fatal:true ~graphql_object:unlock_account_obj
+          ~descr:"unlock_sender_account_graphql" ~num_tries:10
+      in
+      return ()
     in
     let%bind () = unlock_sender_account_graphql () in
     let send_payment_graphql () =
-      let num_tries = 10 in
       let initial_delay_sec = 30.0 in
-      let retry_delay_sec = 30.0 in
       let send_payment_obj =
         Graphql.Send_payment.make
           ~sender:(Graphql_lib.Encoders.public_key sender)
@@ -242,46 +270,13 @@ module Node = struct
           ()
       in
       (* may have to retry if bootstrapping *)
-      let rec go n =
-        if n <= 0 then (
-          [%log error] "send_payment_graphql: too many tries" ;
-          Malleable_error.of_string_hard_error
-            "send_payment_graphql: too many tries" )
-        else
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query send_payment_obj)
-                 (Graphql.uri graphql_port))
-          with
-          | Ok result ->
-              [%log info] "send payment GraphQL succeeded" ;
-              return result
-          | Error (`Failed_request err) ->
-              [%log warn]
-                "send_payment_graphql, Failed GraphQL request: %s, %d tries \
-                 left"
-                err (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-          | Error (`Graphql_error err) ->
-              (* errors are not fatal here, like "still bootstrapping" *)
-              [%log info]
-                "send_payment_graphql, GraphQL error: %s, %d tries left" err
-                (n - 1) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              go (n - 1)
-      in
       let%bind () =
         Deferred.bind ~f:Malleable_error.return
           (after (Time.Span.of_sec initial_delay_sec))
       in
-      go num_tries
+      retry_graphql ~logger ~graphql_port ~retry_delay_sec:30.0
+        ~gql_err_is_fatal:false ~graphql_object:send_payment_obj
+        ~descr:"unlock_sender_account_graphql" ~num_tries:10
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
