@@ -318,6 +318,20 @@ let main ~input_file ~output_file ~archive_uri () =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
+      [%log info] "Loading global slots" ;
+      let%bind global_slots =
+        match%bind
+          Caqti_async.Pool.use
+            (fun db -> Sql.Global_slots.run db state_hash)
+            pool
+        with
+        | Ok slots ->
+            return (Int64.Set.of_list slots)
+        | Error msg ->
+            [%log error] "Error getting global slots"
+              ~metadata:[("error", `String (Caqti_error.show msg))] ;
+            exit 1
+      in
       [%log info] "Loading user command ids" ;
       let%bind user_cmd_ids =
         match%bind
@@ -368,8 +382,13 @@ let main ~input_file ~output_file ~archive_uri () =
                   id (Caqti_error.show msg) () )
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
+      (* filter out internal commands in blocks not along chain from target state hash *)
+      let filtered_internal_cmds =
+        List.filter unsorted_internal_cmds ~f:(fun cmd ->
+            Int64.Set.mem global_slots cmd.global_slot )
+      in
       let sorted_internal_cmds =
-        List.sort unsorted_internal_cmds ~compare:(fun ic1 ic2 ->
+        List.sort filtered_internal_cmds ~compare:(fun ic1 ic2 ->
             let tuple (ic : Sql.Internal_command.t) =
               (ic.global_slot, ic.sequence_no, ic.secondary_sequence_no)
             in
@@ -396,8 +415,13 @@ let main ~input_file ~output_file ~archive_uri () =
                   (Caqti_error.show msg) () )
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
+      (* filter out user commands in blocks not along chain from target state hash *)
+      let filtered_user_cmds =
+        List.filter unsorted_user_cmds ~f:(fun cmd ->
+            Int64.Set.mem global_slots cmd.global_slot )
+      in
       let sorted_user_cmds =
-        List.sort unsorted_user_cmds ~compare:(fun uc1 uc2 ->
+        List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
             let tuple (uc : Sql.User_command.t) =
               (uc.global_slot, uc.sequence_no)
             in

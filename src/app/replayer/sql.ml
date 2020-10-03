@@ -2,6 +2,31 @@
 
 open Core_kernel
 
+module Global_slots = struct
+  (* find all global slots in blocks, working back from block with given state hash *)
+  let query =
+    Caqti_request.collect Caqti_type.string Caqti_type.int64
+      {|
+         WITH RECURSIVE chain AS (
+
+           SELECT id,parent_id,global_slot FROM blocks b WHERE b.state_hash = ?
+
+           UNION ALL
+
+           SELECT b.id,b.parent_id,b.global_slot FROM blocks b
+
+           INNER JOIN chain
+
+           ON b.id = chain.parent_id
+        )
+
+        SELECT global_slot FROM chain c
+   |}
+
+  let run (module Conn : Caqti_async.CONNECTION) state_hash =
+    Conn.collect_list query state_hash
+end
+
 (* build query to find all blocks back to genesis block, starting with the block containing the
    specified state hash; for each such block, find ids of all (user or internal) commands in that block
 *)
