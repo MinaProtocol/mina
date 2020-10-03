@@ -89,7 +89,19 @@ module Network_config = struct
       if List.length block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
-      let f index ({Test_config.Block_producer.balance}, (pk, sk)) =
+      let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
+        let timing =
+          match timing with
+          | Timed t ->
+              Some
+                { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                    t.initial_minimum_balance
+                ; cliff_time= t.cliff_time
+                ; vesting_period= t.vesting_period
+                ; vesting_increment= t.vesting_increment }
+          | Untimed ->
+              None
+        in
         let runtime_account =
           { Runtime_config.Accounts.pk=
               Some (Public_key.Compressed.to_string pk)
@@ -98,7 +110,7 @@ module Network_config = struct
               Balance.of_formatted_string balance
               (* delegation currently unsupported *)
           ; delegate= None
-          ; timing= None }
+          ; timing }
         in
         let secret_name = "test-keypair-" ^ Int.to_string index in
         let keypair =
@@ -255,7 +267,8 @@ module Network_manager = struct
     ; genesis_constants: Genesis_constants.t
     ; block_producer_pod_names: Kubernetes_network.Node.t list
     ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
-    ; mutable deployed: bool }
+    ; mutable deployed: bool
+    ; keypairs: Keypair.t list }
 
   let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
 
@@ -337,7 +350,8 @@ module Network_manager = struct
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
       ; block_producer_pod_names
       ; snark_coordinator_pod_names
-      ; deployed= false }
+      ; deployed= false
+      ; keypairs= List.unzip network_config.keypairs |> snd }
     in
     [%log info] "Initializing terraform" ;
     let%bind () = run_cmd_exn t "terraform" ["init"] in
@@ -368,18 +382,19 @@ module Network_manager = struct
     ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names
     ; archive_nodes= []
-    ; testnet_log_filter= t.testnet_log_filter }
+    ; testnet_log_filter= t.testnet_log_filter
+    ; keypairs= t.keypairs }
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    (* let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in *)
+    let%bind () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
     t.deployed <- false ;
     Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
     [%log' info t.logger] "Cleaning up network configuration" ;
-    (* File_system.remove_dir t.testnet_dir *)
+    let%bind () = File_system.remove_dir t.testnet_dir in
     Deferred.unit
 end
