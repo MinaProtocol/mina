@@ -907,6 +907,85 @@ let%test_module "test" =
 
     open Impls.Step
 
+    module Statement = struct
+      type t = Field.t
+
+      let to_field_elements x = [|x|]
+
+      module Constant = struct
+        type t = Field.Constant.t [@@deriving bin_io]
+
+        let to_field_elements x = [|x|]
+      end
+    end
+
+    module Blockchain_snark = struct
+      module Statement = Statement
+
+      let tag, _, p, Provers.[step] =
+        Common.time "compile" (fun () ->
+            compile
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_branching:(module Nat.N2)
+              ~name:"blockchain-snark"
+              ~choices:(fun ~self ->
+                  [ { prevs= [self; self]
+                  ; main=
+                      (fun [prev; _] self ->
+                        let is_base_case = Field.equal Field.zero self in
+                        let proof_must_verify = Boolean.not is_base_case in
+                        Boolean.Assert.any
+                          [Field.(equal (one + prev) self); is_base_case] ;
+                        [proof_must_verify; Boolean.false_] )
+                  ; main_value=
+                      (fun _ self ->
+                        let is_base_case = Field.Constant.(equal zero self) in
+                        let proof_must_verify = not is_base_case in
+                        [proof_must_verify;false] ) } ] ) )
+
+      module Proof = (val p)
+    end
+
+    let xs =
+      let s_neg_one = Field.Constant.(negate one) in
+      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+        Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
+      in
+      let b0 =
+        Common.time "b0" (fun () ->
+            Blockchain_snark.step
+              [(s_neg_one, b_neg_one)
+              ;(s_neg_one, b_neg_one)]
+              Field.Constant.zero )
+      in
+      let b1 =
+        Common.time "b1" (fun () ->
+            Blockchain_snark.step
+              [(Field.Constant.zero, b0)
+              ;(Field.Constant.zero, b0)]
+              Field.Constant.one )
+      in
+      [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
+
+    let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
+  end )
+
+(*
+let%test_module "test" =
+  ( module struct
+    let () =
+      Tock.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    let () =
+      Tick.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    open Impls.Step
+
     module Txn_snark = struct
       module Statement = struct
         type t = Field.t
@@ -1144,4 +1223,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end )
+  end ) *)
