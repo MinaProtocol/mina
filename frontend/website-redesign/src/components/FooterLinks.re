@@ -80,8 +80,7 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link
-        href="/blog/mina-protocol-the-worlds-lightest-blockchain-releases-its-economics">
+      <Next.Link href="/static/pdf/economicsWP.pdf">
         <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
       </Next.Link>
       <Next.Link href="">

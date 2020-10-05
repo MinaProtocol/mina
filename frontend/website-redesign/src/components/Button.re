@@ -60,7 +60,7 @@ module Styles = {
         hover([
           color(white),
           after([
-            border(`zero, `solid, `rgba(0, 0, 0, 0.)),
+            border(`zero, `solid, `rgba((0, 0, 0, 0.))),
             transform(translate(`rem(-0.25), `rem(-0.25))),
           ]),
           backgrounds([
@@ -81,10 +81,10 @@ module Link = {
   let make = (~href, ~children) => {
     switch (href) {
     | `Scroll_to_top => <Next.Link href=""> children </Next.Link>
-    | `External(href) => <a className=Css.(style([textDecoration(`none)])) href> children </a>
-    | `Internal(href) =>
-      <Next.Link href> children </Next.Link>
-    }
+    | `External(href) =>
+      <a className=Css.(style([textDecoration(`none)])) href> children </a>
+    | `Internal(href) => <Next.Link href> children </Next.Link>
+    };
   };
 };
 
