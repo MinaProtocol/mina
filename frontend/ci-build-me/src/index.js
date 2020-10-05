@@ -61,17 +61,20 @@ const hasExistingBuilds = async (github) => {
   const options = {
     hostname: "api.buildkite.com",
     port: 443,
-    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds?branch=${encodeURIComponent(github.pull_request.head.ref)}&commit=${encodeURIComponent(github.pull_request.head.sha)}&state=running&state=finished`,
-    method: "POST",
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds?branch=${encodeURIComponent(
+      github.pull_request.head.ref
+    )}&commit=${encodeURIComponent(
+      github.pull_request.head.sha
+    )}&state=running&state=finished`,
+    method: "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Content-Length": Buffer.byteLength(postData),
     },
   };
   const request = await httpsRequest(options, postData);
-  return (request.length > 0);
-}
+  return request.length > 0;
+};
 
 const getRequest = async (url) => {
   const request = await axios.get(url);
@@ -95,8 +98,17 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      const buildAlreadyExists = await hasExistingBuilds(req.body);
-      if (buildAlreadyExists) {
+      const buildAlreadyExists = (async () => {
+        try {
+          return await hasExistingBuilds(req.body);
+        } catch (e) {
+          // if this fails for some reason, assume we don't have an existing build
+          console.error(`Failed to find existing builds:`);
+          console.error(e);
+          return false;
+        }
+      })();
+      if (!buildAlreadyExists) {
         const buildkite = await runBuild(req.body);
         const circle = await runCircleBuild(req.body);
         return [buildkite, circle];
