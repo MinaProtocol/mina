@@ -11,7 +11,8 @@ module Make (Engine : Engine_intf) = struct
   let config =
     let open Test_config in
     { default with
-      block_producers= [{balance= "4000"}; {balance= "3000"}]
+      block_producers=
+        [{balance= "4000"; timing= Untimed}; {balance= "3000"; timing= Untimed}]
     ; num_snark_workers= 0 }
 
   let run network log_engine =
