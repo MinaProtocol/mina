@@ -12,12 +12,17 @@ module Make (Engine : Engine_intf) = struct
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
-    {default with block_producers= [{balance= "1000"}]; num_snark_workers= 0}
+    { default with
+      block_producers= [{balance= "1000"; timing= Untimed}]
+    ; num_snark_workers= 0 }
 
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in
     let block_producer = List.nth_exn network.block_producers 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
-    Log_engine.wait_for ~blocks:1 ~timeout:(`Slots 30) log_engine
+    let%map _ =
+      Log_engine.wait_for ~blocks:1 ~timeout:(`Slots 30) log_engine
+    in
+    ()
 end
