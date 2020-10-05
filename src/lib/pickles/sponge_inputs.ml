@@ -63,11 +63,6 @@ struct
             ~compute:
               As_prover.(fun () -> round_table (Array.map init ~f:read_var))
         in
-        (* TODO: Constraint state.(0) = start -> ark *)
-        (*
-        with_label __LOC__ (fun () ->
-          Array.iter2_exn init t.(0) ~f:Field.Assert.equal ) ;
-*)
         t.(0) <- init ;
         (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
         with_label __LOC__ (fun () ->
