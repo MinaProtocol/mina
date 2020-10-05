@@ -178,7 +178,7 @@ exports.githubWebhookHandler = async (req, res) => {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
-      console.error(data);
+      console.error(buildkite);
     }
 
     if (circle && circle.number) {

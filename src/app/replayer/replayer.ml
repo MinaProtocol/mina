@@ -4,9 +4,16 @@ open Core
 open Async
 open Coda_base
 
+(* given a target block B to replay to:
+
+   target state hash  = protocol state hash in B
+   target proof       = blockchain SNARK proof of the protocol state in B
+   target ledger hash = expected Merkle root of the staged ledger in B
+*)
 type input =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
+  ; target_ledger_hash: Ledger_hash.t
   ; genesis_ledger: Account.t list }
 [@@deriving yojson]
 
@@ -492,8 +499,22 @@ let main ~input_file ~output_file ~archive_uri () =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot:0L
       in
-      [%log info] "After applying all commands, ledger hash"
-        ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
+      let target_ledger_json =
+        Ledger_hash.to_yojson input.target_ledger_hash
+      in
+      if Ledger_hash.equal input.target_ledger_hash (Ledger.merkle_root ledger)
+      then
+        [%log info]
+          "After applying all commands, ledger hash equals target ledger hash"
+          ~metadata:[("ledger_hash", target_ledger_json)]
+      else (
+        [%log error]
+          "After applying all commands, ledger hash differs from target \
+           ledger hash"
+          ~metadata:
+            [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+            ; ("target_ledger_hash", target_ledger_json) ] ;
+        Core_kernel.exit 1 ) ;
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =
