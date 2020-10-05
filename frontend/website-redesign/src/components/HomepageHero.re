@@ -44,10 +44,7 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`center),
       marginBottom(`rem(12.)),
-      media(
-        Theme.MediaQuery.tablet,
-        [marginTop(`rem(12.))],
-      ),
+      media(Theme.MediaQuery.tablet, [marginTop(`rem(12.))]),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
     ]);
 
@@ -164,7 +161,7 @@ let make = (~backgroundImg) => {
             </span>
             <span className=Styles.heroButton>
               <Button
-                href=`Internal("/tech")
+                href={`Internal("/tech")}
                 bgColor=Theme.Colors.white
                 paddingX=1.
                 width={`rem(13.5)}>

@@ -103,19 +103,31 @@ let get_tokens_graphql =
          Array.iter response#accounts ~f:(fun account ->
              printf "%s " (Token_id.to_string account#token) ) ))
 
-let print_trust_status status json =
+let print_trust_statuses statuses json =
   if json then
     printf "%s\n"
-      (Yojson.Safe.to_string (Trust_system.Peer_status.to_yojson status))
+      (Yojson.Safe.to_string
+         (`List
+           (List.map
+              ~f:(fun (peer, status) ->
+                `List
+                  [ Network_peer.Peer.to_yojson peer
+                  ; Trust_system.Peer_status.to_yojson status ] )
+              statuses)))
   else
-    let ban_status =
-      match status.banned with
+    let ban_status status =
+      match status.Trust_system.Peer_status.banned with
       | Unbanned ->
           "Unbanned"
       | Banned_until tm ->
           sprintf "Banned_until %s" (Time.to_string_abs tm ~zone:Time.Zone.utc)
     in
-    printf "%0.04f, %s\n" status.trust ban_status
+    List.fold ~init:()
+      ~f:(fun () (peer, status) ->
+        printf "%s, %0.04f, %s\n"
+          (Network_peer.Peer.to_multiaddr_string peer)
+          status.trust (ban_status status) )
+      statuses
 
 let round_trust_score trust_status =
   let open Trust_system.Peer_status in
@@ -141,8 +153,12 @@ let get_trust_status =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status.rpc
              ip_address port
          with
-         | Ok status ->
-             print_trust_status (round_trust_score status) json
+         | Ok statuses ->
+             print_trust_statuses
+               (List.map
+                  ~f:(fun (peer, status) -> (peer, round_trust_score status))
+                  statuses)
+               json
          | Error e ->
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
      ))
@@ -155,15 +171,6 @@ let ip_trust_statuses_to_yojson ip_trust_statuses =
           ; ("status", Trust_system.Peer_status.to_yojson status) ] )
   in
   `List items
-
-let print_ip_trust_statuses ip_statuses json =
-  if json then
-    printf "%s\n"
-      (Yojson.Safe.to_string @@ ip_trust_statuses_to_yojson ip_statuses)
-  else
-    List.iter ip_statuses ~f:(fun (ip_addr, status) ->
-        printf "%s : " (Unix.Inet_addr.to_string ip_addr) ;
-        print_trust_status status false )
 
 let get_trust_status_all =
   let open Command.Param in
@@ -194,7 +201,7 @@ let get_trust_status_all =
                      not Float.(equal status.trust zero) )
                else ip_rounded_trust_statuses
              in
-             print_ip_trust_statuses filtered_ip_trust_statuses json
+             print_trust_statuses filtered_ip_trust_statuses json
          | Error e ->
              printf "Failed to get trust statuses %s\n" (Error.to_string_hum e)
      ))
@@ -219,7 +226,7 @@ let reset_trust_status =
              ip_address port
          with
          | Ok status ->
-             print_trust_status status json
+             print_trust_statuses status json
          | Error e ->
              printf "Failed to reset trust status %s\n" (Error.to_string_hum e)
      ))
