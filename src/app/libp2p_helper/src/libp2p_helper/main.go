@@ -28,11 +28,11 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-discovery"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
-	filter "github.com/libp2p/go-maddr-filter"
 	"github.com/multiformats/go-multiaddr"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 type subscription struct {
@@ -86,8 +86,7 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
-	banIP
-	unbanIP
+	setGatingConfig
 )
 
 const validationTimeout = 5 * time.Minute
@@ -193,14 +192,15 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 }
 
 type configureMsg struct {
-	Statedir        string   `json:"statedir"`
-	Privk           string   `json:"privk"`
-	NetworkID       string   `json:"network_id"`
-	ListenOn        []string `json:"ifaces"`
-	External        string   `json:"external_maddr"`
-	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	GossipType      string   `json:"gossip_type"`
-	SeedPeers       []string `json:"seed_peers"`
+	Statedir        string             `json:"statedir"`
+	Privk           string             `json:"privk"`
+	NetworkID       string             `json:"network_id"`
+	ListenOn        []string           `json:"ifaces"`
+	External        string             `json:"external_maddr"`
+	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
+	GossipType      string             `json:"gossip_type"`
+	SeedPeers       []string           `json:"seed_peers"`
+	GatingConfig    setGatingConfigMsg `json:"gating_config"`
 }
 
 type discoveredPeerUpcall struct {
@@ -245,7 +245,14 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds)
+	gatingConfig, err := gatingConfigFromJson(&m.GatingConfig)
+
+	if err != nil {
+		return nil, badRPC(err)
+	}
+
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, *gatingConfig)
+
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -951,61 +958,92 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	return peerInfos, nil
 }
 
-type banIPMsg struct {
-	IP string `json:"ip"`
-}
+func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
+	realIP := gonet.ParseIP(ip).To4()
 
-func (ban *banIPMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	ip := gonet.ParseIP(ban.IP).To4()
-
-	if ip == nil {
+	if realIP == nil {
 		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+		return badRPC(errors.New("unparsable IP or IPv6"))
 	}
 
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
+	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: realIP}
 
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
+	filters.AddFilter(ipnet, action)
 
-	app.P2p.Filters.AddFilter(ipnet, filter.ActionDeny)
-
-	if currentAction == filter.ActionDeny && isFromRule {
-		return "banIP already banned", nil
-	}
-	return "banIP success", nil
+	return nil
 }
 
 type unbanIPMsg struct {
 	IP string `json:"ip"`
 }
 
-func (unban *unbanIPMsg) run(app *app) (interface{}, error) {
+type setGatingConfigMsg struct {
+	BannedIPs      []string `json:"banned_ips"`
+	BannedPeerIDs  []string `json:"banned_peers"`
+	TrustedPeerIDs []string `json:"trusted_peers"`
+	TrustedIPs     []string `json:"trusted_ips"`
+	Isolate        bool     `json:"isolate"`
+}
+
+func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
+	newFilter := ma.NewFilters()
+	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
+
+	if gc.Isolate {
+		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
+		if err != nil {
+			return nil, err
+		}
+		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+	}
+	for _, ip := range gc.BannedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, ip := range gc.TrustedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionAccept)
+		if err != nil {
+			return nil, err
+		}
+	}
+	bannedPeers := peer.NewSet()
+	for _, peerID := range gc.BannedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		bannedPeers.Add(id)
+	}
+	trustedPeers := peer.NewSet()
+	for _, peerID := range gc.TrustedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		trustedPeers.Add(id)
+	}
+
+	return &codanet.CodaGatingState{AddrFilters: newFilter, AllowedPeers: trustedPeers, DeniedPeers: bannedPeers}, nil
+}
+
+func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
 
-	ip := gonet.ParseIP(unban.IP).To4()
+	newState, err := gatingConfigFromJson(gc)
 
-	if ip == nil {
-		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+	if err != nil {
+		return nil, badRPC(err)
 	}
 
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
+	*app.P2p.GatingState = *newState
 
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
-
-	if !isFromRule || currentAction == filter.ActionAccept {
-		return "unbanIP not banned", nil
-	}
-
-	app.P2p.Filters.RemoveLiteral(ipnet)
-
-	return "unbanIP success", nil
+	return "ok", nil
 }
 
 var msgHandlers = map[methodIdx]func() action{
@@ -1027,8 +1065,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
-	banIP:               func() action { return &banIPMsg{} },
-	unbanIP:             func() action { return &unbanIPMsg{} },
+	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
 }
 
 type errorResult struct {

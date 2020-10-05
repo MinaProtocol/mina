@@ -43,7 +43,9 @@ let make = () => {
                String.lowercase_ascii(blog.title),
              )
            });
-         setBlogs(_ => filteredBlogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog));
+         setBlogs(_ =>
+           filteredBlogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)
+         );
        });
     None;
   });
@@ -56,9 +58,6 @@ let make = () => {
         </h2>
       </div>
     </Wrapped>
-    <ListModule
-      items=blogs
-      itemKind=ListModule.TestnetRetro
-    />
+    <ListModule items=blogs itemKind=ListModule.TestnetRetro />
   </div>;
 };
