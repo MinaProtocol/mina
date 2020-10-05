@@ -86,24 +86,23 @@ end = struct
 
   let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
     let ledger_depth = Inputs.ledger_depth t in
-    let locations, _ = List.unzip locations_and_hashes in
-    if not @@ List.is_empty locations then
+    if not @@ List.is_empty locations_and_hashes then
       let height =
-        Inputs.Location.height ~ledger_depth @@ List.hd_exn locations
+        Inputs.Location.height ~ledger_depth
+        @@ fst
+        @@ List.hd_exn locations_and_hashes
       in
       if height < ledger_depth then
         let location_to_hash_table =
           Inputs.Location_binable.Table.of_alist_exn locations_and_hashes
         in
         let _, parent_locations_and_hashes =
-          List.fold locations_and_hashes ~init:([], [])
+          List.fold locations_and_hashes ~init:(Inputs.Location.Set.empty, [])
             ~f:(fun (processed_locations, parent_locations_and_hashes)
                (location, hash)
                ->
-              if
-                List.mem processed_locations location
-                  ~equal:Inputs.Location.equal
-              then (processed_locations, parent_locations_and_hashes)
+              if Set.mem processed_locations location then
+                (processed_locations, parent_locations_and_hashes)
               else
                 let sibling_location = Inputs.Location.sibling location in
                 let sibling_hash =
@@ -116,7 +115,17 @@ end = struct
                   in
                   Inputs.Hash.merge ~height left_hash right_hash
                 in
-                ( location :: sibling_location :: processed_locations
+                let new_locations =
+                  Inputs.Location.Set.of_array [|location; sibling_location|]
+                in
+                let processed_locations =
+                  (* This halves the best-case runtime (~2/3 for average case)
+                     vs 2 [add]s, which can be significant where we apply a
+                     large change.
+                  *)
+                  Set.union new_locations processed_locations
+                in
+                ( processed_locations
                 , (Inputs.Location.parent location, parent_hash)
                   :: parent_locations_and_hashes ) )
         in

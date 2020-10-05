@@ -47,4 +47,6 @@ module type S = sig
   val sibling : t -> t
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
+
+  module Set : Set.S with type Elt.t = t
 end
