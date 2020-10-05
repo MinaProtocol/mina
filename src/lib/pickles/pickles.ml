@@ -895,7 +895,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -922,6 +921,7 @@ let%test_module "test" =
       end
 
       (* A snark proving one knows a preimage of a hash *)
+(*
       module Know_preimage = struct
         module Statement = Statement
 
@@ -979,6 +979,7 @@ let%test_module "test" =
 
         let side_loaded_vk = Side_loaded.Verification_key.of_compiled tag
       end
+*)
 
       let side_loaded =
         Side_loaded.create
@@ -987,12 +988,12 @@ let%test_module "test" =
           ~value_to_field_elements:Statement.to_field_elements
           ~var_to_field_elements:Statement.to_field_elements ~typ:Field.typ
 
-      let tag, _, p, Provers.[base; preimage_base; merge] =
+      let tag, _, p, Provers.[base; (*preimage_base; *) merge] =
         compile
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
-          ~branches:(module Nat.N3)
+          ~branches:(module Nat.N2)
           ~max_branching:(module Nat.N2)
           ~name:"txn-snark"
           ~choices:(fun ~self ->
@@ -1005,6 +1006,7 @@ let%test_module "test" =
                     done ;
                     [] )
               ; main_value= (fun [] _ -> []) }
+(*
             ; { prevs= [side_loaded]
               ; main=
                   (fun [hash] x ->
@@ -1014,6 +1016,7 @@ let%test_module "test" =
                     Field.Assert.equal hash x ;
                     [Boolean.true_] )
               ; main_value= (fun [_] _ -> [true]) }
+*)
             ; { prevs= [self; self]
               ; main=
                   (fun [l; r] res ->
@@ -1026,15 +1029,19 @@ let%test_module "test" =
 
     let t_proof =
       let preimage = Field.Constant.of_int 10 in
-      let base1, preimage_proof = Txn_snark.Know_preimage.prove ~preimage in
+      let base1 = preimage in
+(*       let base1, preimage_proof = Txn_snark.Know_preimage.prove ~preimage in *)
       let base2 = Field.Constant.of_int 9 in
       let base12 = Field.Constant.(base1 * base2) in
+      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
+(*
       let t1 =
         Common.time "t1" (fun () ->
             Side_loaded.in_prover Txn_snark.side_loaded
               Txn_snark.Know_preimage.side_loaded_vk ;
             Txn_snark.preimage_base [(base1, preimage_proof)] base1 )
       in
+*)
       let module M = struct
         type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
       end in
@@ -1059,13 +1066,15 @@ let%test_module "test" =
       Common.time "verify" (fun () ->
           assert (
             Verify.verify_heterogenous
+(*
               [ T
                   ( (module Nat.N2)
                   , (module Txn_snark.Know_preimage.Statement.Constant)
                   , Lazy.force Txn_snark.Know_preimage.Proof.verification_key
                   , base1
                   , preimage_proof )
-              ; T
+*)
+              [ T
                   ( (module Nat.N2)
                   , (module Txn_snark.Statement.Constant)
                   , Lazy.force Txn_snark.Proof.verification_key
@@ -1135,4 +1144,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end ) *)
+  end )
