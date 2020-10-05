@@ -203,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                |> defer
                     (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd)
+               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
                >>= defer validate_delta_transition_chain
                >>= defer validate_protocol_versions)
            with

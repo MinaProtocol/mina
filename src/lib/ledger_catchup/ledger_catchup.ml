@@ -333,6 +333,16 @@ let verify_transitions_and_build_breadcrumbs ~logger
           in
           Error (Error.of_string "invalid proof")
     in
+    let verification_end_time = Core.Time.now () in
+    [%log debug]
+      ~metadata:
+        [ ("target_hash", State_hash.to_yojson target_hash)
+        ; ( "time_elapsed"
+          , `Float
+              Core.Time.(
+                Span.to_sec
+                @@ diff verification_end_time verification_start_time) ) ]
+      "verification of proofs complete" ;
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
@@ -352,6 +362,16 @@ let verify_transitions_and_build_breadcrumbs ~logger
             @@ Continue_or_stop.Continue
                  (transition_with_initial_validation :: acc) )
       ~finish:(fun acc ->
+        let validation_end_time = Core.Time.now () in
+        [%log debug]
+          ~metadata:
+            [ ("target_hash", State_hash.to_yojson target_hash)
+            ; ( "time_elapsed"
+              , `Float
+                  Core.Time.(
+                    Span.to_sec
+                    @@ diff validation_end_time verification_end_time) ) ]
+          "validation of transitions complete" ;
         if List.length transitions <= 0 then
           Deferred.Or_error.return ([], target_hash)
         else
@@ -363,16 +383,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
           in
           Deferred.Or_error.return (acc, initial_state_hash) )
   in
-  let verification_end_time = Core.Time.now () in
-  [%log debug]
-    ~metadata:
-      [ ("target_hash", State_hash.to_yojson target_hash)
-      ; ( "time_elapsed"
-        , `Float
-            Core.Time.(
-              Span.to_sec @@ diff verification_end_time verification_start_time)
-        ) ]
-    "verification of transitions complete" ;
+  let build_start_time = Core.Time.now () in
   let trees_of_transitions =
     Option.fold
       (Non_empty_list.of_list_opt transitions_with_initial_validation)
@@ -390,8 +401,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         ~metadata:
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
-            , `Float
-                Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
+            , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
             ) ]
         "build of breadcrumbs complete" ;
       Deferred.Or_error.return result
@@ -400,8 +410,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         ~metadata:
           [ ("target_hash", State_hash.to_yojson target_hash)
           ; ( "time_elapsed"
-            , `Float
-                Core.Time.(Span.to_sec @@ diff (now ()) verification_end_time)
+            , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
             ) ]
         "build of breadcrumbs failed" ;
       List.map transitions_with_initial_validation
