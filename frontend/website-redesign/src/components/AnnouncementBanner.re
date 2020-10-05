@@ -13,7 +13,11 @@ module Styles = {
         dark
           ? backgroundColor(black)
           : backgroundImage(`url("/static/img/AnnouncementBanner.png")),
-        padding2(~v=`rem(0.5), ~h=`rem(0.5)),
+        padding2(~v=`rem(0.5), ~h=`rem(1.5)),
+        media(
+          Theme.MediaQuery.tablet,
+          [padding2(~v=`rem(0.5), ~h=`rem(2.5))],
+        ),
       ]),
     ]);
 
@@ -35,7 +39,7 @@ module Styles = {
   let changeRegionSection =
     merge([flexCenter, style([paddingRight(`rem(1.))])]);
 
-  let announcementText = style([paddingLeft(`rem(2.))]);
+  let announcementText = style([]);
 
   let link =
     merge([
@@ -61,29 +65,27 @@ module Styles = {
       style([paddingLeft(`rem(0.5)), paddingRight(`rem(0.5))]),
     ]);
 
-  let linkAnchor =
-    merge([
-      orangeText,
-      style([
-        textDecoration(`none)
-      ])
-    ]);
+  let linkAnchor = merge([orangeText, style([textDecoration(`none)])]);
 };
 
 [@react.component]
 let make = (~children, ~dark=false) => {
   <div className={Styles.announcementBanner(dark)}>
-    <div className=Styles.flexCenter>
-      <span className=Styles.announcementText> children </span>
-      <a className=Styles.linkAnchor href="https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul">
-        <div className=Styles.link>
-          <span className=Styles.learnMoreText>
-            {React.string("Subscribe to stay updated")}
-          </span>
-          <Icon kind=Icon.ArrowRightMedium />
-        </div>
-      </a>
-    </div>
+
+      <div className=Styles.flexCenter>
+        <span className=Styles.announcementText> children </span>
+        <a
+          className=Styles.linkAnchor
+          href="https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul">
+          <div className=Styles.link>
+            <span className=Styles.learnMoreText>
+              {React.string("Subscribe to stay updated")}
+            </span>
+            <Icon kind=Icon.ArrowRightMedium />
+          </div>
+        </a>
+      </div>
+    </div>;
     //<div className=Styles.changeRegionSection>
     //  <Icon kind=Icon.World />
     //  <span
@@ -96,5 +98,4 @@ let make = (~children, ~dark=false) => {
     //    <Icon kind=Icon.ChevronDown />
     //  </span>
     // </div>
-  </div>;
 };
