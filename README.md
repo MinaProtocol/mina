@@ -1,5 +1,5 @@
 <a href="https://minaprotocol.com">
-	<img width="200" src="./frontend/website-redesign/public/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
+	<img width="200" src="https://minaprotocol.com/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
 </a>
 <hr/>
 
