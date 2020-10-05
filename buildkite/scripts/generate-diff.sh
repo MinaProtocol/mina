@@ -10,8 +10,8 @@ COMMIT=$(git log -1 --pretty=format:%H)
 # Use buildkite commit instead when its defined
 [[ -n "$BUILDKITE_COMMIT" ]] && COMMIT=${BUILDKITE_COMMIT}
 
-# Print it for logging/debugging
-echo "Diffing current commit: ${COMMIT} against commit: ${BASECOMMIT} from branch: ${BASE} ."
+# Print it to stderr for logging/debugging
+>&2 echo "Diffing current commit: ${COMMIT} against commit: ${BASECOMMIT} from branch: ${BASE} ."
 
 # Compare base to the current commit
 if [[ $BASECOMMIT != $COMMIT ]]; then
