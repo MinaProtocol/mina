@@ -1001,7 +1001,7 @@ let%test_module "test" =
               ; main=
                   (fun [] x ->
                     let t = (Field.is_square x :> Field.t) in
-                    for i = 0 to 400000 do
+                    for i = 0 to 50_000 do
                       assert_r1cs t t t
                     done ;
                     [] )
