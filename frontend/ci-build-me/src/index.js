@@ -72,7 +72,7 @@ const hasExistingBuilds = async (github) => {
       "Content-Type": "application/json",
     },
   };
-  const request = await httpsRequest(options, postData);
+  const request = await httpsRequest(options);
   return request.length > 0;
 };
 
