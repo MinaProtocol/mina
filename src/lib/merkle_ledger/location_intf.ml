@@ -14,7 +14,7 @@ module type S = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving eq, sexp, hash, compare]
+  [@@deriving sexp, hash, compare]
 
   val is_generic : t -> bool
 
@@ -48,5 +48,5 @@ module type S = sig
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
 
-  module Set : Set.S with type Elt.t = t
+  include Comparable.S with type t := t
 end

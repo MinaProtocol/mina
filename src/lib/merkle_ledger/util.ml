@@ -93,44 +93,55 @@ end = struct
         @@ List.hd_exn locations_and_hashes
       in
       if height < ledger_depth then
-        let location_to_hash_table =
-          Inputs.Location_binable.Table.of_alist_exn locations_and_hashes
+        let parents_to_children =
+          List.fold locations_and_hashes ~init:Inputs.Location.Map.empty
+            ~f:(fun parents_to_children (location, hash) ->
+              let parent_location = Inputs.Location.parent location in
+              Map.update parents_to_children parent_location ~f:(function
+                | Some (`One_side (sibling_location, sibling_hash)) ->
+                    assert (
+                      not (Inputs.Location.equal location sibling_location) ) ;
+                    (* If we have already recorded the sibling, we can compute
+                       the hash now.
+                    *)
+                    let parent_hash =
+                      let left_hash, right_hash =
+                        Inputs.Location.order_siblings location hash
+                          sibling_hash
+                      in
+                      Inputs.Hash.merge ~height left_hash right_hash
+                    in
+                    `Hash parent_hash
+                | Some (`Hash _) ->
+                    assert false
+                | None ->
+                    (* This is the first child of its parent that we have
+                       encountered.
+                    *)
+                    `One_side (location, hash) ) )
         in
-        let _, parent_locations_and_hashes =
-          List.fold locations_and_hashes ~init:(Inputs.Location.Set.empty, [])
-            ~f:(fun (processed_locations, parent_locations_and_hashes)
-               (location, hash)
-               ->
-              if Set.mem processed_locations location then
-                (processed_locations, parent_locations_and_hashes)
-              else
-                let sibling_location = Inputs.Location.sibling location in
-                let sibling_hash =
-                  Option.value ~default:(Inputs.get_hash t sibling_location)
-                  @@ Hashtbl.find location_to_hash_table sibling_location
-                in
-                let parent_hash =
-                  let left_hash, right_hash =
-                    Inputs.Location.order_siblings location hash sibling_hash
-                  in
-                  Inputs.Hash.merge ~height left_hash right_hash
-                in
-                let new_locations =
-                  Inputs.Location.Set.of_array [|location; sibling_location|]
-                in
-                let processed_locations =
-                  (* This halves the best-case runtime (~2/3 for average case)
-                     vs 2 [add]s, which can be significant where we apply a
-                     large change.
+        let rev_parent_locations_and_hashes =
+          Map.fold parents_to_children ~init:[] ~f:(fun ~key ~data acc ->
+              match data with
+              | `One_side (location, hash) ->
+                  (* We haven't recorded the sibling, so query the ledger to get
+                     the hash.
                   *)
-                  Set.union new_locations processed_locations
-                in
-                ( processed_locations
-                , (Inputs.Location.parent location, parent_hash)
-                  :: parent_locations_and_hashes ) )
+                  let sibling_location = Inputs.Location.sibling location in
+                  let sibling_hash = Inputs.get_hash t sibling_location in
+                  let parent_hash =
+                    let left_hash, right_hash =
+                      Inputs.Location.order_siblings location hash sibling_hash
+                    in
+                    Inputs.Hash.merge ~height left_hash right_hash
+                  in
+                  (key, parent_hash) :: acc
+              | `Hash parent_hash ->
+                  (* We have already computed the hash above. *)
+                  (key, parent_hash) :: acc )
         in
-        compute_affected_locations_and_hashes t parent_locations_and_hashes
-          (List.append parent_locations_and_hashes acc)
+        compute_affected_locations_and_hashes t rev_parent_locations_and_hashes
+          (List.rev_append rev_parent_locations_and_hashes acc)
       else acc
     else acc
 
