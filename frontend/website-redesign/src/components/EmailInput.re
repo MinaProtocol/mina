@@ -5,7 +5,7 @@ module Styles = {
       display(`inlineFlex),
       alignItems(`center),
       height(`rem(3.25)),
-      borderRadius(px(4)),
+      borderRadius(px(2)),
       width(`rem(14.5)),
       fontSize(rem(1.)),
       paddingLeft(`rem(1.)),
@@ -96,9 +96,11 @@ let make = () => {
                height={`rem(3.25)}
                width={`rem(7.93)}
                href={
-                 `External("https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul?email="
-                 ++ email)
-               }
+                      `External(
+                        "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul?email="
+                        ++ email,
+                      )
+                    }
                dark=true>
                {React.string("Submit")}
                <Icon kind=Icon.ArrowRightMedium />
