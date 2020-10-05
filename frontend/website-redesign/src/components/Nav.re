@@ -248,7 +248,8 @@ let make = (~dark=false) => {
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <div className=Styles.ctaContainer>
-        <Button href=`Internal("/genesis") width={`rem(13.)} paddingX=1. dark>
+        <Button
+          href={`Internal("/genesis")} width={`rem(13.)} paddingX=1. dark>
           <img src="/static/img/promo-logo.svg" height="40" />
           <Spacer width=0.5 />
           <span> {React.string("Join Genesis Token Program")} </span>

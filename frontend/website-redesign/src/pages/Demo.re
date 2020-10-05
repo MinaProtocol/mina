@@ -72,7 +72,11 @@ let make = () => {
             </span>
           </PromoButton>
           /***Join Genesis Button, uses the CoreProtocolLarge icon */
-          <Button href=`Scroll_to_top bgColor=Theme.Colors.orange paddingX=1. paddingY=0.5>
+          <Button
+            href=`Scroll_to_top
+            bgColor=Theme.Colors.orange
+            paddingX=1.
+            paddingY=0.5>
             <Icon kind=Icon.CoreProtocolLarge size=2.5 />
             <span className=Styles.joinGenesisButton>
               {React.string("Join Genesis + Earn Mina")}
