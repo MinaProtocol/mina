@@ -1,10 +1,9 @@
 open Core
 
 module Sender : sig
-  type t = Local | Remote of (Unix.Inet_addr.Stable.V1.t * Peer.Id.t)
-  [@@deriving sexp, eq, yojson, compare]
+  type t = Local | Remote of Peer.t [@@deriving sexp, eq, yojson, compare]
 
-  val remote_exn : t -> Unix.Inet_addr.Stable.V1.t * Peer.Id.t
+  val remote_exn : t -> Peer.t
 end
 
 module Incoming : sig
@@ -23,7 +22,7 @@ module Incoming : sig
 
   val local : 'a -> 'a t
 
-  val remote_sender_exn : 'a t -> Unix.Inet_addr.Stable.V1.t * Peer.Id.t
+  val remote_sender_exn : 'a t -> Peer.t
 
   val gen : 'a Quickcheck.Generator.t -> 'a t Quickcheck.Generator.t
 end

@@ -393,6 +393,8 @@ module type S = sig
       val start_time : constants:Constants.t -> t -> Block_time.t
 
       val end_time : constants:Constants.t -> t -> Block_time.t
+
+      val to_global_slot : t -> Coda_numbers.Global_slot.t
     end
 
     module Consensus_state : sig
