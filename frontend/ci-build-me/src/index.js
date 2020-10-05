@@ -98,16 +98,17 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      const buildAlreadyExists = (async () => {
-        try {
-          return await hasExistingBuilds(req.body);
-        } catch (e) {
-          // if this fails for some reason, assume we don't have an existing build
-          console.error(`Failed to find existing builds:`);
-          console.error(e);
-          return false;
-        }
-      })();
+      let buildAlreadyExists;
+      try {
+        const res = await hasExistingBuilds(req.body);
+        buildAlreadyExists = res;
+      } catch (e) {
+        // if this fails for some reason, assume we don't have an existing build
+        console.error(`Failed to find existing builds:`);
+        console.error(e);
+        buildAlreadyExists = false;
+      }
+
       if (!buildAlreadyExists) {
         const buildkite = await runBuild(req.body);
         const circle = await runCircleBuild(req.body);
