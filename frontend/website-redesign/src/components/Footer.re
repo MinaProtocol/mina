@@ -80,30 +80,40 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
-        selector("a", [width(`rem(2.)), color(white), hover([color(Theme.Colors.orange)])]),
+        selector("a:visited", [color(white)]),
+        selector(
+          "a",
+          [
+            width(`rem(2.)),
+            color(white),
+            hover([color(Theme.Colors.orange)]),
+          ],
+        ),
       ]);
 
-    let anchor = style([
-      textDecoration(`none)
-    ]);
+    let anchor = style([textDecoration(`none)]);
   };
 
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <a className=Styles.anchor href="https://discord.com/invite/Vexf4ED">
+      <a className=Styles.anchor href="https://bit.ly/MinaDiscord">
         <Icon kind=Icon.Discord size=2. />
       </a>
       <a className=Styles.anchor href="https://twitter.com/minaprotocol">
         <Icon kind=Icon.Twitter size=2. />
       </a>
-      <a className=Styles.anchor href="https://facebook.com/minaprotocol">
+      <a className=Styles.anchor href="http://bit.ly/MinaProtocolFacebook">
         <Icon kind=Icon.Facebook size=2. />
       </a>
-      <a className=Styles.anchor href="https://t.me/minaprotocol">
+      <a className=Styles.anchor href="http://bit.ly/MinaTelegram">
         <Icon kind=Icon.Telegram size=2. />
       </a>
-      <a className=Styles.anchor href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200"> <Icon kind=Icon.WeChat size=2. /> </a>
+      <a
+        className=Styles.anchor
+        href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200">
+        <Icon kind=Icon.WeChat size=2. />
+      </a>
     </div>;
   };
 };
@@ -121,14 +131,9 @@ module LeftSide = {
       ]);
 
     let emailInputSection =
-      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
+      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))])]);
 
-    let logo =
-      style([
-        height(`rem(3.1)),
-        width(`rem(11.)),
-        marginBottom(`rem(4.)),
-      ]);
+    let logo = style([height(`rem(3.1)), width(`rem(11.))]);
 
     let label =
       merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);

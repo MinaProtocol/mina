@@ -9,6 +9,10 @@ open Network_peer
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
+[@@deriving yojson]
+
 let peer_of_peer_info peer_info =
   Peer.create
     (Unix.Inet_addr.of_string peer_info.host)
@@ -64,7 +68,8 @@ module Go_log = struct
     | "warn" ->
         Warn
     | "info" ->
-        Info
+        (* this is intentionally debug, because the go info logs are too verbose for our info *)
+        Debug
     | "debug" ->
         Debug
     | _ ->
@@ -115,6 +120,7 @@ module Helper = struct
       Some types would make it harder to misuse these integers.
     *)
     ; mutable seqno: int
+    ; mutable connection_gating: connection_gating
     ; logger: Logger.t
     ; me_keypair: Keypair0.t Ivar.t
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
@@ -264,6 +270,20 @@ module Helper = struct
       let name = "unsubscribe"
     end
 
+    module Set_gater_config = struct
+      type input =
+        { banned_ips: string list
+        ; banned_peers: string list
+        ; trusted_peers: string list
+        ; trusted_ips: string list
+        ; isolate: bool }
+      [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "setGatingConfig"
+    end
+
     module Configure = struct
       type input =
         { privk: string
@@ -273,6 +293,7 @@ module Helper = struct
         ; network_id: string
         ; unsafe_no_trust_ip: bool
         ; gossip_type: string
+        ; gating_config: Set_gater_config.input
         ; seed_peers: string list }
       [@@deriving yojson]
 
@@ -360,23 +381,21 @@ module Helper = struct
 
       let name = "findPeer"
     end
-
-    module Ban_ip = struct
-      type input = {ip: string} [@@deriving yojson]
-
-      type output = string [@@deriving yojson]
-
-      let name = "banIP"
-    end
-
-    module Unban_ip = struct
-      type input = {ip: string} [@@deriving yojson]
-
-      type output = string [@@deriving yojson]
-
-      let name = "unbanIP"
-    end
   end
+
+  let gating_config_to_helper_format (config : connection_gating) =
+    Rpcs.Set_gater_config.
+      { banned_ips=
+          List.map
+            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+            config.banned_peers
+      ; banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers
+      ; trusted_ips=
+          List.map
+            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+            config.trusted_peers
+      ; trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers
+      ; isolate= config.isolate }
 
   (** Generate the next sequence number for our side of the connection *)
   let genseq t =
@@ -944,6 +963,17 @@ module Multiaddr = struct
   let to_string t = t
 
   let of_string t = t
+
+  let to_peer t =
+    match String.split ~on:'/' t with
+    | [""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id] -> (
+      try
+        let host = Unix.Inet_addr.of_string ip4_str in
+        let libp2p_port = Int.of_string tcp_str in
+        Some (Network_peer.Peer.create host ~libp2p_port ~peer_id)
+      with _ -> None )
+    | _ ->
+        None
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -1099,7 +1129,7 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~gossip_type ~seed_peers =
+    ~unsafe_no_trust_ip ~gossip_type ~seed_peers ~initial_gating_config =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1110,6 +1140,8 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; network_id
       ; unsafe_no_trust_ip
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
+      ; gating_config=
+          Helper.gating_config_to_helper_format initial_gating_config
       ; gossip_type=
           ( match gossip_type with
           | `Gossipsub ->
@@ -1273,36 +1305,23 @@ let begin_advertising net =
 
 let lookup_peerid = Helper.lookup_peerid
 
-let ban_ip net ip =
-  match%map
-    Helper.(do_rpc net (module Rpcs.Ban_ip) {ip= Unix.Inet_addr.to_string ip})
-  with
-  | Ok "banIP success" ->
-      net.banned_ips <- ip :: net.banned_ips ;
-      Ok `Ok
-  | Ok "banIP already banned" ->
-      Ok `Already_banned
-  | Ok v ->
-      failwithf "helper broke RPC protocol: banIP got %s" v ()
-  | Error e ->
-      Error e
+let connection_gating_config net = Deferred.return net.Helper.connection_gating
 
-let unban_ip net ip =
+let set_connection_gating_config net (config : connection_gating) =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Unban_ip) {ip= Unix.Inet_addr.to_string ip})
+      do_rpc net
+        (module Rpcs.Set_gater_config)
+        (gating_config_to_helper_format config))
   with
-  | Ok "unbanIP success" ->
-      net.banned_ips
-      <- List.filter net.banned_ips ~f:(fun banned ->
-             not (Unix.Inet_addr.equal banned ip) ) ;
-      Ok `Ok
-  | Ok "unbanIP not banned" ->
-      Ok `Not_banned
+  | Ok "ok" ->
+      net.connection_gating <- config ;
+      config
   | Ok v ->
-      failwithf "helper broke RPC protocol: unbanIP got %s" v ()
+      failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      Error e
+      failwithf "unexpected error doing setGatingConfig: %s"
+        (Error.to_string_hum e) ()
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1360,6 +1379,8 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; conf_dir
         ; logger
         ; banned_ips= []
+        ; connection_gating=
+            {banned_peers= []; trusted_peers= []; isolate= false}
         ; me_keypair= Ivar.create ()
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
@@ -1448,11 +1469,15 @@ let%test_module "coda network tests" =
         configure a ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~initial_gating_config:
+            {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       and () =
         configure b ~gossip_type:`Gossipsub
           ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+          ~initial_gating_config:
+            {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a

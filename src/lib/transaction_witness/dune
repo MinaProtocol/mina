@@ -3,4 +3,4 @@
   (public_name transaction_witness)
   (inline_tests)
   (libraries core_kernel coda_base coda_state)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda bisect_ppx -- --conditional)))

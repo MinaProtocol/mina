@@ -1,6 +1,6 @@
 (library
  (name coda_incremental)
  (public_name coda_incremental)
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
  (libraries incremental pipe_lib)
  )

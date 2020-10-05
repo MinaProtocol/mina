@@ -1,5 +1,6 @@
 (library
  (name vrf_lib_tests)
+ (public_name vrf_lib_tests)
  (library_flags -linkall)
  (inline_tests)
  (libraries core snarky snarky_curves test_util signature_lib snark_params
