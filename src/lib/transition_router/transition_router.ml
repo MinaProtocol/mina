@@ -119,7 +119,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(
-                    record trust_system logger peer.host
+                    record trust_system logger peer
                       Actions.
                         ( Violated_protocol
                         , Some ("Peer sent us bad proof for their best tip", [])
@@ -128,8 +128,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 acc
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 let enveloped_candidate_best_tip =
-                  Envelope.Incoming.wrap ~data:candidate_best_tip
-                    ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
+                  Envelope.Incoming.wrap_peer ~data:candidate_best_tip
+                    ~sender:peer
                 in
                 return
                 @@ Option.merge acc
