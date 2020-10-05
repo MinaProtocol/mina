@@ -151,12 +151,13 @@ module TechSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-      <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
-      <SideNav.Item title="Projects & Possibilities" slug="#projects" />
-      <SideNav.Item title="Incentive Structure" slug="#incentives" />
-      <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+
+        <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
+        <SideNav.Item title="Projects & Possibilities" slug="#projects" />
+        <SideNav.Item title="Incentive Structure" slug="#incentives" />
+        <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+      </SideNav>;
       // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
-    </SideNav>;
   };
 };
 
@@ -318,83 +319,87 @@ module Projects = {
   [@react.component]
   let make = () =>
     <div
-      className={Css.merge([Styles.sectionContainer("/static/img/tech-projects-bg.jpg"), Styles.fadeOut])}>
+      className={Css.merge([
+        Styles.sectionContainer("/static/img/tech-projects-bg.jpg"),
+        Styles.fadeOut,
+      ])}>
       <Spacer height=5. />
       <Section
         title="Projects & Possibilities"
         subhead={js|Developers are already building powerful applications on Mina — but this is just the beginning.|js}
         slug="projects">
         /*
-        <hr className=Styles.divider />
-        <Spacer height=1. />
-        <h3 className=Theme.Type.h3> {React.string("Built on Mina")} </h3>
-        <Spacer height=3. />
-        <img src="/static/img/AboutHeroTabletBackground.jpg" />
-        <Spacer height=2. />
-        <ProjectCopy
-          title="Figment Block Explorer"
-          description="This open source Mina block explorer provides aggregated network data to enable users to view transactions, blocks, and accounts."
-          url="/"
-        />
-        <Spacer height=2. />
+         <hr className=Styles.divider />
+         <Spacer height=1. />
+         <h3 className=Theme.Type.h3> {React.string("Built on Mina")} </h3>
+         <Spacer height=3. />
+         <img src="/static/img/AboutHeroTabletBackground.jpg" />
+         <Spacer height=2. />
+         <ProjectCopy
+           title="Figment Block Explorer"
+           description="This open source Mina block explorer provides aggregated network data to enable users to view transactions, blocks, and accounts."
+           url="/"
+         />
+         <Spacer height=2. />
 
-        <div className=Styles.projectContainer>
-          <img src="/static/img/AboutHeroTabletBackground.jpg" />
-          <ProjectCopy
-            title="Mina Mobile Wallet"
-            description={js|This wallet gives users full access to Mina tokens on their phone — so they can transact any time, anywhere.|js}
-            url="/"
-          />
-        </div>
-        <Spacer height=2. />
-        <div className=Styles.projectContainer>
-          <img src="/static/img/AboutHeroTabletBackground.jpg" />
-          <ProjectCopy
-            title="Faucet Bot"
-            description="Built on Mina and integrated with Discord, this tool automatically distributes Mina tokens to participants who need them for Testnet challenges and activities."
-            url="/"
-          />
-        </div>
-        <Spacer height=4. /> */
-        <hr className=Styles.divider />
-        <Spacer height=1. />
-        <h3 className=Theme.Type.h3>
-          {React.string("Explore the Possiblities")}
-        </h3>
-        <Spacer height=3. />
-        <div className=Styles.possibilities>
-          <Possibility
-            title="Build Snapps: Privacy-Enabled apps"
-            description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users' data to a public blockchain."
-            image="/static/img/tech-build-snapps.svg"
-          />
-          <Possibility
-            title="Power Enterprise Interoperability"
-            description="Use Mina to combine the cost-efficiency and privacy of a private chain with the interoperability of a public chain."
-            image="/static/img/tech-power-interop.svg"
-          />
-          <Possibility
-            title="Minimize Transaction Fees"
-            description="Power trustless e-commerce and global peer-to-peer transactions without using centralized intermediaries, or paying costly transaction fees."
-            image="/static/img/tech-txn-fees.svg"
-          />
-          <Possibility
-            title="Power secure & Fair Financial services"
-            description="Ensure lenders only use fair criteria to make decisions and securely verify relevant information without accessing  private user data."
-            image="/static/img/tech-power-fair.svg"
-          />
-          <Possibility
-            title="Enable private & auditable elections "
-            description="Guarantee fully verifiable and auditable elections, while keeping the process private and  protecting individuals' voting information. "
-            image="/static/img/tech-audit.svg"
-          />
-          <Possibility
-            title="Access Money from Anywhere in the world"
-            description="With a 22kb Mina chain, access peer-to-peer stablecoins and tokens via smartphone and bring hard-earned money anywhere you go."
-            image="/static/img/tech-access.svg"
-          />
-        </div>
-      </Section>
+         <div className=Styles.projectContainer>
+           <img src="/static/img/AboutHeroTabletBackground.jpg" />
+           <ProjectCopy
+             title="Mina Mobile Wallet"
+             description={js|This wallet gives users full access to Mina tokens on their phone — so they can transact any time, anywhere.|js}
+             url="/"
+           />
+         </div>
+         <Spacer height=2. />
+         <div className=Styles.projectContainer>
+           <img src="/static/img/AboutHeroTabletBackground.jpg" />
+           <ProjectCopy
+             title="Faucet Bot"
+             description="Built on Mina and integrated with Discord, this tool automatically distributes Mina tokens to participants who need them for Testnet challenges and activities."
+             url="/"
+           />
+         </div>
+         <Spacer height=4. /> */
+
+          <hr className=Styles.divider />
+          <Spacer height=1. />
+          <h3 className=Theme.Type.h3>
+            {React.string("Explore the Possiblities")}
+          </h3>
+          <Spacer height=3. />
+          <div className=Styles.possibilities>
+            <Possibility
+              title="Build Snapps: Privacy-Enabled apps"
+              description="Leverage Mina to develop decentralized apps that use zk-SNARKs to ensure privacy, without exposing users' data to a public blockchain."
+              image="/static/img/tech-build-snapps.svg"
+            />
+            <Possibility
+              title="Power Enterprise Interoperability"
+              description="Use Mina to combine the cost-efficiency and privacy of a private chain with the interoperability of a public chain."
+              image="/static/img/tech-power-interop.svg"
+            />
+            <Possibility
+              title="Minimize Transaction Fees"
+              description="Power trustless e-commerce and global peer-to-peer transactions without using centralized intermediaries, or paying costly transaction fees."
+              image="/static/img/tech-txn-fees.svg"
+            />
+            <Possibility
+              title="Power secure & Fair Financial services"
+              description="Ensure lenders only use fair criteria to make decisions and securely verify relevant information without accessing  private user data."
+              image="/static/img/tech-power-fair.svg"
+            />
+            <Possibility
+              title="Enable private & auditable elections "
+              description="Guarantee fully verifiable and auditable elections, while keeping the process private and  protecting individuals' voting information. "
+              image="/static/img/tech-audit.svg"
+            />
+            <Possibility
+              title="Access Money from Anywhere in the world"
+              description="With a 22kb Mina chain, access peer-to-peer stablecoins and tokens via smartphone and bring hard-earned money anywhere you go."
+              image="/static/img/tech-access.svg"
+            />
+          </div>
+        </Section>
     </div>;
 };
 
@@ -430,7 +435,9 @@ module Incentives = {
         title="Incentive Structure"
         subhead="From its protocol architecture and roles framework to its incentive structure and monetary policy, Mina is designed to maximize network scalability and security."
         slug="incentives">
-        <Button width={`rem(15.25)} href=`Internal("/static/pdf/economicsWP.pdf")>
+        <Button
+          width={`rem(15.25)}
+          href={`Internal("/static/pdf/economicsWP.pdf")}>
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
@@ -481,7 +488,11 @@ let make = () => {
       }
       title="Tech"
       header="An Elegant Solution"
-      copy=Some("Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.")
+      copy={
+        Some(
+          "Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
+        )
+      }
     />
     <TechSideNav />
     <HowMinaWorks />
@@ -525,15 +536,15 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
-      /*
-    <div className=Styles.sectionContainer("")>
-      <Spacer height=6. />
-      <div className=Styles.section id="knowledge">
-        <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-      </div>
-    </div>
-    <Spacer height=12. />
-    */
+    /*
+     <div className=Styles.sectionContainer("")>
+       <Spacer height=6. />
+       <div className=Styles.section id="knowledge">
+         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
+       </div>
+     </div>
+     <Spacer height=12. />
+     */
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
