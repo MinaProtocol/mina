@@ -27,8 +27,7 @@ var (
 		"beginAdvertising":    beginAdvertising,
 		"findPeer":            findPeer,
 		"listPeers":           listPeers,
-		"banIP":               banIP,
-		"unbanIP":             unbanIP,
+		"setGatingConfig":     setGatingConfig,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -50,8 +49,7 @@ var (
 		beginAdvertising:    "beginAdvertising",
 		findPeer:            "findPeer",
 		listPeers:           "listPeers",
-		banIP:               "banIP",
-		unbanIP:             "unbanIP",
+		setGatingConfig:     "setGatingConfig",
 	}
 )
 
@@ -77,8 +75,7 @@ func init() {
 			interface{}(beginAdvertising).(fmt.Stringer).String():    beginAdvertising,
 			interface{}(findPeer).(fmt.Stringer).String():            findPeer,
 			interface{}(listPeers).(fmt.Stringer).String():           listPeers,
-			interface{}(banIP).(fmt.Stringer).String():               banIP,
-			interface{}(unbanIP).(fmt.Stringer).String():             unbanIP,
+			interface{}(setGatingConfig).(fmt.Stringer).String():     setGatingConfig,
 		}
 	}
 }
