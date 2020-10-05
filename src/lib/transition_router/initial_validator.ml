@@ -200,11 +200,10 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              let open Deferred.Result.Monad_infix in
              External_transition.(
                Validation.wrap transition_with_hash
-               |> (fun x -> External_transition.validate_proofs ~verifier [x])
-               >>= defer
-                     (validate_time_received ~precomputed_values ~time_received)
+               |> defer
+                    (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= (fun x -> validate_proofs ~verifier [x])
+               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd)
                >>= defer validate_delta_transition_chain
                >>= defer validate_protocol_versions)
            with

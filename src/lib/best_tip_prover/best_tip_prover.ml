@@ -88,7 +88,7 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> (fun x -> validate_proofs ~verifier [x])
+      |> (fun x -> validate_proofs ~verifier [x] >>| List.hd)
       >>= Fn.compose Deferred.Result.return
             (Fn.compose
                (skip_delta_transition_chain_validation
