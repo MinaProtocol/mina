@@ -136,7 +136,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[] ~gossip_type:config.gossip_type
+              configure net2 ~me
+                ~maddrs:
+                  [ Multiaddr.of_string
+                      (sprintf "/ip4/0.0.0.0/tcp/%d"
+                         (Option.value_exn config.addrs_and_ports.peer)
+                           .libp2p_port) ]
+                ~gossip_type:config.gossip_type
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
