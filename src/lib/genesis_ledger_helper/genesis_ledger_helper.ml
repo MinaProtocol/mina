@@ -61,18 +61,7 @@ module Accounts = struct
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.mapi
-      ~f:(fun i {Runtime_config.Accounts.pk; sk; balance; delegate; timing} ->
-        let pk =
-          match pk with
-          | Some pk ->
-              Public_key.Compressed.of_base58_check_exn pk
-          | None ->
-              Quickcheck.random_value
-                ~seed:
-                  (`Deterministic
-                    ("fake pk for genesis ledger " ^ string_of_int i))
-                Public_key.Compressed.gen
-        in
+      ~f:(fun i ({Runtime_config.Accounts.pk; sk; _} as account_config) ->
         let sk =
           match sk with
           | Some sk -> (
@@ -84,28 +73,24 @@ module Accounts = struct
           | None ->
               None
         in
-        let delegate =
-          Option.map ~f:Public_key.Compressed.of_base58_check_exn delegate
-        in
-        let account_id = Account_id.create pk Token_id.default in
-        let account =
-          match timing with
+        let pk =
+          match pk with
+          | Some pk ->
+              pk
           | None ->
-              Account.create account_id balance
-          | Some
-              { initial_minimum_balance
-              ; cliff_time
-              ; vesting_period
-              ; vesting_increment } ->
-              Account.create_timed account_id balance ~initial_minimum_balance
-                ~cliff_time ~vesting_period ~vesting_increment
-              |> Or_error.ok_exn
+              Public_key.Compressed.to_base58_check
+                (Quickcheck.random_value
+                   ~seed:
+                     (`Deterministic
+                       ("fake pk for genesis ledger " ^ string_of_int i))
+                   Public_key.Compressed.gen)
         in
-        ( sk
-        , { account with
-            delegate=
-              (if Option.is_some delegate then delegate else account.delegate)
-          } ) )
+        let account =
+          Runtime_config.Accounts.Single.to_account_with_pk
+            {account_config with pk= Some pk}
+          |> Or_error.ok_exn
+        in
+        (sk, account) )
 
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -1000,28 +985,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
             Accounts
               (List.map
                  (Lazy.force (Precomputed_values.accounts precomputed_values))
-                 ~f:(fun (sk, {public_key; balance; delegate; timing; _}) ->
-                   let timing =
-                     match timing with
-                     | Account.Timing.Untimed ->
-                         None
-                     | Timed t ->
-                         Some
-                           { Runtime_config.Accounts.Single.Timed
-                             .initial_minimum_balance=
-                               t.initial_minimum_balance
-                           ; cliff_time= t.cliff_time
-                           ; vesting_period= t.vesting_period
-                           ; vesting_increment= t.vesting_increment }
-                   in
-                   { Runtime_config.Accounts.pk=
-                       Some (Public_key.Compressed.to_base58_check public_key)
-                   ; sk= Option.map ~f:Private_key.to_base58_check sk
-                   ; balance
-                   ; delegate=
-                       Option.map ~f:Public_key.Compressed.to_base58_check
-                         delegate
-                   ; timing } ))
+                 ~f:(fun (sk, account) ->
+                   Runtime_config.Accounts.Single.of_account account sk ))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
         ; hash=

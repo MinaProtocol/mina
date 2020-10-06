@@ -39,28 +39,123 @@ let dump_on_error yojson x =
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
-      module Timed = struct
-        type t =
-          { initial_minimum_balance: Currency.Balance.t
-          ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
-          ; vesting_period: Coda_numbers.Global_slot.t (*slots*)
-          ; vesting_increment: Currency.Amount.t }
-        [@@deriving yojson, dhall_type]
-      end
-
       type t =
         { pk: (string option[@default None])
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
         ; delegate: (string option[@default None])
-        ; timing: (Timed.t option[@default None]) }
-      [@@deriving yojson, dhall_type]
+        ; timing:
+            (Coda_base.Account_timing.t[@default
+                                         Coda_base.Account_timing.Untimed])
+        ; token: (Coda_base.Token_id.t[@default Coda_base.Token_id.default])
+        ; token_permissions:
+            (Coda_base.Token_permissions.t[@default
+                                            Coda_base.Token_permissions.default])
+        ; nonce:
+            (Coda_base.Account.Nonce.t[@default Coda_base.Account.Nonce.zero])
+        ; receipt_chain_hash:
+            (Coda_base.Receipt.Chain_hash.t[@default
+                                             Coda_base.Receipt.Chain_hash.empty])
+        ; voting_for:
+            (Coda_base.State_hash.t[@default Coda_base.State_hash.dummy])
+        ; snapp: (Coda_base.Snapp_account.t option[@default None])
+        ; permissions:
+            (Coda_base.Permissions.t[@default
+                                      Coda_base.Permissions.user_default]) }
+      [@@deriving yojson, dhall_type, sexp]
 
-      let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
+      let fields =
+        [| "pk"
+         ; "sk"
+         ; "balance"
+         ; "delegate"
+         ; "timing"
+         ; "token"
+         ; "token_permissions"
+         ; "nonce"
+         ; "receipt_chain_hash"
+         ; "voting_for"
+         ; "snapp"
+         ; "permissions" |]
 
       let of_yojson json =
         dump_on_error json @@ of_yojson
         @@ yojson_strip_fields ~keep_fields:fields json
+
+      let to_account_with_pk : t -> Coda_base.Account.t Or_error.t =
+       fun t ->
+        let open Or_error.Let_syntax in
+        let%map pk =
+          match t.pk with
+          | Some pk ->
+              Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
+          | None ->
+              Or_error.errorf !"No public key to create account %{sexp: t}" t
+        in
+        let delegate =
+          Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+            t.delegate
+        in
+        let account_id = Coda_base.Account_id.create pk t.token in
+        let account =
+          match t.timing with
+          | Coda_base.Account_timing.Untimed ->
+              Coda_base.Account.create account_id t.balance
+          | Timed
+              { initial_minimum_balance
+              ; cliff_time
+              ; vesting_period
+              ; vesting_increment } ->
+              Coda_base.Account.create_timed account_id t.balance
+                ~initial_minimum_balance ~cliff_time ~vesting_period
+                ~vesting_increment
+              |> Or_error.ok_exn
+        in
+        { account with
+          delegate=
+            (if Option.is_some delegate then delegate else account.delegate)
+        ; token_id= t.token
+        ; token_permissions= t.token_permissions
+        ; nonce= t.nonce
+        ; receipt_chain_hash= t.receipt_chain_hash
+        ; voting_for= t.voting_for
+        ; snapp= t.snapp
+        ; permissions= t.permissions }
+
+      let of_account :
+          Coda_base.Account.t -> Signature_lib.Private_key.t option -> t =
+       fun account sk ->
+        { pk=
+            Some
+              (Signature_lib.Public_key.Compressed.to_base58_check
+                 account.public_key)
+        ; sk= Option.map ~f:Signature_lib.Private_key.to_base58_check sk
+        ; balance= account.balance
+        ; delegate=
+            Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
+              account.delegate
+        ; timing= account.timing
+        ; token= account.token_id
+        ; token_permissions= account.token_permissions
+        ; nonce= account.nonce
+        ; receipt_chain_hash= account.receipt_chain_hash
+        ; voting_for= account.voting_for
+        ; snapp= account.snapp
+        ; permissions= account.permissions }
+
+      let default : t =
+        { pk= None
+        ; sk= None
+        ; balance= Currency.Balance.zero
+        ; delegate= None
+        ; timing= Coda_base.Account_timing.Untimed
+        ; token= Coda_base.Token_id.default
+        ; token_permissions= Coda_base.Token_permissions.default
+        ; nonce= Coda_base.Account.Nonce.zero
+        ; receipt_chain_hash= Coda_base.Receipt.Chain_hash.empty
+        ; voting_for= Coda_base.State_hash.dummy
+        ; snapp= None
+        ; permissions= Coda_base.Permissions.user_default }
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
@@ -207,21 +302,19 @@ end
 
 module Accounts = struct
   module Single = struct
-    module Timed = struct
-      type t = Json_layout.Accounts.Single.Timed.t =
-        { initial_minimum_balance: Currency.Balance.Stable.Latest.t
-        ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
-        ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
-        ; vesting_increment: Currency.Amount.Stable.Latest.t }
-      [@@deriving bin_io_unversioned]
-    end
-
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
       ; delegate: string option
-      ; timing: Timed.t option }
+      ; timing: Coda_base.Account_timing.Stable.Latest.t
+      ; token: Coda_base.Token_id.Stable.Latest.t
+      ; token_permissions: Coda_base.Token_permissions.Stable.Latest.t
+      ; nonce: Coda_base.Account.Nonce.Stable.Latest.t
+      ; receipt_chain_hash: Coda_base.Receipt.Chain_hash.Stable.Latest.t
+      ; voting_for: Coda_base.State_hash.Stable.Latest.t
+      ; snapp: Coda_base.Snapp_account.Stable.Latest.t option
+      ; permissions: Coda_base.Permissions.Stable.Latest.t }
     [@@deriving bin_io_unversioned]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
@@ -235,6 +328,12 @@ module Accounts = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Accounts.Single.of_yojson json)
+
+    let to_account_with_pk = Json_layout.Accounts.Single.to_account_with_pk
+
+    let of_account = Json_layout.Accounts.Single.of_account
+
+    let default = Json_layout.Accounts.Single.default
   end
 
   type single = Single.t =
@@ -242,7 +341,14 @@ module Accounts = struct
     ; sk: string option
     ; balance: Currency.Balance.t
     ; delegate: string option
-    ; timing: Single.Timed.t option }
+    ; timing: Coda_base.Account_timing.t
+    ; token: Coda_base.Token_id.t
+    ; token_permissions: Coda_base.Token_permissions.t
+    ; nonce: Coda_base.Account.Nonce.t
+    ; receipt_chain_hash: Coda_base.Receipt.Chain_hash.t
+    ; voting_for: Coda_base.State_hash.t
+    ; snapp: Coda_base.Snapp_account.t option
+    ; permissions: Coda_base.Permissions.t }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 

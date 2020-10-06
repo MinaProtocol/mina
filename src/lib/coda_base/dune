@@ -28,6 +28,7 @@
     one_or_two
     o1trace
     outside_hash_image
+    ppx_dhall_type
     ppx_version.runtime
     quickcheck_lib
     random_oracle

@@ -21,6 +21,8 @@ module Stable : sig
   end
 end]
 
+val dhall_type : Ppx_dhall_type.Dhall_type.t
+
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val to_string : t -> string

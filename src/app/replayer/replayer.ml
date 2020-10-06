@@ -7,13 +7,13 @@ open Coda_base
 type input =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
-  ; genesis_ledger: Account.t list }
+  ; genesis_ledger: Runtime_config.Accounts.t }
 [@@deriving yojson]
 
 type output =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
-  ; target_ledger: Account.t list }
+  ; target_ledger: Runtime_config.Accounts.t }
 [@@deriving yojson]
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -22,7 +22,11 @@ let create_ledger accounts =
   let open Coda_base in
   let depth = constraint_constants.ledger_depth in
   let ledger = Ledger.create_ephemeral ~depth () in
-  List.iter accounts ~f:(fun acct ->
+  List.iter accounts ~f:(fun acct_config ->
+      let acct =
+        Runtime_config.Accounts.Single.to_account_with_pk acct_config
+        |> Or_error.ok_exn
+      in
       let pk = Account.public_key acct in
       let token_id = Account.token acct in
       let acct_id = Account_id.create pk token_id in
@@ -30,7 +34,10 @@ let create_ledger accounts =
   ledger
 
 let create_output target_state_hash target_proof ledger =
-  let target_ledger = Ledger.to_list ledger in
+  let target_ledger =
+    List.map (Ledger.to_list ledger) ~f:(fun acc ->
+        Runtime_config.Accounts.Single.of_account acc None )
+  in
   {target_state_hash; target_proof; target_ledger}
 
 (* cache of account keys *)

@@ -66,6 +66,8 @@ module Stable : sig
   end
 end]
 
+val dhall_type : Ppx_dhall_type.Dhall_type.t
+
 val to_input : t -> (_, bool) Random_oracle_input.t
 
 [%%ifdef consensus_mechanism]
