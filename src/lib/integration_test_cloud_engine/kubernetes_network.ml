@@ -219,7 +219,7 @@ module Node = struct
 
   let get_peer_id ~logger t =
     let open Malleable_error.Let_syntax in
-    [%log info] "Getting peer id"
+    [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let graphql_port = 3085 in
@@ -228,12 +228,16 @@ module Node = struct
       retry ~logger ~graphql_port ~retry_on_graphql_error:true
         ~query_name:"query_peer_id" query_obj
     in
-    let peer_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
-    match peer_obj with
-    | None ->
-        Malleable_error.of_string_hard_error "Peer not found"
-    | Some peer ->
-        Malleable_error.return peer#peerId
+    let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
+    let%bind self_id =
+      match self_id_obj with
+      | None ->
+          Malleable_error.of_string_hard_error "Peer not found"
+      | Some peer ->
+          Malleable_error.return peer#peerId
+    in
+    let peers_ids = (query_result_obj#daemonStatus)#peers in
+    return (self_id, Array.to_list peers_ids)
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
