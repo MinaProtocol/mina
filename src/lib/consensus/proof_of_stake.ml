@@ -22,14 +22,12 @@ let make_checked t =
 let name = "proof_of_stake"
 
 let genesis_ledger_total_currency ~ledger =
-  Coda_base.Ledger.to_list (Lazy.force ledger)
-  |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
-         Balance.add_amount sum
-           (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
-         |> Option.value_exn ?here:None ?error:None
-              ~message:"failed to calculate total currency in genesis ledger"
-     )
-  |> Balance.to_amount
+  Coda_base.Ledger.foldi ~init:Amount.zero (Lazy.force ledger)
+    ~f:(fun _addr sum account ->
+      Amount.add sum
+        (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
+      |> Option.value_exn ?here:None ?error:None
+           ~message:"failed to calculate total currency in genesis ledger" )
 
 let genesis_ledger_hash ~ledger =
   Coda_base.Ledger.merkle_root (Lazy.force ledger)
