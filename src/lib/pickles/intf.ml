@@ -148,7 +148,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
     end
 
     module Constant : sig
-      type t [@@deriving sexp]
+      type t [@@deriving sexp, eq]
 
       val ( + ) : t -> t -> t
 

@@ -895,7 +895,7 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-let%test_module "test" =
+let%test_module "testh no sidele-loaded" =
   ( module struct
     let () =
       Tock.Keypair.set_urs_info
