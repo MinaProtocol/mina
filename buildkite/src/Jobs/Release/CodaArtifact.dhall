@@ -1,20 +1,20 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
 
-let Cmd = ../Lib/Cmds.dhall
-let S = ../Lib/SelectFiles.dhall
+let Cmd = ../../Lib/Cmds.dhall
+let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let Pipeline = ../Pipeline/Dsl.dhall
-let JobSpec = ../Pipeline/JobSpec.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Command = ../Command/Base.dhall
-let OpamInit = ../Command/OpamInit.dhall
-let Summon = ../Command/Summon/Type.dhall
-let Size = ../Command/Size.dhall
-let Libp2p = ../Command/Libp2pHelperBuild.dhall
-let DockerArtifact = ../Command/DockerArtifact.dhall
+let Command = ../../Command/Base.dhall
+let OpamInit = ../../Command/OpamInit.dhall
+let Summon = ../../Command/Summon/Type.dhall
+let Size = ../../Command/Size.dhall
+let Libp2p = ../../Command/Libp2pHelperBuild.dhall
+let DockerArtifact = ../../Command/DockerArtifact.dhall
 
-let dependsOn = [ { name = "Artifact", key = "artifacts-build" } ]
+let dependsOn = [ { name = "CodaArtifact", key = "artifacts-build" } ]
 
 in
 Pipeline.build
@@ -24,11 +24,12 @@ Pipeline.build
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
           S.strictly (S.contains "Makefile"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/Artifact"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/CodaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
-        name = "Artifact"
+        path = "Release",
+        name = "CodaArtifact"
       },
     steps = [
       Libp2p.step,
@@ -45,6 +46,9 @@ Pipeline.build
           key = "artifacts-build",
           target = Size.XLarge
         },
-      DockerArtifact.generateStep dependsOn
+      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-daemon",
+      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-daemon-puppeteered",
+      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-rosetta",
+      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-rosetta"
     ]
   }

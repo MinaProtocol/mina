@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
+VALID_SERVICES=('archive-node', 'coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -44,6 +44,9 @@ if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
+archive-node)
+  DOCKERFILE_PATH="scripts/archive/Dockerfile"
+  DOCKER_CONTEXT="scripts/archive"
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
@@ -74,4 +77,12 @@ else
 docker build $EXTRA $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
-if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then docker push codaprotocol/$SERVICE:$VERSION; fi;
+if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+  docker push codaprotocol/$SERVICE:$VERSION
+
+  docker tag codaprotocol/$SERVICE:$VERSION gcr.io/$SERVICE:$VERSION
+  docker push gcr.io/$SERVICE:$VERSION
+
+  docker tag codaprotocol/$SERVICE:$VERSION minaprotocol/$SERVICE:$VERSION
+  docker push minaprotocol/$SERVICE:$VERSION
+fi

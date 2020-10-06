@@ -104,11 +104,25 @@ fi
 ###
 # Build and Publish Docker
 ###
-mkdir docker_build 
-mv coda-*.deb docker_build/.
+if [[ -z "${BUILDKITE}"]]; then
+    mkdir docker_build 
+    mv coda-*.deb docker_build/.
 
-echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+    echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+    docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
 
-docker push codaprotocol/coda-archive:$VERSION
+    docker push codaprotocol/coda-archive:$VERSION
+else
+    set -x
+    # Export variables for use with downstream steps
+    echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_PROJECT=${PROJECT}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_HASH=${GIT_HASH}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_BRANCH=${BUILDKITE_BRANCH:GIT_BRANCH}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_TAG=${GIT_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+    set +x
+fi

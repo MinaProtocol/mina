@@ -12,18 +12,18 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let defaultArtifactStep = { name = "Artifact", key = "build-artifact" }
 
-let generateStep = \(deps : List Command.TaggedKey.Type) ->
+let generateStep = \(deps : List Command.TaggedKey.Type) -> \(docker_env : Text) -> \(service_override : Text) ->
     -- assume head or first dependency specified represents the primary artifact dependency step
     let artifactUploadScope = Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type deps) 
 
     let commands : List Cmd.Type =
     [
         Cmd.run (
-            "if [ ! -f DOCKER_DEPLOY_ENV ]; then " ++
-                "buildkite-agent artifact download --step _${artifactUploadScope.name}-${artifactUploadScope.key} DOCKER_DEPLOY_ENV .; " ++
+            "if [ ! -f ${docker_env} ]; then " ++
+                "buildkite-agent artifact download --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${docker_env} .; " ++
             "fi"
         ),
-        Cmd.run "./buildkite/scripts/docker-artifact.sh"
+        Cmd.run "./buildkite/scripts/docker-release.sh ${docker_env} ${service_override}"
     ]
 
     in
