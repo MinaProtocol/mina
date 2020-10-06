@@ -73,6 +73,7 @@ Pipeline.build
 
           -- rosetta image
       let rosettaSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
         service="coda-rosetta",
         extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-docker-artifact"
@@ -84,6 +85,7 @@ Pipeline.build
 
       -- rosetta image w/ DUNE_PROFILE=dev
       let rosettaDuneSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
         service="coda-rosetta",
         version="dev-\\\${CODA_VERSION}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
