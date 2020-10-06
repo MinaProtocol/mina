@@ -22,6 +22,7 @@ let ReleaseSpec = {
     step_key: Text
   },
   default = {
+    deps = [] : List Command.TaggedKey.Type,
     deploy_env_file = "DOCKER_DEPLOY_ENV",
     service = "\\\$CODA_SERVICE",
     version = "\\\$CODA_VERSION",

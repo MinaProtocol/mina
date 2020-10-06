@@ -43,7 +43,7 @@ Pipeline.build
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "BUILDKITE"
-          ] "make build_archive && ./scripts/build-release-archives.sh" # [ Cmd.run "buildkite-agent artifact upload ./${spec.deploy_env_file}" ],
+          ] "./buildkite/scripts/archive-build-release.sh" # [ Cmd.run "buildkite-agent artifact upload ./${spec.deploy_env_file}" ],
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
           target = Size.XLarge
