@@ -22,10 +22,10 @@ Pipeline.build
         { dirtyWhen =
           [ S.strictlyStart (S.contains "src/lib")
           , S.strictly (S.contains "Makefile")
-          , S.strictlyStart (S.contains "buildkite/src/Jobs/ArchiveNode")
+          , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/ArchiveNodeUnitTest")
           ]
         , path = "Test"
-        , name = "ArchiveNode"
+        , name = "ArchiveNodeUnitTest"
         }
     , steps =
     let outerDir : Text =
