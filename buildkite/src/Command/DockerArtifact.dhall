@@ -18,6 +18,7 @@ let ReleaseSpec = {
     deploy_env_file : Text,
     service: Text,
     version: Text,
+    commit: Text,
     extra_args: Text,
     step_key: Text
   },
