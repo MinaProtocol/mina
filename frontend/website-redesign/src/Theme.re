@@ -193,6 +193,25 @@ module Type = {
       letterSpacing(`px(1)),
     ]);
 
+  let buttonLink =
+    style([
+      Typeface.monumentGrotesk,
+      color(Colors.orange),
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.7)),
+      textDecoration(`none),
+      display(`flex),
+      alignItems(`center),
+      cursor(`pointer),
+      unsafe("width", "fit-content"),
+      padding2(~h=`zero, ~v=`rem(0.5)),
+      hover([
+        padding2(~h=`rem(0.8), ~v=`rem(0.5)),
+        color(white),
+        backgroundColor(Colors.digitalBlack),
+      ]),
+    ]);
+
   let contributorLabel =
     style([
       Typeface.monumentGroteskMono,

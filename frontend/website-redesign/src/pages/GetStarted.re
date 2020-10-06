@@ -40,14 +40,14 @@ let make = () => {
             AlternatingSections.Section.SimpleRow.title: "Run a Node",
             description: "Other protocols are so heavy they require intermediaries to run nodes, recreating the same old power dynamics. But Mina is light, so anyone can connect peer-to-peer and sync and verify the chain in seconds. Built on a consistent-sized cryptographic proof, the blockchain will stay accessible - even as it scales to millions of users.",
             buttonCopy: "Explore the Tech",
-            buttonUrl: `Internal("/tech"),
+            buttonUrl: `Internal("/docs/getting-started"),
             image: "/static/img/rowImages/RunANode.jpg",
           },
           {
             title: "Build on Mina",
             description: "Interested in building decentralized apps that use SNARKs to verify off-chain data with full verifiability, privacy and scaling? Just download the SDK, follow our step-by-step documentation and put your imagination to work.",
             buttonCopy: "Run a node",
-            buttonUrl: `Internal("/docs"),
+            buttonUrl: `Internal("/docs/getting-started"),
             image: "/static/img/rowImages/BuildOnMina.jpg",
           },
           {
