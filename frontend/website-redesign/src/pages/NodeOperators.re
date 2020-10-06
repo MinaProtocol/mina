@@ -365,6 +365,7 @@ let make = () => {
         width={`rem(14.)}
         height={`rem(4.5)}>
         <Icon kind=Icon.Documentation size=2.5 />
+        <Spacer width=1. />
         {React.string("Go To Documentation")}
       </Button>
     </Hero>

@@ -56,7 +56,7 @@ module Styles = {
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
-        textAlign(`center),
+        textAlign(`left),
         hover([
           color(white),
           after([
