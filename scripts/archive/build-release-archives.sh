@@ -36,7 +36,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Coda Archive Process
  Compatible with Coda Daemon
- Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL:-$BUILDKITE_BUILD_URL}
 EOF
 
 echo "------------------------------------------------------------"
