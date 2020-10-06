@@ -18,13 +18,15 @@ let ReleaseSpec = {
     deploy_env_file : Text,
     service: Text,
     version: Text,
-    extra_args: Text
+    extra_args: Text,
+    step_key: Text
   },
   default = {
     deploy_env_file = "DOCKER_DEPLOY_ENV",
     service = "\\\$CODA_SERVICE",
     version = "\\\$CODA_VERSION",
-    extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}"
+    extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
+    step_key = "docker-artifact"
   }
 }
 
@@ -47,8 +49,8 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     Command.build
       Command.Config::{
         commands  = commands,
-        label = "Build and release Docker artifacts",
-        key = "docker-artifact",
+        label = "Build and release Docker artifacts: ${spec.step_key}",
+        key = spec.step_key,
         target = Size.XLarge,
         docker_login = Some DockerLogin::{=},
         depends_on = spec.deps
