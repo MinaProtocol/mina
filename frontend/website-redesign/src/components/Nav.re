@@ -246,6 +246,11 @@ let make = (~dark=false) => {
           href="/docs"
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
+        <NavGroupLink
+          icon=Icon.NodeOperators
+          label="Node Operators"
+          href="/node-operators"
+        />
       </NavGroup>
       <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
