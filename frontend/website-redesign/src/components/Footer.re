@@ -80,7 +80,6 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
-        selector("a:visited", [color(white)]),
         selector(
           "a",
           [

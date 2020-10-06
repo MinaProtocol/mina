@@ -51,9 +51,12 @@ module Styles = {
       right(`zero),
       top(`rem(4.25)),
       width(`percent(90.)),
-      background(Theme.Colors.digitalBlack),
       margin2(~h=`auto, ~v=`zero),
-      media(Theme.MediaQuery.tablet, [top(`rem(6.25))]),
+      background(Theme.Colors.digitalBlack),
+      media(
+        Theme.MediaQuery.tablet,
+        [margin2(~h=`zero, ~v=`zero), top(`rem(6.25))],
+      ),
       media(
         Theme.MediaQuery.desktop,
         [
@@ -248,7 +251,8 @@ let make = (~dark=false) => {
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <div className=Styles.ctaContainer>
-        <Button href=`Internal("/genesis") width={`rem(13.)} paddingX=1. dark>
+        <Button
+          href={`Internal("/genesis")} width={`rem(13.)} paddingX=1. dark>
           <img src="/static/img/promo-logo.svg" height="40" />
           <Spacer width=0.5 />
           <span> {React.string("Join Genesis Token Program")} </span>

@@ -151,6 +151,7 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
+          ; isolate= false
           ; gossip_type= `Gossipsub
           ; conf_dir= temp_conf_dir
           ; chain_id
