@@ -36,7 +36,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Coda Archive Process
  Compatible with Coda Daemon
- Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL:-$BUILDKITE_BUILD_URL}
+ Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -104,7 +104,14 @@ fi
 ###
 # Build and Publish Docker
 ###
-if [[ -z "${BUILDKITE}"]]; then
+if [ -n "${BUILDKITE+x}" ]; then
+    set -x
+    # Export variables for use with downstream steps
+    echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    set +x
+else
     mkdir docker_build 
     mv coda-*.deb docker_build/.
 
@@ -113,11 +120,4 @@ if [[ -z "${BUILDKITE}"]]; then
     docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
 
     docker push codaprotocol/coda-archive:$VERSION
-else
-    set -x
-    # Export variables for use with downstream steps
-    echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
-    set +x
 fi
