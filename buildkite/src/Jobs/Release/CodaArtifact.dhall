@@ -17,6 +17,7 @@ let DockerArtifact = ../../Command/DockerArtifact.dhall
 let dependsOn = [ { name = "CodaArtifact", key = "artifacts-build" } ]
 
 in
+
 Pipeline.build
   Pipeline.Config::{
     spec =
@@ -44,11 +45,52 @@ Pipeline.build
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
-          target = Size.XLarge
+          target = Size.XLarge,
+          artifact_paths = [ S.contains "_build/*" ]
         },
-      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-daemon",
-      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-daemon-puppeteered",
-      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-rosetta",
-      DockerArtifact.generateStep dependsOn "DOCKER_DEPLOY_ENV" "coda-rosetta"
+
+      -- daemon image
+      let daemonSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
+        service="coda-daemon"
+      }
+
+      in
+
+      DockerArtifact.generateStep daemonSpec,
+
+      -- puppeteered image
+      let puppeteeredSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
+        service="\\\${CODA_SERVICE}-puppeteered",
+        extra_args="--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg CODA_BRANCH=\\\${CODA_GIT_BRANCH} --build-arg deb_repo=\\\${CODA_DEB_REPO}"
+      }
+
+      in
+
+      DockerArtifact.generateStep puppeteeredSpec,
+
+          -- rosetta image
+      let rosettaSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
+        service="coda-rosetta",
+        extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop"
+      }
+
+      in
+
+      DockerArtifact.generateStep rosettaSpec,
+
+      -- rosetta image w/ DUNE_PROFILE=dev
+      let rosettaDuneSpec = DockerArtifact.ReleaseSpec::{
+        deps=dependsOn,
+        service="coda-rosetta",
+        version="dev-\\\${CODA_VERSION}",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop"
+      }
+
+      in
+
+      DockerArtifact.generateStep rosettaDuneSpec
     ]
   }

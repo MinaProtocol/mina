@@ -43,10 +43,7 @@ if [ -n "$charts" ]; then
 
       if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
         echo "--- Helm experimental OCI activated - deploying to GCR registry"
-        helm chart save $(basename $dir)
-
-        gcloud auth configure-docker
-        docker login "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
+        helm chart save "${dir}" "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
 
         helm chart push "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
       fi

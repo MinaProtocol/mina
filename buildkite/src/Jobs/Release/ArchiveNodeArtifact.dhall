@@ -14,6 +14,13 @@ let DockerArtifact = ../../Command/DockerArtifact.dhall
 
 let dependsOn = [ { name = "ArchiveNodeArtifact", key = "archive-artifacts-build" } ]
 
+let spec = DockerArtifact.ReleaseSpec::{
+    deps=dependsOn,
+    deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    service="archive-node",
+    extra_args="--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}"
+}
+
 in
 
 Pipeline.build
@@ -33,12 +40,13 @@ Pipeline.build
           commands = OpamInit.andThenRunInDocker [
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY"
-          ] "./scripts/build-release-archives.sh" # [ Cmd.run "buildkite-agent artifact upload ./ARCHIVE_DOCKER_DEPLOY" ],
+            "AWS_SECRET_ACCESS_KEY",
+            "BUILDKITE"
+          ] "make build_archive && ./scripts/build-release-archives.sh" # [ Cmd.run "buildkite-agent artifact upload ./${spec.deploy_env_file}" ],
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
           target = Size.XLarge
         },
-      DockerArtifact.generateStep dependsOn "ARCHIVE_DOCKER_DEPLOY" "archive-node"
+      DockerArtifact.generateStep spec
     ]
   }
