@@ -18,6 +18,7 @@ module Styles = {
       position(`relative),
       background(`url(bg)),
       unsafe("background-size", "100% auto"),
+      backgroundSize(`cover),
       backgroundRepeat(`noRepeat),
       padding(`rem(2.)),
       media(Theme.MediaQuery.desktop, [padding(`zero)]),
@@ -156,8 +157,11 @@ module Roles = {
     let make = (~img, ~title, ~copy, ~linkCopy, ~linkUrl) => {
       <div className=Styles.singleRowContainer>
         <img src=img />
+        <Spacer height=1. />
         <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <Spacer height=0.5 />
         <p className=Theme.Type.paragraph> {React.string(copy)} </p>
+        <Spacer height=0.5 />
         <Next.Link href=linkUrl>
           <span className=Styles.roleLink>
             <p> {React.string(linkCopy)} </p>
@@ -199,14 +203,17 @@ module RunNode = {
     let make = (~sectionNumber, ~title, ~copy) =>
       <div className=Styles.runNodeContent>
         <h1 className=Theme.Type.h1> {React.string(sectionNumber)} </h1>
+        <Spacer height=0.5 />
         <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <Spacer height=0.5 />
         <p className=Theme.Type.paragraph> {React.string(copy)} </p>
       </div>;
   };
   [@react.component]
   let make = () =>
     <div className=Styles.runNodeContainer>
-      <h3 className=Theme.Type.h4> {React.string("Run a Node")} </h3>
+      <Spacer height=1. />
+      <h3 className=Theme.Type.h3> {React.string("Run a Node")} </h3>
       <div>
         <div className=Styles.nodesContainer>
           <RunNodeSection
@@ -264,14 +271,18 @@ module BlockExplorersAndTools = {
     let make = (~img, ~title, ~copy, ~linkCopy, ~linkUrl) =>
       <div className=Styles.blockExplorerCard>
         <img src=img />
+        <Spacer height=1. />
         <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <Spacer height=0.5 />
         <p className=Theme.Type.paragraph> {React.string(copy)} </p>
+        <Spacer height=0.5 />
         <Next.Link href=linkUrl>
           <span className=Styles.roleLink>
             <p> {React.string(linkCopy)} </p>
             <Icon kind=Icon.ExternalLink />
           </span>
         </Next.Link>
+        <Spacer height=1. />
       </div>;
   };
   module BlockAndToolsGrid = {
@@ -325,7 +336,7 @@ module BlockExplorersAndTools = {
       <Spacer height=6. />
       <Section title="Block Explorers & Tools" slug="block-explorers-tools">
         <BlockAndToolsGrid />
-        <Spacer height=13.5 />
+        <Spacer height=12.5 />
       </Section>
     </div>;
 };
