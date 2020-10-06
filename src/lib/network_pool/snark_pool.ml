@@ -476,10 +476,10 @@ let%test_module "random set test" =
       match%bind
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
-      | Some _ ->
+      | Ok _ ->
           Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
             enveloped_diff
-      | None ->
+      | Error _ ->
           Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
     let config verifier =
@@ -589,7 +589,7 @@ let%test_module "random set test" =
                     let%map res =
                       Mock_snark_pool.Resource_pool.Diff.verify t diff
                     in
-                    assert (Option.is_none res) )
+                    assert (Result.is_ok res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
@@ -703,7 +703,8 @@ let%test_module "random set test" =
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command, Fn.const (), Fn.const ()) )
+            (Envelope.Incoming.local command)
+            (Fn.const (), Fn.const ()) )
 
     let%test_unit "when creating a network, the incoming diffs and locally \
                    generated diffs in reader pipes will automatically get \

@@ -28,9 +28,8 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t
-      ( (diff : Resource_pool.Diff.verified Envelope.Incoming.t)
-      , valid_cb
-      , result_cb ) =
+      (diff : Resource_pool.Diff.verified Envelope.Incoming.t)
+      (valid_cb, result_cb) =
     let open Envelope.Incoming in
     let rebroadcast (diff', rejected) =
       result_cb (Ok (diff', rejected)) ;
@@ -65,6 +64,18 @@ end)
           (Error.to_string_hum e) ;
         Deferred.unit
 
+  let process_incoming_resource_pool_diff t diff (valid_cb, result_cb) =
+    match%bind Resource_pool.Diff.verify t.resource_pool diff with
+    | Error err ->
+        valid_cb `Reject ;
+        result_cb (Error err) ;
+        [%log' debug t.logger]
+          "Refusing to rebroadcast. Verification error: %s"
+          (Error.to_string_hum err) ;
+        Deferred.unit
+    | Ok verified_diff ->
+        apply_and_broadcast t verified_diff (valid_cb, result_cb)
+
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
       ~incoming_diffs ~local_diffs ~tf_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
@@ -75,37 +86,22 @@ end)
       ; write_broadcasts
       ; constraint_constants }
     in
-    let filter_verified pipe ~f =
-      let r, w =
-        Strict_pipe.create ~name:"verified network pool diffs"
-          (Buffered (`Capacity 1024, `Overflow Drop_head))
-      in
-      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun (d, cb) ->
-          let env = f d in
-          don't_wait_for
-            ( match%map Resource_pool.Diff.verify resource_pool env with
-            | Some x ->
-                Strict_pipe.Writer.write w (x, cb)
-            | None ->
-                () ) )
-      |> don't_wait_for ;
-      r
-    in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
-      ; Strict_pipe.Reader.map
-          (filter_verified local_diffs ~f:Envelope.Incoming.local)
-          ~f:(fun diff -> `Local diff)
-      ; Strict_pipe.Reader.map (filter_verified incoming_diffs ~f:Fn.id)
-          ~f:(fun diff -> `Incoming diff) ]
+      ; Strict_pipe.Reader.map local_diffs ~f:(fun (diff, cb) ->
+            `Local (Envelope.Incoming.local diff, cb) )
+      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun (diff, cb) ->
+            `Incoming (diff, cb) ) ]
       ~f:(fun diff_source ->
         match diff_source with
         | `Incoming (diff, cb) ->
-            apply_and_broadcast network_pool (diff, cb, Fn.const ())
+            process_incoming_resource_pool_diff network_pool diff
+              (cb, Fn.const ())
         | `Local (diff, result_cb) ->
-            apply_and_broadcast network_pool (diff, Fn.const (), result_cb)
+            process_incoming_resource_pool_diff network_pool diff
+              (Fn.const (), result_cb)
         | `Transition_frontier_extension diff ->
             Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;

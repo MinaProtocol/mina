@@ -64,7 +64,8 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command, Fn.const (), Fn.const ())) ;
+               (Envelope.Incoming.local command)
+               (Fn.const (), Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
