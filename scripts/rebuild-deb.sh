@@ -155,11 +155,20 @@ do
     done
 done
 
-# Genesis Ledger Copy
-for f in /tmp/coda_cache_dir/genesis*; do
-    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    cp /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-done
+# Genesis Ledger/proof Copy
+if [ -d /tmp/coda_cache_dir ]; then
+    for f in /tmp/coda_cache_dir/genesis*; do
+        cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    done
+fi
+
+# Copy genesis Ledger/proof if they were downloaded from s3
+if [ -d /tmp/s3_cache_dir ]; then
+    for f in /tmp/s3_cache_dir/genesis*; do
+        cp /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    done
+fi
+
 
 #copy config.json
 cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"

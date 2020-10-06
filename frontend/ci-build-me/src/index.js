@@ -57,6 +57,25 @@ const runBuild = async (github) => {
   return request;
 };
 
+const hasExistingBuilds = async (github) => {
+  const options = {
+    hostname: "api.buildkite.com",
+    port: 443,
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds?branch=${encodeURIComponent(
+      github.pull_request.head.ref
+    )}&commit=${encodeURIComponent(
+      github.pull_request.head.sha
+    )}&state=running&state=finished`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  };
+  const request = await httpsRequest(options);
+  return request.length > 0;
+};
+
 const getRequest = async (url) => {
   const request = await axios.get(url);
   if (request.status < 200 || request.status >= 300) {
@@ -79,9 +98,24 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      const buildkite = await runBuild(req.body);
-      const circle = await runCircleBuild(req.body);
-      return [buildkite, circle];
+      let buildAlreadyExists;
+      try {
+        const res = await hasExistingBuilds(req.body);
+        buildAlreadyExists = res;
+      } catch (e) {
+        // if this fails for some reason, assume we don't have an existing build
+        console.error(`Failed to find existing builds:`);
+        console.error(e);
+        buildAlreadyExists = false;
+      }
+
+      if (!buildAlreadyExists) {
+        const buildkite = await runBuild(req.body);
+        const circle = await runCircleBuild(req.body);
+        return [buildkite, circle];
+      } else {
+        console.info("Build for this commit on this branch was already found");
+      }
     }
   } else if (event == "issue_comment") {
     if (
@@ -144,7 +178,7 @@ exports.githubWebhookHandler = async (req, res) => {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
-      console.error(data);
+      console.error(buildkite);
     }
 
     if (circle && circle.number) {

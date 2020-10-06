@@ -98,7 +98,7 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 240000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in
-      List.length peers = List.length nodes - 1
+      List.length peers >= List.length nodes - 1
     in
     let rec go () =
       if%bind Deferred.List.for_all nodes ~f:check_ready then return ()

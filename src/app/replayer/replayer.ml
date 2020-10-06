@@ -4,9 +4,16 @@ open Core
 open Async
 open Coda_base
 
+(* given a target block B to replay to:
+
+   target state hash  = protocol state hash in B
+   target proof       = blockchain SNARK proof of the protocol state in B
+   target ledger hash = expected Merkle root of the staged ledger in B
+*)
 type input =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
+  ; target_ledger_hash: Ledger_hash.t
   ; genesis_ledger: Account.t list }
 [@@deriving yojson]
 
@@ -28,6 +35,9 @@ let create_ledger accounts =
       let acct_id = Account_id.create pk token_id in
       Ledger.create_new_account_exn ledger acct_id acct ) ;
   ledger
+
+let json_ledger_hash_of_ledger ledger =
+  Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
 let create_output target_state_hash target_proof ledger =
   let target_ledger = Ledger.to_list ledger in
@@ -245,13 +255,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
     cmd.nonce cmd.global_slot cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
+  let memo = Signed_command_memo.of_string cmd.memo in
   let payload =
     Signed_command_payload.create
       ~fee:(Currency.Fee.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee)
       ~fee_token:(Token_id.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee_token)
       ~fee_payer_pk
       ~nonce:(Unsigned.UInt32.of_int64 cmd.nonce)
-      ~valid_until:None ~memo:Signed_command_memo.dummy ~body
+      ~valid_until:None ~memo ~body
   in
   (* when applying the transaction, there's a check that the fee payer and
      signer keys are the same; since this transaction was accepted, we know
@@ -314,6 +325,20 @@ let main ~input_file ~output_file ~archive_uri () =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
+      [%log info] "Loading global slots" ;
+      let%bind global_slots =
+        match%bind
+          Caqti_async.Pool.use
+            (fun db -> Sql.Global_slots.run db state_hash)
+            pool
+        with
+        | Ok slots ->
+            return (Int64.Set.of_list slots)
+        | Error msg ->
+            [%log error] "Error getting global slots"
+              ~metadata:[("error", `String (Caqti_error.show msg))] ;
+            exit 1
+      in
       [%log info] "Loading user command ids" ;
       let%bind user_cmd_ids =
         match%bind
@@ -364,8 +389,13 @@ let main ~input_file ~output_file ~archive_uri () =
                   id (Caqti_error.show msg) () )
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
+      (* filter out internal commands in blocks not along chain from target state hash *)
+      let filtered_internal_cmds =
+        List.filter unsorted_internal_cmds ~f:(fun cmd ->
+            Int64.Set.mem global_slots cmd.global_slot )
+      in
       let sorted_internal_cmds =
-        List.sort unsorted_internal_cmds ~compare:(fun ic1 ic2 ->
+        List.sort filtered_internal_cmds ~compare:(fun ic1 ic2 ->
             let tuple (ic : Sql.Internal_command.t) =
               (ic.global_slot, ic.sequence_no, ic.secondary_sequence_no)
             in
@@ -392,8 +422,13 @@ let main ~input_file ~output_file ~archive_uri () =
                   (Caqti_error.show msg) () )
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
+      (* filter out user commands in blocks not along chain from target state hash *)
+      let filtered_user_cmds =
+        List.filter unsorted_user_cmds ~f:(fun cmd ->
+            Int64.Set.mem global_slots cmd.global_slot )
+      in
       let sorted_user_cmds =
-        List.sort unsorted_user_cmds ~compare:(fun uc1 uc2 ->
+        List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
             let tuple (uc : Sql.User_command.t) =
               (uc.global_slot, uc.sequence_no)
             in
@@ -401,24 +436,33 @@ let main ~input_file ~output_file ~archive_uri () =
       in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
-          (user_cmds : Sql.User_command.t list) =
+          (user_cmds : Sql.User_command.t list) ~last_global_slot =
+        let log_on_slot_change curr_global_slot =
+          if Int64.( > ) curr_global_slot last_global_slot then
+            [%log info] "Applied all commands at global slot %Ld, ledger hash"
+              ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)]
+              last_global_slot
+        in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
           match ics with
           | ic2 :: ics2
-            when Int.equal ic.sequence_no ic2.sequence_no
+            when Int64.equal ic.global_slot ic2.global_slot
+                 && Int.equal ic.sequence_no ic2.sequence_no
                  && String.equal ic.type_ "fee_transfer"
                  && String.equal ic.type_ ic2.type_ ->
               (* combining situation 2
-             two fee transfer commands with same sequence number
-          *)
+                 two fee transfer commands with same global slot, sequence number
+              *)
+              log_on_slot_change ic.global_slot ;
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
               in
-              apply_commands ics2 user_cmds
+              apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
           | _ ->
+              log_on_slot_change ic.global_slot ;
               let%bind () = run_internal_command ~logger ~pool ~ledger ic in
-              apply_commands ics user_cmds
+              apply_commands ics user_cmds ~last_global_slot:ic.global_slot
         in
         (* choose command with least global slot, sequence number
            TODO: check for gaps?
@@ -432,11 +476,13 @@ let main ~input_file ~output_file ~archive_uri () =
         | [], [] ->
             Deferred.unit
         | [], uc :: ucs ->
+            log_on_slot_change uc.global_slot ;
             let%bind () = run_user_command ~logger ~pool ~ledger uc in
-            apply_commands [] ucs
+            apply_commands [] ucs ~last_global_slot:uc.global_slot
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
+            log_on_slot_change uc.global_slot ;
             let%bind () = run_user_command ~logger ~pool ~ledger uc in
-            apply_commands internal_cmds ucs
+            apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
         | ic :: ics, [] ->
             combine_or_run_internal_cmds ic ics
         | ic :: ics, uc :: _ when cmp_ic_uc ic uc < 0 ->
@@ -447,7 +493,28 @@ let main ~input_file ~output_file ~archive_uri () =
                slot %Ld and sequence number %d"
               ic.global_slot ic.sequence_no ()
       in
-      let%bind () = apply_commands sorted_internal_cmds sorted_user_cmds in
+      [%log info] "At genesis, ledger hash"
+        ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
+      let%bind () =
+        apply_commands sorted_internal_cmds sorted_user_cmds
+          ~last_global_slot:0L
+      in
+      let target_ledger_json =
+        Ledger_hash.to_yojson input.target_ledger_hash
+      in
+      if Ledger_hash.equal input.target_ledger_hash (Ledger.merkle_root ledger)
+      then
+        [%log info]
+          "After applying all commands, ledger hash equals target ledger hash"
+          ~metadata:[("ledger_hash", target_ledger_json)]
+      else (
+        [%log error]
+          "After applying all commands, ledger hash differs from target \
+           ledger hash"
+          ~metadata:
+            [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+            ; ("target_ledger_hash", target_ledger_json) ] ;
+        Core_kernel.exit 1 ) ;
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =
