@@ -1,5 +1,5 @@
 (library
-  (name tests)
+  (name transition_frontier_tests)
   (libraries transition_frontier)
   (inline_tests)
   (preprocess (pps ppx_jane ppx_version bisect_ppx -- --conditional)))

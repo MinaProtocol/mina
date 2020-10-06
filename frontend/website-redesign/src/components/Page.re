@@ -5,7 +5,6 @@ module Styles = {
 
   let main =
     style([
-      position(`relative),
       opacity(0.),
       animationName(fadeIn),
       animationDuration(1000),
