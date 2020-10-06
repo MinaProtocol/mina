@@ -9,6 +9,7 @@ module Styles = {
       width(`rem(14.)),
       zIndex(100),
       background(white),
+      marginTop(`rem(3.5)),
       media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
 
@@ -43,6 +44,58 @@ module Styles = {
       selector("> img", [width(`percent(100.))]),
       media(Theme.MediaQuery.desktop, [paddingLeft(`rem(16.))]),
     ]);
+
+  let rolesContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      alignItems(`flexStart),
+      media(
+        Theme.MediaQuery.notMobile,
+        [flexDirection(`row), alignItems(`center)],
+      ),
+    ]);
+
+  let singleRowContainer = style([width(`rem(26.))]);
+
+  let roleLink =
+    merge([
+      Theme.Type.buttonLink,
+      style([
+        display(`flex),
+        alignItems(`center),
+        selector(">:last-child", [marginLeft(`rem(0.5))]),
+      ]),
+    ]);
+
+  let runNodeContainer = style([width(`percent(100.))]);
+
+  let nodesContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      alignItems(`flexStart),
+      media(
+        Theme.MediaQuery.notMobile,
+        [flexDirection(`row), alignItems(`center)],
+      ),
+    ]);
+
+  let runNodeContent = style([width(`rem(17.)), marginTop(`rem(2.))]);
+
+  let blockAndToolsGrid =
+    style([
+      display(`grid),
+      gridTemplateColumns([
+        `repeat((`autoFit, `minmax((`rem(17.), `fr(1.))))),
+      ]),
+      gridGap(`rem(1.)),
+    ]);
+
+  let blockExplorerCard =
+    style([width(`rem(17.)), display(`flex), flexDirection(`column)]);
 };
 
 module NodeOperatorsSideNav = {
@@ -70,9 +123,10 @@ module NodeOperatorsSideNav = {
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
       <SideNav.Item title="Node Overview" slug="#how-mina-works" />
-      <SideNav.Item title="Block Explorers & Tools" slug="#projects" />
-      <SideNav.Item title="Help & Transport" slug="#incentives" />
-      <SideNav.Item title="Knowledge Base" slug="#roadmap" />
+      <SideNav.Item
+        title="Block Explorers & Tools"
+        slug="#block-explorers-tools"
+      />
     </SideNav>;
     // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
@@ -80,11 +134,15 @@ module NodeOperatorsSideNav = {
 
 module Section = {
   [@react.component]
-  let make = (~title, ~subhead, ~slug, ~children) => {
+  let make = (~title, ~subhead=?, ~slug, ~children) => {
     <section className=Styles.section id=slug>
       <h2 className=Theme.Type.h2> {React.string(title)} </h2>
       <Spacer height=1.5 />
-      <p className=Theme.Type.sectionSubhead> {React.string(subhead)} </p>
+      {switch (subhead) {
+       | Some(subhead) =>
+         <p className=Theme.Type.sectionSubhead> {React.string(subhead)} </p>
+       | None => React.null
+       }}
       <Spacer height=4. />
       children
       <Spacer height=6.5 />
@@ -92,11 +150,183 @@ module Section = {
   };
 };
 
+module Roles = {
+  module Role = {
+    [@react.component]
+    let make = (~img, ~title, ~copy, ~linkCopy, ~linkUrl) => {
+      <div className=Styles.singleRowContainer>
+        <img src=img />
+        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <p className=Theme.Type.paragraph> {React.string(copy)} </p>
+        <Next.Link href=linkUrl>
+          <span className=Styles.roleLink>
+            <p> {React.string(linkCopy)} </p>
+            <Icon kind=Icon.ArrowRightMedium />
+          </span>
+        </Next.Link>
+      </div>;
+    };
+  };
+
+  [@react.component]
+  let make = () => {
+    <div>
+      <Spacer height=1. />
+      <h3 className=Theme.Type.h3> {React.string("Two Roles")} </h3>
+      <Spacer height=2. />
+      <div className=Styles.rolesContainer>
+        <Role
+          img="/static/img/Role1.png"
+          title="Block Producers"
+          copy={js|Similar to miners or stakers in other protocols, block producers can be selected to produce a block and earn block rewards, coinbase, transaction fees and network fees. Block producers can also be SNARK producers and generate their own proofs.|js}
+          linkCopy="Block Producer Documentation"
+          linkUrl="/docs"
+        />
+        <Role
+          img="/static/img/Role1.png"
+          title="Snark Producers"
+          copy={js|SNARK producers help compress data in the network by generating SNARK proofs of transactions. They then sell those SNARK proofs to block producers on the Snarketplace in return for a portion of the block rewards|js}
+          linkCopy="Snark Producer Documentation"
+          linkUrl="/docs"
+        />
+      </div>
+    </div>;
+  };
+};
+module RunNode = {
+  module RunNodeSection = {
+    [@react.component]
+    let make = (~sectionNumber, ~title, ~copy) =>
+      <div className=Styles.runNodeContent>
+        <h1 className=Theme.Type.h1> {React.string(sectionNumber)} </h1>
+        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <p className=Theme.Type.paragraph> {React.string(copy)} </p>
+      </div>;
+  };
+  [@react.component]
+  let make = () =>
+    <div className=Styles.runNodeContainer>
+      <h3 className=Theme.Type.h4> {React.string("Run a Node")} </h3>
+      <div>
+        <div className=Styles.nodesContainer>
+          <RunNodeSection
+            sectionNumber="01"
+            title="Install Mina"
+            copy={js|Check the systems requirements and install Mina. It’s around 1GB — which is smaller than most, but still takes some time.|js}
+          />
+          <RunNodeSection
+            sectionNumber="02"
+            title="Connect to Network"
+            copy={js|Configure your network and use the provided seed nodes to connect to the live peer-to-peer Mina network.|js}
+          />
+          <RunNodeSection
+            sectionNumber="03"
+            title="Send A Transaction"
+            copy={js|Create a new account. Request Mina tokens from the faucet. Then send funds to Mina’s echo service, and you’re done!|js}
+          />
+        </div>
+        <Spacer height=3. />
+        <Button
+          href={`Internal("/docs")}
+          bgColor=Theme.Colors.orange
+          width={`rem(15.)}>
+          {React.string("Go To Documentation")}
+          <Icon kind=Icon.ArrowRightMedium />
+        </Button>
+      </div>
+    </div>;
+};
+
 module NodeOverview = {
   [@react.component]
   let make = () =>
-    <div>
-     {React.string("Node Overview")} 
+    <div
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
+      <Spacer height=6.5 />
+      <hr className=Styles.divider />
+      <Section
+        title="Node Overview"
+        subhead={js|Mina is secured by proof-of-stake consensus. Unlike other legacy protocols, any participant can validate transactions like a full node — making decentralization possible. And here, node operators can play two roles: they can produce blocks, and/or they can produce SNARKs.|js}
+        slug="how-mina-works">
+        <hr className=Styles.divider />
+        <Roles />
+        <Spacer height=3. />
+        <hr className=Styles.divider />
+        <RunNode />
+        <Spacer height=13.5 />
+      </Section>
+    </div>;
+};
+
+module BlockExplorersAndTools = {
+  module BlockExplorerAndTool = {
+    [@react.component]
+    let make = (~img, ~title, ~copy, ~linkCopy, ~linkUrl) =>
+      <div className=Styles.blockExplorerCard>
+        <img src=img />
+        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <p className=Theme.Type.paragraph> {React.string(copy)} </p>
+        <Next.Link href=linkUrl>
+          <span className=Styles.roleLink>
+            <p> {React.string(linkCopy)} </p>
+            <Icon kind=Icon.ExternalLink />
+          </span>
+        </Next.Link>
+      </div>;
+  };
+  module BlockAndToolsGrid = {
+    [@react.component]
+    let make = () =>
+      <div className=Styles.blockAndToolsGrid>
+        <BlockExplorerAndTool
+          img="/static/img/BlockExplorerAndTool.png"
+          title="Mina Block Explorer"
+          copy="Get access to key data like the number of active nodes, transactions and blocks."
+          linkCopy="Check It Out"
+          linkUrl="/docs"
+        />
+        <BlockExplorerAndTool
+          img="/static/img/BlockExplorerAndTool.png"
+          title="Block Producer Performance Dashboard"
+          copy="Understand and optimize your block production with metrics pulled from your nodes."
+          linkCopy="Check It Out"
+          linkUrl="/docs"
+        />
+        <BlockExplorerAndTool
+          img="/static/img/BlockExplorerAndTool.png"
+          title="Snark Producer Performance Dashboard"
+          copy="Understand and optimize your SNARK operation and pricing with metrics pulled from your  nodes."
+          linkCopy="Check It Out"
+          linkUrl="/docs"
+        />
+        <BlockExplorerAndTool
+          img="/static/img/BlockExplorerAndTool.png"
+          title="The Mina Snarketplace"
+          copy="Tour the market where block and SNARK producers buy and sell SNARKs."
+          linkCopy="Check It Out"
+          linkUrl="/docs"
+        />
+        <BlockExplorerAndTool
+          img="/static/img/BlockExplorerAndTool.png"
+          title="Network Health Dashboard"
+          copy={js|Get a bird’s-eye-view of the Mina network with aggregated data.|js}
+          linkCopy="Check It Out"
+          linkUrl="/docs"
+        />
+      </div>;
+  };
+
+  [@react.component]
+  let make = () =>
+    <div
+      className={Styles.sectionContainer(
+        "/static/img/MinaSpectrumPrimary1.png",
+      )}>
+      <Spacer height=6. />
+      <Section title="Block Explorers & Tools" slug="block-explorers-tools">
+        <BlockAndToolsGrid />
+        <Spacer height=13.5 />
+      </Section>
     </div>;
 };
 
@@ -106,9 +336,9 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/tech-hero-desktop.jpg",
-        Theme.tablet: "/static/img/tech-hero-tablet.jpg",
-        Theme.mobile: "/static/img/tech-hero-mobile.jpg",
+        Theme.desktop: "/static/img/NodeOperatorHero.png",
+        Theme.tablet: "/static/img/NodeOperatorHero.png",
+        Theme.mobile: "/static/img/NodeOperatorHero.png",
       }
       title="Get Started For Node Operators"
       header="Run a Node"
@@ -148,7 +378,7 @@ let make = () => {
         },
       }
     />
-    // TODO: Block Exploreers & Tools
+    <BlockExplorersAndTools />
     <FeaturedSingleRow
       row=FeaturedSingleRow.Row.{
         rowType: ImageRightCopyLeft,
