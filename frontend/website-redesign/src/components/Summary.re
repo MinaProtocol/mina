@@ -296,7 +296,7 @@ let make = () => {
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            href=`External("https://bit.ly/3dNmPle")
+            href={`External("https://bit.ly/3dNmPle")}
             bgColor=Theme.Colors.black
             width={`rem(15.)}
             paddingX=1.5>
@@ -306,7 +306,11 @@ let make = () => {
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
           <Spacer width=2.0 height=1.0 />
-          <Button href=`Internal("/genesis") bgColor=Theme.Colors.black width={`rem(13.)} paddingX=1.5>
+          <Button
+            href={`Internal("/genesis")}
+            bgColor=Theme.Colors.black
+            width={`rem(13.)}
+            paddingX=1.5>
             <p className=Theme.Type.buttonLabel>
               {React.string("Genesis Program")}
             </p>

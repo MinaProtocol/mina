@@ -1,10 +1,10 @@
 type state = {blogs: array(ContentType.BlogPost.entries)};
 
-module Fetch(T: {
-  type t
-  let id: string;
-  let dateKeyName: string;
-}) = {
+module Fetch = (T: {
+                  type t;
+                  let id: string;
+                  let dateKeyName: string;
+                }) => {
   let run = () => {
     Contentful.getEntries(
       Lazy.force(Contentful.client),
@@ -15,9 +15,12 @@ module Fetch(T: {
       },
     )
     |> Promise.map((entries: ContentType.System.entries(T.t)) => {
-         Array.map((e: ContentType.System.entry(T.t)) => e.fields, entries.items)
+         Array.map(
+           (e: ContentType.System.entry(T.t)) => e.fields,
+           entries.items,
+         )
        });
-  }
+  };
 };
 
 module Styles = {
@@ -48,8 +51,8 @@ module Title = {
   };
 };
 
-module FetchBlogs = Fetch(ContentType.BlogPost)
-module FetchPress = Fetch(ContentType.Press)
+module FetchBlogs = Fetch(ContentType.BlogPost);
+module FetchPress = Fetch(ContentType.Press);
 
 [@react.component]
 let make = (~source) => {
@@ -57,13 +60,21 @@ let make = (~source) => {
 
   React.useEffect0(() => {
     switch (source) {
-      | `Blogs =>
-        FetchBlogs.run() |> Promise.iter(blogs => setContent(_ =>
-          blogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)));
-      | `Press =>
-        FetchPress.run() |> Promise.iter(press => setContent(_ =>
-          press |> Array.map(ContentType.NormalizedPressBlog.ofPress)));
-    }
+    | `Blogs =>
+      FetchBlogs.run()
+      |> Promise.iter(blogs =>
+           setContent(_ =>
+             blogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)
+           )
+         )
+    | `Press =>
+      FetchPress.run()
+      |> Promise.iter(press =>
+           setContent(_ =>
+             press |> Array.map(ContentType.NormalizedPressBlog.ofPress)
+           )
+         )
+    };
 
     None;
   });
@@ -73,12 +84,9 @@ let make = (~source) => {
       <Title
         copy="In the News"
         buttonCopy="See All Press"
-        buttonHref=`Internal("/blog")
+        buttonHref={`Internal("/blog")}
       />
     </Wrapped>
-    <ListModule
-      items=content
-      itemKind=ListModule.Blog
-    />
+    <ListModule items=content itemKind=ListModule.Blog />
   </div>;
 };

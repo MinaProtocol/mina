@@ -229,8 +229,8 @@ let make = (~dark=false) => {
     </Next.Link>
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
-      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2./> </span>
-      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=2./> </span>
+      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2. /> </span>
+      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=2. /> </span>
     </label>
     <nav className=Styles.nav>
       <NavLink label="About" href="/about" dark />
@@ -248,7 +248,8 @@ let make = (~dark=false) => {
       <NavLink label="Blog" href="/blog" dark />
       <Spacer width=1.5 />
       <div className=Styles.ctaContainer>
-        <Button href=`Internal("/genesis") width={`rem(13.)} paddingX=1. dark>
+        <Button
+          href={`Internal("/genesis")} width={`rem(13.)} paddingX=1. dark>
           <img src="/static/img/promo-logo.svg" height="40" />
           <Spacer width=0.5 />
           <span> {React.string("Join Genesis Token Program")} </span>

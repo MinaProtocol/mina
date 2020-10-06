@@ -15,7 +15,12 @@ let make = (~statusCode="404") => {
         Theme.mobile: "/static/img/backgrounds/404page.png",
       }>
       <Spacer height=1. />
-      <Button href={`Internal("/")} bgColor=Theme.Colors.mint dark=true>
+      <Button
+        href={`Internal("/")}
+        width={`rem(6.9)}
+        bgColor=Theme.Colors.mint
+        borderColor=Theme.Colors.mint
+        textColor=Theme.Colors.digitalBlack>
         {React.string("Home")}
         <Icon kind=Icon.ArrowRightMedium />
       </Button>
