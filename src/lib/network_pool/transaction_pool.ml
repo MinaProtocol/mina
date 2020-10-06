@@ -1892,8 +1892,10 @@ let%test_module _ =
 
     let mock_sender =
       Envelope.Sender.Remote
-        ( Unix.Inet_addr.of_string "1.2.3.4"
-        , Peer.Id.unsafe_of_string "contents should be irrelevant" )
+        (Peer.create
+           (Unix.Inet_addr.of_string "1.2.3.4")
+           ~peer_id:(Peer.Id.unsafe_of_string "contents should be irrelevant")
+           ~libp2p_port:8302)
 
     let%test_unit "rebroadcastable transaction behavior" =
       Thread_safe.block_on_async_exn (fun () ->

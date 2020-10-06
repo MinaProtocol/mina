@@ -73,7 +73,7 @@ end]
 
 type t = Stable.Latest.t =
   {host: Unix.Inet_addr.Blocking_sexp.t; libp2p_port: int; peer_id: string}
-[@@deriving compare, sexp]
+[@@deriving compare, sexp, bin_io_unversioned]
 
 [%%define_locally
 Stable.Latest.(of_yojson, to_yojson)]
@@ -127,6 +127,8 @@ module Display = struct
 
   module Fields = Stable.Latest.Fields
 end
+
+let ip {host; _} = host
 
 let to_display {host; libp2p_port; peer_id} =
   Display.
