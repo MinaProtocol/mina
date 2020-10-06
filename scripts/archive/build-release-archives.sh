@@ -108,6 +108,7 @@ if [ -n "${BUILDKITE+x}" ]; then
     set -x
     # Export variables for use with downstream steps
     echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${VERSION}"
     echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
     set +x

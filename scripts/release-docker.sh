@@ -50,6 +50,7 @@ case $SERVICE in
 archive-node)
   DOCKERFILE_PATH="scripts/archive/Dockerfile"
   DOCKER_CONTEXT="scripts/archive"
+  ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
