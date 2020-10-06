@@ -529,7 +529,7 @@ let make = () => {
         button: {
           buttonColor: Theme.Colors.orange,
           buttonTextColor: Css.white,
-          href: `Internal("/docs"),
+          href: `Internal("/docs/getting-started"),
           buttonText: "Run a Node",
           dark: false,
         },
