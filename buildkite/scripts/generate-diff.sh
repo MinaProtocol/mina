@@ -3,6 +3,8 @@
 # Base against origin/develop by default, but use pull-request base otherwise
 BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-origin/develop}
 
+>&2 git fetch
+
 # Finds the commit hash of HEAD of $BASE branch
 BASECOMMIT=$(git log $BASE -1 --pretty=format:%H)
 # Finds the commit hash of HEAD of the current branch
