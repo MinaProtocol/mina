@@ -24,8 +24,8 @@ let ReleaseSpec = {
   default = {
     deps = [] : List Command.TaggedKey.Type,
     deploy_env_file = "DOCKER_DEPLOY_ENV",
-    service = "\\\$CODA_SERVICE",
-    version = "\\\$CODA_VERSION",
+    service = "\\\${CODA_SERVICE}",
+    version = "\\\${CODA_VERSION}",
     extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
     step_key = "docker-artifact"
   }
@@ -42,7 +42,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
                 "buildkite-agent artifact download --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${spec.deploy_env_file} .; " ++
             "fi"
         ),
-        Cmd.run "source ${spec.deploy_env_file} && ./scripts/release-docker.sh --service ${spec.service} --version ${spec.version} --extra-args \"${spec.extra_args}\""
+        Cmd.run "source ${spec.deploy_env_file} && ./scripts/release-docker.sh --service ${spec.service} --version ${spec.version} --extra-args \\\"${spec.extra_args}\\\""
     ]
 
     in
