@@ -85,6 +85,7 @@ tag-and-push() {
 if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
   docker push "codaprotocol/$SERVICE:$VERSION"
   tag-and-push "codaprotocol/$SERVICE:$VERSION-$COMMIT"
-  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
-  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION-$COMMIT"
+  # TODO: Fix buildkite permissions for pushing to google cloud and then uncomment these
+  # tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
+  # tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION-$COMMIT"
 fi
