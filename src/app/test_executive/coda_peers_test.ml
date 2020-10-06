@@ -20,15 +20,17 @@ module Make (Engine : Engine_intf) = struct
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in
-    let partial_eval node = Log_engine.wait_for_init node log_engine in
+    let logger = Logger.create () in
+    let wait_for_init_partial node =
+      Log_engine.wait_for_init node log_engine
+    in
     let%bind () =
-      Malleable_error.List.iter network.block_producers ~f:partial_eval
+      Malleable_error.List.iter network.block_producers
+        ~f:wait_for_init_partial
     in
     let peer_list = network.block_producers in
-    let expected_peers =
-      []
-      (* TODO, write graphql query, ask each peer for its peer_id*)
-    in
+    let get_peer_id_partial = Node.get_peer_id ~logger in
+    let expected_peers = List.map peer_list ~f:get_peer_id_partial in
     let test_compare_func n =
       let visible_peers_of_n =
         []

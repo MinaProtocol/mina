@@ -141,7 +141,7 @@ module Node = struct
     module Query_peer_id =
     [%graphql
     {|
-      query{
+      query {
         daemonStatus {
           addrsAndPorts {
             peer {
@@ -216,6 +216,24 @@ module Node = struct
         (after (Time.Span.of_sec initial_delay_sec))
     in
     go num_tries
+
+  let get_peer_id ~logger t =
+    let open Malleable_error.Let_syntax in
+    [%log info] "Getting peer id"
+      ~metadata:
+        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
+    let graphql_port = 3085 in
+    let query_obj = Graphql.Query_peer_id.make () in
+    let%bind query_result_obj =
+      retry ~logger ~graphql_port ~retry_on_graphql_error:true
+        ~query_name:"query_peer_id" query_obj
+    in
+    let peer_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
+    match peer_obj with
+    | None ->
+        Malleable_error.of_string_hard_error "Peer not found"
+    | Some peer ->
+        Malleable_error.return peer#peerId
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in

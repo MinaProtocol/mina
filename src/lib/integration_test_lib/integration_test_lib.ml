@@ -71,6 +71,8 @@ module type Engine_intf = sig
       -> t
       -> account_id:Coda_base.Account_id.t
       -> Currency.Balance.t Malleable_error.t
+
+    val get_peer_id : logger:Logger.t -> t -> string Malleable_error.t
   end
 
   module Network : sig
