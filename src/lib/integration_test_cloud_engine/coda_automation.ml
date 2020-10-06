@@ -150,7 +150,7 @@ module Network_config = struct
             { base= Accounts runtime_accounts
             ; add_genesis_winner= None
             ; num_accounts= None
-            ; balances= None
+            ; balances= []
             ; hash= None
             ; name= None } }
     in
