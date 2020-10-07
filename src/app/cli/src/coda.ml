@@ -214,6 +214,12 @@ let daemon logger =
      and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
      and _enable_flooding =
        flag "enable-flooding" ~doc:"true|false Deprecated and unused" no_arg
+     and isolate =
+       flag "isolate-network"
+         ~doc:
+           "true|false Only allow connections to the peers passed on the \
+            command line or configured through GraphQL. (default: false)"
+         (optional bool)
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -249,6 +255,8 @@ let daemon logger =
          ~doc:"full|check|none"
      and plugins = plugin_flag in
      fun () ->
+       (* Immediately disable updating the time offset. *)
+       Block_time.Controller.disable_setting_offset () ;
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
@@ -749,6 +757,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; isolate= Option.value ~default:false isolate
              ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in

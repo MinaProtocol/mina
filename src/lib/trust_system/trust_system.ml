@@ -171,5 +171,5 @@ let record_envelope_sender :
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
-  | Remote (inet_addr, _peer_id) ->
-      record t logger inet_addr action
+  | Remote peer ->
+      record t logger peer action

@@ -11,11 +11,7 @@ module Styles = {
       margin(`zero),
       media(
         Theme.MediaQuery.tablet,
-        [
-          marginTop(`zero),
-          position(`sticky),
-          top(rem(2.5)),
-        ],
+        [marginTop(`zero), position(`sticky), top(rem(2.5))],
       ),
     ]);
 

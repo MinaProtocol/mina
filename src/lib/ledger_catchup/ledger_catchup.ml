@@ -215,7 +215,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
             in
             ignore
               Trust_system.(
-                record trust_system logger peer.host
+                record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
@@ -272,7 +272,7 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                 peer
             in
             Trust_system.(
-              record trust_system logger peer.host
+              record trust_system logger peer
                 Actions.(Violated_protocol, Some (error_msg, [])))
             |> don't_wait_for ;
             Deferred.Or_error.error_string error_msg )
@@ -282,9 +282,8 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                    let transition_with_hash =
                      With_hash.of_data transition ~hash_data:(Fn.const hash)
                    in
-                   Envelope.Incoming.wrap ~data:transition_with_hash
-                     ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
-               ) ) )
+                   Envelope.Incoming.wrap_peer ~data:transition_with_hash
+                     ~sender:peer ) ) )
 
 let verify_transitions_and_build_breadcrumbs ~logger
     ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier

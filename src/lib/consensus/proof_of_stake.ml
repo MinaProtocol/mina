@@ -2485,7 +2485,7 @@ module Hooks = struct
             | Connected {data= Ok (Ok snapshot_ledger); _} ->
                 let%bind () =
                   Trust_system.(
-                    record trust_system logger peer.host
+                    record trust_system logger peer
                       Actions.(Epoch_ledger_provided, None))
                 in
                 let delegatee_table =
