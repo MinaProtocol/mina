@@ -319,6 +319,8 @@ COPY --from=builder /home/opam/coda/src/app/rosetta/config.json /data/config.jso
 
 # Set up coda config dir with demo mode keys and genesis
 COPY --from=builder /home/opam/demo-genesis ${CODA_CONFIG_DIR}/demo-genesis
+# Fix a bad symlink by also putting this data in /home/opam
+COPY --from=builder /home/opam/demo-genesis /home/opam/demo-genesis
 COPY --from=builder /home/opam/coda/src/app/rosetta/demo-config.json ${CODA_CONFIG_DIR}/daemon.json
 
 RUN mkdir -p --mode=700 ${CODA_CONFIG_DIR}/wallets/store/ \
