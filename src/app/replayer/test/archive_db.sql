@@ -17,7 +17,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: internal_command_type; Type: TYPE; Schema: public; Owner: steck
+-- Name: internal_command_type; Type: TYPE; Schema: public; Owner: -
 --
 
 CREATE TYPE public.internal_command_type AS ENUM (
@@ -27,10 +27,8 @@ CREATE TYPE public.internal_command_type AS ENUM (
 );
 
 
-ALTER TYPE public.internal_command_type OWNER TO steck;
-
 --
--- Name: user_command_status; Type: TYPE; Schema: public; Owner: steck
+-- Name: user_command_status; Type: TYPE; Schema: public; Owner: -
 --
 
 CREATE TYPE public.user_command_status AS ENUM (
@@ -39,10 +37,8 @@ CREATE TYPE public.user_command_status AS ENUM (
 );
 
 
-ALTER TYPE public.user_command_status OWNER TO steck;
-
 --
--- Name: user_command_type; Type: TYPE; Schema: public; Owner: steck
+-- Name: user_command_type; Type: TYPE; Schema: public; Owner: -
 --
 
 CREATE TYPE public.user_command_type AS ENUM (
@@ -54,14 +50,12 @@ CREATE TYPE public.user_command_type AS ENUM (
 );
 
 
-ALTER TYPE public.user_command_type OWNER TO steck;
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: blocks; Type: TABLE; Schema: public; Owner: steck
+-- Name: blocks; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.blocks (
@@ -77,10 +71,8 @@ CREATE TABLE public.blocks (
 );
 
 
-ALTER TABLE public.blocks OWNER TO steck;
-
 --
--- Name: blocks_id_seq; Type: SEQUENCE; Schema: public; Owner: steck
+-- Name: blocks_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.blocks_id_seq
@@ -92,17 +84,15 @@ CREATE SEQUENCE public.blocks_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.blocks_id_seq OWNER TO steck;
-
 --
--- Name: blocks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: steck
+-- Name: blocks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.blocks_id_seq OWNED BY public.blocks.id;
 
 
 --
--- Name: blocks_internal_commands; Type: TABLE; Schema: public; Owner: steck
+-- Name: blocks_internal_commands; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.blocks_internal_commands (
@@ -113,10 +103,8 @@ CREATE TABLE public.blocks_internal_commands (
 );
 
 
-ALTER TABLE public.blocks_internal_commands OWNER TO steck;
-
 --
--- Name: blocks_user_commands; Type: TABLE; Schema: public; Owner: steck
+-- Name: blocks_user_commands; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.blocks_user_commands (
@@ -126,10 +114,8 @@ CREATE TABLE public.blocks_user_commands (
 );
 
 
-ALTER TABLE public.blocks_user_commands OWNER TO steck;
-
 --
--- Name: internal_commands; Type: TABLE; Schema: public; Owner: steck
+-- Name: internal_commands; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.internal_commands (
@@ -142,10 +128,8 @@ CREATE TABLE public.internal_commands (
 );
 
 
-ALTER TABLE public.internal_commands OWNER TO steck;
-
 --
--- Name: internal_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: steck
+-- Name: internal_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.internal_commands_id_seq
@@ -157,17 +141,15 @@ CREATE SEQUENCE public.internal_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.internal_commands_id_seq OWNER TO steck;
-
 --
--- Name: internal_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: steck
+-- Name: internal_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.internal_commands_id_seq OWNED BY public.internal_commands.id;
 
 
 --
--- Name: public_keys; Type: TABLE; Schema: public; Owner: steck
+-- Name: public_keys; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.public_keys (
@@ -176,10 +158,8 @@ CREATE TABLE public.public_keys (
 );
 
 
-ALTER TABLE public.public_keys OWNER TO steck;
-
 --
--- Name: public_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: steck
+-- Name: public_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.public_keys_id_seq
@@ -191,17 +171,15 @@ CREATE SEQUENCE public.public_keys_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.public_keys_id_seq OWNER TO steck;
-
 --
--- Name: public_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: steck
+-- Name: public_keys_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.public_keys_id_seq OWNED BY public.public_keys.id;
 
 
 --
--- Name: snarked_ledger_hashes; Type: TABLE; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.snarked_ledger_hashes (
@@ -210,10 +188,8 @@ CREATE TABLE public.snarked_ledger_hashes (
 );
 
 
-ALTER TABLE public.snarked_ledger_hashes OWNER TO steck;
-
 --
--- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.snarked_ledger_hashes_id_seq
@@ -225,17 +201,15 @@ CREATE SEQUENCE public.snarked_ledger_hashes_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.snarked_ledger_hashes_id_seq OWNER TO steck;
-
 --
--- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.snarked_ledger_hashes_id_seq OWNED BY public.snarked_ledger_hashes.id;
 
 
 --
--- Name: user_commands; Type: TABLE; Schema: public; Owner: steck
+-- Name: user_commands; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.user_commands (
@@ -259,10 +233,8 @@ CREATE TABLE public.user_commands (
 );
 
 
-ALTER TABLE public.user_commands OWNER TO steck;
-
 --
--- Name: user_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: steck
+-- Name: user_commands_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.user_commands_id_seq
@@ -274,52 +246,50 @@ CREATE SEQUENCE public.user_commands_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.user_commands_id_seq OWNER TO steck;
-
 --
--- Name: user_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: steck
+-- Name: user_commands_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.user_commands_id_seq OWNED BY public.user_commands.id;
 
 
 --
--- Name: blocks id; Type: DEFAULT; Schema: public; Owner: steck
+-- Name: blocks id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks ALTER COLUMN id SET DEFAULT nextval('public.blocks_id_seq'::regclass);
 
 
 --
--- Name: internal_commands id; Type: DEFAULT; Schema: public; Owner: steck
+-- Name: internal_commands id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.internal_commands ALTER COLUMN id SET DEFAULT nextval('public.internal_commands_id_seq'::regclass);
 
 
 --
--- Name: public_keys id; Type: DEFAULT; Schema: public; Owner: steck
+-- Name: public_keys id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.public_keys ALTER COLUMN id SET DEFAULT nextval('public.public_keys_id_seq'::regclass);
 
 
 --
--- Name: snarked_ledger_hashes id; Type: DEFAULT; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.snarked_ledger_hashes ALTER COLUMN id SET DEFAULT nextval('public.snarked_ledger_hashes_id_seq'::regclass);
 
 
 --
--- Name: user_commands id; Type: DEFAULT; Schema: public; Owner: steck
+-- Name: user_commands id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands ALTER COLUMN id SET DEFAULT nextval('public.user_commands_id_seq'::regclass);
 
 
 --
--- Data for Name: blocks; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: blocks; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.blocks (id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, global_slot, "timestamp") FROM stdin;
@@ -344,7 +314,7 @@ COPY public.blocks (id, state_hash, parent_id, creator_id, snarked_ledger_hash_i
 
 
 --
--- Data for Name: blocks_internal_commands; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: blocks_internal_commands; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.blocks_internal_commands (block_id, internal_command_id, sequence_no, secondary_sequence_no) FROM stdin;
@@ -378,7 +348,7 @@ COPY public.blocks_internal_commands (block_id, internal_command_id, sequence_no
 
 
 --
--- Data for Name: blocks_user_commands; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: blocks_user_commands; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.blocks_user_commands (block_id, user_command_id, sequence_no) FROM stdin;
@@ -393,7 +363,7 @@ COPY public.blocks_user_commands (block_id, user_command_id, sequence_no) FROM s
 
 
 --
--- Data for Name: internal_commands; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: internal_commands; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.internal_commands (id, type, receiver_id, fee, token, hash) FROM stdin;
@@ -408,7 +378,7 @@ COPY public.internal_commands (id, type, receiver_id, fee, token, hash) FROM std
 
 
 --
--- Data for Name: public_keys; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: public_keys; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.public_keys (id, value) FROM stdin;
@@ -421,7 +391,7 @@ COPY public.public_keys (id, value) FROM stdin;
 
 
 --
--- Data for Name: snarked_ledger_hashes; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: snarked_ledger_hashes; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.snarked_ledger_hashes (id, value) FROM stdin;
@@ -430,7 +400,7 @@ COPY public.snarked_ledger_hashes (id, value) FROM stdin;
 
 
 --
--- Data for Name: user_commands; Type: TABLE DATA; Schema: public; Owner: steck
+-- Data for Name: user_commands; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.user_commands (id, type, fee_payer_id, source_id, receiver_id, fee_token, token, nonce, amount, fee, memo, hash, status, failure_reason, fee_payer_account_creation_fee_paid, receiver_account_creation_fee_paid, created_token) FROM stdin;
@@ -445,42 +415,42 @@ COPY public.user_commands (id, type, fee_payer_id, source_id, receiver_id, fee_t
 
 
 --
--- Name: blocks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: steck
+-- Name: blocks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.blocks_id_seq', 18, true);
 
 
 --
--- Name: internal_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: steck
+-- Name: internal_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.internal_commands_id_seq', 8, true);
 
 
 --
--- Name: public_keys_id_seq; Type: SEQUENCE SET; Schema: public; Owner: steck
+-- Name: public_keys_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.public_keys_id_seq', 5, true);
 
 
 --
--- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.snarked_ledger_hashes_id_seq', 1, true);
 
 
 --
--- Name: user_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: steck
+-- Name: user_commands_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.user_commands_id_seq', 8, true);
 
 
 --
--- Name: blocks_internal_commands blocks_internal_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_internal_commands blocks_internal_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_internal_commands
@@ -488,7 +458,7 @@ ALTER TABLE ONLY public.blocks_internal_commands
 
 
 --
--- Name: blocks blocks_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks blocks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks
@@ -496,7 +466,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: blocks blocks_state_hash_key; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks blocks_state_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks
@@ -504,7 +474,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: blocks_user_commands blocks_user_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_user_commands blocks_user_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_user_commands
@@ -512,7 +482,7 @@ ALTER TABLE ONLY public.blocks_user_commands
 
 
 --
--- Name: internal_commands internal_commands_hash_key; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: internal_commands internal_commands_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.internal_commands
@@ -520,7 +490,7 @@ ALTER TABLE ONLY public.internal_commands
 
 
 --
--- Name: internal_commands internal_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: internal_commands internal_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.internal_commands
@@ -528,7 +498,7 @@ ALTER TABLE ONLY public.internal_commands
 
 
 --
--- Name: public_keys public_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: public_keys public_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.public_keys
@@ -536,7 +506,7 @@ ALTER TABLE ONLY public.public_keys
 
 
 --
--- Name: public_keys public_keys_value_key; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: public_keys public_keys_value_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.public_keys
@@ -544,7 +514,7 @@ ALTER TABLE ONLY public.public_keys
 
 
 --
--- Name: snarked_ledger_hashes snarked_ledger_hashes_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes snarked_ledger_hashes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.snarked_ledger_hashes
@@ -552,7 +522,7 @@ ALTER TABLE ONLY public.snarked_ledger_hashes
 
 
 --
--- Name: snarked_ledger_hashes snarked_ledger_hashes_value_key; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: snarked_ledger_hashes snarked_ledger_hashes_value_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.snarked_ledger_hashes
@@ -560,7 +530,7 @@ ALTER TABLE ONLY public.snarked_ledger_hashes
 
 
 --
--- Name: user_commands user_commands_hash_key; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: user_commands user_commands_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands
@@ -568,7 +538,7 @@ ALTER TABLE ONLY public.user_commands
 
 
 --
--- Name: user_commands user_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: steck
+-- Name: user_commands user_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands
@@ -576,42 +546,42 @@ ALTER TABLE ONLY public.user_commands
 
 
 --
--- Name: idx_blocks_creator_id; Type: INDEX; Schema: public; Owner: steck
+-- Name: idx_blocks_creator_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_blocks_creator_id ON public.blocks USING btree (creator_id);
 
 
 --
--- Name: idx_blocks_height; Type: INDEX; Schema: public; Owner: steck
+-- Name: idx_blocks_height; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_blocks_height ON public.blocks USING btree (height);
 
 
 --
--- Name: idx_blocks_state_hash; Type: INDEX; Schema: public; Owner: steck
+-- Name: idx_blocks_state_hash; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_blocks_state_hash ON public.blocks USING btree (state_hash);
 
 
 --
--- Name: idx_public_keys_value; Type: INDEX; Schema: public; Owner: steck
+-- Name: idx_public_keys_value; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_public_keys_value ON public.public_keys USING btree (value);
 
 
 --
--- Name: idx_snarked_ledger_hashes_value; Type: INDEX; Schema: public; Owner: steck
+-- Name: idx_snarked_ledger_hashes_value; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_snarked_ledger_hashes_value ON public.snarked_ledger_hashes USING btree (value);
 
 
 --
--- Name: blocks blocks_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks blocks_creator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks
@@ -619,7 +589,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: blocks_internal_commands blocks_internal_commands_block_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_internal_commands blocks_internal_commands_block_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_internal_commands
@@ -627,7 +597,7 @@ ALTER TABLE ONLY public.blocks_internal_commands
 
 
 --
--- Name: blocks_internal_commands blocks_internal_commands_internal_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_internal_commands blocks_internal_commands_internal_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_internal_commands
@@ -635,7 +605,7 @@ ALTER TABLE ONLY public.blocks_internal_commands
 
 
 --
--- Name: blocks blocks_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks blocks_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks
@@ -643,7 +613,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: blocks blocks_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks blocks_snarked_ledger_hash_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks
@@ -651,7 +621,7 @@ ALTER TABLE ONLY public.blocks
 
 
 --
--- Name: blocks_user_commands blocks_user_commands_block_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_user_commands blocks_user_commands_block_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_user_commands
@@ -659,7 +629,7 @@ ALTER TABLE ONLY public.blocks_user_commands
 
 
 --
--- Name: blocks_user_commands blocks_user_commands_user_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: blocks_user_commands blocks_user_commands_user_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.blocks_user_commands
@@ -667,7 +637,7 @@ ALTER TABLE ONLY public.blocks_user_commands
 
 
 --
--- Name: internal_commands internal_commands_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: internal_commands internal_commands_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.internal_commands
@@ -675,7 +645,7 @@ ALTER TABLE ONLY public.internal_commands
 
 
 --
--- Name: user_commands user_commands_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: user_commands user_commands_fee_payer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands
@@ -683,7 +653,7 @@ ALTER TABLE ONLY public.user_commands
 
 
 --
--- Name: user_commands user_commands_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: user_commands user_commands_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands
@@ -691,7 +661,7 @@ ALTER TABLE ONLY public.user_commands
 
 
 --
--- Name: user_commands user_commands_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: steck
+-- Name: user_commands user_commands_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_commands
@@ -701,3 +671,4 @@ ALTER TABLE ONLY public.user_commands
 --
 -- PostgreSQL database dump complete
 --
+
