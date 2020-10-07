@@ -1,6 +1,40 @@
 module Styles = {
   open Css;
 
+  let section =
+    style([
+      width(`percent(100.)),
+      maxWidth(`rem(71.)),
+      margin2(~v=`auto, ~h=`auto),
+      paddingTop(`rem(3.)),
+      backgroundPosition(`rem(-6.5), `rem(-2.)),
+      gridTemplateColumns([`em(14.), `auto]),
+      selector("> aside", [gridColumnStart(1)]),
+      selector("> :not(aside)", [gridColumnStart(2)]),
+      selector("> img", [width(`percent(100.))]),
+      media(Theme.MediaQuery.desktop, [paddingLeft(`rem(16.))]),
+    ]);
+
+  let sideNav = sticky =>
+    style([
+      display(`none),
+      position(sticky ? `fixed : `absolute),
+      top(sticky ? `rem(3.5) : `rem(66.)),
+      marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
+      width(`rem(14.)),
+      zIndex(100),
+      background(white),
+      media(Theme.MediaQuery.desktop, [display(`block)]),
+    ]);
+
+  let divider =
+    style([
+      maxWidth(`rem(71.)),
+      margin2(~v=`zero, ~h=`auto),
+      height(`px(1)),
+      backgroundColor(Theme.Colors.digitalBlack),
+    ]);
+
   let typesOfGrantsImage =
     style([
       important(backgroundSize(`cover)),
@@ -93,6 +127,63 @@ module Styles = {
         [flexDirection(`row), alignItems(`center)],
       ),
     ]);
+
+  let faqList =
+    style([
+      marginLeft(`rem(2.)),
+      selector("li", [marginTop(`rem(1.))]),
+    ]);
+};
+
+module GrantsSideNav = {
+  [@react.component]
+  let make = () => {
+    let router = Next.Router.useRouter();
+    let hashExp = Js.Re.fromString("#(.+)");
+    let scrollTop = Hooks.useScroll();
+    let calcHash = path =>
+      Js.Re.(exec_(hashExp, path) |> Option.map(captures))
+      |> Js.Option.andThen((. res) => Js.Nullable.toOption(res[0]))
+      |> Js.Option.getWithDefault("");
+    let (hash, setHash) = React.useState(() => calcHash(router.asPath));
+
+    React.useEffect(() => {
+      let handleRouteChange = url => setHash(_ => calcHash(url));
+      router.events
+      ->Next.Router.Events.on("hashChangeStart", handleRouteChange);
+      Some(
+        () =>
+          router.events
+          ->Next.Router.Events.off("hashChangeStart", handleRouteChange),
+      );
+    });
+
+    <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
+      <SideNav.Item title="Product / Front-end Projects" slug="#" />
+      <SideNav.Item title="Protocol Projects" slug="#" />
+      <SideNav.Item
+        title="Opening Marketing and Community Projects"
+        slug="#"
+      />
+      <SideNav.Item title="How to Apply" slug="#" />
+      <SideNav.Item title="Contributers" slug="#" />
+      <SideNav.Item title="FAQ" slug="#faq" />
+    </SideNav>;
+  };
+};
+
+module Section = {
+  [@react.component]
+  let make = (~title, ~subhead, ~slug, ~children) => {
+    <section className=Styles.section id=slug>
+      <h2 className=Theme.Type.h2> {React.string(title)} </h2>
+      <Spacer height=1.5 />
+      <p className=Theme.Type.sectionSubhead> {React.string(subhead)} </p>
+      <Spacer height=4. />
+      children
+      <Spacer height=6.5 />
+    </section>;
+  };
 };
 
 module TypesOfGrants = {
@@ -159,6 +250,108 @@ module GrantRow = {
   };
 };
 
+module FAQ = {
+  module FAQRow = {
+    [@react.component]
+    let make = (~title, ~children) => {
+      <div>
+        <Spacer height=3.5 />
+        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
+        <Spacer height=1. />
+        children
+      </div>;
+    };
+  };
+  [@react.component]
+  let make = () => {
+    <Wrapped>
+      <Section title="General Questions" subhead="" slug="FAQ">
+        <hr className=Styles.divider />
+        <div>
+          <FAQRow
+            title="Where do I begin if I want to understand how Coda works?">
+            <Spacer height=1. />
+            <span className=Theme.Type.paragraph>
+              <span> {React.string("Visit ")} </span>
+              <Next.Link href="/docs">
+                <span className=Theme.Type.link>
+                  {React.string("the Mina Docs")}
+                </span>
+              </Next.Link>
+            </span>
+          </FAQRow>
+          <FAQRow title="Can teams apply?">
+            <Spacer height=1. />
+            <span className=Theme.Type.paragraph>
+              <span>
+                {React.string(
+                   "Yes, both individuals and teams are eligible to apply.",
+                 )}
+              </span>
+            </span>
+          </FAQRow>
+          <FAQRow
+            title="How do I increase my chance of getting selected for a grant?">
+            <Spacer height=1. />
+            <span className=Theme.Type.paragraph>
+              <span> {React.string("See the ")} </span>
+              <Next.Link href="/">
+                <span className=Theme.Type.link>
+                  {React.string("Application Process ")}
+                </span>
+              </Next.Link>
+              <span>
+                {React.string(
+                   "section for selection criteria. Please also reach out to us if you have any unique skills that don't apply to current projects. You can also start ",
+                 )}
+              </span>
+              <Next.Link href="/">
+                <span className=Theme.Type.link>
+                  {React.string("Contributing code to Mina ")}
+                </span>
+              </Next.Link>
+              <span>
+                {React.string(
+                   "-- grants will give precedence to previous contributors.",
+                 )}
+              </span>
+            </span>
+          </FAQRow>
+          <FAQRow title="What is expected of me, if I receive a grant?">
+            <Spacer height=1. />
+            <span className=Theme.Type.paragraph>
+              <span> {React.string("We expect grant recipients to:")} </span>
+              <ul className=Styles.faqList>
+                <li>
+                  {React.string(
+                     "Communicate effectively and create a tight feedback loop",
+                   )}
+                </li>
+                <li> {React.string("Meet project milestones")} </li>
+                <li>
+                  {React.string(
+                     "Serve as ambassadors of Mina in the larger crypto community",
+                   )}
+                </li>
+              </ul>
+            </span>
+          </FAQRow>
+          <FAQRow title="Where do I go if I need help?">
+            <Spacer height=1. />
+            <span className=Theme.Type.paragraph>
+              <span>
+                {React.string(
+                   "Join the Mina Discord channel or reach out to grants[at]o1labs[dot]org to get help.",
+                 )}
+              </span>
+            </span>
+          </FAQRow>
+        </div>
+      </Section>
+    </Wrapped>;
+  };
+};
+
 [@react.component]
 let make = () => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -185,5 +378,7 @@ let make = () => {
       buttonUrl="/docs"
     />
     <TypesOfGrants />
+    <GrantsSideNav />
+    <FAQ />
   </Page>;
 };
