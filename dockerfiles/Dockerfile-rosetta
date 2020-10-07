@@ -317,7 +317,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 # all s3-cached files will be downloaded as needed at runtime
 
 # Uncomment these to optimize start up time at the expense of image size
-# COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
+COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
 COPY --from=builder /tmp/mina_cache_dir /tmp/mina_cache_dir
 
 # Set up mina config dir with demo mode keys and genesis
