@@ -56,7 +56,7 @@ module FetchBlogs = Fetch(ContentType.BlogPost);
 module FetchPress = Fetch(ContentType.Press);
 
 [@react.component]
-let make = (~source) => {
+let make = (~source, ~title="In the News") => {
   let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
@@ -83,7 +83,7 @@ let make = (~source) => {
   <div className=Styles.container>
     <Wrapped>
       <Title
-        copy="In the News"
+        copy=title
         buttonCopy="See All Press"
         buttonHref={`Internal("/blog")}
       />
