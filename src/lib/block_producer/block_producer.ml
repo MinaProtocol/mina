@@ -686,9 +686,7 @@ let scheduled_time_to_yojson time =
        time)
 
 type precomputed_block =
-  { scheduled_time:
-      (Core_kernel.Time.Stable.With_utc_sexp.V2.t[@to_yojson
-                                                   scheduled_time_to_yojson])
+  { scheduled_time: Time.t
   ; protocol_state: Protocol_state.value
   ; protocol_state_proof: Proof.t
   ; staged_ledger_diff: Staged_ledger_diff.t
@@ -718,7 +716,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         let crumb = Transition_frontier.best_tip frontier in
         [%log trace]
           ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-          "Producing new block with parent $breadcrumb%!" ;
+          "Emitting precomputed block with parent $breadcrumb%!" ;
         let previous_protocol_state =
           let transition : External_transition.Validated.t =
             Breadcrumb.validated_transition crumb
@@ -922,8 +920,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       match precomputed_blocks with
       | precomputed_block :: precomputed_blocks ->
           Block_time.Controller.set_time_offset
-            (Core_kernel.Time.diff (Core_kernel.Time.now ())
-               precomputed_block.scheduled_time) ;
+            (Core_kernel.Time.diff
+               (Block_time.to_time precomputed_block.scheduled_time)
+               (Core_kernel.Time.now ())) ;
           let%bind () = produce precomputed_block in
           emit_next_block precomputed_blocks
       | [] ->
