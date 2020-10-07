@@ -63,7 +63,7 @@ Pipeline.build
       let puppeteeredSpec = DockerArtifact.ReleaseSpec::{
         deps=dependsOn,
         service="\\\${CODA_SERVICE}-puppeteered",
-        extra_args="--build-arg coda_deb_version='\\\${CODA_DEB_VERSION}' --build-arg CODA_VERSION='\\\${CODA_VERSION}' --build-arg CODA_BRANCH='\\\${CODA_GIT_BRANCH}' --build-arg deb_repo='\\\${CODA_DEB_REPO}'",
+        extra_args="--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg CODA_BRANCH=\\\${CODA_GIT_BRANCH} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
         step_key="puppeteered-docker-artifact"
       }
 
@@ -75,7 +75,7 @@ Pipeline.build
       let rosettaSpec = DockerArtifact.ReleaseSpec::{
         deps=dependsOn,
         service="coda-rosetta",
-        extra_args="--build-arg MINA_BRANCH='\\\${CODA_GIT_BRANCH}' --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-docker-artifact"
       }
 
@@ -88,7 +88,7 @@ Pipeline.build
         deps=dependsOn,
         service="coda-rosetta",
         version="dev-\\\${CODA_VERSION}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH='\\\${CODA_GIT_BRANCH}' --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-dune-docker-artifact"
       }
 

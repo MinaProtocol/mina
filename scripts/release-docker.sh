@@ -31,7 +31,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
-  --extra-args) EXTRA="${@:2}"; shift $((${#}-1));;
+  --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   --no-upload) NOUPLOAD=1;shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
