@@ -103,6 +103,28 @@ let get_tokens_graphql =
          Array.iter response#accounts ~f:(fun account ->
              printf "%s " (Token_id.to_string account#token) ) ))
 
+let get_time_offset_graphql =
+  Command.async
+    ~summary:
+      "Get the time offset used by the daemon to convert real time into \
+       blockchain time"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Time_offset.make ())
+             graphql_endpoint
+         in
+         let time_offset = response#timeOffset in
+         printf
+           "Current time offset:\n\
+            %i\n\n\
+            Start other daemons with this offset by setting the \
+            CODA_TIME_OFFSET environment variable in the shell before \
+            executing them:\n\
+            export CODA_TIME_OFFSET=%i\n"
+           time_offset time_offset ))
+
 let print_trust_statuses statuses json =
   if json then
     printf "%s\n"
@@ -1674,4 +1696,5 @@ let advanced =
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("next-available-token", next_available_token_cmd) ]
+    ; ("next-available-token", next_available_token_cmd)
+    ; ("time-offset", get_time_offset_graphql) ]
