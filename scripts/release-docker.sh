@@ -30,7 +30,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
-  --extra-args) EXTRA="${@:2}"; shift $((${#}-1));;
+  --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   --no-upload) NOUPLOAD=1;shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -75,10 +75,11 @@ leaderboard)
 esac
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
+extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
-cat $DOCKERFILE_PATH | docker build $EXTRA -t codaprotocol/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $extra_build_args -t codaprotocol/$SERVICE:$VERSION -
 else
-docker build $EXTRA $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $extra_build_args $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {
