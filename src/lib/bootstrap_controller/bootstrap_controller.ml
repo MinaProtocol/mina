@@ -78,7 +78,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
     peer_root =
   let%bind () =
     Trust_system.(
-      record t.trust_system t.logger (fst sender)
+      record t.trust_system t.logger sender
         Actions.
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
@@ -112,8 +112,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
-    ~genesis_constants (candidate_transition : External_transition.t) =
+let on_transition t ~sender ~root_sync_ledger ~genesis_constants
+    (candidate_transition : External_transition.t) =
   let candidate_state =
     External_transition.consensus_state candidate_transition
   in
@@ -121,7 +121,8 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     Deferred.return `Ignored
   else
     match%bind
-      Coda_networking.get_ancestry t.network peer_id candidate_state
+      Coda_networking.get_ancestry t.network sender.Peer.peer_id
+        candidate_state
     with
     | Error e ->
         [%log' error t.logger]
@@ -138,10 +139,10 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
             else
-              start_sync_job_with_peer ~sender:(host, peer_id)
-                ~root_sync_ledger t best_tip root
+              start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip
+                root
         | Error e ->
-            return (received_bad_proof t host e |> Fn.const `Ignored) )
+            return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
 let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
     ~genesis_constants =
@@ -225,10 +226,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Transition_frontier.Persistent_root.Instance.snarked_ledger
         temp_persistent_root_instance
     in
-    let%bind ( sync_ledger_time
-             , ( hash
-               , (sender_host, sender_peer_id)
-               , expected_staged_ledger_hash ) ) =
+    let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
       time_deferred
         (let root_sync_ledger =
            Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
@@ -251,7 +249,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                , staged_ledger_data_download_result ) =
         time_deferred
           (Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-             t.network sender_peer_id hash)
+             t.network sender.peer_id hash)
       in
       match staged_ledger_data_download_result with
       | Error err ->
@@ -353,7 +351,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     | Error e ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender_host
+            record t.trust_system t.logger sender
               Actions.
                 ( Outgoing_connection_error
                 , Some
@@ -383,7 +381,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender_host
+            record t.trust_system t.logger sender
               Actions.
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))
@@ -422,9 +420,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                       let%map peers =
                         Coda_networking.random_peers t.network n
                       in
-                      Network_peer.Peer.create sender_host ~libp2p_port:0
-                        ~peer_id:sender_peer_id
-                      :: peers )
+                      sender :: peers )
                     ~query_peer:
                       { Consensus.Hooks.Rpcs.query=
                           (fun peer rpc query ->
@@ -576,9 +572,7 @@ let%test_module "Bootstrap_controller tests" =
         |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition
-        ~sender:
-          (Envelope.Sender.Remote
-             (sender.Network_peer.Peer.host, sender.peer_id))
+        ~sender:(Envelope.Sender.Remote sender)
 
     let downcast_breadcrumb ~sender breadcrumb =
       downcast_transition ~sender
@@ -754,9 +748,7 @@ let%test_module "Bootstrap_controller tests" =
               ( Transition_frontier.best_tip peer_net.state.frontier
               |> Transition_frontier.Breadcrumb.validated_transition
               |> External_transition.Validated.to_initial_validated )
-            ~sender:
-              (Envelope.Sender.Remote
-                 (peer_net.peer.host, peer_net.peer.peer_id))
+            ~sender:(Envelope.Sender.Remote peer_net.peer)
           |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
