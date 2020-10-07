@@ -93,7 +93,7 @@ module Rpcs : sig
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash: State_hash.Stable.V1.t
             ; ban_statuses:
-                ( Core.Unix.Inet_addr.Stable.V1.t
+                ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes: State_hash.Stable.V1.t list }
@@ -256,6 +256,11 @@ val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
+
+val connection_gating_config : t -> Coda_net2.connection_gating Deferred.t
+
+val set_connection_gating_config :
+  t -> Coda_net2.connection_gating -> Coda_net2.connection_gating Deferred.t
 
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t

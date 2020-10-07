@@ -4,6 +4,7 @@ module Styles = {
       (
         bgColor,
         borderColor,
+        textColor,
         dark,
         buttonHeight,
         buttonWidth,
@@ -52,7 +53,12 @@ module Styles = {
         ]),
         color(
           {
-            bgColor === Theme.Colors.white ? Theme.Colors.digitalBlack : white;
+            switch (textColor) {
+            | Some(textColor) => textColor
+            | None =>
+              bgColor === Theme.Colors.white
+                ? Theme.Colors.digitalBlack : white
+            };
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
@@ -60,7 +66,7 @@ module Styles = {
         hover([
           color(white),
           after([
-            border(`zero, `solid, `rgba(0, 0, 0, 0.)),
+            border(`zero, `solid, `rgba((0, 0, 0, 0.))),
             transform(translate(`rem(-0.25), `rem(-0.25))),
           ]),
           backgrounds([
@@ -81,10 +87,10 @@ module Link = {
   let make = (~href, ~children) => {
     switch (href) {
     | `Scroll_to_top => <Next.Link href=""> children </Next.Link>
-    | `External(href) => <a className=Css.(style([textDecoration(`none)])) href> children </a>
-    | `Internal(href) =>
-      <Next.Link href> children </Next.Link>
-    }
+    | `External(href) =>
+      <a className=Css.(style([textDecoration(`none)])) href> children </a>
+    | `Internal(href) => <Next.Link href> children </Next.Link>
+    };
   };
 };
 
@@ -100,6 +106,7 @@ let make =
       ~height=`rem(3.25),
       ~width=`rem(10.9),
       ~borderColor=Theme.Colors.black,
+      ~textColor=?,
       ~paddingX=1.5,
       ~paddingY=0.,
       ~bgColor=Theme.Colors.orange,
@@ -112,6 +119,7 @@ let make =
       className={Styles.button(
         bgColor,
         borderColor,
+        textColor,
         dark,
         height,
         width,

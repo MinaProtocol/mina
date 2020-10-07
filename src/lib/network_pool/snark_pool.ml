@@ -803,8 +803,11 @@ let%test_module "random set test" =
       in
       let fake_sender =
         Envelope.Sender.Remote
-          ( Unix.Inet_addr.of_string "1.2.4.8"
-          , Peer.Id.unsafe_of_string "contents should be irrelevant" )
+          (Peer.create
+             (Unix.Inet_addr.of_string "1.2.3.4")
+             ~peer_id:
+               (Peer.Id.unsafe_of_string "contents should be irrelevant")
+             ~libp2p_port:8302)
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in

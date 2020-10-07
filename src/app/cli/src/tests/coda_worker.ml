@@ -516,6 +516,7 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
+              ; isolate= false
               ; trust_system
               ; flooding= false
               ; direct_peers= []

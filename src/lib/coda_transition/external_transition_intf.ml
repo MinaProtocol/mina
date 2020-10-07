@@ -526,7 +526,7 @@ module type S = sig
            , 'staged_ledger_diff
            , 'protocol_versions )
            Validation.with_transition
-         , [ `Already_in_frontier
+         , [> `Already_in_frontier
            | `Parent_missing_from_frontier
            | `Not_selected_over_frontier_root ] )
          Result.t

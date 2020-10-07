@@ -231,6 +231,12 @@ let daemon logger =
             to/from. These peers should also have you configured as a direct \
             peer, the relationship is intended to be symmetric"
          (listed string)
+     and isolate =
+       flag "isolate-network"
+         ~doc:
+           "true|false Only allow connections to the peers passed on the \
+            command line or configured through GraphQL. (default: false)"
+         (optional bool)
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -266,6 +272,8 @@ let daemon logger =
          ~doc:"full|check|none"
      and plugins = plugin_flag in
      fun () ->
+       (* Immediately disable updating the time offset. *)
+       Block_time.Controller.disable_setting_offset () ;
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
@@ -772,6 +780,7 @@ let daemon logger =
              ; flooding= Option.value ~default:false enable_flooding
              ; direct_peers
              ; peer_exchange= Option.value ~default:false peer_exchange
+             ; isolate= Option.value ~default:false isolate
              ; keypair= libp2p_keypair }
          in
          let net_config =
