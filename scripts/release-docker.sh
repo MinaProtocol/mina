@@ -47,13 +47,12 @@ if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
-coda-archive)
-  DOCKERFILE_PATH="scripts/archive/Dockerfile"
-  DOCKER_CONTEXT="scripts/archive"
-  ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
+  ;;
+coda-archive)
+  DOCKERFILE_PATH="scripts/archive/Dockerfile"
   ;;
 coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
@@ -65,6 +64,11 @@ coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   ;;
 coda-rosetta)
+  if [[ "$BUILD_ROSETTA" != "true" ]]; then
+    echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
+    exit 0
+  fi
+
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   ;;
 leaderboard)
