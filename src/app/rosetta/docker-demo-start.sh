@@ -55,6 +55,7 @@ echo "========================= STARTING DAEMON ==========================="
   -block-producer-key "$CODA_CONFIG_DIR/wallets/store/$PK" \
   -config-dir "$CODA_CONFIG_DIR" \
   -config-file "$CODA_CONFIG_DIR/daemon.json" \
+  -genesis-ledger-dir "$CODA_CONFIG_DIR/demo-genesis" \
   -demo-mode \
   -disable-telemetry \
   -external-ip 127.0.0.1 \
