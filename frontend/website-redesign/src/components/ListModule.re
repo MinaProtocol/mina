@@ -28,7 +28,7 @@ module Styles = {
 
   let link =
     merge([
-      Theme.Type.link,
+      Theme.Type.buttonLink,
       style([
         display(`flex),
         alignItems(`center),
@@ -60,10 +60,7 @@ module MainListing = {
         selector("img", [marginTop(`rem(1.))]),
       ]);
 
-    let anchor =
-      style([
-        textDecoration(`none)
-      ]);
+    let anchor = style([textDecoration(`none)]);
   };
 
   [@react.component]
@@ -80,26 +77,26 @@ module MainListing = {
         <span> {React.string(item.publisher)} </span>
       </div>
       {ReactExt.fromOpt(item.image, ~f=src =>
-        <img src=src.ContentType.System.fields.ContentType.Image.file.url />)}
+         <img src={src.ContentType.System.fields.ContentType.Image.file.url} />
+       )}
       <article>
         <h5 className=Styles.title> {React.string(item.title)} </h5>
         {ReactExt.fromOpt(item.description, ~f=copy =>
-          <p className=Styles.description> {React.string(copy)} </p>)}
+           <p className=Styles.description> {React.string(copy)} </p>
+         )}
       </article>
       {let inner =
-        <div className=Styles.link>
-          <span> {React.string("Read more")} </span>
-          <Icon kind=Icon.ArrowRightMedium />
-        </div>;
-        switch (item.link) {
+         <div className=Styles.link>
+           <span> {React.string("Read more")} </span>
+           <Icon kind=Icon.ArrowRightMedium />
+         </div>;
+       switch (item.link) {
        | `Slug(slug) =>
-        <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
-          {inner}
-        </Next.Link>
+         <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
+           inner
+         </Next.Link>
        | `Remote(href) =>
-        <a className=MainListingStyles.anchor href>
-          {inner}
-        </a>
+         <a className=MainListingStyles.anchor href> inner </a>
        }}
     </div>;
   };
@@ -128,20 +125,18 @@ module Listing = {
   let make = (~items, ~itemKind) => {
     let button = (item: ContentType.NormalizedPressBlog.t) => {
       let inner =
-          <div className=ListingStyles.link>
-            <span> {React.string("Read more")} </span>
-            <Icon kind=Icon.ArrowRightMedium />
-          </div>;
-          switch (item.link) {
-         | `Slug(slug) =>
-          <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
-            {inner}
-          </Next.Link>
-         | `Remote(href) =>
-          <a className=MainListing.MainListingStyles.anchor href>
-            {inner}
-          </a>
-         }
+        <div className=ListingStyles.link>
+          <span> {React.string("Read more")} </span>
+          <Icon kind=Icon.ArrowRightMedium />
+        </div>;
+      switch (item.link) {
+      | `Slug(slug) =>
+        <Next.Link href="/blog/[slug]" _as={"/blog/" ++ slug} passHref=true>
+          inner
+        </Next.Link>
+      | `Remote(href) =>
+        <a className=MainListing.MainListingStyles.anchor href> inner </a>
+      };
     };
 
     items
@@ -158,8 +153,8 @@ module Listing = {
              <span> {React.string(item.publisher)} </span>
            </div>
            <h5 className=Styles.title> {React.string(item.title)} </h5>
-           { button(item) }
-          </div>
+           {button(item)}
+         </div>
        })
     |> React.array;
   };
