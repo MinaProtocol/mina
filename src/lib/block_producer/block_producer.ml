@@ -820,9 +820,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  transition frontier" ;
               return ()
           | `Timed_out ->
-              (* FIXME #3167: this should be fatal, and more
-                           importantly, shouldn't happen.
-                        *)
+              (* FIXME #3167: this should be fatal, and more importantly,
+                 shouldn't happen.
+              *)
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \
@@ -883,8 +883,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  (Error.to_string_hum e))
         | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
             (* Unexpected errors from staged_ledger are captured in
-                         `Fatal_error
-                      *)
+               `Fatal_error
+            *)
             [%log error]
               ~metadata:
                 [ ("error", `String (Error.to_string_hum e))
