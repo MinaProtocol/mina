@@ -25,6 +25,11 @@ module Time : sig
         variable for all block time controllers.
     *)
     val set_time_offset : Time.Span.t -> unit
+
+    (** Disallow setting the time offset. This should be run at every
+        entrypoint which does not explicitly need to update the time offset.
+    *)
+    val disable_setting_offset : unit -> unit
   end
 
   [%%versioned:
