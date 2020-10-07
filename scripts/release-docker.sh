@@ -27,11 +27,12 @@ function usage() {
 }
 
 while [[ "$#" -gt 0 ]]; do case $1 in
+  --build-rosetta) BUILD_ROSETTA=true;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
+  --no-upload) NOUPLOAD=1;;
   --extra-args) EXTRA="${@:2}"; shift $((${#}-1));;
-  --no-upload) NOUPLOAD=1;shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -64,6 +65,10 @@ coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   ;;
 coda-rosetta)
+  if [[ "$BUILD_ROSETTA" != "true" ]]; then
+    echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
+    exit 0
+  fi
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   ;;
 leaderboard)
@@ -72,6 +77,7 @@ leaderboard)
   ;;
 *)
 esac
+
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [ -z "$DOCKER_CONTEXT" ]; then
