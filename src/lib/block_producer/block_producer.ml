@@ -680,11 +680,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )
 
-let scheduled_time_to_yojson time =
-  `String
-    (Core_kernel.Time.to_string_iso8601_basic ~zone:Core_kernel.Time.Zone.utc
-       time)
-
 type precomputed_block =
   { scheduled_time: Time.t
   ; protocol_state: Protocol_state.value
