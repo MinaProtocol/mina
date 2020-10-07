@@ -8,12 +8,32 @@ set -euo pipefail
 # Set up variables for build
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
+<<<<<<< HEAD
 cd "${SCRIPTPATH}/../.."
 
 # Load in env vars for githash/branch/etc.
 source "./buildkite/scripts/export-git-env-vars.sh"
+||||||| b7eeee4b3
+GIT_HASH=$(git rev-parse --short=7 HEAD)
+GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GIT_TAG=$(git describe --abbrev=0)
 
 PROJECT="coda-archive"
+=======
+PROJECT="coda-archive"
+>>>>>>> origin/buildkite/artifact_release_refactor
+
+<<<<<<< HEAD
+PROJECT="coda-archive"
+||||||| b7eeee4b3
+if [ "$GIT_BRANCH" == "master" ]; then
+    VERSION="${GIT_TAG}"
+else
+    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
+fi
+=======
+source ".././buildkite/scripts/export-git-env-vars.sh"
+>>>>>>> origin/buildkite/artifact_release_refactor
 
 BUILD_DIR="deb_build"
 
@@ -93,8 +113,16 @@ fi
 if [ -n "${BUILDKITE+x}" ]; then
     set -x
     # Export variables for use with downstream steps
+<<<<<<< HEAD
     echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+||||||| b7eeee4b3
+    echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+=======
+    echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+>>>>>>> origin/buildkite/artifact_release_refactor
     echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
