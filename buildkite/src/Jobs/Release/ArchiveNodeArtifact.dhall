@@ -47,7 +47,7 @@ Pipeline.build
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*.deb" ]
+          artifact_paths = [ S.contains "./*.deb" ]
         },
       DockerArtifact.generateStep spec
     ]
