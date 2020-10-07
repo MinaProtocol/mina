@@ -102,7 +102,7 @@ if [ -n "${BUILDKITE+x}" ]; then
     echo "export CODA_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_GIT_HASH=${GIT_HASH}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
     set +x
 else
