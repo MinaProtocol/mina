@@ -63,6 +63,8 @@ module Time = struct
           time_offset := Some offset ;
           offset
 
+    let get_time_offset ~logger = basic ~logger ()
+
     [%%else]
 
     type t = unit [@@deriving sexp]
@@ -72,6 +74,8 @@ module Time = struct
     let basic ~logger:_ = ()
 
     let set_time_offset _ = failwith "Cannot mutate the time offset"
+
+    let get_time_offset _ = Core_kernel.Time.Span.of_int_sec 0
 
     [%%endif]
   end

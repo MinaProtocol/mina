@@ -25,6 +25,11 @@ module Time : sig
         variable for all block time controllers.
     *)
     val set_time_offset : Time.Span.t -> unit
+
+    (** Get the current time offset, either from the [CODA_TIME_OFFSET]
+        environment variable, or as last set by [set_time_offset].
+    *)
+    val get_time_offset : logger:Logger.t -> Time.Span.t
   end
 
   [%%versioned:
