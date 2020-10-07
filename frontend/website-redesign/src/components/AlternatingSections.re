@@ -49,7 +49,6 @@ module Section = {
         justifyContent(`center),
         marginLeft(`rem(0.5)),
         marginTop(`rem(0.2)),
-        color(Theme.Colors.orange),
       ]);
 
     let image =
@@ -133,16 +132,6 @@ module Section = {
 
     module Styles = {
       open Css;
-      let linkText =
-        merge([
-          Theme.Type.link,
-          style([
-            marginTop(`rem(1.5)),
-            display(`flex),
-            alignItems(`center),
-            cursor(`pointer),
-          ]),
-        ]);
 
       let seperator = seperatorNumber =>
         style([
@@ -182,10 +171,13 @@ module Section = {
                  {React.string(row.description)}
                </p>
                <Next.Link href={row.linkUrl}>
-                 <span className=Styles.linkText>
-                   <span> {React.string(row.linkCopy)} </span>
-                   <span className=SectionStyles.icon>
-                     <Icon kind=Icon.ArrowRightMedium />
+                 <span>
+                   <Spacer height=1. />
+                   <span className=Theme.Type.buttonLink>
+                     <span> {React.string(row.linkCopy)} </span>
+                     <span className=SectionStyles.icon>
+                       <Icon kind=Icon.ArrowRightMedium />
+                     </span>
                    </span>
                  </span>
                </Next.Link>

@@ -28,7 +28,7 @@ module Styles = {
 
   let link =
     merge([
-      Theme.Type.link,
+      Theme.Type.buttonLink,
       style([
         display(`flex),
         alignItems(`center),
