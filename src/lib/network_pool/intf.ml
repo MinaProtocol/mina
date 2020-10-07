@@ -125,6 +125,12 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
+  module Broadcast_callback : sig
+    type t =
+      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+      | External of (Coda_net2.validation_result -> unit)
+  end
+
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -163,8 +169,7 @@ module type Network_pool_base_intf = sig
   val apply_and_broadcast :
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
-    -> (Coda_net2.validation_result -> unit)
-       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    -> Broadcast_callback.t
     -> unit Deferred.t
 end
 
