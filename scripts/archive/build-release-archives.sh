@@ -9,10 +9,9 @@ set -euo pipefail
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../.."
 
-PROJECT="coda-archive"
-
 source "buildkite/scripts/export-git-env-vars.sh"
 
+PROJECT="coda-archive"
 BUILD_DIR="deb_build"
 
 mkdir -p "${BUILD_DIR}/DEBIAN"
