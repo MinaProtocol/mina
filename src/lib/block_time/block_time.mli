@@ -29,6 +29,11 @@ module Time : sig
     *)
     val set_time_offset : Time.Span.t -> unit
 
+    (** Get the current time offset, either from the [CODA_TIME_OFFSET]
+        environment variable, or as last set by [set_time_offset].
+    *)
+    val get_time_offset : logger:Logger.t -> Time.Span.t
+
     (** Disallow setting the time offset. This should be run at every
         entrypoint which does not explicitly need to update the time offset.
     *)
