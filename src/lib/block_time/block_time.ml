@@ -38,7 +38,13 @@ module Time = struct
 
     let time_offset = ref None
 
-    let set_time_offset offset = time_offset := Some offset
+    let setting_enabled = ref true
+
+    let disable_setting_offset () = setting_enabled := false
+
+    let set_time_offset offset =
+      if !setting_enabled then time_offset := Some offset
+      else failwith "Cannot mutate the time offset"
 
     let create offset = offset
 
@@ -72,6 +78,8 @@ module Time = struct
     let create () = ()
 
     let basic ~logger:_ = ()
+
+    let disable_setting_offset () = ()
 
     let set_time_offset _ = failwith "Cannot mutate the time offset"
 

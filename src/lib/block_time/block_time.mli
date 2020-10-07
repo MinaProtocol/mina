@@ -30,6 +30,11 @@ module Time : sig
         environment variable, or as last set by [set_time_offset].
     *)
     val get_time_offset : logger:Logger.t -> Time.Span.t
+
+    (** Disallow setting the time offset. This should be run at every
+        entrypoint which does not explicitly need to update the time offset.
+    *)
+    val disable_setting_offset : unit -> unit
   end
 
   [%%versioned:
