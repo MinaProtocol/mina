@@ -18,7 +18,6 @@ let spec = DockerArtifact.ReleaseSpec::{
     deps=dependsOn,
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
     service="coda-archive",
-    extra_args="--build-arg coda_deb_version='\\\${CODA_DEB_VERSION}' --build-arg deb_repo='\\\${CODA_DEB_REPO}'",
     step_key="archive-docker-artifact"
 }
 

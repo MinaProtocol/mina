@@ -11,7 +11,9 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../.."
 
 # Load in env vars for githash/branch/etc.
-source "./buildkite/scripts/export-git-env-vars.sh"
+source "buildkite/scripts/export-git-env-vars.sh"
+
+PROJECT="coda-archive"
 
 BUILD_DIR="deb_build"
 
