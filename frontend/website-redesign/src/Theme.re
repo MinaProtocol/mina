@@ -201,6 +201,8 @@ module Type = {
       lineHeight(`rem(1.7)),
       textDecoration(`none),
       cursor(`pointer),
+      display(`flex),
+      alignItems(`center),
       unsafe("width", "fit-content"),
       padding2(~h=`zero, ~v=`rem(0.5)),
       hover([
