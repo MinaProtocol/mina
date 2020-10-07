@@ -22,7 +22,7 @@ let make = (~statusCode="404") => {
         borderColor=Theme.Colors.mint
         textColor=Theme.Colors.digitalBlack>
         {React.string("Home")}
-        <Icon kind=Icon.ArrowRightMedium />
+        <Icon kind=Icon.ArrowRightMedium size=1. />
       </Button>
     </Hero>
   </Page>;
