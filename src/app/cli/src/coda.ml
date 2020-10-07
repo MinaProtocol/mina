@@ -222,7 +222,7 @@ let daemon logger =
        flag "enable-peer-exchange"
          ~doc:
            "true|false Help keep the mesh connected when closing connections \
-            (default: true)"
+            (default: false)"
          (optional bool)
      and direct_peers_raw =
        flag "direct-peer"
@@ -771,7 +771,7 @@ let daemon logger =
              ; trust_system
              ; flooding= Option.value ~default:false enable_flooding
              ; direct_peers
-             ; peer_exchange= Option.value ~default:true peer_exchange
+             ; peer_exchange= Option.value ~default:false peer_exchange
              ; keypair= libp2p_keypair }
          in
          let net_config =
