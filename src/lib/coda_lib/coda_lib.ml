@@ -744,6 +744,18 @@ let start t =
     ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
+let start_with_precomputed_blocks t blocks =
+  let%bind () =
+    Block_producer.run_precomputed ~logger:t.config.logger
+      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~time_controller:t.config.time_controller
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~precomputed_values:t.config.precomputed_values
+      ~precomputed_blocks:blocks
+  in
+  start t
+
 let create (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
