@@ -905,7 +905,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                 [ ("error", `String (Error.to_string_hum e))
                 ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
               !"Unable to build breadcrumb from produced transition due to \
-                invlaid staged ledger diff: $error" ;
+                invalid staged ledger diff: $error" ;
             return () )
   in
   let rec emit_next_block precomputed_blocks =
