@@ -744,14 +744,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  tf root" ) ;
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
-          let t0 = Time.now time_controller in
           let protocol_state_proof = precomputed_block.protocol_state_proof in
-          let span = Time.diff (Time.now time_controller) t0 in
-          [%log info]
-            ~metadata:
-              [ ( "proving_time"
-                , `Int (Time.Span.to_ms span |> Int64.to_int_exn) ) ]
-            !"Protocol_state_proof proving time(ms): $proving_time%!" ;
           let staged_ledger_diff = precomputed_block.staged_ledger_diff in
           let transition_hash = Protocol_state.hash protocol_state in
           let previous_state_hash =
