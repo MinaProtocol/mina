@@ -17,8 +17,6 @@ let dependsOn = [ { name = "ArchiveNodeArtifact", key = "archive-artifacts-build
 let spec = DockerArtifact.ReleaseSpec::{
     deps=dependsOn,
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
-    service="archive-node",
-    extra_args="--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
     step_key="archive-docker-artifact"
 }
 
@@ -47,7 +45,7 @@ Pipeline.build
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*.deb" ]
+          artifact_paths = [ S.contains "./*.deb" ]
         },
       DockerArtifact.generateStep spec
     ]

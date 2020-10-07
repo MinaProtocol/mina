@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('archive-node', 'coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
+VALID_SERVICES=('coda-archive', 'coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -47,7 +47,7 @@ if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
-archive-node)
+coda-archive)
   DOCKERFILE_PATH="scripts/archive/Dockerfile"
   DOCKER_CONTEXT="scripts/archive"
   ;;
