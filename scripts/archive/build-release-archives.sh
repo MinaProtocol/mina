@@ -7,10 +7,11 @@ set -euo pipefail
 
 # Set up variables for build
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+
 cd "${SCRIPTPATH}/../.."
 
 # Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../../buildkite/scripts/export-git-env-vars.sh"
+source "./buildkite/scripts/export-git-env-vars.sh"
 
 PROJECT="coda-archive"
 
