@@ -71,6 +71,8 @@ module Time = struct
 
     let basic ~logger:_ = ()
 
+    let set_time_offset _ = failwith "Cannot mutate the time offset"
+
     [%%endif]
   end
 
