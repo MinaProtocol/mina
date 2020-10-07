@@ -42,7 +42,7 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
-          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
+          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID} buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.XLarge,
