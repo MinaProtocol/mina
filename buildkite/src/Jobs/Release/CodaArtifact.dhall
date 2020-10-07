@@ -46,7 +46,7 @@ Pipeline.build
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*" ]
+          artifact_paths = [ S.contains "_build/*.deb" ]
         },
 
       -- daemon image
