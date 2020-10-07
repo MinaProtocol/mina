@@ -99,7 +99,7 @@ module Styles = {
 [@react.component]
 let make =
     (
-      ~title,
+      ~title=?,
       ~metadata=None,
       ~header,
       ~copy,
@@ -108,7 +108,12 @@ let make =
     ) => {
   <div className={Styles.heroContainer(background)}>
     <div className=Styles.heroContent>
-      <h4 className=Styles.headerLabel> {React.string(title)} </h4>
+      {switch (title) {
+       | Some(title) =>
+         <h4 className=Styles.headerLabel> {React.string(title)} </h4>
+
+       | None => React.null
+       }}
       {ReactExt.fromOpt(metadata, ~f=metadata =>
          <div className=Styles.categoryDateSourceContainer>
            <CategoryDateSourceText metadata />
