@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
-# we have to trustlist and configure image builds individually because each one is going to be slightly different. 
-# This is needed as opposed to trusting the structure of the each project to be consistent for every deployable. 
+# we have to trustlist and configure image builds individually because each one is going to be slightly different.
+# This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
 
 set -eo pipefail
 set +x
@@ -27,6 +27,7 @@ function usage() {
 }
 
 while [[ "$#" -gt 0 ]]; do case $1 in
+  --build-rosetta) BUILD_ROSETTA=true;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
@@ -47,6 +48,13 @@ if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
+coda-archive)
+  DOCKERFILE_PATH="scripts/archive/Dockerfile"
+  ;;
+coda-archive)
+  DOCKERFILE_PATH="scripts/archive/Dockerfile"
+  DOCKER_CONTEXT="scripts/archive"
+  ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
@@ -68,7 +76,6 @@ coda-rosetta)
     echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
     exit 0
   fi
-
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   ;;
 leaderboard)
@@ -77,6 +84,7 @@ leaderboard)
   ;;
 *)
 esac
+
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
