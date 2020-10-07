@@ -9,17 +9,10 @@ set -euo pipefail
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPT_PATH}/../.."
 
-GIT_HASH=$(git rev-parse --short=7 HEAD)
-GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GIT_TAG=$(git describe --abbrev=0)
+# Load in env vars for githash/branch/etc.
+source "${SCRIPTPATH}/../../buildkite/scripts/export-git-env-vars.sh"
 
 PROJECT="coda-archive"
-
-if [ "$GIT_BRANCH" == "master" ]; then
-    VERSION="${GIT_TAG}"
-else
-    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
-fi
 
 BUILD_DIR="deb_build"
 
@@ -67,8 +60,6 @@ ls -lh coda*.deb
 
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
-
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
