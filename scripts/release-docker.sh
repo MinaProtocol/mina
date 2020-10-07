@@ -49,7 +49,6 @@ if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then u
 case $SERVICE in
 archive-node)
   DOCKERFILE_PATH="scripts/archive/Dockerfile"
-  DOCKER_CONTEXT="scripts/archive"
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
