@@ -2775,7 +2775,9 @@ module Queries = struct
 
   let time_offset =
     field "timeOffset"
-      ~doc:"The time offset used to convert real times into blockchain times"
+      ~doc:
+        "The time offset in seconds used to convert real times into \
+         blockchain times"
       ~args:Arg.[]
       ~typ:(non_null int)
       ~resolve:(fun {ctx= coda; _} () ->

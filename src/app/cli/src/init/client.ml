@@ -106,8 +106,8 @@ let get_tokens_graphql =
 let get_time_offset_graphql =
   Command.async
     ~summary:
-      "Get the time offset used by the daemon to convert real time into \
-       blockchain time"
+      "Get the time offset in seconds used by the daemon to convert real time \
+       into blockchain time"
     (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
        ~f:(fun graphql_endpoint () ->
          let%map response =
