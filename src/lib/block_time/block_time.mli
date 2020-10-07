@@ -20,6 +20,11 @@ module Time : sig
     val create : t -> t
 
     val basic : logger:Logger.t -> t
+
+    (** Override the time offset set by the [CODA_TIME_OFFSET] environment
+        variable for all block time controllers.
+    *)
+    val set_time_offset : Time.Span.t -> unit
   end
 
   [%%versioned:
