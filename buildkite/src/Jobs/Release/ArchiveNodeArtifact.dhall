@@ -16,7 +16,7 @@ let dependsOn = [ { name = "ArchiveNodeArtifact", key = "archive-artifacts-build
 
 let spec = DockerArtifact.ReleaseSpec::{
     deps=dependsOn,
-    deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    deploy_env_file="ARCHIVE_DOCKER_DEPLOY-\\\${BUILDKITE_JOB_ID}",
     service="coda-archive",
     step_key="archive-docker-artifact"
 }
@@ -42,7 +42,7 @@ Pipeline.build
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "BUILDKITE"
-          ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite-agent artifact upload --job \\\${BUILDKITE_JOB_ID} ./${spec.deploy_env_file}" ],
+          ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite-agent artifact upload ./${spec.deploy_env_file} ${spec.deploy_env_file}-\\\${BUILDKITE_JOB_ID}" ],
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
           target = Size.XLarge,

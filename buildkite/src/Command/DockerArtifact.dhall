@@ -24,7 +24,7 @@ let ReleaseSpec = {
   },
   default = {
     deps = [] : List Command.TaggedKey.Type,
-    deploy_env_file = "DOCKER_DEPLOY_ENV",
+    deploy_env_file = "DOCKER_DEPLOY_ENV-\\\${BUILDKITE_JOB_ID}",
     service = "\\\${CODA_SERVICE}",
     version = "\\\${CODA_VERSION}",
     commit = "\\\${CODA_GIT_HASH}",
