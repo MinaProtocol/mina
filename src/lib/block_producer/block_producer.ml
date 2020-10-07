@@ -571,7 +571,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             , Staged_ledger_diff.to_yojson staged_ledger_diff
                             ) ]
                         !"Unable to build breadcrumb from produced transition \
-                          due to invlaid staged ledger diff: $error" ;
+                          due to invalid staged ledger diff: $error" ;
                       return ()) )
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
