@@ -46,7 +46,8 @@ Pipeline.build
           ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite-agent artifact upload ./${spec.deploy_env_file}" ],
           label = "Build Mina archive-node artifacts",
           key = "archive-artifacts-build",
-          target = Size.XLarge
+          target = Size.XLarge,
+          artifact_paths = [ S.contains "_build/*.deb" ]
         },
       DockerArtifact.generateStep spec
     ]
