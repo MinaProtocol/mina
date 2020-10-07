@@ -34,23 +34,54 @@ module Time = struct
     [%%if
     time_offsets]
 
-    type t = Time.Span.t Lazy.t [@@deriving sexp]
+    type t = unit -> Time.Span.t [@@deriving sexp]
+
+    let time_offset = ref None
+
+    let setting_enabled = ref None
+
+    let disable_setting_offset () = setting_enabled := Some false
+
+    let enable_setting_offset () =
+      match !setting_enabled with
+      | None ->
+          setting_enabled := Some true
+      | Some true ->
+          ()
+      | Some false ->
+          failwith
+            "Cannot enable time offset mutations; it has been explicitly \
+             disabled"
+
+    let set_time_offset offset =
+      match !setting_enabled with
+      | Some true ->
+          time_offset := Some offset
+      | None | Some false ->
+          failwith "Cannot mutate the time offset"
 
     let create offset = offset
 
-    let basic ~logger =
-      lazy
-        (let offset =
-           match Core.Sys.getenv "CODA_TIME_OFFSET" with
-           | Some tm ->
-               Int.of_string tm
-           | None ->
-               [%log debug]
-                 "Environment variable CODA_TIME_OFFSET not found, using \
-                  default of 0" ;
-               0
-         in
-         Core_kernel.Time.Span.of_int_sec offset)
+    let basic ~logger () =
+      match !time_offset with
+      | Some offset ->
+          offset
+      | None ->
+          let offset =
+            let env_offset =
+              match Core.Sys.getenv "CODA_TIME_OFFSET" with
+              | Some tm ->
+                  Int.of_string tm
+              | None ->
+                  [%log debug]
+                    "Environment variable CODA_TIME_OFFSET not found, using \
+                     default of 0" ;
+                  0
+            in
+            Core_kernel.Time.Span.of_int_sec env_offset
+          in
+          time_offset := Some offset ;
+          offset
 
     [%%else]
 
@@ -59,6 +90,12 @@ module Time = struct
     let create () = ()
 
     let basic ~logger:_ = ()
+
+    let disable_setting_offset () = ()
+
+    let enable_setting_offset () = ()
+
+    let set_time_offset _ = failwith "Cannot mutate the time offset"
 
     [%%endif]
   end
@@ -149,7 +186,7 @@ module Time = struct
   [%%if
   time_offsets]
 
-  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+  let now offset = of_time (Time.sub (Time.now ()) (offset ()))
 
   [%%else]
 
@@ -194,7 +231,7 @@ module Time = struct
   let to_string_system_time (offset : Controller.t) (t : t) : string =
     let t2 : t =
       of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (Lazy.force offset))
+        Span.(to_span_since_epoch t + of_time_span (offset ()))
     in
     Int64.to_string (to_int64 t2)
 
