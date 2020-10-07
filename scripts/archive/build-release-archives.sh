@@ -6,8 +6,8 @@
 set -euo pipefail
 
 # Set up variables for build
-SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPT_PATH}/../.."
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+cd "${SCRIPTPATH}/../.."
 
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../../buildkite/scripts/export-git-env-vars.sh"
@@ -111,7 +111,7 @@ else
 
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-    docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+    docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPTPATH/Dockerfile docker_build
 
     docker push codaprotocol/coda-archive:$VERSION
 fi
