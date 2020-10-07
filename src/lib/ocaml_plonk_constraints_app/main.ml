@@ -13,24 +13,29 @@ let%test_module "backend test" =
       open Core
       open Impl
 
-      let computation i16 () =
+      let computation x () =
         let open Field in
 
-        for j = 0 to 1 do
+        for j = 0 to 111 do
 
-          let i4 = sqrt i16 in
-          let i_16 = inv i16 in
-          let i_4 = inv i4 in
+          let scalar = [|one; one; zero; one; zero; one; one; zero; one; zero; one; one; zero; one; zero|] in
+          let y = sqrt (x*x*x + (Impl.Field.of_int 5)) in
 
-          let j1 = i4 * i16 in
-          let j_1 = i_4 * i_16 in
+          let module Ecc = Plonk.Ecc.Constraints (Impl) in
+  
+          let rec double (x, y) n = if n < 1 then (x, y) else double (Ecc.double (x, y)) Int.(n - 1) in
+          let xd, yd = double (x, y) (Array.length scalar) in
 
-          let k1 = j1 * j_1 in
-          let k2 = k1 - one in
+          let x1, y1 = Ecc.add (Ecc.scale (x, y) scalar) (xd, negate yd) in
+          assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Impl.Field.of_int 5)));
 
-          assert_r1cs j1 j_1 one;
-          assert_ (Snarky.Constraint.boolean k1);
-          assert_ (Snarky.Constraint.equal k2 zero);
+          let x2, y2 = Ecc.endoscale (x, y) scalar in
+          assert_ (Snarky.Constraint.equal (y2*y2) (x2*x2*x2 + (Impl.Field.of_int 5)));
+
+          let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
+  
+          let perm = Poseidon.permute [|x; y; x*y|] 62 in
+          assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
         done;
 
@@ -38,7 +43,7 @@ let%test_module "backend test" =
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
       let keys = Impl.generate_keypair ~exposing:(input ()) computation
-      let statement = Impl.Field.Constant.of_int 256
+      let statement = Impl.Field.Constant.of_int 2
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) computation () statement
       let%test_unit "check backend ComputationExample proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)

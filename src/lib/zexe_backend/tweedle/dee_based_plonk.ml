@@ -1,3 +1,4 @@
+open Core
 open Zexe_backend_common
 open Basic
 module T = Snarky_bn382.Tweedle
@@ -101,8 +102,9 @@ module Proof = Plonk_dlog_proof.Make (struct
       let witness = Field.Vector.create () in
       for i = 0 to Array.length w.(0) - 1 do
         for j = 0 to n - 1 do
-          Field.Vector.emplace_back witness
-            (if j < Array.length w then w.(j).(i) else Field.zero)
+          let w = if j < Array.length w then w.(j).(i) else Field.zero in
+          Field.Vector.emplace_back witness w;
+          (*print_endline (Sexp.to_string ([%sexp_of: Field.t] w));*)
         done
       done ;
       create pk.index (Field.Vector.create ()) witness prev_chals prev_comms

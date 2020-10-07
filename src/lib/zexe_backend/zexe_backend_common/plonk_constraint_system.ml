@@ -414,15 +414,6 @@ struct
   open Position
 
   let add_row sys row t l r o c =
-    (*
-    print_endline (Sexp.to_string ([%sexp_of: V.t option array] row));
-
-    Printf.printf "row: %d\n" sys.next_row; 
-    Printf.printf "l.row: %d, l.col: %d\n" l.row l.col; 
-    Printf.printf "r.row: %d, r.col: %d\n" r.row r.col; 
-    Printf.printf "o.row: %d, o.col: %d\n" o.row o.col; 
-    Out_channel.flush stdout;
-*)
     ( match sys.gates with
     | `Finalized _ ->
         failwith "add_row called on finalized constraint system"
@@ -563,7 +554,7 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    (*     print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr)); *)
+
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
       let s, x = red x in
@@ -573,9 +564,9 @@ struct
           else
             let sx = create_internal sys [(s, x)] in
             add_generic_constraint ~l:(s, x) ~o:(Fp.one, sx)
-              [|Fp.one; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
+              [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
               sys ;
-            x
+            sx
       | `Constant ->
           let x = create_internal sys ~constant:s [] in
           add_generic_constraint ~l:(Fp.one, x)
@@ -601,6 +592,7 @@ struct
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal (square sl) so)) )
+
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) -> (
         let (s1, x1), (s2, x2), (s3, x3) = (red v1, red v2, red v3) in
         match (x1, x2, x3) with
@@ -634,6 +626,7 @@ struct
               sys
         | `Constant, `Constant, `Constant ->
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
+
     | Snarky_backendless.Constraint.Boolean v -> (
         let s, x = red v in
         match x with
@@ -643,6 +636,7 @@ struct
               sys
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
+
     | Snarky_backendless.Constraint.Equal (v1, v2) -> (
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
@@ -700,12 +694,13 @@ struct
         add_generic_constraint ?l ?r ?o
           [|coeff l; coeff r; coeff o; m; !c|]
           sys
+
     | Plonk_constraint.T (Poseidon {state}) ->
-        let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
+        let reduce_state (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =
           Array.map ~f:(Array.map ~f:reduce_to_v) s
         in
-        let state = reduce_state sys state in
+        let state = reduce_state state in
         let add_round_state array ind =
           let prev =
             Array.mapi array ~f:(fun i x -> wire sys x sys.next_row i)
@@ -715,34 +710,49 @@ struct
             2 prev.(0) prev.(1) prev.(2)
             Params.params.round_constants.(ind)
         in
-        Array.iteri ~f:(fun i state -> add_round_state state i) state ;
+        Array.iteri ~f:
+        (
+          fun i perm ->
+            if i = Array.length state - 1 then 
+              let prev = Array.mapi perm ~f:(fun i x -> wire sys x sys.next_row i) in
+              add_row sys (Array.map perm ~f:(fun x -> Some x)) 0 prev.(0) prev.(1) prev.(2) [||]
+            else add_round_state perm i
+        ) state ;
         ()
+
     | Plonk_constraint.T (EC_add {p1; p2; p3}) ->
         let red =
           Array.map [|p1; p2; p3|] ~f:(fun (x, y) ->
               (reduce_to_v x, reduce_to_v y) )
         in
-        let prev =
+        let y =
           Array.mapi
             ~f:(fun i (x, y) ->
-              (wire sys x sys.next_row i, wire sys y sys.next_row i) )
+              wire sys y sys.next_row i )
             red
         in
         add_row sys
           (Array.map red ~f:(fun (_, y) -> Some y))
           3
-          {row= (fst prev.(0)).row; col= (snd prev.(0)).col}
-          {row= (fst prev.(1)).row; col= (snd prev.(1)).col}
-          {row= (fst prev.(2)).row; col= (snd prev.(2)).col}
+          {row= (y.(0)).row; col= (y.(0)).col}
+          {row= (y.(1)).row; col= (y.(1)).col}
+          {row= (y.(2)).row; col= (y.(2)).col}
           [||] ;
+        let x =
+          Array.mapi
+            ~f:(fun i (x, y) ->
+              wire sys x sys.next_row i )
+            red
+        in
         add_row sys
           (Array.map red ~f:(fun (x, _) -> Some x))
           4
-          {row= (snd prev.(0)).row; col= (fst prev.(0)).col}
-          {row= (snd prev.(1)).row; col= (fst prev.(1)).col}
-          {row= (snd prev.(2)).row; col= (fst prev.(2)).col}
+          {row= (x.(0)).row; col= (x.(0)).col}
+          {row= (x.(1)).row; col= (x.(1)).col}
+          {row= (x.(2)).row; col= (x.(2)).col}
           [||] ;
         ()
+
     | Plonk_constraint.T (EC_scale {state}) ->
         let add_ecscale_round (round : V.t Scale_round.t) =
           let xt = wire sys round.xt sys.next_row 0 in
@@ -752,6 +762,7 @@ struct
           let l1 = wire sys round.l1 (sys.next_row + 1) 1 in
           let yp = wire sys round.yp (sys.next_row + 1) 2 in
           let xs = wire sys round.xs (sys.next_row + 2) 0 in
+          let xt1 = wire sys round.xt (sys.next_row + 2) 1 in
           let ys = wire sys round.ys (sys.next_row + 2) 2 in
           add_row sys
             [|Some round.xt; Some round.b; Some round.yt|]
@@ -761,7 +772,7 @@ struct
             6 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xt; Some round.ys|]
-            7 xs xt ys [||]
+            7 xs xt1 ys [||]
         in
         Array.iter
           ~f:(fun round -> add_ecscale_round round)
@@ -778,7 +789,8 @@ struct
           let l1 = wire sys round.l1 (sys.next_row + 2) 1 in
           let yp = wire sys round.yp (sys.next_row + 2) 2 in
           let xs = wire sys round.xs (sys.next_row + 3) 0 in
-          let ys = wire sys round.xs (sys.next_row + 3) 1 in
+          let xq1 = wire sys round.xq (sys.next_row + 3) 1 in
+          let ys = wire sys round.ys (sys.next_row + 3) 2 in
           add_row sys
             [|Some round.b2i1; Some round.xt; None|]
             8 b2i1 xt
@@ -792,7 +804,7 @@ struct
             10 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xq; Some round.ys|]
-            11 xs xq ys [||]
+            11 xs xq1 ys [||]
         in
         Array.iter
           ~f:(fun round -> add_endoscale_round round)
