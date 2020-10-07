@@ -58,6 +58,191 @@ let file_exists ?follow_symlinks filename =
       false
 
 module Accounts = struct
+  module Single = struct
+    let to_account_with_pk :
+        Runtime_config.Accounts.Single.t -> Coda_base.Account.t Or_error.t =
+     fun t ->
+      let open Or_error.Let_syntax in
+      let%map pk =
+        match t.pk with
+        | Some pk ->
+            Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
+        | None ->
+            Or_error.errorf
+              !"No public key to create the account from runtime config \
+                %{sexp: Runtime_config.Accounts.Single.t}"
+              t
+      in
+      let delegate =
+        Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+          t.delegate
+      in
+      let token_id =
+        Option.value_map t.token ~default:Token_id.default
+          ~f:Coda_base.Token_id.of_uint64
+      in
+      let account_id = Coda_base.Account_id.create pk token_id in
+      let account =
+        match t.timing with
+        | Some
+            { initial_minimum_balance
+            ; cliff_time
+            ; vesting_period
+            ; vesting_increment } ->
+            Coda_base.Account.create_timed account_id t.balance
+              ~initial_minimum_balance ~cliff_time ~vesting_period
+              ~vesting_increment
+            |> Or_error.ok_exn
+        | None ->
+            Coda_base.Account.create account_id t.balance
+      in
+      let permissions =
+        match t.permissions with
+        | None ->
+            account.permissions
+        | Some
+            { stake
+            ; edit_state
+            ; send
+            ; receive
+            ; set_delegate
+            ; set_permissions
+            ; set_verification_key } ->
+            let auth_required a =
+              match a with
+              | Runtime_config.Accounts.Single.Permissions.Auth_required.None
+                ->
+                  Coda_base.Permissions.Auth_required.None
+              | Either ->
+                  Either
+              | Proof ->
+                  Proof
+              | Signature ->
+                  Signature
+              | Both ->
+                  Both
+              | Impossible ->
+                  Impossible
+            in
+            { Coda_base.Permissions.Poly.stake
+            ; edit_state= auth_required edit_state
+            ; send= auth_required send
+            ; receive= auth_required receive
+            ; set_delegate= auth_required set_delegate
+            ; set_permissions= auth_required set_permissions
+            ; set_verification_key= auth_required set_verification_key }
+      in
+      let snapp = None in
+      let token_permissions =
+        Option.value_map t.token_permissions ~default:account.token_permissions
+          ~f:(fun perm ->
+            match perm with
+            | Runtime_config.Accounts.Single.Token_permissions.Token_owned
+                {disable_new_accounts} ->
+                Coda_base.Token_permissions.Token_owned {disable_new_accounts}
+            | Not_owned {account_disabled} ->
+                Not_owned {account_disabled} )
+      in
+      { account with
+        delegate=
+          (if Option.is_some delegate then delegate else account.delegate)
+      ; token_id
+      ; token_permissions
+      ; nonce= Account.Nonce.of_uint32 t.nonce
+      ; receipt_chain_hash=
+          Option.value_map t.receipt_chain_hash
+            ~default:account.receipt_chain_hash
+            ~f:Coda_base.Receipt.Chain_hash.of_base58_check_exn
+      ; voting_for=
+          Option.value_map ~default:account.voting_for
+            ~f:Coda_base.State_hash.of_base58_check_exn t.voting_for
+      ; snapp
+      ; permissions }
+
+    let of_account :
+           Coda_base.Account.t
+        -> Signature_lib.Private_key.t option
+        -> Runtime_config.Accounts.Single.t =
+     fun account sk ->
+      let timing =
+        match account.timing with
+        | Account.Timing.Untimed ->
+            None
+        | Timed t ->
+            Some
+              { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                  t.initial_minimum_balance
+              ; cliff_time= t.cliff_time
+              ; vesting_period= t.vesting_period
+              ; vesting_increment= t.vesting_increment }
+      in
+      let token_permissions =
+        match account.token_permissions with
+        | Coda_base.Token_permissions.Token_owned {disable_new_accounts} ->
+            Some
+              (Runtime_config.Accounts.Single.Token_permissions.Token_owned
+                 {disable_new_accounts})
+        | Not_owned {account_disabled} ->
+            Some (Not_owned {account_disabled})
+      in
+      let snapp = Option.map account.snapp ~f:Fn.ignore in
+      let permissions =
+        let auth_required a =
+          match a with
+          | Coda_base.Permissions.Auth_required.None ->
+              Runtime_config.Accounts.Single.Permissions.Auth_required.None
+          | Either ->
+              Either
+          | Proof ->
+              Proof
+          | Signature ->
+              Signature
+          | Both ->
+              Both
+          | Impossible ->
+              Impossible
+        in
+        let { Coda_base.Permissions.Poly.stake
+            ; edit_state
+            ; send
+            ; receive
+            ; set_delegate
+            ; set_permissions
+            ; set_verification_key } =
+          account.permissions
+        in
+        Some
+          { Runtime_config.Accounts.Single.Permissions.stake
+          ; edit_state= auth_required edit_state
+          ; send= auth_required send
+          ; receive= auth_required receive
+          ; set_delegate= auth_required set_delegate
+          ; set_permissions= auth_required set_permissions
+          ; set_verification_key= auth_required set_verification_key }
+      in
+      { pk=
+          Some
+            (Signature_lib.Public_key.Compressed.to_base58_check
+               account.public_key)
+      ; sk= Option.map ~f:Signature_lib.Private_key.to_base58_check sk
+      ; balance= account.balance
+      ; delegate=
+          Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
+            account.delegate
+      ; timing
+      ; token= Some (Coda_base.Token_id.to_uint64 account.token_id)
+      ; token_permissions
+      ; nonce= account.nonce
+      ; receipt_chain_hash=
+          Some
+            (Coda_base.Receipt.Chain_hash.to_base58_check
+               account.receipt_chain_hash)
+      ; voting_for=
+          Some (Coda_base.State_hash.to_base58_check account.voting_for)
+      ; snapp
+      ; permissions }
+  end
+
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.mapi
@@ -86,8 +271,7 @@ module Accounts = struct
                    Public_key.Compressed.gen)
         in
         let account =
-          Runtime_config.Accounts.Single.to_account_with_pk
-            {account_config with pk= Some pk}
+          Single.to_account_with_pk {account_config with pk= Some pk}
           |> Or_error.ok_exn
         in
         (sk, account) )
@@ -985,8 +1169,7 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
             Accounts
               (List.map
                  (Lazy.force (Precomputed_values.accounts precomputed_values))
-                 ~f:(fun (sk, account) ->
-                   Runtime_config.Accounts.Single.of_account account sk ))
+                 ~f:(fun (sk, account) -> Accounts.Single.of_account account sk))
         ; name= None
         ; num_accounts= genesis_constants.num_accounts
         ; hash=

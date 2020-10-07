@@ -301,8 +301,6 @@ module Stable = struct
   end
 end]
 
-let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
 [%%ifdef
 consensus_mechanism]
 

@@ -22,8 +22,6 @@ module Stable = struct
   end
 end]
 
-let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
 let default = Not_owned {account_disabled= false}
 
 let to_input = function

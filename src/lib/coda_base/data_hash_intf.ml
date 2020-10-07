@@ -29,8 +29,6 @@ module type Basic = sig
 
   val to_bytes : t -> string
 
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   [%%ifdef consensus_mechanism]
 
   val gen : t Quickcheck.Generator.t

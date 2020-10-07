@@ -52,8 +52,6 @@ module Stable = struct
   end
 end]
 
-let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
 open Pickles_types
 
 let digest_vk (t : Side_loaded_verification_key.t) =

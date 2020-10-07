@@ -31,7 +31,7 @@ let create_ledger accounts =
   let ledger = Ledger.create_ephemeral ~depth () in
   List.iter accounts ~f:(fun acct_config ->
       let acct =
-        Runtime_config.Accounts.Single.to_account_with_pk acct_config
+        Genesis_ledger_helper.Accounts.Single.to_account_with_pk acct_config
         |> Or_error.ok_exn
       in
       let pk = Account.public_key acct in
@@ -46,7 +46,7 @@ let json_ledger_hash_of_ledger ledger =
 let create_output target_state_hash target_proof ledger =
   let target_ledger =
     List.map (Ledger.to_list ledger) ~f:(fun acc ->
-        Runtime_config.Accounts.Single.of_account acc None )
+        Genesis_ledger_helper.Accounts.Single.of_account acc None )
   in
   {target_state_hash; target_proof; target_ledger}
 

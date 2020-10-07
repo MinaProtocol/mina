@@ -185,8 +185,6 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
-  let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
   [%%ifdef
   consensus_mechanism]
 

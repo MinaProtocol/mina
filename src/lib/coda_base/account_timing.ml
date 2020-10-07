@@ -61,8 +61,6 @@ type ('slot, 'balance, 'amount) tt = ('slot, 'balance, 'amount) Poly.t =
       ; vesting_increment: 'amount }
 [@@deriving sexp, eq, hash, compare, yojson]
 
-let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
 module As_record = struct
   type ('bool, 'slot, 'balance, 'amount) t =
     { is_timed: 'bool

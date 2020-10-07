@@ -91,6 +91,18 @@ module Network_config = struct
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
         let runtime_account =
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                      t.initial_minimum_balance
+                  ; cliff_time= t.cliff_time
+                  ; vesting_period= t.vesting_period
+                  ; vesting_increment= t.vesting_increment }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
             pk= Some (Public_key.Compressed.to_string pk)

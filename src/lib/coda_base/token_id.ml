@@ -22,8 +22,6 @@ module Stable = struct
   end
 end]
 
-let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
 let to_input = T.to_input
 
 let to_string = T.to_string
