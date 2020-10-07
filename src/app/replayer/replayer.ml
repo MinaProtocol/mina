@@ -328,7 +328,7 @@ let main ~input_file ~output_file ~archive_uri () =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
-      [%log info] "Loading global slots" ;
+      [%log info] "Loading global slots and ledger hashes" ;
       let%bind global_slots =
         match%bind
           Caqti_async.Pool.use
@@ -345,7 +345,7 @@ let main ~input_file ~output_file ~archive_uri () =
                   ~data:(Ledger_hash.of_string hash) ) ;
             return (Int64.Set.of_list slots)
         | Error msg ->
-            [%log error] "Error getting global slots"
+            [%log error] "Error getting global slots and ledger hashes"
               ~metadata:[("error", `String (Caqti_error.show msg))] ;
             exit 1
       in
