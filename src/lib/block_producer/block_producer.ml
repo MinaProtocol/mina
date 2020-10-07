@@ -697,7 +697,12 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     [%log info] "Pausing block production while bootstrapping"
   in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
-  let produce (precomputed_block : precomputed_block) =
+  let produce
+      { scheduled_time= _
+      ; protocol_state
+      ; protocol_state_proof
+      ; staged_ledger_diff
+      ; delta_transition_chain_proof } =
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         log_bootstrap_mode () ; return ()
@@ -718,7 +723,6 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           in
           External_transition.Validated.protocol_state transition
         in
-        let protocol_state = precomputed_block.protocol_state in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [`Take | `Keep]]
               (Consensus.Hooks.select ~constants:consensus_constants
@@ -744,14 +748,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                  tf root" ) ;
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
-          let protocol_state_proof = precomputed_block.protocol_state_proof in
-          let staged_ledger_diff = precomputed_block.staged_ledger_diff in
           let transition_hash = Protocol_state.hash protocol_state in
           let previous_state_hash =
             Protocol_state.hash previous_protocol_state
-          in
-          let delta_transition_chain_proof =
-            precomputed_block.delta_transition_chain_proof
           in
           let%bind transition =
             let open Result.Let_syntax in
