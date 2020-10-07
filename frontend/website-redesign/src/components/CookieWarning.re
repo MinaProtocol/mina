@@ -57,6 +57,7 @@ module Styles = {
       Button.Styles.button(
         Theme.Colors.mint,
         Theme.Colors.digitalBlack,
+        Some(Theme.Colors.digitalBlack),
         true,
         `rem(3.25),
         `rem(7.75),

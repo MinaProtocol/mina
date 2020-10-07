@@ -104,14 +104,8 @@ module SingleRow = {
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(
-          Theme.MediaQuery.tablet,
-          [width(`percent(80.))],
-        ),
-        media(
-          Theme.MediaQuery.desktop,
-          [width(`percent(100.))],
-        ),
+        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
   module ImageLeftCopyRight = {
