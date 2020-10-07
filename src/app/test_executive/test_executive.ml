@@ -24,7 +24,7 @@ let tests : test list =
   ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf))
   ; ( "bp-timed-accounts"
     , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
-  ]
+  ; ("mina-peers-test", (module Mina_peers_test.Make : Test_functor_intf)) ]
 
 let report_test_errors error_set =
   let open Test_error in

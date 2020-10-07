@@ -1,4 +1,3 @@
-open Async
 open Core
 open Integration_test_lib
 open Currency
@@ -40,6 +39,9 @@ module Make (Engine : Engine_intf) = struct
         ~f:wait_for_init_partial
     in
     let peer_list = network.block_producers in
+    (* [%log info] "peers_list"
+      ~metadata:
+      [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ; *)
     let get_peer_id_partial = Node.get_peer_id ~logger in
     let%bind query_result =
       Malleable_error.List.map peer_list ~f:get_peer_id_partial
