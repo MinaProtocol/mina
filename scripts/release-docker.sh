@@ -51,16 +51,9 @@ case $SERVICE in
 coda-archive)
   DOCKERFILE_PATH="scripts/archive/Dockerfile"
   ;;
-coda-archive)
-  DOCKERFILE_PATH="scripts/archive/Dockerfile"
-  DOCKER_CONTEXT="scripts/archive"
-  ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
-  ;;
-coda-archive)
-  DOCKERFILE_PATH="scripts/archive/Dockerfile"
   ;;
 coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
