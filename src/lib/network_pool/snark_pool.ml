@@ -589,7 +589,7 @@ let%test_module "random set test" =
                     let%map res =
                       Mock_snark_pool.Resource_pool.Diff.verify t diff
                     in
-                    assert (Result.is_ok res) )
+                    assert (Result.is_error res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
