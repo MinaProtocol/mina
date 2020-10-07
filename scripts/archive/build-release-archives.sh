@@ -9,17 +9,9 @@ set -euo pipefail
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPT_PATH}/../.."
 
-GIT_HASH=$(git rev-parse --short=7 HEAD)
-GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GIT_TAG=$(git describe --abbrev=0)
-
 PROJECT="coda-archive"
 
-if [ "$GIT_BRANCH" == "master" ]; then
-    VERSION="${GIT_TAG}"
-else
-    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
-fi
+source ".././buildkite/scripts/export-git-env-vars.sh"
 
 BUILD_DIR="deb_build"
 
@@ -68,8 +60,6 @@ ls -lh coda*.deb
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
 
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
@@ -107,11 +97,11 @@ fi
 if [ -n "${BUILDKITE+x}" ]; then
     set -x
     # Export variables for use with downstream steps
-    echo "export CODA_SERVICE=archive-node" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_GIT_HASH=${GIT_HASH}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
     set +x
 else
