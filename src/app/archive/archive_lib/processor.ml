@@ -457,7 +457,7 @@ module Block = struct
     ; creator_id: int
     ; snarked_ledger_hash_id: int
     ; ledger_hash: string
-    ; height: int
+    ; height: int64
     ; global_slot: int64
     ; timestamp: int64 }
 
@@ -502,7 +502,7 @@ module Block = struct
   let typ =
     let open Caqti_type_spec in
     let spec =
-      Caqti_type.[string; option int; int; int; string; int; int64; int64]
+      Caqti_type.[string; option int; int; int; string; int64; int64; int64]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -558,7 +558,7 @@ module Block = struct
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
             ; height=
                 External_transition.blockchain_length t
-                |> Unsigned.UInt32.to_int
+                |> Unsigned.UInt32.to_int64
             ; global_slot=
                 External_transition.global_slot t |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64

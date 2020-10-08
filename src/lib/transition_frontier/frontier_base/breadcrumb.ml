@@ -59,9 +59,9 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
-                  record trust_system logger inet_addr
+                  record trust_system logger peer
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
@@ -74,7 +74,7 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -101,7 +101,7 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                         "build: Unexpected staged ledger error should have \
                          been caught in another pattern"
                 in
-                Trust_system.record trust_system logger inet_addr action
+                Trust_system.record trust_system logger peer action
           in
           Error
             (`Invalid_staged_ledger_diff

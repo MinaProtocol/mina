@@ -9,7 +9,7 @@ end
 
 module Test_config = struct
   module Block_producer = struct
-    type t = {balance: string}
+    type t = {balance: string; timing: Coda_base.Account_timing.t}
   end
 
   type t =
@@ -65,6 +65,12 @@ module type Engine_intf = sig
       -> amount:Currency.Amount.t
       -> fee:Currency.Fee.t
       -> unit Malleable_error.t
+
+    val get_balance :
+         logger:Logger.t
+      -> t
+      -> account_id:Coda_base.Account_id.t
+      -> Currency.Balance.t Malleable_error.t
   end
 
   module Network : sig
@@ -75,7 +81,8 @@ module type Engine_intf = sig
       ; block_producers: Node.t list
       ; snark_coordinators: Node.t list
       ; archive_nodes: Node.t list
-      ; testnet_log_filter: string }
+      ; testnet_log_filter: string
+      ; keypairs: Signature_lib.Keypair.t list }
   end
 
   module Network_config : sig
@@ -94,7 +101,7 @@ module type Engine_intf = sig
   module Network_manager : sig
     type t
 
-    val create : Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
 
     val deploy : t -> Network.t Deferred.t
 
@@ -109,7 +116,7 @@ module type Engine_intf = sig
     val create :
          logger:Logger.t
       -> network:Network.t
-      -> on_fatal_error:(unit -> unit)
+      -> on_fatal_error:(Logger.Message.t -> unit)
       -> t Malleable_error.t
 
     val destroy : t -> Test_error.Set.t Malleable_error.t
@@ -127,7 +134,11 @@ module type Engine_intf = sig
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> unit Malleable_error.t
+      -> ([> `Blocks_produced of int] * [> `Slots_passed of int])
+         Malleable_error.t
+
+    val wait_for_sync :
+      Node.t list -> timeout:Time.Span.t -> t -> unit Malleable_error.t
 
     val wait_for_init : Node.t -> t -> unit Malleable_error.t
 

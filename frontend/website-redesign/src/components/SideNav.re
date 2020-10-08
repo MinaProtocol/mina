@@ -3,31 +3,29 @@ module Styles = {
   let sideNav =
     style([
       unsafe("counter-reset", "orderedList"),
-      minWidth(rem(15.)),
+      width(`percent(100.)),
+      maxWidth(`rem(15.)),
       listStyleType(`none),
       firstChild([marginLeft(`zero)]),
       padding(`zero),
+      margin(`zero),
       media(
-        Theme.MediaQuery.notMobile,
-        [
-          marginRight(rem(2.)),
-          marginTop(`zero),
-          position(`sticky),
-          top(rem(2.5)),
-        ],
+        Theme.MediaQuery.tablet,
+        [marginTop(`zero), position(`sticky), top(rem(2.5))],
       ),
     ]);
 
   let cell =
     style([
       minHeight(`rem(2.75)),
-      width(`rem(12.)),
+      width(`rem(13.)),
       display(`flex),
       justifyContent(`spaceBetween),
       alignItems(`center),
       borderLeft(`px(1), `solid, Theme.Colors.digitalBlackA(0.25)),
       color(Theme.Colors.digitalBlack),
       textDecoration(`none),
+      backgroundSize(`cover),
     ]);
 
   let currentCell =
@@ -36,7 +34,7 @@ module Styles = {
       style([
         unsafe(
           "background",
-          "url(/static/img/MinaSepctrumSecondary.png), linear-gradient(0deg, #2D2D2D, #2D2D2D), #FFFFFF",
+          "url(/static/img/MinaSepctrumSecondary.png) right no-repeat, linear-gradient(0deg, #2D2D2D, #2D2D2D), #FFFFFF",
         ),
       ]),
     ]);
@@ -53,6 +51,7 @@ module Styles = {
           [
             color(Theme.Colors.digitalBlackA(isCurrentItem ? 1. : 0.25)),
             width(`rem(2.)),
+            textAlign(`center),
             unsafe("counter-increment", "orderedList"),
             unsafe("content", "counter(orderedList, decimal-leading-zero)"),
           ]
@@ -75,9 +74,9 @@ module Styles = {
   let currentItem =
     merge([item, style([position(`relative), color(Theme.Colors.white)])]);
 
-  let break = style([flexBasis(`percent(100.)), height(`zero)]);
+  let break = style([flexBasis(`percent(100.))]);
 
-  let childItem = style([marginLeft(`rem(1.)), listStyleType(`none)]);
+  let childItem = style([marginLeft(`rem(2.)), listStyleType(`none)]);
   let flip = style([transform(rotate(`deg(90.)))]);
 
   let chevronWrap = style([height(`rem(1.)), marginRight(`rem(1.))]);
@@ -106,7 +105,6 @@ module Item = {
       | None => (slug, `Top)
       };
     let isCurrentItem = currentSlug == fullSlug;
-    Js.log4("currentSlug", currentSlug, "fullSlug", fullSlug);
     let href = fullSlug;
     <li
       className={
@@ -154,23 +152,24 @@ module Section = {
         ReactEvent.Mouse.preventDefault(e);
         setExpanded(expanded => !expanded);
       });
-
-    <li key=title className={Styles.topLi(false)}>
-      <a
-        href="#"
-        onClick=toggleExpanded
-        ariaExpanded=expanded
-        className=Styles.cell>
-        <span className=Styles.item> {React.string(title)} </span>
-        <div className=Styles.chevronWrap>
-          <img
-            src="/static/img/ChevronRight.svg"
-            width="16"
-            height="16"
-            className={expanded ? Styles.flip : ""}
-          />
-        </div>
-      </a>
+    <>
+      <li key=title className={Styles.topLi(false)}>
+        <a
+          href="#"
+          onClick=toggleExpanded
+          ariaExpanded=expanded
+          className=Styles.cell>
+          <span className=Styles.item> {React.string(title)} </span>
+          <div className=Styles.chevronWrap>
+            <img
+              src="/static/img/ChevronRight.svg"
+              width="16"
+              height="16"
+              className={expanded ? Styles.flip : ""}
+            />
+          </div>
+        </a>
+      </li>
       {!expanded
          ? React.null
          : <SectionSlugProvider value={Some(slug)}>
@@ -178,13 +177,13 @@ module Section = {
                <ul className=Styles.childItem> children </ul>
              </div>
            </SectionSlugProvider>}
-    </li>;
+    </>;
   };
 };
 
 [@react.component]
-let make = (~currentSlug, ~children) => {
-  <aside>
+let make = (~currentSlug, ~className="", ~children) => {
+  <aside className>
     <CurrentSlugProvider value=currentSlug>
       <ol role="list" className=Styles.sideNav> children </ol>
     </CurrentSlugProvider>

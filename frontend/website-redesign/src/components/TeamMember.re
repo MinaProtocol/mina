@@ -30,14 +30,14 @@ module Styles = {
       width(`rem(10.)),
     ]);
 };
+
 [@react.component]
 let make = (~fullName="", ~title="", ~src="") => {
   <div className=Styles.memberContainer>
     <img className=Styles.image src />
     <div className=Styles.flexRow>
-      <h5 className=Styles.name> {React.string(fullName)} </h5>
-      <Icon kind=Icon.Plus />
-    </div>
+       <h5 className=Styles.name> {React.string(fullName)} </h5> </div>
+      //<Icon kind=Icon.Plus />
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
 };

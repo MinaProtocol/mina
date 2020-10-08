@@ -205,6 +205,13 @@ let fee_token (t : t) =
   | Snapp_command x ->
       Snapp_command.fee_token x
 
+let valid_until (t : t) =
+  match t with
+  | Signed_command x ->
+      Signed_command.valid_until x
+  | Snapp_command _ ->
+      Coda_numbers.Global_slot.max_value
+
 let forget_check (t : Valid.t) : t = (t :> t)
 
 let to_valid_unsafe (t : t) =

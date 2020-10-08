@@ -1,6 +1,5 @@
 module Styles = {
   open Css;
-
   let sectionBackgroundImage = backgroundImg =>
     style([
       height(`percent(100.)),
@@ -24,17 +23,11 @@ module Section = {
         marginTop(`rem(2.)),
         media(
           Theme.MediaQuery.tablet,
-          [
-            reverse ? flexDirection(`rowReverse) : flexDirection(`row),
-            marginTop(`rem(6.)),
-          ],
+          [reverse ? flexDirection(`rowReverse) : flexDirection(`row)],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [
-            reverse ? flexDirection(`rowReverse) : flexDirection(`row),
-            marginTop(`rem(12.5)),
-          ],
+          [reverse ? flexDirection(`rowReverse) : flexDirection(`row)],
         ),
       ]);
 
@@ -56,15 +49,17 @@ module Section = {
         justifyContent(`center),
         marginLeft(`rem(0.5)),
         marginTop(`rem(0.2)),
-        color(Theme.Colors.orange),
       ]);
 
     let image =
       style([
         width(`percent(100.)),
+        maxWidth(`rem(23.)),
         height(`auto),
-        maxWidth(`rem(29.)),
-        marginTop(`rem(2.)),
+        media(
+          Theme.MediaQuery.desktop,
+          [maxWidth(`rem(35.)), marginTop(`rem(2.))],
+        ),
       ]);
   };
   module SimpleRow = {
@@ -72,7 +67,7 @@ module Section = {
       title: string,
       description: string,
       buttonCopy: string,
-      buttonUrl: string,
+      buttonUrl: [ | `External(string) | `Internal(string)],
       image: string,
     };
 
@@ -111,7 +106,7 @@ module Section = {
                  {React.string(row.description)}
                </p>
                <div className=Styles.button>
-                 <Button bgColor=Theme.Colors.white>
+                 <Button href={row.buttonUrl} bgColor=Theme.Colors.white>
                    {React.string(row.buttonCopy)}
                    <span className=SectionStyles.icon>
                      <Icon kind=Icon.ArrowRightMedium />
@@ -137,16 +132,6 @@ module Section = {
 
     module Styles = {
       open Css;
-      let linkText =
-        merge([
-          Theme.Type.link,
-          style([
-            marginTop(`rem(1.5)),
-            display(`flex),
-            alignItems(`center),
-            cursor(`pointer),
-          ]),
-        ]);
 
       let seperator = seperatorNumber =>
         style([
@@ -186,10 +171,13 @@ module Section = {
                  {React.string(row.description)}
                </p>
                <Next.Link href={row.linkUrl}>
-                 <span className=Styles.linkText>
-                   <span> {React.string(row.linkCopy)} </span>
-                   <span className=SectionStyles.icon>
-                     <Icon kind=Icon.ArrowRightMedium />
+                 <span>
+                   <Spacer height=1. />
+                   <span className=Theme.Type.buttonLink>
+                     <span> {React.string(row.linkCopy)} </span>
+                     <span className=SectionStyles.icon>
+                       <Icon kind=Icon.ArrowRightMedium />
+                     </span>
                    </span>
                  </span>
                </Next.Link>

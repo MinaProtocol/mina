@@ -43,7 +43,9 @@ let make = () => {
                String.lowercase_ascii(blog.title),
              )
            });
-         setBlogs(_ => filteredBlogs);
+         setBlogs(_ =>
+           filteredBlogs |> Array.map(ContentType.NormalizedPressBlog.ofBlog)
+         );
        });
     None;
   });
@@ -56,10 +58,6 @@ let make = () => {
         </h2>
       </div>
     </Wrapped>
-    <ListModule
-      items=blogs
-      itemKind=ListModule.TestnetRetro
-      mainImg="/static/img/ArticleImage.png"
-    />
+    <ListModule items=blogs itemKind=ListModule.TestnetRetro />
   </div>;
 };

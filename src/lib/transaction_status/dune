@@ -3,4 +3,4 @@
   (public_name transaction_status)
   (inline_tests)
   (libraries core_kernel coda_base transition_frontier network_pool)
-  (preprocess (pps ppx_jane ppx_coda ppx_version)))
+  (preprocess (pps ppx_jane ppx_coda ppx_version bisect_ppx -- --conditional)))

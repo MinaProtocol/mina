@@ -20,9 +20,11 @@ let engines : engine list =
 let tests : test list =
   [ ( "block-production"
     , (module Block_production_test.Make : Test_functor_intf) )
-  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf)) ]
-
-let to_or_error = Deferred.map ~f:Or_error.return
+  ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf))
+  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf))
+  ; ( "bp-timed-accounts"
+    , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
+  ]
 
 let report_test_errors error_set =
   let open Test_error in
@@ -114,14 +116,14 @@ let main inputs =
     | Some deferred ->
         [%log error]
           "additional call to cleanup testnet while already cleaning up \
-           ($reason, $hard_error)"
+           ($reason, $error)"
           ~metadata:
-            [("reason", `String reason); ("hard_error", `String test_error_str)] ;
+            [("reason", `String reason); ("error", `String test_error_str)] ;
         deferred
     | None ->
         [%log info] "cleaning up testnet ($reason, $error)"
           ~metadata:
-            [("reason", `String reason); ("hard_error", `String test_error_str)] ;
+            [("reason", `String reason); ("error", `String test_error_str)] ;
         let deferred = cleanup () in
         cleanup_deferred_ref := Some deferred ;
         deferred
@@ -141,17 +143,22 @@ let main inputs =
         let open Malleable_error.Let_syntax in
         let%bind net_manager =
           Deferred.bind ~f:Malleable_error.return
-            (Engine.Network_manager.create network_config)
+            (Engine.Network_manager.create ~logger network_config)
         in
         net_manager_ref := Some net_manager ;
         let%bind network =
           Deferred.bind ~f:Malleable_error.return
             (Engine.Network_manager.deploy net_manager)
         in
+        [%log info] "Network deployed" ;
         let%bind log_engine =
-          Engine.Log_engine.create ~logger ~network ~on_fatal_error:(fun () ->
+          Engine.Log_engine.create ~logger ~network
+            ~on_fatal_error:(fun message ->
               don't_wait_for
-                (dispatch_cleanup "log engine fatal error"
+                (dispatch_cleanup
+                   (sprintf
+                      !"log engine fatal error: %s"
+                      (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
                    (Malleable_error.return ())) )
         in
         log_engine_ref := Some log_engine ;

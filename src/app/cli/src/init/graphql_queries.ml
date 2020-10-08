@@ -1,3 +1,6 @@
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
 module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
@@ -275,5 +278,11 @@ module Next_available_token =
 {|
 query next_available_token {
   nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
 }
 |}]
