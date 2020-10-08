@@ -25,7 +25,7 @@ if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     export VERSION="${GITTAG}-${GITHASH}"
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
 else
-    export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}"
     export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
 fi
 

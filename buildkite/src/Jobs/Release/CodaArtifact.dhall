@@ -71,7 +71,7 @@ Pipeline.build
 
       DockerArtifact.generateStep puppeteeredSpec,
 
-          -- rosetta image
+      -- rosetta image
       let rosettaSpec = DockerArtifact.ReleaseSpec::{
         deps=dependsOn,
         service="coda-rosetta",
