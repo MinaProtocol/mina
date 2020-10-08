@@ -51,9 +51,12 @@ module Styles = {
       right(`zero),
       top(`rem(4.25)),
       width(`percent(90.)),
-      background(Theme.Colors.digitalBlack),
       margin2(~h=`auto, ~v=`zero),
-      media(Theme.MediaQuery.tablet, [top(`rem(6.25))]),
+      background(Theme.Colors.digitalBlack),
+      media(
+        Theme.MediaQuery.tablet,
+        [margin2(~h=`zero, ~v=`zero), top(`rem(6.25))],
+      ),
       media(
         Theme.MediaQuery.desktop,
         [
