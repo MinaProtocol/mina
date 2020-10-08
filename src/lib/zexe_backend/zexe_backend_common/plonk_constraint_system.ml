@@ -349,9 +349,7 @@ struct
 
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
-  let set_primary_input_size t x =
-    (* Set_once.set_exn t.public_input_size [%here] x *)
-    ()
+  let set_primary_input_size t x = Set_once.set_exn t.public_input_size [%here] x
 
   let digest = digest
 
