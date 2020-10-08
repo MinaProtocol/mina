@@ -10,7 +10,9 @@ in
 let cmdConfig =
   Command.build
     Command.Config::{
-      commands  = [ Cmd.run "cd buildkite/scripts && buildkite-artifact-helper.sh export-git-env-vars.sh" ],
+      commands  = [
+        Cmd.run "cp buildkite/scripts/export-git-env-vars.sh . && buildkite/scripts/buildkite-artifact-helper.sh export-git-env-vars.sh"
+      ],
       label = "Upload deploy environment based on Git setup",
       key = "upload-git-env",
       target = Size.Small

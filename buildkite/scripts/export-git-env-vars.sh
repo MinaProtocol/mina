@@ -34,20 +34,3 @@ case $BUILDKITE_BRANCH in master|develop|rosetta*)
 esac
 
 set -x
-
-format_output () {
-  output_file="${1}"
-
-  echo > ./output_file
-  echo "export PROJECT=${PROJECT}" >> ./$output_file
-  echo "export VERSION=${VERSION}" >> ./$output_file
-  echo "export DOCKER_TAG=${DOCKER_TAG}" >> ./$output_file
-
-  echo "export BUILD_NUM=${BUILDKITE_BUILD_NUM}" >> ./$output_file
-  echo "export BUILD_URL=${BUILDKITE_BUILD_URL}" >> ./$output_file
-  echo "export BUILD_ROSETTA=${BUILD_ROSETTA}" >> ./$output_file
-
-  echo "export GITHASH=${GITHASH}" >> ./$output_file
-  echo "export GITBRANCH=${GITBRANCH}" >> ./$output_file
-  echo "export GITTAG=${GITTAG}" >> ./$output_file
-}

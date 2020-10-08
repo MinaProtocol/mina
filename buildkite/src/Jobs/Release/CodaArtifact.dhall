@@ -79,7 +79,9 @@ Pipeline.build
         deps=rosettaDependsOn,
         deploy_env_file="export-git-env-vars.sh",
         service="coda-rosetta",
-        extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        version="\\\${DOCKER_TAG}",
+        commit = "\\\${GITHASH}",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         build_rosetta=True,
         step_key="rosetta-docker-artifact"
       }
@@ -93,8 +95,9 @@ Pipeline.build
         deps=rosettaDependsOn,
         deploy_env_file="export-git-env-vars.sh",
         service="coda-rosetta",
-        version="dev-\\\${CODA_VERSION}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        version="dev-\\\${DOCKER_TAG}",
+        commit = "\\\${GITHASH}",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         build_rosetta=True,
         step_key="rosetta-dune-docker-artifact"
       }
