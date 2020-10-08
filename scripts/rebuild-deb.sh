@@ -78,6 +78,9 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Keys
 # Identify actual keys used in build
+#NOTE: Moving the keys from /tmp because of storage constraints. This is OK
+# because building deb is the last step and therefore keys, genesis ledger, and
+# proof are not required in /tmp
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
@@ -89,7 +92,7 @@ do
     for f in  /tmp/s3_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in s3 key set"
-            cp /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
@@ -97,7 +100,7 @@ do
     for f in  /var/lib/coda/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in stable key set"
-            cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
@@ -105,7 +108,7 @@ do
     for f in  /tmp/coda_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [WARN] found key in compile-time set"
-            cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
@@ -114,14 +117,14 @@ done
 # Genesis Ledger/proof Copy
 for f in /tmp/coda_cache_dir/genesis*; do
     if [ -e "$f" ]; then
-        cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
     fi
 done
 
 # Copy genesis Ledger/proof if they were downloaded from s3
 for f in /tmp/s3_cache_dir/genesis*; do
     if [ -e "$f" ]; then
-        cp /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
     fi
 done
 
