@@ -407,10 +407,16 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
   let store_periodically (t : Resource_pool.t) =
-    Async.Clock.every' (Time.Span.of_min 3.) (fun () ->
-        Async.Writer.save_bin_prot t.config.disk_location
-          Snark_tables.Serializable.Stable.Latest.bin_writer_t
-          (Snark_tables.to_serializable t.snark_tables) )
+    Clock.every' (Time.Span.of_min 3.) (fun () ->
+        let before = Time.now () in
+        let%map () =
+          Writer.save_bin_prot t.config.disk_location
+            Snark_tables.Serializable.Stable.Latest.bin_writer_t
+            (Snark_tables.to_serializable t.snark_tables)
+        in
+        let elapsed = Time.diff (Time.now ()) before in
+        [%log' debug t.logger] "SNARK pool serialization took $time ms"
+          ~metadata:[("time", `Float (Time.Span.to_ms elapsed))] )
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
       ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
