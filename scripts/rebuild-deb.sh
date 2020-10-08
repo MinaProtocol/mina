@@ -183,11 +183,15 @@ Description: Coda Client and Daemon
 EOF
 
 # remove proving keys
-rm -f "${BUILDDIR}"/var/lib/coda/*_proving
+rm -f "${BUILDDIR}"/var/lib/coda/step*
+rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb
+
+#remove build dir
+rm -rf "${BUILDDIR}"
 
 
 # Export variables for use with downstream circle-ci steps (see buildkite/scripts/publish-deb.sh for BK DOCKER_DEPLOY_ENV)
