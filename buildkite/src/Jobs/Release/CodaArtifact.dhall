@@ -25,7 +25,7 @@ Pipeline.build
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
           S.strictly (S.contains "Makefile"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/CodaArtifact"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/CodaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
@@ -42,7 +42,7 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
-          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID} buildkite-agent artifact upload ./DOCKER_DEPLOY_ENV" ],
+          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
           label = "Build artifacts",
           key = "artifacts-build",
           target = Size.XLarge,
@@ -76,6 +76,7 @@ Pipeline.build
         deps=dependsOn,
         service="coda-rosetta",
         extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        build_rosetta=True,
         step_key="rosetta-docker-artifact"
       }
 
@@ -89,6 +90,7 @@ Pipeline.build
         service="coda-rosetta",
         version="dev-\\\${CODA_VERSION}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        build_rosetta=True,
         step_key="rosetta-dune-docker-artifact"
       }
 

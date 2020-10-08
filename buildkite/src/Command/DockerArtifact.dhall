@@ -19,6 +19,7 @@ let ReleaseSpec = {
     service: Text,
     version: Text,
     commit: Text,
+    build_rosetta: Bool,
     extra_args: Text,
     step_key: Text
   },
@@ -28,6 +29,7 @@ let ReleaseSpec = {
     service = "\\\${CODA_SERVICE}",
     version = "\\\${CODA_VERSION}",
     commit = "\\\${CODA_GIT_HASH}",
+    build_rosetta = False,
     extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
     step_key = "docker-artifact"
   }
@@ -40,11 +42,14 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     let commands : List Cmd.Type =
     [
         Cmd.run (
-            "if [ ! -f ${spec.deploy_env_file} ]; then " ++
-                "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${spec.deploy_env_file} .; " ++
-            "fi"
+          "if [ ! -f ${spec.deploy_env_file} ]; then " ++
+              "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${spec.deploy_env_file} .; " ++
+          "fi"
         ),
-        Cmd.run "source ${spec.deploy_env_file} && ./scripts/release-docker.sh --service ${spec.service} --version ${spec.version} --commit ${spec.commit} --extra-args \\\"${spec.extra_args}\\\""
+        Cmd.run (
+          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta then "--build-rosetta " else ""} " ++
+              "--service ${spec.service} --version ${spec.version} --commit ${spec.commit} --extra-args \\\"${spec.extra_args}\\\""
+        )
     ]
 
     in
