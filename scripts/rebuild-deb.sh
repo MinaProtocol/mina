@@ -80,8 +80,8 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
-for key in $compile_keys
+compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
+for key in ${compile_keys[*]}
 do
     echo -n "Looking for keys matching: ${key} -- "
 
@@ -112,18 +112,18 @@ do
 done
 
 # Genesis Ledger/proof Copy
-if [ -d /tmp/coda_cache_dir ]; then
-    for f in /tmp/coda_cache_dir/genesis*; do
+for f in /tmp/coda_cache_dir/genesis*; do
+    if [ -e "$f" ]; then
         cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    done
-fi
+    fi
+done
 
 # Copy genesis Ledger/proof if they were downloaded from s3
-if [ -d /tmp/s3_cache_dir ]; then
-    for f in /tmp/s3_cache_dir/genesis*; do
+for f in /tmp/s3_cache_dir/genesis*; do
+    if [ -e "$f" ]; then
         cp /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    done
-fi
+    fi
+done
 
 
 #copy config.json
