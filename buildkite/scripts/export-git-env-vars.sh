@@ -12,7 +12,7 @@ export GITTAG=$(git describe --abbrev=0)
 # Identify All Artifacts by Branch and Git Hash
 set +u
 
-export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+# export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 export PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
@@ -25,7 +25,7 @@ if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     export VERSION="${GITTAG}-${GITHASH}"
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!; s!_!-!g')"
 else
-    export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}"
     export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
 fi
 
