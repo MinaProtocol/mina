@@ -101,7 +101,7 @@ module Worker_state = struct
                    | `Valid_assuming (c, _) ->
                        `Valid c )
 
-             let verify_blockchain_snarks _ _ = true
+             let verify_blockchain_snarks _ = true
 
              let verify_transaction_snarks _ = true
            end
