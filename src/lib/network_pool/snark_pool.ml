@@ -5,28 +5,47 @@ open Network_peer
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+  module Serializable = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
             Priced_proof.Stable.V1.t
-            Transaction_snark_work.Statement.Stable.V1.Table.t
-              (** Every SNARK in the pool *)
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Core.Time.Stable.With_utc_sexp.V2.t )
-            Transaction_snark_work.Statement.Stable.V1.Table.t
-              (** Rebroadcastable SNARKs generated on this machine, along with
-                  when they were first added. *)
-        }
-      [@@deriving sexp]
+          * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
+            | `Not_rebroadcastable ] )
+          Transaction_snark_work.Statement.Stable.V1.Table.t
+        [@@deriving sexp]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  type t =
+    { all:
+        Ledger_proof.t One_or_two.t Priced_proof.t
+        Transaction_snark_work.Statement.Table.t
+    ; rebroadcastable:
+        (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
+        Transaction_snark_work.Statement.Table.t }
+  [@@deriving sexp]
+
+  let of_serializable (t : Serializable.t) : t =
+    { all= Hashtbl.map t ~f:fst
+    ; rebroadcastable=
+        Hashtbl.filter_map t ~f:(fun (x, r) ->
+            match r with
+            | `Rebroadcastable time ->
+                Some (x, time)
+            | `Not_rebroadcastable ->
+                None ) }
+
+  let to_serializable (t : t) : Serializable.t =
+    let res = Hashtbl.map t.all ~f:(fun x -> (x, `Not_rebroadcastable)) in
+    Hashtbl.iteri t.rebroadcastable ~f:(fun ~key ~data:(x, r) ->
+        Hashtbl.set res ~key ~data:(x, `Rebroadcastable r) ) ;
+    res
 end
 
 module type S = sig
@@ -36,7 +55,6 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
-       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -72,7 +90,6 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
                       Strict_pipe.Reader.t
@@ -102,7 +119,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
       module Config = struct
         type t =
           { trust_system: Trust_system.t sexp_opaque
-          ; verifier: Verifier.t sexp_opaque }
+          ; verifier: Verifier.t sexp_opaque
+          ; disk_location: string }
         [@@deriving sexp, make]
       end
 
@@ -119,7 +137,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         ; batcher: Batcher.Snark_pool.t }
       [@@deriving sexp]
 
-      type serializable = Snark_tables.Stable.Latest.t
+      type serializable = Snark_tables.Serializable.Stable.Latest.t
       [@@deriving bin_io_unversioned]
 
       let make_config = Config.make
@@ -127,7 +145,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
       let removed_breadcrumb_wait = 10
 
       let of_serializable tables ~config ~logger : t =
-        { snark_tables= tables
+        { snark_tables= Snark_tables.of_serializable tables
         ; batcher= Batcher.Snark_pool.create config.verifier
         ; ref_table= None
         ; config
@@ -208,6 +226,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
+
+      (*       let write_periodically t = *)
 
       let create ~constraint_constants:_ ~consensus_constants:_
           ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
@@ -386,16 +406,21 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
+  let store_periodically (t : Resource_pool.t) =
+    Async.Clock.every' (Time.Span.of_min 3.) (fun () ->
+        Async.Writer.save_bin_prot t.config.disk_location
+          Snark_tables.Serializable.Stable.Latest.bin_writer_t
+          (Snark_tables.to_serializable t.snark_tables) )
+
   let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~disk_location ~incoming_diffs ~local_diffs
-      ~frontier_broadcast_pipe =
+      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
     in
     match%map
-      Async.Reader.load_bin_prot disk_location
-        Snark_tables.Stable.Latest.bin_reader_t
+      Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
+        Snark_tables.Serializable.Stable.Latest.bin_reader_t
     with
     | Ok snark_table ->
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
@@ -403,6 +428,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           of_resource_pool_and_diffs pool ~logger ~constraint_constants
             ~incoming_diffs ~local_diffs ~tf_diffs:tf_diff_reader
         in
+        store_periodically (resource_pool network_pool) ;
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           pool ~tf_diff_writer ;
         network_pool
@@ -484,6 +510,7 @@ let%test_module "random set test" =
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+        ~disk_location:"/tmp/snark-pool"
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
