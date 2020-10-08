@@ -22,7 +22,7 @@ let make = () => {
         <Icon kind=Icon.ArrowRightMedium size=1. />
       </Button>
     </Hero>
-    <BlogModule source=`Press />
+    <BlogModule source=`Press title="Featured Press" />
     <BlogModule
       source=`Announcement
       title="Mina Announcements"
