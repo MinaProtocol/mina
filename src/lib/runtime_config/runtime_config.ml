@@ -1,5 +1,10 @@
 open Core_kernel
 
+module Fork_config = struct
+  type t = {previous_state_hash: string; previous_length: int}
+  [@@deriving yojson, dhall_type, bin_io_unversioned]
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -122,7 +127,8 @@ module Json_layout = struct
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
       ; coinbase_amount: (Currency.Amount.t option[@default None])
       ; supercharged_coinbase_factor: (int option[@default None])
-      ; account_creation_fee: (Currency.Fee.t option[@default None]) }
+      ; account_creation_fee: (Currency.Fee.t option[@default None])
+      ; fork: (Fork_config.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -429,7 +435,8 @@ module Proof_keys = struct
     ; transaction_capacity: Transaction_capacity.t option
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor: int option
-    ; account_creation_fee: Currency.Fee.Stable.Latest.t option }
+    ; account_creation_fee: Currency.Fee.Stable.Latest.t option
+    ; fork: Fork_config.t option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
@@ -441,7 +448,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; c
     ; ledger_depth
@@ -451,7 +459,8 @@ module Proof_keys = struct
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let of_json_layout
       { Json_layout.Proof_keys.level
@@ -462,7 +471,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
@@ -476,7 +486,8 @@ module Proof_keys = struct
     ; transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
 
@@ -501,7 +512,8 @@ module Proof_keys = struct
           t2.supercharged_coinbase_factor
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
-          t2.account_creation_fee }
+          t2.account_creation_fee
+    ; fork= opt_fallthrough ~default:t1.fork t2.fork }
 end
 
 module Genesis = struct
