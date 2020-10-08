@@ -170,7 +170,7 @@ module Worker = struct
             f
               ( [%bin_type_class: Blockchain.Stable.Latest.t list]
               , Bool.bin_t
-              , verify_blockchain )
+              , verify_blockchains )
         ; verify_transaction_snarks=
             f
               ( [%bin_type_class:
