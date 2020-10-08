@@ -4,7 +4,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Press & Media."
+      header="Press & Media"
       copy={
         Some(
           "Light. Accessible. Decentralized. SNARKy. Mina is a whole new kind of blockchain.",
@@ -22,6 +22,11 @@ let make = () => {
         <Icon kind=Icon.ArrowRightMedium size=1. />
       </Button>
     </Hero>
-    <FeaturedPressModule source=`Press title="Featured Press" />
+    <BlogModule source=`Press />
+    <BlogModule
+      source=`Announcement
+      title="Mina Announcements"
+      itemKind=ListModule.Announcement
+    />
   </Page>;
 };

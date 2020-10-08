@@ -51,12 +51,12 @@ module Title = {
     </div>;
   };
 };
-
+module FetchAnnouncements = Fetch(ContentType.Announcement);
 module FetchBlogs = Fetch(ContentType.BlogPost);
 module FetchPress = Fetch(ContentType.Press);
 
 [@react.component]
-let make = (~source, ~title="In the News") => {
+let make = (~source, ~title="In the News", ~itemKind=ListModule.Blog) => {
   let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
@@ -75,6 +75,14 @@ let make = (~source, ~title="In the News") => {
              press |> Array.map(ContentType.NormalizedPressBlog.ofPress)
            )
          )
+    | `Announcement =>
+      FetchAnnouncements.run()
+      |> Promise.iter(announcement =>
+           setContent(_ =>
+             announcement
+             |> Array.map(ContentType.NormalizedPressBlog.ofAnnouncement)
+           )
+         )
     };
 
     None;
@@ -88,6 +96,6 @@ let make = (~source, ~title="In the News") => {
         buttonHref={`Internal("/blog")}
       />
     </Wrapped>
-    <ListModule items=content itemKind=ListModule.Blog />
+    <ListModule items=content itemKind />
   </div>;
 };

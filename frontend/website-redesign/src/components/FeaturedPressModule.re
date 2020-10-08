@@ -3,7 +3,7 @@ type state = {blogs: array(ContentType.BlogPost.entries)};
 module Fetch =
        (
          T: {
-           type t = {image: ContentType.Image.entry};
+           type t;
            let id: string;
            let dateKeyName: string;
          },
@@ -52,7 +52,7 @@ module Styles = {
 module FetchPress = Fetch(ContentType.Press);
 
 [@react.component]
-let make = (~source, ~title="In the News") => {
+let make = () => {
   let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
