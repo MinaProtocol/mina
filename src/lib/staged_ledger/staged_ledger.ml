@@ -548,7 +548,7 @@ module T = struct
                   match
                     apply_transaction_and_get_witness ~constraint_constants
                       ledger pending_coinbase_stack_state t.With_status.data
-                      current_global_slot state_and_body_hash
+                      current_state_view state_and_body_hash
                   with
                   | Ok (res, updated_pending_coinbase_stack_state) ->
                       (res :: acc, updated_pending_coinbase_stack_state)
