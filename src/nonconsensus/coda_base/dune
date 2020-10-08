@@ -13,6 +13,7 @@
     outside_hash_image_nonconsensus
     rosetta_coding_nonconsensus
     signature_lib_nonconsensus
+    snapp_lib_nonconsensus
     snark_params_nonconsensus
     quickcheck_lib_nonconsensus
     random_oracle_nonconsensus
