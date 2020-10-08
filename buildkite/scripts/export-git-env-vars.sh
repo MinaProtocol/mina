@@ -12,7 +12,7 @@ export GITTAG=$(git describe --abbrev=0)
 # Identify All Artifacts by Branch and Git Hash
 set +u
 
-export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+# export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 export PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
@@ -34,3 +34,20 @@ case $BUILDKITE_BRANCH in master|develop|rosetta*)
 esac
 
 set -x
+
+format_output () {
+  output_file="${1}"
+
+  echo > ./output_file
+  echo "export PROJECT=${PROJECT}" >> ./$output_file
+  echo "export VERSION=${VERSION}" >> ./$output_file
+  echo "export DOCKER_TAG=${DOCKER_TAG}" >> ./$output_file
+
+  echo "export BUILD_NUM=${BUILDKITE_BUILD_NUM}" >> ./$output_file
+  echo "export BUILD_URL=${BUILDKITE_BUILD_URL}" >> ./$output_file
+  echo "export BUILD_ROSETTA=${BUILD_ROSETTA}" >> ./$output_file
+
+  echo "export GITHASH=${GITHASH}" >> ./$output_file
+  echo "export GITBRANCH=${GITBRANCH}" >> ./$output_file
+  echo "export GITTAG=${GITTAG}" >> ./$output_file
+}

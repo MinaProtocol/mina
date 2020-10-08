@@ -12,9 +12,11 @@ let OpamInit = ../../Command/OpamInit.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
+let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerArtifact = ../../Command/DockerArtifact.dhall
 
 let dependsOn = [ { name = "CodaArtifact", key = "artifacts-build" } ]
+let rosettaDependsOn = [ { name = "CodaArtifact", key = "upload-git-env" } ]
 
 in
 
@@ -34,6 +36,7 @@ Pipeline.build
       },
     steps = [
       Libp2p.step,
+      UploadGitEnv.step,
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker [
@@ -43,7 +46,7 @@ Pipeline.build
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
-          label = "Build artifacts",
+          label = "Build Mina artifacts",
           key = "artifacts-build",
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]
@@ -73,7 +76,8 @@ Pipeline.build
 
       -- rosetta image
       let rosettaSpec = DockerArtifact.ReleaseSpec::{
-        deps=dependsOn,
+        deps=rosettaDependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         service="coda-rosetta",
         extra_args="--build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         build_rosetta=True,
@@ -86,7 +90,8 @@ Pipeline.build
 
       -- rosetta image w/ DUNE_PROFILE=dev
       let rosettaDuneSpec = DockerArtifact.ReleaseSpec::{
-        deps=dependsOn,
+        deps=rosettaDependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         service="coda-rosetta",
         version="dev-\\\${CODA_VERSION}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
