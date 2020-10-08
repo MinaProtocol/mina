@@ -92,7 +92,14 @@ let make = (~source, ~title="In the News", ~itemKind=ListModule.Blog) => {
     <Wrapped>
       <Title
         copy=title
-        buttonCopy="See All Press"
+        buttonCopy={
+          switch (itemKind) {
+          | ListModule.Blog => "See all posts"
+          | ListModule.Press => "See all press"
+          | ListModule.Announcement => "See all posts"
+          | ListModule.TestnetRetro => "See all posts"
+          }
+        }
         buttonHref={`Internal("/blog")}
       />
     </Wrapped>

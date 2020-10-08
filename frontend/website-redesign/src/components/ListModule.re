@@ -47,7 +47,8 @@ module Styles = {
 type itemKind =
   | Blog
   | TestnetRetro
-  | Announcement;
+  | Announcement
+  | Press;
 
 module MainListing = {
   module MainListingStyles = {
@@ -69,9 +70,10 @@ module MainListing = {
     <div className=MainListingStyles.container>
       <div className=Styles.metadata>
         {switch (itemKind) {
-         | Blog => <span> {React.string("Press")} </span>
+         | Blog => <span> {React.string("Blog")} </span>
          | Announcement => <span> {React.string("Announcement")} </span>
          | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+         | Press => <span> {React.string("Press")} </span>
          }}
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.date)} </span>
@@ -151,7 +153,7 @@ module Listing = {
              {switch (itemKind) {
               | Blog => <span> {React.string("Blog")} </span>
               | Announcement => <span> {React.string("Announcement")} </span>
-
+              | Press => <span> {React.string("Press")} </span>
               | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
               }}
              <span> {React.string(" / ")} </span>
