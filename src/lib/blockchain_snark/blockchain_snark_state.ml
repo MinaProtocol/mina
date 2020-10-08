@@ -345,8 +345,7 @@ module type S = sig
        Pickles.Prover.t
 end
 
-let verify state proof ~key =
-  Pickles.verify (module Nat.N2) (module Statement) key [(state, proof)]
+let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 module Make (T : sig
   val tag : Transaction_snark.tag
