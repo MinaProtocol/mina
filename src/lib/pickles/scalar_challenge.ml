@@ -146,7 +146,7 @@ let to_field_constant (type f) ~endo
   F.((!a * endo) + !b)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state= unit)
+    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
     (Challenge : Challenge.S with module Impl := Impl) (Endo : sig
         val base : Impl.Field.Constant.t
@@ -224,7 +224,7 @@ struct
     let xt, yt = Tuple_lib.Double.map t ~f:(Util.seal (module Impl)) in
     let bits = Array.of_list bits in
     let n = Array.length bits in
-(*     assert (n = 128) ; *)
+    (*     assert (n = 128) ; *)
     assert (n mod 2 = 0) ;
     let rec go rows (xp, yp) i =
       if i < 0 then (Array.of_list_rev rows, (xp, yp))
@@ -257,8 +257,7 @@ struct
               fun () ->
                 (* l1^2 - xp - xq *)
                 let open Field.Constant in
-                square (read_var l1)
-                - read_var xp - read_var xq)
+                square (read_var l1) - read_var xp - read_var xq)
         in
         let l2 =
           As_prover.Ref.create
@@ -319,35 +318,33 @@ struct
     let module T = Internal_Basic in
     let random_point =
       let rec pt x =
-        let y2 = G.Params.(T.Field.(b + x * (a + x * x))) in
-        if T.Field.is_square y2
-        then (x, T.Field.sqrt y2)
+        let y2 = G.Params.(T.Field.(b + (x * (a + (x * x))))) in
+        if T.Field.is_square y2 then (x, T.Field.sqrt y2)
         else pt T.Field.(x + one)
-      in 
+      in
       G.Constant.of_affine (pt (T.Field.random ()))
     in
     let n = 128 in
-    Quickcheck.test 
-      ~trials:10
+    Quickcheck.test ~trials:10
       (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)
       ~f:(fun xs ->
-          try 
-            T.Test.test_equal
-              ~equal:G.Constant.equal
-              ~sexp_of_t:G.Constant.sexp_of_t
-              (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
-              G.typ
-              (fun (g, s) ->
-                make_checked (fun () ->
-                    endo g (SC.Scalar_challenge s) ) )
-              (fun (g, s) ->
-                let x = Constant.to_field (Scalar_challenge (Challenge.Constant.of_bits s)) in
-                G.Constant.scale g x)
-              (random_point, xs)
-          with e ->
-            Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
-            raise e
-        )
+        try
+          T.Test.test_equal ~equal:G.Constant.equal
+            ~sexp_of_t:G.Constant.sexp_of_t
+            (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
+            G.typ
+            (fun (g, s) ->
+              make_checked (fun () -> endo g (SC.Scalar_challenge s)) )
+            (fun (g, s) ->
+              let x =
+                Constant.to_field
+                  (Scalar_challenge (Challenge.Constant.of_bits s))
+              in
+              G.Constant.scale g x )
+            (random_point, xs)
+        with e ->
+          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          raise e )
 
   let endo_inv ((gx, gy) as g) chal =
     let res =

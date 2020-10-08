@@ -154,7 +154,13 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
       val negate : t -> t
 
-      module Scalar : Marlin_checks.Field_intf
+      module Scalar : sig
+        include Marlin_checks.Field_intf
+
+        include Sexpable.S with type t := t
+
+        val project : bool list -> t
+      end
 
       val scale : t -> Scalar.t -> t
 

@@ -296,7 +296,7 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s =
   let open Zexe_backend in
-  Backend.Tock.Field.one :: tock_unpadded_public_input_of_statement s
+  tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
     (prev_statement : _ Types.Pairing_based.Statement.t) =
@@ -307,10 +307,9 @@ let tick_public_input_of_statement ~max_branching
     in
     Impls.Step.generate_public_input [input] prev_statement
   in
-  Backend.Tick.Field.one
-  :: List.init
-       (Backend.Tick.Field.Vector.length input)
-       ~f:(Backend.Tick.Field.Vector.get input)
+  List.init
+    (Backend.Tick.Field.Vector.length input)
+    ~f:(Backend.Tick.Field.Vector.get input)
 
 let index_commitment_length k ~max_degree =
   let actual =

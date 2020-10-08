@@ -503,6 +503,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
+                    Core.printf "Step generate\n%!" ;
                     Cache.Step.read_or_generate cache k_p k_v typ main )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
@@ -566,25 +567,29 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         let module Constraints =
           Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
         let log =
-          let weight =
-            let sys =
-              Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system
-              .create ()
-            in
-            fun (c : Impls.Wrap.Constraint.t) ->
-              let prev = sys.next_row in
-              List.iter c ~f:(fun {annotation; basic} ->
-                  Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
-                  .add_constraint sys ?label:annotation basic ) ;
-              let next = sys.next_row in
-              next - prev
+          let sys =
+            Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create
+              ()
           in
-          Constraints.log ~weight
-            Impls.Wrap.(
-              make_checked (fun () ->
-                  ( let x = with_label __LOC__ (fun () -> exists typ) in
-                    main x ()
-                    : unit ) ))
+          let weight (c : Impls.Wrap.Constraint.t) =
+            let prev = sys.next_row in
+            List.iter c ~f:(fun {annotation; basic} ->
+                Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
+                .add_constraint sys ?label:annotation basic ) ;
+            let next = sys.next_row in
+            next - prev
+          in
+          let log =
+            Constraints.log ~weight
+              Impls.Wrap.(
+                make_checked (fun () ->
+                    ( let x = with_label __LOC__ (fun () -> exists typ) in
+                      main x ()
+                      : unit ) ))
+          in
+          Core.printf "wrap rows (%d, %d)\n%!" sys.next_row
+            (List.length sys.rows_rev) ;
+          log
         in
         Snarky_log.to_file
           (sprintf
@@ -608,6 +613,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
+            Core.printf "Wrap generate\n%!" ;
             Cache.Wrap.read_or_generate
               (Vector.to_array step_domains)
               cache disk_key_prover disk_key_verifier typ main )
@@ -932,7 +938,7 @@ let%test_module "testh no sidele-loaded" =
               ~max_branching:(module Nat.N2)
               ~name:"blockchain-snark"
               ~choices:(fun ~self ->
-                  [ { prevs= [self; self]
+                [ { prevs= [self; self]
                   ; main=
                       (fun [prev; _] self ->
                         let is_base_case = Field.equal Field.zero self in
@@ -944,7 +950,7 @@ let%test_module "testh no sidele-loaded" =
                       (fun _ self ->
                         let is_base_case = Field.Constant.(equal zero self) in
                         let proof_must_verify = not is_base_case in
-                        [proof_must_verify;false] ) } ] ) )
+                        [proof_must_verify; false] ) } ] ) )
 
       module Proof = (val p)
     end
@@ -957,15 +963,13 @@ let%test_module "testh no sidele-loaded" =
       let b0 =
         Common.time "b0" (fun () ->
             Blockchain_snark.step
-              [(s_neg_one, b_neg_one)
-              ;(s_neg_one, b_neg_one)]
+              [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
               Field.Constant.zero )
       in
       let b1 =
         Common.time "b1" (fun () ->
             Blockchain_snark.step
-              [(Field.Constant.zero, b0)
-              ;(Field.Constant.zero, b0)]
+              [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
               Field.Constant.one )
       in
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]

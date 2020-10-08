@@ -25,7 +25,7 @@ let unrelated_g =
 open Impl
 
 module Other_field = struct
-  type t = Impls.Wrap.Field.Constant.t [@@deriving sexp]
+  type t = Tock.Field.t [@@deriving sexp]
 
   include (Tock.Field : module type of Tock.Field with type t := t)
 

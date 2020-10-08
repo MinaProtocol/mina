@@ -56,7 +56,7 @@ end
 module Shift = struct
   type 'f t = 'f
 
-  (* 2^{field size in bits - 1} *)
+  (* 2^{field size in bits} *)
   let create (type f) (module F : Field_intf with type t = f) : f t =
     let rec two_to_the n =
       if n = 0 then F.one
@@ -64,7 +64,7 @@ module Shift = struct
         let r = two_to_the (n - 1) in
         F.(r + r)
     in
-    two_to_the (F.size_in_bits - 1)
+    two_to_the F.size_in_bits
 end
 
 let of_field (type f) (module F : Field_intf with type t = f)

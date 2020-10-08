@@ -259,7 +259,7 @@ struct
             let g = Inner_curve.Constant.of_affine g in
             ( Inner_curve.constant g
             , Inner_curve.constant
-                (Inner_curve.Constant.negate (pow2pow g (input_length - 1))) )
+                (Inner_curve.Constant.negate (pow2pow g input_length)) )
         | xs ->
             failwithf "expected commitment to have length 1. got %d"
               (Array.length xs) () )
@@ -362,7 +362,7 @@ struct
   end
 
   let scale_fast p (Shifted_value.Shifted_value bits) =
-    Ops.scale_fast p (`Plus_two_to_len_minus_1 (Array.of_list bits))
+    Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
 
   let check_bulletproof ~pcs_batch ~sponge ~xi ~combined_inner_product
       ~
@@ -560,8 +560,8 @@ struct
                   | `Cond_add (b, g) ->
                       Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc
                   | `Add_with_correction (x, (g, _)) ->
-                      Ops.add_fast acc
-                        (Ops.scale_fast g (`Plus_two_to_len_minus_1 x)) ) )
+                      Ops.add_fast acc (Ops.scale_fast g (`Plus_two_to_len x))
+              ) )
         in
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in

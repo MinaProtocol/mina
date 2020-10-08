@@ -111,20 +111,19 @@ struct
   end
 
   let multiscale_known ts =
+    let rec pow2pow x i =
+      if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
+    in
     with_label __LOC__ (fun () ->
         let correction =
-          let rec pow2pow x i =
-            if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
-          in
-          Array.map ts ~f:(fun (s, x) ->
-              let n = Array.length s - 1 in
+          Array.mapi ts ~f:(fun i (s, x) ->
+              let n = Array.length s in
               pow2pow x n )
           |> Array.reduce_exn ~f:Inner_curve.Constant.( + )
         in
         let acc =
-          Array.map ts ~f:(fun (s, x) ->
-              Ops.scale_fast (Inner_curve.constant x)
-                (`Plus_two_to_len_minus_1 s) )
+          Array.mapi ts ~f:(fun i (s, x) ->
+              Ops.scale_fast (Inner_curve.constant x) (`Plus_two_to_len s) )
           |> Array.reduce_exn ~f:Inner_curve.( + )
         in
         Inner_curve.(acc + constant (Constant.negate correction)) )
@@ -202,7 +201,7 @@ struct
     fun x -> Lazy.force f x
 
   let scale_fast p (Shifted_value.Shifted_value bits) =
-    Ops.scale_fast p (`Plus_two_to_len_minus_1 (Array.of_list bits))
+    Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
 
   let check_bulletproof ~pcs_batch ~sponge ~xi ~combined_inner_product
       ~
@@ -299,7 +298,6 @@ struct
         in
         (`Success (equal_g lhs rhs), challenges) )
 
-  (* TODO *)
   let assert_eq_marlin
       (m1 :
         ( 'a
@@ -315,9 +313,9 @@ struct
         (Scalar_challenge t2 : Scalar_challenge.t) =
       Field.Assert.equal t1 (Field.project t2)
     in
-    scalar_chal m1.alpha m2.alpha ;
     chal m1.beta m2.beta ;
     chal m1.gamma m2.gamma ;
+    scalar_chal m1.alpha m2.alpha ;
     scalar_chal m1.zeta m2.zeta
 
   let lagrange_commitment ~domain i =
@@ -372,6 +370,7 @@ struct
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC x_hat ;
+        print_g "x_hat" x_hat ;
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
