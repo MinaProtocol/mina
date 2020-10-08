@@ -768,40 +768,46 @@ struct
           Deferred.Or_error.error_string
             "at least one user command had an insufficient fee"
         else
-          let ledger = Option.value_exn t.best_tip_ledger in
-          let diffs' =
-            Envelope.Incoming.map diffs
-              ~f:
-                (List.map
-                   ~f:
-                     (User_command.to_verifiable_exn ~ledger
-                        ~get:Base_ledger.get
-                        ~location_of_account:Base_ledger.location_of_account))
-          in
-          match%bind Batcher.verify t.batcher diffs' with
-          | Error e ->
-              (* Verifier crashed or other errors at our end. Don't punish the peer*)
-              let%map () = log_and_punish ~punish:false t diffs e in
-              Error e
-          | Ok (Ok valid) ->
-              Deferred.Or_error.return
-                (Envelope.Incoming.wrap ~data:valid ~sender)
-          | Ok (Error ()) ->
-              let trust_record =
-                Trust_system.record_envelope_sender t.config.trust_system
-                  t.logger sender
+          match t.best_tip_ledger with
+          | None ->
+              Deferred.Or_error.error_string
+                "We don't have a transition frontier at the moment, so we're \
+                 unable to verify any transactions."
+          | Some ledger -> (
+              let diffs' =
+                Envelope.Incoming.map diffs
+                  ~f:
+                    (List.map
+                       ~f:
+                         (User_command.to_verifiable_exn ~ledger
+                            ~get:Base_ledger.get
+                            ~location_of_account:
+                              Base_ledger.location_of_account))
               in
-              let%map () =
-                (* that's an insta-ban *)
-                trust_record
-                  ( Trust_system.Actions.Sent_invalid_signature
-                  , Some
-                      ( "diff was: $diff"
-                      , [("diff", to_yojson (Envelope.Incoming.data diffs))] )
-                  )
-              in
-              Or_error.error_string
-                "at least one user command had an invalid signature"
+              match%bind Batcher.verify t.batcher diffs' with
+              | Error e ->
+                  (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                  let%map () = log_and_punish ~punish:false t diffs e in
+                  Error e
+              | Ok (Ok valid) ->
+                  Deferred.Or_error.return
+                    (Envelope.Incoming.wrap ~data:valid ~sender)
+              | Ok (Error ()) ->
+                  let trust_record =
+                    Trust_system.record_envelope_sender t.config.trust_system
+                      t.logger sender
+                  in
+                  let%map () =
+                    (* that's an insta-ban *)
+                    trust_record
+                      ( Trust_system.Actions.Sent_invalid_signature
+                      , Some
+                          ( "diff was: $diff"
+                          , [("diff", to_yojson (Envelope.Incoming.data diffs))]
+                          ) )
+                  in
+                  Or_error.error_string
+                    "at least one user command had an invalid signature" )
 
       let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in

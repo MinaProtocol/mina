@@ -143,6 +143,7 @@ let%test_module "transaction_status" =
     let%test_unit "If the transition frontier currently doesn't exist, the \
                    status of a sent transaction will be unknown" =
       Quickcheck.test ~trials:1 gen_user_command ~f:(fun user_command ->
+          Backtrace.elide := false ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
               let%bind transaction_pool, local_diffs_writer =
