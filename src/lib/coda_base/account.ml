@@ -152,7 +152,7 @@ module Stable = struct
       , State_hash.Stable.V1.t
       , Timing.Stable.V1.t
       , Permissions.Stable.V1.t
-      , Snapp_account.Stable.V1.t option )
+      , Snapp_lib.Snapp_account.Stable.V1.t option )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, hash, compare, yojson]
 
@@ -181,7 +181,7 @@ type value =
   , State_hash.t
   , Timing.t
   , Permissions.t
-  , Snapp_account.t option )
+  , Snapp_lib.Snapp_account.t option )
   Poly.t
 [@@deriving sexp]
 
@@ -208,9 +208,9 @@ let initialize account_id : t =
 
 let hash_snapp_account_opt = function
   | None ->
-      Lazy.force Snapp_account.default_digest
-  | Some (a : Snapp_account.t) ->
-      Snapp_account.digest a
+      Lazy.force Snapp_lib.Snapp_account.default_digest
+  | Some (a : Snapp_lib.Snapp_account.t) ->
+      Snapp_lib.Snapp_account.digest a
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
@@ -250,7 +250,7 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t * Snapp_account.t option As_prover.Ref.t
+  , Field.Var.t * Snapp_lib.Snapp_account.t option As_prover.Ref.t
   (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
   )
   Poly.t
@@ -260,12 +260,13 @@ let identifier_of_var ({public_key; token_id; _} : var) =
 
 let typ : (var, value) Typ.t =
   let snapp :
-      ( Field.Var.t * Snapp_account.t option As_prover.Ref.t
-      , Snapp_account.t option )
+      ( Field.Var.t * Snapp_lib.Snapp_account.t option As_prover.Ref.t
+      , Snapp_lib.Snapp_account.t option )
       Typ.t =
     let account :
-        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t
-        =
+        ( Snapp_lib.Snapp_account.t option As_prover.Ref.t
+        , Snapp_lib.Snapp_account.t option )
+        Typ.t =
       Typ.Internal.ref ()
     in
     let alloc =
@@ -341,7 +342,7 @@ module Checked = struct
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
-      , Snapp_account.Checked.t )
+      , Snapp_lib.Snapp_account.Checked.t )
       Poly.t
   end
 

@@ -102,7 +102,7 @@ let typ : (Checked.t, t) Typ.t =
          let f = With_hash.of_data ~hash_data:(fun _ -> Set_once.create ()) in
          {Poly.predicate= f predicate; body1= f body1; body2= f body2} )
 
-open Snapp_basic
+open Snapp_lib.Snapp_basic
 
 module Complement = struct
   module One_proved = struct

@@ -1005,7 +1005,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        ; update= {app_state; delegate; verification_key; permissions}
        ; delta } :
         Snapp_command.Party.Body.t) (a : Account.t) : (Account.t, _) Result.t =
-    let open Snapp_basic in
+    let open Snapp_lib.Snapp_basic in
     let open Result.Let_syntax in
     let%bind balance =
       let%bind b = add_signed_amount a.balance delta in
@@ -1036,7 +1036,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           |> with_err Source_insufficient_balance
     in
     let init =
-      match a.snapp with None -> Snapp_account.default | Some a -> a
+      match a.snapp with
+      | None ->
+          Snapp_lib.Snapp_account.default
+      | Some a ->
+          a
     in
     let update perm u curr ~is_keep ~update =
       match check_auth perm with
@@ -1064,8 +1068,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
       in
-      let t : Snapp_account.t = {app_state; verification_key} in
-      if Snapp_account.(equal default t) then None else Some t
+      let t : Snapp_lib.Snapp_account.t = {app_state; verification_key} in
+      if Snapp_lib.Snapp_account.(equal default t) then None else Some t
     in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions

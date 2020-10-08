@@ -1,5 +1,5 @@
 (library
  (name runtime_config)
  (public_name coda_runtime_config)
- (libraries core_kernel currency ppx_dhall_type coda_numbers)
+ (libraries core_kernel currency ppx_dhall_type snapp_lib coda_numbers)
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version ppx_deriving.eq bisect_ppx -- --conditional)))

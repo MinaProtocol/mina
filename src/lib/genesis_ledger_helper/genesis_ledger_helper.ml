@@ -132,7 +132,6 @@ module Accounts = struct
             ; set_permissions= auth_required set_permissions
             ; set_verification_key= auth_required set_verification_key }
       in
-      let snapp = None in
       let token_permissions =
         Option.value_map t.token_permissions ~default:account.token_permissions
           ~f:(fun perm ->
@@ -156,7 +155,7 @@ module Accounts = struct
       ; voting_for=
           Option.value_map ~default:account.voting_for
             ~f:Coda_base.State_hash.of_base58_check_exn t.voting_for
-      ; snapp
+      ; snapp= t.snapp
       ; permissions }
 
     let of_account :
@@ -185,7 +184,6 @@ module Accounts = struct
         | Not_owned {account_disabled} ->
             Some (Not_owned {account_disabled})
       in
-      let snapp = Option.map account.snapp ~f:Fn.ignore in
       let permissions =
         let auth_required a =
           match a with
@@ -239,7 +237,7 @@ module Accounts = struct
                account.receipt_chain_hash)
       ; voting_for=
           Some (Coda_base.State_hash.to_base58_check account.voting_for)
-      ; snapp
+      ; snapp= account.snapp
       ; permissions }
   end
 

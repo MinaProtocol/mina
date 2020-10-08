@@ -43,7 +43,7 @@ module Party = struct
       module Stable = struct
         module V1 = struct
           type ('state_element, 'pk, 'vk, 'perms) t =
-            { app_state: 'state_element Snapp_state.Stable.V1.t
+            { app_state: 'state_element Snapp_lib.Snapp_state.Stable.V1.t
             ; delegate: 'pk
             ; verification_key: 'vk
             ; permissions: 'perms }
@@ -52,7 +52,7 @@ module Party = struct
       end]
     end
 
-    open Snapp_basic
+    open Snapp_lib.Snapp_basic
 
     [%%versioned
     module Stable = struct
@@ -85,7 +85,7 @@ module Party = struct
       let to_input ({app_state; delegate; verification_key; permissions} : t) =
         let open Random_oracle_input in
         List.reduce_exn ~f:append
-          [ Snapp_state.to_input app_state
+          [ Snapp_lib.Snapp_state.to_input app_state
               ~f:(Set_or_keep.Checked.to_input ~f:field)
           ; Set_or_keep.Checked.to_input delegate
               ~f:Public_key.Compressed.Checked.to_input
@@ -96,7 +96,7 @@ module Party = struct
 
     let dummy : t =
       { app_state=
-          Vector.init Snapp_state.Max_state_size.n ~f:(fun _ ->
+          Vector.init Snapp_lib.Snapp_state.Max_state_size.n ~f:(fun _ ->
               Set_or_keep.Keep )
       ; delegate= Keep
       ; verification_key= Keep
@@ -105,7 +105,7 @@ module Party = struct
     let to_input ({app_state; delegate; verification_key; permissions} : t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
-        [ Snapp_state.to_input app_state
+        [ Snapp_lib.Snapp_state.to_input app_state
             ~f:(Set_or_keep.to_input ~dummy:Field.zero ~f:field)
         ; Set_or_keep.to_input delegate
             ~dummy:(Predicate.Eq_data.Tc.public_key ()).default
@@ -120,7 +120,8 @@ module Party = struct
       let open Poly in
       let open Pickles.Impls.Step in
       Typ.of_hlistable
-        [ Snapp_state.typ (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
+        [ Snapp_lib.Snapp_state.typ
+            (Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ)
         ; Set_or_keep.typ ~dummy:Public_key.Compressed.empty
             Public_key.Compressed.typ
         ; Set_or_keep.typ ~dummy:Field.Constant.zero Field.typ
@@ -677,7 +678,7 @@ module Payload = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
-  open Snapp_basic
+  open Snapp_lib.Snapp_basic
 
   module Zero_proved = struct
     [%%versioned
@@ -885,7 +886,7 @@ module Payload = struct
           List.reduce_exn ~f:append
             [ bitstring [second_starts_empty; second_ends_empty]
             ; !(Token_id.Checked.to_input token_id)
-            ; Snapp_basic.Flagged_option.(
+            ; Snapp_lib.Snapp_basic.Flagged_option.(
                 to_input' ~f:Other_fee_payer.Payload.Checked.to_input
                   other_fee_payer_opt)
             ; p f1 one
@@ -922,7 +923,7 @@ module Payload = struct
         List.reduce_exn ~f:append
           [ bitstring [second_starts_empty; second_ends_empty]
           ; Token_id.to_input token_id
-          ; Snapp_basic.Flagged_option.(
+          ; Snapp_lib.Snapp_basic.Flagged_option.(
               to_input' ~f:Other_fee_payer.Payload.to_input
                 (of_option ~default:Other_fee_payer.Payload.dummy
                    other_fee_payer_opt))

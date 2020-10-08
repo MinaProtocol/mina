@@ -80,9 +80,9 @@ module Json_layout = struct
 
       module Snapp_account = struct
         (*TODO: representation for the snapp account type*)
-        type t = unit [@@deriving yojson, sexp, bin_io_unversioned]
+        type t = Snapp_lib.Snapp_account.t [@@deriving yojson, sexp]
 
-        (* can't be automatically derived *)
+        (* TODO: be able to derive dhall type for polymorphic types*)
         let dhall_type = Ppx_dhall_type.Dhall_type.Text
       end
 
@@ -302,7 +302,6 @@ module Accounts = struct
 
     module Permissions = Json_layout.Accounts.Single.Permissions
     module Token_permissions = Json_layout.Accounts.Single.Token_permissions
-    module Snapp_account = Json_layout.Accounts.Single.Snapp_account
 
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
@@ -315,7 +314,7 @@ module Accounts = struct
       ; nonce: Coda_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash: string option
       ; voting_for: string option
-      ; snapp: Snapp_account.t option
+      ; snapp: Snapp_lib.Snapp_account.Stable.Latest.t option
       ; permissions: Permissions.t option }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -345,7 +344,7 @@ module Accounts = struct
     ; nonce: Coda_numbers.Account_nonce.t
     ; receipt_chain_hash: string option
     ; voting_for: string option
-    ; snapp: Single.Snapp_account.t option
+    ; snapp: Snapp_lib.Snapp_account.t option
     ; permissions: Single.Permissions.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]

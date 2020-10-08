@@ -35,6 +35,7 @@
     rosetta_coding
     sexp_diff_kernel
     signature_lib
+    snapp_lib
     snark_bits
     snark_params
     snarky.backendless
