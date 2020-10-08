@@ -7,7 +7,7 @@ COPY package.json yarn.lock ./
 RUN yarn && \
     yarn cache clean
 
-COPY graphql_schema.json bsconfig.json ./
+COPY bsconfig.json ./
 COPY ./src ./src
 
 RUN yarn build-without-copy
