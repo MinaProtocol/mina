@@ -134,8 +134,9 @@ module Network_config = struct
       ; block_window_duration_ms= None
       ; transaction_capacity= None
       ; coinbase_amount= None
+      ; supercharged_coinbase_factor= None
       ; account_creation_fee= None
-      ; supercharged_coinbase_factor= None }
+      ; fork= None }
     in
     let runtime_config =
       { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
