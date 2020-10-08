@@ -107,18 +107,32 @@ let%snarkydef step ~(logger : Logger.t)
     Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
       previous_state
   in
-  let%bind new_state =
+  let%bind new_state, is_base_case =
     let t =
       Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
         ~blockchain_state:(Snark_transition.blockchain_state transition)
         ~consensus_state
         ~constants:(Protocol_state.constants previous_state)
     in
+    let%bind is_base_case =
+      Protocol_state.consensus_state t
+      |> Consensus.Data.Consensus_state.is_genesis_state_var
+    in
+    let%bind previous_state_hash =
+      match constraint_constants.fork with
+      | Some {previous_state_hash= fork_prev; _} ->
+          State_hash.if_ is_base_case
+            ~then_:(State_hash.var_of_t fork_prev)
+            ~else_:t.previous_state_hash
+      | None ->
+          Checked.return t.previous_state_hash
+    in
+    let t = {t with previous_state_hash} in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in
       with_label __LOC__ (State_hash.assert_equal h new_state_hash)
     in
-    t
+    (t, is_base_case)
   in
   let%bind txn_snark_should_verify, success =
     let%bind ledger_hash_didn't_change =
@@ -241,10 +255,6 @@ let%snarkydef step ~(logger : Logger.t)
         Boolean.false_
     | Full ->
         txn_snark_should_verify
-  in
-  let%bind is_base_case =
-    Protocol_state.consensus_state new_state
-    |> Consensus.Data.Consensus_state.is_genesis_state_var
   in
   let prev_should_verify =
     match proof_level with
