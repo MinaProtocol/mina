@@ -838,7 +838,7 @@ struct
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
             2 prev.(0) prev.(1) prev.(2)
-            Params.params.round_constants.(ind)
+            Params.params.round_constants.(ind + 1)
         in
         Array.iteri
           ~f:(fun i perm ->
