@@ -32,7 +32,7 @@ module Styles = {
   let h2 =
     merge([
       Theme.Type.h2,
-      style([color(black), width(`rem(13.)), fontWeight(`light)]),
+      style([color(black), width(`percent(80.)), fontWeight(`light)]),
     ]);
 
   let h4 = merge([Theme.Type.h4, style([fontWeight(`normal)])]);
@@ -42,6 +42,12 @@ module Styles = {
       height(`percent(100.)),
       backgroundColor(white),
       padding(`rem(1.5)),
+    ]);
+
+  let description =
+    style([
+      width(`percent(80.)),
+      media(Theme.MediaQuery.notMobile, [width(`percent(50.))]),
     ]);
 
   let gridItemCopy =
@@ -80,7 +86,17 @@ module GridItem = {
 [@react.component]
 let make = (~title, ~description, ~sections: array(section)) => {
   <div className=Styles.container>
-    <h2 className=Styles.h2> {React.string(title)} </h2>
+    <div>
+      <h2 className=Styles.h2> {React.string(title)} </h2>
+      {switch (description) {
+       | Some(description) =>
+         <div className=Styles.description>
+           <Spacer height=1. />
+           description
+         </div>
+       | None => React.null
+       }}
+    </div>
     <div className=Styles.grid>
       {sections
        |> Array.map(section =>

@@ -227,7 +227,7 @@ let make = (~profiles) => {
         <Spacer height=4. />
         <CultureGrid
           title="What Unites Us"
-          description=""
+          description=None
           sections=[|
             {
               title: "Respect",

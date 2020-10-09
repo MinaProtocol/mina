@@ -791,7 +791,32 @@ module HowToApply = {
           <Spacer height=4. />
           <CultureGrid
             title="Evaluation Criteria"
-            description=""
+            description={
+              Some(
+                <p className=Theme.Type.paragraph>
+                  <span>
+                    {React.string(
+                       "All grants are subject to approval by O(1) Labs. ",
+                     )}
+                  </span>
+                  <Next.Link href="/">
+                    <span className=Theme.Type.link>
+                      {React.string("Terms and Conditions")}
+                    </span>
+                  </Next.Link>
+                  <span>
+                    {React.string(
+                       " will apply. By submitting an application, you agree to our ",
+                     )}
+                  </span>
+                  <Next.Link href="/">
+                    <span className=Theme.Type.link>
+                      {React.string("Privacy Policy")}
+                    </span>
+                  </Next.Link>
+                </p>,
+              )
+            }
             sections=[|
               {
                 title: "01",
