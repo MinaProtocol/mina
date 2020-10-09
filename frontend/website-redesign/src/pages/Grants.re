@@ -1,6 +1,16 @@
 module Styles = {
   open Css;
 
+  let sectionContainer = bg =>
+    style([
+      position(`relative),
+      background(`url(bg)),
+      unsafe("background-size", "100% auto"),
+      backgroundRepeat(`noRepeat),
+      padding(`rem(2.)),
+      media(Theme.MediaQuery.desktop, [padding(`zero)]),
+    ]);
+
   let section =
     style([
       width(`percent(100.)),
@@ -30,6 +40,7 @@ module Styles = {
   let divider =
     style([
       maxWidth(`rem(71.)),
+      width(`percent(100.)),
       margin2(~v=`zero, ~h=`auto),
       height(`px(1)),
       backgroundColor(Theme.Colors.digitalBlack),
@@ -76,6 +87,7 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [
           flexDirection(`row),
+          alignItems(`flexStart),
           height(`percent(80.)),
           width(`percent(90.)),
         ],
@@ -133,6 +145,18 @@ module Styles = {
       marginLeft(`rem(2.)),
       selector("li", [marginTop(`rem(1.))]),
     ]);
+
+  let grantDescriptionOuterContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      width(`percent(100.)),
+    ]);
+
+  let grantDescriptionInnerContainer =
+    style([display(`flex), justifyContent(`spaceBetween)]);
+
+  let grantAllocation = style([width(`percent(50.))]);
 };
 
 module GrantsSideNav = {
@@ -352,6 +376,69 @@ module FAQ = {
   };
 };
 
+module Project = {
+  module AllocationDescription = {
+    [@react.component]
+    let make = (~title, ~allocation, ~description, ~buttonUrl) =>
+      <div className=Styles.grantDescriptionOuterContainer>
+        <hr className=Styles.divider />
+        <Spacer height=1. />
+        <h3 className=Theme.Type.h3> {React.string(title)} </h3>
+        <Spacer height=2. />
+        <div className=Styles.grantDescriptionInnerContainer>
+          <div className=Styles.grantAllocation>
+            <h4 className=Theme.Type.h4> {React.string("Allocation")} </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph> {React.string(allocation)} </p>
+          </div>
+          <div className=Styles.grantAllocation>
+            <h4 className=Theme.Type.h4> {React.string("Description")} </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph>
+              {React.string(description)}
+            </p>
+          </div>
+        </div>
+        <Spacer height=4. />
+        <span className=Css.(style([marginLeft(`auto)]))>
+          <Button
+            href={`Internal(buttonUrl)}
+            bgColor=Theme.Colors.orange
+            width={`rem(7.)}>
+            {React.string("Apply")}
+            <Icon kind=Icon.ArrowRightSmall />
+          </Button>
+        </span>
+      </div>;
+  };
+};
+
+module FrontEndProjects = {
+  [@react.component]
+  let make = () =>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
+      <Spacer height=6.5 />
+      <hr className=Styles.divider />
+      <Section
+        title="Product / Front-End Projects"
+        subhead={js|Assist with building interfaces and platforms for users to interact with Mina.|js}
+        slug="frontend">
+        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+          {React.string("Install SDK")}
+          <Icon kind=Icon.ArrowRightMedium />
+        </Button>
+        <Spacer height=4. />
+        <Project.AllocationDescription
+          title="Graph QL API"
+          allocation={js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js}
+          description={js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js}
+          buttonUrl="/docs"
+        />
+      </Section>
+    </div>;
+};
+
 [@react.component]
 let make = () => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -379,6 +466,7 @@ let make = () => {
     />
     <TypesOfGrants />
     <GrantsSideNav />
+    <FrontEndProjects />
     <FAQ />
   </Page>;
 };
