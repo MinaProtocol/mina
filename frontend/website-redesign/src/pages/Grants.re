@@ -156,7 +156,9 @@ module Styles = {
   let grantDescriptionInnerContainer =
     style([display(`flex), justifyContent(`spaceBetween)]);
 
-  let grantAllocation = style([width(`percent(50.))]);
+  let grantTwoColumnContent = style([width(`percent(50.))]);
+
+  let grantThreeColumnContent = style([width(`percent(30.))]);
 };
 
 module GrantsSideNav = {
@@ -183,14 +185,14 @@ module GrantsSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-      <SideNav.Item title="Product / Front-end Projects" slug="#" />
-      <SideNav.Item title="Protocol Projects" slug="#" />
+      <SideNav.Item title="Product / Front-end Projects" slug="#frontend" />
+      <SideNav.Item title="Protocol Projects" slug="#protocol" />
       <SideNav.Item
         title="Opening Marketing and Community Projects"
-        slug="#"
+        slug="#marketing-community"
       />
       <SideNav.Item title="How to Apply" slug="#" />
-      <SideNav.Item title="Contributers" slug="#" />
+      //<SideNav.Item title="Contributers" slug="#" />
       <SideNav.Item title="FAQ" slug="#faq" />
     </SideNav>;
   };
@@ -289,7 +291,7 @@ module FAQ = {
   [@react.component]
   let make = () => {
     <Wrapped>
-      <Section title="General Questions" subhead="" slug="FAQ">
+      <Section title="General Questions" subhead="" slug="faq">
         <hr className=Styles.divider />
         <div>
           <FAQRow
@@ -377,25 +379,99 @@ module FAQ = {
 };
 
 module Project = {
-  module AllocationDescription = {
+  module TwoColumn = {
     [@react.component]
-    let make = (~title, ~allocation, ~description, ~buttonUrl) =>
+    let make =
+        (
+          ~title,
+          ~firstColumnTitle,
+          ~firstColumnCopy,
+          ~secondColumnTitle,
+          ~secondColumnCopy,
+          ~buttonUrl,
+        ) =>
       <div className=Styles.grantDescriptionOuterContainer>
         <hr className=Styles.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3> {React.string(title)} </h3>
         <Spacer height=2. />
         <div className=Styles.grantDescriptionInnerContainer>
-          <div className=Styles.grantAllocation>
-            <h4 className=Theme.Type.h4> {React.string("Allocation")} </h4>
-            <Spacer height=1. />
-            <p className=Theme.Type.paragraph> {React.string(allocation)} </p>
-          </div>
-          <div className=Styles.grantAllocation>
-            <h4 className=Theme.Type.h4> {React.string("Description")} </h4>
+          <div className=Styles.grantTwoColumnContent>
+            <h4 className=Theme.Type.h4>
+              {React.string(firstColumnTitle)}
+            </h4>
             <Spacer height=1. />
             <p className=Theme.Type.paragraph>
-              {React.string(description)}
+              {React.string(firstColumnCopy)}
+            </p>
+          </div>
+          <div className=Styles.grantTwoColumnContent>
+            <h4 className=Theme.Type.h4>
+              {React.string(secondColumnTitle)}
+            </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph>
+              {React.string(secondColumnCopy)}
+            </p>
+          </div>
+        </div>
+        <Spacer height=4. />
+        <span className=Css.(style([marginLeft(`auto)]))>
+          <Button
+            href={`Internal(buttonUrl)}
+            bgColor=Theme.Colors.orange
+            width={`rem(7.)}>
+            {React.string("Apply")}
+            <Icon kind=Icon.ArrowRightSmall />
+          </Button>
+        </span>
+      </div>;
+  };
+
+  module ThreeColumn = {
+    [@react.component]
+    let make =
+        (
+          ~title,
+          ~firstColumnTitle,
+          ~firstColumnCopy,
+          ~secondColumnTitle,
+          ~secondColumnCopy,
+          ~thirdColumnTitle,
+          ~thirdColumnCopy,
+          ~buttonUrl,
+        ) =>
+      <div className=Styles.grantDescriptionOuterContainer>
+        <hr className=Styles.divider />
+        <Spacer height=1. />
+        <h3 className=Theme.Type.h3> {React.string(title)} </h3>
+        <Spacer height=2. />
+        <div className=Styles.grantDescriptionInnerContainer>
+          <div className=Styles.grantThreeColumnContent>
+            <h4 className=Theme.Type.h4>
+              {React.string(firstColumnTitle)}
+            </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph>
+              {React.string(firstColumnCopy)}
+            </p>
+          </div>
+          <div className=Styles.grantThreeColumnContent>
+            <h4 className=Theme.Type.h4>
+              {React.string(secondColumnTitle)}
+            </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph>
+              {React.string(secondColumnCopy)}
+            </p>
+          </div>
+          <div className=Styles.grantThreeColumnContent>
+            <h4 className=Theme.Type.h4>
+              {React.string(thirdColumnTitle)}
+            </h4>
+            <Spacer height=1. />
+            <p className=Theme.Type.paragraph>
+              {React.string(thirdColumnCopy)}
             </p>
           </div>
         </div>
@@ -429,12 +505,159 @@ module FrontEndProjects = {
           <Icon kind=Icon.ArrowRightMedium />
         </Button>
         <Spacer height=4. />
-        <Project.AllocationDescription
+        <Project.TwoColumn
           title="Graph QL API"
-          allocation={js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js}
-          description={js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js}
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js}
           buttonUrl="/docs"
         />
+        <Spacer height=3. />
+        <Project.ThreeColumn
+          title="Snarketplace Aggregated Data"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens|js}
+          secondColumnTitle="Project Type"
+          secondColumnCopy={js|Open source|js}
+          thirdColumnTitle="Overview"
+          thirdColumnCopy={js|Create a web interface that provides information about the marketplace that snarkers and block producers meet buy & sell snarks associated with the transactions. Snarketplace is the queue that lists that snarks that are available for the block producers to buy and add to the blockchain.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.ThreeColumn
+          title="Telemetry Health Dashboard"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens|js}
+          secondColumnTitle="Project Type"
+          secondColumnCopy={js|Open source|js}
+          thirdColumnTitle="Overview"
+          thirdColumnCopy={js|Build a high-level dashboard that describes the current state of the network by aggregating data from as many nodes as it has access to.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.ThreeColumn
+          title="Browser Wallet (with optional chrome extension)"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens|js}
+          secondColumnTitle="Project Type"
+          secondColumnCopy={js|Open source|js}
+          thirdColumnTitle="Overview"
+          thirdColumnCopy={js|Enable sending, receiving, and delegating Coda tokens using a web wallet with support for the Ledger.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.TwoColumn
+          title="Mobile Wallet"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Enable sending, receiving, and delegating Coda tokens using a Mobile Wallet.|js}
+          buttonUrl="/docs"
+        />
+      </Section>
+    </div>;
+};
+
+module ProtocolProjects = {
+  [@react.component]
+  let make = () =>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
+      <Spacer height=6.5 />
+      <hr className=Styles.divider />
+      <Section
+        title="Protocol Projects"
+        subhead={js|Contribute to engineering projects to develop the core technology underlying the protocol.|js}
+        slug="protocol">
+        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+          {React.string("Install SDK")}
+          <Icon kind=Icon.ArrowRightMedium />
+        </Button>
+        <Spacer height=4. />
+        <Project.TwoColumn
+          title="Protocol Specification Document"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Work closely with the O(1) Labs Protocol Engineering team to create a detailed formal specification of the Coda protocol. This project is ideal for someone who is familiar with the tools and technical side of the Coda protocol.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.TwoColumn
+          title="Stablecoin Support"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Integration fee as grant or initial deposit amount|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Offer a US dollar backed programmable stablecoin on the Coda Protocol.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.ThreeColumn
+          title="Alternative Client Implementation (e.g. Rust)"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $10,000 USD per month of Coda tokens|js}
+          secondColumnTitle="Project Type"
+          secondColumnCopy={js|Open source|js}
+          thirdColumnTitle="Overview"
+          thirdColumnCopy={js|Enable Coda nodes to parse and verify the Coda transactions, its smart contracts and everything related. Provide an interfaces to create transactions, product blocks, and create snarks in Coda.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+      </Section>
+    </div>;
+};
+
+module MarketingAndCommunityProjects = {
+  [@react.component]
+  let make = () =>
+    <div
+      className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
+      <Spacer height=6.5 />
+      <hr className=Styles.divider />
+      <Section
+        title="Marketing and Community Projects"
+        subhead={js|Help to build and grow Mina's community by serving as ambassadors, creating content, and other initiatives.|js}
+        slug="marketing-community">
+        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+          {React.string("Install SDK")}
+          <Icon kind=Icon.ArrowRightMedium />
+        </Button>
+        <Spacer height=4. />
+        <Project.TwoColumn
+          title="Technical Community Ambassadors"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $1000 USD of Mina tokens per month|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Grow, excite and organize Mina’s technical community globally by organizing virtual meetups, supporting the community in testnet activities, establishing a presence on geographically-relevant platforms (ex. WeChat in China), producing and sharing educational content, recruiting new community members and being a spokesperson for the project. As our community grows and evolves, so will this role. The ideal candidate will be equal parts passionate, flexible, and dedicated.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.TwoColumn
+          title="Stablecoin Support"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Integration fee as grant or initial deposit amount|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Offer a US dollar backed programmable stablecoin on the Coda Protocol.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=3. />
+        <Project.TwoColumn
+          title="Intro video for Mina"
+          firstColumnTitle="Allocation"
+          firstColumnCopy={js|Minimum of $1000 USD of Mina tokens|js}
+          secondColumnTitle="Description"
+          secondColumnCopy={js|Create a short video that introduces Mina, highlights key differentiators, discusses Mina’s novel use of zk-SNARKs, use cases, etc.|js}
+          buttonUrl="/docs"
+        />
+        <Spacer height=5. />
+        <p className=Theme.Type.paragraph>
+          <em>
+            {React.string(
+               "We are also open to any of your suggestions for a grant! Submit an application and we will review it.",
+             )}
+          </em>
+        </p>
       </Section>
     </div>;
 };
@@ -467,6 +690,8 @@ let make = () => {
     <TypesOfGrants />
     <GrantsSideNav />
     <FrontEndProjects />
+    <ProtocolProjects />
+    <MarketingAndCommunityProjects />
     <FAQ />
   </Page>;
 };
