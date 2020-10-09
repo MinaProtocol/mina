@@ -189,9 +189,8 @@ let rec fold_until ~(init : 'accum)
           fold_until ~init ~f ~finish xs )
 
 (* returns a list of state-hashes with the older ones at the front *)
-let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
+let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
     ~target_hash =
-  let%bind peers = Coda_networking.random_peers network num_peers in
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
@@ -364,11 +363,52 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
          don't_wait_for
            (let start_time = Core.Time.now () in
             let%bind () = Catchup_jobs.incr () in
+            let subtree_peers =
+              List.fold subtrees ~init:[] ~f:(fun acc_outer tree ->
+                  let cacheds = Rose_tree.flatten tree in
+                  let cached_peers =
+                    List.fold cacheds ~init:[] ~f:(fun acc_inner cached ->
+                        let envelope = Cached.peek cached in
+                        match Envelope.Incoming.sender envelope with
+                        | Local ->
+                            acc_inner
+                        | Remote peer ->
+                            peer :: acc_inner )
+                  in
+                  cached_peers @ acc_outer )
+              |> List.dedup_and_sort ~compare:Peer.compare
+            in
             match%bind
               let open Deferred.Or_error.Let_syntax in
               let%bind preferred_peer, hashes_of_missing_transitions =
-                download_state_hashes ~logger ~trust_system ~network ~frontier
-                  ~num_peers ~target_hash
+                (* try peers from subtrees first *)
+                let open Deferred.Let_syntax in
+                match%bind
+                  download_state_hashes ~logger ~trust_system ~network
+                    ~frontier ~peers:subtree_peers ~target_hash
+                with
+                | Ok (peer, hashes) ->
+                    return (Ok (peer, hashes))
+                | Error err -> (
+                    [%log info]
+                      "Could not download state hashes using peers from \
+                       subtrees; trying again with random peers"
+                      ~metadata:[("error", `String (Error.to_string_hum err))] ;
+                    let%bind random_peers =
+                      Coda_networking.random_peers network num_peers
+                    in
+                    match%bind
+                      download_state_hashes ~logger ~trust_system ~network
+                        ~frontier ~peers:random_peers ~target_hash
+                    with
+                    | Ok (peer, hashes) ->
+                        return (Ok (peer, hashes))
+                    | Error err ->
+                        [%log info]
+                          "Could not download state hashes using random peers"
+                          ~metadata:
+                            [("error", `String (Error.to_string_hum err))] ;
+                        return (Error err) )
               in
               let num_of_missing_transitions =
                 List.length hashes_of_missing_transitions
