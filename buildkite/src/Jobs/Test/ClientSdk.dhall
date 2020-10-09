@@ -1,15 +1,15 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
 
-let S = ../Lib/SelectFiles.dhall
-let Cmd = ../Lib/Cmds.dhall
+let S = ../../Lib/SelectFiles.dhall
+let Cmd = ../../Lib/Cmds.dhall
 
-let Pipeline = ../Pipeline/Dsl.dhall
-let JobSpec = ../Pipeline/JobSpec.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Command = ../Command/Base.dhall
-let OpamInit = ../Command/OpamInit.dhall
-let Docker = ../Command/Docker/Type.dhall
-let Size = ../Command/Size.dhall
+let Command = ../../Command/Base.dhall
+let OpamInit = ../../Command/OpamInit.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
 
 in
 
@@ -21,6 +21,7 @@ Pipeline.build
           S.strictlyStart (S.contains "buildkite/src/Jobs/ClientSdk"),
           S.strictlyStart (S.contains "src")
         ],
+        path = "Test",
         name = "ClientSdk"
       },
     steps = [
@@ -29,7 +30,7 @@ Pipeline.build
           commands = [
             Cmd.run "chmod -R 777 frontend/client_sdk",
             Cmd.runInDocker
-              Cmd.Docker::{image = (../Constants/ContainerImages.dhall).codaToolchain}
+              Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).codaToolchain}
               "cd frontend/client_sdk && yarn install"
           ]
           , label = "Install Yarn dependencies"
@@ -40,7 +41,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker ([] : List Text) "./scripts/client-sdk-unit-tests.sh"
-          , label = "Build client SDK, run unit tests"
+          , label = "Build client SDK and run unit tests"
           , key = "client-sdk-build-unittests"
           , target = Size.Medium
           , docker = None Docker.Type
