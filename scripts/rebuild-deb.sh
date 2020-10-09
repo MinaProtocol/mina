@@ -150,18 +150,6 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
-# Tar up keys for an artifact
-echo "------------------------------------------------------------"
-if [ -z "$(ls -A ${BUILDDIR}/var/lib/coda)" ]; then
-    echo "PV Key Dir Empty"
-    touch "${cwd}/coda_pvkeys_EMPTY"
-else
-    echo "Creating PV Key Tar"
-    pushd "${BUILDDIR}/var/lib/coda"
-    tar -cv --use-compress-program=pigz -f "${cwd}"/coda_pvkeys_"${GITHASH}"_"${DUNE_PROFILE}".tar.bz2 * ; \
-    popd
-fi
-ls -lh coda_pvkeys_*
 
 # second deb without the proving keys -- FIXME: DRY
 echo "------------------------------------------------------------"
