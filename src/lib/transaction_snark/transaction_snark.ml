@@ -3278,10 +3278,14 @@ let verify (ts : (t * _) list) ~key =
        key
        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
-module Make () = struct
+module Make (Inputs : sig
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+end) =
+struct
+  open Inputs
+
   let tag, cache_handle, p, Pickles.Provers.[base; merge] =
-    system
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    system ~constraint_constants
 
   module Proof = (val p)
 
@@ -3528,7 +3532,9 @@ let%test_module "transaction_snark" =
         ~receiver_pk:(Account.public_key receiver.account)
         ~fee_token ~token amt fee nonce memo
 
-    include Make ()
+    include Make (struct
+      let constraint_constants = constraint_constants
+    end)
 
     let state_body =
       let compile_time_genesis =
@@ -5884,7 +5890,7 @@ let%test_module "account timing check" =
           false
   end )
 
-let constraint_system_digests () =
+let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
     , digest
@@ -5898,6 +5904,4 @@ let constraint_system_digests () =
     , digest
         Base.(
           Tick.constraint_system ~exposing:[Statement.With_sok.typ]
-            (main
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled)) ) ]
+            (main ~constraint_constants)) ) ]
