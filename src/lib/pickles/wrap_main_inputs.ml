@@ -42,7 +42,9 @@ module Unsafe = struct
     let res =
       exists
         (Typ.list Boolean.typ_unchecked ~length)
-        ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+        ~compute:
+          As_prover.(
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
     in
     Field.Assert.equal x (Field.project res) ;
     res
