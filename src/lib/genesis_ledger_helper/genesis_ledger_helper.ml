@@ -1271,3 +1271,16 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
               |> Option.value ~default:Public_key.Compressed.empty
               |> Public_key.Compressed.equal
                    (fst Coda_state.Consensus_state_hooks.genesis_winner) ) } }
+
+let%test_module "Account config test" =
+  ( module struct
+    let%test_unit "Runtime config <=> Account" =
+      let module Ledger = (val Genesis_ledger.for_unit_tests) in
+      let accounts = Lazy.force Ledger.accounts in
+      List.iter accounts ~f:(fun (sk, acc) ->
+          let acc_config = Accounts.Single.of_account acc sk in
+          let acc' =
+            Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
+          in
+          [%test_eq: Account.t] acc acc' )
+  end )
