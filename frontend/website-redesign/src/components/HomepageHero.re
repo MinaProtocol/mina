@@ -7,26 +7,31 @@ module Styles = {
       position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.tablet, [height(`auto)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          height(`auto),
+          after([
+            contentRule(""),
+            position(`absolute),
+            bottom(`zero),
+            left(`zero),
+            right(`zero),
+            height(`rem(20.)),
+            background(
+              linearGradient(
+                deg(0.),
+                [
+                  (`percent(0.), white),
+                  (`percent(100.), rgba(255, 255, 255, 0.)),
+                ],
+              ),
+            ),
+          ]),
+        ],
+      ),
       media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
-      after([
-        contentRule(""),
-        position(`absolute),
-        bottom(`zero),
-        left(`zero),
-        right(`zero),
-        height(`rem(20.)),
-        background(
-          linearGradient(
-            deg(0.),
-            [
-              (`percent(0.), white),
-              (`percent(100.), rgba(255, 255, 255, 0.)),
-            ],
-          ),
-        ),
-      ]),
     ]);
 
   let container =
@@ -59,6 +64,9 @@ module Styles = {
     merge([
       Theme.Type.h1jumbo,
       style([
+        fontSize(`rem(4.6)),
+        important(fontWeight(`num(100))),
+        lineHeight(`rem(5.)),
         position(`absolute),
         display(`flex),
         justifyContent(`center),
@@ -125,7 +133,6 @@ module Styles = {
       justifySelf(`flexStart),
       alignSelf(`flexStart),
       width(`percent(100.)),
-      height(`percent(100.)),
       media(
         Theme.MediaQuery.tablet,
         [
