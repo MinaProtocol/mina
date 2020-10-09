@@ -158,7 +158,7 @@ if [ -z "$(ls -A ${BUILDDIR}/var/lib/coda)" ]; then
 else
     echo "Creating PV Key Tar"
     pushd "${BUILDDIR}/var/lib/coda"
-    tar -cvjf "${cwd}"/coda_pvkeys_"${GITHASH}"_"${DUNE_PROFILE}".tar.bz2 * ; \
+    tar -cv --use-compress-program=pigz -f "${cwd}"/coda_pvkeys_"${GITHASH}"_"${DUNE_PROFILE}".tar.bz2 * ; \
     popd
 fi
 ls -lh coda_pvkeys_*
