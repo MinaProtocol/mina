@@ -1,3 +1,5 @@
+workspace( name = "coda" )
+
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
@@ -6,19 +8,19 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_r
 git_repository(
     name = "obazl_rules_ocaml",
     remote = "https://github.com/obazl/rules_ocaml",
-    branch = "master",
+    branch = "dev",
     # commit = "feef897197b36b14b65ffdf00b9badcbdb8f42f4",
     # shallow_since = "1593623637 -0500"
 )
 
-
-load("@obazl_rules_ocaml//ocaml:deps.bzl",
-     "ocaml_configure_tooling",
-     # "ocaml_repositories",
-     # "ocaml_home_sdk",
+load("@obazl_rules_ocaml//ocaml:bootstrap.bzl",
+     "ocaml_configure",
+     "opam_configure",
      "ocaml_register_toolchains")
 
-ocaml_configure_tooling()
+opam_configure()
+
+ocaml_configure()
 
 ocaml_register_toolchains(installation="host")
 
@@ -32,38 +34,6 @@ git_repository(
     # url = "https://github.com/bazelbuild/rules_foreign_cc/archive/master.zip",
     # sha256 = "55b7c4678b4014be103f0e93eb271858a43493ac7a193ec059289fbdc20b9023",
 )
-
-########################
-####   PROTOBUF
-########################
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
-
-git_repository(
-    name = "com_google_protobuf",
-    commit = "09745575a923640154bcf307fba8aedff47f240a",
-    remote = "https://github.com/protocolbuffers/protobuf",
-    shallow_since = "1558721209 -0700",
-)
-
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
-
-http_archive(
-    name = "rules_proto",
-    sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
-    strip_prefix = "rules_proto-97d8af4dc474595af3900dd85cb3a29ad28cc313",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-        "https://github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-    ],
-)
-
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
-
-rules_proto_dependencies()
-
-rules_proto_toolchains()
 
 ##################################################
 ########        C/C++ DEPENDENCIES        ########
@@ -201,36 +171,13 @@ http_archive(
     build_file_content = all_content,
 )
 
-# new_git_repository(
-#     name = "libsnark",
-#     commit = "477c9dfd07b280e42369f82f89c08416319e24ae",
-#     remote = "https://github.com/scipr-lab/libsnark.git",
-#     # branch = "master",
-#     init_submodules = True,
-#     shallow_since = "1560897792 -0400",
-#     # strip_prefix = "",
+# http_archive(
+#     name = "zlib",
+#     url = "https://zlib.net/zlib-1.2.11.tar.gz",
+#     sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
+#     strip_prefix = "zlib-1.2.11",
 #     build_file_content = all_content,
-#     verbose = True
 # )
-
-# new_git_repository(
-#     name = "snarky",
-#     # commit = "",
-#     remote = "git@github.com:o1-labs/snarky.git",
-#     branch = "master",
-#     init_submodules = True,
-#     # shallow_since = "1570056263 -0700",
-#     build_file_content = all_content,
-#     verbose = True
-# )
-
-http_archive(
-    name = "zlib",
-    url = "https://zlib.net/zlib-1.2.11.tar.gz",
-    sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
-    strip_prefix = "zlib-1.2.11",
-    build_file_content = all_content,
-)
 
 ############################################
 ################    CUDA    ################
@@ -249,72 +196,58 @@ http_archive(
 ##########################################
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "6a68e269802911fa419abb940c850734086869d7fe9bc8e12aaf60a09641c818",
+    sha256 = "b725e6497741d7fc2d55fcc29a276627d10e43fa5d0bb692692890ae30d98d00",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.23.0/rules_go-v0.23.0.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.23.0/rules_go-v0.23.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.24.3/rules_go-v0.24.3.tar.gz",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.24.3/rules_go-v0.24.3.tar.gz",
     ],
 )
 
-load(
-    "@io_bazel_rules_go//go:deps.bzl",
-    "go_rules_dependencies",
-    "go_register_toolchains",
-)
+load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
 go_rules_dependencies()
+
+# go_register_toolchains()
 go_register_toolchains(go_version = "host")
+
+#######################################
+####    PROTOBUF (needed by Go)    ####
+#######################################
+git_repository(
+    name = "com_google_protobuf",
+    commit = "09745575a923640154bcf307fba8aedff47f240a",
+    remote = "https://github.com/protocolbuffers/protobuf",
+    shallow_since = "1558721209 -0700",
+)
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
+
+local_repository(
+    name = "libp2p_helper",
+    path = "src/app/libp2p_helper"
+)
 
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "bfd86b3cbe855d6c16c6fce60d76bd51f5c8dbc9cfcaef7a2bb5c1aafd0710e8",
+    sha256 = "d4113967ab451dd4d2d767c3ca5f927fec4b30f3b2c6f8135a2033b9c05a5687",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.21.0/bazel-gazelle-v0.21.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.21.0/bazel-gazelle-v0.21.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.0/bazel-gazelle-v0.22.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.0/bazel-gazelle-v0.22.0.tar.gz",
     ],
 )
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
-gazelle_dependencies()
+# load("//bzl/libp2p:bootstrap.bzl", "libp2p_bootstrap")
+load("@libp2p_helper//bzl/libp2p:deps.bzl", "libp2p_bootstrap")
+# # gazelle:repository_macro bzl/libp2p/bootstrap.bzl%libp2p_bootstrap
+libp2p_bootstrap()
 
-
-#######################################
-########        GO DEPS        ########
-
-## Fetching this in bzl/external/go.bzl does not work, for some reason.
-## libp2p_core depends on it.
-go_repository(
-    name = "com_github_mini_sha256_simd",
-    importpath = "github.com/minio/sha256-simd",
-    commit = "6de4475307716de15b286880ff321c9547086fdd",
-    # version = "0.1.1"
-    # sum = ""
-)
-
-load("//bzl/external:go.bzl",
-     "fetch_go_repos")
-fetch_go_repos()
+gazelle_dependencies(go_repository_default_config = "@libp2p_helper//:WORKSPACE.bazel")
 
 ################################################################
-git_repository(
-    name = "digestif",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/digestif",
-)
-
-git_repository(
-    name = "ppx_optcomp",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/ppx_optcomp"
-)
-
-git_repository(
-    name = "ppx_version",
-    branch = "bazel",
-    remote = "https://github.com/mobileink/ppx_version",
-)
-
 local_repository( name = "async_kernel" , path = "src/external/async_kernel")
 local_repository( name = "graphql_ppx"  , path = "src/external/graphql_ppx")
 local_repository( name = "ocaml_extlib" , path = "src/external/ocaml_extlib")
