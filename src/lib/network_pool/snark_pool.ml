@@ -590,7 +590,7 @@ let%test_module "random set test" =
     let%test_unit "serialization" =
       let t =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Quickcheck.random_value (gen ~length:1000 ()) )
+            Quickcheck.random_value (gen ~length:100 ()) )
       in
       let s0 = Mock_snark_pool.For_tests.snark_tables t in
       let s1 =
