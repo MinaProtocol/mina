@@ -693,14 +693,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let genesis_state_timestamp =
         consensus_constants.genesis_state_timestamp
       in
-      let%map () =
-        match recheck_timing_reader with
-        | None ->
-            return ()
-        | Some recheck_timing_reader ->
-            Strict_pipe.Reader.iter recheck_timing_reader ~f:(fun () ->
-                Deferred.return (check_next_block_timing ()) )
-      in
+      Option.iter recheck_timing_reader ~f:(fun recheck_timing_reader ->
+          don't_wait_for
+          @@ Strict_pipe.Reader.iter recheck_timing_reader ~f:(fun () ->
+                 Deferred.return (check_next_block_timing ()) ) ) ;
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in
       if Time.( >= ) now genesis_state_timestamp then start ()
