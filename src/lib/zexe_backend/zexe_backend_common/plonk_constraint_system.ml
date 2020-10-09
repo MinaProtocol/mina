@@ -270,8 +270,6 @@ struct
     | _ ->
         failwith "Unsupported constraint"
 
-  let bad_constraint = 1276
-
   let compute_witness sys (external_values : int -> Fp.t) : Fp.t array array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
@@ -303,30 +301,17 @@ struct
     in
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input row ->
         let i = i_after_input + public_input_size in
-        if i_after_input = 0 then [%test_eq: int] i 141 ;
         Array.iteri row ~f:(fun j v ->
             match v with
             | None ->
                 ()
             | Some (External v) ->
-                if i = bad_constraint then (
-                  Core.printf "External %d\n%!" v ;
-                  Fp.print (external_values v) ) ;
                 res.(i).(j) <- external_values v
             | Some (Internal v) ->
                 let lc = find sys.internal_vars v in
                 let value = compute lc in
-                if i = bad_constraint then (
-                  Core.printf !"Internal %{sexp:Internal_var.t}\n%!" v ;
-                  Core.printf
-                    !"lc %{sexp:(Fp.t * V.t) list * Fp.t option}\n%!"
-                    lc ;
-                  Fp.print value ) ;
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
-    Core.printf
-      !"res[%d] = %{sexp:Fp.t array}"
-      bad_constraint res.(bad_constraint) ;
     res
 
   let create_internal ?constant sys lc : V.t =
@@ -367,6 +352,20 @@ struct
 
   let digest = digest
 
+  let wire' sys key row col =
+    let prev =
+      match V.Table.find sys.equivalence_classes key with
+      | Some x -> (
+        match List.hd x with Some x -> x | None -> {row; col} )
+      | None ->
+          {row; col}
+    in
+    V.Table.add_multi sys.equivalence_classes ~key ~data:{row; col} ;
+    prev
+
+  let wire sys key row col =
+    wire' sys key (Row.After_public_input row) col
+
   let finalize_and_get_gates sys =
     match sys.gates with
     | `Finalized g ->
@@ -376,16 +375,17 @@ struct
         let n = Set_once.get_exn sys.public_input_size [%here] in
         (* First, add gates for public input *)
         let pub =
-          Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+          Fp.Vector.of_array [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
         in
         for row = 0 to n - 1 do
-          (* Add to the equivalence class *)
-          V.Table.add_multi sys.equivalence_classes
-            ~key:(V.External (row + 1))
-            ~data:{row= Row.Public_input row; col= 0} ;
+          let lp = 
+            wire' sys (V.External (row + 1))
+              (Row.Public_input row) 0
+          in 
+          let lp_row = Row.to_absolute ~public_input_size:n lp.row in
           (* Add to the gate vector *)
           let row = Unsigned.Size_t.of_int row in
-          Gates.add_raw g ~gate_enum:1 ~row ~lrow:row ~lcol:0 ~rrow:row ~rcol:1
+          Gates.add_raw g ~gate_enum:1 ~row ~lrow:lp_row ~lcol:0 ~rrow:row ~rcol:1
             ~orow:row ~ocol:2 pub
         done ;
         let offset_row = Row.to_absolute ~public_input_size:n in
@@ -427,15 +427,6 @@ struct
   open Position
 
   let add_row sys row t l r o c =
-    (*
-    print_endline (Sexp.to_string ([%sexp_of: V.t option array] row));
-
-    Printf.printf "row: %d\n" sys.next_row; 
-    Printf.printf "l.row: %d, l.col: %d\n" l.row l.col; 
-    Printf.printf "r.row: %d, r.col: %d\n" r.row r.col; 
-    Printf.printf "o.row: %d, o.col: %d\n" o.row o.col; 
-    Out_channel.flush stdout;
-*)
     ( match sys.gates with
     | `Finalized _ ->
         failwith "add_row called on finalized constraint system"
@@ -454,18 +445,6 @@ struct
              :: gates ) ) ;
     sys.next_row <- sys.next_row + 1 ;
     sys.rows_rev <- row :: sys.rows_rev
-
-  let wire sys key row col =
-    let row = Row.After_public_input row in
-    let prev =
-      match V.Table.find sys.equivalence_classes key with
-      | Some x -> (
-        match List.hd x with Some x -> x | None -> {row; col} )
-      | None ->
-          {row; col}
-    in
-    V.Table.add_multi sys.equivalence_classes ~key ~data:{row; col} ;
-    prev
 
   let add_generic_constraint ?l ?r ?o c sys : unit =
     let next_row = sys.next_row in
@@ -491,9 +470,6 @@ struct
           {row= After_public_input next_row; col= 2}
     in
     add_row sys [|l; r; o|] 1 lp rp op c
-
-  let when_first sys f =
-    if Int.abs (sys.next_row - (bad_constraint - 141)) = 0 then f ()
 
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -549,10 +525,6 @@ struct
           | Some c ->
               (* res = ls * lx + c *)
               let res = create_internal ~constant:c sys [(ls, External lx)] in
-              when_first sys (fun () ->
-                  Core.printf
-                    !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                    __LOC__ x ) ;
               add_generic_constraint ~l:(External lx) ~o:res
                 [|ls; Fp.zero; Fp.(negate one); Fp.zero; c|]
                 sys ;
@@ -562,20 +534,6 @@ struct
             let res =
               create_internal ?constant sys [(ls, External lx); (rs, rx)]
             in
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ x ;
-                Core.printf !"rx = %{sexp:V.t}\n%!" rx ;
-                Core.printf !"lx = %{sexp:V.t}\n%!" (External lx) ;
-                Core.printf !"rs = %{sexp:Fp.t}\n%!" rs ;
-                Core.printf !"ls = %{sexp:Fp.t}\n%!" ls ) ;
-            (* 1 + x215 - x214 = res *)
-            (* Actual:
-              -1 * x214 + 1 * x215 -res + 1 = 0
-
-               res = 1 + x215 - x214 
-            *)
             (* res = ls * lx + rs * rx + c *)
             add_generic_constraint ~l:(External lx) ~r:rx ~o:res
               [| ls
@@ -591,7 +549,6 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    (*     print_endline (Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr)); *)
     let red = reduce_lincom sys in
     let reduce_to_v (x as x0 : Fp.t Snarky_backendless.Cvar.t) : V.t =
       let s, x = red x in
@@ -600,10 +557,6 @@ struct
           if Fp.equal s Fp.one then x
           else
             let sx = create_internal sys [(s, x)] in
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ x0 ) ;
             (* s * x - sx = 0 *)
             add_generic_constraint ~l:x ~o:sx
               [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
@@ -621,14 +574,6 @@ struct
         let (sl, xl), (so, xo) = (red v1, red v2) in
         match (xl, xo) with
         | `Var xl, `Var xo ->
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v1 ) ;
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v2 ) ;
             (* (sl * xl)^2 = so * xo
                sl^2 * xl * xl - so * xo = 0
             *)
@@ -636,26 +581,10 @@ struct
               [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]
               sys
         | `Var xl, `Constant ->
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v1 ) ;
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v2 ) ;
             add_generic_constraint ~l:xl ~r:xl
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
               sys
         | `Constant, `Var xo ->
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v1 ) ;
-            when_first sys (fun () ->
-                Core.printf
-                  !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ v2 ) ;
             (* sl^2 = so * xo *)
             add_generic_constraint ~o:xo
               [|Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl)|]
@@ -663,21 +592,9 @@ struct
         | `Constant, `Constant ->
             assert (Fp.(equal (square sl) so)) )
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) -> (
-        let f s =
-          when_first sys (fun () ->
-              Core.printf !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!" s v1
-          ) ;
-          when_first sys (fun () ->
-              Core.printf !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!" s v2
-          ) ;
-          when_first sys (fun () ->
-              Core.printf !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!" s v3
-          )
-        in
         let (s1, x1), (s2, x2), (s3, x3) = (red v1, red v2, red v3) in
         match (x1, x2, x3) with
         | `Var x1, `Var x2, `Var x3 ->
-            f __LOC__ ;
             (* s1 x1 * s2 x2 = s3 x3
                - s1 s2 (x1 x2) + s3 x3 = 0
             *)
@@ -685,34 +602,28 @@ struct
               [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]
               sys
         | `Var x1, `Var x2, `Constant ->
-            f __LOC__ ;
             add_generic_constraint ~l:x1 ~r:x2
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
               sys
         | `Var x1, `Constant, `Var x3 ->
-            f __LOC__ ;
             (* s1 x1 * s2 = s3 x3
             *)
             add_generic_constraint ~l:x1 ~o:x3
               [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Constant, `Var x2, `Var x3 ->
-            f __LOC__ ;
             add_generic_constraint ~r:x2 ~o:x3
               [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Var x1, `Constant, `Constant ->
-            f __LOC__ ;
             add_generic_constraint ~l:x1
               [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Var x2, `Constant ->
-            f __LOC__ ;
             add_generic_constraint ~r:x2
               [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Constant, `Var x3 ->
-            f __LOC__ ;
             add_generic_constraint ~o:x3
               [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]
               sys
@@ -720,10 +631,6 @@ struct
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
     | Snarky_backendless.Constraint.Boolean v -> (
         let s, x = red v in
-        when_first sys (fun () ->
-            Core.printf
-              !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-              __LOC__ v ) ;
         match x with
         | `Var x ->
             (* -x + x * x = 0  *)
@@ -733,14 +640,6 @@ struct
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
     | Snarky_backendless.Constraint.Equal (v1, v2) -> (
-        when_first sys (fun () ->
-            Core.printf
-              !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-              __LOC__ v1 ) ;
-        when_first sys (fun () ->
-            Core.printf
-              !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-              __LOC__ v2 ) ;
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
