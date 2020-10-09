@@ -142,6 +142,9 @@ val start : t -> unit Deferred.t
 val start_with_precomputed_blocks :
   t -> Block_producer.Precomputed_block.t list -> unit Deferred.t
 
+val generate_precomputed_blocks :
+  t -> filename:string -> skip_slots:int -> unit Deferred.t
+
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
 val create : Config.t -> t Deferred.t

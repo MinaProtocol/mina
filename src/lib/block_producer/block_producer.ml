@@ -272,8 +272,8 @@ end
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation
-    ~(precomputed_values : Precomputed_values.t) =
+    ~set_next_producer_timing ~log_block_creation ?precomputed_block_writer
+    ?recheck_timing_reader ~(precomputed_values : Precomputed_values.t) () =
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
@@ -447,6 +447,20 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     Coda_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
+                    let () =
+                      match precomputed_block_writer with
+                      | None ->
+                          ()
+                      | Some precomputed_block_writer ->
+                          Strict_pipe.Writer.write precomputed_block_writer
+                            ( transition_hash
+                            , { Precomputed_block.scheduled_time=
+                                  Time.now time_controller
+                              ; protocol_state
+                              ; protocol_state_proof
+                              ; staged_ledger_diff
+                              ; delta_transition_chain_proof } )
+                    in
                     let%bind.Async () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -588,6 +602,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
       let rec check_next_block_timing () =
+        (* Drop any pending requests to recheck timing if we are doing it now.
+        *)
+        Option.iter recheck_timing_reader ~f:(fun recheck_timing_reader ->
+            Strict_pipe.Reader.clear recheck_timing_reader ) ;
         trace_recurring "check next block timing" (fun () ->
             (* See if we want to change keypairs *)
             let keypairs =
@@ -674,6 +692,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       in
       let genesis_state_timestamp =
         consensus_constants.genesis_state_timestamp
+      in
+      let%map () =
+        match recheck_timing_reader with
+        | None ->
+            return ()
+        | Some recheck_timing_reader ->
+            Strict_pipe.Reader.iter recheck_timing_reader ~f:(fun () ->
+                Deferred.return (check_next_block_timing ()) )
       in
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in

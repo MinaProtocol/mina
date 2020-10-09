@@ -726,22 +726,24 @@ let last_epoch_delegators t ~pk =
   find_delegators last_epoch_delegatee_table pk
 
 let start t =
-  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
-    ~prover:t.processes.prover ~trust_system:t.config.trust_system
-    ~transaction_resource_pool:
-      (Network_pool.Transaction_pool.resource_pool
-         t.components.transaction_pool)
-    ~get_completed_work:
-      (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
-    ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.block_production_keypairs)
-    ~coinbase_receiver:t.coinbase_receiver
-    ~consensus_local_state:t.config.consensus_local_state
-    ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values ;
+  let%bind () =
+    Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+      ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
+      ~prover:t.processes.prover ~trust_system:t.config.trust_system
+      ~transaction_resource_pool:
+        (Network_pool.Transaction_pool.resource_pool
+           t.components.transaction_pool)
+      ~get_completed_work:
+        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+      ~time_controller:t.config.time_controller
+      ~keypairs:(Agent.read_only t.block_production_keypairs)
+      ~coinbase_receiver:t.coinbase_receiver
+      ~consensus_local_state:t.config.consensus_local_state
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~log_block_creation:t.config.log_block_creation
+      ~precomputed_values:t.config.precomputed_values ()
+  in
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
@@ -755,6 +757,88 @@ let start_with_precomputed_blocks t blocks =
       ~precomputed_blocks:blocks
   in
   start t
+
+let generate_precomputed_blocks t ~filename ~skip_slots =
+  let file = Out_channel.create filename ~fail_if_exists:true in
+  let precomputed_block_reader, precomputed_block_writer =
+    Strict_pipe.create ~name:"precomputed block"
+      (Buffered (`Capacity 1, `Overflow Crash))
+  in
+  let recheck_timing_reader, recheck_timing_writer =
+    Strict_pipe.create ~name:"recheck block timing"
+      (Buffered (`Capacity 1, `Overflow Crash))
+  in
+  let%bind () =
+    Strict_pipe.Reader.iter precomputed_block_reader
+      ~f:(fun (transition_hash, precomputed_block) ->
+        [%log' info t.config.logger] "Recording $block to $filename"
+          ~metadata:
+            [ ("transition_hash", Frozen_ledger_hash.to_yojson transition_hash)
+            ; ( "block"
+              , Block_producer.Precomputed_block.to_yojson precomputed_block )
+            ; ("filename", `String filename) ] ;
+        Block_producer.Precomputed_block.sexp_of_t precomputed_block
+        |> Sexp.to_string
+        |> Out_channel.output_string file ;
+        Out_channel.newline file ;
+        Out_channel.flush file ;
+        let rec wait_for_hash () =
+          match%bind Strict_pipe.Reader.read (validated_transitions t) with
+          | `Ok (found_transition_hash, _external_transition)
+            when State_hash.equal found_transition_hash.hash transition_hash ->
+              (* The transition has made its way through the system, we can now
+                 update the block time to our desired next block time.
+              *)
+              let block_time = precomputed_block.scheduled_time in
+              let constants =
+                t.config.precomputed_values.consensus_constants
+              in
+              let current_slot_start_time =
+                Consensus.Data.Consensus_time.(
+                  of_time_exn ~constants block_time |> start_time ~constants)
+                |> Block_time.to_time
+              in
+              let next_slot_start_time =
+                Time.Span.(
+                  scale
+                    (Block_time.Span.to_time_span constants.slot_duration_ms)
+                    (Float.of_int skip_slots)
+                  + Time.to_span_since_epoch current_slot_start_time)
+                |> Time.of_span_since_epoch
+              in
+              let now = Time.now () in
+              let time_offset = Time.diff now next_slot_start_time in
+              Block_time.Controller.set_time_offset time_offset ;
+              Strict_pipe.Writer.write recheck_timing_writer () ;
+              return ()
+          | `Ok _ ->
+              wait_for_hash ()
+          | `Eof ->
+              failwith
+                "Unexpected EOF received from validated_transitions pipe"
+        in
+        wait_for_hash () )
+  in
+  let%bind () =
+    Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+      ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
+      ~prover:t.processes.prover ~trust_system:t.config.trust_system
+      ~transaction_resource_pool:
+        (Network_pool.Transaction_pool.resource_pool
+           t.components.transaction_pool)
+      ~get_completed_work:
+        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+      ~time_controller:t.config.time_controller
+      ~keypairs:(Agent.read_only t.block_production_keypairs)
+      ~coinbase_receiver:t.coinbase_receiver
+      ~consensus_local_state:t.config.consensus_local_state
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~log_block_creation:t.config.log_block_creation
+      ~precomputed_values:t.config.precomputed_values ~precomputed_block_writer
+      ~recheck_timing_reader ()
+  in
+  Snark_worker.start t
 
 let create (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
