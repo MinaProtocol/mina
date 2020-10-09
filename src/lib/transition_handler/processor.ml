@@ -52,7 +52,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       | Some _ ->
           Transition_frontier.add_breadcrumb_exn frontier breadcrumb
       | None ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          [%log warn]
             !"When trying to add breadcrumb, its parent had been removed from \
               transition frontier: %{sexp: State_hash.t}"
             parent_hash ;
@@ -123,7 +123,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           in
           Error ()
       | Error `Already_in_frontier ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
              is is already in the transition frontier" ;
           let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
@@ -179,7 +179,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   (metadata @ [("error", `String (Error.to_string_hum error))])
                 "Error while building breadcrumb in the transition handler \
@@ -300,7 +300,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                Cached.invalidate_with_failure cached_breadcrumb
                              in
                              () ) ) ;
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
                         transition frontier: %s"
                        (Error.to_string_hum err) )
@@ -331,8 +331,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                    | Ok () ->
                        ()
                    | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
+                       [%log error]
                          ~metadata:
                            [("error", `String (Error.to_string_hum err))]
                          "Error, failed to attach produced breadcrumb to \
@@ -438,8 +437,7 @@ let%test_module "Transition_handler.Processor tests" =
                                     next_expected_breadcrumb)
                                  (External_transition.Validated.state_hash
                                     newly_added_transition) ;
-                               Logger.info logger ~module_:__MODULE__
-                                 ~location:__LOC__
+                               [%log info]
                                  ~metadata:
                                    [ ( "height"
                                      , `Int

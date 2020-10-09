@@ -1,4 +1,7 @@
-module Decoders = Graphql_client.Decoders
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
+module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
 [%graphql
@@ -17,12 +20,21 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey) {
-  account(publicKey: $public_key) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+query ($public_key: PublicKey, $token: UInt64) {
+  account(publicKey: $public_key, token: $token) {
     balance {
       total @bsDecoder(fn: "Decoders.balance")
     }
+  }
+}
+|}]
+
+module Get_all_accounts =
+[%graphql
+{|
+query ($public_key: PublicKey) {
+  accounts(publicKey: $public_key) {
+    token @bsDecoder(fn: "Decoders.token")
   }
 }
 |}]
@@ -142,11 +154,11 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $fee: UInt64!,
+          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
-  sendPayment(input: 
-    {from: $sender, to: $receiver, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+  sendPayment(input:
+    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
     payment {
       id
     }
@@ -162,12 +174,75 @@ mutation ($sender: PublicKey!,
           $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
-  sendDelegation(input: 
+  sendDelegation(input:
     {from: $sender, to: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
     delegation {
       id
     }
   }
+}
+|}]
+
+module Send_create_token =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $receiver: PublicKey!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  createToken(input:
+    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewToken {
+      id
+    }
+  }
+}
+|}]
+
+module Send_create_token_account =
+[%graphql
+{|
+mutation ($sender: PublicKey,
+          $tokenOwner: PublicKey!,
+          $receiver: PublicKey!,
+          $token: TokenId!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  createTokenAccount(input:
+    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+    createNewTokenAccount {
+      id
+    }
+  }
+}
+|}]
+
+module Send_mint_tokens =
+[%graphql
+{|
+mutation ($sender: PublicKey!,
+          $receiver: PublicKey,
+          $token: TokenId!,
+          $amount: UInt64!,
+          $fee: UInt64!,
+          $nonce: UInt32,
+          $memo: String) {
+  mintTokens(input:
+    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+    mintTokens {
+      id
+    }
+  }
+}
+|}]
+
+module Get_token_owner =
+[%graphql
+{|
+query tokenOwner($token: TokenId!) {
+  tokenOwner(token: $token)
 }
 |}]
 
@@ -193,7 +268,21 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+    memo @bsDecoder(fn: "Coda_base.Signed_command_memo.of_string")
   }
+}
+|}]
+
+module Next_available_token =
+[%graphql
+{|
+query next_available_token {
+  nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
 }
 |}]

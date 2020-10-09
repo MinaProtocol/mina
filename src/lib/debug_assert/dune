@@ -1,7 +1,7 @@
 (library
  (name debug_assert)
   (public_name debug_assert)
-  (preprocess (pps ppx_version))
+  (preprocess (pps ppx_version bisect_ppx -- --conditional))
   (libraries async_kernel)
   (synopsis "Debug assertion library")
  )

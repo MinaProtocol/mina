@@ -11,10 +11,11 @@
     block_time
     coda_compile_config
     genesis_constants
-    coda_digestif
+    digestif
     coda_numbers
     codable
     core
+    crypto_params
     currency
     debug_assert
     dummy_values
@@ -27,15 +28,16 @@
     one_or_two
     o1trace
     outside_hash_image
-    ppx_version
+    ppx_version.runtime
     quickcheck_lib
     random_oracle
     rocksdb
+    rosetta_coding
     sexp_diff_kernel
     signature_lib
     snark_bits
     snark_params
-    snarky crypto_params
+    snarky.backendless
     sparse_ledger_lib
     storage
     syncable_ledger
@@ -43,13 +45,14 @@
     trust_system
     unsigned_extended
     visualization
+    with_hash
     yojson
     )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
+  (pps ppx_snarky ppx_here ppx_coda ppx_version ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
     ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test h_list.ppx
-    bisect_ppx -- -conditional))
+    bisect_ppx -- --conditional))
  (synopsis "Snarks and friends necessary for keypair generation"))
 
 (rule

@@ -138,8 +138,6 @@ module Key = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
-
   let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
   let gen = Account.key_gen
@@ -166,8 +164,6 @@ module Account_id = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Coda_base.Account_id.t [@@deriving sexp, compare, hash]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

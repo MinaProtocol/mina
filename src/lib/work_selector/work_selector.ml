@@ -11,6 +11,7 @@ module type Selection_method_intf =
               , Transaction_witness.t
               , Ledger_proof.t )
               Snark_work_lib.Work.Single.Spec.t
+   and type transition_frontier := Transition_frontier.t
    and module State := State
 
 module Selection_methods = struct

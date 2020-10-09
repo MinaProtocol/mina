@@ -11,6 +11,9 @@ let Size = ../../Command/Size.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let ValidationService = ../../Projects/ValidationService.dhall
 
+let B = ../../External/Buildkite.dhall
+let B/Skip = B.definitions/commandStep/properties/skip/Type
+
 let commands =
   let sigPath = "mix_cache.sig"
   let archivePath = "\"mix-cache-\\\$(sha256sum ${sigPath} | cut -d\" \" -f1).tar.gz\""
@@ -56,7 +59,8 @@ in Pipeline.build Pipeline.Config::{
       commands = commands,
       label = "Validation service lint steps; employs various forms static analysis on the elixir codebase",
       key = "lint",
-      target = Size.Large,
+      target = Size.Small,
+      skip = Some (B/Skip.String "https://github.com/MinaProtocol/mina/issues/6285"),
       docker = None Docker.Type
     }
   ]

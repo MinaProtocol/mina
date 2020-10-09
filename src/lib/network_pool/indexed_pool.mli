@@ -8,6 +8,26 @@ open Core
 open Coda_base
 open Coda_numbers
 
+module Command_error : sig
+  type t =
+    | Invalid_nonce of
+        [ `Expected of Account.Nonce.t
+        | `Between of Account.Nonce.t * Account.Nonce.t ]
+        * Account.Nonce.t
+    | Insufficient_funds of [`Balance of Currency.Amount.t] * Currency.Amount.t
+    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
+          each other that way! *)
+        Insufficient_replace_fee of
+        [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
+    | Overflow
+    | Bad_token
+    | Expired of
+        [`Valid_until of Coda_numbers.Global_slot.t]
+        * [`Current_global_slot of Coda_numbers.Global_slot.t]
+    | Unwanted_fee_token of Token_id.t
+  [@@deriving sexp_of, to_yojson]
+end
+
 val replace_fee : Currency.Fee.t
 
 (** Transaction pool. This is a purely functional data structure. *)
@@ -16,7 +36,11 @@ type t [@@deriving sexp_of]
 (* TODO sexp is debug only, remove *)
 
 (** Empty pool *)
-val empty : constraint_constants:Genesis_constants.Constraint_constants.t -> t
+val empty :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
+  -> time_controller:Block_time.Controller.t
+  -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
@@ -26,10 +50,16 @@ val min_fee : t -> Currency.Fee.t option
 
 (** Remove the lowest fee command from the pool, along with any others from the
     same account with higher nonces. *)
-val remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
+val remove_lowest_fee :
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
+
+(** Remove all the user commands that are expired. (Valid-until < Current-global-slot) *)
+val remove_expired :
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
 (** Get the highest fee applicable command in the pool *)
-val get_highest_fee : t -> User_command.With_valid_signature.t option
+val get_highest_fee :
+  t -> Transaction_hash.User_command_with_valid_signature.t option
 
 (** Call this when a transaction is added to the best tip or when generating a
     sequence of transactions to apply. This will drop any transactions at that
@@ -41,11 +71,13 @@ val get_highest_fee : t -> User_command.With_valid_signature.t option
 *)
 val handle_committed_txn :
      t
-  -> User_command.With_valid_signature.t
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> fee_payer_balance:Currency.Amount.t
-  -> ( t * User_command.With_valid_signature.t Sequence.t
+  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
      , [ `Queued_txns_by_sender of
-         string * User_command.With_valid_signature.t Sequence.t ] )
+         string
+         * Transaction_hash.User_command_with_valid_signature.t Sequence.t ]
+     )
      Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
@@ -56,23 +88,11 @@ val handle_committed_txn :
 *)
 val add_from_gossip_exn :
      t
-  -> User_command.With_valid_signature.t
+  -> Transaction_hash.User_command_with_valid_signature.t
   -> Account_nonce.t
   -> Currency.Amount.t
-  -> ( t * User_command.With_valid_signature.t Sequence.t
-     , [> `Invalid_nonce of
-          [ `Expected of Account.Nonce.t
-          | `Between of Account.Nonce.t * Account.Nonce.t ]
-          * Account.Nonce.t
-       | `Insufficient_funds of
-         [`Balance of Currency.Amount.t] * Currency.Amount.t
-       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
-          each other that way! *)
-         `Insufficient_replace_fee of
-         [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-       | `Overflow
-       | `Bad_token
-       | `Unwanted_fee_token of Token_id.t ] )
+  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+     , Command_error.t )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
     be empty unless we're replacing one. *)
@@ -80,17 +100,27 @@ val add_from_gossip_exn :
 (** Add a command to the pool that was removed from the best tip because we're
     switching chains. Must be called in reverse order i.e. newest-to-oldest.
 *)
-val add_from_backtrack : t -> User_command.With_valid_signature.t -> t
+val add_from_backtrack :
+     t
+  -> Transaction_hash.User_command_with_valid_signature.t
+  -> (t, Command_error.t) Result.t
 
 (** Check whether a command is in the pool *)
-val member : t -> User_command.With_valid_signature.t -> bool
+val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
-  t -> Account_id.t -> User_command.With_valid_signature.t list
+     t
+  -> Account_id.t
+  -> Transaction_hash.User_command_with_valid_signature.t list
 
 (** Get all user commands in the pool. *)
-val get_all : t -> User_command.With_valid_signature.t list
+val get_all : t -> Transaction_hash.User_command_with_valid_signature.t list
+
+val find_by_hash :
+     t
+  -> Transaction_hash.t
+  -> Transaction_hash.User_command_with_valid_signature.t option
 
 (** Check the contents of the pool are valid against the current ledger. Call
     this whenever the transition frontier is (re)created.
@@ -99,7 +129,7 @@ val revalidate :
      t
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
-  -> t * User_command.With_valid_signature.t Sequence.t
+  -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

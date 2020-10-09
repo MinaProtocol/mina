@@ -1,6 +1,6 @@
 (library
  (name coda_net2)
  (public_name coda_net2)
- (libraries async base58 base64 child_processes coda_digestif core file_system logger network_peer pipe_lib yojson)
+ (libraries async base58 base64 child_processes digestif core file_system logger network_peer pipe_lib yojson)
  (inline_tests)
- (preprocess (pps ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson bisect_ppx -- --conditional)))

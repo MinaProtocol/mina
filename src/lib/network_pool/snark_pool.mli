@@ -20,15 +20,6 @@ module Snark_tables : sig
       [@@deriving sexp]
     end
   end]
-
-  type t = Stable.Latest.t =
-    { all:
-        Ledger_proof.t One_or_two.t Priced_proof.t
-        Transaction_snark_work.Statement.Stable.V1.Table.t
-    ; rebroadcastable:
-        ( Ledger_proof.t One_or_two.t Priced_proof.t
-        * Core.Time.Stable.With_utc_sexp.V2.t )
-        Transaction_snark_work.Statement.Table.t }
 end
 
 module type S = sig
@@ -48,7 +39,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Core.Time.t -> [`Expired | `Ok])
+      -> has_timed_out:(Core.Time.t -> [`Timed_out | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -56,6 +47,7 @@ module type S = sig
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
+     and type resource_pool_diff_verified := Resource_pool.Diff.verified
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
@@ -71,6 +63,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
@@ -111,9 +105,4 @@ module Diff_versioned : sig
       [@@deriving compare, sexp]
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Add_solved_work of
-        Transaction_snark_work.Statement.t
-        * Ledger_proof.t One_or_two.t Priced_proof.t
 end

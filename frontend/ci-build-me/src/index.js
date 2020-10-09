@@ -5,6 +5,30 @@ const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
+const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
+
+const runCircleBuild = async (github) => {
+  const postData = JSON.stringify({
+    branch: github.pull_request.head.ref,
+    parameters: {
+      "run-ci": true,
+    },
+  });
+
+  const options = {
+    hostname: "circleci.com",
+    port: 443,
+    path: `/api/v2/project/github/MinaProtocol/mina/pipeline`,
+    method: "POST",
+    headers: {
+      "Circle-token": circleApiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  };
+  const request = await httpsRequest(options, postData);
+  return request;
+};
 
 const runBuild = async (github) => {
   const postData = JSON.stringify({
@@ -21,7 +45,7 @@ const runBuild = async (github) => {
   const options = {
     hostname: "api.buildkite.com",
     port: 443,
-    path: `/v2/organizations/o-1-labs-2/pipelines/coda/builds`,
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds`,
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -31,6 +55,25 @@ const runBuild = async (github) => {
   };
   const request = await httpsRequest(options, postData);
   return request;
+};
+
+const hasExistingBuilds = async (github) => {
+  const options = {
+    hostname: "api.buildkite.com",
+    port: 443,
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds?branch=${encodeURIComponent(
+      github.pull_request.head.ref
+    )}&commit=${encodeURIComponent(
+      github.pull_request.head.sha
+    )}&state=running&state=finished`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  };
+  const request = await httpsRequest(options);
+  return request.length > 0;
 };
 
 const getRequest = async (url) => {
@@ -43,7 +86,6 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  let request;
   if (event == "pull_request") {
     if (
       // if PR has ci-build-me label
@@ -56,8 +98,24 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      request = await runBuild(req.body);
-      return request;
+      let buildAlreadyExists;
+      try {
+        const res = await hasExistingBuilds(req.body);
+        buildAlreadyExists = res;
+      } catch (e) {
+        // if this fails for some reason, assume we don't have an existing build
+        console.error(`Failed to find existing builds:`);
+        console.error(e);
+        buildAlreadyExists = false;
+      }
+
+      if (!buildAlreadyExists) {
+        const buildkite = await runBuild(req.body);
+        const circle = await runCircleBuild(req.body);
+        return [buildkite, circle];
+      } else {
+        console.info("Build for this commit on this branch was already found");
+      }
     }
   } else if (event == "issue_comment") {
     if (
@@ -72,18 +130,21 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-        orgData.data.filter((org) => org.login == "CodaProtocol").length > 0
+        orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
-        const request = await runBuild({
+        const buildkite = await runBuild({
           sender: req.body.sender,
           pull_request: prData.data,
         });
-        return request;
+        const circle = await runCircleBuild({
+          pull_request: prData.data,
+        });
+        return [buildkite, circle];
       }
     }
   }
-  return null;
+  return [null, null];
 };
 
 /**
@@ -112,17 +173,24 @@ exports.githubWebhookHandler = async (req, res) => {
     github.validateWebhook(req);
 
     const githubEvent = req.headers["x-github-event"];
-    const request = await handler(githubEvent, req);
-    if (request && request.web_url) {
-      console.info(`Triggered build at ${request.web_url}`);
+    const [buildkite, circle] = await handler(githubEvent, req);
+    if (buildkite && buildkite.web_url) {
+      console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
-      console.error("Failed to trigger build for some reason:");
-      console.error(request);
+      console.error(`Failed to trigger buildkite build for some reason:`);
+      console.error(buildkite);
+    }
+
+    if (circle && circle.number) {
+      console.info(`Triggered circle build #${circle.number}`);
+    } else {
+      console.error(`Failed to trigger circle build for some reason:`);
+      console.error(circle);
     }
 
     res.status(200);
     console.info(`HTTP 200: ${githubEvent} event`);
-    res.send(request || {});
+    res.send({ buildkite, circle } || {});
   } catch (e) {
     if (e instanceof HTTPError) {
       res.status(e.statusCode).send(e.message);

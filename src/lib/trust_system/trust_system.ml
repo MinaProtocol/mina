@@ -22,6 +22,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Sent_invalid_signature_or_proof
+        (** Peer either sent us a proof or a signature that does not verify. *)
     | Sent_invalid_protocol_version
         (** Peer sent block with invalid protocol version *)
     | Sent_mismatched_protocol_version
@@ -97,6 +99,8 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
+    | Sent_invalid_signature_or_proof ->
+        Insta_ban
     | Sent_invalid_protocol_version ->
         Insta_ban
     (* allow nodes to send wrong current protocol version a small number of times *)
@@ -163,9 +167,9 @@ let record_envelope_sender :
   match sender with
   | Local ->
       let action_fmt, action_metadata = Actions.to_log action in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
-  | Remote (inet_addr, _peer_id) ->
-      record t logger inet_addr action
+  | Remote peer ->
+      record t logger peer action

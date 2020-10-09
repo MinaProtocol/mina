@@ -8,6 +8,8 @@ open Network_peer
 module Rejected = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = unit [@@deriving sexp, yojson]
 
@@ -26,6 +28,8 @@ module Make
   type t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
+
+  type verified = t [@@deriving compare, sexp, to_yojson]
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
@@ -61,6 +65,47 @@ module Make
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
+  let has_lower_fee pool work ~fee ~sender =
+    let reject_and_log_if_local reason =
+      [%log' trace (Pool.get_logger pool)]
+        "Rejecting snark work $work from $sender: $reason"
+        ~metadata:
+          [ ("work", Work.compact_json work)
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ; ("reason", `String reason) ] ;
+      Or_error.error_string reason
+    in
+    match Pool.request_proof pool work with
+    | None ->
+        Ok ()
+    | Some {fee= {fee= prev; _}; _} -> (
+      match Currency.Fee.compare fee prev with
+      | -1 ->
+          Ok ()
+      | 0 ->
+          reject_and_log_if_local "fee equal to cheapest work we have"
+      | 1 ->
+          reject_and_log_if_local "fee higher than cheapest work we have"
+      | _ ->
+          failwith "compare didn't return -1, 0, or 1!" )
+
+  let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
+    let (Add_solved_work (work, ({Priced_proof.fee; _} as p))) = data in
+    let is_local = match sender with Local -> true | _ -> false in
+    let verify () = Pool.verify_and_act pool ~work:(work, p) ~sender in
+    (*reject higher priced gossiped proofs*)
+    let res =
+      if is_local then verify ()
+      else
+        match has_lower_fee pool work ~fee:fee.fee ~sender with
+        | Ok () ->
+            verify ()
+        | _ ->
+            return false
+    in
+    match%map res with false -> None | true -> Some t
+
+  (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
@@ -70,39 +115,15 @@ module Make
       | `Added ->
           Ok (diff, ())
     in
-    match diff with
-    | Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
-        let reject_and_log_if_local reason =
-          if is_local then (
-            Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
-              ~location:__LOC__
-              "Rejecting locally generated snark work $work: $reason"
-              ~metadata:
-                [("work", Work.compact_json work); ("reason", `String reason)] ;
-            Deferred.return (Error (`Locally_generated (diff, ()))) )
-          else Deferred.return (Error (`Other (Error.of_string reason)))
-        in
-        let check_and_add () =
-          match%map
-            Pool.verify_and_act pool ~work:(work, p)
-              ~sender:(Envelope.Incoming.sender t)
-          with
-          | Ok () ->
-              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
-          | Error e ->
-              Error (`Other e)
-        in
-        match Pool.request_proof pool work with
-        | None ->
-            check_and_add ()
-        | Some {fee= {fee= prev; _}; _} -> (
-          match Currency.Fee.compare fee.fee prev with
-          | -1 ->
-              check_and_add ()
-          | 0 ->
-              reject_and_log_if_local "fee equal to cheapest work we have"
-          | 1 ->
-              reject_and_log_if_local "fee higher than cheapest work we have"
-          | _ ->
-              failwith "compare didn't return -1, 0, or 1!" ) )
+    Deferred.return
+      (let (Add_solved_work (work, {Priced_proof.proof; fee})) = diff in
+       let add_to_pool () =
+         Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+       in
+       match has_lower_fee pool work ~fee:fee.fee ~sender with
+       | Ok () ->
+           add_to_pool ()
+       | Error e ->
+           if is_local then Error (`Locally_generated (diff, ()))
+           else Error (`Other e))
 end

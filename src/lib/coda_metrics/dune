@@ -3,4 +3,4 @@
   (public_name coda_metrics)
   (libraries async cohttp cohttp-async logger jemalloc prometheus)
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_version ppx_pipebang ppx_custom_printf ppx_optcomp)))
+  (preprocess (pps ppx_coda ppx_version ppx_pipebang ppx_custom_printf ppx_optcomp bisect_ppx -- --conditional)))

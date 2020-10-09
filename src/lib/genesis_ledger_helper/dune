@@ -1,6 +1,6 @@
 (library
   (public_name genesis_ledger_helper)
   (name genesis_ledger_helper)
-  (libraries core_kernel coda_base signature_lib genesis_constants runtime_config cache_dir coda_lib)
+  (libraries snark_keys core_kernel coda_base signature_lib genesis_constants runtime_config cache_dir coda_lib)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_optcomp ppx_let ppx_deriving_yojson ppx_custom_printf)))
+  (preprocess (pps ppx_coda ppx_version ppx_optcomp ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf bisect_ppx -- --conditional)))

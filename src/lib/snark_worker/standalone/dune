@@ -1,0 +1,4 @@
+(executable
+ (name run_snark_worker)
+ (libraries snark_worker)
+ (preprocess (pps ppx_let ppx_custom_printf ppx_version)))

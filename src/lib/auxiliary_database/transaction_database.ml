@@ -46,10 +46,9 @@ struct
   let add {database; pagination; logger} transaction date =
     match Hashtbl.find pagination.all_values.table transaction with
     | Some _retrieved_transaction ->
-        Logger.trace logger
+        [%log trace]
           !"Not adding transaction into transaction database since it already \
             exists: $transaction"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("transaction", Transaction.to_yojson transaction)]
     | None ->
         Database.set database ~key:transaction ~data:date ;
@@ -64,8 +63,39 @@ struct
   let query {pagination; _} = Pagination.query pagination
 end
 
+module Transaction_with_hash = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          ( (Signed_command.Stable.V1.t[@hash.ignore])
+          , (Transaction_hash.Stable.V1.t[@to_yojson
+                                           Transaction_hash.to_yojson]) )
+          With_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, to_yojson]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+
+      let accounts_accessed ~next_available_token ({data; _} : t) =
+        Signed_command.accounts_accessed ~next_available_token data
+
+      include Comparable.Make (T)
+      include Hashable.Make (T)
+    end
+  end]
+
+  let create cmd =
+    { With_hash.data= cmd
+    ; hash= Transaction_hash.hash_command (Signed_command cmd) }
+end
+
 module Block_time = Block_time
-module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
+module T =
+  Make (Transaction_with_hash.Stable.Latest) (Block_time.Time.Stable.Latest)
 include T
 
 module For_tests = struct
@@ -105,10 +135,12 @@ module For_tests = struct
             "Need to select two elements from a list with at least two elements"
     in
     let payment_gen =
-      User_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+      Signed_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+      |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let delegation_gen =
-      User_command.Gen.stake_delegation ~key_gen ~max_fee ()
+      Signed_command.Gen.stake_delegation ~key_gen ~max_fee ()
+      |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let command_gen =
       Quickcheck.Generator.weighted_union
@@ -143,12 +175,14 @@ module For_tests = struct
         in
         let%bind delegation_with_time =
           tuple2
-            (User_command.Gen.stake_delegation ~key_gen ~max_fee ())
+            ( Signed_command.Gen.stake_delegation ~key_gen ~max_fee ()
+            |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in
         let%map payment_with_time =
           tuple2
-            (User_command.Gen.payment ~key_gen ~max_amount ~max_fee ())
+            ( Signed_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+            |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in
         [payment_with_time; delegation_with_time]

@@ -18,21 +18,21 @@ let record_payment t (txn : User_command.t) account =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
   match Receipt_chain_database.add receipt_chain_database ~previous txn with
   | `Ok hash ->
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:
-          [ ("user_command", User_command.to_yojson txn)
+          [ ("command", User_command.to_yojson txn)
           ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
-        "Added  payment $user_command into receipt_chain database. You should \
-         wait for a bit to see your account's receipt chain hash update as \
+        "Added  payment $command into receipt_chain database. You should wait \
+         for a bit to see your account's receipt chain hash update as \
          $receipt_chain_hash" ;
       hash
   | `Duplicate hash ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("user_command", User_command.to_yojson txn)]
+      [%log warn]
+        ~metadata:[("command", User_command.to_yojson txn)]
         "Already sent transaction $user_command" ;
       hash
   | `Error_multiple_previous_receipts parent_hash ->
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           [ ( "parent_receipt_chain_hash"
             , Receipt.Chain_hash.to_yojson parent_hash )
@@ -85,7 +85,7 @@ let get_balance t (addr : Account_id.t) =
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.lookup trust_system ip_address
+  Trust_system.lookup_ip trust_system ip_address
 
 let get_trust_status_all t =
   let config = Coda_lib.config t in
@@ -95,7 +95,7 @@ let get_trust_status_all t =
 let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.reset trust_system ip_address
+  Trust_system.reset_ip trust_system ip_address
 
 let replace_block_production_keys keys pks =
   let kps =
@@ -126,13 +126,14 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
-  | Ok ([txn], []) ->
-      Logger.info
-        (Coda_lib.top_level_logger t)
-        ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("user_command", User_command.to_yojson txn)]
-        "Scheduled payment $user_command" ;
-      Ok (txn, record_payment t txn (Option.value_exn account_opt))
+  | Ok ([Signed_command txn], []) ->
+      [%log' info (Coda_lib.top_level_logger t)]
+        ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
+        "Scheduled payment $command" ;
+      Ok
+        ( txn
+        , record_payment t (Signed_command txn) (Option.value_exn account_opt)
+        )
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->
@@ -141,9 +142,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
-  Logger.warn
-    (Coda_lib.top_level_logger t)
-    ~module_:__MODULE__ ~location:__LOC__
+  [%log' warn (Coda_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
       [("coda_command", `String "scheduling a batch of user transactions")] ;
@@ -338,7 +337,7 @@ let get_status ~flag t =
     Option.map (Coda_lib.next_producer_timing t) ~f:(function
       | `Produce_now _ ->
           `Produce_now
-      | `Produce (time, _, _) ->
+      | `Produce (time, _, _, _) ->
           `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
@@ -353,6 +352,7 @@ let get_status ~flag t =
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
+  ; chain_id= config.chain_id
   ; consensus_time_best_tip
   ; commit_id
   ; conf_dir
@@ -383,25 +383,23 @@ module Subscriptions = struct
 end
 
 module For_tests = struct
-  let get_all_user_commands coda public_key =
+  let get_all_commands coda public_key =
     let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
-    let user_commands =
-      List.concat_map
-        ~f:
-          (Fn.compose
-             Auxiliary_database.Filtered_external_transition.user_commands
-             With_hash.data)
+    let commands =
+      List.concat_map ~f:(fun transition ->
+          transition |> With_hash.data
+          |> Auxiliary_database.Filtered_external_transition.commands
+          |> List.map ~f:With_hash.data )
       @@ Auxiliary_database.External_transition_database.get_all_values
            external_transition_database (Some account_id)
     in
-    let participants_user_commands =
-      User_command.filter_by_participant user_commands public_key
+    let participants_commands =
+      User_command.filter_by_participant commands public_key
     in
-    List.dedup_and_sort participants_user_commands
-      ~compare:User_command.compare
+    List.dedup_and_sort participants_commands ~compare:User_command.compare
 
   module Subscriptions = struct
     let new_user_commands coda public_key =

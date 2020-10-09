@@ -1,0 +1,6 @@
+(library
+  (name backend)
+  (public_name pickles.backend)
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson  bisect_ppx -- --conditional))
+  (libraries
+    zexe_backend ))

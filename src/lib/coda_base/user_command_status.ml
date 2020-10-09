@@ -15,24 +15,15 @@ module Failure = struct
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
+        | Signed_command_on_snapp_account
+        | Snapp_account_not_present
+        | Update_not_permitted
+        | Incorrect_nonce
       [@@deriving sexp, yojson, eq, compare]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Predicate
-    | Source_not_present
-    | Receiver_not_present
-    | Amount_insufficient_to_create_account
-    | Cannot_pay_creation_fee_in_token
-    | Source_insufficient_balance
-    | Receiver_already_exists
-    | Not_token_owner
-    | Mismatched_token_permissions
-    | Overflow
-  [@@deriving sexp, yojson, eq, compare]
 
   let to_latest = Fn.id
 
@@ -57,6 +48,14 @@ module Failure = struct
         "Mismatched_token_permissions"
     | Overflow ->
         "Overflow"
+    | Signed_command_on_snapp_account ->
+        "Signed_command_on_snapp_account"
+    | Snapp_account_not_present ->
+        "Snapp_account_not_present"
+    | Update_not_permitted ->
+        "Update_not_permitted"
+    | Incorrect_nonce ->
+        "Incorrect_nonce"
 
   let of_string = function
     | "Predicate" ->
@@ -79,13 +78,16 @@ module Failure = struct
         Ok Mismatched_token_permissions
     | "Overflow" ->
         Ok Overflow
+    | "Snapp_account_not_present" ->
+        Ok Snapp_account_not_present
+    | "Incorrect_nonce" ->
+        Ok Incorrect_nonce
     | _ ->
-        Error "User_command_status.Failure.of_string: Unknown value"
+        Error "Signed_command_status.Failure.of_string: Unknown value"
 
   let describe = function
     | Predicate ->
-        "The fee-payer is not authorised to issue this command for the source \
-         account"
+        "A predicate failed"
     | Source_not_present ->
         "The source account does not exist"
     | Receiver_not_present ->
@@ -106,17 +108,46 @@ module Failure = struct
         "The permissions for this token do not match those in the command"
     | Overflow ->
         "The resulting balance is too large to store"
+    | Signed_command_on_snapp_account ->
+        "The source of a signed command cannot be a snapp account"
+    | Snapp_account_not_present ->
+        "A snapp account does not exist"
+    | Update_not_permitted ->
+        "An account is not permitted to make the given update"
+    | Incorrect_nonce ->
+        "Incorrect nonce"
+end
+
+module Auxiliary_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer_account_creation_fee_paid:
+            Currency.Amount.Stable.V1.t option
+        ; receiver_account_creation_fee_paid:
+            Currency.Amount.Stable.V1.t option
+        ; created_token: Token_id.Stable.V1.t option }
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let empty =
+    { fee_payer_account_creation_fee_paid= None
+    ; receiver_account_creation_fee_paid= None
+    ; created_token= None }
 end
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Applied | Failed of Failure.Stable.V1.t
+    type t =
+      | Applied of Auxiliary_data.Stable.V1.t
+      | Failed of Failure.Stable.V1.t
     [@@deriving sexp, yojson, eq, compare]
 
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = Applied | Failed of Failure.t
-[@@deriving sexp, yojson, eq, compare]

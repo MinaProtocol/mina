@@ -1,0 +1,12 @@
+{{ if (ne $.Values.coda.runtimeConfig "") -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ tpl $.Values.seed.fullname . }}-daemon-config
+  labels:
+    app: {{ tpl $.Values.seed.fullname . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+data:
+  daemon.json: {{ $.Values.coda.runtimeConfig | quote }}
+{{- end }}

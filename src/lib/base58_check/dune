@@ -2,7 +2,17 @@
  (name base58_check)
  (public_name base58_check)
  (inline_tests)
- (libraries coda_digestif core_kernel base58)
+ (libraries digestif core_kernel base58)
  (library_flags (-linkall))
- (preprocess (pps ppx_base ppx_version ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_inline_test ppx_deriving_yojson bisect_ppx -conditional))
+ (preprocess
+  (pps
+   bisect_ppx --conditional
+   ppx_assert
+   ppx_base
+   ppx_deriving.std
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let
+   ppx_sexp_conv
+   ppx_version))
  (synopsis "Base58Check implementation"))

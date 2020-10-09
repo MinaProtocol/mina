@@ -59,7 +59,7 @@ module Poly = struct
         ; fee_excess_l: 'fee
         ; fee_token_r: 'token
         ; fee_excess_r: 'fee }
-      [@@deriving compare, equal, hash, sexp]
+      [@@deriving compare, equal, hash, sexp, hlist]
 
       let to_yojson token_to_yojson fee_to_yojson
           {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
@@ -86,16 +86,8 @@ module Poly = struct
     end
   end]
 
-  type ('token, 'fee) t = ('token, 'fee) Stable.Latest.t =
-    { fee_token_l: 'token
-    ; fee_excess_l: 'fee
-    ; fee_token_r: 'token
-    ; fee_excess_r: 'fee }
-  [@@deriving compare, equal, hash, sexp, hlist]
-
-  let to_yojson = Stable.Latest.to_yojson
-
-  let of_yojson = Stable.Latest.of_yojson
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
 
   [%%ifdef
   consensus_mechanism]
@@ -135,13 +127,6 @@ let poly_to_yojson = Poly.to_yojson
 
 let poly_of_yojson = Poly.of_yojson
 
-[@@@warning "-39"]
-
-type t = (Token_id.t, Fee.Signed.t) poly constraint t = Stable.Latest.t
-[@@deriving compare, equal, hash, sexp, yojson]
-
-[@@@warning "+39"]
-
 [%%ifdef
 consensus_mechanism]
 
@@ -177,6 +162,13 @@ let to_input_checked {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
     ; Fee.Signed.Checked.to_input fee_excess_l
     ; fee_token_r
     ; Fee.Signed.Checked.to_input fee_excess_r ]
+
+let assert_equal_checked (t1 : var) (t2 : var) =
+  Checked.all_unit
+    [ Token_id.Checked.Assert.equal t1.fee_token_l t2.fee_token_l
+    ; Fee.Signed.Checked.assert_equal t1.fee_excess_l t2.fee_excess_l
+    ; Token_id.Checked.Assert.equal t1.fee_token_r t2.fee_token_r
+    ; Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r ]
 
 [%%endif]
 
@@ -242,7 +234,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     let%bind fee_excess_zero =
       Field.(Checked.equal (Var.constant zero)) fee_excess
     in
-    let%bind may_move = Boolean.(fee_token_equal || fee_excess_zero) in
+    let%bind may_move = Boolean.(fee_token_equal ||| fee_excess_zero) in
     let%bind fee_token =
       Token_id.Checked.if_ fee_excess_zero ~then_:fee_token_m ~else_:fee_token
     in

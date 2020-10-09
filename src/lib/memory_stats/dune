@@ -9,5 +9,5 @@
     logger
     )
  (preprocess
-  (pps ppx_snarky ppx_version ppx_let))
+  (pps ppx_snarky ppx_coda ppx_version ppx_let bisect_ppx -- --conditional))
  (synopsis "Memory statistics for OCaml and jemalloc"))

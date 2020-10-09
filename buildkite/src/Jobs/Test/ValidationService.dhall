@@ -1,4 +1,3 @@
-
 let S = ../../Lib/SelectFiles.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -24,7 +23,7 @@ in Pipeline.build Pipeline.Config::{
         ValidationService.runMix "test"
       ],
       label = "Validation service tests; executes the ExUnit test suite",
-      key = "test",
+      key = "validation-service-test",
       target = Size.Small,
       docker = Some Docker::{ image = ValidationService.containerImage }
     }

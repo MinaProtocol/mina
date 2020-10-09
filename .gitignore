@@ -30,3 +30,5 @@ src/app/validation/cover
 src/app/validation/deps
 src/app/validation/doc
 src/app/validation/priv/plts
+maintenance/*.dot
+maintenance/*.png

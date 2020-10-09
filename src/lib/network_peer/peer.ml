@@ -7,13 +7,11 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving bin_io, compare, hash, equal, sexp, version]
+      type t = string [@@deriving compare, hash, equal, sexp]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving compare, hash, equal, sexp]
 
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
@@ -24,6 +22,8 @@ end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     type t =
       { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
@@ -73,7 +73,7 @@ end]
 
 type t = Stable.Latest.t =
   {host: Unix.Inet_addr.Blocking_sexp.t; libp2p_port: int; peer_id: string}
-[@@deriving compare, sexp]
+[@@deriving compare, sexp, bin_io_unversioned]
 
 [%%define_locally
 Stable.Latest.(of_yojson, to_yojson)]
@@ -96,7 +96,7 @@ let to_string {host; libp2p_port; peer_id} =
     peer_id
 
 let to_multiaddr_string {host; libp2p_port; peer_id} =
-  sprintf "/ip4/%s/tcp/%d/ipfs/%s"
+  sprintf "/ip4/%s/tcp/%d/p2p/%s"
     (Unix.Inet_addr.to_string host)
     libp2p_port peer_id
 
@@ -112,6 +112,8 @@ end
 module Display = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = {host: string; libp2p_port: int; peer_id: string}
       [@@deriving yojson, version, sexp, fields]
@@ -125,6 +127,8 @@ module Display = struct
 
   module Fields = Stable.Latest.Fields
 end
+
+let ip {host; _} = host
 
 let to_display {host; libp2p_port; peer_id} =
   Display.

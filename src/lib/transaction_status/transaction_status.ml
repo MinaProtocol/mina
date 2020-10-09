@@ -13,9 +13,6 @@ module State = struct
     end
   end]
 
-  type t = Stable.Latest.t = Pending | Included | Unknown
-  [@@deriving equal, sexp, compare]
-
   let to_string = function
     | Pending ->
         "PENDING"
@@ -29,8 +26,11 @@ end
 let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   let open Or_error.Let_syntax in
   let%map check_cmd =
-    Result.of_option (User_command.check cmd)
+    Result.of_option (Signed_command.check cmd)
       ~error:(Error.of_string "Invalid signature")
+    |> Result.map ~f:(fun x ->
+           Transaction_hash.User_command_with_valid_signature.create
+             (Signed_command x) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
@@ -42,9 +42,14 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists
-              (Transition_frontier.Breadcrumb.user_commands breadcrumb)
-              ~f:(fun {data= cmd'; _} -> User_command.equal cmd cmd')
+            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
+              ~f:(fun {data= cmd'; _} ->
+                match cmd' with
+                | Snapp_command _ ->
+                    false
+                | Signed_command cmd' ->
+                    Signed_command.equal cmd (Signed_command.forget_check cmd')
+            )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -66,6 +71,8 @@ let%test_module "transaction_status" =
     let frontier_size = 1
 
     let logger = Logger.null ()
+
+    let time_controller = Block_time.Controller.basic ~logger
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
@@ -89,8 +96,10 @@ let%test_module "transaction_status" =
         ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
-      User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
+      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
+
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let create_pool ~frontier_broadcast_pipe =
       let pool_reader, _ =
@@ -100,22 +109,28 @@ let%test_module "transaction_status" =
       let local_reader, local_writer =
         Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
       in
-      let config =
+      let%bind config =
+        let%map verifier =
+          Verifier.create ~logger ~proof_level
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            ~conf_dir:None
+        in
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+          ~verifier
       in
       let transaction_pool =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
-          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
-          ~frontier_broadcast_pipe
+          ~consensus_constants:precomputed_values.consensus_constants
+          ~time_controller ~incoming_diffs:pool_reader ~logger
+          ~local_diffs:local_reader ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
            ~f:(fun transactions ->
-             Logger.trace logger
+             [%log trace]
                "Transactions have been applied successfully and is propagated \
                 throughout the 'network'"
-               ~module_:__MODULE__ ~location:__LOC__
                ~metadata:
                  [ ( "transactions"
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
@@ -135,11 +150,10 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Checking status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Checking status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
@@ -160,7 +174,7 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  ([user_command], Fn.const ())
+                  ([Signed_command user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -168,8 +182,7 @@ let%test_module "transaction_status" =
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
                      user_command
               in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
@@ -198,11 +211,12 @@ let%test_module "transaction_status" =
               in
               let%bind () =
                 Strict_pipe.Writer.write local_diffs_writer
-                  (pool_user_commands, Fn.const ())
+                  ( List.map pool_user_commands ~f:(fun x ->
+                        User_command.Signed_command x )
+                  , Fn.const () )
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-              Logger.info logger "Computing status" ~module_:__MODULE__
-                ~location:__LOC__ ;
+              [%log info] "Computing status" ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool

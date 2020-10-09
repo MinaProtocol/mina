@@ -1,5 +1,5 @@
 open Core_kernel
-open Snarky
+open Snarky_backendless
 open Snark_params.Tick
 open Unsigned
 module Length = Coda_numbers.Length
@@ -24,28 +24,9 @@ module Poly = struct
         ; epoch_duration: 'timespan
         ; delta_duration: 'timespan
         ; genesis_state_timestamp: 'time }
-      [@@deriving eq, ord, hash, sexp, to_yojson]
+      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
     end
   end]
-
-  type ('length, 'time, 'timespan) t =
-        ('length, 'time, 'timespan) Stable.Latest.t =
-    { k: 'length
-    ; c: 'length
-    ; delta: 'length
-    ; slots_per_sub_window: 'length
-    ; slots_per_window: 'length
-    ; sub_windows_per_window: 'length
-    ; slots_per_epoch: 'length
-    ; epoch_size: 'length
-    ; checkpoint_window_slots_per_year: 'length
-    ; checkpoint_window_size_in_slots: 'length
-    ; block_window_duration_ms: 'timespan
-    ; slot_duration_ms: 'timespan
-    ; epoch_duration: 'timespan
-    ; delta_duration: 'timespan
-    ; genesis_state_timestamp: 'time }
-  [@@deriving sexp, eq, to_yojson, hlist]
 end
 
 [%%versioned
@@ -61,8 +42,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, eq, to_yojson]
 
 type var =
   ( Length.Checked.t

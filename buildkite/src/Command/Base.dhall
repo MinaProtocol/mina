@@ -1,25 +1,38 @@
 -- Commands are the individual command steps that CI runs
 
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
+
+let Map = Prelude.Map
 let List/map = Prelude.List.map
 let List/concat = Prelude.List.concat
 let Optional/map = Prelude.Optional.map
 let Optional/toList = Prelude.Optional.toList
-let B = ../External/Buildkite.dhall
+
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
-let Map = Prelude.Map
+-- Retry bits
+let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
+let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
+let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
+let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
+
+-- Job requirement/flake mgmt bits
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let B/Skip = B.definitions/commandStep/properties/skip/Type
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
 
 let Docker = ./Docker/Type.dhall
+let DockerLogin = ./DockerLogin/Type.dhall
 let Summon= ./Summon/Type.dhall
 let Size = ./Size.dhall
 
 -- If you are adding a new type of plugin, stick it here
 let Plugins =
   < Docker : Docker.Type
+  | DockerLogin : DockerLogin.Type
   | Summon : Summon.Type
   >
 
@@ -40,6 +53,7 @@ let B/DependsOn =
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
+let B/Env = B.definitions/commandStep/properties/env/Type
 
 -- A type to make sure we don't accidentally forget the prefix on keys
 let TaggedKey = {
@@ -48,6 +62,19 @@ let TaggedKey = {
     key : Text
   },
   default = {=}
+}
+
+-- Retry requires you feed an exit status (as a string so we can support
+-- negative codes), and optionally a limit to the number of times this command
+-- should be retried.
+let Retry = {
+  Type = {
+    exit_status : Integer,
+    limit : Optional Natural
+  },
+  default = {
+    limit = None Natural
+  }
 }
 
 -- Everything here is taken directly from the buildkite Command documentation
@@ -62,24 +89,35 @@ let Config =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
       , artifact_paths : List SelectFiles.Type
+      , env : List TaggedKey.Type
       , label : Text
       , key : Text
       , target : Size
       , docker : Optional Docker.Type
+      , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
+      , retries : List Retry.Type
+      , soft_fail : Optional B/SoftFail
+      , skip: Optional B/Skip
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
     , docker = None Docker.Type
+    , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , env = [] : List TaggedKey.Type
+    , retries = [] : List Retry.Type
+    , soft_fail = None B/SoftFail
+    , skip = None B/Skip
     }
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { Large = toMap { size = "large" },
-          Small = toMap { size = "small" },
-          Experimental = toMap { size = "experimental" }
+  merge { XLarge = toMap { size = "xlarge" },
+          Large = toMap { size = "large" },
+          Medium = toMap { size = "medium" },
+          Small = toMap { size = "small" }
         }
         target
 
@@ -107,6 +145,37 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    retry =
+          Some {
+              -- we only consider automatic retries
+              automatic = Some (
+                -- and for every retry
+                let xs : List B/AutoRetryChunk =
+                    List/map
+                      Retry.Type
+                      B/AutoRetryChunk
+                      (\(retry : Retry.Type) ->
+                      {
+                        -- we always require the exit status
+                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
+                        -- but limit is optional
+                        limit =
+                          Optional/map
+                          Natural
+                          Integer
+                          Natural/toInteger
+                          retry.limit
+                    })
+                    -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
+                    ([Retry::{ exit_status = -1, limit = Some 2 }] #
+                    -- and the retries that are passed in (if any)
+                    c.retries)
+                in
+                B/Retry.ListAutomaticRetry/Type xs),
+              manual = None B/Manual
+          },
+    soft_fail = c.soft_fail,
+    skip = c.skip,
     plugins =
       let dockerPart =
         Optional/toList
@@ -117,6 +186,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
             (\(docker: Docker.Type) ->
               toMap { `docker#v3.5.0` = Plugins.Docker docker })
             c.docker)
+      let dockerLoginPart =
+        Optional/toList
+          (Map.Type Text Plugins)
+          (Optional/map
+            DockerLogin.Type
+            (Map.Type Text Plugins)
+            (\(dockerLogin: DockerLogin.Type) ->
+              toMap { `docker-login#v2.0.1` = Plugins.DockerLogin dockerLogin })
+            c.docker_login)
       let summonPart =
         Optional/toList
           (Map.Type Text Plugins)
@@ -129,7 +207,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
 
       -- Add more plugins here as needed, empty list omits that part from the
       -- plugins map
-      let allPlugins = List/concat (Map.Entry Text Plugins) (dockerPart # summonPart) in
+      let allPlugins = List/concat (Map.Entry Text Plugins) (dockerPart # summonPart # dockerLoginPart) in
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 

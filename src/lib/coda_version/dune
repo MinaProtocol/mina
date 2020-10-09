@@ -1,6 +1,6 @@
 (library
  (name coda_version)
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
  (public_name coda_version))
 
 (rule

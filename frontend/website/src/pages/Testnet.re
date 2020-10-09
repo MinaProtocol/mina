@@ -54,7 +54,6 @@ module Styles = {
       flexDirection(`column),
       width(`percent(100.)),
       marginBottom(`rem(1.5)),
-      maxWidth(`rem(58.)),
     ]);
 
   let leaderboardCopy =
@@ -222,11 +221,31 @@ module Styles = {
     merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
   let disclaimer =
     merge([Theme.Body.small, style([color(Theme.Colors.midnight)])]);
+
+  let leaderboardLink = style([textDecoration(`none)]);
+
+  let signUpContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`spaceBetween),
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      selector(
+        "a",
+        [
+          important(maxWidth(`rem(10.))),
+          important(height(`percent(100.))),
+          media(Theme.MediaQuery.tablet, [marginTop(`rem(0.5))]),
+        ],
+      ),
+    ]);
 };
 
 module Section = {
   [@react.component]
-  let make = (~name, ~expanded, ~setExpanded, ~children) => {
+  let make = (~name, ~expanded, ~setExpanded, ~children, ~link=?) => {
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       {if (expanded) {
          <div className=Styles.gradientSectionExpanded> children </div>;
@@ -235,11 +254,13 @@ module Section = {
            <div className=Styles.gradientSection> children </div>
            <div
              className=Styles.expandButton
-             onClick={_ => setExpanded(_ => true)}>
-             <div> {React.string("Expand " ++ name)} </div>
-             <div className=Css.(style([marginLeft(`rem(0.5))]))>
-               {React.string({js| ↓|js})}
-             </div>
+             onClick={_ =>
+               switch (link) {
+               | Some(dest) => ReasonReactRouter.push(dest)
+               | None => setExpanded(_ => true)
+               }
+             }>
+             <div> {React.string("View Full " ++ name)} </div>
            </div>
          </>;
        }}
@@ -260,22 +281,36 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             <p className=Theme.Body.basic>
               {React.string(
-                 "Coda's public testnet is live! There are weekly challenges for the community \
-                  to interact with the testnet and contribute to Coda's development. Each week \
-                  features a new competition to recognize and reward top contributors with testnet \
-                  points.",
+                 "Coda's public testnet is live! During testnet releases, there are challenges for the community to interact with the testnet and contribute to Coda's development. Top contributors will be recognized and rewarded with testnet points.",
                )}
             </p>
             <br />
             <p className=Theme.Body.basic>
               {React.string(
-                 "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
+                 "Later this year Coda will begin its adversarial testnet, 'Testworld', where users can earn Coda tokens, USD, and token delegations for participating.",
                )}
             </p>
-            <p className=Theme.Body.basic>
-              {React.string("Testnet Status: ")}
-              <StatusBadge service=`Network />
-            </p>
+            <div className=Styles.signUpContainer>
+              <Button
+                link="/adversarial"
+                label="Sign Up Now"
+                bgColor=Theme.Colors.jungle
+                bgColorHover={Theme.Colors.hyperlinkAlpha(1.)}
+              />
+              <span
+                className=Css.(
+                  style([
+                    display(`flex),
+                    alignItems(`center),
+                    justifyContent(`center),
+                  ])
+                )>
+                <p className=Theme.Body.basic>
+                  {React.string("Testnet Status: ")}
+                  <StatusBadge service=`Network />
+                </p>
+              </span>
+            </div>
           </div>
           <Terminal.Wrapper lineDelay=2000>
             <Terminal.Line prompt=">" value="coda daemon -peer ..." />
@@ -336,16 +371,13 @@ let make = (~challenges as _, ~testnetName as _) => {
           </div>
         </div>
         <hr />
-        <Section name="Leaderboard" expanded setExpanded>
+        <Section name="Leaderboard" expanded setExpanded link="/leaderboard">
           <div className=Styles.dashboardHeader>
             <h1 className=Theme.H1.hero>
               {React.string("Testnet Leaderboard")}
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
-            <a
-              href="https://bit.ly/TestnetLeaderboard"
-              target="_blank"
-              className=Styles.headerLink>
+            <a href="/leaderboard" className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
             </a>
           </div>
@@ -366,7 +398,9 @@ let make = (~challenges as _, ~testnetName as _) => {
                  )}
               </p>
             </span>
-            <Leaderboard />
+            <a href="/leaderboard" className=Styles.leaderboardLink>
+              <Leaderboard interactive=false />
+            </a>
           </div>
         </Section>
         <hr />

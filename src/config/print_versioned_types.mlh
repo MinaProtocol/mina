@@ -1,5 +1,5 @@
 [%%import "/src/config/ledger_depth/small.mlh"]
-[%%import "/src/config/curve/small.mlh"]
+[%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/consensus/postake_short.mlh"]
 [%%import "/src/config/scan_state/medium.mlh"]
@@ -9,9 +9,11 @@
 [%%import "/src/config/account_creation_fee/standard.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
 
 [%%define time_offsets false]
-[%%define fake_hash false]
+
+[%%define plugins false]
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
@@ -20,9 +22,12 @@
 [%%define integration_tests true]
 [%%define force_updates false]
 
+[%%define download_snark_keys false]
+
 [%%define mock_frontend_data false]
 
 [%%define print_versioned_types true]
 
 [%%define daemon_expiry "never"]
 [%%define test_full_epoch false]
+[%%import "/src/config/fork.mlh"]

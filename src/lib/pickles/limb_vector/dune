@@ -2,9 +2,9 @@
   (name limb_vector)
   (public_name pickles.limb_vector)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson  bisect_ppx -- --conditional))
   (libraries
-    zexe_backend
+    backend
     pickles_types
-    snarky
+    snarky.backendless
     core_kernel ))

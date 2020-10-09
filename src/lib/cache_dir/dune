@@ -6,7 +6,7 @@
    async
    core
    ; libs
+   key_cache
    blake2
-   coda_compile_config
    logger)
- (preprocess (pps ppx_version ppx_let ppx_custom_printf)))
+ (preprocess (pps ppx_coda ppx_version ppx_let ppx_custom_printf bisect_ppx -- --conditional)))

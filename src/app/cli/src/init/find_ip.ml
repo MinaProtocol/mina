@@ -21,8 +21,7 @@ let ip_service_result {uri; body_handler} ~logger =
   | Ok v ->
       v
   | Error e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "Failed to query our own IP from $provider: $exn"
+      [%log error] "Failed to query our own IP from $provider: $exn"
         ~metadata:
           [("exn", `String (Exn.to_string e)); ("provider", `String uri)] ;
       None

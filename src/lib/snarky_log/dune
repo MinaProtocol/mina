@@ -1,5 +1,5 @@
 (library
  (name snarky_log)
  (public_name snarky_log)
- (preprocess (pps ppx_version))
- (libraries yojson snarky webkit_trace_event))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
+ (libraries yojson snarky.backendless webkit_trace_event))

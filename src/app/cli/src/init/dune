@@ -17,4 +17,4 @@
     o1trace protocol_version telemetry transition_frontier web_client_pipe
     web_request graphql_lib genesis_ledger_helper)
   (preprocessor_deps ../../../../config.mlh)
-  (preprocess (pps graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+  (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson bisect_ppx -- --conditional)))

@@ -1,6 +1,6 @@
 open Core_kernel
-module H_list = Snarky.H_list
-module Typ = Snarky.Typ
+module H_list = Snarky_backendless.H_list
+module Typ = Snarky_backendless.Typ
 
 module Evals = struct
   [%%versioned
@@ -23,22 +23,6 @@ module Evals = struct
       [@@deriving fields, sexp, compare, yojson]
     end
   end]
-
-  type 'a t = 'a Stable.Latest.t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; g_1: 'a
-    ; h_1: 'a
-    ; g_2: 'a
-    ; h_2: 'a
-    ; g_3: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t }
-  [@@deriving fields, sexp, compare, yojson]
 
   open Vector
 
@@ -263,7 +247,8 @@ module Accumulator = struct
         end
       end]
 
-      type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, yojson]
+      [%%define_locally
+      Stable.Latest.(to_yojson, of_yojson)]
     end
 
     [%%versioned
@@ -271,13 +256,9 @@ module Accumulator = struct
       module V1 = struct
         type ('g, 'unshifted) t =
           {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
-        [@@deriving fields, sexp, yojson, compare]
+        [@@deriving fields, sexp, yojson, compare, hlist]
       end
     end]
-
-    type ('g, 'unshifted) t = ('g, 'unshifted) Stable.Latest.t =
-      {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
-    [@@deriving fields, sexp, yojson, compare, hlist]
 
     let typ (shifts : Shift.Set.t) g =
       let key_order = `Increasing in
@@ -289,7 +270,7 @@ module Accumulator = struct
         |> Fn.flip Sequence.zip (Sequence.of_list xs)
         |> Shift.Map.of_increasing_sequence |> Or_error.ok_exn
       in
-      Snarky.Typ.of_hlistable
+      Snarky_backendless.Typ.of_hlistable
         [ g
         ; Typ.transport (Typ.list ~length:(Set.length shifts) g) ~there ~back
           |> Typ.transport_var ~there ~back ]
@@ -340,15 +321,12 @@ module Accumulator = struct
     module Stable = struct
       module V1 = struct
         type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-        [@@deriving fields, sexp, compare, yojson]
+        [@@deriving fields, sexp, compare, yojson, hlist]
       end
     end]
 
-    type 'g t = 'g Stable.Latest.t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-    [@@deriving fields, sexp, compare, yojson, hlist]
-
     let typ g =
-      Snarky.Typ.of_hlistable [g; g] ~var_to_hlist:to_hlist
+      Snarky_backendless.Typ.of_hlistable [g; g] ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -372,17 +350,12 @@ module Accumulator = struct
         { opening_check: 'g Opening_check.Stable.V1.t
         ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.Stable.V1.t
         }
-      [@@deriving fields, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson, hlist]
     end
   end]
 
-  type ('g, 'unshifted) t = ('g, 'unshifted) Stable.Latest.t =
-    { opening_check: 'g Opening_check.t
-    ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
-  [@@deriving fields, sexp, compare, yojson, hlist]
-
   let typ shifts g =
-    Snarky.Typ.of_hlistable
+    Snarky_backendless.Typ.of_hlistable
       [Opening_check.typ g; Degree_bound_checks.typ shifts g]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -415,20 +388,12 @@ module Opening = struct
   module Stable = struct
     module V1 = struct
       type ('proof, 'values) t = {proof: 'proof; values: 'values}
-      [@@deriving fields]
+      [@@deriving fields, hlist]
     end
   end]
 
-  type ('proof, 'values) t = ('proof, 'values) Stable.Latest.t =
-    {proof: 'proof; values: 'values}
-  [@@deriving fields]
-
-  let to_hlist {proof; values} = H_list.[proof; values]
-
-  let of_hlist ([proof; values] : (unit, _) H_list.t) = {proof; values}
-
   let typ proof values =
-    Snarky.Typ.of_hlistable [proof; values] ~var_to_hlist:to_hlist
+    Snarky_backendless.Typ.of_hlistable [proof; values] ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
@@ -438,15 +403,12 @@ module Openings = struct
     module V1 = struct
       type ('proof, 'fp) t =
         {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.Stable.V1.t}
+      [@@deriving hlist]
     end
   end]
 
-  type ('proof, 'fp) t = ('proof, 'fp) Stable.Latest.t =
-    {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.t}
-  [@@deriving hlist]
-
   let typ proof fp =
-    let open Snarky.Typ in
+    let open Snarky_backendless.Typ in
     of_hlistable
       [tuple3 proof proof proof; Evals.typ fp]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -461,8 +423,6 @@ module Messages = struct
         type 'pc t = 'pc * 'pc [@@deriving sexp, compare, yojson]
       end
     end]
-
-    type 'pc t = 'pc Stable.Latest.t [@@deriving sexp, compare, yojson]
   end
 
   [%%versioned
@@ -475,21 +435,12 @@ module Messages = struct
         ; gh_1: 'pc Degree_bounded.Stable.V1.t * 'pc
         ; sigma_gh_2: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc)
         ; sigma_gh_3: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc) }
-      [@@deriving fields, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson, hlist]
     end
   end]
 
-  type ('pc, 'fp) t = ('pc, 'fp) Stable.Latest.t =
-    { w_hat: 'pc
-    ; z_hat_a: 'pc
-    ; z_hat_b: 'pc
-    ; gh_1: 'pc Degree_bounded.t * 'pc
-    ; sigma_gh_2: 'fp * ('pc Degree_bounded.t * 'pc)
-    ; sigma_gh_3: 'fp * ('pc Degree_bounded.t * 'pc) }
-  [@@deriving fields, sexp, compare, yojson, hlist]
-
   let typ pc fp =
-    let open Snarky.Typ in
+    let open Snarky_backendless.Typ in
     let db = pc * pc in
     of_hlistable
       [pc; pc; pc; db * pc; fp * (db * pc); fp * (db * pc)]
@@ -503,16 +454,12 @@ module Proof = struct
     module V1 = struct
       type ('pc, 'fp, 'openings) t =
         {messages: ('pc, 'fp) Messages.Stable.V1.t; openings: 'openings}
-      [@@deriving fields, sexp, compare, yojson]
+      [@@deriving fields, sexp, compare, yojson, hlist]
     end
   end]
 
-  type ('pc, 'fp, 'openings) t = ('pc, 'fp, 'openings) Stable.Latest.t =
-    {messages: ('pc, 'fp) Messages.t; openings: 'openings}
-  [@@deriving fields, sexp, compare, yojson, hlist]
-
   let typ pc fp openings =
-    Snarky.Typ.of_hlistable
+    Snarky_backendless.Typ.of_hlistable
       [Messages.typ pc fp; openings]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

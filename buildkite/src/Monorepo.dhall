@@ -31,7 +31,7 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   ''
 
 let prefixCommands = [
-  Cmd.run "git config http.sslVerify false", -- make git work inside container
+  Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
   Cmd.run "git fetch origin", -- Freshen the cache
   Cmd.run "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
 ]
@@ -50,8 +50,11 @@ in Pipeline.build Pipeline.Config::{
       commands = prefixCommands # commands,
       label = "Monorepo triage",
       key = "cmds",
-      target = Size.Large,
-      docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      target = Size.Small,
+      docker = Some Docker::{
+        image = (./Constants/ContainerImages.dhall).toolchainBase,
+        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL"]
+      }
     }
   ]
 }

@@ -1,5 +1,10 @@
 open Core_kernel
 
+module Fork_config = struct
+  type t = {previous_state_hash: string; previous_length: int}
+  [@@deriving yojson, dhall_type, bin_io_unversioned]
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -31,39 +36,67 @@ let result_opt ~f x =
   | None ->
       Result.return None
 
+let dump_on_error yojson x =
+  Result.map_error x ~f:(fun str ->
+      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
+  )
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
+      module Timed = struct
+        type t =
+          { initial_minimum_balance: Currency.Balance.t
+          ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
+          ; vesting_period: Coda_numbers.Global_slot.t (*slots*)
+          ; vesting_increment: Currency.Amount.t }
+        [@@deriving yojson, dhall_type]
+      end
+
       type t =
         { pk: (string option[@default None])
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
-        ; delegate: (string option[@default None]) }
+        ; delegate: (string option[@default None])
+        ; timing: (Timed.t option[@default None]) }
       [@@deriving yojson, dhall_type]
 
-      let fields = [|"pk"; "sk"; "balance"; "delegate"|]
+      let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
 
       let of_yojson json =
-        of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+        dump_on_error json @@ of_yojson
+        @@ yojson_strip_fields ~keep_fields:fields json
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
   end
 
   module Ledger = struct
+    module Balance_spec = struct
+      type t = {number: int; balance: Currency.Balance.t}
+      [@@deriving yojson, dhall_type]
+    end
+
     type t =
       { accounts: (Accounts.t option[@default None])
       ; num_accounts: (int option[@default None])
+      ; balances: (Balance_spec.t list[@default []])
       ; hash: (string option[@default None])
       ; name: (string option[@default None])
       ; add_genesis_winner: (bool option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
-      [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
+      [| "accounts"
+       ; "num_accounts"
+       ; "balances"
+       ; "hash"
+       ; "name"
+       ; "add_genesis_winner" |]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Proof_keys = struct
@@ -82,7 +115,7 @@ module Json_layout = struct
         json
         |> yojson_rename_fields ~alternates
         |> yojson_strip_fields ~keep_fields:fields
-        |> of_yojson
+        |> of_yojson |> dump_on_error json
     end
 
     type t =
@@ -93,7 +126,9 @@ module Json_layout = struct
       ; block_window_duration_ms: (int option[@default None])
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
       ; coinbase_amount: (Currency.Amount.t option[@default None])
-      ; account_creation_fee: (Currency.Fee.t option[@default None]) }
+      ; supercharged_coinbase_factor: (int option[@default None])
+      ; account_creation_fee: (Currency.Fee.t option[@default None])
+      ; fork: (Fork_config.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -104,10 +139,12 @@ module Json_layout = struct
        ; "block_window_duration_ms"
        ; "transaction_capacity"
        ; "coinbase_amount"
+       ; "supercharged_coinbase_factor"
        ; "account_creation_fee" |]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Genesis = struct
@@ -120,7 +157,8 @@ module Json_layout = struct
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   module Daemon = struct
@@ -130,7 +168,8 @@ module Json_layout = struct
     let fields = [|"txpool_max_size"|]
 
     let of_yojson json =
-      of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+      dump_on_error json @@ of_yojson
+      @@ yojson_strip_fields ~keep_fields:fields json
   end
 
   type t =
@@ -143,7 +182,8 @@ module Json_layout = struct
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
   let of_yojson json =
-    of_yojson @@ yojson_strip_fields ~keep_fields:fields json
+    dump_on_error json @@ of_yojson
+    @@ yojson_strip_fields ~keep_fields:fields json
 end
 
 (** JSON representation:
@@ -159,6 +199,7 @@ end
       , "block_window_duration_ms": 180000
       , "transaction_capacity": {"txns_per_second_x10": 2}
       , "coinbase_amount": "200"
+      , "supercharged_coinbase_factor": 2
       , "account_creation_fee": "0.001" }
   , "ledger":
       { "name": "release"
@@ -183,11 +224,21 @@ end
 
 module Accounts = struct
   module Single = struct
+    module Timed = struct
+      type t = Json_layout.Accounts.Single.Timed.t =
+        { initial_minimum_balance: Currency.Balance.Stable.Latest.t
+        ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
+        ; vesting_increment: Currency.Amount.Stable.Latest.t }
+      [@@deriving bin_io_unversioned]
+    end
+
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
-      ; delegate: string option }
+      ; delegate: string option
+      ; timing: Timed.t option }
     [@@deriving bin_io_unversioned]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
@@ -207,7 +258,8 @@ module Accounts = struct
     { pk: string option
     ; sk: string option
     ; balance: Currency.Balance.t
-    ; delegate: string option }
+    ; delegate: string option
+    ; timing: Single.Timed.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 
@@ -242,15 +294,21 @@ module Ledger = struct
   type t =
     { base: base
     ; num_accounts: int option
+    ; balances: (int * Currency.Balance.Stable.Latest.t) list
     ; hash: string option
     ; name: string option
     ; add_genesis_winner: bool option }
   [@@deriving bin_io_unversioned]
 
-  let to_json_layout {base; num_accounts; hash; name; add_genesis_winner} :
+  let to_json_layout
+      {base; num_accounts; balances; hash; name; add_genesis_winner} :
       Json_layout.Ledger.t =
+    let balances =
+      List.map balances ~f:(fun (number, balance) ->
+          {Json_layout.Ledger.Balance_spec.number; balance} )
+    in
     let without_base : Json_layout.Ledger.t =
-      {accounts= None; num_accounts; hash; name; add_genesis_winner}
+      {accounts= None; num_accounts; balances; hash; name; add_genesis_winner}
     in
     match base with
     | Named name ->
@@ -261,7 +319,7 @@ module Ledger = struct
         {without_base with hash= Some hash}
 
   let of_json_layout
-      ({accounts; num_accounts; hash; name; add_genesis_winner} :
+      ({accounts; num_accounts; balances; hash; name; add_genesis_winner} :
         Json_layout.Ledger.t) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
@@ -282,7 +340,12 @@ module Ledger = struct
                 "Runtime_config.Ledger.of_json_layout: Expected a field \
                  'accounts', 'name' or 'hash'" ) )
     in
-    {base; num_accounts; hash; name; add_genesis_winner}
+    let balances =
+      List.map balances
+        ~f:(fun {Json_layout.Ledger.Balance_spec.number; balance} ->
+          (number, balance) )
+    in
+    {base; num_accounts; balances; hash; name; add_genesis_winner}
 
   let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
@@ -371,7 +434,9 @@ module Proof_keys = struct
     ; block_window_duration_ms: int option
     ; transaction_capacity: Transaction_capacity.t option
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
-    ; account_creation_fee: Currency.Fee.Stable.Latest.t option }
+    ; supercharged_coinbase_factor: int option
+    ; account_creation_fee: Currency.Fee.Stable.Latest.t option
+    ; fork: Fork_config.t option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
@@ -382,7 +447,9 @@ module Proof_keys = struct
       ; block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount
-      ; account_creation_fee } =
+      ; supercharged_coinbase_factor
+      ; account_creation_fee
+      ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; c
     ; ledger_depth
@@ -391,7 +458,9 @@ module Proof_keys = struct
     ; transaction_capacity=
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
-    ; account_creation_fee }
+    ; supercharged_coinbase_factor
+    ; account_creation_fee
+    ; fork }
 
   let of_json_layout
       { Json_layout.Proof_keys.level
@@ -401,7 +470,9 @@ module Proof_keys = struct
       ; block_window_duration_ms
       ; transaction_capacity
       ; coinbase_amount
-      ; account_creation_fee } =
+      ; supercharged_coinbase_factor
+      ; account_creation_fee
+      ; fork } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
@@ -414,7 +485,9 @@ module Proof_keys = struct
     ; block_window_duration_ms
     ; transaction_capacity
     ; coinbase_amount
-    ; account_creation_fee }
+    ; supercharged_coinbase_factor
+    ; account_creation_fee
+    ; fork }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
 
@@ -434,9 +507,13 @@ module Proof_keys = struct
           t2.transaction_capacity
     ; coinbase_amount=
         opt_fallthrough ~default:t1.coinbase_amount t2.coinbase_amount
+    ; supercharged_coinbase_factor=
+        opt_fallthrough ~default:t1.supercharged_coinbase_factor
+          t2.supercharged_coinbase_factor
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
-          t2.account_creation_fee }
+          t2.account_creation_fee
+    ; fork= opt_fallthrough ~default:t1.fork t2.fork }
 end
 
 module Genesis = struct
@@ -522,3 +599,107 @@ let combine t1 t2 =
   ; genesis= merge ~combine:Genesis.combine t1.genesis t2.genesis
   ; proof= merge ~combine:Proof_keys.combine t1.proof t2.proof
   ; ledger= opt_fallthrough ~default:t1.ledger t2.ledger }
+
+module Test_configs = struct
+  let bootstrap =
+    lazy
+      ( (* test_postake_bootstrap *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "none"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 1500
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
+      , "account_creation_fee": "1" }
+  , "ledger": { "name": "test", "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let transactions =
+    lazy
+      ( (* test_postake_txns *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 6
+      , "work_delay": 2
+      , "block_window_duration_ms": 15000
+      , "transaction_capacity": {"2_to_the": 3}
+      , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let split_snarkless =
+    lazy
+      ( (* test_postake_split_snarkless *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 24
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 8
+      , "ledger_depth": 30
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_split_two_stakers"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+
+  let delegation =
+    lazy
+      ( (* test_postake_delegation *)
+        {json|
+  { "daemon":
+      { "txpool_max_size": 3000 }
+  , "genesis":
+      { "k": 6
+      , "delta": 3
+      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
+  , "proof":
+      { "level": "check"
+      , "c": 1
+      , "ledger_depth": 6
+      , "work_delay": 1
+      , "block_window_duration_ms": 10000
+      , "transaction_capacity": {"2_to_the": 2}
+      , "coinbase_amount": "20"
+      , "supercharged_coinbase_factor": 2
+      , "account_creation_fee": "1" }
+  , "ledger":
+      { "name": "test_delegation"
+      , "add_genesis_winner": false } }
+      |json}
+      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+end

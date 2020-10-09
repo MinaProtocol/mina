@@ -1,6 +1,6 @@
 (executable
   (name logproc)
   (public_name logproc)
-  (modules bash_colors logproc)
-  (libraries logproc_lib core yojson angstrom cmdliner logger)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.std)))
+  (modules logproc)
+  (libraries logproc_lib bash_colors core yojson angstrom cmdliner logger)
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.std bisect_ppx -- --conditional)))

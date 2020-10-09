@@ -2,4 +2,4 @@
   (name persistent_frontier)
   (public_name transition_frontier_persistent_frontier)
   (libraries transition_frontier_base block_time transition_frontier_full_frontier transition_frontier_extensions file_system coda_base core async rocksdb coda_intf signature_lib consensus storage yojson rpc_parallel otp_lib)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq ppx_bin_prot ppx_deriving_yojson)))
+  (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_bin_prot ppx_deriving_yojson bisect_ppx -- --conditional)))

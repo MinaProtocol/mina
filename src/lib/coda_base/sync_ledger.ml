@@ -61,9 +61,6 @@ module Answer = struct
       let to_latest = Fn.id
     end
   end]
-
-  (* bin_io omitted from deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 module Query = struct
@@ -77,6 +74,4 @@ module Query = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end

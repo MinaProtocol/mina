@@ -326,7 +326,7 @@ struct
             return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t t.state >>| with_new_state t in
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' debug t.logger]
               ~metadata:
                 [ ("source", State.to_yojson t.state)
                 ; ("destination", State.to_yojson t'.state)
@@ -344,7 +344,7 @@ struct
     | false, Some transition, _ ->
         let _ = Linear_pipe.read_now t.triggered_timers_r in
         let%map t' = transition t t.state >>| with_new_state t in
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.logger]
           ~metadata:
             [ ("source", State.to_yojson t.state)
             ; ("destination", State.to_yojson t'.state)
@@ -362,7 +362,7 @@ struct
             return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t msg t.state >>| with_new_state t in
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' debug t.logger]
               !"Making transition from %{sexp:State.t} to %{sexp:State.t} at \
                 %{sexp:Peer.t} label: %{sexp:Message_label.label}\n\
                 %!"

@@ -1,0 +1,51 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Lifecycle of a Payment" });
+
+# The Lifecycle of a Payment
+
+In Mina, payments pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single payment in a simplified overview to help users understand a little about how Mina payments work. It it not a comprehensive technical overview, but instead a simplified walkthrough for users. For a more detailed technical overview aimed at developers wishing to understand the codebase check out the [technical lifecycle of a payment](lifecycle-payment-technical.md).
+
+!!! note
+Mina uses a gossip protocol to ensure that messages can be reliably transmitted to all other members of the network in a timely manner.
+
+## Payments
+
+A payment is a type of transaction, requesting to transfer value from one account to another account, and the associated fee the sender is willing to pay for the payment to go through.
+
+Let's walk through a scenario where a sender, Bob, wants to send a receiver, Alice, some mina.
+
+### Step 1: Payment Creation - Bob clicks ‘send’
+
+Any member of the network can create a payment and share it with the Mina network. The payment is
+cryptographically signed with a private key so that the sender’s account can be verified. It is then sent out to peers on the network to be processed. The payment, when received by a peer, will exist in their local `transaction pool`, which is an in-memory store of all the transactions that peer has heard on the network.
+
+### Step 2: Producing a Block - Bob’s payment gets put in a todo list
+
+A block producer node is chosen on the network for a given time slot. The currently active producer choses in-flight payments based on payment fees and places them in a list to be processed called a transition block. Block producers earn mina for building these blocks. The producer generates a SNARK defining the structure of the transition block as compared to the previous block (but not yet verifying these new payments). The producer transmits this new information for snark workers to process.
+
+### Step 3: Transaction Snark Proving - Bob’s payment gets snark-signed
+
+Snark worker nodes on the network begin performing snark calculations on each step of the new transition block. These are individual proofs of each payment and then merge proofs of neighboring payments. Eventually all the payments are verified. Snark workers can earn currency by generating these proofs, paid for by block producers from their block rewards. These proofs are transmitted out over the network.
+
+### Step 4: Payment Verification - Alice and Bob’s accounts show the result of the transfer
+
+Once the whole block has been proven, the block producer will send out a confirmation of the transition block. Then member nodes on the network apply the changes to their local account balances to reflect these changes.
+
+### Step 5: Payment Confidence Level - Alice is confident the transfer is complete
+
+With each subsequent block, a recipient has a higher degree of confidence that the payment is actually complete and that the network has consensus about that block.
+
+## Failure Scenarios
+
+### Transaction is not accepted by the network
+
+There are a couple reasons why a transaction shared with peer nodes may not get accepted:
+
+- The transaction is not fundamentally valid. Meaning that the sender's account doesn't exist, it doesn't have sufficient funds, the signature doesn't match with the account, or the nonce in the transaction was not incremented.
+- There could be adversarial nodes in the network that collude to deny service to specific senders in the network. However, this behavior is highly disincentivized and one honest node is enough to prevent this issue.
+
+### Transaction is not included in a block
+
+If a transaction is valid and the network is honest, then in all likelihood, a transaction will make it into a block. However, there is one case where a transaction may be dumped from a transaction pool:
+
+- If the transaction pool hits its capacity, or `max_txpool_size`, then it will evict the transaction with the lowest fee in the pool, causing it dumped from memory. If this happens, the sender will need to re-send the transaction with a higher fee, according to market dynamics at the time.

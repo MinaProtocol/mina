@@ -2,12 +2,10 @@
   (name pseudo)
   (public_name pickles.pseudo)
   (flags -warn-error -27)
-  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson  bisect_ppx -- --conditional))
   (libraries
     marlin_checks
-
-    zexe_backend
+    one_hot_vector
     pickles_types
-    snarky
+    snarky.backendless
     core_kernel ))
-

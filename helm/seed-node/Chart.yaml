@@ -1,0 +1,13 @@
+apiVersion: v2
+name: seed-node
+description: A Helm chart for Coda Protocol's seed nodes
+type: application
+version: 0.1.1
+appVersion: 1.16.0
+dependencies:
+icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+keywords:
+- seed
+home: https://codaprotocol.com/
+sources:
+- https://github.com/CodaProtocol/coda
