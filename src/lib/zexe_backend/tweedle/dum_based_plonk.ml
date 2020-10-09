@@ -105,7 +105,7 @@ module Proof = Plonk_dlog_proof.Make (struct
             (if j < Array.length w then w.(j).(i) else Field.zero)
         done
       done ;
-      create pk.index (Field.Vector.create ()) witness prev_chals prev_comms
+      create pk.index witness prev_chals prev_comms
   end
 
   module Verifier_index = B.Field_verifier_index

@@ -363,7 +363,11 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
       |> g_array_to_vec
     in
-    Backend.make ~primary_input:(Fq.Vector.create ()) ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
+    let public = Fq.Vector.create () in
+    for i = 1 to Fq.Vector.length primary_input - 1 do
+      Fq.Vector.emplace_back public (Fq.Vector.get primary_input i)
+    done;
+    Backend.make ~primary_input:public ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
       ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcw t_comm) ~lr
       ~z1:z_1 ~z2:z_2 ~delta:(g delta) ~sg:(g sg)
       ~evals0:(eval_to_backend evals0) ~evals1:(eval_to_backend evals1)

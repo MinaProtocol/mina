@@ -16,7 +16,7 @@ let%test_module "backend test" =
       let computation x () =
         let open Field in
 
-        for j = 0 to 111 do
+        for j = 0 to 109 do
 
           let scalar = [|one; one; zero; one; zero; one; one; zero; one; zero; one; one; zero; one; zero|] in
           let y = sqrt (x*x*x + (Impl.Field.of_int 5)) in
@@ -34,7 +34,7 @@ let%test_module "backend test" =
 
           let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
   
-          let perm = Poseidon.permute [|x; y; x*y|] 62 in
+          let perm = Poseidon.permute [|x; y; x*y|] 63 in
           assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
         done;
@@ -43,7 +43,7 @@ let%test_module "backend test" =
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
       let keys = Impl.generate_keypair ~exposing:(input ()) computation
-      let statement = Impl.Field.Constant.of_int 2
+      let statement = Impl.Field.Constant.of_int 13579
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) computation () statement
       let%test_unit "check backend ComputationExample proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)

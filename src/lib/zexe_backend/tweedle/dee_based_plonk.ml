@@ -107,7 +107,7 @@ module Proof = Plonk_dlog_proof.Make (struct
           (*print_endline (Sexp.to_string ([%sexp_of: Field.t] w));*)
         done
       done ;
-      create pk.index (Field.Vector.create ()) witness prev_chals prev_comms
+      create pk.index witness prev_chals prev_comms
   end
 
   module Verifier_index = B.Field_verifier_index

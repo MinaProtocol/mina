@@ -328,9 +328,7 @@ struct
   end
 
   let create () =
-    let public_input_size = Set_once.create () in
-    Set_once.set_exn public_input_size [%here] 0;
-    { public_input_size
+    { public_input_size= Set_once.create ()
     ; internal_vars= Internal_var.Table.create ()
     ; gates= `Unfinalized_rev [] (* Gates.create () *)
     ; rows_rev= []
@@ -349,9 +347,7 @@ struct
 
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
 
-  let set_primary_input_size t x =
-    (* Set_once.set_exn t.public_input_size [%here] x *)
-    ()
+  let set_primary_input_size t x = Set_once.set_exn t.public_input_size [%here] x
 
   let digest = digest
 
@@ -364,7 +360,7 @@ struct
         let n = Set_once.get_exn sys.public_input_size [%here] in
         (* First, add gates for public input *)
         let pub =
-          Fp.Vector.of_array [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+          Fp.Vector.of_array [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
         in
         for row = 0 to n - 1 do
           (* Add to the equivalence class *)
@@ -414,6 +410,10 @@ struct
   open Position
 
   let add_row sys row t l r o c =
+  (*
+    print_endline (Sexp.to_string ([%sexp_of:  int] sys.next_row));
+    print_endline (Sexp.to_string ([%sexp_of:  Fp.t array] c));
+*)
     ( match sys.gates with
     | `Finalized _ ->
         failwith "add_row called on finalized constraint system"
