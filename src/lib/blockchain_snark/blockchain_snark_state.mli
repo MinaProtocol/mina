@@ -51,6 +51,14 @@ end
 
 module Make (T : sig
   val tag : Transaction_snark.tag
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
 end) : S
 
-val constraint_system_digests : unit -> (string * Md5.t) list
+val constraint_system_digests :
+     proof_level:Genesis_constants.Proof_level.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> unit
+  -> (string * Md5.t) list
