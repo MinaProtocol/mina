@@ -942,9 +942,24 @@ let%test_module "testh no sidele-loaded" =
                   ; main=
                       (fun [prev; _] self ->
                         let is_base_case = Field.equal Field.zero self in
+                        Core.printf
+                          !"is_base_case = %{sexp:Field.Constant.t \
+                            Snarky_backendless.Cvar.t}\n\
+                            %!"
+                          (is_base_case :> Field.t) ;
                         let proof_must_verify = Boolean.not is_base_case in
-                        Boolean.Assert.any
-                          [Field.(equal (one + prev) self); is_base_case] ;
+                        Core.printf
+                          !"proof_must_verify = %{sexp:Field.Constant.t \
+                            Snarky_backendless.Cvar.t}\n\
+                            %!"
+                          (proof_must_verify :> Field.t) ;
+                        let self_correct = Field.(equal (one + prev) self) in
+                        Core.printf
+                          !"self_correct = %{sexp:Field.Constant.t \
+                            Snarky_backendless.Cvar.t}\n\
+                            %!"
+                          (self_correct :> Field.t) ;
+                        Boolean.Assert.any [self_correct; is_base_case] ;
                         [proof_must_verify; Boolean.false_] )
                   ; main_value=
                       (fun _ self ->
@@ -960,18 +975,21 @@ let%test_module "testh no sidele-loaded" =
       let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
         Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
       in
+      Core.printf "%s\n%!" __LOC__ ;
       let b0 =
         Common.time "b0" (fun () ->
             Blockchain_snark.step
               [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
               Field.Constant.zero )
       in
+      Core.printf "%s\n%!" __LOC__ ;
       let b1 =
         Common.time "b1" (fun () ->
             Blockchain_snark.step
               [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
               Field.Constant.one )
       in
+      Core.printf "%s\n%!" __LOC__ ;
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)

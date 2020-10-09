@@ -324,7 +324,9 @@ struct
                   Fp.print value ) ;
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
-    Core.printf !"res[%d] = %{sexp:Fp.t array}" bad_constraint res.(bad_constraint) ;
+    Core.printf
+      !"res[%d] = %{sexp:Fp.t array}"
+      bad_constraint res.(bad_constraint) ;
     res
 
   let create_internal ?constant sys lc : V.t =
@@ -469,30 +471,29 @@ struct
     let next_row = sys.next_row in
     let lp =
       match l with
-      | Some (_, lx) ->
+      | Some lx ->
           wire sys lx next_row 0
       | None ->
           {row= After_public_input next_row; col= 0}
     in
     let rp =
       match r with
-      | Some (_, rx) ->
+      | Some rx ->
           wire sys rx next_row 1
       | None ->
           {row= After_public_input next_row; col= 1}
     in
     let op =
       match o with
-      | Some (_, ox) ->
+      | Some ox ->
           wire sys ox next_row 2
       | None ->
           {row= After_public_input next_row; col= 2}
     in
-    add_row sys
-      [|Option.map l ~f:snd; Option.map r ~f:snd; Option.map o ~f:snd|]
-      1 lp rp op c
+    add_row sys [|l; r; o|] 1 lp rp op c
 
-  let when_first sys f = if Int.abs (sys.next_row - (bad_constraint - 141)) < 2  then f ()
+  let when_first sys f =
+    if Int.abs (sys.next_row - (bad_constraint - 141)) = 0 then f ()
 
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -505,8 +506,7 @@ struct
           let lx = V.External lx in
           let rs, rx = go t in
           let s1x1_plus_s2x2 = create_internal sys [(ls, lx); (rs, rx)] in
-          add_generic_constraint ~l:(ls, lx) ~r:(rs, rx)
-            ~o:(Fp.one, s1x1_plus_s2x2)
+          add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
             [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|]
             sys ;
           (Fp.one, s1x1_plus_s2x2)
@@ -553,24 +553,31 @@ struct
                   Core.printf
                     !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
                     __LOC__ x ) ;
-              add_generic_constraint ~l:(ls, External lx) ~o:(Fp.one, res)
-                [| ls
-                 ; Fp.zero
-                 ; Fp.(negate one)
-                 ; Fp.zero
-                 ; (match constant with Some x -> x | None -> Fp.zero) |]
+              add_generic_constraint ~l:(External lx) ~o:res
+                [|ls; Fp.zero; Fp.(negate one); Fp.zero; c|]
                 sys ;
               (Fp.one, `Var res) )
         | (ls, lx) :: tl ->
+            let rs, rx = completely_reduce sys tl in
+            let res =
+              create_internal ?constant sys [(ls, External lx); (rs, rx)]
+            in
             when_first sys (fun () ->
                 Core.printf
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
-                  __LOC__ x ) ;
-            let rs, rx = completely_reduce sys tl in
-            let res = create_internal sys [(ls, External lx); (rs, rx)] in
-            (* res = ls * lx + rs * rx *)
-            add_generic_constraint ~l:(ls, External lx) ~r:(rs, rx)
-              ~o:(Fp.one, res)
+                  __LOC__ x ;
+                Core.printf !"rx = %{sexp:V.t}\n%!" rx ;
+                Core.printf !"lx = %{sexp:V.t}\n%!" (External lx) ;
+                Core.printf !"rs = %{sexp:Fp.t}\n%!" rs ;
+                Core.printf !"ls = %{sexp:Fp.t}\n%!" ls ) ;
+            (* 1 + x215 - x214 = res *)
+            (* Actual:
+              -1 * x214 + 1 * x215 -res + 1 = 0
+
+               res = 1 + x215 - x214 
+            *)
+            (* res = ls * lx + rs * rx + c *)
+            add_generic_constraint ~l:(External lx) ~r:rx ~o:res
               [| ls
                ; rs
                ; Fp.(negate one)
@@ -598,13 +605,13 @@ struct
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
                   __LOC__ x0 ) ;
             (* s * x - sx = 0 *)
-            add_generic_constraint ~l:(Fp.one, x) ~o:(Fp.one, sx)
+            add_generic_constraint ~l:x ~o:sx
               [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
               sys ;
             sx
       | `Constant ->
           let x = create_internal sys ~constant:s [] in
-          add_generic_constraint ~l:(Fp.one, x)
+          add_generic_constraint ~l:x
             [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]
             sys ;
           x
@@ -622,7 +629,10 @@ struct
                 Core.printf
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
                   __LOC__ v2 ) ;
-            add_generic_constraint ~l:(sl, xl) ~r:(sl, xl) ~o:(so, xo)
+            (* (sl * xl)^2 = so * xo
+               sl^2 * xl * xl - so * xo = 0
+            *)
+            add_generic_constraint ~l:xl ~r:xl ~o:xo
               [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]
               sys
         | `Var xl, `Constant ->
@@ -634,10 +644,10 @@ struct
                 Core.printf
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
                   __LOC__ v2 ) ;
-            add_generic_constraint ~l:(sl, xl) ~r:(sl, xl)
+            add_generic_constraint ~l:xl ~r:xl
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
               sys
-        | `Constant, `Var xl ->
+        | `Constant, `Var xo ->
             when_first sys (fun () ->
                 Core.printf
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
@@ -646,8 +656,9 @@ struct
                 Core.printf
                   !"%s %{sexp:Fp.t Snarky_backendless.Cvar.t}\n%!"
                   __LOC__ v2 ) ;
-            add_generic_constraint ~l:(sl, xl)
-              [|sl; Fp.zero; Fp.zero; Fp.zero; Fp.negate (Fp.square so)|]
+            (* sl^2 = so * xo *)
+            add_generic_constraint ~o:xo
+              [|Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl)|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal (square sl) so)) )
@@ -667,37 +678,42 @@ struct
         match (x1, x2, x3) with
         | `Var x1, `Var x2, `Var x3 ->
             f __LOC__ ;
-            add_generic_constraint ~l:(s1, x1) ~r:(s2, x2) ~o:(s3, x3)
+            (* s1 x1 * s2 x2 = s3 x3
+               - s1 s2 (x1 x2) + s3 x3 = 0
+            *)
+            add_generic_constraint ~l:x1 ~r:x2 ~o:x3
               [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]
               sys
         | `Var x1, `Var x2, `Constant ->
             f __LOC__ ;
-            add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+            add_generic_constraint ~l:x1 ~r:x2
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
               sys
         | `Var x1, `Constant, `Var x3 ->
             f __LOC__ ;
-            add_generic_constraint ~l:(s1, x1) ~o:(s3, x3)
+            (* s1 x1 * s2 = s3 x3
+            *)
+            add_generic_constraint ~l:x1 ~o:x3
               [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Constant, `Var x2, `Var x3 ->
             f __LOC__ ;
-            add_generic_constraint ~r:(s2, x2) ~o:(s3, x3)
+            add_generic_constraint ~r:x2 ~o:x3
               [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Var x1, `Constant, `Constant ->
             f __LOC__ ;
-            add_generic_constraint ~l:(s1, x1)
+            add_generic_constraint ~l:x1
               [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Var x2, `Constant ->
             f __LOC__ ;
-            add_generic_constraint ~r:(s2, x2)
+            add_generic_constraint ~r:x2
               [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Constant, `Var x3 ->
             f __LOC__ ;
-            add_generic_constraint ~o:(s3, x3)
+            add_generic_constraint ~o:x3
               [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]
               sys
         | `Constant, `Constant, `Constant ->
@@ -710,7 +726,8 @@ struct
               __LOC__ v ) ;
         match x with
         | `Var x ->
-            add_generic_constraint ~l:(s, x) ~r:(s, x)
+            (* -x + x * x = 0  *)
+            add_generic_constraint ~l:x ~r:x
               [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|]
               sys
         | `Constant ->
@@ -727,32 +744,46 @@ struct
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
+            (* s1 x1 - s2 x2 = 0
+          *)
             if s1 <> s2 then
-              add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+              add_generic_constraint ~l:x1 ~r:x2
                 [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
                 sys
               (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
-              add_generic_constraint ~l:(s1, x1) ~r:(s2, x2)
+              add_generic_constraint ~l:x1 ~r:x2
                 [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
                 sys
         | `Var x1, `Constant ->
-            add_generic_constraint ~l:(s1, x1)
+            add_generic_constraint ~l:x1
               [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]
               sys
         | `Constant, `Var x2 ->
-            add_generic_constraint ~r:(s2, x2)
+            add_generic_constraint ~r:x2
               [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic {l; r; o; m; c}) ->
-        (* l.s * l.x 
+        (* 0
+         = l.s * l.x 
          + r.s * r.x 
          + o.s * o.x 
          + m * (l.x * r.x)
          + c
-         = 0
+         = 
+           l.s * l.s' * l.x'
+         + r.s * r.s' * r.x' 
+         + o.s * o.s' * o.x' 
+         + m * (l.s' * l.x' * r.s' * r.x')
+         + c
+         = 
+           (l.s * l.s') * l.x'
+         + (r.s * r.s') * r.x' 
+         + (o.s * o.s') * o.x' 
+         + (m * l.s' * r.s') * l.x' r.x'
+         + c
       *)
         (* TODO: This is sub-optimal *)
         let c = ref c in
@@ -765,9 +796,23 @@ struct
           | s', `Var x ->
               (s', Some (Fp.(s * s'), x))
         in
+        (* l.s * l.x 
+         + r.s * r.x 
+         + o.s * o.x 
+         + m * (l.x * r.x)
+         + c
+         = 
+           l.s * l.s' * l.x'
+         + r.s * r.x 
+         + o.s * o.x 
+         + m * (l.x * r.x)
+         + c
+         = 
+        *)
         let l_s', l = red_pr l in
         let r_s', r = red_pr r in
         let _, o = red_pr o in
+        let var = Option.map ~f:snd in
         let coeff = Option.value_map ~default:Fp.zero ~f:fst in
         let m =
           match (l, r) with
@@ -777,7 +822,7 @@ struct
               (* TODO: Figure this out later. *)
               failwith "Must use non-constant cvar in plonk constraints"
         in
-        add_generic_constraint ?l ?r ?o
+        add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
           [|coeff l; coeff r; coeff o; m; !c|]
           sys
     | Plonk_constraint.T (Poseidon {state}) ->
@@ -795,14 +840,17 @@ struct
             2 prev.(0) prev.(1) prev.(2)
             Params.params.round_constants.(ind)
         in
-        Array.iteri ~f:
-        (
-          fun i perm ->
+        Array.iteri
+          ~f:(fun i perm ->
             if i = Array.length state - 1 then
-              let prev = Array.mapi perm ~f:(fun i x -> wire sys x sys.next_row i) in
-              add_row sys (Array.map perm ~f:(fun x -> Some x)) 0 prev.(0) prev.(1) prev.(2) [||]
-            else add_round_state perm i
-        ) state ;
+              let prev =
+                Array.mapi perm ~f:(fun i x -> wire sys x sys.next_row i)
+              in
+              add_row sys
+                (Array.map perm ~f:(fun x -> Some x))
+                0 prev.(0) prev.(1) prev.(2) [||]
+            else add_round_state perm i )
+          state ;
         ()
     | Plonk_constraint.T (EC_add {p1; p2; p3}) ->
         let red =
@@ -810,30 +858,24 @@ struct
               (reduce_to_v x, reduce_to_v y) )
         in
         let y =
-          Array.mapi
-            ~f:(fun i (x, y) ->
-              wire sys y sys.next_row i )
-            red
+          Array.mapi ~f:(fun i (x, y) -> wire sys y sys.next_row i) red
         in
         add_row sys
           (Array.map red ~f:(fun (_, y) -> Some y))
           3
-          {row= (y.(0)).row; col= (y.(0)).col}
-          {row= (y.(1)).row; col= (y.(1)).col}
-          {row= (y.(2)).row; col= (y.(2)).col}
+          {row= y.(0).row; col= y.(0).col}
+          {row= y.(1).row; col= y.(1).col}
+          {row= y.(2).row; col= y.(2).col}
           [||] ;
         let x =
-          Array.mapi
-            ~f:(fun i (x, y) ->
-              wire sys x sys.next_row i )
-            red
+          Array.mapi ~f:(fun i (x, y) -> wire sys x sys.next_row i) red
         in
         add_row sys
           (Array.map red ~f:(fun (x, _) -> Some x))
           4
-          {row= (x.(0)).row; col= (x.(0)).col}
-          {row= (x.(1)).row; col= (x.(1)).col}
-          {row= (x.(2)).row; col= (x.(2)).col}
+          {row= x.(0).row; col= x.(0).col}
+          {row= x.(1).row; col= x.(1).col}
+          {row= x.(2).row; col= x.(2).col}
           [||] ;
         ()
     | Plonk_constraint.T (EC_scale {state}) ->
