@@ -375,7 +375,10 @@ struct
         let n = Set_once.get_exn sys.public_input_size [%here] in
         (* First, add gates for public input *)
         let pub =
-          Fp.Vector.of_array [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+          [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+        in
+        let pub_input_gate_specs_rev =
+          ref []
         in
         for row = 0 to n - 1 do
           let lp = 
@@ -385,12 +388,26 @@ struct
           let lp_row = Row.to_absolute ~public_input_size:n lp.row in
           (* Add to the gate vector *)
           let row = Unsigned.Size_t.of_int row in
-          Gates.add_raw g ~gate_enum:1 ~row ~lrow:lp_row ~lcol:0 ~rrow:row ~rcol:1
-            ~orow:row ~ocol:2 pub
+          pub_input_gate_specs_rev :=
+            { Gate_spec.gate_enum=1
+            ; row
+            ; lrow=lp_row
+            ; lcol=lp.col
+            ; rrow= row
+            ; rcol=1
+            ; orow= row
+            ; ocol= 2
+            ; coeffs= pub
+            }
+            :: !pub_input_gate_specs_rev 
         done ;
         let offset_row = Row.to_absolute ~public_input_size:n in
-        List.iter
-          (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
+        let all_gates =
+          List.rev_append
+            !pub_input_gate_specs_rev
+            (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
+        in
+        List.iter all_gates
           ~f:
             (fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
             Gates.add_raw g ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol
