@@ -85,7 +85,7 @@ let get_balance t (addr : Account_id.t) =
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.lookup trust_system ip_address
+  Trust_system.lookup_ip trust_system ip_address
 
 let get_trust_status_all t =
   let config = Coda_lib.config t in
@@ -95,7 +95,7 @@ let get_trust_status_all t =
 let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.reset trust_system ip_address
+  Trust_system.reset_ip trust_system ip_address
 
 let replace_block_production_keys keys pks =
   let kps =

@@ -1,5 +1,10 @@
 open Core_kernel
 
+module Fork_config = struct
+  type t = {previous_state_hash: string; previous_length: int}
+  [@@deriving yojson, dhall_type, bin_io_unversioned]
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -67,16 +72,27 @@ module Json_layout = struct
   end
 
   module Ledger = struct
+    module Balance_spec = struct
+      type t = {number: int; balance: Currency.Balance.t}
+      [@@deriving yojson, dhall_type]
+    end
+
     type t =
       { accounts: (Accounts.t option[@default None])
       ; num_accounts: (int option[@default None])
+      ; balances: (Balance_spec.t list[@default []])
       ; hash: (string option[@default None])
       ; name: (string option[@default None])
       ; add_genesis_winner: (bool option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
-      [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
+      [| "accounts"
+       ; "num_accounts"
+       ; "balances"
+       ; "hash"
+       ; "name"
+       ; "add_genesis_winner" |]
 
     let of_yojson json =
       dump_on_error json @@ of_yojson
@@ -111,7 +127,8 @@ module Json_layout = struct
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
       ; coinbase_amount: (Currency.Amount.t option[@default None])
       ; supercharged_coinbase_factor: (int option[@default None])
-      ; account_creation_fee: (Currency.Fee.t option[@default None]) }
+      ; account_creation_fee: (Currency.Fee.t option[@default None])
+      ; fork: (Fork_config.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -277,15 +294,21 @@ module Ledger = struct
   type t =
     { base: base
     ; num_accounts: int option
+    ; balances: (int * Currency.Balance.Stable.Latest.t) list
     ; hash: string option
     ; name: string option
     ; add_genesis_winner: bool option }
   [@@deriving bin_io_unversioned]
 
-  let to_json_layout {base; num_accounts; hash; name; add_genesis_winner} :
+  let to_json_layout
+      {base; num_accounts; balances; hash; name; add_genesis_winner} :
       Json_layout.Ledger.t =
+    let balances =
+      List.map balances ~f:(fun (number, balance) ->
+          {Json_layout.Ledger.Balance_spec.number; balance} )
+    in
     let without_base : Json_layout.Ledger.t =
-      {accounts= None; num_accounts; hash; name; add_genesis_winner}
+      {accounts= None; num_accounts; balances; hash; name; add_genesis_winner}
     in
     match base with
     | Named name ->
@@ -296,7 +319,7 @@ module Ledger = struct
         {without_base with hash= Some hash}
 
   let of_json_layout
-      ({accounts; num_accounts; hash; name; add_genesis_winner} :
+      ({accounts; num_accounts; balances; hash; name; add_genesis_winner} :
         Json_layout.Ledger.t) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
@@ -317,7 +340,12 @@ module Ledger = struct
                 "Runtime_config.Ledger.of_json_layout: Expected a field \
                  'accounts', 'name' or 'hash'" ) )
     in
-    {base; num_accounts; hash; name; add_genesis_winner}
+    let balances =
+      List.map balances
+        ~f:(fun {Json_layout.Ledger.Balance_spec.number; balance} ->
+          (number, balance) )
+    in
+    {base; num_accounts; balances; hash; name; add_genesis_winner}
 
   let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
@@ -407,7 +435,8 @@ module Proof_keys = struct
     ; transaction_capacity: Transaction_capacity.t option
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor: int option
-    ; account_creation_fee: Currency.Fee.Stable.Latest.t option }
+    ; account_creation_fee: Currency.Fee.Stable.Latest.t option
+    ; fork: Fork_config.t option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
@@ -419,7 +448,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; c
     ; ledger_depth
@@ -429,7 +459,8 @@ module Proof_keys = struct
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let of_json_layout
       { Json_layout.Proof_keys.level
@@ -440,7 +471,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
@@ -454,7 +486,8 @@ module Proof_keys = struct
     ; transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
 
@@ -479,7 +512,8 @@ module Proof_keys = struct
           t2.supercharged_coinbase_factor
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
-          t2.account_creation_fee }
+          t2.account_creation_fee
+    ; fork= opt_fallthrough ~default:t1.fork t2.fork }
 end
 
 module Genesis = struct

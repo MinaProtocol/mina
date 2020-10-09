@@ -107,25 +107,85 @@ module Accounts = struct
               (if Option.is_some delegate then delegate else account.delegate)
           } ) )
 
+  let gen_with_balance balance :
+      (Private_key.t option * Account.t) Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map pk = Signature_lib.Public_key.Compressed.gen in
+    (None, Account.create (Account_id.create pk Token_id.default) balance)
+
   let gen : (Private_key.t option * Account.t) Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%bind balance = Int.gen_incl 10 500 >>| Currency.Balance.of_int in
-    let%map pk = Signature_lib.Public_key.Compressed.gen in
-    (None, Account.create (Account_id.create pk Token_id.default) balance)
+    gen_with_balance balance
 
   let generate n : (Private_key.t option * Account.t) list =
     let open Quickcheck in
     random_value ~seed:(`Deterministic "fake accounts for genesis ledger")
       (Generator.list_with_length n gen)
 
-  let rec pad_to n accounts =
+  (* This implements a tail-recursive generator using the low-level primitives
+     so that we don't blow out the stack.
+  *)
+  let gen_balances_rev balances :
+      (Private_key.t option * Account.t) list Quickcheck.Generator.t =
+    match balances with
+    | [] ->
+        Quickcheck.Generator.return []
+    | (n, balance) :: balances_tl ->
+        Quickcheck.Generator.create (fun ~size ~random ->
+            let rec gen_balances_rev n balance balances_tl accounts =
+              if n > 0 then
+                let new_random = Splittable_random.State.split random in
+                let account =
+                  (* Manually generate an account using the [generate] primitive. *)
+                  Quickcheck.Generator.generate ~size ~random:new_random
+                    (gen_with_balance balance)
+                in
+                gen_balances_rev (n - 1) balance balances_tl
+                  (account :: accounts)
+              else
+                match balances_tl with
+                | [] ->
+                    accounts
+                | (n, balance) :: balances_tl ->
+                    gen_balances_rev n balance balances_tl accounts
+            in
+            gen_balances_rev n balance balances_tl [] )
+
+  let pad_with_rev_balances balances accounts =
+    let balances_accounts =
+      Quickcheck.random_value
+        ~seed:(`Deterministic "fake accounts with balances for genesis ledger")
+        (gen_balances_rev balances)
+    in
+    List.append accounts balances_accounts
+
+  (* NOTE: When modifying this function, be very careful to ensure that all
+     operations are tail-recursive, otherwise a sufficiently large genesis
+     ledger will blow the stack.
+     In particular, do not use any functions that return values of the form
+     [_ :: _], since this construction is NOT tail-recursive.
+  *)
+  let pad_to n accounts =
     if n <= 0 then accounts
     else
-      match accounts with
-      | [] ->
-          generate n
-      | account :: accounts ->
-          account :: pad_to (n - 1) accounts
+      let exception Stop in
+      try
+        (* Count accounts and reverse the list while we're doing so to avoid
+           re-traversing the list.
+        *)
+        let rev_accounts, count =
+          List.fold ~init:([], 0) accounts ~f:(fun (acc, count) account ->
+              let count = count + 1 in
+              if count >= n then raise Stop ;
+              (account :: acc, count + 1) )
+        in
+        (* [rev_append] is tail-recursive, and we've already reversed the list,
+           so we can avoid calling [append] which may internally reverse the
+           list again where it is sufficiently long.
+        *)
+        List.rev_append rev_accounts (generate (n - count))
+      with Stop -> accounts
 end
 
 module Ledger = struct
@@ -146,11 +206,13 @@ module Ledger = struct
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~num_accounts name =
+      ~num_accounts ~balances name =
     let str =
       String.concat
         [ Int.to_string constraint_constants.ledger_depth
         ; Int.to_string (Option.value ~default:0 num_accounts)
+        ; List.to_string balances ~f:(fun (i, balance) ->
+              sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
           Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
         ; (* Distinguish ledgers when the account record layout has changed. *)
@@ -222,7 +284,8 @@ module Ledger = struct
       | Accounts accounts -> (
           let named_filename =
             named_filename ~constraint_constants
-              ~num_accounts:config.num_accounts (accounts_name accounts)
+              ~num_accounts:config.num_accounts ~balances:config.balances
+              (accounts_name accounts)
           in
           match%bind
             Deferred.List.find_map ~f:(file_exists named_filename) search_paths
@@ -234,7 +297,7 @@ module Ledger = struct
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
-              ~num_accounts:config.num_accounts name
+              ~num_accounts:config.num_accounts ~balances:config.balances name
           in
           Deferred.List.find_map ~f:(file_exists named_filename) search_paths )
 
@@ -343,14 +406,19 @@ module Ledger = struct
                   ~metadata:[("ledger_name", `String name)] ;
                 None )
         in
+        let padded_accounts_with_balances_opt =
+          Option.map accounts_opt
+            ~f:
+              (Lazy.map
+                 ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
+        in
         let padded_accounts_opt =
-          Option.map
+          Option.map padded_accounts_with_balances_opt
             ~f:
               (Lazy.map
                  ~f:
                    (Accounts.pad_to
                       (Option.value ~default:0 config.num_accounts)))
-            accounts_opt
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -385,7 +453,8 @@ module Ledger = struct
             | Named ledger_name ->
                 let ledger_filename =
                   named_filename ~constraint_constants
-                    ~num_accounts:config.num_accounts ledger_name
+                    ~num_accounts:config.num_accounts ~balances:config.balances
+                    ledger_name
                 in
                 [%log error]
                   "Bad config $config: genesis ledger named $ledger_name is \
@@ -430,7 +499,8 @@ module Ledger = struct
                   let link_name =
                     genesis_dir
                     ^/ named_filename ~constraint_constants
-                         ~num_accounts:config.num_accounts name
+                         ~num_accounts:config.num_accounts
+                         ~balances:config.balances name
                   in
                   (* Delete the file if it already exists. *)
                   let%bind () =
@@ -760,7 +830,17 @@ let make_constraint_constants
         config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
-        config.account_creation_fee }
+        config.account_creation_fee
+  ; fork=
+      ( match config.fork with
+      | None ->
+          default.fork
+      | Some {previous_state_hash; previous_length} ->
+          Some
+            { previous_state_hash=
+                State_hash.of_base58_check_exn previous_state_hash
+            ; previous_length= Coda_numbers.Length.of_int previous_length } )
+  }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -908,6 +988,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
          ~default:
            { base= Named Coda_compile_config.genesis_ledger
            ; num_accounts= None
+           ; balances= []
            ; hash= None
            ; name= None
            ; add_genesis_winner= None })
@@ -1032,7 +1113,13 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; supercharged_coinbase_factor=
             Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
-        }
+        ; fork=
+            Option.map constraint_constants.fork
+              ~f:(fun {previous_state_hash; previous_length} ->
+                { Runtime_config.Fork_config.previous_state_hash=
+                    State_hash.to_base58_check previous_state_hash
+                ; previous_length= Coda_numbers.Length.to_int previous_length
+                } ) }
   ; ledger=
       Some
         { base=
@@ -1062,6 +1149,7 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
                          delegate
                    ; timing } ))
         ; name= None
+        ; balances= []
         ; num_accounts= genesis_constants.num_accounts
         ; hash=
             Some

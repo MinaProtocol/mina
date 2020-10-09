@@ -1,13 +1,13 @@
-let Prelude = ../External/Prelude.dhall
-let Cmd = ../Lib/Cmds.dhall
-let S = ../Lib/SelectFiles.dhall
-let Pipeline = ../Pipeline/Dsl.dhall
-let JobSpec = ../Pipeline/JobSpec.dhall
-let Command = ../Command/Base.dhall
-let OpamInit = ../Command/OpamInit.dhall
-let WithCargo = ../Command/WithCargo.dhall
-let Docker = ../Command/Docker/Type.dhall
-let Size = ../Command/Size.dhall
+let Prelude = ../../External/Prelude.dhall
+let Cmd = ../../Lib/Cmds.dhall
+let S = ../../Lib/SelectFiles.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
+let Command = ../../Command/Base.dhall
+let OpamInit = ../../Command/OpamInit.dhall
+let WithCargo = ../../Command/WithCargo.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
 in
 
 let user = "admin"
@@ -22,9 +22,10 @@ Pipeline.build
         { dirtyWhen =
           [ S.strictlyStart (S.contains "src/lib")
           , S.strictly (S.contains "Makefile")
-          , S.strictlyStart (S.contains "buildkite/src/Jobs/ArchiveNode")
+          , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/ArchiveNodeUnitTest")
           ]
-        , name = "ArchiveNode"
+        , path = "Test"
+        , name = "ArchiveNodeUnitTest"
         }
     , steps =
     let outerDir : Text =
@@ -47,8 +48,8 @@ Pipeline.build
                   , "GO=/usr/lib/go/bin/go make libp2p_helper"
                   , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:coda-archive-processor-test'"
                   ])
-            , label = "Archive-node unit tests"
-            , key = "build-client-sdk"
+            , label = "Archive node unit tests"
+            , key = "archive-unit-tests"
             , target = Size.Large
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]

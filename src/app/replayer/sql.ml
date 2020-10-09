@@ -2,6 +2,32 @@
 
 open Core_kernel
 
+module Global_slots_and_ledger_hashes = struct
+  (* find all global slots in blocks, working back from block with given state hash *)
+  let query =
+    Caqti_request.collect Caqti_type.string
+      Caqti_type.(tup2 int64 string)
+      {|
+         WITH RECURSIVE chain AS (
+
+           SELECT id,parent_id,global_slot,ledger_hash FROM blocks b WHERE b.state_hash = ?
+
+           UNION ALL
+
+           SELECT b.id,b.parent_id,b.global_slot,b.ledger_hash FROM blocks b
+
+           INNER JOIN chain
+
+           ON b.id = chain.parent_id
+        )
+
+        SELECT global_slot,ledger_hash FROM chain c
+   |}
+
+  let run (module Conn : Caqti_async.CONNECTION) state_hash =
+    Conn.collect_list query state_hash
+end
+
 (* build query to find all blocks back to genesis block, starting with the block containing the
    specified state hash; for each such block, find ids of all (user or internal) commands in that block
 *)
@@ -52,6 +78,7 @@ module User_command = struct
     ; fee_token: int64
     ; token: int64
     ; amount: int64 option
+    ; memo: string
     ; nonce: int64
     ; global_slot: int64
     ; sequence_no: int }
@@ -62,12 +89,12 @@ module User_command = struct
       Ok
         ( (t.type_, t.fee_payer_id, t.source_id, t.receiver_id)
         , (t.fee, t.fee_token, t.token, t.amount)
-        , (t.nonce, t.global_slot, t.sequence_no) )
+        , (t.memo, t.nonce, t.global_slot, t.sequence_no) )
     in
     let decode
         ( (type_, fee_payer_id, source_id, receiver_id)
         , (fee, fee_token, token, amount)
-        , (nonce, global_slot, sequence_no) ) =
+        , (memo, nonce, global_slot, sequence_no) ) =
       Ok
         { type_
         ; fee_payer_id
@@ -77,6 +104,7 @@ module User_command = struct
         ; fee_token
         ; token
         ; amount
+        ; memo
         ; nonce
         ; global_slot
         ; sequence_no }
@@ -85,14 +113,14 @@ module User_command = struct
       Caqti_type.(
         tup3 (tup4 string int int int)
           (tup4 int64 int64 int64 (option int64))
-          (tup3 int64 int64 int))
+          (tup4 string int64 int64 int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,nonce,global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,global_slot,sequence_no,status FROM
 
          (SELECT * FROM user_commands WHERE id = ?) AS uc
 

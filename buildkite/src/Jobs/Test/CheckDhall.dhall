@@ -1,13 +1,13 @@
-let S = ../Lib/SelectFiles.dhall
+let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let JobSpec = ../Pipeline/JobSpec.dhall
-let Pipeline = ../Pipeline/Dsl.dhall
-let Command = ../Command/Base.dhall
-let Docker = ../Command/Docker/Type.dhall
-let Size = ../Command/Size.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let Command = ../../Command/Base.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
 
-let Cmd = ../Lib/Cmds.dhall
+let Cmd = ../../Lib/Cmds.dhall
 
 in
 
@@ -22,6 +22,7 @@ Pipeline.build
         S.strictly (S.contains "buildkite/Makefile"),
         S.exactly "buildkite/scripts/generate-jobs" "sh"
       ],
+      path = "Test",
       name = "CheckDhall"
     },
     steps = [
@@ -31,9 +32,9 @@ Pipeline.build
           Cmd.run "cd buildkite && make check"
         ],
         label = "Check all CI Dhall entrypoints",
-        key = "check",
+        key = "check-dhall",
         target = Size.Small,
-        docker = Some Docker::{ image = (../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
       }
     ]
   }

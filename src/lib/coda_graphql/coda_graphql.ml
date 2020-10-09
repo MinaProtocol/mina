@@ -1220,6 +1220,20 @@ module Types = struct
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
+    let peer : ('context, Network_peer.Peer.t option) typ =
+      obj "NetworkPeer" ~fields:(fun _ ->
+          [ field "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
+          ; field "host" ~doc:"IP address of the remote host"
+              ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer ->
+                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+          ; field "libp2p_port" ~typ:(non_null int)
+              ~args:Arg.[]
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port) ] )
+
     let create_account : (Coda_lib.t, Account.key option) typ =
       obj "AddAccountPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
@@ -1286,7 +1300,11 @@ module Types = struct
           let open Trust_system.Peer_status in
           [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
-              ~resolve:(fun _ (ip_addr, _) -> Unix.Inet_addr.to_string ip_addr)
+              ~resolve:(fun _ (peer, _) ->
+                Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
+          ; field "peer_id" ~typ:(non_null string) ~doc:"libp2p Peer ID"
+              ~args:Arg.[]
+              ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
               ~resolve:(fun _ (_, {trust; _}) -> trust)
@@ -1374,6 +1392,27 @@ module Types = struct
               ~typ:public_key
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
+
+    let set_connection_gating_config =
+      obj "SetConnectionGatingConfigPayload" ~fields:(fun _ ->
+          [ field "trustedPeers"
+              ~typ:(non_null (list (non_null peer)))
+              ~doc:"Peers we will always allow connections from"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.trusted_peers)
+          ; field "bannedPeers"
+              ~typ:(non_null (list (non_null peer)))
+              ~doc:
+                "Peers we will never allow connections from (unless they are \
+                 also trusted!)"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.banned_peers)
+          ; field "isolate" ~typ:(non_null bool)
+              ~doc:
+                "If true, no connections will be allowed unless they are from \
+                 a trusted peer"
+              ~args:Arg.[]
+              ~resolve:(fun _ config -> config.Coda_net2.isolate) ] )
   end
 
   module Arguments = struct
@@ -1384,6 +1423,21 @@ module Types = struct
 
   module Input = struct
     open Schema.Arg
+
+    let peer : (Network_peer.Peer.t, string) result option arg_typ =
+      obj "NetworkPeer"
+        ~doc:"Network identifiers for another protocol participant"
+        ~coerce:(fun peer_id host libp2p_port ->
+          try
+            Ok
+              Network_peer.Peer.
+                {peer_id; host= Unix.Inet_addr.of_string host; libp2p_port}
+          with _ -> Error "Invalid format for NetworkPeer.host" )
+        ~fields:
+          [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+          ; arg "host" ~doc:"IP address of the remote host"
+              ~typ:(non_null string)
+          ; arg "libp2p_port" ~typ:(non_null int) ]
 
     let public_key_arg =
       scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
@@ -1698,6 +1752,28 @@ module Types = struct
                      "Time that a payment gets added to another clients \
                       transaction database") ]
     end
+
+    let set_connection_gating_config =
+      obj "SetConnectionGatingConfigInput"
+        ~coerce:(fun trusted_peers banned_peers isolate ->
+          let open Result.Let_syntax in
+          let%bind trusted_peers = Result.all trusted_peers in
+          let%map banned_peers = Result.all banned_peers in
+          Coda_net2.{isolate; trusted_peers; banned_peers} )
+        ~fields:
+          Arg.
+            [ arg "trustedPeers"
+                ~typ:(non_null (list (non_null peer)))
+                ~doc:"Peers we will always allow connections from"
+            ; arg "bannedPeers"
+                ~typ:(non_null (list (non_null peer)))
+                ~doc:
+                  "Peers we will never allow connections from (unless they \
+                   are also trusted!)"
+            ; arg "isolate" ~typ:(non_null bool)
+                ~doc:
+                  "If true, no connections will be allowed unless they are \
+                   from a trusted peer" ]
   end
 
   module Pagination = struct
@@ -1969,8 +2045,8 @@ module Mutations = struct
 
   let reset_trust_status =
     io_field "resetTrustStatus"
-      ~doc:"Reset trust status for a given IP address"
-      ~typ:(non_null Types.Payload.trust_status)
+      ~doc:"Reset trust status for all peers at a given IP address"
+      ~typ:(list (non_null Types.Payload.trust_status))
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
       ~resolve:(fun {ctx= coda; _} () ip_address_input ->
         let open Deferred.Result.Let_syntax in
@@ -1978,7 +2054,7 @@ module Mutations = struct
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        (ip_address, Coda_commands.reset_trust_status coda ip_address) )
+        Some (Coda_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
     match
@@ -2299,6 +2375,22 @@ module Mutations = struct
         Coda_lib.set_snark_work_fee coda fee ;
         Currency.Fee.to_uint64 last_fee )
 
+  let set_connection_gating_config =
+    io_field "setConnectionGatingConfig"
+      ~args:
+        Arg.
+          [arg "input" ~typ:(non_null Types.Input.set_connection_gating_config)]
+      ~doc:
+        "Set the connection gating config, returning the current config after \
+         the application (which may have failed)"
+      ~typ:(non_null Types.Payload.set_connection_gating_config)
+      ~resolve:(fun {ctx= coda; _} () config ->
+        let open Deferred.Result.Let_syntax in
+        let%bind config = Deferred.return config in
+        let open Deferred.Let_syntax in
+        Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
+        >>| Result.return )
+
   let commands =
     [ add_wallet
     ; create_account
@@ -2319,7 +2411,8 @@ module Mutations = struct
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
-    ; set_snark_work_fee ]
+    ; set_snark_work_fee
+    ; set_connection_gating_config ]
 end
 
 module Queries = struct
@@ -2398,13 +2491,14 @@ module Queries = struct
         Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
-    field "trustStatus" ~typ:Types.Payload.trust_status
+    field "trustStatus"
+      ~typ:(list (non_null Types.Payload.trust_status))
       ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
       ~doc:"Trust status for an IPv4 or IPv6 address"
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
-            Some (ip_addr, Coda_commands.get_trust_status coda ip_addr)
+            Some (Coda_commands.get_trust_status coda ip_addr)
         | Error _ ->
             None )
 
@@ -2679,6 +2773,18 @@ module Queries = struct
       ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
+  let time_offset =
+    field "timeOffset"
+      ~doc:
+        "The time offset in seconds used to convert real times into \
+         blockchain times"
+      ~args:Arg.[]
+      ~typ:(non_null int)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Block_time.Controller.get_time_offset
+          ~logger:(Coda_lib.config coda).logger
+        |> Time.Span.to_sec |> Float.to_int )
+
   let next_available_token =
     field "nextAvailableToken"
       ~doc:
@@ -2693,6 +2799,18 @@ module Queries = struct
                |> Staged_ledger.ledger |> Ledger.next_available_token )
         |> Option.value ~default:Token_id.(next default) )
 
+  let connection_gating_config =
+    io_field "connectionGatingConfig"
+      ~doc:
+        "The rules that the libp2p helper will use to determine which \
+         connections to permit"
+      ~args:Arg.[]
+      ~typ:(non_null Types.Payload.set_connection_gating_config)
+      ~resolve:(fun {ctx= coda; _} _ ->
+        let net = Coda_lib.net coda in
+        let%map config = Coda_networking.connection_gating_config net in
+        Ok config )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2700,6 +2818,7 @@ module Queries = struct
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
+    ; connection_gating_config
     ; account
     ; accounts_for_pk
     ; token_owner
@@ -2716,6 +2835,7 @@ module Queries = struct
     ; snark_pool
     ; pending_snark_work
     ; genesis_constants
+    ; time_offset
     ; next_available_token ]
 end
 
