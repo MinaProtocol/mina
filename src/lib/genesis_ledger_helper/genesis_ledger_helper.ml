@@ -591,7 +591,8 @@ module Genesis_proof = struct
             return None )
 
   let generate_inputs ~runtime_config ~proof_level ~ledger
-      ~constraint_constants ~(genesis_constants : Genesis_constants.t) =
+      ~constraint_constants ~blockchain_proof_system_id
+      ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
@@ -604,25 +605,38 @@ module Genesis_proof = struct
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
     ; proof_level
-    ; blockchain_proof_system_id= Snark_keys.blockchain_verification_key_id ()
+    ; blockchain_proof_system_id
     ; genesis_ledger= ledger
     ; consensus_constants
     ; protocol_state_with_hash
     ; genesis_constants }
 
-  let generate (inputs : Genesis_proof.Inputs.t) =
+  let blockchain_snark_state (inputs : Genesis_proof.Inputs.t) :
+      (module Blockchain_snark.Blockchain_snark_state.S) =
+    let module T = Transaction_snark.Make (struct
+      let constraint_constants = inputs.constraint_constants
+    end) in
+    ( module Blockchain_snark.Blockchain_snark_state.Make (struct
+      let tag = T.tag
+
+      let constraint_constants = inputs.constraint_constants
+
+      let proof_level = inputs.proof_level
+    end) )
+
+  let generate b (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
-        let module B =
-          Blockchain_snark.Blockchain_snark_state.Make
-            (Transaction_snark.Make ()) in
+        let (module B) =
+          match b with Some b -> b | None -> blockchain_snark_state inputs
+        in
         let computed_values =
           Genesis_proof.create_values
             (module B)
             { genesis_ledger= inputs.genesis_ledger
             ; runtime_config= inputs.runtime_config
             ; proof_level= inputs.proof_level
-            ; blockchain_proof_system_id= Lazy.force B.Proof.id
+            ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id)
             ; protocol_state_with_hash= inputs.protocol_state_with_hash
             ; genesis_constants= inputs.genesis_constants
             ; consensus_constants= inputs.consensus_constants
@@ -660,10 +674,19 @@ module Genesis_proof = struct
     let proof_needed =
       match inputs.proof_level with Full -> true | _ -> false
     in
+    let b, id =
+      match (inputs.blockchain_proof_system_id, inputs.proof_level) with
+      | Some id, _ ->
+          (None, id)
+      | None, Full ->
+          let ((module B) as b) = blockchain_snark_state inputs in
+          (Some b, Lazy.force B.Proof.id)
+      | _ ->
+          (None, Pickles.Verification_key.Id.dummy ())
+    in
     let compiled = Precomputed_values.compiled in
     let base_hash =
-      Base_hash.create ~id:inputs.blockchain_proof_system_id
-        ~state_hash:inputs.protocol_state_with_hash.hash
+      Base_hash.create ~id ~state_hash:inputs.protocol_state_with_hash.hash
     in
     let compiled_base_hash =
       Base_hash.create
@@ -729,7 +752,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        let values = generate inputs in
+        let values = generate b inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -807,7 +830,17 @@ let make_constraint_constants
         config.supercharged_coinbase_factor
   ; account_creation_fee=
       Option.value ~default:default.account_creation_fee
-        config.account_creation_fee }
+        config.account_creation_fee
+  ; fork=
+      ( match config.fork with
+      | None ->
+          default.fork
+      | Some {previous_state_hash; previous_length} ->
+          Some
+            { previous_state_hash=
+                State_hash.of_base58_check_exn previous_state_hash
+            ; previous_length= Coda_numbers.Length.of_int previous_length } )
+  }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -886,17 +919,32 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               None)
       ; Some Genesis_constants.Proof_level.compiled ]
   in
-  let constraint_constants, generated_constraint_constants =
+  let ( constraint_constants
+      , generated_constraint_constants
+      , blockchain_proof_system_id ) =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
-        (Genesis_constants.Constraint_constants.compiled, false)
+        ( Genesis_constants.Constraint_constants.compiled
+        , false
+        , Some (Precomputed_values.blockchain_proof_system_id ()) )
     | Some config ->
         [%log info]
           "Using the constraint constants from the configuration file" ;
+        let blockchain_proof_system_id =
+          (* We pass [None] here, which will force the constraint systems to be
+             set up and their hashes evaluated before we can calculate the
+             genesis proof's filename.
+             This adds no overhead if we are generating a genesis proof, since
+             we will do these evaluations anyway to load the blockchain proving
+             key. Otherwise, this will in a slight slowdown.
+          *)
+          None
+        in
         ( make_constraint_constants
             ~default:Genesis_constants.Constraint_constants.compiled config
-        , true )
+        , true
+        , blockchain_proof_system_id )
   in
   let%bind () =
     match (proof_level, Genesis_constants.Proof_level.compiled) with
@@ -955,6 +1003,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let proof_inputs =
     Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
       ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
+      ~blockchain_proof_system_id
   in
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
@@ -1064,7 +1113,13 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; supercharged_coinbase_factor=
             Some constraint_constants.supercharged_coinbase_factor
         ; account_creation_fee= Some constraint_constants.account_creation_fee
-        }
+        ; fork=
+            Option.map constraint_constants.fork
+              ~f:(fun {previous_state_hash; previous_length} ->
+                { Runtime_config.Fork_config.previous_state_hash=
+                    State_hash.to_base58_check previous_state_hash
+                ; previous_length= Coda_numbers.Length.to_int previous_length
+                } ) }
   ; ledger=
       Some
         { base=
