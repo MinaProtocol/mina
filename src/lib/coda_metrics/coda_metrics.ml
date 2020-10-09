@@ -369,8 +369,18 @@ module Network = struct
     Gauge_map.add rpc_latency_table ~name ~help
 
   let rpc_size_bytes ~name : Rpc_size_histogram.t =
-    let help = "size for RPC reponse in bytes" in
+    let help = "size for RPC response in bytes" in
     let name = name ^ "_size" in
+    Histogram_map.add rpc_size_table ~name ~help
+
+  let rpc_max_bytes ~name : Rpc_size_histogram.t =
+    let help = "maximum size for RPC response in bytes" in
+    let name = name ^ "_max_size" in
+    Histogram_map.add rpc_size_table ~name ~help
+
+  let rpc_avg_bytes ~name : Rpc_size_histogram.t =
+    let help = "average size for RPC response in bytes" in
+    let name = name ^ "_avg_size" in
     Histogram_map.add rpc_size_table ~name ~help
 
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
