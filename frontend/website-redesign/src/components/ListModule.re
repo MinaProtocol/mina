@@ -111,7 +111,7 @@ module Listing = {
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
         width(`percent(100.)),
-        marginTop(`rem(1.)),
+        marginTop(`rem(3.)),
         media(
           Theme.MediaQuery.notMobile,
           [marginTop(`zero), width(`percent(80.))],
