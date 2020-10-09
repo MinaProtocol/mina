@@ -13,9 +13,14 @@ let hashes ~loc =
   end) in
   let open E in
   let f (_, x) = estring (Core.Md5.to_hex x) in
-  let ts = Transaction_snark.constraint_system_digests () in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let proof_level = Genesis_constants.Proof_level.compiled in
+  let ts =
+    Transaction_snark.constraint_system_digests ~constraint_constants ()
+  in
   let bs =
-    Blockchain_snark.Blockchain_snark_state.constraint_system_digests ()
+    Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+      ~proof_level ~constraint_constants ()
   in
   elist (List.map ts ~f @ List.map bs ~f)
 
@@ -127,8 +132,16 @@ let handle_dirty dirty =
       Deferred.unit
 
 let str ~loc =
-  let module T = Transaction_snark.Make () in
-  let module B = Blockchain_snark.Blockchain_snark_state.Make (T) in
+  let module T = Transaction_snark.Make (struct
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  end) in
+  let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+    let tag = T.tag
+
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.compiled
+  end) in
   let%map () =
     handle_dirty
       Pickles.(
