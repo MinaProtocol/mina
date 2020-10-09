@@ -613,9 +613,16 @@ module Genesis_proof = struct
   let generate (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
-        let module B =
-          Blockchain_snark.Blockchain_snark_state.Make
-            (Transaction_snark.Make ()) in
+        let module T = Transaction_snark.Make (struct
+          let constraint_constants = inputs.constraint_constants
+        end) in
+        let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+          let tag = T.tag
+
+          let constraint_constants = inputs.constraint_constants
+
+          let proof_level = inputs.proof_level
+        end) in
         let computed_values =
           Genesis_proof.create_values
             (module B)

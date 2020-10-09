@@ -360,10 +360,12 @@ let verify state proof ~key =
 
 module Make (T : sig
   val tag : Transaction_snark.tag
-end) : S = struct
-  let proof_level = Genesis_constants.Proof_level.compiled
 
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
+end) : S = struct
+  open T
 
   let tag, cache_handle, p, Pickles.Provers.[step] =
     Pickles.compile ~cache:Cache_dir.cache
@@ -381,7 +383,7 @@ end) : S = struct
   module Proof = (val p)
 end
 
-let constraint_system_digests () =
+let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
     , digest
@@ -390,10 +392,8 @@ let constraint_system_digests () =
            let%bind x1 = exists Coda_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
-             step ~proof_level:Genesis_constants.Proof_level.compiled
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~logger:(Logger.create ()) [x1; x2] x
+             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
+               [x1; x2] x
            in
            ()
          in

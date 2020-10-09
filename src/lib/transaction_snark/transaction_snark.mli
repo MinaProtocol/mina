@@ -339,6 +339,11 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-module Make () : S
+module Make (Inputs : sig
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+end) : S
 
-val constraint_system_digests : unit -> (string * Md5.t) list
+val constraint_system_digests :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> unit
+  -> (string * Md5.t) list
