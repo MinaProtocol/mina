@@ -18,6 +18,7 @@ module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Coda_compile_config =
   Coda_compile_config_nonconsensus.Coda_compile_config
+module Snapp_lib = Snapp_lib_nonconsensus
 
 [%%endif]
 

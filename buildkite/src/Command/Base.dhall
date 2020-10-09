@@ -53,6 +53,7 @@ let B/DependsOn =
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
+let B/Env = B.definitions/commandStep/properties/env/Type
 
 -- A type to make sure we don't accidentally forget the prefix on keys
 let TaggedKey = {
@@ -88,6 +89,7 @@ let Config =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
       , artifact_paths : List SelectFiles.Type
+      , env : List TaggedKey.Type
       , label : Text
       , key : Text
       , target : Size
@@ -104,6 +106,7 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
