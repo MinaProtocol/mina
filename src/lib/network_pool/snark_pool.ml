@@ -31,6 +31,16 @@ module Snark_tables = struct
         Transaction_snark_work.Statement.Table.t }
   [@@deriving sexp]
 
+  let compare t1 t2 =
+    let p t = (Hashtbl.to_alist t.all, Hashtbl.to_alist t.rebroadcastable) in
+    [%compare:
+      ( Transaction_snark_work.Statement.t
+      * Ledger_proof.t One_or_two.t Priced_proof.t )
+      list
+      * ( Transaction_snark_work.Statement.t
+        * (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t) )
+        list] (p t1) (p t2)
+
   let of_serializable (t : Serializable.t) : t =
     { all= Hashtbl.map t ~f:fst
     ; rebroadcastable=
@@ -112,8 +122,7 @@ module type Transition_frontier_intf = sig
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Transition_frontier : Transition_frontier_intf) :
-  S with type transition_frontier := Transition_frontier.t = struct
+module Make (Transition_frontier : Transition_frontier_intf) = struct
   module Resource_pool = struct
     module T = struct
       module Config = struct
@@ -226,8 +235,6 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
-
-      (*       let write_periodically t = *)
 
       let create ~constraint_constants:_ ~consensus_constants:_
           ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
@@ -397,6 +404,8 @@ module Make (Transition_frontier : Transition_frontier_intf) :
 
   module For_tests = struct
     let get_rebroadcastable = Resource_pool.get_rebroadcastable
+
+    let snark_tables (t : Resource_pool.t) = t.snark_tables
   end
 
   let get_completed_work t statement =
@@ -406,6 +415,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
+  (* This causes a snark pool to never be GC'd. This is fine as it should live as long as the daemon lives. *)
   let store_periodically (t : Resource_pool.t) =
     Clock.every' (Time.Span.of_min 3.) (fun () ->
         let before = Time.now () in
@@ -414,12 +424,21 @@ module Make (Transition_frontier : Transition_frontier_intf) :
             Snark_tables.Serializable.Stable.Latest.bin_writer_t
             (Snark_tables.to_serializable t.snark_tables)
         in
-        let elapsed = Time.diff (Time.now ()) before in
+        let elapsed = Time.(diff (now ()) before |> Span.to_ms) in
+        Coda_metrics.(
+          Snark_work.Snark_pool_serialization_ms_histogram.observe
+            Snark_work.snark_pool_serialization_ms elapsed) ;
         [%log' debug t.logger] "SNARK pool serialization took $time ms"
-          ~metadata:[("time", `Float (Time.Span.to_ms elapsed))] )
+          ~metadata:[("time", `Float elapsed)] )
+
+  let loaded = ref false
 
   let load ~config ~logger ~constraint_constants ~consensus_constants
       ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
+    if !loaded then
+      failwith
+        "Snark_pool.load should only be called once. It has been called twice." ;
+    loaded := true ;
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
@@ -518,13 +537,19 @@ let%test_module "random set test" =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
 
-    let gen =
+    let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry =
         Quickcheck.Generator.tuple2 Mocks.Transaction_snark_work.Statement.gen
           Fee_with_prover.gen
       in
-      let%map sample_solved_work = Quickcheck.Generator.list gen_entry in
+      let%map sample_solved_work =
+        match length with
+        | None ->
+            Quickcheck.Generator.list gen_entry
+        | Some n ->
+            Quickcheck.Generator.list_with_length n gen_entry
+      in
       (*This has to be None because otherwise (if frontier_broadcast_pipe_r is
       seeded with (0, empty-table)) add_snark function wouldn't add snarks in
       the snark pool (see work_is_referenced) until the first diff (first block)
@@ -561,6 +586,19 @@ let%test_module "random set test" =
         resource_pool
       in
       res
+
+    let%test_unit "serialization" =
+      let t =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Quickcheck.random_value (gen ~length:1000 ()) )
+      in
+      let s0 = Mock_snark_pool.For_tests.snark_tables t in
+      let s1 =
+        Snark_tables.to_serializable s0 |> Snark_tables.of_serializable
+      in
+      [%test_eq: Snark_tables.t] s0 s1
+
+    let gen = gen ()
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in

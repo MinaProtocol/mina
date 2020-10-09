@@ -410,6 +410,15 @@ module Snark_work = struct
     let help = "total # of snark work bundles that are yet to be generated" in
     Gauge.v "pending_snark_work" ~help ~namespace ~subsystem
 
+  module Snark_pool_serialization_ms_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 2000. 20
+  end)
+
+  let snark_pool_serialization_ms =
+    let help = "A histogram for snark pool serialization time" in
+    Snark_pool_serialization_ms_histogram.v "snark_pool_serialization_ms" ~help
+      ~namespace ~subsystem
+
   module Snark_fee_histogram = Histogram (struct
     let spec = Histogram_spec.of_linear 0. 1. 10
   end)
