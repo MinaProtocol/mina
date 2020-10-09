@@ -240,9 +240,7 @@ http_archive(
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
-# load("//bzl/libp2p:bootstrap.bzl", "libp2p_bootstrap")
 load("@libp2p_helper//bzl/libp2p:deps.bzl", "libp2p_bootstrap")
-# # gazelle:repository_macro bzl/libp2p/bootstrap.bzl%libp2p_bootstrap
 libp2p_bootstrap()
 
 gazelle_dependencies(go_repository_default_config = "@libp2p_helper//:WORKSPACE.bazel")
