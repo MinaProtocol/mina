@@ -258,6 +258,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               in
               Some (protocol_state, internal_transition, witness) ) )
 
+module Precomputed_block = struct
+  type t =
+    { scheduled_time: Time.t
+    ; protocol_state: Protocol_state.value
+    ; protocol_state_proof: Proof.t
+    ; staged_ledger_diff: Staged_ledger_diff.t
+    ; delta_transition_chain_proof:
+        Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+  [@@deriving sexp, to_yojson]
+end
+
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
@@ -680,15 +691,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )
 
-type precomputed_block =
-  { scheduled_time: Time.t
-  ; protocol_state: Protocol_state.value
-  ; protocol_state_proof: Proof.t
-  ; staged_ledger_diff: Staged_ledger_diff.t
-  ; delta_transition_chain_proof:
-      Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-[@@deriving sexp, to_yojson]
-
 let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     ~frontier_reader ~transition_writer ~precomputed_blocks
     ~(precomputed_values : Precomputed_values.t) =
@@ -698,7 +700,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
   in
   let module Breadcrumb = Transition_frontier.Breadcrumb in
   let produce
-      { scheduled_time= _
+      { Precomputed_block.scheduled_time= _
       ; protocol_state
       ; protocol_state_proof
       ; staged_ledger_diff
@@ -908,7 +910,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       | precomputed_block :: precomputed_blocks ->
           Block_time.Controller.set_time_offset
             (Core_kernel.Time.diff
-               (Block_time.to_time precomputed_block.scheduled_time)
+               (Block_time.to_time
+                  precomputed_block.Precomputed_block.scheduled_time)
                (Core_kernel.Time.now ())) ;
           let%bind () = produce precomputed_block in
           emit_next_block precomputed_blocks
