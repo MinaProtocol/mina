@@ -400,6 +400,15 @@ module Type = {
       opacity(0.5),
       color(Colors.digitalBlack),
     ]);
+
+  let divider =
+    style([
+      maxWidth(`rem(71.)),
+      width(`percent(100.)),
+      margin2(~v=`zero, ~h=`auto),
+      height(`px(1)),
+      backgroundColor(Colors.digitalBlack),
+    ]);
 };
 
 // Match Tachyons setting pretty much everything to border-box

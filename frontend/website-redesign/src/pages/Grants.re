@@ -37,15 +37,6 @@ module Styles = {
       media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
 
-  let divider =
-    style([
-      maxWidth(`rem(71.)),
-      width(`percent(100.)),
-      margin2(~v=`zero, ~h=`auto),
-      height(`px(1)),
-      backgroundColor(Theme.Colors.digitalBlack),
-    ]);
-
   let typesOfGrantsImage =
     style([
       important(backgroundSize(`cover)),
@@ -146,6 +137,14 @@ module Styles = {
       selector("li", [marginTop(`rem(1.))]),
     ]);
 
+  let background =
+    style([
+      backgroundImage(
+        `url("/static/img/community-page/SectionCulture&Values.png"),
+      ),
+      backgroundSize(`cover),
+    ]);
+
   let grantDescriptionOuterContainer =
     style([
       display(`flex),
@@ -191,7 +190,7 @@ module GrantsSideNav = {
         title="Opening Marketing and Community Projects"
         slug="#marketing-community"
       />
-      <SideNav.Item title="How to Apply" slug="#" />
+      <SideNav.Item title="How to Apply" slug="#how-to-apply" />
       //<SideNav.Item title="Contributers" slug="#" />
       <SideNav.Item title="FAQ" slug="#faq" />
     </SideNav>;
@@ -292,7 +291,7 @@ module FAQ = {
   let make = () => {
     <Wrapped>
       <Section title="General Questions" subhead="" slug="faq">
-        <hr className=Styles.divider />
+        <hr className=Theme.Type.divider />
         <div>
           <FAQRow
             title="Where do I begin if I want to understand how Coda works?">
@@ -399,7 +398,7 @@ module Project = {
     [@react.component]
     let make = (~title, ~rows: array(twoColumnRow), ~buttonUrl) =>
       <div className=Styles.grantDescriptionOuterContainer>
-        <hr className=Styles.divider />
+        <hr className=Theme.Type.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3> {React.string(title)} </h3>
         <Spacer height=2. />
@@ -447,7 +446,7 @@ module Project = {
     [@react.component]
     let make = (~title, ~rows: array(threeColumnRow), ~buttonUrl) =>
       <div className=Styles.grantDescriptionOuterContainer>
-        <hr className=Styles.divider />
+        <hr className=Theme.Type.divider />
         <Spacer height=1. />
         <h3 className=Theme.Type.h3> {React.string(title)} </h3>
         <Spacer height=2. />
@@ -506,7 +505,7 @@ module FrontEndProjects = {
     <div
       className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
       <Spacer height=6.5 />
-      <hr className=Styles.divider />
+      <hr className=Theme.Type.divider />
       <Section
         title="Product / Front-End Projects"
         subhead={js|Assist with building interfaces and platforms for users to interact with Mina.|js}
@@ -623,7 +622,7 @@ module ProtocolProjects = {
     <div
       className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
       <Spacer height=6.5 />
-      <hr className=Styles.divider />
+      <hr className=Theme.Type.divider />
       <Section
         title="Protocol Projects"
         subhead={js|Contribute to engineering projects to develop the core technology underlying the protocol.|js}
@@ -698,7 +697,7 @@ module MarketingAndCommunityProjects = {
     <div
       className={Styles.sectionContainer("/static/img/tech-gradient-1.jpg")}>
       <Spacer height=6.5 />
-      <hr className=Styles.divider />
+      <hr className=Theme.Type.divider />
       <Section
         title="Marketing and Community Projects"
         subhead={js|Help to build and grow Mina's community by serving as ambassadors, creating content, and other initiatives.|js}
@@ -763,6 +762,61 @@ module MarketingAndCommunityProjects = {
     </div>;
 };
 
+module HowToApply = {
+  [@react.component]
+  let make = () =>
+    <section id="how-to-apply">
+      <div className=Styles.background>
+        <FeaturedSingleRow
+          row={
+            FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
+            title: "How to Apply",
+            copySize: `Small,
+            description: {js|Fill out this form to apply for an open project. Applicants who are selected will have the opportunity to claim or “lock” the project so that they can work on it exclusively.|js},
+            textColor: Theme.Colors.black,
+            image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
+            background:
+              Image("/static/img/community-page/SectionCulture_Values.jpg"),
+            contentBackground: Color(Theme.Colors.white),
+            button: {
+              FeaturedSingleRow.Row.buttonText: "Apply Now",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: false,
+              href: `External(Constants.codeOfConductUrl),
+            },
+          }>
+          <Spacer height=4. />
+          <hr className=Theme.Type.divider />
+          <Spacer height=4. />
+          <CultureGrid
+            title="Evaluation Criteria"
+            description=""
+            sections=[|
+              {
+                title: "01",
+                copy: "Previous experience in the domain of the project",
+              },
+              {
+                title: "02",
+                copy: "Previous open-source contributions is a plus, but not necessary",
+              },
+              {
+                title: "03",
+                copy: "Prior involvement in the Coda community is a plus, but not necessary",
+              },
+              {
+                title: "04",
+                copy: "Interest in Mina and cryptocurrencies is a plus, but not necessary",
+              },
+            |]
+          />
+          <Spacer height=7. />
+        </FeaturedSingleRow>
+      </div>
+    </section>;
+};
+
 [@react.component]
 let make = () => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -793,6 +847,7 @@ let make = () => {
     <FrontEndProjects />
     <ProtocolProjects />
     <MarketingAndCommunityProjects />
+    <HowToApply />
     <FAQ />
   </Page>;
 };

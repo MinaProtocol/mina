@@ -97,98 +97,6 @@ module Styles = {
     style([width(`percent(100.)), textDecoration(`none)]);
 };
 
-module CultureGrid = {
-  module Styles = {
-    open Css;
-    let container =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        media(
-          Theme.MediaQuery.desktop,
-          [flexDirection(`row), justifyContent(`spaceBetween)],
-        ),
-      ]);
-    let grid =
-      style([
-        display(`grid),
-        gridTemplateColumns([`rem(21.)]),
-        gridAutoRows(`rem(15.43)),
-        gridRowGap(`rem(1.)),
-        marginTop(`rem(2.)),
-        marginBottom(`rem(4.)),
-        media(
-          Theme.MediaQuery.tablet,
-          [
-            gridTemplateColumns([`rem(21.), `rem(21.)]),
-            gridColumnGap(`rem(1.)),
-          ],
-        ),
-        media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
-      ]);
-    let h2 =
-      merge([
-        Theme.Type.h2,
-        style([color(black), width(`rem(13.)), fontWeight(`light)]),
-      ]);
-    let h4 = merge([Theme.Type.h4, style([fontWeight(`normal)])]);
-    let gridItem = style([backgroundColor(white), padding(`rem(1.5))]);
-    let link = merge([Theme.Type.link, style([textDecoration(`none)])]);
-  };
-
-  module GridItem = {
-    [@react.component]
-    let make = (~label="", ~children=?) => {
-      <div className=Styles.gridItem>
-        <h4 className=Styles.h4> {React.string(label)} </h4>
-        <Spacer height=1. />
-        {switch (children) {
-         | Some(children) => children
-         | None => <> </>
-         }}
-      </div>;
-    };
-  };
-
-  [@react.component]
-  let make = () => {
-    <div className=Styles.container>
-      <h2 className=Styles.h2> {React.string("What Unites Us")} </h2>
-      <div className=Styles.grid>
-        <GridItem label="Respect">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "Above all, we respect each other. That's why we stand for equality and fairness. Why we're committed to decentralization. And why we strive to always be inclusive and accessible.",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="Curiosity">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "
-                 It's our obsession to understand and solve. Our attraction to big questions and impossible problems. Our love of collaboration and exploration. It's our imagination, at work.",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="Excellence">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "We demand the best of ourselves. Elegant solutions. Symphonic systems. Technical beauty. We're committed to creating tech people can depend on. We enjoy the process and deliver results.",
-             )}
-          </p>
-        </GridItem>
-        <GridItem label="Openness">
-          <p className=Theme.Type.paragraph>
-            {React.string(
-               "We're all about being there for our community. Empowering people with helpful information. Sharing where we are. Owning our mistakes. And serving our vision with humility. ",
-             )}
-          </p>
-        </GridItem>
-      </div>
-    </div>;
-  };
-};
-
 [@react.component]
 let make = (~profiles) => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
@@ -314,13 +222,32 @@ let make = (~profiles) => {
             href: `External(Constants.codeOfConductUrl),
           },
         }>
-        <Wrapped>
-          <Spacer height=4. />
-          <Rule color=Theme.Colors.white />
-          <Spacer height=4. />
-          <CultureGrid />
-          <Spacer height=7. />
-        </Wrapped>
+        <Spacer height=4. />
+        <Rule color=Theme.Colors.white />
+        <Spacer height=4. />
+        <CultureGrid
+          title="What Unites Us"
+          description=""
+          sections=[|
+            {
+              title: "Respect",
+              copy: "Above all, we respect each other. That's why we stand for equality and fairness. Why we're committed to decentralization. And why we strive to always be inclusive and accessible.",
+            },
+            {
+              title: "Curiosity",
+              copy: "It's our obsession to understand and solve. Our attraction to big questions and impossible problems. Our love of collaboration and exploration. It's our imagination, at work.",
+            },
+            {
+              title: "Excellence",
+              copy: "We demand the best of ourselves. Elegant solutions. Symphonic systems. Technical beauty. We're committed to creating tech people can depend on. We enjoy the process and deliver results.",
+            },
+            {
+              title: "Openness",
+              copy: "We're all about being there for our community. Empowering people with helpful information. Sharing where we are. Owning our mistakes. And serving our vision with humility.",
+            },
+          |]
+        />
+        <Spacer height=7. />
       </FeaturedSingleRow>
     </div>
   </Page>;

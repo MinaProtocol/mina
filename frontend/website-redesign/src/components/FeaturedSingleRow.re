@@ -220,9 +220,7 @@ module SingleRow = {
               href={row.button.href}>
               <span className={Styles.buttonText(row.button.buttonTextColor)}>
                 {React.string(row.button.buttonText)}
-                <span className=Css.(style([marginTop(`rem(0.8))]))>
-                  <Icon kind=Icon.ArrowRightSmall />
-                </span>
+                <span> <Icon kind=Icon.ArrowRightSmall /> </span>
               </span>
             </Button>
           </div>
