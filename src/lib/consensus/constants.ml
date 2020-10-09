@@ -191,7 +191,7 @@ let create' (type a b c)
     (* Amount of time in total for an epoch *)
     let duration = Slot.duration_ms * size
   end in
-  let delta_duration = Slot.duration_ms * delta in
+  let delta_duration = Slot.duration_ms * (delta + 1) in
   let res : (a, b, c) Poly.t =
     { Poly.k= to_length k
     ; c= to_length c

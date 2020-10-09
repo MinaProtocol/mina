@@ -14,7 +14,7 @@
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 20]
 [%%define c 8]
-[%%define delta 3]
+[%%define delta 0]
 
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
