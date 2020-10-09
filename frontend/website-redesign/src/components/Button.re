@@ -4,6 +4,7 @@ module Styles = {
       (
         bgColor,
         borderColor,
+        textColor,
         dark,
         buttonHeight,
         buttonWidth,
@@ -52,7 +53,12 @@ module Styles = {
         ]),
         color(
           {
-            bgColor === Theme.Colors.white ? Theme.Colors.digitalBlack : white;
+            switch (textColor) {
+            | Some(textColor) => textColor
+            | None =>
+              bgColor === Theme.Colors.white
+                ? Theme.Colors.digitalBlack : white
+            };
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
@@ -100,6 +106,7 @@ let make =
       ~height=`rem(3.25),
       ~width=`rem(10.9),
       ~borderColor=Theme.Colors.black,
+      ~textColor=?,
       ~paddingX=1.5,
       ~paddingY=0.,
       ~bgColor=Theme.Colors.orange,
@@ -112,6 +119,7 @@ let make =
       className={Styles.button(
         bgColor,
         borderColor,
+        textColor,
         dark,
         height,
         width,
