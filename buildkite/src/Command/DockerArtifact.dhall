@@ -47,7 +47,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
           "fi"
         ),
         Cmd.run (
-          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta then "--build-rosetta " else ""} " ++
+          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
               "--service ${spec.service} --version ${spec.version} --commit ${spec.commit} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
