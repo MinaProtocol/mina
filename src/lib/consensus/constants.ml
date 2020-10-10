@@ -76,9 +76,13 @@ module type M_intf = sig
 
   val zero : t
 
+  val one : t
+
   val ( / ) : t -> t -> t
 
   val ( * ) : t -> t -> t
+
+  val ( + ) : t -> t -> t
 end
 
 module Constants_UInt32 :
@@ -100,6 +104,8 @@ module Constants_UInt32 :
 
   let zero = UInt32.zero
 
+  let one = UInt32.one
+
   let of_length = Fn.id
 
   let to_length = Fn.id
@@ -115,6 +121,8 @@ module Constants_UInt32 :
   let ( / ) = UInt32.Infix.( / )
 
   let ( * ) = UInt32.mul
+
+  let ( + ) = UInt32.add
 end
 
 module Constants_checked :
@@ -138,6 +146,8 @@ module Constants_checked :
 
   let zero = constant 0
 
+  let one = constant 1
+
   let of_length = Length.Checked.to_integer
 
   let to_length = Length.Checked.Unsafe.of_integer
@@ -158,6 +168,8 @@ module Constants_checked :
   let ( / ) (t : t) (t' : t) = Integer.div_mod ~m t t' |> fst
 
   let ( * ) = Integer.mul ~m
+
+  let ( + ) = Integer.add ~m
 end
 
 let create' (type a b c)
@@ -191,7 +203,7 @@ let create' (type a b c)
     (* Amount of time in total for an epoch *)
     let duration = Slot.duration_ms * size
   end in
-  let delta_duration = Slot.duration_ms * (delta + 1) in
+  let delta_duration = Slot.duration_ms * (delta + M.one) in
   let res : (a, b, c) Poly.t =
     { Poly.k= to_length k
     ; c= to_length c

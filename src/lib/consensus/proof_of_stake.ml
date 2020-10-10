@@ -2536,8 +2536,13 @@ module Hooks = struct
         (epoch, slot)
     in
     if slot_diff < 0L then Error `Too_early
-    else if slot_diff >= UInt32.to_int64 constants.delta + 1 then
-      Error (`Too_late (sub slot_diff (UInt32.to_int64 (constants.delta + 1))))
+    else if
+      slot_diff >= UInt32.to_int64 UInt32.(add constants.delta (of_int 1))
+    then
+      Error
+        (`Too_late
+          (sub slot_diff
+             (UInt32.to_int64 UInt32.(add constants.delta (of_int 1)))))
     else Ok ()
 
   let received_at_valid_time ~(constants : Constants.t)
@@ -2798,7 +2803,7 @@ module Hooks = struct
   let should_bootstrap_len ~(constants : Constants.t) ~existing ~candidate =
     let open UInt32.Infix in
     candidate - existing
-    > (UInt32.of_int 2 * constants.k) + (constants.delta + 1)
+    > (UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1)
 
   let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
       =
@@ -2832,7 +2837,7 @@ module Hooks = struct
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot negative_one
     in
-    let delay = UInt32.(div (constants.delta + 1) (of_int 2)) in
+    let delay = UInt32.(div (add constants.delta (of_int 1)) (of_int 2)) in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
     received_at_valid_time ~constants negative_one
@@ -2861,7 +2866,7 @@ module Hooks = struct
       Epoch.start_time ~constants (Consensus_state.curr_slot negative_one)
     in
     let too_late =
-      let delay = UInt32.(mul (constants.delta + 1) (of_int 2)) in
+      let delay = UInt32.(mul (add constants.delta (of_int 1)) (of_int 2)) in
       let delayed_slot = UInt32.Infix.(curr_slot + delay) in
       Epoch.slot_start_time ~constants curr_epoch delayed_slot
     in
