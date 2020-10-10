@@ -64,7 +64,10 @@ Pipeline.build
 
       -- puppeteered image
       let puppeteeredSpec = DockerArtifact.ReleaseSpec::{
-        deps=[ { name = "CodaArtifact", key = "docker-artifact" } ],
+        deps=[
+          dependOn,
+          { name = "CodaArtifact", key = "docker-artifact" }
+        ],
         service="\\\${CODA_SERVICE}-puppeteered",
         extra_args="--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg CODA_BRANCH=\\\${CODA_GIT_BRANCH} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
         step_key="puppeteered-docker-artifact"
@@ -82,7 +85,6 @@ Pipeline.build
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
-        build_rosetta=True,
         step_key="rosetta-docker-artifact"
       }
 
@@ -98,7 +100,6 @@ Pipeline.build
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
-        build_rosetta=True,
         step_key="rosetta-dune-docker-artifact"
       }
 
