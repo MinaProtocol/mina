@@ -140,7 +140,7 @@ module Section = {
           borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
           before([
             contentRule(seperatorNumber),
-            Theme.Typeface.monumentGrotesk,
+            Theme.Typeface.monumentGroteskMono,
             color(Theme.Colors.digitalBlack),
             lineHeight(`rem(1.5)),
             letterSpacing(`px(-1)),
