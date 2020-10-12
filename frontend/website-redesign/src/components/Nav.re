@@ -233,7 +233,7 @@ let make = (~dark=false) => {
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
       <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2. /> </span>
-      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=2. /> </span>
+      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=3. /> </span>
     </label>
     <nav className=Styles.nav>
       <NavLink label="About" href="/about" dark />
