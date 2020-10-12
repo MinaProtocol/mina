@@ -267,8 +267,6 @@ let setup_daemon logger =
       ~doc:"full|check|none"
   and plugins = plugin_flag in
   fun () ->
-    (* Immediately disable updating the time offset. *)
-    Block_time.Controller.disable_setting_offset () ;
     let open Deferred.Let_syntax in
     let compute_conf_dir home =
       Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
