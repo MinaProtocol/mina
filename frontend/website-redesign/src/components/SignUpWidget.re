@@ -66,6 +66,7 @@ module Styles = {
       Button.Styles.button(
         Theme.Colors.orange,
         Theme.Colors.digitalBlack,
+        Some(Theme.Colors.digitalBlack),
         true,
         `rem(3.25),
         Some(`rem(7.7)),
