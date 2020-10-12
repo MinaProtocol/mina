@@ -9,6 +9,8 @@ open Network_peer
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+type validation_result = [`Accept | `Reject | `Ignore]
+
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 [@@deriving yojson]
@@ -135,7 +137,7 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
+    ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -292,7 +294,9 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; gossip_type: string
+        ; flooding: bool
+        ; direct_peers: string list
+        ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
         ; seed_peers: string list }
       [@@deriving yojson]
@@ -343,7 +347,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; is_valid: bool} [@@deriving yojson]
+      type input = {seqno: int; action: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -788,7 +792,7 @@ module Helper = struct
             (let open Deferred.Let_syntax in
             let raw_data = Data.to_string m.data in
             let decoded = sub.decode raw_data in
-            let%bind is_valid =
+            let%bind action =
               match decoded with
               | Ok data ->
                   sub.validator (wrap m.sender data)
@@ -805,10 +809,20 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return false
+                  return `Reject
             in
             match%map
-              do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid}
+              do_rpc t
+                (module Rpcs.Validation_complete)
+                { seqno
+                ; action=
+                    ( match action with
+                    | `Accept ->
+                        "accept"
+                    | `Reject ->
+                        "reject"
+                    | `Ignore ->
+                        "ignore" ) }
             with
             | Ok "validationComplete success" ->
                 ()
@@ -1001,7 +1015,7 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
+      ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -1129,7 +1143,8 @@ let list_peers net =
       []
 
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~gossip_type ~seed_peers ~initial_gating_config =
+    ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange ~seed_peers
+    ~initial_gating_config =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1139,17 +1154,12 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
+      ; flooding
+      ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
+      ; peer_exchange
       ; gating_config=
-          Helper.gating_config_to_helper_format initial_gating_config
-      ; gossip_type=
-          ( match gossip_type with
-          | `Gossipsub ->
-              "gossipsub"
-          | `Flood ->
-              "flood"
-          | `Random ->
-              "random" ) }
+          Helper.gating_config_to_helper_format initial_gating_config }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1466,16 +1476,16 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs ~network_id
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
+          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
+          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       and () =
-        configure b ~gossip_type:`Gossipsub
-          ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs ~network_id
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
+        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
+          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
+          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn

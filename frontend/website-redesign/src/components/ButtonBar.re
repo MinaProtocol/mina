@@ -10,6 +10,7 @@ module Card = {
     let container =
       style([
         display(`flex),
+        height(`percent(100.)),
         justifyContent(`spaceBetween),
         flexDirection(`column),
         padding2(~h=`rem(1.), ~v=`rem(1.)),
@@ -75,26 +76,19 @@ module ButtonBarStyles = {
       | GetStarted => (1.5, 5.75, 2.5)
       | Developers => (1.5, 5.75, 6.)
       | CommunityLanding => (1.5, 4.25, 4.25)
-      | HelpAndSupport => (1.5, 5.75, 2.5)
-      };
-    let (mobileH, tabletH, desktopH) =
-      switch (kind) {
-      | GetStarted => (1.25, 2.75, 9.5)
-      | Developers => (1.25, 2.75, 9.5)
-      | CommunityLanding => (1.25, 1.25, 1.25)
-      | HelpAndSupport => (1.25, 2.75, 9.5)
+      | HelpAndSupport => (1.5, 5.75, 5.75)
       };
     style([
-      padding2(~v=`rem(mobileV), ~h=`rem(mobileH)),
+      padding2(~v=`rem(mobileV), ~h=`zero),
       backgroundImage(`url(backgroundImg)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(tabletV), ~h=`rem(tabletH))],
+        [padding2(~v=`rem(tabletV), ~h=`zero)],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(desktopV), ~h=`rem(desktopH))],
+        [padding2(~v=`rem(desktopV), ~h=`zero)],
       ),
     ]);
   };
@@ -224,6 +218,7 @@ module HelpAndSupport = {
       merge([
         Theme.Type.paragraphSmall,
         style([
+          Theme.Typeface.monumentGroteskMono,
           display(`none),
           color(Theme.Colors.white),
           media(Theme.MediaQuery.tablet, [display(`block)]),
@@ -348,34 +343,36 @@ module GetStarted = {
       </Card>;
     };
 
-    <div className=ButtonBarStyles.container>
-      <div className=ButtonBarStyles.grid>
-        {renderCard(
-           Icon.NodeOperators,
-           `Internal("/tech"),
-           "Run a node",
-           "Getting started is easier than you think.",
-         )}
-        {renderCard(
-           Icon.Developers,
-           `Internal("/docs"),
-           "Build on Mina",
-           "Work on the protocol  and contribute to Mina's codebase.",
-         )}
-        {renderCard(
-           Icon.Community,
-           `Internal("/community"),
-           "Join the Community",
-           "Let's keep it positive and productive.",
-         )}
-        {renderCard(
-           Icon.GrantsProgram,
-           `Internal("/docs/contributing#mina-grants"),
-           "Apply for a Grant",
-           "Roll up your sleeves and help build Mina.",
-         )}
+    <Wrapped>
+      <div className=ButtonBarStyles.container>
+        <div className=ButtonBarStyles.grid>
+          {renderCard(
+             Icon.NodeOperators,
+             `Internal("/tech"),
+             "Run a node",
+             "Getting started is easier than you think.",
+           )}
+          {renderCard(
+             Icon.Developers,
+             `Internal("/docs"),
+             "Build on Mina",
+             "Work on the protocol  and contribute to Mina's codebase.",
+           )}
+          {renderCard(
+             Icon.Community,
+             `Internal("/community"),
+             "Join the Community",
+             "Let's keep it positive and productive.",
+           )}
+          {renderCard(
+             Icon.GrantsProgram,
+             `Internal("/docs/contributing#mina-grants"),
+             "Apply for a Grant",
+             "Roll up your sleeves and help build Mina.",
+           )}
+        </div>
       </div>
-    </div>;
+    </Wrapped>;
   };
 };
 
