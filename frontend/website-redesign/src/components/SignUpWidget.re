@@ -68,7 +68,7 @@ module Styles = {
         Theme.Colors.digitalBlack,
         true,
         `rem(3.25),
-        `rem(7.7),
+        Some(`rem(7.7)),
         1.5,
         1.,
       ),

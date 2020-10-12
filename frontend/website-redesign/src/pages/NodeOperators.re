@@ -123,13 +123,15 @@ module NodeOperatorsSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-      <SideNav.Item title="Node Overview" slug="#how-mina-works" />
-      <SideNav.Item
-        title="Block Explorers & Tools"
-        slug="#block-explorers-tools"
-      />
-    </SideNav>;
-    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+
+        <SideNav.Item title="Node Overview" slug="#how-mina-works" />
+        <SideNav.Item title="Help And Support" slug="#help-and-support" />
+      </SideNav>;
+      // <SideNav.Item
+      //   title="Block Explorers & Tools"
+      //   slug="#block-explorers-tools"
+      // />
+      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -180,14 +182,14 @@ module Roles = {
       <Spacer height=2. />
       <div className=Styles.rolesContainer>
         <Role
-          img="/static/img/Role1.png"
+          img="/static/img/BlockProducers_2x.svg"
           title="Block Producers"
           copy={js|Similar to miners or stakers in other protocols, block producers can be selected to produce a block and earn block rewards, coinbase, transaction fees and network fees. Block producers can also be SNARK producers and generate their own proofs.|js}
           linkCopy="Block Producer Documentation"
           linkUrl="/docs"
         />
         <Role
-          img="/static/img/Role1.png"
+          img="/static/img/SnarkProducers_2x.svg"
           title="Snark Producers"
           copy={js|SNARK producers help compress data in the network by generating SNARK proofs of transactions. They then sell those SNARK proofs to block producers on the Snarketplace in return for a portion of the block rewards|js}
           linkCopy="Snark Producer Documentation"
@@ -378,9 +380,9 @@ let make = () => {
         copySize: `Small,
         description: {js|Check out what’s in beta, take on Testnet challenges and earn Testnet points.|js},
         textColor: Theme.Colors.white,
-        image: "/static/img/NodeOpsTestnet.png",
+        image: "/static/img/NodeOperators_large.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        contentBackground: Image("/static/img/MinaSepctrumSecondary.png"),
+        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
         button: {
           FeaturedSingleRow.Row.buttonText: "Go to Testnet",
           buttonColor: Theme.Colors.orange,
@@ -390,7 +392,8 @@ let make = () => {
         },
       }
     />
-    <BlockExplorersAndTools />
+    // TODO: Not currently ready to ship. Update component with proper info when available.
+    //<BlockExplorersAndTools />
     <FeaturedSingleRow
       row=FeaturedSingleRow.Row.{
         rowType: ImageRightCopyLeft,
@@ -412,9 +415,11 @@ let make = () => {
       }
     />
     // TODO: Knowledge Base
-    <ButtonBar
-      kind=ButtonBar.HelpAndSupport
-      backgroundImg="/static/img/ButtonBarBackground.jpg"
-    />
+    <section id="help-and-support">
+      <ButtonBar
+        kind=ButtonBar.HelpAndSupport
+        backgroundImg="/static/img/ButtonBarBackground.jpg"
+      />
+    </section>
   </Page>;
 };

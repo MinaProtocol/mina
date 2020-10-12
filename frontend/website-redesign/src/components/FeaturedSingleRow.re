@@ -159,7 +159,7 @@ module SingleRow = {
               href={row.button.href}>
               <span className=RowStyles.buttonText>
                 {React.string(row.button.buttonText)}
-                <Icon kind=Icon.ArrowRightMedium size=1.5 />
+                <Icon kind=Icon.ArrowRightSmall size=1.5 />
               </span>
             </Button>
           </div>
