@@ -936,6 +936,30 @@ let daemon logger =
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ))
 
+let replay_blocks logger =
+  let replay_flag =
+    let open Command.Param in
+    flag "-blocks-filename" (required string)
+      ~doc:"PATH The file to read the precomputed blocks from"
+  in
+  Command.async ~summary:"Start coda daemon with blocks replayed from a file"
+    (Command.Param.map2 replay_flag (setup_daemon logger)
+       ~f:(fun blocks_filename setup_daemon () ->
+         (* Enable updating the time offset. *)
+         Block_time.Controller.enable_setting_offset () ;
+         let blocks =
+           In_channel.with_file blocks_filename ~f:(fun blocks_file ->
+               In_channel.input_lines blocks_file
+               |> List.map ~f:(fun s ->
+                      Sexp.of_string_conv_exn s
+                        Block_producer.Precomputed_block.t_of_sexp ) )
+         in
+         let%bind coda = setup_daemon () in
+         let%bind () = Coda_lib.start_with_precomputed_blocks coda blocks in
+         [%log info]
+           "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
+         Async.never () ))
+
 [%%if
 force_updates]
 
@@ -1025,7 +1049,7 @@ let snark_hashes =
                (Hashes.to_yojson Precomputed_values.key_hashes))
         else List.iter Precomputed_values.key_hashes ~f:print]
 
-let internal_commands =
+let internal_commands logger =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
@@ -1080,14 +1104,16 @@ let internal_commands =
               Core_kernel.Out_channel.close out_channel
           | None ->
               () ) ;
-          Deferred.return ()) ) ]
+          Deferred.return ()) )
+  ; ("replay-blocks", replay_blocks logger) ]
 
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
-  ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
+  ; ( "internal"
+    , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
