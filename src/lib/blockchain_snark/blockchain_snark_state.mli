@@ -12,7 +12,9 @@ type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 val verify :
-  Protocol_state.Value.t -> Proof.t -> key:Pickles.Verification_key.t -> bool
+     (Protocol_state.Value.t * Proof.t) list
+  -> key:Pickles.Verification_key.t
+  -> bool
 
 val check :
      Witness.t
