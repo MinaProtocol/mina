@@ -631,15 +631,22 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proof (t, validation) ~verifier =
+let validate_proofs tvs ~verifier =
   let open Blockchain_snark.Blockchain in
   let open Deferred.Let_syntax in
-  let {protocol_state= state; protocol_state_proof= proof; _} =
-    With_hash.data t
-  in
-  match%map Verifier.verify_blockchain_snark verifier {state; proof} with
+  match%map
+    Verifier.verify_blockchain_snarks verifier
+      (List.map tvs ~f:(fun (t, _validation) ->
+           let {protocol_state= state; protocol_state_proof= proof; _} =
+             With_hash.data t
+           in
+           {state; proof} ))
+  with
   | Ok verified ->
-      if verified then Ok (t, Validation.Unsafe.set_valid_proof validation)
+      if verified then
+        Ok
+          (List.map tvs ~f:(fun (t, validation) ->
+               (t, Validation.Unsafe.set_valid_proof validation) ))
       else Error `Invalid_proof
   | Error e ->
       Error (`Verifier_error e)

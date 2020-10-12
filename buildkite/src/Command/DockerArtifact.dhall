@@ -19,7 +19,7 @@ let ReleaseSpec = {
     service: Text,
     version: Text,
     commit: Text,
-    build_rosetta: Bool,
+    build_rosetta_override: Bool,
     extra_args: Text,
     step_key: Text
   },
@@ -29,7 +29,7 @@ let ReleaseSpec = {
     service = "\\\${CODA_SERVICE}",
     version = "\\\${CODA_VERSION}",
     commit = "\\\${CODA_GIT_HASH}",
-    build_rosetta = False,
+    build_rosetta_override = False,
     extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
     step_key = "docker-artifact"
   }
@@ -47,7 +47,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
           "fi"
         ),
         Cmd.run (
-          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta then "--build-rosetta " else ""} " ++
+          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
               "--service ${spec.service} --version ${spec.version} --commit ${spec.commit} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]

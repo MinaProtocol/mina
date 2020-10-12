@@ -179,12 +179,10 @@ module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
   val make_config :
-    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
-
-  (* TODO: we don't seem to be using the bin_io here, can this type be removed? *)
-  type serializable [@@deriving bin_io]
-
-  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
+       trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> disk_location:string
+    -> Config.t
 
   val add_snark :
        ?is_local:bool
