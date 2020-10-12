@@ -897,7 +897,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "testh no sidele-loaded" =
   ( module struct
     let () =
@@ -974,8 +973,9 @@ let%test_module "testh no sidele-loaded" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end ) *)
+  end )
 
+(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -1225,4 +1225,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end )
+  end ) *)
