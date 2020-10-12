@@ -24,6 +24,14 @@ module System = {
   type entries('a) = {items: array(entry('a))};
 };
 
+module Image = {
+  type file = {url: string};
+  type t = {file};
+
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
 module BlogPost = {
   let id = "test";
   let dateKeyName = "date";
@@ -36,6 +44,21 @@ module BlogPost = {
     authorWebsite: Js.Undefined.t(string),
     date: string,
     text: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module Announcement = {
+  let id = "announcement";
+  let dateKeyName = "date";
+  type t = {
+    title: string,
+    snippet: string,
+    slug: string,
+    date: string,
+    text: string,
+    image: option(Image.entry),
   };
   type entry = System.entry(t);
   type entries = System.entries(t);
@@ -63,14 +86,6 @@ module KnowledgeBase = {
     videos: array(link),
   };
   type t = {links};
-  type entry = System.entry(t);
-  type entries = System.entries(t);
-};
-
-module Image = {
-  type file = {url: string};
-  type t = {file};
-
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
@@ -111,37 +126,49 @@ module NormalizedPressBlog = {
   type t = {
     title: string,
     image: option(Image.entry),
-    link: [`Slug(string) | `Remote(string)],
+    link: [ | `Slug(string) | `Remote(string)],
     featured: bool,
     description: option(string),
-    publisher: string,
+    publisher: option(string),
     date: string,
   };
 
-  let ofBlog = (blog : BlogPost.t) => {
+  let ofBlog = (blog: BlogPost.t) => {
     {
       title: blog.title,
       image: None,
       link: `Slug(blog.slug),
       featured: true,
       description: Some(blog.snippet),
-      publisher: blog.author,
-      date: blog.date
-    }
+      publisher: Some(blog.author),
+      date: blog.date,
+    };
   };
 
-  let ofPress = (press : Press.t) => {
+  let ofAnnouncement = (announcement: Announcement.t) => {
+    {
+      title: announcement.title,
+      image: announcement.image,
+      link: `Slug(announcement.slug),
+      featured: true,
+      description: Some(announcement.snippet),
+      publisher: None,
+      date: announcement.date,
+    };
+  };
+
+  let ofPress = (press: Press.t) => {
     {
       title: press.title,
       image: Some(press.image),
       link: `Remote(press.link),
       featured: press.featured,
       description: Js.Undefined.toOption(press.description),
-      publisher: press.publisher,
+      publisher: Some(press.publisher),
       date: press.datePublished,
-    }
+    };
   };
 
   type entry = System.entry(t);
   type entries = System.entries(t);
-}
+};
