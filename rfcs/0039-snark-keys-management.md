@@ -52,7 +52,12 @@ JSON format before the actual contents, specifying
   zexe repos used when generating the keys
 * the length of the binary data following the header, so that we can validate
   that the file was successfully downloaded in full, where applicable
-* the date when the file's contents were created
+* the date associated with the current commit
+  - we don't chose the file generation time, in order to make the header
+    reproducible
+  - it is helpful to have some notion of date, so that we can build a simple
+    `ls`-style tool that we can use to identify out-of-date keys in the local
+    cache etc.
 * the type of the file's contents
 * the constraint system hash (for keys) or domain size (for URS)
 * any other input information
@@ -82,7 +87,7 @@ For example, a header for the transaction snark key file might look like:
     , "marlin": "COMMIT_SHA_HERE"
     , "zexe": "COMMIT_SHA_HERE" }
 , "length": 1000000000
-, "date": "1970-01-01 00:00:00"
+, "commit_date": "1970-01-01 00:00:00"
 , "constraint_system_hash": "MD5_HERE"
 , "identifying_hash": "HASH_HERE" }
 ```
