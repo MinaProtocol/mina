@@ -258,6 +258,98 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               in
               Some (protocol_state, internal_transition, witness) ) )
 
+module Precomputed_block = struct
+  type t =
+    { scheduled_time: Time.t
+    ; protocol_state: Protocol_state.value
+    ; protocol_state_proof: Proof.t
+    ; staged_ledger_diff: Staged_ledger_diff.t
+    ; delta_transition_chain_proof:
+        Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+  [@@deriving sexp, to_yojson]
+end
+
+let handle_block_production_errors ~logger ~previous_protocol_state
+    ~protocol_state x =
+  let transition_error_msg_prefix = "Validation failed: " in
+  let transition_reason_for_failure =
+    " One possible reason could be a ledger-catchup is triggered before we \
+     produce a proof for the produced transition."
+  in
+  let exn_breadcrumb name =
+    raise
+      (Error.to_exn
+         (Error.of_string
+            (sprintf "Error building breadcrumb from produced transition: %s"
+               name)))
+  in
+  match x with
+  | Ok x ->
+      return x
+  | Error
+      (`Prover_error
+        ( err
+        , ( previous_protocol_state_proof
+          , internal_transition
+          , pending_coinbase_witness ) )) ->
+      [%log error]
+        "Prover failed to prove freshly generated transition: $error"
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum err))
+          ; ( "prev_state"
+            , Protocol_state.value_to_yojson previous_protocol_state )
+          ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
+          ; ("next_state", Protocol_state.value_to_yojson protocol_state)
+          ; ( "internal_transition"
+            , Internal_transition.to_yojson internal_transition )
+          ; ( "pending_coinbase_witness"
+            , Pending_coinbase_witness.to_yojson pending_coinbase_witness ) ] ;
+      return ()
+  | Error `Invalid_genesis_protocol_state ->
+      let state_yojson =
+        Fn.compose State_hash.to_yojson Protocol_state.genesis_state_hash
+      in
+      [%log warn]
+        ~metadata:
+          [ ("expected", state_yojson previous_protocol_state)
+          ; ("got", state_yojson protocol_state) ]
+        "Produced transition has invalid genesis state hash" ;
+      return ()
+  | Error `Already_in_frontier ->
+      [%log error]
+        ~metadata:
+          [("protocol_state", Protocol_state.value_to_yojson protocol_state)]
+        "%sproduced transition is already in frontier"
+        transition_error_msg_prefix ;
+      return ()
+  | Error `Not_selected_over_frontier_root ->
+      [%log warn]
+        "%sproduced transition is not selected over the root of transition \
+         frontier.%s"
+        transition_error_msg_prefix transition_reason_for_failure ;
+      return ()
+  | Error `Parent_missing_from_frontier ->
+      [%log warn]
+        "%sparent of produced transition is missing from the frontier.%s"
+        transition_error_msg_prefix transition_reason_for_failure ;
+      return ()
+  | Error (`Fatal_error e) ->
+      exn_breadcrumb (sprintf "fatal error -- %s" (Exn.to_string e))
+  | Error (`Invalid_staged_ledger_hash e) ->
+      exn_breadcrumb
+        (sprintf "Invalid staged ledger hash -- %s" (Error.to_string_hum e))
+  | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
+      (* Unexpected errors from staged_ledger are captured in
+                         `Fatal_error
+                      *)
+      [%log error]
+        ~metadata:
+          [ ("error", `String (Error.to_string_hum e))
+          ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
+        !"Unable to build breadcrumb from produced transition due to invalid \
+          staged ledger diff: $error" ;
+      return ()
+
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
@@ -359,7 +451,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~next_state:protocol_state internal_transition
                             pending_coinbase_witness )
                       |> Deferred.Result.map_error ~f:(fun err ->
-                             `Prover_error err )
+                             `Prover_error
+                               ( err
+                               , ( previous_protocol_state_proof
+                                 , internal_transition
+                                 , pending_coinbase_witness ) ) )
                     in
                     let span = Time.diff (Time.now time_controller) t0 in
                     [%log info]
@@ -480,99 +576,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                            `-run-snark-worker` if it's configured." ;
                         return ()
                   in
-                  let transition_error_msg_prefix = "Validation failed: " in
-                  let transition_reason_for_failure =
-                    " One possible reason could be a ledger-catchup is \
-                     triggered before we produce a proof for the produced \
-                     transition."
-                  in
-                  let exn_breadcrumb name =
-                    raise
-                      (Error.to_exn
-                         (Error.of_string
-                            (sprintf
-                               "Error building breadcrumb from produced \
-                                transition: %s"
-                               name)))
-                  in
-                  match%bind emit_breadcrumb () with
-                  | Ok () ->
-                      return ()
-                  | Error (`Prover_error err) ->
-                      [%log error]
-                        "Prover failed to prove freshly generated transition: \
-                         $error"
-                        ~metadata:
-                          [ ("error", `String (Error.to_string_hum err))
-                          ; ( "prev_state"
-                            , Protocol_state.value_to_yojson
-                                previous_protocol_state )
-                          ; ( "prev_state_proof"
-                            , Proof.to_yojson previous_protocol_state_proof )
-                          ; ( "next_state"
-                            , Protocol_state.value_to_yojson protocol_state )
-                          ; ( "internal_transition"
-                            , Internal_transition.to_yojson internal_transition
-                            )
-                          ; ( "pending_coinbase_witness"
-                            , Pending_coinbase_witness.to_yojson
-                                pending_coinbase_witness ) ] ;
-                      return ()
-                  | Error `Invalid_genesis_protocol_state ->
-                      let state_yojson =
-                        Fn.compose State_hash.to_yojson
-                          Protocol_state.genesis_state_hash
-                      in
-                      [%log warn]
-                        ~metadata:
-                          [ ("expected", state_yojson previous_protocol_state)
-                          ; ("got", state_yojson protocol_state) ]
-                        "Produced transition has invalid genesis state hash" ;
-                      return ()
-                  | Error `Already_in_frontier ->
-                      [%log error]
-                        ~metadata:
-                          [ ( "protocol_state"
-                            , Protocol_state.value_to_yojson protocol_state )
-                          ]
-                        "%sproduced transition is already in frontier"
-                        transition_error_msg_prefix ;
-                      return ()
-                  | Error `Not_selected_over_frontier_root ->
-                      [%log warn]
-                        "%sproduced transition is not selected over the root \
-                         of transition frontier.%s"
-                        transition_error_msg_prefix
-                        transition_reason_for_failure ;
-                      return ()
-                  | Error `Parent_missing_from_frontier ->
-                      [%log warn]
-                        "%sparent of produced transition is missing from the \
-                         frontier.%s"
-                        transition_error_msg_prefix
-                        transition_reason_for_failure ;
-                      return ()
-                  | Error (`Fatal_error e) ->
-                      exn_breadcrumb
-                        (sprintf "fatal error -- %s" (Exn.to_string e))
-                  | Error (`Invalid_staged_ledger_hash e) ->
-                      exn_breadcrumb
-                        (sprintf "Invalid staged ledger hash -- %s"
-                           (Error.to_string_hum e))
-                  | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff))
-                    ->
-                      (* Unexpected errors from staged_ledger are captured in
-                         `Fatal_error
-                      *)
-                      [%log error]
-                        ~metadata:
-                          [ ("error", `String (Error.to_string_hum e))
-                          ; ( "diff"
-                            , Staged_ledger_diff.to_yojson staged_ledger_diff
-                            ) ]
-                        !"Unable to build breadcrumb from produced transition \
-                          due to invalid staged ledger diff: $error" ;
-                      return ()) )
+                  let%bind res = emit_breadcrumb () in
+                  handle_block_production_errors ~logger
+                    ~previous_protocol_state ~protocol_state res) )
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
@@ -679,3 +685,184 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
                start () )) )
+
+let run_precomputed ~logger ~verifier ~trust_system ~time_controller
+    ~frontier_reader ~transition_writer ~precomputed_blocks
+    ~(precomputed_values : Precomputed_values.t) =
+  let consensus_constants = precomputed_values.consensus_constants in
+  let log_bootstrap_mode () =
+    [%log info] "Pausing block production while bootstrapping"
+  in
+  let module Breadcrumb = Transition_frontier.Breadcrumb in
+  let produce
+      { Precomputed_block.scheduled_time= _
+      ; protocol_state
+      ; protocol_state_proof
+      ; staged_ledger_diff
+      ; delta_transition_chain_proof } =
+    match Broadcast_pipe.Reader.peek frontier_reader with
+    | None ->
+        log_bootstrap_mode () ; return ()
+    | Some frontier ->
+        let open Transition_frontier.Extensions in
+        let transition_registry =
+          get_extension
+            (Transition_frontier.extensions frontier)
+            Transition_registry
+        in
+        let crumb = Transition_frontier.best_tip frontier in
+        [%log trace]
+          ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
+          "Emitting precomputed block with parent $breadcrumb%!" ;
+        let previous_protocol_state =
+          let transition : External_transition.Validated.t =
+            Breadcrumb.validated_transition crumb
+          in
+          External_transition.Validated.protocol_state transition
+        in
+        Debug_assert.debug_assert (fun () ->
+            [%test_result: [`Take | `Keep]]
+              (Consensus.Hooks.select ~constants:consensus_constants
+                 ~existing:
+                   (Protocol_state.consensus_state previous_protocol_state)
+                 ~candidate:(Protocol_state.consensus_state protocol_state)
+                 ~logger)
+              ~expect:`Take
+              ~message:
+                "newly generated consensus states should be selected over \
+                 their parent" ;
+            let root_consensus_state =
+              Transition_frontier.root frontier |> Breadcrumb.consensus_state
+            in
+            [%test_result: [`Take | `Keep]]
+              (Consensus.Hooks.select ~existing:root_consensus_state
+                 ~constants:consensus_constants
+                 ~candidate:(Protocol_state.consensus_state protocol_state)
+                 ~logger)
+              ~expect:`Take
+              ~message:
+                "newly generated consensus states should be selected over the \
+                 tf root" ) ;
+        let emit_breadcrumb () =
+          let open Deferred.Result.Let_syntax in
+          let transition_hash = Protocol_state.hash protocol_state in
+          let previous_state_hash =
+            Protocol_state.hash previous_protocol_state
+          in
+          let%bind transition =
+            let open Result.Let_syntax in
+            External_transition.Validation.wrap
+              { With_hash.hash= transition_hash
+              ; data=
+                  External_transition.create ~protocol_state
+                    ~protocol_state_proof ~staged_ledger_diff
+                    ~validation_callback:Fn.ignore
+                    ~delta_transition_chain_proof () }
+            |> External_transition.skip_time_received_validation
+                 `This_transition_was_not_received_via_gossip
+            |> External_transition.skip_protocol_versions_validation
+                 `This_transition_has_valid_protocol_versions
+            |> External_transition.validate_genesis_protocol_state
+                 ~genesis_state_hash:
+                   (Protocol_state.genesis_state_hash
+                      ~state_hash:(Some previous_state_hash)
+                      previous_protocol_state)
+            >>| External_transition.skip_proof_validation
+                  `This_transition_was_generated_internally
+            >>| External_transition.skip_delta_transition_chain_validation
+                  `This_transition_was_not_received_via_gossip
+            >>= Transition_frontier_validation.validate_frontier_dependencies
+                  ~logger ~frontier ~consensus_constants
+            |> Deferred.return
+          in
+          let%bind breadcrumb =
+            Breadcrumb.build ~logger ~precomputed_values ~verifier
+              ~trust_system ~parent:crumb ~transition ~sender:None
+            |> Deferred.Result.map_error ~f:(function
+                 | `Invalid_staged_ledger_diff e ->
+                     `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                 | ( `Fatal_error _
+                   | `Invalid_genesis_protocol_state
+                   | `Invalid_staged_ledger_hash _
+                   | `Not_selected_over_frontier_root
+                   | `Parent_missing_from_frontier ) as err ->
+                     err )
+          in
+          [%str_log trace]
+            ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
+            Block_produced ;
+          let metadata =
+            [("state_hash", State_hash.to_yojson transition_hash)]
+          in
+          Coda_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
+          let%bind.Async () =
+            Strict_pipe.Writer.write transition_writer breadcrumb
+          in
+          [%log debug] ~metadata
+            "Waiting for block $state_hash to be inserted into frontier" ;
+          Deferred.choose
+            [ Deferred.choice
+                (Transition_registry.register transition_registry
+                   transition_hash)
+                (Fn.const (Ok `Transition_accepted))
+            ; Deferred.choice
+                ( Time.Timeout.create time_controller (Time.Span.of_ms 20000L)
+                    ~f:(Fn.const ())
+                |> Time.Timeout.to_deferred )
+                (Fn.const (Ok `Timed_out)) ]
+          >>= function
+          | `Transition_accepted ->
+              [%log info] ~metadata
+                "Generated transition $state_hash was accepted into \
+                 transition frontier" ;
+              return ()
+          | `Timed_out ->
+              (* FIXME #3167: this should be fatal, and more importantly,
+                 shouldn't happen.
+              *)
+              [%log fatal] ~metadata
+                "Timed out waiting for generated transition $state_hash to \
+                 enter transition frontier. Continuing to produce new blocks \
+                 anyway. This may mean your CPU is overloaded. Consider \
+                 disabling `-run-snark-worker` if it's configured." ;
+              return ()
+        in
+        let%bind res = emit_breadcrumb () in
+        handle_block_production_errors ~logger ~previous_protocol_state
+          ~protocol_state res
+  in
+  let rec emit_next_block precomputed_blocks =
+    (* Begin checking for the ability to produce a block *)
+    match Broadcast_pipe.Reader.peek frontier_reader with
+    | None ->
+        log_bootstrap_mode () ;
+        let%bind () =
+          Broadcast_pipe.Reader.iter_until frontier_reader
+            ~f:(Fn.compose Deferred.return Option.is_some)
+        in
+        emit_next_block precomputed_blocks
+    | Some _transition_frontier -> (
+      match precomputed_blocks with
+      | precomputed_block :: precomputed_blocks ->
+          let new_time_offset =
+            Core_kernel.Time.diff (Core_kernel.Time.now ())
+              (Block_time.to_time
+                 precomputed_block.Precomputed_block.scheduled_time)
+          in
+          [%log info]
+            "Changing time offset from $old_time_offset to $new_time_offset"
+            ~metadata:
+              [ ( "old_time_offset"
+                , `String
+                    (Core_kernel.Time.Span.to_string_hum
+                       (Block_time.Controller.get_time_offset ~logger)) )
+              ; ( "new_time_offset"
+                , `String (Core_kernel.Time.Span.to_string_hum new_time_offset)
+                ) ] ;
+          Block_time.Controller.set_time_offset new_time_offset ;
+          let%bind () = produce precomputed_block in
+          emit_next_block precomputed_blocks
+      | [] ->
+          return () )
+  in
+  emit_next_block precomputed_blocks
