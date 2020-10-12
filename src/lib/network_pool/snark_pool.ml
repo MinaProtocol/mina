@@ -101,7 +101,7 @@ module type S = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * (bool -> unit) )
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
@@ -527,10 +527,10 @@ let%test_module "random set test" =
       match%bind
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
-      | Some _ ->
+      | Ok _ ->
           Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
             enveloped_diff
-      | None ->
+      | Error _ ->
           Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
     let config verifier =
@@ -660,7 +660,7 @@ let%test_module "random set test" =
                     let%map res =
                       Mock_snark_pool.Resource_pool.Diff.verify t diff
                     in
-                    assert (Option.is_none res) )
+                    assert (Result.is_error res) )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
                 (Mock_snark_pool.Resource_pool.all_completed_work t) ) )
@@ -774,7 +774,8 @@ let%test_module "random set test" =
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command, Fn.const (), Fn.const ()) )
+            (Envelope.Incoming.local command)
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) )
 
     let%test_unit "when creating a network, the incoming diffs and locally \
                    generated diffs in reader pipes will automatically get \
