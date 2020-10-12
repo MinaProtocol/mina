@@ -1,0 +1,60 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "lib",
+    srcs = [
+        "main.go",
+        "methodidx_jsonenum.go",
+    ],
+    importpath = "//src/libp2p_helper",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_go_errors_errors//:errors",
+        "@com_github_ipfs_go_ipfs//core/bootstrap",
+        "@com_github_ipfs_go_log_v2//:go-log",
+        "@com_github_libp2p_go_libp2p//p2p/discovery",
+        "@com_github_libp2p_go_libp2p_core//crypto",
+        "@com_github_libp2p_go_libp2p_core//discovery",
+        "@com_github_libp2p_go_libp2p_core//event",
+        "@com_github_libp2p_go_libp2p_core//network",
+        "@com_github_libp2p_go_libp2p_core//peer",
+        "@com_github_libp2p_go_libp2p_core//peerstore",
+        "@com_github_libp2p_go_libp2p_core//protocol",
+        "@com_github_libp2p_go_libp2p_discovery//:go-libp2p-discovery",
+        "@com_github_libp2p_go_libp2p_pubsub//:go-libp2p-pubsub",
+        "@com_github_multiformats_go_multiaddr//:go-multiaddr",
+    ],
+)
+
+go_binary(
+    name = "libp2p_helper",
+    embed = [":libp2p_helper_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "libp2p_helper_lib",
+    srcs = [
+        "main.go",
+        "methodidx_jsonenum.go",
+    ],
+    importpath = "libp2p_helper",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//src:codanet",
+        "@com_github_go_errors_errors//:errors",
+        "@com_github_ipfs_go_ipfs//core/bootstrap",
+        "@com_github_ipfs_go_log_v2//:go-log",
+        "@com_github_libp2p_go_libp2p//p2p/discovery",
+        "@com_github_libp2p_go_libp2p_core//crypto",
+        "@com_github_libp2p_go_libp2p_core//discovery",
+        "@com_github_libp2p_go_libp2p_core//event",
+        "@com_github_libp2p_go_libp2p_core//network",
+        "@com_github_libp2p_go_libp2p_core//peer",
+        "@com_github_libp2p_go_libp2p_core//peerstore",
+        "@com_github_libp2p_go_libp2p_core//protocol",
+        "@com_github_libp2p_go_libp2p_discovery//:go-libp2p-discovery",
+        "@com_github_libp2p_go_libp2p_pubsub//:go-libp2p-pubsub",
+        "@com_github_multiformats_go_multiaddr//:go-multiaddr",
+    ],
+)

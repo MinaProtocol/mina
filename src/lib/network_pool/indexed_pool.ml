@@ -957,7 +957,7 @@ let%test_module _ =
 
     let gen_cmd ?sign_type ?nonce ?fee_token ?payment_token () =
       User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
-        ~max_amount:1000 ~max_fee:10 ?sign_type ?nonce ?fee_token
+        ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ?fee_token
         ?payment_token ()
       |> Quickcheck.Generator.map
            ~f:Transaction_hash.User_command_with_valid_signature.create
@@ -1156,7 +1156,7 @@ let%test_module _ =
                   (Quickcheck_lib.of_array test_keys)
               in
               User_command.Gen.payment ~sign_type:`Fake ~key_gen
-                ~nonce:current_nonce ~max_amount:1 ~max_fee:0 ()
+                ~nonce:current_nonce ~max_amount:1 ~fee_range:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
@@ -1196,7 +1196,7 @@ let%test_module _ =
           User_command.Gen.payment ~sign_type:`Fake ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
-            ~max_fee:0 ()
+            ~fee_range:0 ()
         in
         let replace_cmd =
           modify_payment replace_cmd_skeleton ~sender ~body:Fn.id
