@@ -188,7 +188,6 @@ module Make (Inputs : Inputs_intf) = struct
           let h = List.hd_exn x in
           let t = List.last_exn x in
           Gate_vector.wrap_gate gates (conv t.row) t.col (conv h.row) h.col ) ;
-    Core.printf "rows = %d\n%!" (List.length cs.rows_rev) ;
     let index =
       Index.create gates
         (Unsigned.Size_t.of_int (Set_once.get_exn cs.public_input_size [%here]))

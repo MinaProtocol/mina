@@ -503,7 +503,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
-                    Core.printf "Step generate\n%!" ;
                     Cache.Step.read_or_generate cache k_p k_v typ main )
               in
               accum_dirty (Lazy.map pk ~f:snd) ;
@@ -587,8 +586,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       main x ()
                       : unit ) ))
           in
-          Core.printf "wrap rows (%d, %d)\n%!" sys.next_row
-            (List.length sys.rows_rev) ;
           log
         in
         Snarky_log.to_file
@@ -613,7 +610,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
-            Core.printf "Wrap generate\n%!" ;
             Cache.Wrap.read_or_generate
               (Vector.to_array step_domains)
               cache disk_key_prover disk_key_verifier typ main )
@@ -901,6 +897,7 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
+(*
 let%test_module "testh no sidele-loaded" =
   ( module struct
     let () =
@@ -912,6 +909,8 @@ let%test_module "testh no sidele-loaded" =
         [On_disk {directory= "/tmp/"; should_write= true}]
 
     open Impls.Step
+
+    let () = Snarky_backendless.Snark0.set_eval_constraints true
 
     module Statement = struct
       type t = Field.t
@@ -942,23 +941,8 @@ let%test_module "testh no sidele-loaded" =
                   ; main=
                       (fun [prev; _] self ->
                         let is_base_case = Field.equal Field.zero self in
-                        Core.printf
-                          !"is_base_case = %{sexp:Field.Constant.t \
-                            Snarky_backendless.Cvar.t}\n\
-                            %!"
-                          (is_base_case :> Field.t) ;
                         let proof_must_verify = Boolean.not is_base_case in
-                        Core.printf
-                          !"proof_must_verify = %{sexp:Field.Constant.t \
-                            Snarky_backendless.Cvar.t}\n\
-                            %!"
-                          (proof_must_verify :> Field.t) ;
                         let self_correct = Field.(equal (one + prev) self) in
-                        Core.printf
-                          !"self_correct = %{sexp:Field.Constant.t \
-                            Snarky_backendless.Cvar.t}\n\
-                            %!"
-                          (self_correct :> Field.t) ;
                         Boolean.Assert.any [self_correct; is_base_case] ;
                         [proof_must_verify; Boolean.false_] )
                   ; main_value=
@@ -975,27 +959,23 @@ let%test_module "testh no sidele-loaded" =
       let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
         Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
       in
-      Core.printf "%s\n%!" __LOC__ ;
       let b0 =
         Common.time "b0" (fun () ->
             Blockchain_snark.step
               [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
               Field.Constant.zero )
       in
-      Core.printf "%s\n%!" __LOC__ ;
       let b1 =
         Common.time "b1" (fun () ->
             Blockchain_snark.step
               [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
               Field.Constant.one )
       in
-      Core.printf "%s\n%!" __LOC__ ;
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end )
+  end ) *)
 
-(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -1102,7 +1082,7 @@ let%test_module "test" =
               ; main=
                   (fun [] x ->
                     let t = (Field.is_square x :> Field.t) in
-                    for i = 0 to 50_000 do
+                    for i = 0 to 10_000 do
                       assert_r1cs t t t
                     done ;
                     [] )
@@ -1245,4 +1225,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end ) *)
+  end )

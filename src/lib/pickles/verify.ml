@@ -77,6 +77,7 @@ let verify_heterogenous (ts : Instance.t list) =
             Marlin_checks.derive_plonk
               (module Tick.Field)
               ~endo:Endo.Dee.base ~shift:Shifts.tick
+              ~mds:Tick_field_sponge.params.mds
               ~domain:
                 (* TODO: Cache the shifts and domain_generator *)
                 (Marlin_checks.domain

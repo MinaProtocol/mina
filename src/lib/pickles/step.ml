@@ -10,7 +10,7 @@ open Types
 open Common
 
 (* This contains the "step" prover *)
-
+let () = Printexc.record_backtrace true
 module Make
     (A : T0) (A_value : sig
         type t
@@ -153,6 +153,7 @@ struct
           Marlin_checks.derive_plonk
             (module Tick.Field)
             ~endo:Endo.Dee.base ~shift:Shifts.tick
+            ~mds:Tick_field_sponge.params.mds
             ~domain:
               (Marlin_checks.domain
                  (module Tick.Field)
@@ -315,7 +316,7 @@ struct
             Pcs_batch.combine_split_evaluations
               (Common.dlog_pcs_batch
                  (Local_max_branching.add Nat.N8.n)
-                 ~max_quot_size:Int.((5 * Domain.size domains.h) - 5))
+                 ~max_quot_size:Int.((5 * Domain.size domains.h) + 5))
               ~xi ~init:Fn.id ~mul ~last:Array.last
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
@@ -332,6 +333,7 @@ struct
           Marlin_checks.derive_plonk
             (module Tock.Field)
             ~shift:Shifts.tock ~endo:Endo.Dum.base
+            ~mds:Tock_field_sponge.params.mds
             ~domain:
               (Marlin_checks.domain
                  (module Tock.Field)
@@ -358,7 +360,7 @@ struct
               ; combined_inner_product= shifted_value combined_inner_product
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
-              ; b= shifted_value combined_inner_product }
+              ; b= shifted_value b }
           ; sponge_digest_before_evaluations=
               Digest.Constant.of_tock_field sponge_digest_before_evaluations }
         , prev_statement_with_hashes

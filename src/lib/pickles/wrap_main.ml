@@ -112,18 +112,13 @@ let pack_statement max_branching =
         [|low_bits; [high_bit]|] )
   in
   fun t ->
-    Core.printf "packing!\n%!" ;
     with_label __LOC__ (fun () ->
-        let r =
-          Spec.pack
-            (module Impl)
-            pack_fq
-            (Types.Pairing_based.Statement.spec max_branching
-               Backend.Tock.Rounds.n)
-            (Types.Pairing_based.Statement.to_data t)
-        in
-        Core.printf "packed=%d\n%!" (Array.length r) ;
-        r )
+        Spec.pack
+          (module Impl)
+          pack_fq
+          (Types.Pairing_based.Statement.spec max_branching
+             Backend.Tock.Rounds.n)
+          (Types.Pairing_based.Statement.to_data t) )
 
 let shifts ~log2_size =
   Backend.Tock.B.Field_verifier_index.shifts ~log2_size

@@ -78,6 +78,10 @@ module Hash_state = struct
   let digest t = Md5.digest_string H.(to_raw_string (get t))
 end
 
+let fail = ref false
+
+let next_row = ref 0
+
 module Plonk_constraint = struct
   open Core_kernel
 
@@ -270,6 +274,16 @@ struct
     | _ ->
         failwith "Unsupported constraint"
 
+  let pub_input_size = 141
+  let bad_constraint = 194037 (* 205 *)
+
+  let when_bad sys f = 
+    if sys.next_row = bad_constraint - pub_input_size
+    then f ()
+  ;;
+
+  let print_on_bad sys s = when_bad sys (fun () -> Core.printf "%s\n%!" s)
+
   let compute_witness sys (external_values : int -> Fp.t) : Fp.t array array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
@@ -306,12 +320,27 @@ struct
             | None ->
                 ()
             | Some (External v) ->
+              if i = bad_constraint || i = 205 then (
+                 Core.printf "External %d\n%!" v;
+               Fp.print (external_values v) ;
+                 Core.printf "!\n%!";
+              ) ;
                 res.(i).(j) <- external_values v
             | Some (Internal v) ->
                 let lc = find sys.internal_vars v in
                 let value = compute lc in
+              if i = bad_constraint || i = 205 then (
+                 Core.printf !"Internal %{sexp:Internal_var.t}\n%!" v;
+                 Core.printf !"lc= %{sexp: (Fp.t * V.t) list * Fp.t option}\n%!" lc;
+               Fp.print value ;
+                 Core.printf "!\n%!";
+              ) ;
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
+    Core.printf "he %s\n%!" __LOC__ ;
+    Array.iter res.(205) ~f:Fp.print ;
+    Core.printf "te %s\n%!" __LOC__ ;
+    Array.iter res.(bad_constraint) ~f:Fp.print ;
     res
 
   let create_internal ?constant sys lc : V.t =
@@ -363,8 +392,7 @@ struct
     V.Table.add_multi sys.equivalence_classes ~key ~data:{row; col} ;
     prev
 
-  let wire sys key row col =
-    wire' sys key (Row.After_public_input row) col
+  let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
   let finalize_and_get_gates sys =
     match sys.gates with
@@ -374,42 +402,33 @@ struct
         let g = Gates.create () in
         let n = Set_once.get_exn sys.public_input_size [%here] in
         (* First, add gates for public input *)
-        let pub =
-          [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
-        in
-        let pub_input_gate_specs_rev =
-          ref []
-        in
+        let pub = [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|] in
+        let pub_input_gate_specs_rev = ref [] in
         for row = 0 to n - 1 do
-          let lp = 
-            wire' sys (V.External (row + 1))
-              (Row.Public_input row) 0
-          in 
+          let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) 0 in
           let lp_row = Row.to_absolute ~public_input_size:n lp.row in
           (* Add to the gate vector *)
           let row = Unsigned.Size_t.of_int row in
           pub_input_gate_specs_rev :=
-            { Gate_spec.gate_enum=1
+            { Gate_spec.gate_enum= 1
             ; row
-            ; lrow=lp_row
-            ; lcol=lp.col
+            ; lrow= lp_row
+            ; lcol= lp.col
             ; rrow= row
-            ; rcol=1
+            ; rcol= 1
             ; orow= row
             ; ocol= 2
-            ; coeffs= pub
-            }
-            :: !pub_input_gate_specs_rev 
+            ; coeffs= pub }
+            :: !pub_input_gate_specs_rev
         done ;
         let offset_row = Row.to_absolute ~public_input_size:n in
         let all_gates =
-          List.rev_append
-            !pub_input_gate_specs_rev
+          List.rev_append !pub_input_gate_specs_rev
             (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
         in
         List.iter all_gates
-          ~f:
-            (fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
+          ~f:(fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs}
+             ->
             Gates.add_raw g ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol
               (Fp.Vector.of_array coeffs) ) ;
         g
@@ -461,6 +480,7 @@ struct
                ; coeffs= c }
              :: gates ) ) ;
     sys.next_row <- sys.next_row + 1 ;
+    next_row := sys.next_row ;
     sys.rows_rev <- row :: sys.rows_rev
 
   let add_generic_constraint ?l ?r ?o c sys : unit =
@@ -486,6 +506,13 @@ struct
       | None ->
           {row= After_public_input next_row; col= 2}
     in
+    when_bad sys 
+    (fun () ->
+      if !fail && Array.length c = 5 &&
+        Fp.equal 
+         c.(4)
+        (Fp.of_bigint (Fp.Bigint.of_decimal_string "1407093205071385134019160203229442695267924164910042285561052671714302327117"))
+     then  failwithf "here %d" sys.next_row ()) ;
     add_row sys [|l; r; o|] 1 lp rp op c
 
   let completely_reduce sys (terms : (Fp.t * int) list) =
@@ -499,6 +526,7 @@ struct
           let lx = V.External lx in
           let rs, rx = go t in
           let s1x1_plus_s2x2 = create_internal sys [(ls, lx); (rs, rx)] in
+          print_on_bad sys __LOC__ ;
           add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
             [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|]
             sys ;
@@ -542,8 +570,9 @@ struct
           | Some c ->
               (* res = ls * lx + c *)
               let res = create_internal ~constant:c sys [(ls, External lx)] in
+          print_on_bad sys __LOC__ ;
               add_generic_constraint ~l:(External lx) ~o:res
-                [|ls; Fp.zero; Fp.(negate one); Fp.zero; c|]
+                [|ls; Fp.zero; Fp.(negate one); Fp.zero; c|] (* Could be here *)
                 sys ;
               (Fp.one, `Var res) )
         | (ls, lx) :: tl ->
@@ -552,12 +581,13 @@ struct
               create_internal ?constant sys [(ls, External lx); (rs, rx)]
             in
             (* res = ls * lx + rs * rx + c *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:(External lx) ~r:rx ~o:res
               [| ls
                ; rs
                ; Fp.(negate one)
                ; Fp.zero
-               ; (match constant with Some x -> x | None -> Fp.zero) |]
+               ; (match constant with Some x -> x | None -> Fp.zero) |](* Could be here *)
               sys ;
             (Fp.one, `Var res) )
 
@@ -575,12 +605,14 @@ struct
           else
             let sx = create_internal sys [(s, x)] in
             (* s * x - sx = 0 *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x ~o:sx
               [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
               sys ;
             sx
       | `Constant ->
           let x = create_internal sys ~constant:s [] in
+          print_on_bad sys __LOC__ ;
           add_generic_constraint ~l:x
             [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]
             sys ;
@@ -594,15 +626,18 @@ struct
             (* (sl * xl)^2 = so * xo
                sl^2 * xl * xl - so * xo = 0
             *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:xl ~r:xl ~o:xo
               [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]
               sys
         | `Var xl, `Constant ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:xl ~r:xl
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
               sys
         | `Constant, `Var xo ->
             (* sl^2 = so * xo *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~o:xo
               [|Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl)|]
               sys
@@ -615,32 +650,39 @@ struct
             (* s1 x1 * s2 x2 = s3 x3
                - s1 s2 (x1 x2) + s3 x3 = 0
             *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x1 ~r:x2 ~o:x3
               [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]
               sys
         | `Var x1, `Var x2, `Constant ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x1 ~r:x2
               [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
               sys
         | `Var x1, `Constant, `Var x3 ->
             (* s1 x1 * s2 = s3 x3
             *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x1 ~o:x3
               [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Constant, `Var x2, `Var x3 ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~r:x2 ~o:x3
               [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]
               sys
         | `Var x1, `Constant, `Constant ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x1
               [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Var x2, `Constant ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~r:x2
               [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Constant, `Var x3 ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~o:x3
               [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]
               sys
@@ -651,6 +693,7 @@ struct
         match x with
         | `Var x ->
             (* -x + x * x = 0  *)
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x ~r:x
               [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|]
               sys
@@ -662,26 +705,31 @@ struct
         | `Var x1, `Var x2 ->
             (* s1 x1 - s2 x2 = 0
           *)
-            if s1 <> s2 then
+            if s1 <> s2 then (
+          print_on_bad sys __LOC__ ;
               add_generic_constraint ~l:x1 ~r:x2
                 [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
                 sys
               (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
-            else
+        ) else (
+          print_on_bad sys __LOC__ ;
               add_generic_constraint ~l:x1 ~r:x2
                 [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
-                sys
+                sys )
         | `Var x1, `Constant ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~l:x1
               [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]
               sys
         | `Constant, `Var x2 ->
+          print_on_bad sys __LOC__ ;
             add_generic_constraint ~r:x2
               [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic {l; r; o; m; c}) ->
+      let o0 = o in
         (* 0
          = l.s * l.x 
          + r.s * r.x 
@@ -738,6 +786,19 @@ struct
               (* TODO: Figure this out later. *)
               failwith "Must use non-constant cvar in plonk constraints"
         in
+          print_on_bad sys __LOC__ ;
+          (
+            if Array.equal Fp.equal
+              [|coeff l; coeff r; coeff o; m; !c|]
+              [|Fp.one; Fp.zero; Fp.(negate one); Fp.zero;
+                Fp.of_bigint 
+                  (Fp.Bigint.of_decimal_string "1407093205071385134019160203229442695267924164910042285561052671714302327117") 
+              |]
+            then  (
+              Core.printf "h %d\n%!" sys.next_row ;
+              Core.printf !"%{sexp: Fp.t * Fp.t Snarky_backendless.Cvar.t}\n%!" o0 
+            )
+          );
         add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
           [|coeff l; coeff r; coeff o; m; !c|]
           sys
@@ -751,6 +812,7 @@ struct
           let prev =
             Array.mapi array ~f:(fun i x -> wire sys x sys.next_row i)
           in
+          print_on_bad sys __LOC__ ;
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
             2 prev.(0) prev.(1) prev.(2)
@@ -762,6 +824,7 @@ struct
               let prev =
                 Array.mapi perm ~f:(fun i x -> wire sys x sys.next_row i)
               in
+          print_on_bad sys __LOC__ ;
               add_row sys
                 (Array.map perm ~f:(fun x -> Some x))
                 0 prev.(0) prev.(1) prev.(2) [||]
@@ -776,6 +839,7 @@ struct
         let y =
           Array.mapi ~f:(fun i (x, y) -> wire sys y sys.next_row i) red
         in
+          print_on_bad sys __LOC__ ;
         add_row sys
           (Array.map red ~f:(fun (_, y) -> Some y))
           3
@@ -786,6 +850,7 @@ struct
         let x =
           Array.mapi ~f:(fun i (x, y) -> wire sys x sys.next_row i) red
         in
+          print_on_bad sys __LOC__ ;
         add_row sys
           (Array.map red ~f:(fun (x, _) -> Some x))
           4
@@ -795,6 +860,7 @@ struct
           [||] ;
         ()
     | Plonk_constraint.T (EC_scale {state}) ->
+      let i = ref 0 in
         let add_ecscale_round (round : V.t Scale_round.t) =
           let xt = wire sys round.xt sys.next_row 0 in
           let b = wire sys round.b sys.next_row 1 in
@@ -805,18 +871,28 @@ struct
           let xs = wire sys round.xs (sys.next_row + 2) 0 in
           let xt1 = wire sys round.xt (sys.next_row + 2) 1 in
           let ys = wire sys round.ys (sys.next_row + 2) 2 in
+          print_on_bad sys __LOC__ ;
+          when_bad sys (fun () ->
+              Core.printf "the next row is %d\n%!" sys.next_row ;
+              Core.printf !"round %d/%d %{sexp:V.t Scale_round.t}\n%!"
+                (!i) (Array.length state)
+                round 
+            ) ;
+(*           when_bad sys (fun () -> if !fail then failwith __LOC__); *)
           add_row sys
             [|Some round.xt; Some round.b; Some round.yt|]
             5 xt b yt [||] ;
+          print_on_bad sys __LOC__ ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
             6 xp l1 yp [||] ;
+          print_on_bad sys __LOC__ ;
           add_row sys
             [|Some round.xs; Some round.xt; Some round.ys|]
             7 xs xt1 ys [||]
         in
         Array.iter
-          ~f:(fun round -> add_ecscale_round round)
+          ~f:(fun round -> add_ecscale_round round ; incr i)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
         ()
     | Plonk_constraint.T (EC_endoscale {state}) ->
@@ -832,17 +908,25 @@ struct
           let xs = wire sys round.xs (sys.next_row + 3) 0 in
           let xq1 = wire sys round.xq (sys.next_row + 3) 1 in
           let ys = wire sys round.ys (sys.next_row + 3) 2 in
+          print_on_bad sys __LOC__ ;
           add_row sys
             [|Some round.b2i1; Some round.xt; None|]
             8 b2i1 xt
             {row= After_public_input sys.next_row; col= 3}
             [||] ;
+          print_on_bad sys __LOC__ ;
+          when_bad sys (fun () -> 
+              Core.printf "the next row is also %d\n%!" sys.next_row ;
+(*               if !fail then failwith __LOC__ *)
+            );
           add_row sys
             [|Some round.b2i; Some round.xq; Some round.yt|]
             9 b2i xq yt [||] ;
+          print_on_bad sys __LOC__ ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
             10 xp l1 yp [||] ;
+          print_on_bad sys __LOC__ ;
           add_row sys
             [|Some round.xs; Some round.xq; Some round.ys|]
             11 xs xq1 ys [||]

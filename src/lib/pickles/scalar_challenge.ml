@@ -145,6 +145,35 @@ let to_field_constant (type f) ~endo
   done ;
   F.((!a * endo) + !b)
 
+let test (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type prover_state = unit
+       and type field = f) ~(endo : f) =
+  let open Impl in
+  let module T = Internal_Basic in
+  let n = 128 in
+  Quickcheck.test ~trials:10
+    (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)
+    ~f:(fun xs ->
+      try
+        T.Test.test_equal ~equal:Field.Constant.equal
+          ~sexp_of_t:Field.Constant.sexp_of_t
+          (Typ.list ~length:n Boolean.typ)
+          Field.typ
+          (fun s ->
+            make_checked (fun () ->
+                to_field_checked (module Impl) ~endo (SC.Scalar_challenge s) )
+            )
+          (fun s ->
+            to_field_constant
+              (module Field.Constant)
+              ~endo
+              (Scalar_challenge (Challenge.Constant.of_bits s)) )
+          xs
+      with e ->
+        Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+        raise e )
+
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
@@ -342,6 +371,9 @@ struct
               let state = ref [] in
               let xpl, ypl = (ref (read_var xp), ref (read_var yp)) in
               let xtl, ytl = (read_var xt, read_var yt) in
+              if Field.Constant.(equal xtl zero) then begin
+                failwith "bad"
+              end ;
               for i = Int.(n - 1) downto 0 do
                 let b2il = read_var (scalar.(Int.(2 * i)) :> Field.t) in
                 let b2i1l =

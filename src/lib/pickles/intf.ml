@@ -232,6 +232,8 @@ module type Inputs_base = sig
   module Other_field : sig
     type t = Inner_curve.Constant.Scalar.t [@@deriving sexp]
 
+    include Shifted_value.Field_intf with type t := t
+
     val to_bigint : t -> Impl.Bigint.t
 
     val of_bigint : Impl.Bigint.t -> t

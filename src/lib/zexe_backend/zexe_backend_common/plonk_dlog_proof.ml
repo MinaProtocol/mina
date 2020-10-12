@@ -403,14 +403,12 @@ module Make (Inputs : Inputs_intf) = struct
     let res = Backend.batch_verify vks v in
     Backend.Vector.delete v ; res
 
-  let batch_verify =
-    batch_verify' (fun xs -> field_vector_of_list (Fq.one :: xs))
+  let batch_verify = batch_verify' (fun xs -> field_vector_of_list xs)
 
   let verify ?message t vk (xs : Fq.Vector.t) : bool =
     batch_verify'
       (fun xs ->
         let v = Fq.Vector.create () in
-        Fq.Vector.emplace_back v Fq.one ;
         for i = 0 to Fq.Vector.length xs - 1 do
           Fq.Vector.emplace_back v (Fq.Vector.get xs i)
         done ;

@@ -46,6 +46,7 @@ module Constant = struct
             { (Marlin_checks.derive_plonk
                  (module Tock.Field)
                  ~shift ~endo:Endo.Dum.base (* I think this is right *)
+                 ~mds:Tock_field_sponge.params.mds
                  ~domain:
                    (Marlin_checks.domain
                       (module Tock.Field)

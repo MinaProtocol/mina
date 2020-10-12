@@ -269,6 +269,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       Marlin_checks.derive_plonk
         (module Tick.Field)
         ~shift:Shifts.tick ~endo:Endo.Dee.base
+        ~mds:Tick_field_sponge.params.mds
         ~domain:
           (Marlin_checks.domain
              (module Tick.Field)

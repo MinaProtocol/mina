@@ -262,7 +262,7 @@ module Ipa = struct
       |> Backend.Tick.Curve.Affine.of_backend |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
-      let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
+      let open Snarky_bn382.Tweedle.Dum.Plonk.Field_poly_comm in
       let chals =
         let open Backend.Tick.Field.Vector in
         let v = create () in
@@ -278,7 +278,7 @@ module Ipa = struct
             emplace_back v (to_backend (Finite comm)) ) ;
         v
       in
-      Snarky_bn382.Tweedle.Dum.Field_urs.batch_accumulator_check
+      Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.batch_accumulator_check
         (Backend.Tick.Keypair.load_urs ())
         comms chals
   end

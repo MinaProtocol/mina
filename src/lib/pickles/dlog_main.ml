@@ -97,9 +97,11 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark: %s (%s, %s)\n%!" lab
-              (Field.Constant.to_string (read_var x))
-              (Field.Constant.to_string (read_var y)))
+            Core.printf "in-snark: %s %!" lab ;
+            Field.Constant.print (read_var x) ;
+            Core.printf ", %!" ;
+            Field.Constant.print (read_var y) ;
+            Core.printf "\n%!")
 
   let print_chal lab x =
     if debug then
@@ -392,7 +394,8 @@ struct
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
         let p_prime =
-          combined_polynomial + scale_fast u combined_inner_product
+          let uc = scale_fast u combined_inner_product in
+          combined_polynomial + uc
         in
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
@@ -562,11 +565,11 @@ struct
                   | `Add_with_correction (x, (g, _)) ->
                       Ops.add_fast acc (Ops.scale_fast g (`Plus_two_to_len x))
               ) )
+          |> Inner_curve.negate
         in
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;
-        print_g1 "x_hat" x_hat ;
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
@@ -622,6 +625,7 @@ struct
                 [ plonk.perm1 * m.sigma_comm_2
                 ; generic
                 ; poseidon
+                ; plonk.psdn0 * m.psm_comm
                 ; plonk.ecad0 * m.add_comm
                 ; plonk.vbmul0 * m.mul1_comm
                 ; plonk.vbmul1 * m.mul2_comm
@@ -782,7 +786,10 @@ struct
             failwith "empty list" )
 
   let shift =
-    Field.constant (Shifted_value.Shift.create (module Field.Constant))
+    Shifted_value.Shift.(
+      map ~f:Field.constant (create (module Field.Constant)))
+
+  let%test_unit "endo scalar" = SC.test (module Impl) ~endo:Endo.Dee.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
    It 
@@ -900,7 +907,7 @@ struct
           Marlin_checks.checked
             (module Impl)
             ~endo:(Impl.Field.constant Endo.Dum.base)
-            ~domain ~shift plonk
+            ~domain ~shift plonk ~mds:sponge_params.mds
             ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
             , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 ) )
     in

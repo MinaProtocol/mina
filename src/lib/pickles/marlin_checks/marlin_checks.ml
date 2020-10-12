@@ -87,7 +87,7 @@ let evals_of_split_evals field ~zeta ~zetaw
 open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 
 let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
-    (module F : Field_intf with type t = t) ~shift ~endo
+    (module F : Field_intf with type t = t) ~shift ~endo ~mds
     ~(domain : t plonk_domain) =
   let open F in
   let square x = x * x in
@@ -130,11 +130,15 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       a
     in
     let psdn0 =
-      let l, r, o = (sbox e0.l, sbox e0.r, sbox e0.o) in
+      let lro =
+        let s = [|sbox e0.l; sbox e0.r; sbox e0.o|] in
+        Array.map mds ~f:(fun m ->
+            Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )) )
+      in
       with_label __LOC__ (fun () ->
-          ((l + o - e1.l) * alphas.(1))
-          + ((l + r - e1.r) * alphas.(2))
-          + ((r + o - e1.o) * alphas.(3)) )
+          ((lro.(0) - e1.l) * alphas.(1))
+          + ((lro.(1) - e1.r) * alphas.(2))
+          + ((lro.(2) - e1.o) * alphas.(3)) )
     in
     let ecad0 =
       with_label __LOC__ (fun () ->
@@ -193,11 +197,11 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
 
 let checked (type t)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-    ~domain ~shift ~endo (plonk : _ In_circuit.t) evals =
+    ~domain ~shift ~endo ~mds (plonk : _ In_circuit.t) evals =
   let actual =
     derive_plonk ~with_label:Impl.with_label
       (module Impl.Field)
-      ~endo ~domain ~shift
+      ~endo ~mds ~domain ~shift
       { alpha= plonk.alpha
       ; beta= plonk.beta
       ; gamma= plonk.gamma

@@ -53,8 +53,16 @@ module type Field_intf = sig
   val one : t
 end
 
-module Shift = struct
+module Shift : sig
+  type 'f t = private 'f
+
+  val create : (module Field_intf with type t = 'f) -> 'f t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+end = struct
   type 'f t = 'f
+
+  let map t ~f = f t
 
   (* 2^{field size in bits} *)
   let create (type f) (module F : Field_intf with type t = f) : f t =
@@ -69,10 +77,10 @@ end
 
 let of_field (type f) (module F : Field_intf with type t = f)
     ~(shift : f Shift.t) (s : f) : f t =
-  Shifted_value F.(s - shift)
+  Shifted_value F.(s - (shift :> t))
 
 let to_field (type f) (module F : Field_intf with type t = f)
     ~(shift : f Shift.t) (Shifted_value t : f t) : f =
-  F.(t + shift)
+  F.(t + (shift :> t))
 
 let equal equal (Shifted_value t1) (Shifted_value t2) = equal t1 t2

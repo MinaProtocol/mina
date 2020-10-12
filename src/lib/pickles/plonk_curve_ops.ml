@@ -204,6 +204,9 @@ struct
                 As_prover.(
                   fun () ->
                     let xt, yt = Tuple_lib.Double.map t ~f:read_var in
+                    if Field.Constant.(equal xt zero) then begin
+                      failwith "badd"
+                    end ;
                     let state = ref [] in
                     let pl = ref (read G.typ p) in
                     let tl = ref (read G.typ t) in
@@ -230,6 +233,7 @@ struct
                     done ;
                     Array.of_list_rev !state)
           in
+          let pre = !Zexe_backend_common.Plonk_constraint_system.next_row in
           let state =
             Array.mapi state ~f:(fun i s ->
                 {s with S.xt; yt; b= (scalar.(Int.(n - i - 1)) :> Field.t)} )
@@ -242,6 +246,19 @@ struct
                   Zexe_backend_common.Plonk_constraint_system.Plonk_constraint
                   .T
                     (EC_scale {state}) } ] ;
+          let post = !Zexe_backend_common.Plonk_constraint_system.next_row in
+          let bad = 194037 - 141 in
+          if pre <= bad && bad <= post then begin
+            as_prover As_prover.(fun () ->
+                Core.printf !"xt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n%!" xt ;
+                Core.printf !"yt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n%!" yt ;
+              Array.iteri state ~f:(fun i r ->
+                    Core.printf !"v[%d]: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t S.t}\n%!" i
+                      (r );
+                    Core.printf !"w[%d]: %{sexp:Field.Constant.t S.t}\n%!" i
+                      (read (S.typ Field.typ) r ) ) 
+              ) 
+          end ;
           let fin = state.(Int.(n - 2)) in
           (fin.xs, fin.ys)
       in
@@ -373,12 +390,6 @@ struct
               let open G.Constant.Scalar in
               let shift = project (List.init n ~f:(fun _ -> false) @ [true]) in
               let x = project s + shift in
-              Core.printf !"shift = %{sexp:G.Constant.Scalar.t}\n%!" shift ;
-              let s = G.Constant.Scalar.project s in
-              for i = 0 to 1 lsl Int.(n) do
-                G.Constant.scale g G.Constant.Scalar.(s + of_int i)
-                |> Core.printf !"s + %d: %{sexp:G.Constant.t}\n%!" i
-              done ;
               G.Constant.scale g x )
             (random_point, xs)
         with e ->

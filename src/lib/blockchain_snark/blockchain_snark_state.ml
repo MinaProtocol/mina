@@ -77,6 +77,7 @@ let%snarkydef step ~(logger : Logger.t)
       (exists Snark_transition.typ ~request:(As_prover.return Transition))
   in
   let%bind previous_state, previous_state_body_hash =
+      with_label __LOC__ ( 
     let%bind t =
       with_label __LOC__
         (exists
@@ -87,7 +88,7 @@ let%snarkydef step ~(logger : Logger.t)
     let%map () =
       with_label __LOC__ (State_hash.assert_equal h previous_state_hash)
     in
-    (t, body)
+    (t, body) )
   in
   let%bind ( `Success updated_consensus_state
            , `Supercharge_coinbase supercharge_coinbase
@@ -103,11 +104,13 @@ let%snarkydef step ~(logger : Logger.t)
     |> Staged_ledger_hash.pending_coinbase_hash_var
   in
   let%bind genesis_state_hash =
+      with_label __LOC__ ( 
     (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
     Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
-      previous_state
+      previous_state )
   in
   let%bind new_state =
+      with_label __LOC__ ( 
     let t =
       Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
         ~blockchain_state:(Snark_transition.blockchain_state transition)
@@ -118,27 +121,32 @@ let%snarkydef step ~(logger : Logger.t)
       let%bind h, _ = Protocol_state.hash_checked t in
       with_label __LOC__ (State_hash.assert_equal h new_state_hash)
     in
-    t
+    t )
   in
   let%bind txn_snark_should_verify, success =
     let%bind ledger_hash_didn't_change =
+      with_label __LOC__ ( 
       Frozen_ledger_hash.equal_var
         ( previous_state |> Protocol_state.blockchain_state
         |> Blockchain_state.snarked_ledger_hash )
-        txn_snark.target
+        txn_snark.target )
     and supply_increase_is_zero =
+      with_label __LOC__ ( 
       Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
+    )
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let%bind root_after_delete, deleted_stack =
+      with_label __LOC__ ( 
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
           prev_pending_coinbase_root
-          ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
+          ~proof_emitted:(Boolean.not ledger_hash_didn't_change) )
       in
       (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
       let%bind no_coinbases_popped =
+      with_label __LOC__ ( 
         Pending_coinbase.Hash.equal_var root_after_delete
-          prev_pending_coinbase_root
+          prev_pending_coinbase_root )
       in
       (*new stack or update one*)
       let%map new_root =
@@ -154,6 +162,7 @@ let%snarkydef step ~(logger : Logger.t)
       Pending_coinbase.Stack.Checked.create_with deleted_stack
     in
     let%bind txn_snark_input_correct =
+      with_label __LOC__ (
       let lh t =
         Protocol_state.blockchain_state t
         |> Blockchain_state.snarked_ledger_hash
@@ -176,9 +185,10 @@ let%snarkydef step ~(logger : Logger.t)
         ; Token_id.Checked.equal txn_snark.next_available_token_after
             ( transition |> Snark_transition.blockchain_state
             |> Blockchain_state.snarked_next_available_token ) ]
-      >>= Boolean.all
+      >>= Boolean.all )
     in
     let%bind nothing_changed =
+      with_label __LOC__ (
       let%bind next_available_token_didn't_change =
         Token_id.Checked.equal txn_snark.next_available_token_after
           txn_snark.next_available_token_before
@@ -187,15 +197,17 @@ let%snarkydef step ~(logger : Logger.t)
         [ ledger_hash_didn't_change
         ; supply_increase_is_zero
         ; no_coinbases_popped
-        ; next_available_token_didn't_change ]
+        ; next_available_token_didn't_change ] )
     in
     let%bind correct_coinbase_status =
+      with_label __LOC__ ( 
       let new_root =
         transition |> Snark_transition.blockchain_state
         |> Blockchain_state.staged_ledger_hash
         |> Staged_ledger_hash.pending_coinbase_hash_var
       in
       Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
+    )
     in
     let%bind () =
       Boolean.Assert.any [txn_snark_input_correct; nothing_changed]
@@ -243,8 +255,10 @@ let%snarkydef step ~(logger : Logger.t)
         txn_snark_should_verify
   in
   let%bind is_base_case =
+      with_label __LOC__ ( 
     Protocol_state.consensus_state new_state
     |> Consensus.Data.Consensus_state.is_genesis_state_var
+  )
   in
   let prev_should_verify =
     match proof_level with
@@ -359,6 +373,8 @@ end) : S = struct
   include Crypto_params
 
   let tag, cache_handle, p, Pickles.Provers.[step] =
+    Snarky_backendless.Snark0.set_eval_constraints true ;
+           Zexe_backend_common.Plonk_constraint_system.fail := true; 
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)
@@ -369,7 +385,8 @@ end) : S = struct
       ~choices:(fun ~self ->
         [rule ~proof_level ~constraint_constants T.tag self] )
 
-  let step = with_handler step
+  let step w = 
+    with_handler step w
 
   module Proof = (val p)
 end
