@@ -47,7 +47,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
-      alignItems(`center),
       marginBottom(`rem(12.)),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(12.))]),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
@@ -135,12 +134,7 @@ module Styles = {
       width(`percent(100.)),
       media(
         Theme.MediaQuery.tablet,
-        [
-          justifySelf(`center),
-          alignSelf(`center),
-          height(`rem(12.)),
-          width(`rem(34.)),
-        ],
+        [height(`rem(12.)), width(`rem(34.))],
       ),
     ]);
 };
