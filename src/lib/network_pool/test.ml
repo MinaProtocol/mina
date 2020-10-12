@@ -23,6 +23,7 @@ let%test_module "network pool test" =
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+        ~disk_location:"/tmp/snark-pool"
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -64,7 +65,8 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command, Fn.const (), Fn.const ())) ;
+               (Envelope.Incoming.local command)
+               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ()))) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
