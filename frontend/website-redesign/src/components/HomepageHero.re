@@ -110,12 +110,7 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon =
-    style([
-      height(`rem(1.5)),
-      marginLeft(`rem(0.5)),
-      color(Theme.Colors.orange),
-    ]);
+  let buttonIcon = style([height(`rem(1.5)), color(Theme.Colors.orange)]);
 
   let heroText =
     merge([
@@ -165,10 +160,10 @@ let make = (~backgroundImg) => {
                 href={`Internal("/tech")}
                 bgColor=Theme.Colors.white
                 paddingX=1.
-                width={`rem(13.5)}>
+                width={`rem(13.)}>
                 <span> {React.string("See Behind The Tech")} </span>
                 <span className=Styles.buttonIcon>
-                  <Icon kind=Icon.ArrowRightMedium />
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
               </Button>
             </span>
