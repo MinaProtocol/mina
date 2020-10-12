@@ -44,6 +44,15 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
+          {{- if $.Values.coda.enableFlooding }}
+          "-enable-flooding true"
+          {{- end -}}
+          {{- if $.Values.coda.peerExchange }}
+          "-peer-exchange true"
+          {{- end -}}
+          {{- range $.Values.coda.directPeers }}
+          "-direct-peers", {{ . | quote }},
+          {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
