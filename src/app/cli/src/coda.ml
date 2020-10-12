@@ -212,8 +212,25 @@ let daemon logger =
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
      and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
-     and _enable_flooding =
-       flag "enable-flooding" ~doc:"true|false Deprecated and unused" no_arg
+     and enable_flooding =
+       flag "enable-flooding"
+         ~doc:
+           "true|false Publish our own blocks/transactions to every peer we \
+            can find (default: false)"
+         (optional bool)
+     and peer_exchange =
+       flag "enable-peer-exchange"
+         ~doc:
+           "true|false Help keep the mesh connected when closing connections \
+            (default: false)"
+         (optional bool)
+     and direct_peers_raw =
+       flag "direct-peer"
+         ~doc:
+           "/ip4/IPADDR/tcp/PORT/p2p/PEERID Peers to always send new messages \
+            to/from. These peers should also have you configured as a direct \
+            peer, the relationship is intended to be symmetric"
+         (listed string)
      and isolate =
        flag "isolate-network"
          ~doc:
@@ -739,6 +756,9 @@ let daemon logger =
                        (YJ.Util.convert_each YJ.Util.to_string))
                     "peers" None ~default:[] ]
          in
+         let direct_peers =
+           List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
+         in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
          if is_seed then [%log info] "Starting node as a seed node"
          else if List.is_empty initial_peers then
@@ -757,8 +777,10 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; flooding= Option.value ~default:false enable_flooding
+             ; direct_peers
+             ; peer_exchange= Option.value ~default:false peer_exchange
              ; isolate= Option.value ~default:false isolate
-             ; gossip_type= `Gossipsub
              ; keypair= libp2p_keypair }
          in
          let net_config =
