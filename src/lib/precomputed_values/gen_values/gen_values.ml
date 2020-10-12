@@ -38,9 +38,14 @@ let hashes =
   end) in
   let open E in
   let f (_, x) = estring (Core.Md5.to_hex x) in
-  let ts = Transaction_snark.constraint_system_digests () in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let proof_level = Genesis_constants.Proof_level.compiled in
+  let ts =
+    Transaction_snark.constraint_system_digests ~constraint_constants ()
+  in
   let bs =
-    Blockchain_snark.Blockchain_snark_state.constraint_system_digests ()
+    Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+      ~proof_level ~constraint_constants ()
   in
   elist (List.map ts ~f @ List.map bs ~f)
 
@@ -70,9 +75,17 @@ module Make_real () = struct
 
   open E
 
-  module T = Transaction_snark.Make ()
+  module T = Transaction_snark.Make (struct
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  end)
 
-  module B = Blockchain_snark.Blockchain_snark_state.Make (T)
+  module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+    let tag = T.tag
+
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.compiled
+  end)
 
   let key_hashes = hashes
 
@@ -98,7 +111,7 @@ module Make_real () = struct
       ; genesis_ledger= (module Test_genesis_ledger)
       ; consensus_constants
       ; protocol_state_with_hash
-      ; blockchain_proof_system_id= Lazy.force B.Proof.id }
+      ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
 
   let blockchain_proof_system_id =
     [%expr

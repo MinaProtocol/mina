@@ -11,7 +11,13 @@ module Inputs = struct
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
-    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t }
+    ; blockchain_proof_system_id:
+        (* This is only used for calculating the hash to lookup the genesis
+           proof with. It is re-calculated when building the blockchain prover,
+           so it is always okay -- if less efficient at startup -- to pass
+           [None] here.
+        *)
+        Pickles.Verification_key.Id.t option }
 end
 
 module T = struct
