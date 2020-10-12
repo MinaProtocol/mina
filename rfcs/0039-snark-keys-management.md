@@ -48,8 +48,11 @@ we need to have some representation of the configuration embedded with the keys
 files. We propose that every key (and URS) file contains a header in minified
 JSON format before the actual contents, specifying
 * the constraint constants, as defined in the runtime configuration
-* the SHA commit identifiers for the current commit in the coda, marlin and
-  zexe repos used when generating the keys
+* the SHA commit identifiers for the current commit in the mina and marlin
+  repos used when generating the keys
+  - the identifying hash depends on the marlin repo SHA, so including it lets
+    us recompute/verify the identifying hash, even though we could technically
+    derive it from the mina SHA and its git repository.
 * the length of the binary data following the header, so that we can validate
   that the file was successfully downloaded in full, where applicable
 * the date associated with the current commit
@@ -83,9 +86,8 @@ For example, a header for the transaction snark key file might look like:
     , "supercharged_coinbase_factor": 2
     , "account_creation_fee": "0.001" }
 , "commits":
-    { "coda": "COMMIT_SHA_HERE"
-    , "marlin": "COMMIT_SHA_HERE"
-    , "zexe": "COMMIT_SHA_HERE" }
+    { "mina": "COMMIT_SHA_HERE"
+    , "marlin": "COMMIT_SHA_HERE" }
 , "length": 1000000000
 , "commit_date": "1970-01-01 00:00:00"
 , "constraint_system_hash": "MD5_HERE"
