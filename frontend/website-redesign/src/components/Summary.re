@@ -151,75 +151,50 @@ module Styles = {
 module StatisticsRow = {
   module Styles = {
     open Css;
-    let statistic =
-      style([
-        Theme.Typeface.monumentGroteskMono,
-        textTransform(`uppercase),
-        fontSize(`px(14)),
-        color(Theme.Colors.black),
-        letterSpacing(`em(0.03)),
-      ]);
 
-    let value =
-      merge([
-        Theme.Type.h2,
-        style([
-          fontSize(`px(40)),
-          marginBottom(`rem(0.5)),
-          fontWeight(`light),
-          display(`flex),
-          media(
-            Theme.MediaQuery.tablet,
-            [
-              marginBottom(`px(3)),
-              fontSize(`rem(2.5)),
-              lineHeight(`rem(2.5)),
-            ],
-          ),
-        ]),
-      ]);
+    let container = style([display(`flex), justifyContent(`spaceBetween)]);
 
-    let container =
-      style([
-        display(`flex),
-        flexWrap(`wrap),
-        justifyContent(`spaceBetween),
-        media(
-          Theme.MediaQuery.tablet,
-          [gridTemplateColumns([`rem(12.), `rem(12.), `rem(12.)])],
-        ),
-      ]);
     let flexColumn =
       style([
         display(`flex),
         flexDirection(`column),
         justifyContent(`flexStart),
       ]);
+
+    let h2 =
+      style([
+        Theme.Typeface.monumentGrotesk,
+        fontWeight(`normal),
+        fontSize(`rem(2.5)),
+        lineHeight(`rem(3.)),
+        color(Theme.Colors.digitalBlack),
+      ]);
+
+    let label =
+      style([
+        Theme.Typeface.monumentGroteskMono,
+        textTransform(`uppercase),
+        fontSize(`rem(0.875)),
+        lineHeight(`rem(1.)),
+        color(Theme.Colors.digitalBlack),
+      ]);
   };
   [@react.component]
   let make = (~statistics) => {
     <div className=Styles.container>
       <div className=Styles.flexColumn>
-        <div className=Styles.value>
-          {React.string(statistics.participants)}
-        </div>
-        <h2 className=Styles.statistic> {React.string("Participants")} </h2>
+        <h2 className=Styles.h2> {React.string(statistics.participants)} </h2>
+        <p className=Styles.label> {React.string("Participants")} </p>
       </div>
       <div className=Styles.flexColumn>
-        <span className=Styles.value>
+        <h2 className=Styles.h2>
           {React.string(statistics.genesisMembers)}
-        </span>
-        <span className=Styles.statistic>
-          {React.string("Genesis Members")}
-        </span>
-      </div>
-      <div className=Styles.statistic>
-        <div className=Styles.value>
-          {React.string(statistics.blockCount)}
-        </div>
-        <h2 className=Styles.statistic>
-          {React.string("Blocks Produced")}
         </h2>
+        <p className=Styles.label> {React.string("Genesis Members")} </p>
+      </div>
+      <div className=Styles.flexColumn>
+        <h2 className=Styles.h2> {React.string(statistics.blockCount)} </h2>
+        <p className=Styles.label> {React.string("Blocks Produced")} </p>
       </div>
     </div>;
   };

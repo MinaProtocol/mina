@@ -166,7 +166,13 @@ module Styles = {
       alignItems(`center),
       gridColumnGap(rem(1.5)),
       width(`percent(100.)),
-      gridTemplateColumns([`rem(3.5), `rem(6.), `auto, `rem(9.)]),
+      gridTemplateColumns([
+        `rem(3.5),
+        `rem(6.),
+        `rem(6.),
+        `auto,
+        `rem(9.),
+      ]),
       hover([backgroundColor(Theme.Colors.orangeAlpha(0.1))]),
       media(
         Theme.MediaQuery.tablet,
@@ -219,11 +225,10 @@ module Styles = {
         zIndex(99),
         display(`none),
         paddingBottom(`rem(0.5)),
-        fontSize(`rem(1.)),
+        fontSize(`rem(0.875)),
         fontWeight(`normal),
         textTransform(`uppercase),
         letterSpacing(`rem(0.125)),
-        borderBottom(`px(1), `solid, Theme.Colors.orange),
         media(Theme.MediaQuery.notMobile, [display(`grid)]),
         hover([
           backgroundColor(Theme.Colors.digitalBlack),
@@ -234,19 +239,10 @@ module Styles = {
 
   let activeColumn =
     style([
-      position(`relative),
       justifySelf(`flexEnd),
       cursor(`pointer),
-      after([
-        position(`absolute),
-        left(`percent(100.)),
-        contentRule(""),
-        height(`rem(1.5)),
-        width(`rem(1.5)),
-        backgroundImage(`url("/static/img/arrowDown.svg")),
-        backgroundRepeat(`noRepeat),
-        backgroundPosition(`px(4), `px(9)),
-      ]),
+      display(`flex),
+      alignItems(`center),
     ]);
 
   let inactiveColumn =
@@ -254,7 +250,10 @@ module Styles = {
       display(`none),
       justifySelf(`flexEnd),
       cursor(`pointer),
-      media(Theme.MediaQuery.tablet, [display(`inline)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [display(`flex), alignItems(`center)],
+      ),
     ]);
 
   let topTen =
@@ -660,7 +659,9 @@ let make =
       className={
         column === filter ? Styles.activeColumn : Styles.inactiveColumn
       }>
-      {React.string(string_of_filter(column))}
+      {column === filter
+         ?  <Icon kind=Icon.ChevronDown />  : React.null}
+      <span> {React.string(string_of_filter(column))} </span>
     </span>;
 
   <div className={Styles.leaderboardContainer(interactive)}>
@@ -703,6 +704,7 @@ let make =
          </div>;
        } else {
          Array.concat([
+           [|<hr />|],
            Array.length(topTen) > 0
              ? [|
                <div className=Styles.topTen>
