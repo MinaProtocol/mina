@@ -12,7 +12,9 @@ type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
 val verify :
-  Protocol_state.Value.t -> Proof.t -> key:Pickles.Verification_key.t -> bool
+     (Protocol_state.Value.t * Proof.t) list
+  -> key:Pickles.Verification_key.t
+  -> bool
 
 val check :
      Witness.t
@@ -49,6 +51,14 @@ end
 
 module Make (T : sig
   val tag : Transaction_snark.tag
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
 end) : S
 
-val constraint_system_digests : unit -> (string * Md5.t) list
+val constraint_system_digests :
+     proof_level:Genesis_constants.Proof_level.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> unit
+  -> (string * Md5.t) list

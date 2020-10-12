@@ -6,21 +6,12 @@
 set -euo pipefail
 
 # Set up variables for build
-SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPT_PATH}/../.."
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+cd "${SCRIPTPATH}/../.."
 
-GIT_HASH=$(git rev-parse --short=7 HEAD)
-GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GIT_TAG=$(git describe --abbrev=0)
+source "buildkite/scripts/export-git-env-vars.sh"
 
 PROJECT="coda-archive"
-
-if [ "$GIT_BRANCH" == "master" ]; then
-    VERSION="${GIT_TAG}"
-else
-    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
-fi
-
 BUILD_DIR="deb_build"
 
 mkdir -p "${BUILD_DIR}/DEBIAN"
@@ -36,7 +27,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Coda Archive Process
  Compatible with Coda Daemon
- Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -68,8 +59,6 @@ ls -lh coda*.deb
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
 
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
@@ -83,12 +72,6 @@ else
     case $GITBRANCH in
         master)
             CODENAME='release'
-            ;;
-        develop)
-            CODENAME='develop'
-            ;;
-        release*)
-            CODENAME='stable'
             ;;
         *)
             CODENAME='unstable'
@@ -104,11 +87,24 @@ fi
 ###
 # Build and Publish Docker
 ###
-mkdir docker_build 
-mv coda-*.deb docker_build/.
+if [ -n "${BUILDKITE+x}" ]; then
+    set -x
 
-echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+    # Export variables for use with downstream steps
+    echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
-docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+    set +x
+else
+    mkdir docker_build 
+    mv coda-*.deb docker_build/.
 
-docker push codaprotocol/coda-archive:$VERSION
+    echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+
+    docker build -t codaprotocol/coda-archive:$DOCKER_TAG -f $SCRIPTPATH/Dockerfile docker_build
+
+    docker push codaprotocol/coda-archive:$DOCKER_TAG
+fi
