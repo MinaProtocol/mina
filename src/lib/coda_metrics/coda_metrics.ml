@@ -369,8 +369,18 @@ module Network = struct
     Gauge_map.add rpc_latency_table ~name ~help
 
   let rpc_size_bytes ~name : Rpc_size_histogram.t =
-    let help = "size for RPC reponse in bytes" in
+    let help = "size for RPC response in bytes" in
     let name = name ^ "_size" in
+    Histogram_map.add rpc_size_table ~name ~help
+
+  let rpc_max_bytes ~name : Rpc_size_histogram.t =
+    let help = "maximum size for RPC response in bytes" in
+    let name = name ^ "_max_size" in
+    Histogram_map.add rpc_size_table ~name ~help
+
+  let rpc_avg_bytes ~name : Rpc_size_histogram.t =
+    let help = "average size for RPC response in bytes" in
+    let name = name ^ "_avg_size" in
     Histogram_map.add rpc_size_table ~name ~help
 
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
@@ -409,6 +419,15 @@ module Snark_work = struct
   let pending_snark_work : Gauge.t =
     let help = "total # of snark work bundles that are yet to be generated" in
     Gauge.v "pending_snark_work" ~help ~namespace ~subsystem
+
+  module Snark_pool_serialization_ms_histogram = Histogram (struct
+    let spec = Histogram_spec.of_linear 0. 2000. 20
+  end)
+
+  let snark_pool_serialization_ms =
+    let help = "A histogram for snark pool serialization time" in
+    Snark_pool_serialization_ms_histogram.v "snark_pool_serialization_ms" ~help
+      ~namespace ~subsystem
 
   module Snark_fee_histogram = Histogram (struct
     let spec = Histogram_spec.of_linear 0. 1. 10

@@ -1201,12 +1201,12 @@ let create (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
-              ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r

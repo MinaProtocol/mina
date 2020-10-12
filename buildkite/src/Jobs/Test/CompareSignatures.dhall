@@ -1,13 +1,13 @@
-let Prelude =  ../External/Prelude.dhall
-let S = ../Lib/SelectFiles.dhall
-let Cmd =  ../Lib/Cmds.dhall
-let Pipeline = ../Pipeline/Dsl.dhall
-let Command = ../Command/Base.dhall
-let OpamInit = ../Command/OpamInit.dhall
-let WithCargo = ../Command/WithCargo.dhall
-let Docker = ../Command/Docker/Type.dhall
-let Size = ../Command/Size.dhall
-let JobSpec = ../Pipeline/JobSpec.dhall
+let Prelude =  ../../External/Prelude.dhall
+let S = ../../Lib/SelectFiles.dhall
+let Cmd =  ../../Lib/Cmds.dhall
+let Pipeline = ../../Pipeline/Dsl.dhall
+let Command = ../../Command/Base.dhall
+let OpamInit = ../../Command/OpamInit.dhall
+let WithCargo = ../../Command/WithCargo.dhall
+let Docker = ../../Command/Docker/Type.dhall
+let Size = ../../Command/Size.dhall
+let JobSpec = ../../Pipeline/JobSpec.dhall
 in
 
 Pipeline.build
@@ -18,6 +18,7 @@ Pipeline.build
           [ S.strictlyStart (S.contains "buildkite/src/Jobs/CompareSignatures")
           , S.strictlyStart (S.contains "src")
           ]
+        , path = "Test"
         , name = "CompareSignatures"
         }
     , steps =
