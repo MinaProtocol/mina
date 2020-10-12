@@ -100,6 +100,8 @@ end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
+type validation_result = [`Accept | `Reject | `Ignore]
+
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
@@ -144,7 +146,8 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(string Envelope.Incoming.t -> bool Deferred.t)
+    -> should_forward_message:(   string Envelope.Incoming.t
+                               -> validation_result Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -161,7 +164,8 @@ module Pubsub : sig
   val subscribe_encode :
        net
     -> string
-    -> should_forward_message:('a Envelope.Incoming.t -> bool Deferred.t)
+    -> should_forward_message:(   'a Envelope.Incoming.t
+                               -> validation_result Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of
@@ -208,7 +212,9 @@ val configure :
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
-  -> gossip_type:[`Gossipsub | `Flood | `Random]
+  -> flooding:bool
+  -> direct_peers:Multiaddr.t list
+  -> peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> unit Deferred.Or_error.t

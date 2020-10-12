@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = bool -> unit
+  type t = Coda_net2.validation_result -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 
@@ -121,9 +121,9 @@ type t_ = t
 
 type external_transition = t
 
-let broadcast {validation_callback; _} = validation_callback true
+let broadcast {validation_callback; _} = validation_callback `Accept
 
-let don't_broadcast {validation_callback; _} = validation_callback false
+let don't_broadcast {validation_callback; _} = validation_callback `Reject
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
