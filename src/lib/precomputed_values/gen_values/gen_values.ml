@@ -111,7 +111,7 @@ module Make_real () = struct
       ; genesis_ledger= (module Test_genesis_ledger)
       ; consensus_constants
       ; protocol_state_with_hash
-      ; blockchain_proof_system_id= Lazy.force B.Proof.id }
+      ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
 
   let blockchain_proof_system_id =
     [%expr
