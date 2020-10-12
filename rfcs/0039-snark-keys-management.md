@@ -118,6 +118,10 @@ Suggested optional arguments are:
     some files are missing but their headers could not be inferred because they
     depend on other files.
 
+This tool should be implemented as a library at the level of the current
+`Snark_keys` library, so that we can also create a standalone executable for
+easier use by the infrastructure team.
+
 Most of this is calling existing functions; the only particular difficulty is
 modifying `Pickles` and `Cache_dir` to allow finer-grained control of cache
 locations for keys.
