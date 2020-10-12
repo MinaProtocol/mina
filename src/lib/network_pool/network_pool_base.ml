@@ -16,6 +16,44 @@ end)
    and type transition_frontier_diff := Resource_pool.transition_frontier_diff
    and type config := Resource_pool.Config.t
    and type rejected_diff := Resource_pool.Diff.rejected = struct
+  module Broadcast_callback = struct
+    type t =
+      | Local of
+          (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
+           -> unit)
+      | External of (Coda_net2.validation_result -> unit)
+
+    let error err =
+      Fn.compose Deferred.return (function
+        | Local f ->
+            f (Error err)
+        | External f ->
+            f `Reject )
+
+    let drop accepted rejected =
+      Fn.compose Deferred.return (function
+        | Local f ->
+            f (Ok (accepted, rejected))
+        | External f ->
+            f `Ignore )
+
+    let forward broadcast_pipe accepted rejected = function
+      | Local f ->
+          f (Ok (accepted, rejected)) ;
+          Linear_pipe.write broadcast_pipe accepted
+      | External f ->
+          f `Accept ;
+          Deferred.unit
+
+    let replace broadcast_pipe accepted rejected = function
+      | Local f ->
+          f (Ok (accepted, rejected)) ;
+          Linear_pipe.write broadcast_pipe accepted
+      | External f ->
+          f `Ignore ;
+          Linear_pipe.write broadcast_pipe accepted
+  end
+
   type t =
     { resource_pool: Resource_pool.t
     ; logger: Logger.t
@@ -28,34 +66,52 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t
-      ( (pool_diff : Resource_pool.Diff.verified Envelope.Incoming.t)
-      , valid_cb
-      , result_cb ) =
+      (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
+    let open Envelope.Incoming in
     let rebroadcast (diff', rejected) =
-      result_cb (Ok (diff', rejected)) ;
+      let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
         [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
-        valid_cb false ;
-        Deferred.unit )
+        drop diff' rejected cb )
+      else if
+        Resource_pool.Diff.verified_size diff.data
+        = Resource_pool.Diff.size diff'
+      then (
+        [%log' trace t.logger] "Rebroadcasting diff" ;
+        forward t.write_broadcasts diff' rejected cb )
       else (
         [%log' trace t.logger] "Broadcasting %s"
           (Resource_pool.Diff.summary diff') ;
-        valid_cb true ;
-        Linear_pipe.write t.write_broadcasts diff' )
+        replace t.write_broadcasts diff' rejected cb )
     in
-    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
     | Ok res ->
         rebroadcast res
     | Error (`Locally_generated res) ->
         rebroadcast res
     | Error (`Other e) ->
-        valid_cb false ;
-        result_cb (Error e) ;
         [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: %s"
           (Error.to_string_hum e) ;
-        Deferred.unit
+        Broadcast_callback.error e cb
+
+  let process_incoming_resource_pool_diff t diff cb =
+    match%bind Resource_pool.Diff.verify t.resource_pool diff with
+    | Error err ->
+        [%log' info t.logger] "Refusing to rebroadcast. Verification error: %s"
+          (Error.to_string_hum err) ;
+        Broadcast_callback.error err cb
+    | Ok verified_diff ->
+        [%log' debug t.logger] "Verified diff: $verified_diff"
+          ~metadata:
+            [ ( "verified_diff"
+              , Resource_pool.Diff.verified_to_yojson
+                @@ Envelope.Incoming.data verified_diff )
+            ; ( "sender"
+              , Envelope.Sender.to_yojson
+                @@ Envelope.Incoming.sender verified_diff ) ] ;
+        apply_and_broadcast t verified_diff cb
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
       ~incoming_diffs ~local_diffs ~tf_diffs =
@@ -67,37 +123,22 @@ end)
       ; write_broadcasts
       ; constraint_constants }
     in
-    let filter_verified pipe ~f =
-      let r, w =
-        Strict_pipe.create ~name:"verified network pool diffs"
-          (Buffered (`Capacity 1024, `Overflow Drop_head))
-      in
-      Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun (d, cb) ->
-          let env = f d in
-          don't_wait_for
-            ( match%map Resource_pool.Diff.verify resource_pool env with
-            | Some x ->
-                Strict_pipe.Writer.write w (x, cb)
-            | None ->
-                () ) )
-      |> don't_wait_for ;
-      r
-    in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
-      ; Strict_pipe.Reader.map
-          (filter_verified local_diffs ~f:Envelope.Incoming.local)
-          ~f:(fun diff -> `Local diff)
-      ; Strict_pipe.Reader.map (filter_verified incoming_diffs ~f:Fn.id)
-          ~f:(fun diff -> `Incoming diff) ]
+      ; Strict_pipe.Reader.map local_diffs ~f:(fun (diff, cb) ->
+            `Local (Envelope.Incoming.local diff, cb) )
+      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun (diff, cb) ->
+            `Incoming (diff, cb) ) ]
       ~f:(fun diff_source ->
         match diff_source with
         | `Incoming (diff, cb) ->
-            apply_and_broadcast network_pool (diff, cb, Fn.const ())
-        | `Local (diff, result_cb) ->
-            apply_and_broadcast network_pool (diff, Fn.const (), result_cb)
+            process_incoming_resource_pool_diff network_pool diff
+              (Broadcast_callback.External cb)
+        | `Local (diff, cb) ->
+            process_incoming_resource_pool_diff network_pool diff
+              (Broadcast_callback.Local cb)
         | `Transition_frontier_extension diff ->
             Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;
