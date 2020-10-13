@@ -42,9 +42,9 @@ done
 rm -f $CONTAINER_FILE
 
 if [ $RESULT = 0 ]; then
-    echo Succeeded
+    echo SUCCEEDED
 else
-    echo Failed
+    echo FAILED
 fi
 
 exit $RESULT
