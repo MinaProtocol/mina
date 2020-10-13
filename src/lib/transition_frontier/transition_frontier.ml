@@ -288,6 +288,7 @@ let add_breadcrumb_exn t breadcrumb =
     (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
+    (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~ignore_consensus_local_state:false
   in
@@ -315,12 +316,76 @@ let add_breadcrumb_exn t breadcrumb =
           , `List
               (List.map user_cmds
                  ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
-  let lite_diffs =
-    List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
+  let lite_diffs, root_transitions =
+    List.partition_map diffs
+      ~f:
+        Diff.(
+          fun (Full.E.E diff) ->
+            match to_lite diff with
+            | Root_transitioned r ->
+                `Snd r
+            | diff ->
+                `Fst (Lite.E.E diff))
+  in
+  (* Eagerly perform root transitions so that root de-sync only occurs if daemon
+      terminates between the call to [Full_frontier.apply_diffs] and here. *)
+  let garbage =
+    let db = t.persistent_frontier_instance.db in
+    let n = List.length root_transitions in
+    [%log' debug t.logger] "applying $n root transitions"
+      ~metadata:[("n", `Int n)] ;
+    let start = Time.now () in
+    let res, garbage =
+      with_return (fun {return} ->
+          let err ?(acc_garbage = []) = function
+            | Error e ->
+                return (Error e, acc_garbage)
+            | Ok x ->
+                x
+          in
+          let init = err (Persistent_frontier.Database.get_frontier_hash db) in
+          let res, garbage =
+            List.fold root_transitions ~init:(init, [])
+              ~f:(fun (acc, acc_garbage) ({new_root; garbage} as r) ->
+                match garbage with
+                | Full _ ->
+                    failwith "impossible"
+                | Lite garbage ->
+                    let old_root_hash =
+                      (* TODO: Maybe we should just keep going instead of returning early? *)
+                      err ~acc_garbage
+                        (Persistent_frontier.Database.move_root ~new_root
+                           ~garbage db)
+                    in
+                    ( Frontier_hash.merge_diff acc (Root_transitioned r)
+                        old_root_hash
+                    , old_root_hash :: List.rev_append garbage acc_garbage ) )
+          in
+          (Ok res, garbage) )
+    in
+    ( match res with
+    | Ok r ->
+        [%log' debug t.logger]
+          "successfully applied $n root transitions in $time ms"
+          ~metadata:
+            [ ("n", `Int n)
+            ; ("time", `Float Time.(Span.to_ms (diff (now ()) start))) ] ;
+        Persistent_frontier.Database.set_frontier_hash db r
+    | Error e ->
+        let e =
+          [%sexp_of:
+            [ `Not_found of
+              [`Frontier_hash | `New_root_transition | `Old_root_transition] ]]
+            e
+        in
+        [%log' warn t.logger] "applying root transition failed with $error"
+          ~metadata:[("error", `String (Sexp.to_string_hum e))] ) ;
+    garbage
   in
   let%bind sync_result =
+    (* Diffs get put into a buffer here. They're processed asynchronously *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
-      ~diffs:lite_diffs
+      ~garbage ~diffs:lite_diffs
       ~hash_transition:
         {source= old_hash; target= Full_frontier.hash t.full_frontier}
   in
