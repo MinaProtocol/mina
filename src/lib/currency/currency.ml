@@ -57,6 +57,9 @@ end = struct
 
   type t = Unsigned.t [@@deriving sexp, compare, hash]
 
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
@@ -134,8 +137,9 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+  module B = Bits.Vector.Make (Vector)
+
+  include (B : Bits_intf.Convertible_bits with type t := t)
 
   [%%ifdef
   consensus_mechanism]
@@ -190,7 +194,7 @@ end = struct
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
       {magnitude: 'magnitude; sgn: 'sgn}
-    [@@deriving sexp, hash, compare, yojson]
+    [@@deriving sexp, hash, compare, yojson, hlist]
 
     type t = (Unsigned.t, Sgn.t) Signed_poly.t
     [@@deriving sexp, hash, compare, eq, yojson]
@@ -207,7 +211,8 @@ end = struct
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-          create ~magnitude ~sgn )
+          if Unsigned.(equal zero magnitude) then zero
+          else create ~magnitude ~sgn )
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -232,7 +237,9 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
-    let negate t = {t with sgn= Sgn.negate t.sgn}
+    let negate t =
+      if Unsigned.(equal zero t.magnitude) then zero
+      else {t with sgn= Sgn.negate t.sgn}
 
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
@@ -243,17 +250,14 @@ end = struct
 
     type nonrec var = (var, Sgn.var) Signed_poly.t
 
-    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) typ =
-      Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
-
-    let to_hlist {magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
-
     let typ =
-      Typ.of_hlistable [typ; Sgn.typ] ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+      Typ.of_hlistable [typ; Sgn.typ] ~var_to_hlist:typ_to_hlist
+        ~var_of_hlist:typ_of_hlist ~value_to_hlist:typ_to_hlist
+        ~value_of_hlist:typ_of_hlist
 
     module Checked = struct
+      type t = var
+
       let to_bits {magnitude; sgn} =
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
@@ -292,6 +296,14 @@ end = struct
         {magnitude; sgn}
 
       let ( + ) = add
+
+      let equal (t1 : var) (t2 : var) =
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.equal t1 t2
+
+      let assert_equal (t1 : var) (t2 : var) =
+        let%bind t1 = to_field_var t1 and t2 = to_field_var t2 in
+        Field.Checked.Assert.equal t1 t2
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
@@ -335,6 +347,10 @@ end = struct
   consensus_mechanism]
 
   module Checked = struct
+    module N = Coda_numbers.Nat.Make_checked (Unsigned) (B)
+
+    type t = var
+
     let if_ = if_
 
     let if_value cond ~then_ ~else_ : var =
@@ -360,6 +376,24 @@ end = struct
       in
       (bits, `Underflow (Boolean.not no_underflow))
 
+    let assert_equal x y = Field.Checked.Assert.equal (pack_var x) (pack_var y)
+
+    let equal x y = Field.Checked.equal (pack_var x) (pack_var y)
+
+    let ( = ) = equal
+
+    let op f (x : var) (y : var) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits var_to_bits in
+      f (g x) (g y)
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
+
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Var.add (pack_var x) (pack_var y))
@@ -378,6 +412,14 @@ end = struct
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
+
+    let add_signed_flagged (t : var) (d : Signed.var) =
+      let%bind d = Signed.Checked.to_field_var d in
+      let%map bits, `Success no_overflow =
+        Field.Var.add (pack_var t) d
+        |> Field.Checked.unpack_flagged ~length:length_in_bits
+      in
+      (bits, `Overflow (Boolean.not no_overflow))
 
     let scale (f : Field.Var.t) (t : var) =
       let%bind x = Field.Checked.mul (pack_var t) f in
@@ -469,7 +511,7 @@ end = struct
           qc_test_fast generator ~shrinker ~f:(fun num ->
               match of_formatted_string (to_formatted_string num) with
               | after_format ->
-                  if after_format = num then ()
+                  if Unsigned.equal after_format num then ()
                   else
                     Error.(
                       raise
@@ -519,12 +561,14 @@ module Fee = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -559,12 +603,14 @@ module Amount = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
       [@@deriving sexp, compare, hash, eq, yojson]
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      to_yojson, of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end
@@ -600,17 +646,20 @@ module Balance = struct
       type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
 
       let to_latest = Fn.id
+
+      (* can't be automatically derived *)
+      let dhall_type = Ppx_dhall_type.Dhall_type.Text
     end
   end]
 
   [%%ifdef
   consensus_mechanism]
 
-  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
+  include (Amount : Basic with type t := t with type var = Amount.var)
 
   [%%else]
 
-  include (Amount : Basic with type t = Amount.t)
+  include (Amount : Basic with type t := t)
 
   [%%endif]
 
@@ -628,21 +677,23 @@ module Balance = struct
   consensus_mechanism]
 
   module Checked = struct
-    let add_signed_amount = Amount.Checked.add_signed
+    include Amount.Checked
 
-    let add_amount = Amount.Checked.add
+    let add_signed_amount = add_signed
 
-    let sub_amount = Amount.Checked.sub
+    let add_amount = add
 
-    let add_amount_flagged = Amount.Checked.add_flagged
+    let sub_amount = sub
 
-    let sub_amount_flagged = Amount.Checked.sub_flagged
+    let add_amount_flagged = add_flagged
+
+    let add_signed_amount_flagged = add_signed_flagged
+
+    let sub_amount_flagged = sub_flagged
 
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
-
-    let if_ = Amount.Checked.if_
   end
 
   [%%endif]
@@ -660,7 +711,8 @@ let%test_module "sub_flagged module" =
 
       type magnitude = t [@@deriving sexp, compare]
 
-      type var = field Snarky.Cvar.t Snarky.Boolean.t list
+      type var =
+        field Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t list
 
       val zero : t
 
@@ -683,7 +735,7 @@ let%test_module "sub_flagged module" =
       in
       let sub_flagged_checked =
         let f (x, y) =
-          Snarky.Checked.map (M.Checked.sub_flagged x y)
+          Snarky_backendless.Checked.map (M.Checked.sub_flagged x y)
             ~f:(fun (r, `Underflow u) -> (r, u))
         in
         Test_util.checked_to_unchecked (Typ.tuple2 typ typ)

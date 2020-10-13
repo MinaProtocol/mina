@@ -35,7 +35,7 @@ module Metadata = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Yojson.Safe.json String.Map.t
+      type t = Yojson.Safe.t String.Map.t
 
       let to_latest = Fn.id
 
@@ -67,8 +67,6 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
-  type t = Stable.Latest.t
-
   let mem = String.Map.mem
 
   let extend (t : t) alist =
@@ -86,46 +84,39 @@ module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t option
+    ; source: Source.t option [@default None]
     ; message: string
-    ; metadata: Metadata.t }
+    ; metadata: Metadata.t
+    ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
 
-  type without_source =
-    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
-  [@@deriving yojson]
+  let escape_chars = ['"'; '\\']
 
-  let escape_string str =
-    String.to_list str
-    |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
-    |> String.of_char_list
+  let to_yojson =
+    let escape =
+      Staged.unstage
+      @@ String.Escaping.escape ~escapeworthy:escape_chars ~escape_char:'\\'
+    in
+    fun t -> to_yojson {t with message= escape t.message}
 
-  let of_yojson json =
-    match without_source_of_yojson json with
-    | Ok {timestamp; level; message; metadata} ->
-        Ok {timestamp; level; message; metadata; source= None}
-    | Error _ ->
-        of_yojson json
-
-  let to_yojson ({timestamp; level; source; message; metadata} as m) =
-    match source with
-    | Some _ ->
-        to_yojson {m with message= escape_string m.message}
-    | None ->
-        without_source_to_yojson {timestamp; level; message; metadata}
-
-  let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
-
-  let metadata_references str =
-    match Re2.find_all ~sub:(`Index 1) metadata_interpolation_regex str with
-    | Ok ls ->
-        ls
-    | Error _ ->
-        []
+  let of_yojson =
+    let unescape =
+      Staged.unstage @@ String.Escaping.unescape ~escape_char:'\\'
+    in
+    fun json ->
+      Result.map (of_yojson json) ~f:(fun t ->
+          {t with message= unescape t.message} )
 
   let check_invariants (t : t) =
-    let refs = metadata_references t.message in
-    List.for_all refs ~f:(Metadata.mem t.metadata)
+    match Logproc_lib.Interpolator.parse t.message with
+    | Error _ ->
+        false
+    | Ok items ->
+        List.for_all items ~f:(function
+          | `Interpolate item ->
+              Metadata.mem t.metadata item
+          | `Raw _ ->
+              true )
 end
 
 module Processor = struct
@@ -318,8 +309,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
-
 let metadata t = t.metadata
 
 let create ?(metadata = []) ?(id = "default") () =
@@ -333,23 +322,32 @@ let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
 
 let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
-let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
+let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
+    =
   { Message.timestamp= Time.now ()
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+  ; event_id }
 
 let raw ({id; _} as t) msg =
   if t.null then ()
   else if Message.check_invariants msg then
     Consumer_registry.broadcast_log_message ~id msg
-  else failwith "invalid log call"
+  else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
 
-let log t ~level ~module_ ~location ?(metadata = []) fmt =
+let add_tags_to_metadata metadata tags =
+  Option.value_map tags ~default:metadata ~f:(fun tags ->
+      let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
+      tags_item :: metadata )
+
+let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
+  let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t @@ make_message t ~level ~module_ ~location ~metadata ~message
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
   in
   ksprintf f fmt
 
@@ -357,7 +355,9 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
-  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ?tags:Tags.t list
+  -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
 
@@ -375,7 +375,41 @@ let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
 
-let spam = log ~level:Spam ~module_:"" ~location:""
+let spam = log ~level:Spam ~module_:"" ~location:"" ?event_id:None
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment
+
+module Structured = struct
+  type log_function =
+       t
+    -> module_:string
+    -> location:string
+    -> ?tags:Tags.t list
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
+
+  let log t ~level ~module_ ~location ?tags ?(metadata = []) event =
+    let message, event_id, str_metadata = Structured_log_events.log event in
+    let event_id = Some event_id in
+    let metadata = add_tags_to_metadata (str_metadata @ metadata) tags in
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+
+  let trace = log ~level:Trace
+
+  let debug = log ~level:Debug
+
+  let info = log ~level:Info
+
+  let warn = log ~level:Warn
+
+  let error = log ~level:Error
+
+  let fatal = log ~level:Fatal
+
+  let faulty_peer_without_punishment = log ~level:Faulty_peer
+end
+
+module Str = Structured

@@ -1,0 +1,239 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "CLI Reference" });
+
+# CLI Reference
+
+The Mina CLI (command-line interface) is the primary way for users to interact with the Mina network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
+
+The CLI is installed when you [install mina](/docs/getting-started#installation).
+
+<Alert kind="warning">
+
+
+Mina APIs are still under construction, so these commands will likely change. See `mina help` for the most up-to-date version.
+
+</Alert>
+
+
+### Mina Accounts
+
+```
+$ mina accounts help
+
+Client commands concerning account management
+
+  mina accounts SUBCOMMAND
+
+=== subcommands ===
+
+  list    List all owned accounts
+  create  Create new account
+  import  Import a password protected private key to be tracked by the daemon.
+          Set MINA_PRIVKEY_PASS environment variable to use non-interactively
+          (key will be imported using the same password).
+  export  Export a tracked account so that it can be saved or transferred
+          between machines.
+          Set MINA_PRIVKEY_PASS environment variable to use non-interactively
+          (key will be exported using the same password).
+  unlock  Unlock a tracked account
+  lock    Lock a tracked account
+  help    explain a given subcommand (perhaps recursively)
+```
+
+### Mina Client
+
+```
+$ mina client help
+
+Lightweight client commands
+
+  mina client SUBCOMMAND
+
+=== subcommands ===
+
+  get-balance         Get balance associated with a public key
+  send-payment        Send payment to an address
+  delegate-stake      Delegate your stake to another public key
+  cancel-transaction  Cancel a transaction -- this submits a replacement
+                      transaction with a fee larger than the cancelled
+                      transaction.
+  set-staking         Start producing blocks
+  set-snark-worker    Set key you wish to snark work with or disable snark
+                      working
+  set-snark-work-fee  Set fee reward for doing transaction snark work
+  stop-daemon         Stop the daemon
+  status              Get running daemon status
+  help                explain a given subcommand (perhaps recursively)
+```
+
+### Mina Daemon
+
+```
+$ mina daemon -help
+
+Mina daemon
+
+  mina.exe daemon
+
+=== flags ===
+
+  [-archive-address HOST:PORT/LOCALHOST-PORT]  Daemon to archive process
+                                               communication. If HOST is
+                                               omitted, then localhost is
+                                               assumed to be HOST. (examples:
+                                               3086, 154.97.53.97:3086)
+  [-archive-rocksdb]                           Stores all the blocks heard in
+                                               RocksDB
+  [-background]                                Run process on the background
+  [-bind-ip IP]                                IP of network interface to use
+                                               for peer connections
+  [-block-producer-key KEYFILE]                Private key file for the block
+                                               producer. You cannot provide both
+                                               `block-producer-key` and
+                                               `block-producer-pubkey`.
+                                               (default: don't produce blocks)
+  [-block-producer-password PASSWORD]          Password associated with the
+                                               block-producer key. Setting this
+                                               is equivalent to setting the
+                                               MINA_PRIVKEY_PASS environment
+                                               variable. Be careful when setting
+                                               it in the commandline as it will
+                                               likely get tracked in your
+                                               history. Mainly to be used from
+                                               the daemon.json config file
+  [-block-producer-pubkey PUBLICKEY]           Public key for the associated
+                                               private key that is being tracked
+                                               by this daemon. You cannot
+                                               provide both `block-producer-key`
+                                               and `block-producer-pubkey`.
+                                               (default: don't produce blocks)
+  [-client-port PORT]                          local RPC-server for clients to
+                                               interact with the daemon
+                                               (default: 8301)
+  [-coinbase-receiver PUBLICKEY]               Address to send coinbase rewards
+                                               to (if this node is producing
+                                               blocks). If not provided,
+                                               coinbase rewards will be sent to
+                                               the producer of a block.
+  [-config-directory DIR]                      Configuration directory
+  [-current-fork-id HEX-STRING]                (5 characters) Current fork ID
+                                               for this node, only blocks with
+                                               the same ID accepted
+  [-demo-mode]                                 Run the daemon in demo-mode --
+                                               assume we're "synced" to the
+                                               network instantly
+  [-discovery-keypair KEYFILE]                 Keypair (generated from `mina
+                                               advanced
+                                               generate-libp2p-keypair`) to use
+                                               with libp2p discovery (default:
+                                               generate per-run temporary
+                                               keypair)
+  [-external-ip IP]                            External IP address for other
+                                               nodes to connect to. You only
+                                               need to set this if
+                                               auto-discovery fails for some
+                                               reason.
+  [-external-port PORT]                        Port to use for all libp2p
+                                               communications (gossip and RPC)
+                                               (default: 8302)
+  [-genesis-ledger-dir DIR]                    Directory that contains the
+                                               genesis ledger and the genesis
+                                               blockchain proof (default:
+                                               <config-dir>/genesis-ledger)
+  [-insecure-rest-server]                      Have REST server listen on all
+                                               addresses, not just localhost
+                                               (this is INSECURE, make sure your
+                                               firewall is configured
+                                               correctly!)
+  [-log-block-creation true|false]             Log the steps involved in
+                                               including transactions and snark
+                                               work in a block (default: true)
+  [-log-json]                                  Print log output as JSON
+                                               (default: plain text)
+  [-log-level Set]                             log level (default: Info)
+  [-log-received-blocks true|false]            Log blocks received from peers
+                                               (default: false)
+  [-log-snark-work-gossip true|false]          Log snark-pool diff received from
+                                               peers (default: false)
+  [-log-txn-pool-gossip true|false]            Log transaction-pool diff
+                                               received from peers (default:
+                                               false)
+  [-metrics-port PORT]                         metrics server for scraping via
+                                               Prometheus (default no
+                                               metrics-server)
+  [-peer /ip4/IPADDR/tcp/PORT/p2p/PEERID]     initial "bootstrap" peers for
+                                               discovery
+  [-rest-port PORT]                            local REST-server for daemon
+                                               interaction (default: 3085)
+  [-run-snark-worker PUBLICKEY]                Run the SNARK worker with this
+                                               public key
+  [-seed]                                      Start the node as a seed node
+  [-snark-worker-fee FEE]                      Amount a worker wants to get
+                                               compensated for generating a
+                                               snark proof (default: 1000000000)
+  [-snark-worker-parallelism NUM]              Run the SNARK worker using this
+                                               many threads. Equivalent to
+                                               setting OMP_NUM_THREADS, but
+                                               doesn't affect block production.
+  [-tracing]                                   Trace into
+                                               $config-directory/$pid.trace
+  [-work-reassignment-wait WAIT-TIME]          in ms before a snark-work is
+                                               reassigned (default: 420000ms)
+  [-work-selection seq|rand]                   Choose work sequentially (seq) or
+                                               randomly (rand) (default: rand)
+  [-working-dir PATH]                          path to chdir into before
+                                               starting (useful for background
+                                               mode, defaults to cwd, or / if
+                                               -background)
+  [-help]                                      print this help text and exit
+                                               (alias: -?)
+
+
+```
+
+### Mina Advanced
+
+```
+$ mina advanced help
+
+Advanced client commands
+
+  mina advanced SUBCOMMAND
+
+=== subcommands ===
+
+  batch-send-payments        Send multiple payments from a file
+  client-trustlist           Client trustlist management
+  compile-time-constants     Print a JSON map of the compile-time consensus
+                             parameters
+  constraint-system-digests  Print MD5 digest of each SNARK constraint
+  dump-keypair               Print out a keypair from a private key file
+  dump-ledger                Print the ledger with given Merkle root
+  generate-keypair           Generate a new public-key/private-key pair
+  generate-libp2p-keypair    Generate a new libp2p keypair and print out the
+                             peer ID
+  generate-receipt           Generate a receipt for a sent payment
+  get-nonce                  Get the current nonce for an account
+  get-public-keys            Get public keys
+  get-trust-status           Get the trust status associated with an IP address
+  get-trust-status-all       Get trust statuses for all peers known to the trust
+                             system
+  pending-snark-work         List of snark works in JSON format that are not
+                             available in the pool yet
+  pooled-user-commands       Retrieve all the user commands that are pending
+                             inclusion
+  reset-trust-status         Reset the trust status associated with an IP
+                             address
+  snark-job-list             List of snark jobs in JSON format that are yet to
+                             be included in the blocks
+  snark-pool-list            List of snark works in the snark pool in JSON
+                             format
+  start-tracing              Start async tracing to $config-directory/$pid.trace
+  status-clear-hist          Clear histograms reported in status
+  stop-tracing               Stop async tracing
+  telemetry                  Get the trust status associated with an IP address
+  verify-receipt             Verify a receipt of a sent payment
+  visualization              Visualize data structures special to Mina
+  wrap-key                   Wrap a private key into a private key file
+  help                       explain a given subcommand (perhaps recursively)
+```

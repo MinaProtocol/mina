@@ -21,14 +21,14 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
+let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
                   External_transition.Almost_validated.t) ~sender =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~constraint_constants ~verifier
+        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -59,9 +59,9 @@ let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
-                  record trust_system logger inet_addr
+                  record trust_system logger peer
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
@@ -74,7 +74,7 @@ let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -92,8 +92,8 @@ let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
                   match staged_ledger_error with
                   | Invalid_proofs _ ->
                       make_actions Sent_invalid_proof
-                  | Pre_diff (Bad_signature _) ->
-                      make_actions Sent_invalid_signature
+                  | Pre_diff (Verification_failed _) ->
+                      make_actions Sent_invalid_signature_or_proof
                   | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
                       make_actions Gossiped_invalid_transition
                   | Unexpected _ ->
@@ -101,7 +101,7 @@ let build ~logger ~verifier ~constraint_constants ~trust_system ~parent
                         "build: Unexpected staged ledger error should have \
                          been caught in another pattern"
                 in
-                Trust_system.record trust_system logger inet_addr action
+                Trust_system.record trust_system logger peer action
           in
           Error
             (`Invalid_staged_ledger_diff
@@ -124,7 +124,7 @@ let blockchain_length = lift External_transition.Validated.blockchain_length
 
 let block_producer = lift External_transition.Validated.block_producer
 
-let user_commands = lift External_transition.Validated.user_commands
+let commands = lift External_transition.Validated.commands
 
 let payments = lift External_transition.Validated.payments
 
@@ -162,10 +162,16 @@ let display t =
   ; parent }
 
 let all_user_commands breadcrumbs =
-  Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+  Sequence.fold (Sequence.of_list breadcrumbs) ~init:Signed_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      let user_commands = user_commands breadcrumb in
-      Set.union acc_set (User_command.Set.of_list user_commands) )
+      breadcrumb |> commands
+      |> List.filter_map ~f:(fun {data; _} ->
+             match data with
+             | Snapp_command _ ->
+                 None
+             | Signed_command c ->
+                 Some (Signed_command.forget_check c) )
+      |> Signed_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
   open Currency
@@ -175,7 +181,7 @@ module For_tests = struct
      each user send a payment of one coin to another random
      user if they have at least one coin*)
   let gen_payments staged_ledger accounts_with_secret_keys :
-      User_command.With_valid_signature.t Sequence.t =
+      Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.identifier account )
@@ -209,11 +215,10 @@ module For_tests = struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
-        let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~fee_payer_pk:sender_pk ~nonce
-            ~valid_until:Coda_numbers.Global_slot.max_value
-            ~memo:User_command_memo.dummy
+        let payload : Signed_command.Payload.t =
+          Signed_command.Payload.create ~fee:Fee.zero
+            ~fee_token:Token_id.default ~fee_payer_pk:sender_pk ~nonce
+            ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
                  { source_pk= sender_pk
@@ -221,9 +226,10 @@ module For_tests = struct
                  ; token_id= token
                  ; amount= send_amount })
         in
-        User_command.sign sender_keypair payload )
+        Signed_command.sign sender_keypair payload )
 
-  let gen ?(logger = Logger.null ()) ~proof_level ~precomputed_values ?verifier
+  let gen ?(logger = Logger.null ())
+      ~(precomputed_values : Precomputed_values.t) ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -233,7 +239,8 @@ module For_tests = struct
           verifier
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~proof_level ~conf_dir:None
+              Verifier.create ~logger
+                ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
@@ -248,6 +255,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
+        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
@@ -264,28 +272,40 @@ module For_tests = struct
             ; proofs=
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy
-                )
+                      ~sok_digest:Sok_message.Digest.default
+                      ~proof:Proof.transaction_dummy )
             ; prover }
+      in
+      let current_state_view, state_and_body_hash =
+        let prev_state =
+          validated_transition parent_breadcrumb
+          |> External_transition.Validated.protocol_state
+        in
+        let current_state_view =
+          Protocol_state.body prev_state |> Protocol_state.Body.view
+        in
+        let body_hash =
+          Protocol_state.body prev_state |> Protocol_state.Body.hash
+        in
+        ( current_state_view
+        , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
+          ~current_state_view ~supercharge_coinbase:true
           ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
+               , `Pending_coinbase_update _ ) =
         match%bind
-          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~state_body_hash:
-              ( validated_transition parent_breadcrumb
-              |> External_transition.Validated.protocol_state
-              |> Protocol_state.body |> Protocol_state.Body.hash )
+            ~current_state_view ~state_and_body_hash
         with
         | Ok r ->
             return r
@@ -306,10 +326,18 @@ module For_tests = struct
             Ledger_proof.statement proof |> Ledger_proof.statement_target )
           ~default:previous_ledger_hash
       in
+      let snarked_next_available_token =
+        match ledger_proof_opt with
+        | Some (proof, _) ->
+            (Ledger_proof.statement proof).next_available_token_after
+        | None ->
+            previous_protocol_state |> Protocol_state.blockchain_state
+            |> Blockchain_state.snarked_next_available_token
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~snarked_ledger_hash:next_ledger_hash
+          ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
           ~staged_ledger_hash:next_staged_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
@@ -331,7 +359,7 @@ module For_tests = struct
       Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
-          ~protocol_state_proof:Proof.dummy
+          ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
@@ -342,16 +370,15 @@ module For_tests = struct
         External_transition.Validated.create_unsafe next_external_transition
       in
       match%map
-        build ~logger
-          ~constraint_constants:precomputed_values.constraint_constants
-          ~trust_system ~verifier ~parent:parent_breadcrumb
+        build ~logger ~precomputed_values ~trust_system ~verifier
+          ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
           ~sender:None
       with
       | Ok new_breadcrumb ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             ~metadata:
               [ ( "state_hash"
                 , state_hash new_breadcrumb |> State_hash.to_yojson ) ]
@@ -364,21 +391,21 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~proof_level ~precomputed_values ?verifier
-      ?trust_system ~accounts_with_secret_keys =
+  let gen_non_deferred ?logger ~precomputed_values ?verifier ?trust_system
+      ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ~proof_level ~precomputed_values ?trust_system
+      gen ?logger ?verifier ~precomputed_values ?trust_system
         ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
+  let gen_seq ?logger ~precomputed_values ?verifier ?trust_system
       ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~proof_level ~precomputed_values ?verifier ?trust_system
+        (gen ?logger ~precomputed_values ?verifier ?trust_system
            ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in

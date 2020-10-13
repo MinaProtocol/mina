@@ -9,5 +9,5 @@
    prover transaction_snark_scan_state transition_frontier
    network_pool unix_timestamp otp_lib transition_chain_prover)
  (preprocess
-  (pps ppx_version ppx_jane bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_jane ppx_register_event bisect_ppx -- --conditional))
  (synopsis "Coda block producer"))

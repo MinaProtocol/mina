@@ -1,0 +1,22 @@
+(library
+  (inline_tests)
+  (name zexe_backend_common)
+  (public_name zexe_backend.common)
+  (flags -warn-error -27)
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std bisect_ppx -- --conditional))
+  (libraries
+    hex
+    digestif
+    pickles_types
+    snarky_bn382
+    key_cache
+    sgn_type
+    snarky.backendless
+    sponge
+    snarkette
+    core ))
+
+(rule
+ (targets version.ml)
+ (deps (:< gen_version.sh) (source_tree src/lib/marlin))
+ (action (run %{<} %{targets})))

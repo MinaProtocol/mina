@@ -65,5 +65,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   let ban_notification_reader (Any ((module M), t)) =
     M.ban_notification_reader t
 
-  let net2 (Any ((module M), t)) = M.net2 t
+  let connection_gating (Any ((module M), t)) = M.connection_gating t
+
+  let set_connection_gating (Any ((module M), t)) config =
+    M.set_connection_gating t config
 end

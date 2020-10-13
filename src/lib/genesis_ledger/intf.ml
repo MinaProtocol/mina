@@ -1,11 +1,32 @@
 open Coda_base
 open Signature_lib
+open Core_kernel
+
+module Timing = struct
+  type t = (int, int, int) Account_timing.Poly.t
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    if%bind Quickcheck.Generator.bool then return Account_timing.Poly.Untimed
+    else
+      let%bind initial_minimum_balance =
+        Quickcheck.Generator.small_non_negative_int
+      in
+      let%bind cliff_time = Quickcheck.Generator.small_non_negative_int in
+      let%bind vesting_increment =
+        Quickcheck.Generator.small_non_negative_int
+      in
+      let%map vesting_period = Quickcheck.Generator.small_positive_int in
+      Account_timing.Poly.Timed
+        {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
+end
 
 module Public_accounts = struct
   type account_data =
     { pk: Public_key.Compressed.t
     ; balance: int
-    ; delegate: Public_key.Compressed.t option }
+    ; delegate: Public_key.Compressed.t option
+    ; timing: Timing.t }
 
   module type S = sig
     val name : string
@@ -16,7 +37,10 @@ end
 
 module Private_accounts = struct
   type account_data =
-    {pk: Public_key.Compressed.t; sk: Private_key.t; balance: int}
+    { pk: Public_key.Compressed.t
+    ; sk: Private_key.t
+    ; balance: int
+    ; timing: Timing.t }
 
   module type S = sig
     val name : string
@@ -62,10 +86,22 @@ module type S = sig
   val find_new_account_record_exn :
     Public_key.t list -> Private_key.t option * Account.t
 
+  val find_new_account_record_exn_ :
+    Public_key.Compressed.t list -> Private_key.t option * Account.t
+
   val largest_account_exn : unit -> Private_key.t option * Account.t
+
+  val largest_account_id_exn : unit -> Account_id.t
+
+  val largest_account_pk_exn : unit -> Public_key.Compressed.t
 
   val largest_account_keypair_exn : unit -> Keypair.t
 
   val keypair_of_account_record_exn :
     Private_key.t option * Account.t -> Keypair.t
+
+  val id_of_account_record : Private_key.t option * Account.t -> Account_id.t
+
+  val pk_of_account_record :
+    Private_key.t option * Account.t -> Public_key.Compressed.t
 end

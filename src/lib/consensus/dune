@@ -1,33 +1,48 @@
 (library
-  (name consensus)
-  (public_name consensus)
-  (inline_tests)
-  (modules (:standard \ proof_of_stake_fuzzer))
-  (flags (-w -37))
-  (library_flags (-linkall))
-  (libraries
-    snarky_taylor
-    core_kernel
-    coda_base
-    block_time
-    with_hash
-    test_genesis_ledger
-    snark_params
-    perf_histograms
-    rc_pool
-    test_util
-    vrf_lib
-    unix_timestamp
-    global_signer_private_key
-    non_zero_curve_point
-    module_version
-    yojson
-    staged_ledger_hash
-    coda_metrics
-    graphql_lib)
-   (preprocessor_deps "../../config.mlh")
-   (preprocess (pps ppx_base ppx_coda ppx_version ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
-   (synopsis "Consensus mechanisms"))
+ (name consensus)
+ (public_name consensus)
+ (inline_tests)
+ (modules (:standard \ proof_of_stake_fuzzer))
+ (flags (-w -37))
+ (library_flags (-linkall))
+ (libraries
+   snarky_taylor
+   core_kernel
+   coda_base
+   block_time
+   with_hash
+   test_genesis_ledger
+   snark_params
+   perf_histograms
+   rc_pool
+   test_util
+   vrf_lib
+   unix_timestamp
+   global_signer_private_key
+   non_zero_curve_point
+   yojson
+   coda_metrics
+   graphql_lib)
+ (preprocessor_deps "../../config.mlh")
+ (preprocess
+  (pps
+   bisect_ppx --conditional
+   h_list.ppx
+   ppx_assert
+   ppx_base
+   ppx_bin_prot
+   ppx_coda
+   ppx_custom_printf
+   ppx_deriving.std
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_inline_test
+   ppx_let
+   ppx_optcomp
+   ppx_sexp_conv
+   ppx_snarky
+   ppx_version))
+  (synopsis "Consensus mechanisms"))
 
 (executable
   (name proof_of_stake_fuzzer)

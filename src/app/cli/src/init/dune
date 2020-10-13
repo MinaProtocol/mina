@@ -13,8 +13,8 @@
     snarky_log
     cli_lib
     coda_base coda_graphql coda_lib coda_state
-    consensus coda_transition coda_version lite_compat lite_lib
+    consensus coda_transition coda_version
     o1trace protocol_version telemetry transition_frontier web_client_pipe
     web_request graphql_lib genesis_ledger_helper)
   (preprocessor_deps ../../../../config.mlh)
-  (preprocess (pps graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+  (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson bisect_ppx -- --conditional)))

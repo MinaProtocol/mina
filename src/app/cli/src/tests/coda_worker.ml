@@ -29,7 +29,8 @@ module Input = struct
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool
     ; is_seed: bool
-    ; archive_process_location: Core.Host_and_port.t option }
+    ; archive_process_location: Core.Host_and_port.t option
+    ; runtime_config: Runtime_config.t }
   [@@deriving bin_io_unversioned]
 end
 
@@ -44,13 +45,11 @@ module Send_payment_input = struct
         * Public_key.Compressed.Stable.V1.t
         * Currency.Amount.Stable.V1.t
         * Currency.Fee.Stable.V1.t
-        * User_command_memo.Stable.V1.t
+        * Signed_command_memo.Stable.V1.t
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -73,12 +72,12 @@ module T = struct
     ; send_user_command:
         ( 'worker
         , Send_payment_input.t
-        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
+        , (Signed_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; process_user_command:
         ( 'worker
         , User_command_input.t
-        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
+        , (Signed_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; verified_transitions:
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
@@ -87,7 +86,7 @@ module T = struct
     ; get_all_user_commands:
         ( 'worker
         , Public_key.Compressed.t
-        , User_command.t list )
+        , Signed_command.t list )
         Rpc_parallel.Function.t
     ; get_all_transitions:
         ( 'worker
@@ -100,7 +99,7 @@ module T = struct
     ; new_user_command:
         ( 'worker
         , Public_key.Compressed.t
-        , User_command.t Pipe.Reader.t )
+        , Signed_command.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
@@ -146,16 +145,16 @@ module T = struct
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
            Send_payment_input.t
-        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
+        -> (Signed_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_process_user_command:
            User_command_input.t
-        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
+        -> (Signed_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
-        Public_key.Compressed.t -> User_command.t Pipe.Reader.t Deferred.t
+        Public_key.Compressed.t -> Signed_command.t Pipe.Reader.t Deferred.t
     ; coda_get_all_user_commands:
-        Public_key.Compressed.t -> User_command.t list Deferred.t
+        Public_key.Compressed.t -> Signed_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
@@ -322,7 +321,8 @@ module T = struct
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (User_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let process_user_command =
@@ -330,7 +330,8 @@ module T = struct
         ~bin_input:User_command_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
-            (User_command.Stable.Latest.t * Receipt.Chain_hash.Stable.Latest.t)
+            ( Signed_command.Stable.Latest.t
+            * Receipt.Chain_hash.Stable.Latest.t )
             Or_error.t] ()
 
     let verified_transitions =
@@ -354,12 +355,12 @@ module T = struct
     let new_user_command =
       C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:User_command.Stable.Latest.bin_t ()
+        ~bin_output:Signed_command.Stable.Latest.bin_t ()
 
     let get_all_user_commands =
       C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:[%bin_type_class: User_command.Stable.Latest.t list] ()
+        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t list] ()
 
     let dump_tf =
       C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t
@@ -423,6 +424,7 @@ module T = struct
         ; is_archive_rocksdb
         ; is_seed
         ; archive_process_location
+        ; runtime_config
         ; _ } =
       let logger =
         Logger.create
@@ -431,7 +433,12 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
-      let precomputed_values = Lazy.force Precomputed_values.compiled in
+      let%bind precomputed_values, _runtime_config =
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+          ~proof_level:None runtime_config
+        >>| Or_error.ok_exn
+      in
+      let constraint_constants = precomputed_values.constraint_constants in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
@@ -454,6 +461,7 @@ module T = struct
             Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
           let trace_database_initialization typ location =
+            (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
           in
@@ -509,8 +517,11 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
-              ; flood= false
+              ; isolate= false
               ; trust_system
+              ; flooding= false
+              ; direct_peers= []
+              ; peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =
@@ -521,6 +532,7 @@ module T = struct
             ; is_seed= List.is_empty peers
             ; genesis_ledger_hash=
                 Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+            ; constraint_constants
             ; log_gossip_heard=
                 { snark_pool_diff= true
                 ; transaction_pool_diff= true
@@ -537,8 +549,8 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~is_seed ~disable_telemetry:true ~coinbase_receiver:`Producer
-                 ~net_config ~gossip_net_params
+                 ~chain_id ~is_seed ~disable_telemetry:true
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:
@@ -565,7 +577,7 @@ module T = struct
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ~proof_level:Genesis_constants.Proof_level.compiled ())
+                 ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
@@ -575,14 +587,12 @@ module T = struct
               (fun () ->
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
-                Logger.info logger "Setting up snark worker "
-                  ~module_:__MODULE__ ~location:__LOC__ ;
+                [%log info] "Setting up snark worker " ;
                 Coda_run.setup_local_server coda ;
                 coda )
               ()
           in
-          Logger.info logger "Worker finish setting up coda"
-            ~module_:__MODULE__ ~location:__LOC__ ;
+          [%log info] "Worker finish setting up coda" ;
           let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
@@ -614,7 +624,7 @@ module T = struct
               let sender_pk = pk_of_sk sender_sk in
               User_command_input.create ~fee ~fee_token:Token_id.default
                 ~fee_payer_pk:sender_pk ~signer:sender_pk ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
+                ~valid_until:None
                 ~body:
                   (Payment
                      { source_pk= sender_pk
@@ -644,7 +654,7 @@ module T = struct
                 ~resulting_receipt
             with
             | Ok proof ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                [%log info]
                   !"Constructed proof for receipt: $receipt_chain_hash"
                   ~metadata:
                     [ ( "receipt_chain_hash"
@@ -686,7 +696,7 @@ module T = struct
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
                    Linear_pipe.write_without_pushback_if_open w
@@ -703,7 +713,7 @@ module T = struct
               (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
                  ~f:(fun diff ->
                    if Pipe.is_closed w then
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
                    Linear_pipe.write_if_open w diff )) ;
@@ -758,9 +768,14 @@ module T = struct
             Fn.compose Deferred.return
             @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
           in
-          let coda_get_all_user_commands =
-            Fn.compose Deferred.return
-            @@ Coda_commands.For_tests.get_all_user_commands coda
+          let coda_get_all_user_commands t =
+            Deferred.return
+              (List.filter_map
+                 (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
+                | Signed_command c ->
+                    Some c
+                | Snapp_command _ ->
+                    None ))
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions

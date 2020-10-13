@@ -2,8 +2,6 @@ open Core
 open Async
 open Signature_lib
 open Coda_base
-open Coda_transition
-open Coda_state
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -18,54 +16,6 @@ let snark_pool_list t =
   Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
-
-let get_lite_chain :
-    (Coda_lib.t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
-    option =
-  Option.map Consensus.Data.Consensus_state.to_lite
-    ~f:(fun consensus_state_to_lite t pks ->
-      let ledger = Coda_lib.best_ledger t |> Participating_state.active_exn in
-      let transition =
-        Transition_frontier.Breadcrumb.validated_transition
-          (Coda_lib.best_tip t |> Participating_state.active_exn)
-      in
-      let state = External_transition.Validated.protocol_state transition in
-      let proof =
-        External_transition.Validated.protocol_state_proof transition
-      in
-      let ledger =
-        List.fold pks
-          ~f:(fun acc key ->
-            let aid = Account_id.create key Token_id.default in
-            let loc =
-              Option.value_exn (Ledger.location_of_account ledger aid)
-            in
-            Lite_lib.Sparse_ledger.add_path acc
-              (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
-              (Lite_compat.public_key key)
-              (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
-            )
-          ~init:
-            (Lite_lib.Sparse_ledger.of_hash ~depth:(Ledger.depth ledger)
-               (Lite_compat.digest
-                  ( Ledger.merkle_root ledger
-                    :> Snark_params.Tick.Pedersen.Digest.t )))
-      in
-      let protocol_state : Lite_base.Protocol_state.t =
-        { previous_state_hash=
-            Lite_compat.digest
-              ( Protocol_state.previous_state_hash state
-                :> Snark_params.Tick.Pedersen.Digest.t )
-        ; body=
-            { blockchain_state=
-                Lite_compat.blockchain_state
-                  (Protocol_state.blockchain_state state)
-            ; consensus_state=
-                consensus_state_to_lite (Protocol_state.consensus_state state)
-            } }
-      in
-      let proof = Lite_compat.proof proof in
-      {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
 (* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
@@ -94,13 +44,13 @@ let get_current_protocol_version ~compile_time_current_protocol_version
     try
       (* not provided on command line, try to read from config dir *)
       let protocol_version = read_protocol_version () in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      [%log info]
         "Setting current protocol version to $protocol_version from config"
         ~metadata:[("protocol_version", `String protocol_version)] ;
       Protocol_version.of_string_exn protocol_version
     with Sys_error _ ->
       (* not on command-line, not in config dir, use compile-time value *)
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      [%log info]
         "Setting current protocol version to $protocol_version from \
          compile-time config"
         ~metadata:
@@ -111,13 +61,13 @@ let get_current_protocol_version ~compile_time_current_protocol_version
       (* it's an error if the command line value disagrees with the value in the config *)
       let config_protocol_version = read_protocol_version () in
       if String.equal config_protocol_version protocol_version then (
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        [%log info]
           "Using current protocol version $protocol_version from command \
            line, which matches the one in the config"
           ~metadata:[("protocol_version", `String protocol_version)] ;
         Protocol_version.of_string_exn config_protocol_version )
       else (
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        [%log fatal]
           "Current protocol version $protocol_version from the command line \
            disagrees with $config_protocol_version from the Coda config"
           ~metadata:
@@ -131,13 +81,12 @@ let get_current_protocol_version ~compile_time_current_protocol_version
       (* use value provided on command line, write to config dir *)
       match Protocol_version.of_string_opt protocol_version with
       | None ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            "Protocol version provided on command line is invalid"
+          [%log fatal] "Protocol version provided on command line is invalid"
             ~metadata:[("protocol_version", `String protocol_version)] ;
           failwith "Protocol version from command line is invalid"
       | Some pv ->
           write_protocol_version protocol_version ;
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "Using current protocol_version $protocol_version from command \
              line, writing to config"
             ~metadata:[("protocol_version", `String protocol_version)] ;
@@ -152,7 +101,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
     try
       (* not provided on command line, try to read from config dir *)
       let protocol_version = read_protocol_version () in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      [%log info]
         "Setting proposed protocol version to $protocol_version from config"
         ~metadata:[("protocol_version", `String protocol_version)] ;
       Some (Protocol_version.of_string_exn protocol_version)
@@ -163,7 +112,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
       let validate_cli_protocol_version protocol_version =
         if Option.is_none (Protocol_version.of_string_opt protocol_version)
         then (
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          [%log fatal]
             "Proposed protocol version provided on command line is invalid"
             ~metadata:[("proposed_protocol_version", `String protocol_version)] ;
           failwith "Proposed protocol version from command line is invalid" )
@@ -172,7 +121,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
         (* overwrite if the command line value disagrees with the value in the config *)
         let config_protocol_version = read_protocol_version () in
         if String.equal config_protocol_version protocol_version then (
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "Using proposed protocol version $protocol_version from command \
              line, which matches the one in the config"
             ~metadata:[("protocol_version", `String protocol_version)] ;
@@ -180,7 +129,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
         else (
           validate_cli_protocol_version protocol_version ;
           write_protocol_version protocol_version ;
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "Overwriting Coda config proposed protocol version \
              $config_proposed_protocol_version with proposed protocol version \
              $protocol_version from the command line"
@@ -193,7 +142,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
         (* use value provided on command line, write to config dir *)
         validate_cli_protocol_version protocol_version ;
         write_protocol_version protocol_version ;
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        [%log info]
           "Using proposed protocol version from command line, writing to config"
           ~metadata:[("protocol_version", `String protocol_version)] ;
         Some (Protocol_version.of_string_exn protocol_version) )
@@ -207,21 +156,21 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
   (* ledger visualization *)
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+  [%log debug] "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     (*Transition frontier visualization*)
     match Coda_lib.visualize_frontier ~filename:frontier_file t with
     | `Active () ->
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        [%log debug] "%s"
           (Visualization_message.success "transition frontier" frontier_file)
     | `Bootstrapping ->
-        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+        [%log debug] "%s"
           (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
@@ -250,8 +199,7 @@ let coda_status coda_ref =
 
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
-  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
-    "make_report: enter" ;
+  [%log' trace top_logger] "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
   let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
@@ -264,8 +212,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
   (* TEMP MAKE REPORT TRACE *)
-  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
-    "make_report: acquired and wrote status" ;
+  [%log' trace top_logger] "make_report: acquired and wrote status" ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
   let () =
@@ -312,8 +259,8 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then (
-    Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
-      "Error making the crash report. Exit code: %d" exit ;
+    [%log' fatal top_logger] "Error making the crash report. Exit code: %d"
+      exit ;
     None )
   else Some (report_file, temp_config)
 
@@ -451,27 +398,25 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
           Deferred.return
             (let open Option.Let_syntax in
-            let%bind snark_worker_key = Coda_lib.snark_worker_key coda in
+            let%bind key =
+              Option.merge
+                (Coda_lib.snark_worker_key coda)
+                (Coda_lib.snark_coordinator_key coda)
+                ~f:Fn.const
+            in
             let%map r = Coda_lib.request_work coda in
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "work_spec"
-                  , `String (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" r) )
-                ]
+            [%log trace]
+              ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
             Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, snark_worker_key)) )
+            (r, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Coda_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            "received completed work from a snark worker"
+          [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [ ( "work_spec"
-                , `String
-                    (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
-              ] ;
+              [("work_spec", Snark_worker.Work.Spec.to_yojson work.spec)] ;
           One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
@@ -494,7 +439,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~on_handler_error:
                 (`Call
                   (fun _net exn ->
-                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    [%log error]
                       "Exception while handling REST server request: $error"
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
@@ -513,8 +458,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 let lift x = `Response x in
                 match Uri.path uri with
                 | "/graphql" ->
-                    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                      "Received graphql request. Uri: $uri"
+                    [%log debug] "Received graphql request. Uri: $uri"
                       ~metadata:
                         [ ("uri", `String (Uri.to_string uri))
                         ; ("context", `String "rest_server") ] ;
@@ -527,10 +471,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     Server.respond_string ~status:`Not_found "Route not found"
                     >>| lift ))
           |> Deferred.map ~f:(fun _ ->
-                 Logger.info logger
+                 [%log info]
                    !"Created GraphQL server at: http://localhost:%i/graphql"
-                   rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
-  ) ;
+                   rest_server_port ) ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Coda_lib.client_port coda))
@@ -542,7 +485,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~on_handler_error:
                 (`Call
                   (fun _net exn ->
-                    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    [%log error]
                       "Exception while handling TCP server request: $error"
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
@@ -555,14 +498,26 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     (Set.exists !client_trustlist ~f:(fun cidr ->
                          Unix.Cidr.does_match cidr address ))
                 then (
-                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log error]
                     !"Rejecting client connection from $address, it is not \
                       present in the trustlist."
                     ~metadata:
                       [("$address", `String (Unix.Inet_addr.to_string address))] ;
                   Deferred.unit )
                 else
-                  Rpc.Connection.server_with_close reader writer
+                  Rpc.Connection.server_with_close
+                    ~handshake_timeout:
+                      (Time.Span.of_sec
+                         Coda_compile_config.rpc_handshake_timeout_sec)
+                    ~heartbeat_config:
+                      (Rpc.Connection.Heartbeat_config.create
+                         ~timeout:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_timeout_sec)
+                         ~send_every:
+                           (Time_ns.Span.of_sec
+                              Coda_compile_config.rpc_heartbeat_send_every_sec))
+                    reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
                          ~implementations:(client_impls @ snark_worker_impls)
@@ -571,8 +526,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          Logger.error logger ~module_:__MODULE__
-                            ~location:__LOC__
+                          [%log error]
                             "Exception while handling RPC server request from \
                              $address: $error"
                             ~metadata:
@@ -618,13 +572,12 @@ let no_report exn_str status =
 
 let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
-  Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", `String exn_str)] ;
   let%bind status = coda_status !coda_ref in
   (* TEMP MAKE REPORT TRACE *)
-  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
-    "handle_crash: acquired coda status" ;
+  [%log' trace top_logger] "handle_crash: acquired coda status" ;
   let%map action_string =
     match%map
       Block_time.Timeout.await
@@ -643,13 +596,11 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
         no_report exn_str status
     | `Ok (Error e) ->
-        Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
-          "Exception when generating crash report: $exn"
+        [%log' fatal top_logger] "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
         no_report exn_str status
     | `Timeout ->
-        Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
-          "Timed out while generated crash report" ;
+        [%log' fatal top_logger] "Timed out while generated crash report" ;
         no_report exn_str status
   in
   let message =
@@ -694,7 +645,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
           Logger.extend top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        [%log info]
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         (* causes async shutdown and at_exit handlers to run *)

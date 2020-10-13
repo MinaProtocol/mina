@@ -98,11 +98,11 @@ module Vrf_distribution = struct
                  with
                  | `Check_again _ ->
                      None
-                 | `Produce_now (_, proposal_data) ->
+                 | `Produce_now (_, proposal_data, _) ->
                      let slot_span = constants.block_window_duration_ms in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
-                 | `Produce (proposal_time, _, proposal_data) ->
+                 | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
                            of_span_since_epoch @@ Span.of_ms proposal_time)
@@ -181,7 +181,7 @@ module Vrf_distribution = struct
           Option.map (Hashtbl.find dist slot) ~f:Hashtbl.data
         with
         | None -> all_possible_chains (slot + 1) pred
-        | Some potential_succ_proposals -> 
+        | Some potential_succ_proposals ->
             List.bind potential_succs_proposals ~f:(fun (succ_proposer, succ_proposal) ->
               if Public_key.equal pred_proposer.keypair.public_key succ_proposer.keypair.public_key then
                 compute_branches succ
@@ -224,6 +224,56 @@ let run () =
   fuzz_vrf_round ~stakers ~base_chains:[genesis_chain]
 *)
 
+(* TODO: Should these be runtime configurable? *)
+
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+let precomputed_values = Lazy.force Precomputed_values.compiled
+
+module Genesis_ledger = Genesis_ledger.Make (struct
+  include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
+
+  let directory = `Ephemeral
+
+  let depth = constraint_constants.ledger_depth
+end)
+
+let genesis_protocol_state = precomputed_values.protocol_state_with_hash
+
+let create_genesis_data () =
+  let genesis_dummy_pk =
+    Account.public_key (snd (List.hd_exn (Lazy.force Genesis_ledger.accounts)))
+  in
+  let empty_diff =
+    { Staged_ledger_diff.diff=
+        ( { completed_works= []
+          ; user_commands= []
+          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+        , None )
+    ; creator= genesis_dummy_pk
+    ; coinbase_receiver= genesis_dummy_pk }
+  in
+  let genesis_transition =
+    External_transition.create
+      ~protocol_state:(With_hash.data genesis_protocol_state)
+      ~protocol_state_proof:precomputed_values.base_proof
+      ~staged_ledger_diff:empty_diff
+      ~delta_transition_chain_proof:
+        (Protocol_state.previous_state_hash genesis_protocol_state, [])
+      ~validation_callback:Fn.ignore ()
+  in
+  let scan_state = Staged_ledger.Scan_state.empty () in
+  let pending_coinbase_collection =
+    Pending_coinbase.create () |> Or_error.ok_exn
+  in
+  let genesis_ledger = Lazy.force Genesis_ledger.t in
+  let%map genesis_staged_ledger_res =
+    Staged_ledger.of_scan_state_and_ledger_unchecked ~ledger:genesis_ledger
+      ~scan_state ~pending_coinbase_collection
+      ~snarked_ledger_hash:(Ledger.merkle_root genesis_ledger)
+  in
+  (genesis_transition, Or_error.ok_exn genesis_staged_ledger_res)
+
 [%%if
 proof_level = "full"]
 
@@ -260,17 +310,13 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         ; proof= wrap next_state_top_hash prev_proof } )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res
 
 [%%elif
 proof_level = "check"]
-
-let genesis_protocol_state =
-  Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-    ~genesis_constants:Genesis_constants.compiled
 
 let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
@@ -294,10 +340,11 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
          (main @@ Tick.Field.Var.constant next_state_top_hash)
          prover_state)
       ~f:(fun () ->
-        {Blockchain.state= next_state; proof= Precomputed_values.base_proof} )
+        {Blockchain.state= next_state; proof= precomputed_values.genesis_proof}
+        )
   in
   Or_error.iter_error res ~f:(fun e ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      [%log error]
         ~metadata:[("error", `String (Error.to_string_hum e))]
         "Prover threw an error while extending block: $error" ) ;
   res
@@ -354,10 +401,10 @@ let propose_block_onto_chain ~logger ~keys
   let%map ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) =
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+      =
     let%map res =
-      Staged_ledger.apply_diff_unchecked previous_staged_ledger
+      Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
     in
     res
@@ -389,7 +436,7 @@ let propose_block_onto_chain ~logger ~keys
       ~transactions:
         ( Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands
             staged_ledger_diff
-          :> User_command.t list )
+          :> Signed_command.t list )
       ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
   in
   let snark_transition =
@@ -405,8 +452,7 @@ let propose_block_onto_chain ~logger ~keys
            ~f:(fun (proof, _) -> (Ledger_proof.statement proof).supply_increase)
            ledger_proof_opt)
       ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-      ~consensus_transition ~coinbase_receiver:proposer_pk ~coinbase_amount
-      ~pending_coinbase_action ()
+      ~consensus_transition ~pending_coinbase_update ()
   in
   let internal_transition =
     Internal_transition.create ~snark_transition
@@ -437,45 +483,6 @@ let propose_block_onto_chain ~logger ~keys
   in
   (external_transition, staged_ledger)
 
-let create_genesis_data () =
-  let genesis_dummy_pk =
-    Account.public_key
-      (snd (List.hd_exn (Lazy.force Test_genesis_ledger.accounts)))
-  in
-  let empty_diff =
-    { Staged_ledger_diff.diff=
-        ( { completed_works= []
-          ; user_commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-        , None )
-    ; creator= genesis_dummy_pk
-    ; coinbase_receiver= genesis_dummy_pk }
-  in
-  let genesis_protocol_state =
-    With_hash.data
-      (Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-         ~genesis_constants:Genesis_constants.compiled)
-  in
-  let genesis_transition =
-    External_transition.create ~protocol_state:genesis_protocol_state
-      ~protocol_state_proof:Precomputed_values.base_proof
-      ~staged_ledger_diff:empty_diff
-      ~delta_transition_chain_proof:
-        (Protocol_state.previous_state_hash genesis_protocol_state, [])
-      ~validation_callback:Fn.ignore ()
-  in
-  let scan_state = Staged_ledger.Scan_state.empty () in
-  let pending_coinbase_collection =
-    Pending_coinbase.create () |> Or_error.ok_exn
-  in
-  let genesis_ledger = Lazy.force Test_genesis_ledger.t in
-  let%map genesis_staged_ledger_res =
-    Staged_ledger.of_scan_state_and_ledger_unchecked ~ledger:genesis_ledger
-      ~scan_state ~pending_coinbase_collection
-      ~snarked_ledger_hash:(Ledger.merkle_root genesis_ledger)
-  in
-  (genesis_transition, Or_error.ok_exn genesis_staged_ledger_res)
-
 let main () =
   let logger = Logger.create ~id:"fuzz" () in
   let consensus_constants = Constants.compiled in
@@ -491,7 +498,7 @@ let main () =
      in
      let%bind keys = Keys_lib.Keys.create () in
      let stakers =
-       List.map (Lazy.force Test_genesis_ledger.accounts)
+       List.map (Lazy.force Genesis_ledger.accounts)
          ~f:(fun (sk_opt, _account) ->
            let sk = Option.value_exn sk_opt in
            let raw_keypair = Keypair.of_private_key_exn sk in
@@ -500,7 +507,7 @@ let main () =
            let local_state =
              Local_state.create
                (Public_key.Compressed.Set.of_list [compressed_pk])
-               ~genesis_ledger:Test_genesis_ledger.t
+               ~genesis_ledger:Genesis_ledger.t
            in
            Staker.{keypair; local_state} )
      in

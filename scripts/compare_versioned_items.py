@@ -55,7 +55,9 @@ def create_items_file (printer,ocaml,tag) :
     if os.path.exists(out_fn) :
         os.remove(out_fn)
     with open (out_fn, 'w') as fp :
-        subprocess.run([printer,ocaml,'-o','/dev/null'],stdout=fp)
+        retval = subprocess.run([printer,ocaml,'-o','/dev/null'],stdout=fp);
+        # script should fail if printer fails
+        retval.check_returncode ()
     return out_fn
 
 def run_comparison (printer,item_kind,original,modified) :

@@ -12,6 +12,8 @@ let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Coda_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
       in
       let net = Or_error.ok_exn net in
       let ips =
@@ -52,11 +54,25 @@ let local_configs ?block_production_interval
     ?(is_archive_rocksdb = Fn.const false)
     ?(archive_process_location = Fn.const None) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
-    ~max_concurrent_connections =
+    ~max_concurrent_connections ~runtime_config =
   let%map net_configs = net_configs n in
   let addrs_and_ports_list, peers = net_configs in
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
+  let offset =
+    let genesis_state_timestamp =
+      match
+        Option.bind runtime_config.Runtime_config.genesis
+          ~f:(fun {genesis_state_timestamp= ts; _} -> ts)
+      with
+      | Some timestamp ->
+          Genesis_constants.genesis_timestamp_of_string timestamp
+      | None ->
+          (Lazy.force Precomputed_values.compiled).consensus_constants
+            .genesis_state_timestamp |> Block_time.to_time
+    in
+    Core.Time.(diff (now ())) genesis_state_timestamp
+  in
   let configs =
     List.mapi args ~f:(fun i ((addrs_and_ports, libp2p_keypair), peers) ->
         let public_key =
@@ -74,18 +90,15 @@ let local_configs ?block_production_interval
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~archive_process_location:(archive_process_location i)
-          ~offset:
-            (offset
-               (Lazy.force Precomputed_values.compiled).consensus_constants)
-          ~max_concurrent_connections () )
+          ~offset ~max_concurrent_connections ~runtime_config () )
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 20000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 240000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in
-      List.length peers = List.length nodes - 1
+      List.length peers >= List.length nodes - 1
     in
     let rec go () =
       if%bind Deferred.List.for_all nodes ~f:check_ready then return ()
@@ -93,6 +106,7 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 20000.) nodes =
     in
     go ()
   in
+  let before_time = Time.now () in
   match%bind
     Deferred.any
       [ (after (Time.Span.of_ms timeout_ms) >>= fun () -> return `Timeout)
@@ -101,6 +115,13 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 20000.) nodes =
   | `Timeout ->
       failwith @@ sprintf "Nodes couldn't initialize within %f ms" timeout_ms
   | `Ready ->
+      let after_time = Time.now () in
+      [%log' info (Logger.create ())]
+        "Initialized nodes in $time_span_ms ms"
+        ~metadata:
+          [ ( "time_span_ms"
+            , `Float (Time.Span.to_ms (Time.abs_diff before_time after_time))
+            ) ] ;
       Deferred.List.iter nodes ~f:(fun node -> Coda_process.start_exn node)
 
 let spawn_local_processes_exn ?(first_delay = 0.0) configs =

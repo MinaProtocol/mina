@@ -7,148 +7,64 @@ open Parsetree
 open Longident
 open Core
 
-module Blockchain_snark_keys = struct
-  module Proving = struct
-    let key_location ~loc bc_location =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      estring
-        (Blockchain_snark.Blockchain_transition.Keys.Proving.Location.to_string
-           bc_location)
+let hashes ~loc =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let f (_, x) = estring (Core.Md5.to_hex x) in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let proof_level = Genesis_constants.Proof_level.compiled in
+  let ts =
+    Transaction_snark.constraint_system_digests ~constraint_constants ()
+  in
+  let bs =
+    Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+      ~proof_level ~constraint_constants ()
+  in
+  elist (List.map ts ~f @ List.map bs ~f)
 
-    let load_expr ~loc bc_location bc_checksum =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      [%expr
-        let open Async.Deferred in
-        Blockchain_snark.Blockchain_transition.Keys.Proving.load
-          (Blockchain_snark.Blockchain_transition.Keys.Proving.Location
-           .of_string
-             [%e key_location ~loc bc_location])
-        >>| fun (keys, checksum) ->
-        assert (
-          String.equal (Md5_lib.to_hex checksum)
-            [%e estring (Md5_lib.to_hex bc_checksum)] ) ;
-        keys]
-  end
+let from_disk_expr ~loc id =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  [%expr
+    (* TODO: Not sure what to do with cache hit/generated something *)
+    let open Async in
+    let%map t, _ =
+      Pickles.Verification_key.load ~cache:Cache_dir.cache
+        (Sexp.of_string_conv_exn
+           [%e
+             estring
+               (Pickles.Verification_key.Id.sexp_of_t id |> Sexp.to_string)]
+           Pickles.Verification_key.Id.t_of_sexp)
+      >>| Or_error.ok_exn
+    in
+    t]
 
-  module Verification = struct
-    let key_location ~loc bc_location =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      estring
-        (Blockchain_snark.Blockchain_transition.Keys.Verification.Location
-         .to_string bc_location)
+let str ~loc ~blockchain_verification_key_id ~transaction_snark
+    ~blockchain_snark =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let hashes = hashes ~loc in
+  [%str
+    open! Core_kernel
 
-    let load_expr ~loc bc_location bc_checksum =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      [%expr
-        let open Async.Deferred in
-        Blockchain_snark.Blockchain_transition.Keys.Verification.load
-          (Blockchain_snark.Blockchain_transition.Keys.Verification.Location
-           .of_string
-             [%e key_location ~loc bc_location])
-        >>| fun (keys, checksum) ->
-        assert (
-          String.equal (Md5_lib.to_hex checksum)
-            [%e estring (Md5_lib.to_hex bc_checksum)] ) ;
-        keys]
-  end
-end
+    let blockchain_verification_key_id = [%e blockchain_verification_key_id]
 
-module Transaction_snark_keys = struct
-  module Proving = struct
-    let key_location ~loc t_location =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      estring (Transaction_snark.Keys.Proving.Location.to_string t_location)
+    let transaction_verification () = [%e transaction_snark]
 
-    let load_expr ~loc t_location t_checksum =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      [%expr
-        let open Async.Deferred in
-        Transaction_snark.Keys.Proving.load
-          (Transaction_snark.Keys.Proving.Location.of_string
-             [%e key_location ~loc t_location])
-        >>| fun (keys, checksum) ->
-        assert (
-          String.equal (Md5_lib.to_hex checksum)
-            [%e estring (Md5_lib.to_hex t_checksum)] ) ;
-        keys]
-  end
+    let blockchain_verification () = [%e blockchain_snark]
 
-  module Verification = struct
-    let key_location ~loc t_location =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      estring
-        (Transaction_snark.Keys.Verification.Location.to_string t_location)
+    type key_hashes = string list [@@deriving to_yojson]
 
-    let load_expr ~loc t_location t_checksum =
-      let module E = Ppxlib.Ast_builder.Make (struct
-        let loc = loc
-      end) in
-      let open E in
-      [%expr
-        let open Async.Deferred in
-        Transaction_snark.Keys.Verification.load
-          (Transaction_snark.Keys.Verification.Location.of_string
-             [%e key_location ~loc t_location])
-        >>| fun (keys, checksum) ->
-        assert (
-          String.equal (Md5_lib.to_hex checksum)
-            [%e estring (Md5_lib.to_hex t_checksum)] ) ;
-        keys]
-  end
-end
+    let key_hashes : key_hashes = [%e hashes]]
 
 let ok_or_fail_expr ~loc =
   [%expr function Ok x -> x | Error _ -> failwith "Gen_keys error"]
-
-module Dummy = struct
-  module Transaction_keys = struct
-    module Proving = struct
-      let expr ~loc = [%expr Async.return Transaction_snark.Keys.Proving.dummy]
-    end
-
-    module Verification = struct
-      let expr ~loc =
-        [%expr Async.return Transaction_snark.Keys.Verification.dummy]
-    end
-  end
-
-  module Blockchain_keys = struct
-    module Proving = struct
-      let expr ~loc =
-        [%expr
-          Async.return
-            Blockchain_snark.Blockchain_transition.Keys.Proving.dummy]
-    end
-
-    module Verification = struct
-      let expr ~loc =
-        [%expr
-          Async.return
-            Blockchain_snark.Blockchain_transition.Keys.Verification.dummy]
-    end
-  end
-end
 
 open Async
 
@@ -157,50 +73,7 @@ let loc = Ppxlib.Location.none
 [%%if
 proof_level = "full"]
 
-let location_expr key_location =
-  let module E = Ppxlib.Ast_builder.Make (struct
-    let loc = loc
-  end) in
-  let open E in
-  [%expr
-    let open Async.Deferred in
-    Transaction_snark.Keys.Verification.load
-      (Transaction_snark.Keys.Verification.Location.of_string
-         [%e
-           estring
-             (Transaction_snark.Keys.Verification.Location.to_string
-                key_location)])]
-
-let gen_keys () =
-  let open Async_kernel in
-  let%bind {Cached.With_track_generated.data= acc; dirty} =
-    let open Cached.Deferred_with_track_generated.Let_syntax in
-    let%bind tx_keys_location, tx_keys, tx_keys_checksum =
-      Transaction_snark.Keys.cached ()
-    in
-    let module M =
-    (* TODO make toplevel library to encapsulate consensus params *)
-    Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
-                                                 .Make
-                                                   (struct
-      let keys = tx_keys
-    end)) in
-    let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
-    ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
-        bc_keys_checksum.proving
-    , Blockchain_snark_keys.Proving.key_location ~loc bc_keys_location.proving
-    , Blockchain_snark_keys.Verification.load_expr ~loc
-        bc_keys_location.verification bc_keys_checksum.verification
-    , Blockchain_snark_keys.Verification.key_location ~loc
-        bc_keys_location.verification
-    , Transaction_snark_keys.Proving.load_expr ~loc tx_keys_location.proving
-        tx_keys_checksum.proving
-    , Transaction_snark_keys.Proving.key_location ~loc tx_keys_location.proving
-    , Transaction_snark_keys.Verification.load_expr ~loc
-        tx_keys_location.verification tx_keys_checksum.verification
-    , Transaction_snark_keys.Verification.key_location ~loc
-        tx_keys_location.verification )
-  in
+let handle_dirty dirty =
   if Array.mem ~equal:String.equal Sys.argv "--generate-keys-only" then
     Stdlib.exit 0 ;
   match dirty with
@@ -243,8 +116,9 @@ let gen_keys () =
                pull-request is from an external contributor.@ Using the local \
                keys@."
         | `Cache_hit ->
-            (* Excluded above. *) assert false ) ;
-        return acc
+            (* Excluded above. *)
+            assert false ) ;
+        Deferred.unit
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
         (* We are intentionally aborting the build here with a special error code
@@ -253,91 +127,72 @@ let gen_keys () =
         * Exit code is 0xc1 for "CI" *)
         exit 0xc1
     | Some _, Some _ | _, None | None, _ ->
-        return acc )
+        Deferred.unit )
   | `Cache_hit ->
-      return acc
+      Deferred.unit
+
+let str ~loc =
+  let module T = Transaction_snark.Make (struct
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  end) in
+  let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+    let tag = T.tag
+
+    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.compiled
+  end) in
+  let%map () =
+    handle_dirty
+      Pickles.(
+        List.map
+          [T.cache_handle; B.cache_handle]
+          ~f:Cache_handle.generate_or_load
+        |> List.reduce_exn ~f:Dirty.( + ))
+  in
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  str ~loc
+    ~blockchain_verification_key_id:
+      [%expr
+        let t =
+          lazy
+            (Sexp.of_string_conv_exn
+               [%e
+                 estring
+                   ( Pickles.Verification_key.Id.sexp_of_t
+                       (Lazy.force B.Proof.id)
+                   |> Sexp.to_string )]
+               Pickles.Verification_key.Id.t_of_sexp)
+        in
+        fun () -> Lazy.force t]
+    ~transaction_snark:(from_disk_expr ~loc (Lazy.force T.id))
+    ~blockchain_snark:(from_disk_expr ~loc (Lazy.force B.Proof.id))
 
 [%%else]
 
-let gen_keys () =
-  let dummy_loc = [%expr "dummy-location"] in
+let str ~loc =
+  let e =
+    [%expr Async.Deferred.return (Lazy.force Pickles.Verification_key.dummy)]
+  in
   return
-    ( Dummy.Blockchain_keys.Proving.expr ~loc
-    , dummy_loc
-    , Dummy.Blockchain_keys.Verification.expr ~loc
-    , dummy_loc
-    , Dummy.Transaction_keys.Proving.expr ~loc
-    , dummy_loc
-    , Dummy.Transaction_keys.Verification.expr ~loc
-    , dummy_loc )
+    (str ~loc
+       ~blockchain_verification_key_id:
+         [%expr Pickles.Verification_key.Id.dummy] ~transaction_snark:e
+       ~blockchain_snark:e)
 
 [%%endif]
 
 let main () =
-  (*   let%bind blockchain_expr, transaction_expr = *)
-  let%bind ( bc_proving
-           , bc_proving_loc
-           , bc_verification
-           , bc_verification_loc
-           , tx_proving
-           , tx_proving_loc
-           , tx_verification
-           , tx_verification_loc ) =
-    gen_keys ()
-  in
+  if Array.mem ~equal:String.equal Sys.argv "--download-keys" then
+    Key_cache.set_downloads_enabled true ;
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "snark_keys.ml")
   in
-  Pprintast.top_phrase fmt
-    (Ptop_def
-       [%str
-         open Core_kernel
-
-         let blockchain_proving () = [%e bc_proving]
-
-         let blockchain_verification () = [%e bc_verification]
-
-         let transaction_proving () = [%e tx_proving]
-
-         let transaction_verification () = [%e tx_verification]
-
-         type key_hashes = string list [@@deriving to_yojson]
-
-         let key_locations =
-           [ ("blockchain_proving", [%e bc_proving_loc])
-           ; ("blockchain_verification", [%e bc_verification_loc])
-           ; ("transaction_proving", [%e tx_proving_loc])
-           ; ("transaction_verification", [%e tx_verification_loc]) ]
-
-         let rec location_sexp_to_hashes = function
-           | Sexp.Atom s
-             when List.mem
-                    ["base"; "merge"; "step"; "wrap"]
-                    s ~equal:String.equal ->
-               []
-           | Sexp.Atom s -> (
-               let fn = Filename.basename s in
-               match String.split fn ~on:'_' with
-               | hash :: _ ->
-                   [hash]
-               | _ ->
-                   failwith "location_sexp_to_hashes: unexpected filename" )
-           | Sexp.List sexps ->
-               List.(concat (map sexps ~f:location_sexp_to_hashes))
-
-         let location_to_hashes (loc : string) =
-           match Sexp.parse loc with
-           | Done (sexp, _) ->
-               location_sexp_to_hashes sexp
-           | _ ->
-               []
-
-         let key_hashes =
-           let locations =
-             List.map key_locations ~f:(fun (_name, loc) -> loc)
-           in
-           let hashes = List.(concat (map locations ~f:location_to_hashes)) in
-           List.dedup_and_sort hashes ~compare:String.compare]) ;
+  let%bind str = str ~loc:Location.none in
+  Pprintast.top_phrase fmt (Ptop_def str) ;
   exit 0
 
 let () =

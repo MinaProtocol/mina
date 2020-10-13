@@ -1,25 +1,11 @@
-open Core
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 
 module type S = sig
-  include Data_hash.Full_size
+  include Ledger_hash_intf0.S
 
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = Field.t [@@deriving sexp, compare, hash, yojson]
-
-      val to_latest : t -> t
-
-      include Comparable.S with type t := t
-
-      include Hashable_binable with type t := t
-    end
-  end]
-
-  type path = Pedersen.Digest.t list
+  type path = Random_oracle.Digest.t list
 
   type _ Request.t +=
     | Get_path : Account.Index.t -> path Request.t
@@ -42,7 +28,15 @@ module type S = sig
 
   val empty_hash : t
 
-  val of_digest : Pedersen.Digest.t -> t
+  val of_digest : Random_oracle.Digest.t -> t
+
+  val modify_account :
+       depth:int
+    -> var
+    -> Account_id.var
+    -> filter:(Account.var -> ('a, 's) Checked.t)
+    -> f:('a -> Account.var -> (Account.var, 's) Checked.t)
+    -> (var, 's) Checked.t
 
   val modify_account_send :
        depth:int

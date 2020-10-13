@@ -1,5 +1,6 @@
 (library
  (name precomputed_values)
+ (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
    coda_base
@@ -7,10 +8,10 @@
    dummy_values
    genesis_proof
    snark_keys
-   snarky)
+   snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot)))
+  (pps ppx_version ppx_jane ppxlib.metaquot bisect_ppx -- --conditional)))
 
 (rule
  (targets precomputed_values.ml)

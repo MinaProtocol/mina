@@ -12,16 +12,16 @@ let make_local_uri port address =
 
 module type S = sig
   val query_or_error :
-       < parse: Yojson.Basic.json -> 'response
+       < parse: Yojson.Basic.t -> 'response
        ; query: string
-       ; variables: Yojson.Basic.json >
+       ; variables: Yojson.Basic.t >
     -> int
     -> 'response Deferred.Or_error.t
 
   val query :
-       < parse: Yojson.Basic.json -> 'response
+       < parse: Yojson.Basic.t -> 'response
        ; query: string
-       ; variables: Yojson.Basic.json >
+       ; variables: Yojson.Basic.t >
     -> int
     -> 'response Deferred.t
 end

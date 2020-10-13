@@ -1,0 +1,7 @@
+(library
+ (name outside_hash_image_nonconsensus)
+ (public_name outside_hash_image_nonconsensus)
+ (libraries snark_params_nonconsensus)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_version ppx_optcomp bisect_ppx -- --conditional)))

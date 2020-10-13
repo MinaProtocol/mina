@@ -2,9 +2,9 @@
  (name blockchain_snark)
  (public_name blockchain_snark)
  (library_flags -linkall)
- (libraries core cached cache_dir snarky snark_params coda_base coda_state
-   transaction_snark bignum_bigint consensus module_version)
+ (libraries core cache_dir snarky.backendless snark_params coda_base coda_state
+   transaction_snark bignum_bigint consensus)
  (inline_tests)
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "blockchain state transition snarking library"))

@@ -24,14 +24,14 @@ val create : External_transition.Validated.t -> Staged_ledger.t -> t
 
 val build :
      logger:Logger.t
+  -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
   -> ( t
-     , [ `Invalid_staged_ledger_diff of Error.t
+     , [> `Invalid_staged_ledger_diff of Error.t
        | `Invalid_staged_ledger_hash of Error.t
        | `Fatal_error of exn ] )
      Result.t
@@ -59,13 +59,13 @@ val parent_hash : t -> State_hash.t
 
 val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
-val user_commands : t -> User_command.t list
+val commands : t -> User_command.Valid.t With_status.t list
 
-val payments : t -> User_command.t list
+val payments : t -> Signed_command.t With_status.t list
 
 val mask : t -> Ledger.Mask.Attached.t
 
-val all_user_commands : t list -> User_command.Set.t
+val all_user_commands : t list -> Signed_command.Set.t
 
 val display : t -> display
 
@@ -74,7 +74,6 @@ val name : t -> string
 module For_tests : sig
   val gen :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
@@ -83,7 +82,6 @@ module For_tests : sig
 
   val gen_non_deferred :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
@@ -92,7 +90,6 @@ module For_tests : sig
 
   val gen_seq :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> precomputed_values:Precomputed_values.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t

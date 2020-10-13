@@ -74,7 +74,7 @@ module Instance = struct
   let snarked_ledger {snarked_ledger; _} = snarked_ledger
 
   let set_root_identifier t new_root_identifier =
-    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+    [%log' trace t.factory.logger]
       ~metadata:
         [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
       "Setting persistent root identifier" ;
@@ -96,7 +96,7 @@ module Instance = struct
             let root_identifier =
               Root_identifier.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
             in
-            Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' trace t.factory.logger]
               ~metadata:
                 [("root_identifier", Root_identifier.to_yojson root_identifier)]
               "Loaded persistent root identifier" ;

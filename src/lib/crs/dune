@@ -1,7 +1,7 @@
 (library
  (name crs)
  (public_name crs)
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
  (library_flags -linkall)
- (libraries coda_digestif)
+ (libraries digestif)
  (synopsis "Common random string generation library"))

@@ -8,6 +8,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = Pos | Neg
-[@@deriving sexp, hash, compare, eq, yojson]

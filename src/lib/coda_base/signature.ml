@@ -11,6 +11,8 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Hex = Hex_nonconsensus.Hex
+module Rosetta_coding = Rosetta_coding_nonconsensus
 
 [%%endif]
 
@@ -40,34 +42,17 @@ module Stable = struct
 
   module Tests = struct
     [%%if
-    curve_size = 298]
+    curve_size = 255]
 
-    let%test "signature serialization v1 (curve_size=298)" =
+    let%test "signature serialization v1 (curve_size=255)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
-      let known_good_hash =
-        "\xAB\x7E\xE6\x52\xB9\xF4\x6C\xEE\x7B\xAB\x77\x3E\x25\x49\x84\xF5\xD0\x6E\x27\xB7\x2B\xCB\x76\x6B\xE5\xAC\x74\xAB\x8A\xC6\x27\x42"
-      in
-      Ppx_version.Serialization.check_serialization
+      let known_good_digest = "b991865dd2ff76596c470a72a4282cbd" in
+      Ppx_version_runtime.Serialization.check_serialization
         (module V1)
-        signature known_good_hash
-
-    [%%elif
-    curve_size = 753]
-
-    let%test "signature serialization v1 (curve_size=753)" =
-      let signature =
-        Quickcheck.random_value
-          ~seed:(`Deterministic "signature serialization") V1.gen
-      in
-      let known_good_hash =
-        "\xFE\x32\x2E\x97\x30\xE8\x41\xA5\x8E\xC3\xCD\x85\xB1\x12\x8D\x41\x82\x99\xB5\x43\x00\x42\xDF\x10\xD6\xF0\xEC\x33\x38\x77\x2B\x50"
-      in
-      Ppx_version.Serialization.check_serialization
-        (module V1)
-        signature known_good_hash
+        signature known_good_digest
 
     [%%else]
 
@@ -78,9 +63,24 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
-
 let dummy = (Field.one, Inner_curve.Scalar.one)
+
+module Raw = struct
+  open Rosetta_coding.Coding
+
+  let encode (field, scalar) = of_field field ^ of_scalar scalar
+
+  let decode raw =
+    let len = String.length raw in
+    let field_len = len / 2 in
+    let field_enc = String.sub raw ~pos:0 ~len:field_len in
+    let scalar_enc = String.sub raw ~pos:field_len ~len:field_len in
+    try Some (to_field field_enc, to_scalar scalar_enc) with _ -> None
+
+  let%test_unit "partial isomorphism" =
+    Quickcheck.test ~trials:300 Stable.Latest.gen ~f:(fun signature ->
+        [%test_eq: t option] (Some signature) (encode signature |> decode) )
+end
 
 [%%ifdef
 consensus_mechanism]

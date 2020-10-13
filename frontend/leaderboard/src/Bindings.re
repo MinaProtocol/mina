@@ -1,3 +1,23 @@
+module Postgres = {
+  type pool;
+  type config = {
+    connectionString: string,
+    connectionTimeoutMillis: int,
+  };
+
+  type dbResult = {rows: array(Js.Json.t)};
+
+  [@bs.module "pg"] [@bs.new] external makePool: config => pool = "Pool";
+
+  [@bs.send]
+  external query:
+    (pool, string, (~error: Js.Nullable.t(string), ~res: dbResult) => unit) =>
+    unit =
+    "query";
+
+  [@bs.send] external endPool: pool => unit = "end";
+};
+
 module GoogleSheets = {
   type client;
   type sheets;

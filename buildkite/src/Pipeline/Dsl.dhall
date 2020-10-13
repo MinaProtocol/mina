@@ -20,7 +20,9 @@ let Config = {
   default = {=}
 }
 
-let build : Config.Type -> Pipeline/Type = \(c : Config.Type) ->
+let CompoundType = { pipeline: Pipeline/Type, spec: JobSpec.Type } 
+
+let build : Config.Type -> CompoundType = \(c : Config.Type) ->
   let name = c.spec.name
   let buildCommand = \(c : Command.Type) ->
     c // { key =
@@ -30,6 +32,8 @@ let build : Config.Type -> Pipeline/Type = \(c : Config.Type) ->
       Some "_${name}-${key}"
     }
   in
-  { steps = List/map Command.Type Command.Type buildCommand c.steps }
+  { pipeline = { steps = List/map Command.Type Command.Type buildCommand c.steps },
+    spec = c.spec
+  }
 
-in {Config = Config, build = build, Type = Pipeline/Type}
+in {Config = Config, build = build, Type = Pipeline/Type, CompoundType = CompoundType }

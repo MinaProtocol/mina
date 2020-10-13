@@ -4,6 +4,6 @@
   (library_flags (-linkall))
   (libraries core key_value_database ppx_deriving_yojson.runtime yojson merkle_list_prover merkle_list_verifier coda_base)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_version bisect_ppx -conditional ppx_jane ppx_deriving.eq ppx_deriving_yojson ppx_fields_conv))
+  (preprocess (pps ppx_version bisect_ppx --conditional ppx_jane ppx_deriving.eq ppx_deriving_yojson ppx_fields_conv))
   (synopsis "A library that contains a database that records sent payments for an individual account and generates a proof of a payment.
   Also, the library contains a verifier that proves the correctness of the proof of payments"))

@@ -18,6 +18,12 @@ module Root_data = Root_data
 
 include Frontier_intf.S
 
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event]
+
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
  * frontier as long as the `For_tests.load_with_max_length` is not used *)
@@ -75,7 +81,6 @@ module For_tests : sig
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> precomputed_values:Precomputed_values.t
     -> unit
@@ -83,15 +88,13 @@ module For_tests : sig
 
   val gen_persistence :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
-    -> ledger_depth:int
     -> ?verifier:Verifier.t
+    -> precomputed_values:Precomputed_values.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
@@ -110,7 +113,6 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t

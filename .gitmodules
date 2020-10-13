@@ -13,9 +13,6 @@
 [submodule "src/external/rpc_parallel"]
 	path = src/external/rpc_parallel
 	url = https://github.com/CodaProtocol/rpc_parallel.git
-[submodule "src/external/digestif"]
-	path = src/external/digestif
-	url = https://github.com/CodaProtocol/digestif.git
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
 	url = https://github.com/bkase/tablecloth
@@ -28,3 +25,6 @@
 [submodule "src/lib/marlin"]
 	path = src/lib/marlin
 	url = https://github.com/o1-labs/marlin.git
+[submodule "src/external/ppx_version"]
+	path = src/external/ppx_version
+	url = https://github.com/o1-labs/ppx_version.git

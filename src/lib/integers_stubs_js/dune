@@ -5,4 +5,4 @@
   (javascript_files ./runtime.js)
   )
  (libraries zarith_stubs_js)
- (preprocess (pps ppx_version)))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))

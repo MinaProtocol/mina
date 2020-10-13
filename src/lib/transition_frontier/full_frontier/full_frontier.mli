@@ -45,6 +45,9 @@ val hash : t -> Frontier_hash.t
 
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 
+val protocol_states_for_root_scan_state :
+  t -> Protocol_states_for_root_scan_state.t
+
 val apply_diffs :
      t
   -> Diff.Full.E.t list

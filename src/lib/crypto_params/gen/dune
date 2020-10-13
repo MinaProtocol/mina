@@ -1,8 +1,7 @@
 (executable
  (name gen)
- (libraries async core crs coda_digestif fold_lib snarky tuple_lib ppxlib group_map
-   curve_choice chunk_table chunked_triples)
+ (libraries pickles async core crs digestif fold_lib snarky.backendless tuple_lib ppxlib group_map)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))
+  (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot bisect_ppx -- --conditional))
  (modes native))

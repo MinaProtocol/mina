@@ -38,7 +38,7 @@ let with_check = false
 [%%endif]
 
 [%%if
-curve_size = 753]
+curve_size = 255]
 
 let medium_curves = true
 
@@ -74,8 +74,7 @@ let heartbeat_flag = ref true
 let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
+      [%log warn] "Heartbeat for CI" ;
       let%bind () = after (Time.Span.of_min 1.) in
       loop () )
     else return ()
@@ -85,6 +84,7 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants = precomputed_values.consensus_constants in
@@ -103,6 +103,7 @@ let run_test () : unit Deferred.t =
             Deferred.unit
       in
       let trace_database_initialization typ location =
+        (* can't use %log here, using passed-in location *)
         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
           typ
       in
@@ -145,15 +146,19 @@ let run_test () : unit Deferred.t =
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let chain_id = "bogus chain id for testing" in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; flood= false
+          ; isolate= false
           ; conf_dir= temp_conf_dir
-          ; chain_id= "bogus chain id for testing"
+          ; chain_id
+          ; flooding= false
+          ; direct_peers= []
+          ; peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
@@ -172,6 +177,7 @@ let run_test () : unit Deferred.t =
           ; is_seed= true
           ; genesis_ledger_hash=
               Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+          ; constraint_constants
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -186,14 +192,17 @@ let run_test () : unit Deferred.t =
       let largest_account_keypair =
         Genesis_ledger.largest_account_keypair_exn ()
       in
-      let fee = Currency.Fee.of_int in
+      let fee n =
+        Currency.Fee.of_int
+          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+      in
       let snark_work_fee, transaction_fee =
-        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
+        if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
+             ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None
@@ -214,8 +223,7 @@ let run_test () : unit Deferred.t =
              ~epoch_ledger_location ~time_controller ~receipt_chain_database
              ~snark_work_fee ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values
-             ~proof_level:Genesis_constants.Proof_level.compiled ())
+             ~precomputed_values ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -276,12 +284,11 @@ let run_test () : unit Deferred.t =
         trace_recurring "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
-              User_command_memo.create_from_string_exn
+              Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
-              ~fee_token:Token_id.default ~memo
-              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~fee_token:Token_id.default ~memo ~valid_until:None
               ~body:
                 (Payment
                    { source_pk= signer
@@ -293,7 +300,7 @@ let run_test () : unit Deferred.t =
                    (Keypair.of_private_key_exn sender_sk))
               () )
       in
-      let assert_ok x = assert (Or_error.is_ok x) in
+      let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
         Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
@@ -324,7 +331,7 @@ let run_test () : unit Deferred.t =
            because the nonce is wrong *)
         let payment' =
           build_payment
-            ~nonce:(User_command.nonce user_cmd)
+            ~nonce:(Signed_command.nonce user_cmd)
             send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
@@ -374,7 +381,8 @@ let run_test () : unit Deferred.t =
                 (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
-              receiver (f_amount i) acc (Currency.Fee.of_int 0) )
+              receiver (f_amount i) acc
+              Coda_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
         Coda_lib.best_protocol_state t

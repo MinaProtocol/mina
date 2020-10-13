@@ -6,15 +6,14 @@ module T = struct
   type t = {logger: Logger.t}
 
   type view =
-    { new_user_commands: User_command.t list
-    ; removed_user_commands: User_command.t list
+    { new_commands: User_command.Valid.t With_status.t list
+    ; removed_commands: User_command.Valid.t With_status.t list
     ; reorg_best_tip: bool }
 
   let create ~logger frontier =
     ( {logger}
-    , { new_user_commands=
-          Breadcrumb.user_commands (Full_frontier.root frontier)
-      ; removed_user_commands= []
+    , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
+      ; removed_commands= []
       ; reorg_best_tip= false } )
 
   (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
@@ -34,9 +33,7 @@ module T = struct
       in
       go t2 []
     in
-    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Common ancestor: %{sexp: State_hash.t}"
-      ancestor ;
+    [%log' debug t.logger] !"Common ancestor: %{sexp: State_hash.t}" ancestor ;
     ( path_from_to (Full_frontier.find_exn frontier ancestor) bc1
     , path_from_to (Full_frontier.find_exn frontier ancestor) bc2 )
 
@@ -45,13 +42,10 @@ module T = struct
     let view, should_broadcast =
       List.fold diffs_with_mutants
         ~init:
-          ( { new_user_commands= []
-            ; removed_user_commands= []
-            ; reorg_best_tip= false }
+          ( {new_commands= []; removed_commands= []; reorg_best_tip= false}
           , false )
         ~f:
-          (fun ( ( {new_user_commands; removed_user_commands; reorg_best_tip= _}
-                 as acc )
+          (fun ( ({new_commands; removed_commands; reorg_best_tip= _} as acc)
                , should_broadcast ) -> function
           | E (Best_tip_changed new_best_tip, old_best_tip_hash) ->
               let new_best_tip_breadcrumb =
@@ -64,7 +58,7 @@ module T = struct
               let added_to_best_tip_path, removed_from_best_tip_path =
                 get_path_diff t frontier new_best_tip_breadcrumb old_best_tip
               in
-              Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' debug t.logger]
                 "added %d breadcrumbs and removed %d making path to new best \
                  tip"
                 (List.length added_to_best_tip_path)
@@ -78,19 +72,18 @@ module T = struct
                     , `List
                         (List.map ~f:Breadcrumb.to_yojson
                            removed_from_best_tip_path) ) ] ;
-              let new_user_commands =
-                List.bind added_to_best_tip_path ~f:Breadcrumb.user_commands
-                @ new_user_commands
+              let new_commands =
+                List.bind added_to_best_tip_path ~f:Breadcrumb.commands
+                @ new_commands
               in
-              let removed_user_commands =
-                List.bind removed_from_best_tip_path
-                  ~f:Breadcrumb.user_commands
-                @ removed_user_commands
+              let removed_commands =
+                List.bind removed_from_best_tip_path ~f:Breadcrumb.commands
+                @ removed_commands
               in
               let reorg_best_tip =
                 not (List.is_empty removed_from_best_tip_path)
               in
-              ({new_user_commands; removed_user_commands; reorg_best_tip}, true)
+              ({new_commands; removed_commands; reorg_best_tip}, true)
           | E (New_node (Full _), _) -> (acc, should_broadcast)
           | E (Root_transitioned _, _) -> (acc, should_broadcast)
           | E (New_node (Lite _), _) -> failwith "impossible" )

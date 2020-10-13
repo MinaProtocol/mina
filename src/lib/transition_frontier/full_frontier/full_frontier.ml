@@ -96,6 +96,9 @@ let find_protocol_state (t : t) hash =
 
 let root t = find_exn t t.root
 
+let protocol_states_for_root_scan_state t =
+  t.protocol_states_for_root_scan_state
+
 let best_tip t = find_exn t t.best_tip
 
 let close t =
@@ -246,7 +249,7 @@ module Visualizor = struct
             | Some child_node ->
                 add_edge acc_graph node child_node
             | None ->
-                Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                [%log' debug t.logger]
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson successor_state_hash)
                     ; ("error", `String "missing from frontier") ]
@@ -315,7 +318,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
-   * 
+   *
    *     garbage
    *     [m...]
    *       ^
@@ -414,14 +417,21 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
-           (Staged_ledger.proof_txns
+           (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
-        ~f:(fun txn ->
+        ~f:(fun (txn, state_hash) ->
+          (*Validate transactions against the protocol state associated with the transaction*)
+          let txn_state_view =
+            find_protocol_state t state_hash
+            |> Option.value_exn |> Protocol_state.body
+            |> Protocol_state.Body.view
+          in
           ignore
             (Or_error.ok_exn
                (Ledger.apply_transaction
                   ~constraint_constants:
-                    t.precomputed_values.constraint_constants mt txn)) ) ;
+                    t.precomputed_values.constraint_constants ~txn_state_view
+                  mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -434,7 +444,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Update the protocol states required for scan state at the new root*)
+  (*Update the protocol states required for scan state at the new root.
+  Note: this should be after applying the transactions to the snarked ledger (Step 5)
+  because the protocol states corresponding to those transactions won't be part
+  of the new_root_protocol_states since those transactions would have been
+  deleted from the scan state after emitting the proof*)
   let new_protocol_states_map =
     State_hash.Map.of_alist_exn new_root_protocol_states
   in
@@ -525,6 +539,7 @@ let update_metrics_with_diff (type mutant) t
       Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
+      let best_tip_breadcrumb = best_tip t in
       let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
       let blockchain_length =
         Int.to_float
@@ -537,17 +552,20 @@ let update_metrics_with_diff (type mutant) t
         |> Float.of_int
       in
       Coda_metrics.(
+        let best_tip_user_txns =
+          Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
+        in
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float
-            (List.length (Breadcrumb.user_commands new_root_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
         in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
+        Gauge.set Transition_frontier.best_tip_user_txns best_tip_user_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc_one Transition_frontier.root_transitions ;
@@ -578,8 +596,8 @@ let update_metrics_with_diff (type mutant) t
 
 let apply_diffs t diffs ~enable_epoch_ledger_sync =
   let open Root_identifier.Stable.Latest in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
+  [%log' trace t.logger] "Applying %d diffs to full frontier (%s --> ?)"
+    (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
   let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
@@ -604,7 +622,7 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     "Reached state %s after applying diffs to full frontier"
     (Frontier_hash.to_string t.hash) ;
   if not (enable_epoch_ledger_sync = `Disabled) then
@@ -620,11 +638,10 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
             if local_state_was_synced_at_start then (
-              Logger.fatal t.logger
+              [%log' fatal t.logger]
                 "after lock transition, the best tip consensus state is out \
                  of sync with the local state -- bug in either \
                  required_local_state_sync or frontier_root_transition."
-                ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "sync_jobs"
                     , `List

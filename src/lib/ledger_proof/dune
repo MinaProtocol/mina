@@ -3,4 +3,4 @@
   (public_name ledger_proof)
   (libraries core_kernel coda_base transaction_snark)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare ppx_coda ppx_version ppx_deriving_yojson)))
+  (preprocess (pps ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare ppx_version ppx_deriving_yojson bisect_ppx -- --conditional)))

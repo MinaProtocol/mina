@@ -1,0 +1,107 @@
+import Page from "@reason/pages/Docs";
+export default Page({ title: "Getting Started" });
+
+# Getting Started
+
+Welcome to Mina Genesis Program applicants! This section will walk you through the requirements needed to run a Mina protocol node on your local machine and connect to the network.
+
+<Alert>
+
+
+This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.14-beta`.
+
+</Alert>
+
+
+## Requirements
+
+**Software**: macOS or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
+
+Note: Windows is not officially supported at this time. However, community members succeeded in setting up nodes using Windows Subsystem for Linux. Click [here](https://minawiki.com/index.php?title=Mina_on_Windows) for instructions on using Windows, which are created by the community.
+
+**Hardware**: Sending and receiving mina does not require any special hardware, but running a block producer on the Mina network currently requires:
+
+- at least a 4-core processor
+- at least 8GB of RAM
+
+Note that if you plan on running a snark worker node, you may need more RAM -- 16GB is recommended. GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
+
+**Network**: At least 1 Mbps connection
+
+**VM Instances**:
+O(1) Labs has tested running nodes on several cloud providers, and recommends the following instances for basic node operator needs. Keep in mind that custom requirements as well as different cost constraints may require a different instance type.
+
+- AWS - [c5.2xlarge](https://www.ec2instances.info/?filter=c5.2xl&region=us-west-2&cost_duration=daily&selected=c5.2xlarge)
+- GCP - [c2-standard-4](https://cloud.google.com/compute/docs/machine-types)
+- Azure - [Standard_F8s_v2](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-compute#fsv2-series-1)
+- Digital Ocean - [c-8-16gib](https://cloud.digitalocean.com/droplets/new?size=c-8-16gib)
+
+Check out our [guide](https://www.youtube.com/watch?v=iSrtjxOsC6A) for how to configure your Mina node on Google Cloud.
+
+## Installation
+
+The newest binary releases can be found below. Instructions are provided for macOS and Linux below:
+
+This is a large download, around 1GB, so the install might take some time.
+
+<Alert kind="warning">
+
+
+If you installed `mina` from a previous release, you'll need to upgrade it so that you won't get banned by the network for using an older client. See instructions below for upgrading both macOS and Linux builds.
+
+</Alert>
+
+
+### macOS
+
+Install using [Homebrew](https://brew.sh).
+
+```
+brew install minaprotocol/mina/mina
+```
+
+If you already have `mina` installed from a previous release, run:
+
+```
+brew upgrade mina
+```
+
+You can run `mina -help` to check if the installation succeeded.
+
+### Ubuntu 18.04 / Debian 9
+
+Add the Mina Debian repo and install:
+
+```
+sudo apt-get remove mina-testnet-postake-medium-curves
+sudo apt-get remove mina-kademlia
+echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/mina.list
+sudo apt-get update
+sudo apt-get install -t unstable mina-testnet-postake-medium-curves=0.0.12-beta+406048-feature-bump-genesis-timestamp-3e9b174-PV48525e92
+```
+
+If you already have `mina` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Mina from scratch, you may see this error when you run the first command: `E: Unable to locate package mina-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
+
+You can run `mina -help` to check if the installation succeeded.
+
+### Windows
+
+Windows is not yet supported. If you are interested in receiving a grant to develop Mina for Windows, please email grants@o1labs.org or reach out in the [Discord server](https://bit.ly/MinaDiscord).
+
+### Build from source
+
+If you're running another Linux distro or a different version of macOS, you can [try building Mina from source code](https://github.com/MinaProtocol/mina/blob/master/README-dev.md#building-mina). Please note that other operating systems haven't been tested thoroughly, and may have issues. Feel free to share any logs and get troubleshooting help in the [Discord server](https://bit.ly/MinaDiscord).
+
+## Set up port forwarding and any firewalls
+
+If you are running a firewall, you should allow traffic on TCP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
+
+You may need to configure your router's port forwarding to allow inbound traffic to the following ports through your **external** IP address.
+
+- `TCP` port `8302` and `8303`
+
+For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
+
+## Next
+
+Now that you've installed Mina and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!

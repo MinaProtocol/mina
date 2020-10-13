@@ -113,23 +113,23 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
   | `Yes -> (
       let%bind pid_str = Reader.file_contents lockpath in
       let pid = Pid.of_string pid_str in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "Found PID file for %s %s with contents %s" name lockpath pid_str ;
+      [%log debug] "Found PID file for %s %s with contents %s" name lockpath
+        pid_str ;
       let%bind () =
         match Signal.send Signal.term (`Pid pid) with
         | `No_such_process ->
-            Logger.debug logger "Couldn't kill %s with PID %s, does not exist"
-              name pid_str ~module_:__MODULE__ ~location:__LOC__ ;
+            [%log debug] "Couldn't kill %s with PID %s, does not exist" name
+              pid_str ;
             Deferred.unit
         | `Ok -> (
-            Logger.debug logger "Successfully sent TERM signal to %s (%s)" name
-              pid_str ~module_:__MODULE__ ~location:__LOC__ ;
+            [%log debug] "Successfully sent TERM signal to %s (%s)" name
+              pid_str ;
             let%bind () = after (Time.Span.of_sec 0.5) in
             match Signal.send Signal.kill (`Pid pid) with
             | `No_such_process ->
                 Deferred.unit
             | `Ok ->
-                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                [%log error]
                   "helper process %s (%s) didn't die after being sent TERM, \
                    KILLed it"
                   name pid_str ;
@@ -143,7 +143,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
           | Ok () ->
               Deferred.unit
           | Error exn ->
-              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              [%log warn]
                 !"Couldn't delete lock file for %s (pid $childPid) after \
                   killing it. If another Coda daemon was already running it \
                   may have cleaned it up for us. ($exn)"
@@ -153,8 +153,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                   ; ("exn", `String (Exn.to_string exn)) ] ;
               Deferred.unit ) )
   | `Unknown | `No ->
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        "No PID file for %s" name ;
+      [%log debug] "No PID file for %s" name ;
       Deferred.unit
 
 type output_handling =
@@ -205,7 +204,8 @@ let reader_to_strict_pipe_with_logging :
                  ; metadata=
                      String.Map.set ~key:"child_name" ~data:(`String name)
                        (String.Map.set ~key:"line" ~data:(`String line)
-                          (Logger.metadata logger)) }
+                          (Logger.metadata logger))
+                 ; event_id= None }
              in
              match
                Option.try_with (fun () -> Yojson.Safe.from_string line)
@@ -260,8 +260,7 @@ let start_custom :
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
   in
-  Logger.debug logger ~location:__LOC__ ~module_:__MODULE__
-    "Starting custom child process %s with args $args" name
+  [%log debug] "Starting custom child process %s with args $args" name
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
   let relative_to_root =
@@ -275,7 +274,7 @@ let start_custom :
          ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
-      ~f:(fun prog -> Process.create ~prog ~args ())
+      ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   let%bind () =
     Deferred.map ~f:Or_error.return
@@ -307,8 +306,7 @@ let start_custom :
   don't_wait_for
     (let open Deferred.Let_syntax in
     let%bind termination_status = Process.wait process in
-    Logger.trace logger "child process %s died" name ~module_:__MODULE__
-      ~location:__LOC__ ;
+    [%log trace] "child process %s died" name ;
     don't_wait_for
       (let%bind () = after (Time.Span.of_sec 1.) in
        let%bind () = Writer.close @@ Process.stdin process in
@@ -317,8 +315,7 @@ let start_custom :
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        "Process died unexpectedly: $exit_or_signal"
+      [%log fatal] "Process died unexpectedly: $exit_or_signal"
         ~metadata:
           [ ( "exit_or_signal"
             , `String (Unix.Exit_or_signal.to_string_hum termination_status) )

@@ -22,7 +22,7 @@ docker run \
   --publish 3085:3085 \
   -d \
   --name coda \
-  codaprotocol/coda-demo:sandbox-32a.1
+  codaprotocol/coda-demo:pickles-sandbox
 ```
 
 This command will start a daemon inside the docker container and expose the GraphQL port (3085), which is used for communication with the client, to your computer. This daemon will automatically be running in the background with a block producer and snark worker.
@@ -50,7 +50,7 @@ docker exec -it coda bash
 The container has one account with this public key:
 
 ```
-4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe1qsyDs4AW5XeNgAf16WUPRBCakaPiXcxjp6JUpGNQ6fdU977x5LntvxrSg11xrmK6ZDaGSMEGj12dkeEpyKcEpkzcKwYWZ2Yf2vpwQP
+B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 ```
 
 The password for this account is the empty string (there's no password -- you can leave the password field blank).
@@ -59,8 +59,8 @@ The password for this account is the empty string (there's no password -- you ca
 
 There are a few things you can do with your sandbox now that you have it running:
 
-- [Install Coda](/docs/getting-started#installation) as usual and use many of the client commands. Since the daemon is already running in the container, you don't need to run `coda daemon`!
-
-- Install the [GUI Wallet](/docs/gui-wallet) app to use a graphical interface to your node. Enter '127.0.0.1' as the host of your node during setup.
+- Follow [the normal instructions](https://codaprotocol.com/docs/my-first-transaction#create-a-new-account) skipping over those steps that interact with a live network such as using a faucet.
 
 - Head over to http://localhost:3085/graphql to play with the GraphQL API directly.
+
+- Observe the logs and marvel at all the interesting crypto executing on your machine.

@@ -3,7 +3,7 @@
 Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 * [Developer homepage](https://codaprotocol.com/code.html)
-* [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+* [Roadmap](https://codaprotocol.com/docs/developers)
 * [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
@@ -26,8 +26,8 @@ The short version:
      - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
     you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
  4. Install Docker, GNU make, and bash
- 5. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE dev`
- 6. `make LIBP2P_NIXLESS=1 USEDOCKER=TRUE deb`
+ 5. `make USEDOCKER=TRUE dev`
+ 6. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
@@ -41,8 +41,6 @@ of the repo.
 ### Developer Setup (MacOS)
 
 * Invoke `make macos-setup`
-* Make sure [`nix` is installed](https://nixos.org/download.html) (if you are running the latest macOS, [this workaround](https://medium.com/@robinbb/install-nix-on-macos-catalina-ca8c03a225fc) or a similar one will be necessary).
-* Wait a long time...
 * Invoke `make build`
 * Jump to [customizing your editor for autocomplete](#dev-env)
 
@@ -60,7 +58,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-ff342e8e78343bf409b94817a0f96bae57914cea`
+`docker pull codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171`
 
 * Create local builder image
 
@@ -153,10 +151,6 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
 
-You will need to install [Nix](https://nixos.org/nix/download.html) and also
-[cachix](https://cachix.org) with `nix-env -iA cachix -f
-https://cachix.org/api/v1/install`.
-
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
@@ -200,13 +194,13 @@ in the form of `dune exec coda -- integration-tests $SOME_TEST`.
 You might see a build error like this:
 
 ```text
-Error: Files external/digestif/src-c/.digestif_c.objs/digestif.cmx
-       and external/digestif/src-c/.digestif_c.objs/rakia.cmx
-       make inconsistent assumptions over implementation Rakia
+Error: Files src/lib/coda_base/coda_base.objs/account.cmx
+       and src/lib/coda_base/coda_base.objs/token_id.cmx
+       make inconsistent assumptions over implementation Crypto_params
 ```
 
 You can work around it with `rm -r src/_build/default/src/$OFFENDING_PATH` and a rebuild.
-Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
+Here, the offending path is `src/lib/coda_base/coda_base.objs`.
 
 ## Docker Image Family Tree
 

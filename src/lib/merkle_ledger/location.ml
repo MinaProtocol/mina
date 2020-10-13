@@ -19,8 +19,6 @@ module Bigstring = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare]
-
   [%%define_locally
   Bigstring.(get, length, equal, create, to_string, set, blit, sub)]
 
@@ -48,7 +46,7 @@ module T = struct
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving hash, sexp, compare, eq]
+  [@@deriving hash, sexp, compare]
 
   let is_generic = function Generic _ -> true | _ -> false
 
@@ -150,4 +148,10 @@ module T = struct
         (base, sibling)
     | Right ->
         (sibling, base)
+
+  type location = t [@@deriving sexp, compare]
+
+  include Comparable.Make (struct
+    type t = location [@@deriving sexp, compare]
+  end)
 end

@@ -1,14 +1,34 @@
+/*
+  Metrics.re has the responsibilities of taking a collection of blocks as input
+  and transforming that block data into a Map of public keys to metricRecord types.
+  The metricRecord type is defined in Types/Metrics.
+
+  The data visualized for a Map is as follows, where x is some int value:
+
+ "public_key1": {
+    blocksCreated: x,
+    transactionSent: x,
+    snarkFeesCollected: x,
+    highestSnarkFeeCollected: x,
+    transactionsReceivedByEcho: x,
+    coinbaseReceiver: x,
+    createAndSendToken: x,
+ }
+
+  All the metrics to be computed are specified in calculateMetrics(). Each
+  metric to be computed is contained within it's own Map structure and is then
+  combined together with all other metric Maps.
+ */
+
 module StringMap = Map.Make(String);
 
 // Helper functions for gathering metrics
 let printMap = map => {
-  StringMap.mapi(
-    (key, value) => {
-      Js.log(key);
-      Js.log(value);
-    },
-    map,
-  );
+  map
+  |> StringMap.mapi((key, value) => {
+       Js.log(key);
+       Js.log(value);
+     });
 };
 
 // Iterate through list of blocks and apply f on all fields in a block
@@ -27,22 +47,37 @@ let incrementMapValue = (key, map) => {
      });
 };
 
+let max = (a, b) => {
+  a > b ? a : b;
+};
+
+let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
+  blocks->Belt.Array.keep((block: Types.Block.t) => {
+    endTime < block.blockchainState.timestamp
+    && block.blockchainState.timestamp > startTime
+  });
+};
+
 // Gather metrics
 let getBlocksCreatedByUser = blocks => {
   blocks
   |> Array.fold_left(
-       (map, block: Types.NewBlock.data) => {
-         incrementMapValue(block.creatorAccount.publicKey, map)
+       (map, block: Types.Block.t) => {
+         incrementMapValue(block.blockchainState.creatorAccount, map)
        },
        StringMap.empty,
      );
 };
 
-let calculateTransactionSent = (map, block: Types.NewBlock.data) => {
-  block.transactions.userCommands
+let calculateTransactionSent = (map, block: Types.Block.t) => {
+  block.userCommands
   |> Array.fold_left(
-       (transactionMap, userCommand: Types.NewBlock.userCommands) => {
-         incrementMapValue(userCommand.fromAccount.publicKey, transactionMap)
+       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
+         switch (userCommand.type_, userCommand.status) {
+         | (Payment, Some(Applied)) =>
+           incrementMapValue(userCommand.fromAccount, transactionMap)
+         | _ => transactionMap
+         }
        },
        map,
      );
@@ -52,168 +87,187 @@ let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
 };
 
-let calculateSnarkWorkCount = (map, block: Types.NewBlock.data) => {
-  block.snarkJobs
+let calculateCreateTokenAndSend = (map, block: Types.Block.t) => {
+  block.userCommands
   |> Array.fold_left(
-       (snarkMap, snarkJob: Types.NewBlock.snarkJobs) => {
-         incrementMapValue(snarkJob.prover, snarkMap)
+       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
+         switch (userCommand.type_, userCommand.status) {
+         | (Payment, Some(Applied)) =>
+           /* If tokenID is 1, that means it's native coda */
+           if (userCommand.token |> int_of_string != 1) {
+             incrementMapValue(userCommand.fromAccount, transactionMap);
+           } else {
+             transactionMap;
+           }
+         | _ => transactionMap
+         }
        },
        map,
      );
 };
 
-let getSnarkWorkCreatedByUser = blocks => {
-  blocks |> calculateProperty(calculateSnarkWorkCount);
+let getCreateTokenAndSend = blocks => {
+  blocks |> calculateProperty(calculateCreateTokenAndSend);
+};
+
+/*
+  Due to snarkJobs not being apart of the archive API, we calculate
+  snark fees differently in the meantime.
+
+  Snark fees will be calculated by inspecting fees paid out to snark
+  workers inside blocks. This means that if you get more than one
+  snark work included in a block we will measure as the sum of all fees
+  for the work that has been included.
+ */
+let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
+  block.internalCommands
+  |> Array.fold_left(
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (
+           command.type_,
+           command.receiverAccount != block.blockchainState.creatorAccount,
+         ) {
+         | (FeeTransfer, true) =>
+           map
+           |> StringMap.update(
+                command.receiverAccount,
+                feeSum => {
+                  let snarkFee = Int64.of_string(command.fee);
+                  switch (feeSum) {
+                  | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
+                  | None => Some(snarkFee)
+                  };
+                },
+              )
+         | _ => map
+         }
+       },
+       map,
+     );
 };
 
 let getSnarkFeesCollected = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      Array.fold_left(
-        (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          StringMap.update(
-            snarkJob.prover,
-            feeCount =>
-              switch (feeCount) {
-              | Some(feeCount) => Some(Int64.add(feeCount, snarkJob.fee))
-              | None => Some(snarkJob.fee)
-              },
-            map,
-          )
-        },
-        map,
-        block.snarkJobs,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks |> calculateProperty(calculateSnarkFeeSum);
 };
 
-let max = (a, b) => {
-  a > b ? a : b;
+let calculateHighestSnarkFeeCollected = (map, block: Types.Block.t) => {
+  block.internalCommands
+  |> Array.fold_left(
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (
+           command.type_,
+           command.receiverAccount != block.blockchainState.creatorAccount,
+         ) {
+         | (FeeTransfer, true) =>
+           map
+           |> StringMap.update(
+                command.receiverAccount,
+                feeCount => {
+                  let snarkFee = Int64.of_string(command.fee);
+                  switch (feeCount) {
+                  | Some(feeCount) => Some(max(snarkFee, feeCount))
+                  | None => Some(snarkFee)
+                  };
+                },
+              )
+         | _ => map
+         }
+       },
+       map,
+     );
 };
 
 let getHighestSnarkFeeCollected = blocks => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      Array.fold_left(
-        (map, snarkJob: Types.NewBlock.snarkJobs) => {
-          StringMap.update(
-            snarkJob.prover,
-            feeCount =>
-              switch (feeCount) {
-              | Some(feeCount) => Some(max(feeCount, snarkJob.fee))
-              | None => Some(snarkJob.fee)
-              },
-            map,
-          )
-        },
-        map,
-        block.snarkJobs,
-      )
-    },
-    StringMap.empty,
-    blocks,
-  );
+  blocks |> calculateProperty(calculateHighestSnarkFeeCollected);
 };
 
-let calculateTransactionsSentToAddress = (blocks, address) => {
-  Array.fold_left(
-    (map, block: Types.NewBlock.data) => {
-      block.transactions.userCommands
-      |> Array.fold_left(
-           (map, userCommand: Types.NewBlock.userCommands) => {
-             userCommand.toAccount.publicKey === address
-               ? incrementMapValue(userCommand.fromAccount.publicKey, map)
-               : map
-           },
-           map,
-         )
-    },
-    StringMap.empty,
-    blocks,
-  );
-};
-
-let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
-  let blocksList = Array.to_list(blocks);
-
-  let filteredBlocksList =
-    List.filter(
-      (block: Types.NewBlock.data) => {
-        endTime < block.protocolState.date
-        && block.protocolState.date > startTime
-      },
-      blocksList,
-    );
-  Array.of_list(filteredBlocksList);
-};
-
-let calculateCoinbaseReceiverChallenge = blocks => {
+let getTransactionsSentToAddress = (blocks, addresses) => {
   blocks
   |> Array.fold_left(
-       (map, block: Types.NewBlock.data) => {
-         let creatorAccount = block.creatorAccount.publicKey;
-         switch (
-           Js.Nullable.toOption(block.transactions.coinbaseReceiverAccount)
-         ) {
-         | Some(account) =>
-           StringMap.update(
-             block.creatorAccount.publicKey,
-             _ => Some(account.publicKey !== creatorAccount),
-             map,
-           )
-         | None => map
-         };
+       (map, block: Types.Block.t) => {
+         block.userCommands
+         |> Array.fold_left(
+              (map, userCommand: Types.Block.UserCommand.t) => {
+                addresses
+                |> List.filter(address => {userCommand.toAccount === address})
+                |> List.length > 0
+                  ? incrementMapValue(userCommand.fromAccount, map) : map
+              },
+              map,
+            )
        },
        StringMap.empty,
      );
 };
 
-let throwAwayValues = metric => {
-  StringMap.map(_ => {()}, metric);
+let calculateCoinbaseReceiverChallenge = (map, block: Types.Block.t) => {
+  block.internalCommands
+  |> Array.fold_left(
+       (map, command: Types.Block.InternalCommand.t) => {
+         switch (command.type_) {
+         | Coinbase =>
+           StringMap.update(
+             command.receiverAccount,
+             _ =>
+               Some(
+                 command.receiverAccount
+                 != block.blockchainState.creatorAccount,
+               ),
+             map,
+           )
+         | _ => map
+         }
+       },
+       map,
+     );
+};
+
+let getCoinbaseReceiverChallenge = blocks => {
+  blocks |> calculateProperty(calculateCoinbaseReceiverChallenge);
+};
+
+let throwAwayValues = metrics => {
+  metrics |> StringMap.map(_ => {()});
 };
 
 let calculateAllUsers = metrics => {
-  List.fold_left(
-    StringMap.merge((_, _, _) => {Some()}),
-    StringMap.empty,
-    metrics,
-  );
+  metrics
+  |> List.fold_left(StringMap.merge((_, _, _) => {Some()}), StringMap.empty);
 };
 
-let echoBotPublicKey = "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x";
+let echoBotPublicKeys = [
+  "B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9",
+];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
-  let snarkWorkCreated = getSnarkWorkCreatedByUser(blocks);
   let snarkFeesCollected = getSnarkFeesCollected(blocks);
   let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
   let transactionsReceivedByEcho =
-    calculateTransactionsSentToAddress(blocks, echoBotPublicKey);
-  let coinbaseReceiverChallenge = calculateCoinbaseReceiverChallenge(blocks);
+    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
+  let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
+  let createAndSendToken = getCreateTokenAndSend(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
     throwAwayValues(transactionSent),
-    throwAwayValues(snarkWorkCreated),
     throwAwayValues(snarkFeesCollected),
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
     throwAwayValues(coinbaseReceiverChallenge),
+    throwAwayValues(createAndSendToken),
   ])
   |> StringMap.mapi((key, _) =>
        {
          Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
          transactionSent: StringMap.find_opt(key, transactionSent),
-         snarkWorkCreated: StringMap.find_opt(key, snarkWorkCreated),
          snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
          highestSnarkFeeCollected:
            StringMap.find_opt(key, highestSnarkFeeCollected),
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
          coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
+         createAndSendToken: StringMap.find_opt(key, createAndSendToken),
        }
      );
 };

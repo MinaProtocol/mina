@@ -1,10 +1,9 @@
 (library
   (name snarky_group_map)
   (public_name snarky_group_map)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (inline_tests)
   (libraries
     group_map
-    snarky
-    snarkette
+    snarky.backendless
     core_kernel ))

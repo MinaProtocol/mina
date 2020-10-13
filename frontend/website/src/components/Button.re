@@ -9,6 +9,7 @@ module Styles = {
         backgroundColor(bgColor),
         borderRadius(`px(6)),
         textDecoration(`none),
+        fontSize(`rem(1.)),
         color(white),
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),

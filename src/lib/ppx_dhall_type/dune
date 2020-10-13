@@ -1,0 +1,7 @@
+(library
+ (name ppx_dhall_type)
+ (public_name ppx_dhall_type)
+ (kind ppx_deriver)
+ (libraries ppxlib core_kernel)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_version ppxlib.metaquot bisect_ppx -- --conditional)))

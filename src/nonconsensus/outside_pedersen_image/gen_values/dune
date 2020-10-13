@@ -1,9 +1,0 @@
-(executable
-  (name gen_values)
-  (libraries async core_kernel snark_params_nonconsensus
-             ppxlib ppx_util)
-  (preprocessor_deps ../../../config.mlh)
-  (preprocess
-    (pps ppx_version ppx_optcomp ppxlib.metaquot))
-  (flags -w -40 -g)
-  (modes native))

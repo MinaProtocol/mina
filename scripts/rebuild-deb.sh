@@ -10,6 +10,7 @@ cd "${SCRIPTPATH}/../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
+GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
@@ -17,18 +18,21 @@ PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
-if [ "$GITBRANCH" == "master" ]; then
-    VERSION="${GITTAG}-${GITHASH}"
-else
-    VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
-fi
+BUILD_NUM=${BUILDKITE_BUILD_NUM}
+BUILD_URL=${BUILDKITE_BUILD_URL}
 
-# Export variables for use with downstream steps
-echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
+# Load in env vars for githash/branch/etc.
+source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+
+cd "${SCRIPTPATH}/../_build"
+
+if [[ "$1" == "optimized" ]] ; then
+    echo "Optimized deb"
+    VERSION=${VERSION}_optimized
+else
+    echo "Standard deb"
+    VERSION=${VERSION}
+fi
 
 BUILDDIR="deb_build"
 
@@ -46,7 +50,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
 echo "------------------------------------------------------------"
@@ -74,10 +78,13 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Keys
 # Identify actual keys used in build
+#NOTE: Moving the keys from /tmp because of storage constraints. This is OK
+# because building deb is the last step and therefore keys, genesis ledger, and
+# proof are not required in /tmp
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
-for key in $compile_keys
+compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
+for key in ${compile_keys[*]}
 do
     echo -n "Looking for keys matching: ${key} -- "
 
@@ -85,7 +92,7 @@ do
     for f in  /tmp/s3_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in s3 key set"
-            cp /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
@@ -93,7 +100,7 @@ do
     for f in  /var/lib/coda/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in stable key set"
-            cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
@@ -101,16 +108,29 @@ do
     for f in  /tmp/coda_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [WARN] found key in compile-time set"
-            cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
             break
         fi
     done
 done
 
-# Genesis Ledger Copy
+# Genesis Ledger/proof Copy
 for f in /tmp/coda_cache_dir/genesis*; do
-    cp /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    if [ -e "$f" ]; then
+        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    fi
 done
+
+# Copy genesis Ledger/proof if they were downloaded from s3
+for f in /tmp/s3_cache_dir/genesis*; do
+    if [ -e "$f" ]; then
+        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    fi
+done
+
+
+#copy config.json
+cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -130,18 +150,6 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
-# Tar up keys for an artifact
-echo "------------------------------------------------------------"
-if [ -z "$(ls -A ${BUILDDIR}/var/lib/coda)" ]; then
-    echo "PV Key Dir Empty"
-    touch "${cwd}/coda_pvkeys_EMPTY"
-else
-    echo "Creating PV Key Tar"
-    pushd "${BUILDDIR}/var/lib/coda"
-    tar -cvjf "${cwd}"/coda_pvkeys_"${GITHASH}"_"${DUNE_PROFILE}".tar.bz2 * ; \
-    popd
-fi
-ls -lh coda_pvkeys_*
 
 # second deb without the proving keys -- FIXME: DRY
 echo "------------------------------------------------------------"
@@ -159,12 +167,24 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
 # remove proving keys
-rm -f "${BUILDDIR}"/var/lib/coda/*_proving
+rm -f "${BUILDDIR}"/var/lib/coda/step*
+rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb
+
+#remove build dir
+rm -rf "${BUILDDIR}"
+
+
+# Export variables for use with downstream circle-ci steps (see buildkite/scripts/publish-deb.sh for BK DOCKER_DEPLOY_ENV)
+echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV

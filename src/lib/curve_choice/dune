@@ -1,7 +1,0 @@
-(library
- (name curve_choice)
- (public_name curve_choice)
- (libraries snarkette snarky)
- (preprocessor_deps ../../config.mlh)
- (preprocess
-  (pps ppx_version ppx_optcomp ppx_sexp_conv ppx_deriving_yojson)))

@@ -1,5 +1,4 @@
 open Core
-open Snark_params
 open Signature_lib
 open Merkle_ledger
 
@@ -61,8 +60,6 @@ module Ledger_inner = struct
         let empty_account = Ledger_hash.of_digest Account.empty_digest
       end
     end]
-
-    type t = Stable.Latest.t
   end
 
   module Account = struct
@@ -77,11 +74,18 @@ module Ledger_inner = struct
 
         let balance Account.Poly.{balance; _} = balance
 
+        let token Account.Poly.{token_id; _} = token_id
+
         let empty = Account.empty
+
+        let token_owner ({token_permissions; _} : t) =
+          match token_permissions with
+          | Token_owned _ ->
+              true
+          | Not_owned _ ->
+              false
       end
     end]
-
-    type t = Stable.Latest.t
 
     let empty = Stable.Latest.empty
 
@@ -239,13 +243,18 @@ module Ledger_inner = struct
     let accounts = to_list t in
     List.fold_until accounts ~init ~f ~finish
 
-  let create_new_account_exn t pk account =
-    let action, _ = get_or_create_account_exn t pk account in
-    assert (action = `Added)
+  let create_new_account_exn t account_id account =
+    let action, _ = get_or_create_account_exn t account_id account in
+    if action = `Existed then
+      failwith
+        (sprintf
+           !"Could not create a new account with pk \
+             %{sexp:Public_key.Compressed.t}: Account already exists"
+           (Account_id.public_key account_id))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
-    Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
+    Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger account_id =
     let action, loc =
@@ -277,10 +286,10 @@ module Ledger_inner = struct
         match request with
         | Ledger_hash.Get_element idx ->
             let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide (elt, path))
         | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide path)
         | Ledger_hash.Set (idx, account) ->
             set_at_index_exn t idx account ;
@@ -295,10 +304,15 @@ end
 include Ledger_inner
 include Transaction_logic.Make (Ledger_inner)
 
-let gen_initial_ledger_state :
-    (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
-    array
-    Quickcheck.Generator.t =
+type init_state =
+  ( Signature_lib.Keypair.t
+  * Currency.Amount.t
+  * Coda_numbers.Account_nonce.t
+  * Account_timing.t )
+  array
+[@@deriving sexp_of]
+
+let gen_initial_ledger_state : init_state Quickcheck.Generator.t =
   let open Quickcheck.Generator.Let_syntax in
   let%bind n_accounts = Int.gen_incl 2 10 in
   let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
@@ -320,26 +334,22 @@ let gen_initial_ledger_state :
     | [], [], [] ->
         []
     | x :: xs, y :: ys, z :: zs ->
-        (x, y, z) :: zip3_exn xs ys zs
+        (x, y, z, Account_timing.Untimed) :: zip3_exn xs ys zs
     | _ ->
         failwith "zip3 unequal lengths"
   in
   return @@ Array.of_list @@ zip3_exn keypairs balances nonces
 
-type init_state =
-  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
-  array
-[@@deriving sexp_of]
-
 let apply_initial_ledger_state : t -> init_state -> unit =
  fun t accounts ->
-  Array.iter accounts ~f:(fun (kp, balance, nonce) ->
+  Array.iter accounts ~f:(fun (kp, balance, nonce, timing) ->
       let pk_compressed = Public_key.compress kp.public_key in
       let account_id = Account_id.create pk_compressed Token_id.default in
       let account = Account.initialize account_id in
       let account' =
         { account with
           balance= Currency.Balance.of_int (Currency.Amount.to_int balance)
-        ; nonce }
+        ; nonce
+        ; timing }
       in
       create_new_account_exn t account_id account' )

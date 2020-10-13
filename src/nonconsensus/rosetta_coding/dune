@@ -1,0 +1,9 @@
+(library
+ (name rosetta_coding_nonconsensus)
+ (public_name rosetta_coding_nonconsensus)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel snark_params_nonconsensus signature_lib_nonconsensus)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_version ppx_optcomp ppx_let ppx_inline_test bisect_ppx -- --conditional))
+ (synopsis "Encoders and decoders for Rosetta, nonconsensus"))

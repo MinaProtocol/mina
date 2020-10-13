@@ -1,0 +1,7 @@
+(library
+ (name outside_hash_image)
+ (public_name outside_hash_image)
+ (libraries snark_params)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_version ppx_optcomp bisect_ppx -- --conditional)))

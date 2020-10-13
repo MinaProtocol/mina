@@ -59,11 +59,9 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
         ~processed_transition_writer ) ;
   trace_recurring "catchup" (fun () ->
-      Ledger_catchup.run ~logger
-        ~consensus_constants:precomputed_values.consensus_constants
-        ~constraint_constants:precomputed_values.constraint_constants
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
-        ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ) ;
+      Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
+        ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+        ~unprocessed_transition_cache ) ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;

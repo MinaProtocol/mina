@@ -1,0 +1,105 @@
+# Coda Daemon
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: archive-node-{{ .Values.archive.nodeName }}
+  labels:
+    app: archive-node-{{ .Values.archive.nodeName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: archive-node-{{ .Values.archive.nodeName }}
+  template:
+    metadata:
+      labels:
+        app: archive-node-{{ .Values.archive.nodeName }}
+        testnet: {{ $.Values.testnetName }}
+        role: archive-node
+        version: {{ (split ":" $.Values.coda.image)._1 }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '10000'
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: coda
+        resources:
+          limits:
+            memory: 6.0Gi
+          requests:
+            memory: 2.0Gi
+            cpu: 1000m
+        image: {{ $.Values.coda.image }}
+        command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
+        args: [ "daemon",
+          "-log-level", {{ $.Values.coda.logLevel }},
+          "-log-json",
+          {{- if $.Values.coda.logReceivedBlocks }}
+          "-log-received-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.coda.logSnarkWorkGossip }}
+          "-log-snark-work-gossip", "true",
+          {{- end -}}
+          {{- range $.Values.coda.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end -}}
+          {{- if $.Values.coda.enableFlooding }}
+          "-enable-flooding true"
+          {{- end -}}
+          {{- if $.Values.coda.peerExchange }}
+          "-peer-exchange true"
+          {{- end -}}
+          {{- range $.Values.coda.directPeers }}
+          "-direct-peers", {{ . | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.coda-config",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          "-insecure-rest-server",
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-archive-address", "3086",
+          {{- if (ne $.Values.coda.runtimeConfig "") -}}
+          "-config-file", "/config/daemon.json",
+          "-generate-genesis-proof", "true",
+          {{- end -}}
+        ]
+        env:
+          - name: DAEMON_REST_PORT
+            value: "3085"
+          - name: DAEMON_ARCHIVE_PORT
+            value: "3086"
+          - name: DAEMON_CLIENT_PORT
+            value: "8301"
+          - name: DAEMON_METRICS_PORT
+            value: "10000"
+          - name: DAEMON_EXTERNAL_PORT
+            value: {{ .Values.archive.hostPort | quote }}
+        ports:
+          - containerPort: {{ .Values.archive.hostPort }}
+            hostPort: {{ .Values.archive.hostPort }}
+            protocol: TCP
+        imagePullPolicy: Always
+        volumeMounts: 
+        - name: config-dir
+          mountPath: /root/.coda-config
+        {{- if (ne $.Values.coda.runtimeConfig "") }}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+      # Archive Process
+      - name: archive
+        image: {{ $.Values.archive.image }}
+        command: ["bash", "-c"]
+        args: [ "coda-archive -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port 3086" ]
+        env:
+        imagePullPolicy: Always
+      volumes:
+      - name: config-dir
+        emptyDir: {}
+      {{- if (ne $.Values.coda.runtimeConfig "") }}
+      - name: daemon-config
+        configMap:
+          name: archive-daemon-config
+      {{- end }}

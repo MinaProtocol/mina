@@ -67,7 +67,7 @@ module Make (Inputs : Inputs_intf) :
     let _, merkle_list =
       Merkle_list_prover.prove ~context:frontier best_verified_tip
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+    [%log debug]
       ~metadata:
         [ ( "merkle_list"
           , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
@@ -88,7 +88,7 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> validate_proof ~verifier
+      |> (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
                `This_transition_was_not_received_via_gossip)

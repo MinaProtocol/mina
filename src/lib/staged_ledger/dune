@@ -4,9 +4,9 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core lens transaction_snark_scan_state sgn transaction_snark coda_base  merkle_mask pipe_lib logger
-  async async_extra module_version ledger_proof verifier transaction_snark_work staged_ledger_diff)
+  async async_extra ledger_proof verifier transaction_snark_work staged_ledger_diff)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps
-  ppx_optcomp lens.ppx_deriving ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_deriving.eq ppx_deriving.make
-  ppx_deriving_yojson ppx_custom_printf ppx_let ppx_inline_test ppx_assert ppx_pipebang))
+  ppx_optcomp lens.ppx_deriving ppx_coda ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_deriving.eq ppx_deriving.make
+  ppx_deriving_yojson ppx_custom_printf ppx_let ppx_inline_test ppx_assert ppx_pipebang bisect_ppx -- --conditional))
  (synopsis "Staged Ledger updates the current ledger with new transactions"))

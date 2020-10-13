@@ -6,8 +6,8 @@
  (libraries core debug_assert logger coda_intf async async_extra
    unix_timestamp staged_ledger network_pool)
  (preprocess
-  (pps ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
+  (pps ppx_coda ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
     ppx_custom_printf ppx_inline_test ppx_optcomp bisect_ppx --
-    -conditional))
+    --conditional))
  (preprocessor_deps ../../config.mlh)
  (synopsis "Selects work from the work pool"))

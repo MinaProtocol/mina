@@ -1,0 +1,11 @@
+(executable
+  (package dhall_types)
+  (name dump_dhall_types)
+  (public_name dump_dhall_types)
+  (libraries
+    async_kernel
+    core
+    runtime_config
+    ppx_dhall_type)
+  (preprocessor_deps ../../config.mlh)
+  (preprocess (pps ppx_version ppx_let bisect_ppx -- --conditional)))

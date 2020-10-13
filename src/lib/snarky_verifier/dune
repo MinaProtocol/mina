@@ -1,10 +1,10 @@
 (library
   (name snarky_verifier)
   (public_name snarky_verifier)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane h_list.ppx ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries
     sgn_type
     snarky_curves
-    snarky
+    snarky.backendless
     snarkette
     core_kernel ))

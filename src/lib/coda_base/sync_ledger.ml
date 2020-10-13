@@ -15,8 +15,7 @@ end
 module Root_hash = struct
   include Ledger_hash
 
-  let to_hash (h : t) =
-    Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+  let to_hash (h : t) = Ledger_hash.of_digest (h :> Random_oracle.Digest.t)
 end
 
 module Mask = Syncable_ledger.Make (struct
@@ -62,9 +61,6 @@ module Answer = struct
       let to_latest = Fn.id
     end
   end]
-
-  (* bin_io omitted from deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 module Query = struct
@@ -78,6 +74,4 @@ module Query = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end

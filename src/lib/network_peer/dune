@@ -1,5 +1,5 @@
 (library
   (name network_peer)
   (public_name network_peer)
-  (libraries core module_version async async_rpc_kernel)
-  (preprocess (pps ppx_deriving.eq ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))
+  (libraries core async async_rpc_kernel)
+  (preprocess (pps ppx_deriving.eq ppx_coda ppx_version ppx_jane ppx_deriving_yojson bisect_ppx -- --conditional)))

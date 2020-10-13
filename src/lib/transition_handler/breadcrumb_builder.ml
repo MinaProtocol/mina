@@ -5,7 +5,7 @@ open Cache_lib
 open Coda_transition
 open Network_peer
 
-let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
+let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   (* If the breadcrumb we are targetting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
@@ -19,7 +19,7 @@ let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
             "Transition frontier already garbage-collected the parent of %s"
             (Coda_base.State_hash.to_base58_check initial_hash)
         in
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        [%log error]
           ~metadata:
             [ ("state_hash", Coda_base.State_hash.to_yojson initial_hash)
             ; ( "transition_hashes"
@@ -95,7 +95,7 @@ let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
                 match%bind
                   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
                       Transition_frontier.Breadcrumb.build ~logger
-                        ~constraint_constants ~verifier ~trust_system ~parent
+                        ~precomputed_values ~verifier ~trust_system ~parent
                         ~transition:mostly_validated_transition
                         ~sender:(Some sender) )
                 with
@@ -120,15 +120,15 @@ let build_subtrees_of_breadcrumbs ~logger ~constraint_constants ~verifier
                         Envelope.Incoming.sender (Cached.peek node)
                       in
                       List.fold subtree_nodes
-                        ~init:(Set.empty (module Unix.Inet_addr))
+                        ~init:(Set.empty (module Network_peer.Peer))
                         ~f:(fun inet_addrs node ->
                           match sender_from_tree_node node with
                           | Local ->
                               failwith
                                 "build_subtrees_of_breadcrumbs: sender of \
                                  external transition should not be Local"
-                          | Remote (inet_addr, _peer_id) ->
-                              Set.add inet_addrs inet_addr )
+                          | Remote peer ->
+                              Set.add inet_addrs peer )
                     in
                     let ip_addresses = Set.to_list ip_address_set in
                     let trust_system_record_invalid msg error =

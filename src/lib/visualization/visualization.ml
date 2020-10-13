@@ -10,7 +10,7 @@ let display_short_sexp (type t) (module M : Sexpable.S with type t = t)
   value |> [%sexp_of: M.t] |> Sexp.to_string |> display_prefix_of_string
 
 (* converts a json structure into a presentable node in a dot file *)
-let rec to_dot (json : Yojson.Safe.json) =
+let rec to_dot (json : Yojson.Safe.t) =
   match json with
   | `Int value ->
       Int.to_string value

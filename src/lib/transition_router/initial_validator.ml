@@ -32,10 +32,37 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     Trust_system.record_envelope_sender trust_system logger sender
       (action, Some (message', metadata))
   in
+  let metadata =
+    match error with
+    | `Invalid_time_received `Too_early ->
+        [ ("reason", `String "invalid time")
+        ; ("time_error", `String "too early") ]
+    | `Invalid_time_received (`Too_late slot_diff) ->
+        [ ("reason", `String "invalid time")
+        ; ("time_error", `String "too late")
+        ; ("slot_diff", `String (Int64.to_string slot_diff)) ]
+    | `Invalid_genesis_protocol_state ->
+        [("reason", `String "invalid genesis state")]
+    | `Invalid_proof ->
+        [("reason", `String "invalid proof")]
+    | `Invalid_delta_transition_chain_proof ->
+        [("reason", `String "invalid delta transition chain proof")]
+    | `Verifier_error err ->
+        [ ("reason", `String "verifier error")
+        ; ("error", `String (Error.to_string_hum err)) ]
+    | `Mismatched_protocol_version ->
+        [("reason", `String "protocol version mismatch")]
+    | `Invalid_protocol_version ->
+        [("reason", `String "invalid protocol version")]
+  in
+  [%log error]
+    ~metadata:(("state_hash", State_hash.to_yojson state_hash) :: metadata)
+    "Validation error: external transition with state hash $state_hash was \
+     rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
       let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      [%log fatal]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
@@ -125,7 +152,7 @@ module Duplicate_block_detector = struct
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
     | Some hash ->
         if not (State_hash.equal hash protocol_state_hash) then
-          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          [%log error]
             ~metadata:
               [ ( "block_producer"
                 , Public_key.Compressed.to_yojson block_producer )
@@ -176,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                |> defer
                     (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= validate_proof ~verifier
+               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
                >>= defer validate_delta_transition_chain
                >>= defer validate_protocol_versions)
            with
@@ -196,7 +223,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  blockchain_length ;
                return ()
            | Error error ->
-               is_valid_cb false ;
+               is_valid_cb `Reject ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  ~delta:genesis_constants.protocol.delta error )

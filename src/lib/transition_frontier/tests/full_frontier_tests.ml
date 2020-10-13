@@ -14,25 +14,27 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let constraint_constants = precomputed_values.constraint_constants
 
     let ledger_depth = constraint_constants.ledger_depth
 
-    let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    module Genesis_ledger = (val precomputed_values.genesis_ledger)
+
+    let accounts_with_secret_keys = Lazy.force Genesis_ledger.accounts
 
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~proof_level ~precomputed_values
-        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ~precomputed_values ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ~precomputed_values
-        ?verifier:None ?trust_system:None ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
 
@@ -53,12 +55,12 @@ let%test_module "Full_frontier tests" =
       in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-          ~genesis_ledger:Test_genesis_ledger.t ~epoch_ledger_location
+          ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
       in
       let root_ledger =
         Or_error.ok_exn
           (Transfer.transfer_accounts
-             ~src:(Lazy.force Test_genesis_ledger.t)
+             ~src:(Lazy.force Genesis_ledger.t)
              ~dest:(Ledger.create ~depth:ledger_depth ()))
       in
       let root_data =

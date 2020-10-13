@@ -22,6 +22,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Sent_invalid_signature_or_proof
+        (** Peer either sent us a proof or a signature that does not verify. *)
     | Sent_invalid_protocol_version
         (** Peer sent block with invalid protocol version *)
     | Sent_mismatched_protocol_version
@@ -54,7 +56,7 @@ module Actions = struct
 
   (** The action they took, paired with a message and associated JSON metadata
       for logging. *)
-  type t = action * (string * (string, Yojson.Safe.json) List.Assoc.t) option
+  type t = action * (string * (string, Yojson.Safe.t) List.Assoc.t) option
 
   let to_trust_response (action, _) =
     let open Peer_trust.Trust_response in
@@ -96,6 +98,8 @@ module Actions = struct
     | Sent_invalid_signature ->
         Insta_ban
     | Sent_invalid_proof ->
+        Insta_ban
+    | Sent_invalid_signature_or_proof ->
         Insta_ban
     | Sent_invalid_protocol_version ->
         Insta_ban
@@ -139,7 +143,7 @@ module Actions = struct
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
 
-  let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
+  let to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t =
    fun (action, extra_opt) ->
     match extra_opt with
     | None ->
@@ -163,9 +167,9 @@ let record_envelope_sender :
   match sender with
   | Local ->
       let action_fmt, action_metadata = Actions.to_log action in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      [%log debug]
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
-  | Remote (inet_addr, _peer_id) ->
-      record t logger inet_addr action
+  | Remote peer ->
+      record t logger peer action

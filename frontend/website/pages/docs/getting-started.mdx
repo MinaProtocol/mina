@@ -3,38 +3,30 @@ export default Page({title: "Getting Started"});
 
 # Getting Started
 
-<Alert kind="welcome">
-
-Welcome to [Coda Genesis Program](https://codaprotocol.com/genesis) applicants!
-
-Thank you for helping us reach the milestone of over 150 active participants! We're working hard to improve the testnet's ability to handle a large magnitude of new node operators.
- 
-Documentation on how to run a node is still accurate and up to date, and we’d love for you to continue to familiarize yourself with how to run a Coda node.
-
-As always we will continue to post updates in the #announcements channel in [Discord](https://bit.ly/CodaDiscord).
-
-</Alert>
-
-This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
+Welcome to Coda Genesis Program applicants! This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 <Alert>
 
-  This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.13-beta`.
-
-  **For the 3.2a testnet, we are not running a live network. Instead, we encourage you to play with the [Sandbox Node](/docs/developers/sandbox-node).**
+  This documentation is for the **beta** release. The commands and APIs may change before the initial release. Last updated for version `0.0.15-beta`.
 
 </Alert>
 
 ## Requirements
 
+<Alert kind="warning">
+
+  For release 3.3, the recommended hardware requirements have changed. This increase in hardware requirements is a temporary measure for this release only, and is not reflective of the hardware requirements for future testnets or the mainnet.
+
+</Alert>
+
 **Software**: macOS or Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
 
 Note: Windows is not officially supported at this time. However, community members succeeded in setting up nodes using Windows Subsystem for Linux. Click [here](https://codawiki.com/index.php?title=Coda_on_Windows) for instructions on using Windows, which are created by the community.
 
-**Hardware**: Sending and receiving coda does not require any special hardware, but running a block producer on the Coda network currently requires:
+**Hardware**: Sending and receiving coda does not require any special hardware, but the recommended requirements for running a block producer on the Coda network is currently:
 
-- at least a 4-core processor
-- at least 8GB of RAM
+- at least an 8-core processor
+- at least 12GB of RAM
 
 Note that if you plan on running a snark worker node, you may need more RAM -- 16GB is recommended. GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
 
@@ -47,6 +39,8 @@ O(1) Labs has tested running nodes on several cloud providers, and recommends th
 - GCP - [c2-standard-4](https://cloud.google.com/compute/docs/machine-types)
 - Azure - [Standard_F8s_v2](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes-compute#fsv2-series-1)
 - Digital Ocean - [c-8-16gib](https://cloud.digitalocean.com/droplets/new?size=c-8-16gib)
+
+Check out our [guide](https://www.youtube.com/watch?v=iSrtjxOsC6A) for how to configure your Coda node on Google Cloud.
 
 ## Installation
 
@@ -83,7 +77,9 @@ sudo apt-get remove coda-testnet-postake-medium-curves
 sudo apt-get remove coda-kademlia
 echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
 sudo apt-get update
-sudo apt-get install -t release coda-testnet-postake-medium-curves
+sudo apt-get install coda-testnet-postake-medium-curves
+# optionally, install the archive node
+sudo apt-get install coda-archive
 ```
 
 If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
@@ -107,6 +103,7 @@ You may need to configure your router's port forwarding to allow inbound traffic
 - `TCP` port `8302` and `8303`
 
 For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwarding).
+
 ## Next
  
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!

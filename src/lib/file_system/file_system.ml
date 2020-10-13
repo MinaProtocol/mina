@@ -1,6 +1,13 @@
 open Core
 open Async
 
+let dir_exists dir =
+  let%bind access_res = Unix.access dir [`Exists] in
+  if Result.is_ok access_res then
+    let%map stat = Unix.stat dir in
+    Unix.Stats.kind stat = `Directory
+  else return false
+
 let remove_dir dir =
   let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; dir] () in
   Deferred.unit

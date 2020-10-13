@@ -1,7 +1,7 @@
 (library
   (name pokolog)
   (public_name pokolog)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
   (libraries
-    snarky
+    snarky.backendless
     core_kernel ))

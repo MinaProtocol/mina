@@ -12,15 +12,13 @@
   bitstring
   cache_dir
   direction
-  dyn_array
   empty_hashes
   immutable_array
   key_value_database
   merkle_address
-  module_version
   non_empty_list
   signature_lib
   visualization)
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson bisect_ppx -- --conditional))
  (synopsis "Implementation of different account databases"))

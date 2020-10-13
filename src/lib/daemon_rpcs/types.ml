@@ -4,6 +4,8 @@ open Async
 module Git_sha = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = string [@@deriving sexp, to_yojson, eq]
 
@@ -204,6 +206,8 @@ module Status = struct
 
     let state_hash = string_option_entry "Protocol state hash"
 
+    let chain_id = string_entry "Chain id"
+
     let commit_id = string_entry "Git SHA-1"
 
     let conf_dir = string_entry "Configuration directory"
@@ -261,6 +265,7 @@ module Status = struct
       let ms_to_string i =
         float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
       in
+      (* Time.to_string is safe here because this is for display. *)
       let time_to_string = Fn.compose Time.to_string Block_time.to_time in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
@@ -310,6 +315,7 @@ module Status = struct
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
+    ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
     ; peers: string list
@@ -341,8 +347,8 @@ module Status = struct
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
-      ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
+      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
       ~consensus_time_now ~consensus_mechanism ~consensus_configuration
       ~next_block_production ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id

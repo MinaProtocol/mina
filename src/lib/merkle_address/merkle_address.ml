@@ -95,8 +95,6 @@ let height ~ledger_depth path = ledger_depth - depth path
 
 let get = get
 
-type t = Stable.Latest.t
-
 [%%define_locally
 Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
 
@@ -267,12 +265,10 @@ let%test "Bitstring bin_io serialization does not change" =
      has roots in a piece of classical Latin literature."
   in
   let bitstring = Bitstring.bitstring_of_string text in
-  let known_good_hash =
-    "\x0D\xF3\x25\xCE\xD4\x05\xBD\x6C\xB9\xC6\x88\x9E\x16\xD1\x4A\x1B\xEF\xB8\xBC\x3F\xB7\x16\x58\xCB\xC6\x16\xAC\x4B\xD6\x3B\x70\x5B"
-  in
-  Ppx_version.Serialization.check_serialization
+  let known_good_digest = "c4c7ade09ba305b69ffac494a6eab60e" in
+  Ppx_version_runtime.Serialization.check_serialization
     (module Stable.V1)
-    bitstring known_good_hash
+    bitstring known_good_digest
 
 module Make_test (Input : sig
   val depth : int

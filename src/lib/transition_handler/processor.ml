@@ -22,7 +22,7 @@ module Transition_frontier_validation =
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
     ( precomputed_values.genesis_constants.protocol.delta
-      * Coda_compile_config.block_window_duration_ms
+      * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
@@ -52,7 +52,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       | Some _ ->
           Transition_frontier.add_breadcrumb_exn frontier breadcrumb
       | None ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          [%log warn]
             !"When trying to add breadcrumb, its parent had been removed from \
               transition frontier: %{sexp: State_hash.t}"
             parent_hash ;
@@ -123,7 +123,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           in
           Error ()
       | Error `Already_in_frontier ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+          [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
              is is already in the transition frontier" ;
           let (_ : External_transition.Initial_validated.t Envelope.Incoming.t)
@@ -172,15 +172,14 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     let%bind breadcrumb =
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
-          Transition_frontier.Breadcrumb.build ~logger
-            ~constraint_constants:precomputed_values.constraint_constants
+          Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~sender:(Some sender)
             ~parent:parent_breadcrumb ~transition:mostly_validated_transition
           )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              [%log error]
                 ~metadata:
                   (metadata @ [("error", `String (Error.to_string_hum error))])
                 "Error while building breadcrumb in the transition handler \
@@ -243,8 +242,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
        , unit )
        Writer.t) ~processed_transition_writer =
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger
-      ~constraint_constants:precomputed_values.constraint_constants ~verifier
+    Catchup_scheduler.create ~logger ~precomputed_values ~verifier
       ~trust_system ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
@@ -302,7 +300,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                                Cached.invalidate_with_failure cached_breadcrumb
                              in
                              () ) ) ;
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                     [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
                         transition frontier: %s"
                        (Error.to_string_hum err) )
@@ -333,8 +331,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                    | Ok () ->
                        ()
                    | Error err ->
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
+                       [%log error]
                          ~metadata:
                            [("error", `String (Error.to_string_hum err))]
                          "Error, failed to attach produced breadcrumb to \
@@ -362,9 +359,9 @@ let%test_module "Transition_handler.Processor tests" =
 
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -384,8 +381,8 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~proof_level
-           ~precomputed_values ~max_length ~frontier_size ~branch_size ())
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~max_length ~frontier_size ~branch_size ())
         ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
@@ -440,8 +437,7 @@ let%test_module "Transition_handler.Processor tests" =
                                     next_expected_breadcrumb)
                                  (External_transition.Validated.state_hash
                                     newly_added_transition) ;
-                               Logger.info logger ~module_:__MODULE__
-                                 ~location:__LOC__
+                               [%log info]
                                  ~metadata:
                                    [ ( "height"
                                      , `Int

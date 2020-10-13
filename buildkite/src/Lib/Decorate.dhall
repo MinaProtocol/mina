@@ -2,21 +2,33 @@
 
 let Prelude = ../External/Prelude.dhall
 
+let Optional/fold_ = Prelude.Optional.fold
 
-let decorate = \(run : Text) ->
-    [
-      "echo \"--\"",
-      "echo \"-- Running: ${run} --\"",
-      "echo \"--\"",
-      run
-    ]
+let Cmd = ./Cmds.dhall
 
+
+let decorate : Cmd.Type -> List Text = \(run : Cmd.Type) ->
+  Optional/fold_
+    Text
+    run.readable
+    (List Text)
+    (\(readable : Text) ->
+      [
+        "echo \"--\"",
+        "echo \"-- Running: ${readable} --\"",
+        "echo \"--\"",
+        run.line
+      ])
+    [ run.line ]
 in
 
 {
   decorate = decorate,
-  decorateAll = \(commands : List Text) ->
-    Prelude.List.concat Text
-      (Prelude.List.map Text (List Text) decorate commands)
+  decorateAll = \(commands : List Cmd.Type) ->
+    Prelude.List.concatMap
+      Cmd.Type
+      Text
+      decorate
+      commands
 }
 

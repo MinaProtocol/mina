@@ -84,34 +84,17 @@ module Compressed = struct
        *)
 
       [%%if
-      curve_size = 298]
+      curve_size = 255]
 
       let%test "nonzero_curve_point_compressed v1" =
         let point =
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_hash =
-          "\xC3\x5E\x26\x42\xA5\x04\x4A\x9D\x00\x17\xD8\x3E\xED\x84\x08\xDB\xD1\xA0\xCE\x13\x13\x10\x28\x80\x74\xD4\xF1\x25\x6C\x87\x44\x04"
-        in
-        Ppx_version.Serialization.check_serialization
+        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
+        Ppx_version_runtime.Serialization.check_serialization
           (module V1)
-          point known_good_hash
-
-      [%%elif
-      curve_size = 753]
-
-      let%test "nonzero_curve_point_compressed v1" =
-        let point =
-          Quickcheck.random_value
-            ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
-        in
-        let known_good_hash =
-          "\x4C\x68\x08\xF4\xC0\xB7\xF1\x41\xFE\xDF\x43\x55\xDA\xB6\x13\xD4\x69\x46\x04\x51\x58\xF7\x92\x51\x02\x5B\x2B\x20\x3F\x6F\x2C\x11"
-        in
-        Ppx_version.Serialization.check_serialization
-          (module V1)
-          point known_good_hash
+          point known_good_digest
 
       [%%else]
 
@@ -134,9 +117,6 @@ module Compressed = struct
 
   let compress (x, y) = {Poly.x; is_odd= parity y}
 
-  (* sexp operations written manually, don't derive them *)
-  type t = (Field.t, bool) Poly.t [@@deriving eq, compare, hash]
-
   let empty = Poly.{x= Field.zero; is_odd= false}
 
   let to_input {Poly.x; is_odd} =
@@ -149,14 +129,10 @@ module Compressed = struct
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
-  let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
-
-  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t =
-    Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
-
   let typ : (var, t) Typ.t =
-    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Typ.of_hlistable [Field.typ; Boolean.typ] ~var_to_hlist:Poly.to_hlist
+      ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
+      ~value_of_hlist:Poly.of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
     {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
@@ -252,11 +228,6 @@ module Uncompressed = struct
         Option.value_exn (decompress @@ Compressed.t_of_sexp sexp)
     end
   end]
-
-  type t =
-    Field.t * Field.t
-    (* sexp operations written manually, don't derive them *)
-  [@@deriving compare, hash]
 
   (* so we can make sets of public keys *)
   include Comparable.Make_binable (Stable.Latest)

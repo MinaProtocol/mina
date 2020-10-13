@@ -12,7 +12,7 @@
 
 open Core
 open Snark_params
-open Snarky
+open Snarky_backendless
 open Tick
 open Signature_lib
 open Currency
@@ -32,19 +32,17 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, to_yojson]
       end
 
       module Latest = V1
     end
 
-    type t = Stable.Latest.t
-
-    type value [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
     type var = Public_key.Compressed.var * Amount.var
 
-    val typ : (var, value) Typ.t
+    val typ : (var, t) Typ.t
 
     val empty : t
 
@@ -82,7 +80,7 @@ module type S = sig
 
     val empty_hash : t
 
-    val of_digest : Pedersen.Digest.t -> t
+    val of_digest : Random_oracle.Digest.t -> t
   end
 
   module Hash_versioned : sig
@@ -92,18 +90,13 @@ module type S = sig
         type nonrec t = Hash.t [@@deriving sexp, compare, eq, yojson, hash]
       end
     end]
-
-    type nonrec t = Stable.Latest.t
-    [@@deriving sexp, compare, eq, yojson, hash]
   end
 
   module Stack_versioned : sig
-    type t [@@deriving sexp, compare, eq, yojson, hash]
-
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type nonrec t = t [@@deriving sexp, compare, eq, yojson, hash]
+        type nonrec t [@@deriving sexp, compare, eq, yojson, hash]
       end
     end]
   end
@@ -153,13 +146,18 @@ module type S = sig
 
       val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
 
+      val check_merge :
+           transition1:t * t
+        -> transition2:t * t
+        -> (Boolean.var, _) Tick.Checked.t
+
       val empty : t
 
       val create_with : t -> t
     end
   end
 
-  module Coinbase_stack_state : sig
+  module State_stack : sig
     type t
   end
 
@@ -177,13 +175,6 @@ module type S = sig
         end
       end]
 
-      type t = Stable.Latest.t =
-        | Update_none
-        | Update_one
-        | Update_two_coinbase_in_first
-        | Update_two_coinbase_in_second
-      [@@deriving sexp]
-
       type var = Boolean.var * Boolean.var
 
       val typ : (var, t) Typ.t
@@ -191,21 +182,31 @@ module type S = sig
       val var_of_t : t -> var
     end
 
+    module Poly : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type ('action, 'coinbase_data) t =
+            {action: 'action; coinbase_data: 'coinbase_data}
+          [@@deriving sexp]
+        end
+      end]
+    end
+
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
-          Action.Stable.V1.t
-          * Coinbase_data.Stable.V1.t
-          * State_body_hash.Stable.V1.t
-        [@@deriving sexp]
+          (Action.Stable.V1.t, Coinbase_data.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, to_yojson]
       end
+    end]
 
-      module Latest = V1
-    end
+    type var = (Action.var, Coinbase_data.var) Poly.t
 
-    type t = Stable.Latest.t
+    val genesis : t
 
-    type var = Action.var * Coinbase_data.var * State_body_hash.var
+    val typ : (var, t) Typ.t
 
     val var_of_t : t -> var
   end
@@ -256,7 +257,7 @@ module type S = sig
           Update.Action.t
           -> (Address.value * Address.value) Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
-      | Get_previous_stack : Coinbase_stack_state.t Request.t
+      | Get_previous_stack : State_stack.t Request.t
 
     val get : depth:int -> var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
@@ -270,6 +271,8 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> Update.var
+      -> supercharge_coinbase:Boolean.var
+      -> State_body_hash.var
       -> (var, 's) Tick.Checked.t
 
     (**

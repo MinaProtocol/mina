@@ -18,6 +18,11 @@ module type Gossip_net_intf = sig
 
   val initial_peers : t -> Coda_net2.Multiaddr.t list
 
+  val connection_gating : t -> Coda_net2.connection_gating Deferred.t
+
+  val set_connection_gating :
+    t -> Coda_net2.connection_gating -> Coda_net2.connection_gating Deferred.t
+
   val random_peers : t -> int -> Peer.t list Deferred.t
 
   val random_peers_except :
@@ -43,9 +48,8 @@ module type Gossip_net_intf = sig
 
   val received_message_reader :
        t
-    -> (Message.msg Envelope.Incoming.t * (bool -> unit)) Strict_pipe.Reader.t
+    -> (Message.msg Envelope.Incoming.t * (Coda_net2.validation_result -> unit))
+       Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
-
-  val net2 : t -> Coda_net2.net option
 end

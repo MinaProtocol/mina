@@ -1,9 +1,0 @@
-(library
- (name logging_events)
- (public_name logging_events)
- (inline_tests)
- (library_flags -linkall)
- (libraries core_kernel yojson)
- (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_inline_test))
- (synopsis "Events, logging and parsing"))

@@ -1,5 +1,0 @@
-(library
-  (name chunk_table)
-  (public_name crypto_params.chunk_table)
-  (libraries curve_choice)
-  (preprocess (pps ppx_version -lint-version-syntax-warnings ppx_jane)))

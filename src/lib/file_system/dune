@@ -4,5 +4,5 @@
  (library_flags -linkall)
  (libraries core async)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps ppx_version ppx_jane bisect_ppx -- --conditional))
  (synopsis "Interface to make system calls to the Unix file system"))

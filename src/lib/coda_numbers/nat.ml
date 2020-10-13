@@ -14,6 +14,103 @@ open Snark_bits
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
 
+module Make_checked
+    (N : Unsigned_extended.S)
+    (Bits : Bits_intf.Convertible_bits with type t := N.t) =
+struct
+  open Bitstring_lib
+  open Snark_params.Tick
+  open Snarky_integer
+
+  type var = field Integer.t
+
+  let () = assert (Int.(N.length_in_bits < Field.size_in_bits))
+
+  let to_field = Integer.to_field
+
+  let of_bits bs = Integer.of_bits ~m bs
+
+  let to_bits t =
+    with_label
+      (sprintf "to_bits: %s" __LOC__)
+      (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
+
+  let to_input t =
+    Checked.map (to_bits t) ~f:(fun bits ->
+        Random_oracle.Input.bitstring
+          (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
+
+  let constant n = Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
+
+  (* warning: this typ does not work correctly with the generic if_ *)
+  let typ : (field Integer.t, N.t) Typ.t =
+    let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
+    let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
+    let alloc = Typ.Alloc.map typ.alloc ~f:of_bits in
+    let store t =
+      Typ.Store.map (typ.store (Fold.to_list (Bits.fold t))) ~f:of_bits
+    in
+    let check v =
+      typ.check (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v))
+    in
+    let read v =
+      let of_field_elt x =
+        let bs = List.take (Field.unpack x) N.length_in_bits in
+        (* TODO: Make this efficient *)
+        List.foldi bs ~init:N.zero ~f:(fun i acc b ->
+            if b then N.(logor (shift_left one i) acc) else acc )
+      in
+      Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
+    in
+    {alloc; store; check; read}
+
+  type t = var
+
+  let is_succ ~pred ~succ =
+    let open Snark_params.Tick in
+    let open Field in
+    Checked.(equal (to_field pred + Var.constant one) (to_field succ))
+
+  let min a b = make_checked (fun () -> Integer.min ~m a b)
+
+  let if_ c ~then_ ~else_ =
+    make_checked (fun () -> Integer.if_ ~m c ~then_ ~else_)
+
+  let succ_if t c =
+    make_checked (fun () ->
+        let t = Integer.succ_if ~m t c in
+        t )
+
+  let succ t =
+    make_checked (fun () ->
+        let t = Integer.succ ~m t in
+        t )
+
+  let op op a b = make_checked (fun () -> op ~m a b)
+
+  let add a b = op Integer.add a b
+
+  let equal a b = op Integer.equal a b
+
+  let ( < ) a b = op Integer.lt a b
+
+  let ( <= ) a b = op Integer.lte a b
+
+  let ( > ) a b = op Integer.gt a b
+
+  let ( >= ) a b = op Integer.gte a b
+
+  let ( = ) = equal
+
+  let to_integer = Fn.id
+
+  module Unsafe = struct
+    let of_integer = Fn.id
+  end
+
+  let zero = zero_checked
+end
+
 [%%else]
 
 open Snark_bits_nonconsensus
@@ -31,6 +128,9 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  (* can't be automatically derived *)
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   let max_value = N.max_int
 
   include Comparable.Make (N)
@@ -40,101 +140,7 @@ struct
   [%%ifdef
   consensus_mechanism]
 
-  module Checked = struct
-    open Bitstring_lib
-    open Snark_params.Tick
-    open Snarky_integer
-
-    type var = field Integer.t
-
-    let () = assert (Int.(N.length_in_bits < Field.size_in_bits))
-
-    let to_field = Integer.to_field
-
-    let of_bits bs = Integer.of_bits ~m bs
-
-    let to_bits t =
-      with_label
-        (sprintf "to_bits: %s" __LOC__)
-        (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
-
-    let to_input t =
-      Checked.map (to_bits t) ~f:(fun bits ->
-          Random_oracle.Input.bitstring
-            (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
-
-    let constant n =
-      Integer.constant ~length:N.length_in_bits ~m
-        (Bignum_bigint.of_int (N.to_int n))
-
-    (* warning: this typ does not work correctly with the generic if_ *)
-    let typ : (field Integer.t, t) Typ.t =
-      let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
-      let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
-      let alloc = Typ.Alloc.map typ.alloc ~f:of_bits in
-      let store t =
-        Typ.Store.map (typ.store (Fold.to_list (Bits.fold t))) ~f:of_bits
-      in
-      let check v =
-        typ.check (Bitstring.Lsb_first.to_list (Integer.to_bits_exn v))
-      in
-      let read v =
-        let of_field_elt x =
-          let bs = List.take (Field.unpack x) N.length_in_bits in
-          (* TODO: Make this efficient *)
-          List.foldi bs ~init:N.zero ~f:(fun i acc b ->
-              if b then N.(logor (shift_left one i) acc) else acc )
-        in
-        Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
-      in
-      {alloc; store; check; read}
-
-    type t = var
-
-    let is_succ ~pred ~succ =
-      let open Snark_params.Tick in
-      let open Field in
-      Checked.(equal (to_field pred + Var.constant one) (to_field succ))
-
-    let min a b = make_checked (fun () -> Integer.min ~m a b)
-
-    let if_ c ~then_ ~else_ =
-      make_checked (fun () -> Integer.if_ ~m c ~then_ ~else_)
-
-    let succ_if t c =
-      make_checked (fun () ->
-          let t = Integer.succ_if ~m t c in
-          t )
-
-    let succ t =
-      make_checked (fun () ->
-          let t = Integer.succ ~m t in
-          t )
-
-    let op op a b = make_checked (fun () -> op ~m a b)
-
-    let add a b = op Integer.add a b
-
-    let equal a b = op Integer.equal a b
-
-    let ( < ) a b = op Integer.lt a b
-
-    let ( <= ) a b = op Integer.lte a b
-
-    let ( > ) a b = op Integer.gt a b
-
-    let ( >= ) a b = op Integer.gte a b
-
-    let ( = ) = equal
-
-    let to_integer = Fn.id
-
-    module Unsafe = struct
-      let of_integer = Fn.id
-    end
-
-    let zero = zero_checked
-  end
+  module Checked = Make_checked (N) (Bits)
 
   (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
@@ -167,6 +173,8 @@ module Make32 () : UInt32 = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = UInt32.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 
@@ -196,6 +204,8 @@ module Make64 () : UInt64 = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = UInt64.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 

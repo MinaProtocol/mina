@@ -272,7 +272,11 @@ module NavWrapper = {
               width(`rem(22.25)),
               media(
                 Theme.MediaQuery.statusLift(keepAnnouncementBar),
-                [width(`rem(22.25)), margin(`auto)],
+                [
+                  width(`percent(100.)),
+                  maxWidth(`rem(28.)),
+                  margin(`auto),
+                ],
               ),
             ])
           )>

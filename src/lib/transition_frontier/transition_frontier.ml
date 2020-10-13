@@ -29,6 +29,14 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
+(* There is no Diff.Full.E.of_yojson, so we store raw Yojson.Safe.t here so that
+ * we can still deserialize something to inspect *)
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event {msg= "Applying diffs: $diffs"}]
+
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
@@ -68,7 +76,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Ok () ->
           Ok ()
       | Error `Frontier_hash_does_not_match ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          [%log warn]
             ~metadata:
               [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
             "Persistent frontier hash did not match persistent root frontier \
@@ -81,7 +89,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Error `Bootstrap_required ->
           Error `Bootstrap_required
       | Error (`Failure msg) ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          [%log fatal]
             ~metadata:
               [("target_root", Root_identifier.to_yojson root_identifier)]
             "Unable to fast forward persistent frontier: %s" msg ;
@@ -104,7 +112,9 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   in
   let%map () =
     Deferred.return
-      ( Persistent_frontier.Instance.start_sync persistent_frontier_instance
+      ( Persistent_frontier.Instance.start_sync
+          ~constraint_constants:precomputed_values.constraint_constants
+          persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"
@@ -189,21 +199,17 @@ let rec load_with_max_length :
       (* TODO: this case can be optimized to not create the
          * database twice through rocks -- currently on clean bootup,
          * this code path will reinitialize the rocksdb twice *)
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "persistent frontier database does not exist" ;
+      [%log info] "persistent frontier database does not exist" ;
       reset_and_continue ()
   | Error `Invalid_version ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "persistent frontier database out of date" ;
+      [%log info] "persistent frontier database out of date" ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
-      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-        "Persistent frontier database is corrupt: %s"
+      [%log error] "Persistent frontier database is corrupt: %s"
         (Persistent_frontier.Database.Error.message err) ;
       if retry_with_fresh_db then (
         (* should retry be on by default? this could be unnecessarily destructive *)
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "destroying old persistent frontier database " ;
+        [%log info] "destroying old persistent frontier database " ;
         let%bind () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
@@ -246,8 +252,7 @@ let close
     ; persistent_frontier_instance
     ; extensions
     ; genesis_state_hash= _ } =
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    "Closing transition frontier" ;
+  [%log trace] "Closing transition frontier" ;
   Full_frontier.close full_frontier ;
   Extensions.close extensions ;
   let%map () =
@@ -270,23 +275,17 @@ let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
-        )
+            (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "PRE: ($state_hash, $n)" ;
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:
-      [ ( "diffs"
-        , `List
-            (List.map diffs ~f:(fun (Diff.Full.E.E diff) -> Diff.to_yojson diff))
-        ) ]
-    "Applying diffs: $diffs" ;
+  [%str_log' trace t.logger]
+    (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
     Full_frontier.apply_diffs t.full_frontier diffs
@@ -295,7 +294,7 @@ let add_breadcrumb_exn t breadcrumb =
   Option.iter new_root_identifier
     ~f:
       (Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
-  Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+  [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
@@ -305,6 +304,17 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
+  let user_cmds = Breadcrumb.commands breadcrumb in
+  if not (List.is_empty user_cmds) then
+    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+       command or snapp command
+    *)
+    [%str_log' trace t.logger] Added_breadcrumb_user_commands
+      ~metadata:
+        [ ( "user_commands"
+          , `List
+              (List.map user_cmds
+                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
@@ -422,7 +432,7 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier
       ~(precomputed_values : Precomputed_values.t) () =
     let constraint_constants = precomputed_values.constraint_constants in
     let verifier =
@@ -431,7 +441,8 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~proof_level ~conf_dir:None
+              Verifier.create ~logger
+                ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -441,6 +452,13 @@ module For_tests = struct
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         in
+        (*scan state is empty so no protocol state should be required*)
+        let get_state hash =
+          Or_error.errorf
+            !"Protocol state (for scan state transactions) for \
+              %{sexp:State_hash.t} not found"
+            hash
+        in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
@@ -449,6 +467,7 @@ module For_tests = struct
                    ~verifier ~constraint_constants
                    ~scan_state:
                      (Staged_ledger.Scan_state.empty ~constraint_constants ())
+                   ~get_state
                    ~pending_coinbases:
                      ( Or_error.ok_exn
                      @@ Pending_coinbase.create
@@ -459,8 +478,8 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ~proof_level ~ledger_depth
-      ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ?verifier
+      ~(precomputed_values : Precomputed_values.t) () =
     let open Core in
     let verifier =
       match verifier with
@@ -468,7 +487,8 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~proof_level ~conf_dir:None
+              Verifier.create ~logger
+                ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let root_dir = "/tmp/coda_unit_test" in
@@ -496,7 +516,8 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir ~ledger_depth
+          Persistent_root.create ~logger ~directory:root_dir
+            ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
@@ -514,25 +535,24 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
-  let gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
-      ?verifier ~precomputed_values () =
+  let gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier
+      ~precomputed_values () =
     let open Quickcheck.Generator.Let_syntax in
     let%map root =
-      gen_genesis_breadcrumb ~logger ~proof_level ?verifier ~precomputed_values
-        ()
+      gen_genesis_breadcrumb ~logger ?verifier ~precomputed_values ()
     in
     (* List of protocol states required to prove transactions in the scan state; empty scan state at genesis*)
     let protocol_states = [] in
     (root, protocol_states)
 
-  let gen ?(logger = Logger.null ()) ~proof_level ?verifier ?trust_system
+  let gen ?(logger = Logger.null ()) ?verifier ?trust_system
       ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
-        gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
-          ?verifier ~precomputed_values ()) ~max_length ~size () =
+        gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier
+          ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Precomputed_values.genesis_state_hash precomputed_values
@@ -543,7 +563,8 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~proof_level ~conf_dir:None
+              Verifier.create ~logger
+                ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let trust_system =
@@ -569,8 +590,8 @@ module For_tests = struct
         Quickcheck.Generator.with_size ~size
           (Quickcheck_lib.gen_imperative_rose_tree
              (Quickcheck.Generator.return root)
-             (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
-                ~precomputed_values ~verifier ~trust_system
+             (Breadcrumb.For_tests.gen_non_deferred ~logger ~precomputed_values
+                ~verifier ~trust_system
                 ~accounts_with_secret_keys:root_ledger_accounts))
       in
       (root, branches, protocol_states)
@@ -585,9 +606,7 @@ module For_tests = struct
         ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ~proof_level
-        ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
-        ()
+      gen_persistence ~logger ~precomputed_values ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
@@ -631,8 +650,8 @@ module For_tests = struct
     ) ;
     frontier
 
-  let gen_with_branch ?logger ~proof_level ?verifier ?trust_system
-      ?consensus_local_state ~precomputed_values
+  let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
+      ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
@@ -640,13 +659,13 @@ module For_tests = struct
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~proof_level ?verifier ?trust_system ?consensus_local_state
+      gen ?logger ?verifier ?trust_system ?consensus_local_state
         ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
-      Breadcrumb.For_tests.gen_seq ?logger ~proof_level ~precomputed_values
-        ?verifier ?trust_system
+      Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ?verifier
+        ?trust_system
         ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
         branch_size
     in

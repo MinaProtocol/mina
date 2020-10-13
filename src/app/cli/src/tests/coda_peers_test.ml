@@ -3,15 +3,19 @@ open Async
 
 let name = "coda-peers-test"
 
+let runtime_config = Runtime_config.Test_configs.split_snarkless
+
 let main () =
-  let precomputed_values =
-    (* TODO: Load for this specific test. *)
-    Lazy.force Precomputed_values.compiled
+  let logger = Logger.create () in
+  let%bind precomputed_values, _runtime_config =
+    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+      ~proof_level:None
+      (Lazy.force runtime_config)
+    >>| Or_error.ok_exn
   in
   let consensus_constants = precomputed_values.consensus_constants in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
-  let logger = Logger.create () in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
     |> Int64.to_int_exn
@@ -32,6 +36,7 @@ let main () =
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
+      ~runtime_config:precomputed_values.runtime_config
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, expected_peers = (List.hd_exn configs).net_configs in
@@ -43,7 +48,7 @@ let main () =
              List.map expected_peers ~f:(fun p -> p.libp2p_port)
            in
            let%map peers = Coda_process.peers_exn worker in
-           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+           [%log debug]
              ~metadata:
                [ ( "peers"
                  , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )

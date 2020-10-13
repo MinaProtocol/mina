@@ -1,0 +1,10 @@
+(library
+  (name limb_vector)
+  (public_name pickles.limb_vector)
+  (flags -warn-error -27)
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson  bisect_ppx -- --conditional))
+  (libraries
+    backend
+    pickles_types
+    snarky.backendless
+    core_kernel ))

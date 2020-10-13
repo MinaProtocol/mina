@@ -70,9 +70,9 @@ type t = T.t =
   ; ciphertext: Bytes.t }
 [@@deriving sexp]
 
-let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
+let to_yojson t : Yojson.Safe.t = Json.to_yojson (Json.of_stable t)
 
-let of_yojson (t : Yojson.Safe.json) =
+let of_yojson (t : Yojson.Safe.t) =
   Result.map ~f:Json.to_stable (Json.of_yojson t)
 
 (** warning: this will zero [password] *)

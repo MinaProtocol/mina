@@ -7,7 +7,7 @@ export default Page({title: "FAQ"});
 
 #### Do I need any specific hardware?
 
-Currently, a 4-core processor and 8 GB of RAM are the minimum requirements.  In the near future though, GPUs may be required.
+Currently, a 4-core processor and 8 GB of RAM are the minimum requirements. In the near future though, GPUs may be required.
 
 #### What about software?
 
@@ -41,7 +41,11 @@ First, check out [Github issues](https://github.com/codaprotocol/coda/issues) to
 
 #### Is there a block explorer?
 
-Yes, check out the block explorer here: https://codaexplorer.garethtdavies.com/
+Yes, check out these block explorers: 
+
+https://codaexplorer.garethtdavies.com/
+
+https://coda.bitfly.at/
 
 ## General Questions
 
@@ -77,6 +81,35 @@ No, Coda does not natively implement privacy features at the moment. However, pr
 
 [See here](/docs/node-operator#running-coda-as-a-service) for information about using launchd or systemd with coda.
 
+## Block Producers
+
+#### Can I run multiple Block Producers with the same Private Key? 
+
+No. It is important to only run one Block Producer process against a particular private key. In the event the Coda daemon receives two different blocks from the same Block Producer, both blocks would be discarded. 
+
+#### How can I verify that I am indeed producing blocks?
+
+(Via the CLI): 
+Execute `coda client status`
+
+As output, you should see a block of text, there will be a line similar to this if your Block Producer is running: 
+`Block producers running:        1 (B62qrPN5Y5yq8kGE3FbVK...)`
+
+If your Block Producer has won a slot, you will see something like this: 
+`Next block will be produced in:  in 17.52m`
+
+(Via the Logs): 
+The following text appears each time the daemon produces a block: 
+
+`Producing new block with parent $breadcrumb`
+
+#### I produced a block, why wasn't it selected for the *Canonical Chain*? 
+
+Due to a property of the Codaboros consensus protocol, it's entirely possible that more than one block is produced in a particular slot. The network resolves the short-lived forks and will consolidate onto one block per slot by random selection.  
+
+Below is a visualization of the Coda Blockchain:
+![Visualization of the Coda Blockchain and its Singleton Forks](/static/img/faq/coda-singleton-forks.png)
+
 ## SNARKs and Snark Workers
 
 #### If I run a Snark Worker, how do I get paid for my SNARKs that I generate?
@@ -91,6 +124,12 @@ No, they are different in several ways:
 - There is no difficulty increase for SNARK work, as there is with PoW mining. In fact, as SNARK constructions, and proof generation times improve, the difficulty may actually decrease.
 - SNARK work is not directly involved in consensus. Snark workers play no role in determining the next state of the blockchain. Their role is to simply generate SNARKs of transactions observed in the network
 - As a snark worker, there is no requirement for uptime. PoW miners need to run their rigs non-stop to ensure they don't miss out on a potential block. Snark workers can come online and offline as they please — it is more like Uber, where there will always be work to be done, and it is nobody needs to say head of of time when they want to work.
+
+#### Why have my SNARKs not been included? (A.K.A. How should I price my SNARKs?)
+
+Even though your SNARK Worker might be producing SNARKs at a breakneck pace, if someone else produces a cheaper proof for a particular job you have already completed, their SNARK would be preferred due to its lower fee. 
+
+Pricing your SNARKs is a delicate balance between the cost of compute, the market environment (demand for SNARKs), your SNARK throughput, and the speed at which each of your SNARK Worker processes can produce SNARKs. Sometimes, it might even be economically prudent to turn off your SNARK Worker altogether until the market improves. 
 
 #### Will Snark Workers require more storage and computing power over time? What about compared to Coda full nodes?
 
@@ -132,3 +171,4 @@ Nope -- when a new block is generated, Coda computes the proof recursively over 
 #### How do you control or limit the number of cores Snark Workers use?
 
 You can use the `-snark-worker-parallelism` flag when starting up `coda daemon`.
+

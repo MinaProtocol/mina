@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = bool -> unit
+  type t = Coda_net2.validation_result -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 
@@ -96,13 +96,19 @@ module Stable = struct
       | Error e ->
           Core.Error.raise (Error.to_error e)
 
-    let user_commands {staged_ledger_diff; _} =
-      Staged_ledger_diff.user_commands staged_ledger_diff
+    let commands {staged_ledger_diff; _} =
+      Staged_ledger_diff.commands staged_ledger_diff
 
     let payments external_transition =
-      List.filter
-        (user_commands external_transition)
-        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+      List.filter_map (commands external_transition) ~f:(function
+        | { data= Signed_command ({payload= {body= Payment _; _}; _} as c)
+          ; status } ->
+            Some {With_status.data= c; status}
+        | _ ->
+            None )
+
+    let global_slot t =
+      consensus_state t |> Consensus.Data.Consensus_state.curr_global_slot
 
     let equal =
       Comparable.lift Consensus.Data.Consensus_state.Value.equal
@@ -110,24 +116,14 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
-  ; staged_ledger_diff: Staged_ledger_diff.t
-  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
-  ; current_protocol_version: Protocol_version.t
-  ; proposed_protocol_version_opt: Protocol_version.t option
-  ; mutable validation_callback: Validate_content.t }
-[@@deriving sexp]
-
 (* another name, so we can avoid cyclic type below *)
 type t_ = t
 
 type external_transition = t
 
-let broadcast {validation_callback; _} = validation_callback true
+let broadcast {validation_callback; _} = validation_callback `Accept
 
-let don't_broadcast {validation_callback; _} = validation_callback false
+let don't_broadcast {validation_callback; _} = validation_callback `Reject
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
@@ -147,8 +143,9 @@ Stable.Latest.
   , consensus_time_produced_at
   , block_producer
   , transactions
-  , user_commands
+  , commands
   , payments
+  , global_slot
   , to_yojson )]
 
 let equal = Stable.Latest.equal
@@ -634,15 +631,22 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proof (t, validation) ~verifier =
+let validate_proofs tvs ~verifier =
   let open Blockchain_snark.Blockchain in
   let open Deferred.Let_syntax in
-  let {protocol_state= state; protocol_state_proof= proof; _} =
-    With_hash.data t
-  in
-  match%map Verifier.verify_blockchain_snark verifier {state; proof} with
+  match%map
+    Verifier.verify_blockchain_snarks verifier
+      (List.map tvs ~f:(fun (t, _validation) ->
+           let {protocol_state= state; protocol_state_proof= proof; _} =
+             With_hash.data t
+           in
+           {state; proof} ))
+  with
   | Ok verified ->
-      if verified then Ok (t, Validation.Unsafe.set_valid_proof validation)
+      if verified then
+        Ok
+          (List.map tvs ~f:(fun (t, validation) ->
+               (t, Validation.Unsafe.set_valid_proof validation) ))
       else Error `Invalid_proof
   | Error e ->
       Error (`Verifier_error e)
@@ -717,12 +721,14 @@ module With_validation = struct
 
   let block_producer t = lift block_producer t
 
-  let user_commands t = lift user_commands t
+  let commands t = lift commands t
 
   let transactions ~constraint_constants t =
     lift (transactions ~constraint_constants) t
 
   let payments t = lift payments t
+
+  let global_slot t = lift global_slot t
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
 
@@ -855,8 +861,6 @@ module Validated = struct
     end
   end]
 
-  type t = Stable.Latest.t
-
   type nonrec protocol_version_status = protocol_version_status =
     {valid_current: bool; valid_next: bool; matches_daemon: bool}
 
@@ -884,8 +888,9 @@ module Validated = struct
     , consensus_time_produced_at
     , block_producer
     , transactions
-    , user_commands
+    , commands
     , payments
+    , global_slot
     , erase
     , to_yojson )]
 
@@ -894,6 +899,15 @@ module Validated = struct
   let to_initial_validated t =
     t |> Validation.reset_frontier_dependencies_validation
     |> Validation.reset_staged_ledger_diff_validation
+
+  let commands (t : t) =
+    List.map (commands t) ~f:(fun x ->
+        (* This is safe because at this point the stage ledger diff has been
+             applied successfully. *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it c) =
+          User_command.to_valid_unsafe x.data
+        in
+        {x with data= c} )
 end
 
 let genesis ~precomputed_values =
@@ -907,11 +921,12 @@ let genesis ~precomputed_values =
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
-          ; user_commands= []
+          ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
-    ; coinbase_receiver= creator }
+    ; coinbase_receiver= creator
+    ; supercharge_coinbase= false }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -1008,7 +1023,7 @@ module Staged_ledger_validation = struct
          , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> precomputed_values:Precomputed_values.t
       -> verifier:Verifier.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
@@ -1030,7 +1045,7 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~constraint_constants ~verifier
+   fun (t, validation) ~logger ~precomputed_values ~verifier
        ~parent_staged_ledger ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
@@ -1041,11 +1056,18 @@ module Staged_ledger_validation = struct
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
-             , `Pending_coinbase_data _ ) =
-      Staged_ledger.apply ~constraint_constants ~logger ~verifier
-        parent_staged_ledger staged_ledger_diff
-        ~state_body_hash:
-          Protocol_state.(Body.hash @@ body parent_protocol_state)
+             , `Pending_coinbase_update _ ) =
+      Staged_ledger.apply
+        ~constraint_constants:precomputed_values.constraint_constants ~logger
+        ~verifier parent_staged_ledger staged_ledger_diff
+        ~current_state_view:
+          Coda_state.Protocol_state.(Body.view @@ body parent_protocol_state)
+        ~state_and_body_hash:
+          (let body_hash =
+             Protocol_state.(Body.hash @@ body parent_protocol_state)
+           in
+           ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
+           , body_hash ))
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
@@ -1056,8 +1078,9 @@ module Staged_ledger_validation = struct
             (Staged_ledger.current_ledger_proof transitioned_staged_ledger)
             ~f:target_hash_of_ledger_proof
             ~default:
-              (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)))
+              ( Precomputed_values.genesis_ledger precomputed_values
+              |> Lazy.force |> Ledger.merkle_root
+              |> Frozen_ledger_hash.of_ledger_hash )
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in
