@@ -52,6 +52,7 @@ type t =
   { diff_array: Diff.Lite.E.t DynArray.t
   ; worker: Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
+  ; garbage_since_last_flush: Coda_base.State_hash.Hash_set.t
   ; mutable timer: Timer.t option
   ; mutable target_hash: Frontier_hash.t
   ; mutable flush_job: unit Deferred.t option
@@ -68,7 +69,15 @@ let flush t =
     let diffs = DynArray.to_list t.diff_array in
     DynArray.clear t.diff_array ;
     DynArray.compact t.diff_array ;
-    let%bind () = Worker.dispatch t.worker (diffs, t.target_hash) in
+    let%bind () =
+      Worker.dispatch t.worker
+        { diffs
+        ; target_hash=
+            t.target_hash
+            (* This copy is not really necessary, but just to be on the safe side. *)
+        ; garbage= Hash_set.copy t.garbage_since_last_flush }
+    in
+    Hash_set.clear t.garbage_since_last_flush ;
     if should_flush t then flush_job t
     else (
       t.flush_job <- None ;
@@ -81,6 +90,7 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~time_controller ~base_hash ~worker =
   let t =
     { diff_array= DynArray.create ()
+    ; garbage_since_last_flush= Coda_base.State_hash.Hash_set.create ()
     ; worker
     ; timer= None
     ; target_hash= base_hash
@@ -95,13 +105,14 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   t.timer <- Some timer ;
   t
 
-let write t ~diffs ~hash_transition =
+let write t ~garbage ~diffs ~hash_transition =
   let open Frontier_hash in
   if t.closed then failwith "attempt to write to diff buffer after closed" ;
   if not (Frontier_hash.equal t.target_hash hash_transition.source) then
     failwith "invalid hash transition received by persistence buffer" ;
   t.target_hash <- hash_transition.target ;
   List.iter diffs ~f:(DynArray.add t.diff_array) ;
+  List.iter garbage ~f:(Hash_set.add t.garbage_since_last_flush) ;
   if should_flush t && t.flush_job = None then flush t
   else check_for_overflow t
 
