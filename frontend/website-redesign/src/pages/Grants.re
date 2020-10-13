@@ -432,7 +432,7 @@ module Project = {
         <Spacer height=4. />
         <span className=Css.(style([marginLeft(`auto)]))>
           <Button
-            href={`Internal(buttonUrl)}
+            href={`External(buttonUrl)}
             bgColor=Theme.Colors.orange
             width={`rem(7.)}>
             {React.string("Apply")}
@@ -488,7 +488,7 @@ module Project = {
          |> React.array}
         <span className=Css.(style([marginLeft(`auto)]))>
           <Button
-            href={`Internal(buttonUrl)}
+            href={`External(buttonUrl)}
             bgColor=Theme.Colors.orange
             width={`rem(7.)}>
             {React.string("Apply")}
@@ -510,109 +510,89 @@ module FrontEndProjects = {
         title="Product / Front-End Projects"
         subhead={js|Assist with building interfaces and platforms for users to interact with Mina.|js}
         slug="frontend">
-        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
-          {React.string("Install SDK")}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-        <Spacer height=4. />
-        <Project.TwoColumn
-          title="Graph QL API"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+        // <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+        //   {React.string("Install SDK")}
+        //   <Icon kind=Icon.ArrowRightMedium />
+        // </Button>
+
+          <Spacer height=4. />
+          <Project.TwoColumn
+            title="Graph QL API"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+                },
+                secondColumn: {
+                  title: "Description",
+                  copy: {js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js},
+                },
               },
-              secondColumn: {
-                title: "Description",
-                copy: {js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js},
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+          <Project.ThreeColumn
+            title="Telemetry Health Dashboard"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
+                },
+                secondColumn: {
+                  title: "Project Type",
+                  copy: {js|Open source|js},
+                },
+                thirdColumn: {
+                  title: "Overview",
+                  copy: {js|Build a high-level dashboard that describes the current state of the network by aggregating data from as many nodes as it has access to.|js},
+                },
               },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.ThreeColumn
-          title="Snarketplace Aggregated Data"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+          <Project.ThreeColumn
+            title="Browser Wallet (with optional chrome extension)"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
+                },
+                secondColumn: {
+                  title: "Project Type",
+                  copy: {js|Open source|js},
+                },
+                thirdColumn: {
+                  title: "Overview",
+                  copy: {js|Enable sending, receiving, and delegating Coda tokens using a web wallet with support for the Ledger.|js},
+                },
               },
-              secondColumn: {
-                title: "Project Type",
-                copy: {js|Open source|js},
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+          <Project.TwoColumn
+            title="Mobile Wallet"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+                },
+                secondColumn: {
+                  title: "Overview",
+                  copy: {js|Enable sending, receiving, and delegating Coda tokens using a Mobile Wallet.|js},
+                },
               },
-              thirdColumn: {
-                title: "Overview",
-                copy: {js|Create a web interface that provides information about the marketplace that snarkers and block producers meet buy & sell snarks associated with the transactions. Snarketplace is the queue that lists that snarks that are available for the block producers to buy and add to the blockchain.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.ThreeColumn
-          title="Telemetry Health Dashboard"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
-              },
-              secondColumn: {
-                title: "Project Type",
-                copy: {js|Open source|js},
-              },
-              thirdColumn: {
-                title: "Overview",
-                copy: {js|Build a high-level dashboard that describes the current state of the network by aggregating data from as many nodes as it has access to.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.ThreeColumn
-          title="Browser Wallet (with optional chrome extension)"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
-              },
-              secondColumn: {
-                title: "Project Type",
-                copy: {js|Open source|js},
-              },
-              thirdColumn: {
-                title: "Overview",
-                copy: {js|Enable sending, receiving, and delegating Coda tokens using a web wallet with support for the Ledger.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.TwoColumn
-          title="Mobile Wallet"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
-              },
-              secondColumn: {
-                title: "Overview",
-                copy: {js|Enable sending, receiving, and delegating Coda tokens using a Mobile Wallet.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-      </Section>
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+        </Section>
     </div>;
 };
 
@@ -627,67 +607,51 @@ module ProtocolProjects = {
         title="Protocol Projects"
         subhead={js|Contribute to engineering projects to develop the core technology underlying the protocol.|js}
         slug="protocol">
-        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
-          {React.string("Install SDK")}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-        <Spacer height=4. />
-        <Project.TwoColumn
-          title="Protocol Specification Document"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
+        // <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+        //   {React.string("Install SDK")}
+        //   <Icon kind=Icon.ArrowRightMedium />
+        // </Button>
+
+          <Spacer height=4. />
+          <Project.TwoColumn
+            title="Stablecoin Support"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Integration fee as grant or initial deposit amount|js},
+                },
+                secondColumn: {
+                  title: "Description",
+                  copy: {js|Offer a US dollar backed programmable stablecoin on the Coda Protocol.|js},
+                },
               },
-              secondColumn: {
-                title: "Description",
-                copy: {js|Work closely with the O(1) Labs Protocol Engineering team to create a detailed formal specification of the Coda protocol. This project is ideal for someone who is familiar with the tools and technical side of the Coda protocol.|js},
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+          <Project.ThreeColumn
+            title="Alternative Client Implementation (e.g. Rust)"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $100,000 USD of Coda tokens|js},
+                },
+                secondColumn: {
+                  title: "Project Type",
+                  copy: {js|Open source|js},
+                },
+                thirdColumn: {
+                  title: "Overview",
+                  copy: {js|Enable Coda nodes to parse and verify the Coda transactions, its smart contracts and everything related. Provide an interfaces to create transactions, product blocks, and create snarks in Coda.|js},
+                },
               },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.TwoColumn
-          title="Stablecoin Support"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Integration fee as grant or initial deposit amount|js},
-              },
-              secondColumn: {
-                title: "Description",
-                copy: {js|Offer a US dollar backed programmable stablecoin on the Coda Protocol.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.ThreeColumn
-          title="Alternative Client Implementation (e.g. Rust)"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $100,000 USD of Coda tokens|js},
-              },
-              secondColumn: {
-                title: "Project Type",
-                copy: {js|Open source|js},
-              },
-              thirdColumn: {
-                title: "Overview",
-                copy: {js|Enable Coda nodes to parse and verify the Coda transactions, its smart contracts and everything related. Provide an interfaces to create transactions, product blocks, and create snarks in Coda.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-      </Section>
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+        </Section>
     </div>;
 };
 
@@ -702,63 +666,64 @@ module MarketingAndCommunityProjects = {
         title="Marketing and Community Projects"
         subhead={js|Help to build and grow Mina's community by serving as ambassadors, creating content, and other initiatives.|js}
         slug="marketing-community">
-        <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
-          {React.string("Install SDK")}
-          <Icon kind=Icon.ArrowRightMedium />
-        </Button>
-        <Spacer height=4. />
-        <Project.TwoColumn
-          title="Technical Community Ambassadors"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $1000 USD of Mina tokens per month|js},
+        // <Button href={`Internal("/docs")} bgColor=Theme.Colors.orange>
+        //   {React.string("Install SDK")}
+        //   <Icon kind=Icon.ArrowRightMedium />
+        // </Button>
+
+          <Spacer height=4. />
+          <Project.TwoColumn
+            title="Technical Community Ambassadors"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $1000 USD of Mina tokens per month|js},
+                },
+                secondColumn: {
+                  title: "Description",
+                  copy: {js|Grow, excite and organize Mina’s technical community globally by organizing virtual meetups, supporting the community in testnet activities, establishing a presence on geographically-relevant platforms (ex. WeChat in China), producing and sharing educational content, recruiting new community members and being a spokesperson for the project. As our community grows and evolves, so will this role. The ideal candidate will be equal parts passionate, flexible, and dedicated.|js},
+                },
               },
-              secondColumn: {
-                title: "Description",
-                copy: {js|Grow, excite and organize Mina’s technical community globally by organizing virtual meetups, supporting the community in testnet activities, establishing a presence on geographically-relevant platforms (ex. WeChat in China), producing and sharing educational content, recruiting new community members and being a spokesperson for the project. As our community grows and evolves, so will this role. The ideal candidate will be equal parts passionate, flexible, and dedicated.|js},
+              {
+                firstColumn: {
+                  title: "Minimum qualifications",
+                  copy: {js|Native fluency in the dominant language of your region (Ex. German for Germany), plus an ability to communicate effectively in written and spoken English.|js},
+                },
+                secondColumn: {
+                  title: "Relevant Countries/Regions",
+                  copy: {js|China / France / Germany / India / Indonesia / Japan / Korea / Latin America (Portuguese-speaking) / Latin America (Spanish-speaking) / Netherlands / Nigeria / Russia / Turkey / UK / US|js},
+                },
               },
-            },
-            {
-              firstColumn: {
-                title: "Minimum qualifications",
-                copy: {js|Native fluency in the dominant language of your region (Ex. German for Germany), plus an ability to communicate effectively in written and spoken English.|js},
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=3. />
+          <Project.TwoColumn
+            title="Intro video for Mina"
+            rows=[|
+              {
+                firstColumn: {
+                  title: "Allocation",
+                  copy: {js|Minimum of $1000 USD of Mina tokens|js},
+                },
+                secondColumn: {
+                  title: "Description",
+                  copy: {js|Create a short video that introduces Mina, highlights key differentiators, discusses Mina’s novel use of zk-SNARKs, use cases, etc.|js},
+                },
               },
-              secondColumn: {
-                title: "Relevant Countries/Regions",
-                copy: {js|China / France / Germany / India / Indonesia / Japan / Korea / Latin America (Portuguese-speaking) / Latin America (Spanish-speaking) / Netherlands / Nigeria / Russia / Turkey / UK / US|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=3. />
-        <Project.TwoColumn
-          title="Intro video for Mina"
-          rows=[|
-            {
-              firstColumn: {
-                title: "Allocation",
-                copy: {js|Minimum of $1000 USD of Mina tokens|js},
-              },
-              secondColumn: {
-                title: "Description",
-                copy: {js|Create a short video that introduces Mina, highlights key differentiators, discusses Mina’s novel use of zk-SNARKs, use cases, etc.|js},
-              },
-            },
-          |]
-          buttonUrl="/docs"
-        />
-        <Spacer height=5. />
-        <p className=Theme.Type.paragraph>
-          <em>
-            {React.string(
-               "We are also open to any of your suggestions for a grant! Submit an application and we will review it.",
-             )}
-          </em>
-        </p>
-      </Section>
+            |]
+            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+          />
+          <Spacer height=5. />
+          <p className=Theme.Type.paragraph>
+            <em>
+              {React.string(
+                 "We are also open to any of your suggestions for a grant! Submit an application and we will review it.",
+               )}
+            </em>
+          </p>
+        </Section>
     </div>;
 };
 
@@ -783,7 +748,7 @@ module HowToApply = {
               buttonColor: Theme.Colors.orange,
               buttonTextColor: Theme.Colors.white,
               dark: false,
-              href: `External(Constants.codeOfConductUrl),
+              href: `External("https://forms.gle/ekPwDKE1BArTqVCu9"),
             },
           }>
           <Spacer height=4. />
@@ -860,13 +825,14 @@ let make = () => {
         Theme.mobile: "/static/img/GrantsHero.jpg",
       }
     />
-    <GrantRow
-      img="/static/img/GrantsRow.jpg"
-      title="Work on projects with us and earn Mina tokens"
-      copy={js|About $2.1M USD in Coda token grants has been allocated to support these efforts prior to Coda’s mainnet launch. There will be additional Coda token grants allocated after mainnet.|js}
-      buttonCopy="Learn More"
-      buttonUrl="/docs"
-    />
+    // TODO: Currently to be removed. Not sure if this will be added back? Delete this later if it's been a reasonable amount of time.
+    // <GrantRow
+    //   img="/static/img/GrantsRow.jpg"
+    //   title="Work on projects with us and earn Mina tokens"
+    //   copy={js|About $2.1M USD in Coda token grants has been allocated to support these efforts prior to Coda’s mainnet launch. There will be additional Coda token grants allocated after mainnet.|js}
+    //   buttonCopy="Learn More"
+    //   buttonUrl="/docs"
+    // />
     <TypesOfGrants />
     <GrantsSideNav />
     <FrontEndProjects />
