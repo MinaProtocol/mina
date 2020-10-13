@@ -132,9 +132,9 @@ module Instance = struct
         t.sync <- None ;
         Ok () )
 
-  let notify_sync t ~diffs ~hash_transition =
+  let notify_sync t ~garbage ~diffs ~hash_transition =
     assert_sync t ~f:(fun sync ->
-        Sync.notify sync ~diffs ~hash_transition ;
+        Sync.notify sync ~garbage ~diffs ~hash_transition ;
         Deferred.Result.return () )
 
   let destroy t =

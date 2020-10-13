@@ -17,5 +17,5 @@ let close t =
   let%bind () = Diff_buffer.close_and_finish_copy t.buffer in
   Worker.close t.worker
 
-let notify t ~diffs ~hash_transition =
-  Diff_buffer.write t.buffer ~diffs ~hash_transition
+let notify t ~garbage ~diffs ~hash_transition =
+  Diff_buffer.write t.buffer ~garbage ~diffs ~hash_transition

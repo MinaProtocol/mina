@@ -19,6 +19,8 @@ val create :
 
 val notify :
      t
+  -> garbage:Coda_base.State_hash.t list
+     (* Nodes that have already been garbage collected *)
   -> diffs:Diff.Lite.E.t list
   -> hash_transition:Frontier_hash.transition
   -> unit
