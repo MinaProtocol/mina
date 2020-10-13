@@ -20,6 +20,8 @@ module UInt64 : sig
 
   include S with type t = Stable.Latest.t
 
+  val dhall_type : Ppx_dhall_type.Dhall_type.t
+
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
