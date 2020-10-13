@@ -161,7 +161,7 @@ module Styles = {
         ~bottom=`rem(1.),
         ~left=`rem(1.),
       ),
-      height(`rem(4.)),
+      height(`percent(100.)),
       display(`grid),
       alignItems(`center),
       gridColumnGap(rem(1.5)),
@@ -659,8 +659,7 @@ let make =
       className={
         column === filter ? Styles.activeColumn : Styles.inactiveColumn
       }>
-      {column === filter
-         ?  <Icon kind=Icon.ChevronDown />  : React.null}
+      {column === filter ? <Icon kind=Icon.ChevronDown /> : React.null}
       <span> {React.string(string_of_filter(column))} </span>
     </span>;
 

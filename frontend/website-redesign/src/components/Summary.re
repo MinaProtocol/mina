@@ -75,10 +75,9 @@ module Styles = {
 
   let disclaimer =
     merge([
-      Theme.Type.paragraph,
+      Theme.Type.tooltip,
       style([
         marginTop(`rem(3.6)),
-        fontSize(`rem(1.)),
         color(Theme.Colors.greyScale),
         media(
           Theme.MediaQuery.notMobile,
