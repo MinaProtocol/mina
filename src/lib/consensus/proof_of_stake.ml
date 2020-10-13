@@ -279,9 +279,10 @@ module Data = struct
         Genesis_constants.Constraint_constants.compiled.ledger_depth
       in
       if Sys.file_exists location then (
-        Logger.info (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-          !"Loading epoch ledger from disk: %s"
-          location ;
+        let logger = Logger.create () in
+        [%log info]
+          ~metadata:[("location", `String location)]
+          "Loading epoch ledger from disk: $location" ;
         Ledger.Db.create ~directory_name:location ~depth () )
       else
         let epoch_ledger =
