@@ -1425,7 +1425,9 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   } )
           | Error err ->
               [%log debug]
-                ~metadata:[("line", `String line); ("error", `String err)]
+                ~metadata:
+                  [ ("line", `String line)
+                  ; ("error", `String (Error.to_string_hum err)) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error err) ->
               [%log debug]
@@ -1446,7 +1448,9 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               ()
           | Error err ->
               [%log debug]
-                ~metadata:[("line", `String line); ("error", `String err)]
+                ~metadata:
+                  [ ("line", `String line)
+                  ; ("error", `String (Error.to_string_hum err)) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error e) ->
               [%log error] "handling line from helper failed! $err"
