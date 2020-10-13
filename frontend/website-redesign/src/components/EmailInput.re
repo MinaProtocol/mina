@@ -5,7 +5,7 @@ module Styles = {
       display(`inlineFlex),
       alignItems(`center),
       height(`rem(3.25)),
-      borderRadius(px(4)),
+      borderRadius(px(2)),
       width(`rem(14.5)),
       fontSize(rem(1.)),
       paddingLeft(`rem(1.)),
