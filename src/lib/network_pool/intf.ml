@@ -52,13 +52,20 @@ module type Resource_pool_diff_intf = sig
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
 
+  (** Used to check whether or not information was filtered out of diffs
+   *  during diff application. Assumes that diff size will be the equal or
+   *  smaller after application is completed. *)
+  val size : t -> int
+
+  val verified_size : verified -> int
+
   val summary : t -> string
 
   (** Warning: It must be safe to call this function asynchronously! *)
   val verify :
        pool
     -> t Envelope.Incoming.t
-    -> verified Envelope.Incoming.t option Deferred.t
+    -> verified Envelope.Incoming.t Deferred.Or_error.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
   conincides with applying locally generated diffs or diffs from the network
@@ -118,12 +125,19 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
+  module Broadcast_callback : sig
+    type t =
+      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+      | External of (Coda_net2.validation_result -> unit)
+  end
+
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -138,7 +152,8 @@ module type Network_pool_base_intf = sig
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -154,8 +169,7 @@ module type Network_pool_base_intf = sig
   val apply_and_broadcast :
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
-       * (bool -> unit)
-       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    -> Broadcast_callback.t
     -> unit Deferred.t
 end
 

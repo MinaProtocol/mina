@@ -18,8 +18,10 @@ module Styles = {
         display(`flex),
         justifyContent(`spaceBetween),
         alignItems(`center),
-        unsafe("width", "max-content"),
-        width(buttonWidth),
+        Belt.Option.mapWithDefault(
+          buttonWidth, unsafe("width", "max-content"), buttonWidth =>
+          width(buttonWidth)
+        ),
         height(buttonHeight),
         border(`px(1), `solid, borderColor),
         backgroundColor(bgColor),
@@ -62,7 +64,7 @@ module Styles = {
           },
         ),
         padding2(~v=`rem(paddingY), ~h=`rem(paddingX)),
-        textAlign(`center),
+        textAlign(`left),
         hover([
           color(white),
           after([
@@ -104,7 +106,7 @@ let make =
       ~href,
       ~children=?,
       ~height=`rem(3.25),
-      ~width=`rem(10.9),
+      ~width=?,
       ~borderColor=Theme.Colors.black,
       ~textColor=?,
       ~paddingX=1.5,
