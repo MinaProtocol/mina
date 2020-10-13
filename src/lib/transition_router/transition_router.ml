@@ -434,38 +434,40 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           don't_wait_for
           @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
                ~f:(fun enveloped_transition ->
-                 Strict_pipe.Writer.write !transition_writer_ref
-                   enveloped_transition ;
                  don't_wait_for
-                 @@
-                 let incoming_transition =
-                   Envelope.Incoming.data enveloped_transition
-                 in
-                 match Broadcast_pipe.Reader.peek frontier_r with
-                 | Some frontier ->
-                     if
-                       is_transition_for_bootstrap ~logger frontier
-                         incoming_transition ~precomputed_values
-                     then (
-                       Strict_pipe.Writer.kill !transition_writer_ref ;
-                       let initial_root_transition =
-                         Transition_frontier.(
-                           Breadcrumb.validated_transition (root frontier))
-                       in
-                       let%bind () =
-                         Strict_pipe.Writer.write clear_writer `Clear
-                       in
-                       let%map () = Transition_frontier.close frontier in
-                       start_bootstrap_controller ~logger ~trust_system
-                         ~verifier ~network ~time_controller
-                         ~producer_transition_reader
-                         ~verified_transition_writer ~clear_reader
-                         ~transition_reader_ref ~transition_writer_ref
-                         ~consensus_local_state ~frontier_w ~persistent_root
-                         ~persistent_frontier ~initial_root_transition
-                         ~best_seen_transition:(Some enveloped_transition)
-                         ~precomputed_values )
-                     else Deferred.unit
-                 | None ->
-                     Deferred.unit ) ) ) ;
+                 @@ let%map () =
+                      let incoming_transition =
+                        Envelope.Incoming.data enveloped_transition
+                      in
+                      match Broadcast_pipe.Reader.peek frontier_r with
+                      | Some frontier ->
+                          if
+                            is_transition_for_bootstrap ~logger frontier
+                              incoming_transition ~precomputed_values
+                          then (
+                            Strict_pipe.Writer.kill !transition_writer_ref ;
+                            let initial_root_transition =
+                              Transition_frontier.(
+                                Breadcrumb.validated_transition (root frontier))
+                            in
+                            let%bind () =
+                              Strict_pipe.Writer.write clear_writer `Clear
+                            in
+                            let%map () = Transition_frontier.close frontier in
+                            start_bootstrap_controller ~logger ~trust_system
+                              ~verifier ~network ~time_controller
+                              ~producer_transition_reader
+                              ~verified_transition_writer ~clear_reader
+                              ~transition_reader_ref ~transition_writer_ref
+                              ~consensus_local_state ~frontier_w
+                              ~persistent_root ~persistent_frontier
+                              ~initial_root_transition
+                              ~best_seen_transition:(Some enveloped_transition)
+                              ~precomputed_values )
+                          else Deferred.unit
+                      | None ->
+                          Deferred.unit
+                    in
+                    Strict_pipe.Writer.write !transition_writer_ref
+                      enveloped_transition ) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
