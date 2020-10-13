@@ -36,8 +36,9 @@ let make = (~fullName="", ~title="", ~src="") => {
   <div className=Styles.memberContainer>
     <img className=Styles.image src />
     <div className=Styles.flexRow>
-       <h5 className=Styles.name> {React.string(fullName)} </h5> </div>
-      //<Icon kind=Icon.Plus />
+      <h5 className=Styles.name> {React.string(fullName)} </h5>
+    </div>
+    //<Icon kind=Icon.Plus />
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
 };

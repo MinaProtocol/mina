@@ -203,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                |> defer
                     (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= validate_proof ~verifier
+               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
                >>= defer validate_delta_transition_chain
                >>= defer validate_protocol_versions)
            with
@@ -223,7 +223,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  blockchain_length ;
                return ()
            | Error error ->
-               is_valid_cb false ;
+               is_valid_cb `Reject ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  ~delta:genesis_constants.protocol.delta error )

@@ -232,8 +232,8 @@ let make = (~dark=false) => {
     </Next.Link>
     <input type_="checkbox" id="nav_toggle" className=Styles.hiddenToggle />
     <label htmlFor="nav_toggle" className=Styles.navToggle>
-      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2./> </span>
-      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=2./> </span>
+      <span id="open-nav"> <Icon kind=Icon.BurgerMenu size=2. /> </span>
+      <span id="close-nav"> <Icon kind=Icon.CloseMenu size=3. /> </span>
     </label>
     <nav className=Styles.nav>
       <NavLink label="About" href="/about" dark />
@@ -246,6 +246,11 @@ let make = (~dark=false) => {
           href="/docs"
         />
         <NavGroupLink icon=Icon.Testnet label="Testnet" href="/testnet" />
+        <NavGroupLink
+          icon=Icon.NodeOperators
+          label="Node Operators"
+          href="/node-operators"
+        />
       </NavGroup>
       <NavLink label="Community" href="/community" dark />
       <NavLink label="Blog" href="/blog" dark />
