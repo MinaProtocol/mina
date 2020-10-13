@@ -24,7 +24,7 @@ module Test_config = struct
 
   let default =
     { k= 20
-    ; delta= 3
+    ; delta= 0
     ; proof_level= Full
     ; txpool_max_size= 3000
     ; num_snark_workers= 2

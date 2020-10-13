@@ -21,7 +21,7 @@ module Transition_frontier_validation =
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
-    ( precomputed_values.genesis_constants.protocol.delta
+    ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 

@@ -379,8 +379,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let delta_transition_chain_proof =
                       Transition_chain_prover.prove
                         ~length:
-                          ( Coda_numbers.Length.to_int consensus_constants.delta
-                          - 1 )
+                          (Coda_numbers.Length.to_int consensus_constants.delta)
                         ~frontier previous_state_hash
                       |> Option.value_exn
                     in

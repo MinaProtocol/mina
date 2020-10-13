@@ -84,6 +84,7 @@ module Actions = struct
          * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
+        (* this delta has not been updated for delta=0. Leaving since this system is off and likely to be replaced*)
         let y = (Float.of_int delta ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
