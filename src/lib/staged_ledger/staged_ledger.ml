@@ -484,7 +484,6 @@ module T = struct
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s txn_state_view state_and_body_hash =
-    let open Deferred.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -503,13 +502,11 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
@@ -519,6 +516,13 @@ module T = struct
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
+
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
@@ -533,18 +537,23 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       try
+        let tss = partition 10 ts in
         let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_state_view state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
+              let%map () = Async.Scheduler.yield () in
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      current_state_view state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) )
         in
         return ret
       with Exit err -> Deferred.Result.fail err

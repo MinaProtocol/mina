@@ -3,7 +3,7 @@
  (public_name unsigned_extended_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel integers snark_params_nonconsensus ppx_version)
+ (libraries core_kernel integers snark_params_nonconsensus ppx_dhall_type ppx_version)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_hash ppx_compare
