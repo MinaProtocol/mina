@@ -31,6 +31,7 @@ module Make (Engine : Engine_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    [%log info] "mina_peers_test: started" ;
     let wait_for_init_partial node =
       Log_engine.wait_for_init node log_engine
     in
@@ -38,6 +39,7 @@ module Make (Engine : Engine_intf) = struct
       Malleable_error.List.iter network.block_producers
         ~f:wait_for_init_partial
     in
+    [%log info] "mina_peers_test: done waiting for initialization" ;
     let peer_list = network.block_producers in
     (* [%log info] "peers_list"
       ~metadata:
@@ -46,6 +48,7 @@ module Make (Engine : Engine_intf) = struct
     let%bind query_result =
       Malleable_error.List.map peer_list ~f:get_peer_id_partial
     in
+    [%log info] "mina_peers_test: successfully made graphql querry" ;
     (* query_result is of type (string * string sexp_list) sexp_list *)
     (* each element represents the data of a single node relevant to this test. ( peer_id of node * [list of peer_ids of node's peers] ) *)
     let expected_peers, _ = List.unzip query_result in
@@ -62,5 +65,6 @@ module Make (Engine : Engine_intf) = struct
                 if String.equal x p then true else false ) ) )
       (* loop through visible_peers_of_node and make sure everything in that list is also in expected_peers_of_node *)
     in
+    [%log info] "mina_peers_test: making assertions" ;
     return (List.iter query_result ~f:test_compare_func)
 end
