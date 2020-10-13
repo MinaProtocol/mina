@@ -63,7 +63,7 @@ module Accounts = struct
         Runtime_config.Accounts.Single.t -> Coda_base.Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
-      let%map pk =
+      let%bind pk =
         match t.pk with
         | Some pk ->
             Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
@@ -134,13 +134,54 @@ module Accounts = struct
       in
       let token_permissions =
         Option.value_map t.token_permissions ~default:account.token_permissions
-          ~f:(fun perm ->
-            match perm with
-            | Runtime_config.Accounts.Single.Token_permissions.Token_owned
-                {disable_new_accounts} ->
-                Coda_base.Token_permissions.Token_owned {disable_new_accounts}
-            | Not_owned {account_disabled} ->
-                Not_owned {account_disabled} )
+          ~f:(fun {token_owned; disable_new_accounts; account_disabled} ->
+            if token_owned then
+              Coda_base.Token_permissions.Token_owned {disable_new_accounts}
+            else Not_owned {account_disabled} )
+      in
+      let%map snapp =
+        match t.snapp with
+        | None ->
+            Ok None
+        | Some {state; verification_key} ->
+            let%bind app_state =
+              if
+                Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
+                <> List.length state
+              then
+                Or_error.errorf
+                  !"Snap account state has invalid length %{sexp: \
+                    Runtime_config.Accounts.Single.t} length: %d"
+                  t (List.length state)
+              else Ok (Snapp_state.of_list_exn state)
+            in
+            let%map verification_key =
+              (* Use a URI-safe alphabet to make life easier for maintaining json
+                   We prefer this to base58-check here because users should not
+                   be manually entering verification keys.
+                *)
+              Option.value_map ~default:(Ok None) verification_key
+                ~f:(fun verification_key ->
+                  let%map vk =
+                    Base64.decode ~alphabet:Base64.uri_safe_alphabet
+                      verification_key
+                    |> Result.map_error ~f:(function `Msg s ->
+                           Error.createf
+                             !"Could not parse verification key account \
+                               %{sexp:Runtime_config.Accounts.Single.t}: %s"
+                             t s )
+                    |> Result.map
+                         ~f:
+                           (Binable.of_string
+                              ( module Pickles.Side_loaded.Verification_key
+                                       .Stable
+                                       .Latest ))
+                  in
+                  Some
+                    (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
+              )
+            in
+            Some {Snapp_account.verification_key; app_state}
       in
       { account with
         delegate=
@@ -155,7 +196,7 @@ module Accounts = struct
       ; voting_for=
           Option.value_map ~default:account.voting_for
             ~f:Coda_base.State_hash.of_base58_check_exn t.voting_for
-      ; snapp= t.snapp
+      ; snapp
       ; permissions }
 
     let of_account :
@@ -179,10 +220,15 @@ module Accounts = struct
         match account.token_permissions with
         | Coda_base.Token_permissions.Token_owned {disable_new_accounts} ->
             Some
-              (Runtime_config.Accounts.Single.Token_permissions.Token_owned
-                 {disable_new_accounts})
+              { Runtime_config.Accounts.Single.Token_permissions.token_owned=
+                  true
+              ; disable_new_accounts
+              ; account_disabled= false }
         | Not_owned {account_disabled} ->
-            Some (Not_owned {account_disabled})
+            Some
+              { token_owned= false
+              ; disable_new_accounts= false
+              ; account_disabled }
       in
       let permissions =
         let auth_required a =
@@ -218,6 +264,20 @@ module Accounts = struct
           ; set_permissions= auth_required set_permissions
           ; set_verification_key= auth_required set_verification_key }
       in
+      let snapp =
+        Option.map account.snapp ~f:(fun {app_state; verification_key} ->
+            let state = Snapp_state.to_list app_state in
+            let verification_key =
+              Option.map verification_key ~f:(fun vk ->
+                  With_hash.data vk
+                  |> Binable.to_string
+                       ( module Pickles.Side_loaded.Verification_key.Stable
+                                .Latest )
+                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet )
+            in
+            { Runtime_config.Accounts.Single.Snapp_account.state
+            ; verification_key } )
+      in
       { pk=
           Some
             (Signature_lib.Public_key.Compressed.to_base58_check
@@ -237,7 +297,7 @@ module Accounts = struct
                account.receipt_chain_hash)
       ; voting_for=
           Some (Coda_base.State_hash.to_base58_check account.voting_for)
-      ; snapp= account.snapp
+      ; snapp
       ; permissions }
   end
 

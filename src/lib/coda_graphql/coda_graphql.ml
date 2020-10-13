@@ -606,7 +606,7 @@ module Types = struct
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
-          , Snapp_lib.Snapp_account.t option )
+          , Snapp_account.t option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool

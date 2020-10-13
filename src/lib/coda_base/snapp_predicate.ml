@@ -22,7 +22,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module A = Account
 open Coda_numbers
 open Currency
-open Snapp_lib.Snapp_basic
+open Snapp_basic
 open Pickles_types
 module Impl = Pickles.Impls.Step
 
@@ -346,7 +346,7 @@ module Account = struct
           ; receipt_chain_hash: 'receipt_chain_hash
           ; public_key: 'pk
           ; delegate: 'pk
-          ; state: 'field Snapp_lib.Snapp_state.Stable.V1.t }
+          ; state: 'field Snapp_state.Stable.V1.t }
         [@@deriving hlist, sexp, eq, yojson, hash, compare]
       end
     end]
@@ -375,8 +375,8 @@ module Account = struct
     ; public_key= Ignore
     ; delegate= Ignore
     ; state=
-        Vector.init Snapp_lib.Snapp_state.Max_state_size.n ~f:(fun _ ->
-            Or_ignore.Ignore ) }
+        Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
+    }
 
   let to_input
       ({balance; nonce; receipt_chain_hash; public_key; delegate; state} : t) =
@@ -437,7 +437,7 @@ module Account = struct
          ; public_key= _
          ; delegate= _
          ; state } :
-          t) (snapp : Snapp_lib.Snapp_account.Checked.t) =
+          t) (snapp : Snapp_account.Checked.t) =
       Boolean.all
         Vector.(
           to_list
@@ -458,7 +458,7 @@ module Account = struct
       ; receipt_chain_hash
       ; public_key ()
       ; public_key ()
-      ; Snapp_lib.Snapp_state.typ
+      ; Snapp_state.typ
           (Or_ignore.typ_implicit Field.typ ~equal:Field.equal
              ~ignore:Field.zero) ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist

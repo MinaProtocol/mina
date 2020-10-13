@@ -41,6 +41,10 @@ let dump_on_error yojson x =
       str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
   )
 
+let of_yojson_generic ~fields of_yojson json =
+  dump_on_error json @@ of_yojson
+  @@ yojson_strip_fields ~keep_fields:fields json
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
@@ -51,44 +55,115 @@ module Json_layout = struct
           ; vesting_period: Coda_numbers.Global_slot.t
           ; vesting_increment: Currency.Amount.t }
         [@@deriving yojson, dhall_type, sexp]
+
+        let fields =
+          [| "initial_minimum_balance"
+           ; "cliff_time"
+           ; "vesting_period"
+           ; "vesting_increment" |]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       module Permissions = struct
         module Auth_required = struct
           type t = None | Either | Proof | Signature | Both | Impossible
-          [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+          [@@deriving dhall_type, sexp, bin_io_unversioned]
+
+          let to_yojson = function
+            | None ->
+                `String "none"
+            | Either ->
+                `String "either"
+            | Proof ->
+                `String "proof"
+            | Signature ->
+                `String "signature"
+            | Both ->
+                `String "both"
+            | Impossible ->
+                `String "impossible"
+
+          let of_yojson = function
+            | `String s -> (
+              match String.lowercase s with
+              | "none" ->
+                  Ok None
+              | "either" ->
+                  Ok Either
+              | "proof" ->
+                  Ok Proof
+              | "signature" ->
+                  Ok Signature
+              | "both" ->
+                  Ok Both
+              | "impossible" ->
+                  Ok Impossible
+              | _ ->
+                  Error (sprintf "Invalid Auth_required.t value: %s" s) )
+            | _ ->
+                Error
+                  "Runtime_config.Json_Account.Single.Permissions.Auth_Required.t"
         end
 
         type t =
-          { stake: bool
-          ; edit_state: Auth_required.t
-          ; send: Auth_required.t
-          ; receive: Auth_required.t
-          ; set_delegate: Auth_required.t
-          ; set_permissions: Auth_required.t
-          ; set_verification_key: Auth_required.t }
+          { stake: bool [@default false]
+          ; edit_state: Auth_required.t [@default None]
+          ; send: Auth_required.t [@default None]
+          ; receive: Auth_required.t [@default None]
+          ; set_delegate: Auth_required.t [@default None]
+          ; set_permissions: Auth_required.t [@default None]
+          ; set_verification_key: Auth_required.t [@default None] }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+
+        let fields =
+          [| "stake"
+           ; "edit_state"
+           ; "send"
+           ; "receive"
+           ; "set_delegate"
+           ; "set_permissions"
+           ; "set_verification_key" |]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       module Token_permissions = struct
-        type disable_new_accounts = {disable_new_accounts: bool}
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
-
-        type account_disabled = {account_disabled: bool}
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
-
         type t =
-          | Token_owned of disable_new_accounts
-          | Not_owned of account_disabled
+          { token_owned: bool [@default false]
+          ; account_disabled: bool [@default false]
+          ; disable_new_accounts: bool [@default false] }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+
+        let fields =
+          [|"token_owned"; "account_disabled"; "disable_new_accounts"|]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       module Snapp_account = struct
-        (*TODO: representation for the snapp account type*)
-        type t = Snapp_lib.Snapp_account.t [@@deriving yojson, sexp]
+        module Field = struct
+          type t = Snark_params.Tick.Field.t
+          [@@deriving sexp, bin_io_unversioned]
 
-        (* TODO: be able to derive dhall type for polymorphic types*)
-        let dhall_type = Ppx_dhall_type.Dhall_type.Text
+          (* can't be automatically derived *)
+          let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
+          let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
+
+          let of_yojson = function
+            | `String s ->
+                Ok (Snark_params.Tick.Field.of_string s)
+            | _ ->
+                Error "Invalid Field.t runtime config Snapp_account.state"
+        end
+
+        type t = {state: Field.t list; verification_key: string option}
+        [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
+
+        let fields = [|"state"; "verification_key"|]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       type t =
@@ -106,7 +181,7 @@ module Json_layout = struct
         ; voting_for: (string option[@default None])
         ; snapp: (Snapp_account.t option[@default None])
         ; permissions: (Permissions.t option[@default None]) }
-      [@@deriving yojson, dhall_type, sexp]
+      [@@deriving sexp, yojson, dhall_type]
 
       let fields =
         [| "pk"
@@ -122,9 +197,7 @@ module Json_layout = struct
          ; "snapp"
          ; "permissions" |]
 
-      let of_yojson json =
-        dump_on_error json @@ of_yojson
-        @@ yojson_strip_fields ~keep_fields:fields json
+      let of_yojson json = of_yojson_generic ~fields of_yojson json
 
       let default : t =
         { pk= None
@@ -167,9 +240,7 @@ module Json_layout = struct
        ; "name"
        ; "add_genesis_winner" |]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Proof_keys = struct
@@ -215,9 +286,7 @@ module Json_layout = struct
        ; "supercharged_coinbase_factor"
        ; "account_creation_fee" |]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Genesis = struct
@@ -229,9 +298,7 @@ module Json_layout = struct
 
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Daemon = struct
@@ -240,9 +307,7 @@ module Json_layout = struct
 
     let fields = [|"txpool_max_size"|]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   type t =
@@ -254,9 +319,7 @@ module Json_layout = struct
 
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
-  let of_yojson json =
-    dump_on_error json @@ of_yojson
-    @@ yojson_strip_fields ~keep_fields:fields json
+  let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
 
 (** JSON representation:
@@ -308,6 +371,7 @@ module Accounts = struct
 
     module Permissions = Json_layout.Accounts.Single.Permissions
     module Token_permissions = Json_layout.Accounts.Single.Token_permissions
+    module Snapp_account = Json_layout.Accounts.Single.Snapp_account
 
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
@@ -320,7 +384,7 @@ module Accounts = struct
       ; nonce: Coda_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash: string option
       ; voting_for: string option
-      ; snapp: Snapp_lib.Snapp_account.Stable.Latest.t option
+      ; snapp: Snapp_account.t option
       ; permissions: Permissions.t option }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -350,7 +414,7 @@ module Accounts = struct
     ; nonce: Coda_numbers.Account_nonce.t
     ; receipt_chain_hash: string option
     ; voting_for: string option
-    ; snapp: Snapp_lib.Snapp_account.t option
+    ; snapp: Single.Snapp_account.t option
     ; permissions: Single.Permissions.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]

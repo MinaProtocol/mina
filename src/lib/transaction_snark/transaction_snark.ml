@@ -1005,7 +1005,7 @@ module Base = struct
 
       type _ t +=
         | State_body : Coda_state.Protocol_state.Body.Value.t t
-        | Snapp_account : [`One | `Two] -> Snapp_lib.Snapp_account.t t
+        | Snapp_account : [`One | `Two] -> Snapp_account.t t
         | Fee_payer_signature : Signature.t t
         | Account_signature : [`One | `Two] -> Signature.t t
         | Zero_complement : Snapp_command.Payload.Zero_proved.t t
@@ -1014,13 +1014,13 @@ module Base = struct
     end
 
     let handler ~(state_body : Coda_state.Protocol_state.Body.Value.t)
-        ~(snapp_account1 : Snapp_lib.Snapp_account.t option)
-        ~(snapp_account2 : Snapp_lib.Snapp_account.t option)
-        (c : Snapp_command.t) handler : request -> response =
+        ~(snapp_account1 : Snapp_account.t option)
+        ~(snapp_account2 : Snapp_account.t option) (c : Snapp_command.t)
+        handler : request -> response =
      fun (With {request; respond} as r) ->
       let Vector.[snapp_account1; snapp_account2] =
         Vector.map
-          ~f:(Option.value ~default:Snapp_lib.Snapp_account.default)
+          ~f:(Option.value ~default:Snapp_account.default)
           [snapp_account1; snapp_account2]
       in
       let sig1, sig2 =
@@ -1090,7 +1090,7 @@ module Base = struct
       | _ ->
           handler r
 
-    open Snapp_lib.Snapp_basic
+    open Snapp_basic
 
     let check_fee ~(excess : Amount.Signed.var) ~token_id
         ~(other_fee_payer_opt :
@@ -1128,12 +1128,10 @@ module Base = struct
         Account.Checked.Unhashed.t =
       let open Impl in
       let s =
-        exists Snapp_lib.Snapp_account.typ ~request:(fun () ->
-            Snapp_account which )
+        exists Snapp_account.typ ~request:(fun () -> Snapp_account which)
       in
       with_label __LOC__ (fun () ->
-          Field.Assert.equal (fst a.snapp)
-            (Snapp_lib.Snapp_account.Checked.digest s) ) ;
+          Field.Assert.equal (fst a.snapp) (Snapp_account.Checked.digest s) ) ;
       {a with snapp= s}
 
     let apply_body
@@ -1235,7 +1233,7 @@ module Base = struct
                    verification_key
                    (Lazy.force a.snapp.verification_key.hash)))
         in
-        let snapp' = {Snapp_lib.Snapp_account.verification_key; app_state} in
+        let snapp' = {Snapp_account.verification_key; app_state} in
         let r =
           As_prover.Ref.create
             As_prover.(
@@ -1246,16 +1244,13 @@ module Base = struct
                       used for computing the hash of the snapp account. We can't
                       provide the verification key since it's not available here. *)
                         Some
-                          { With_hash.data=
-                              Snapp_lib.Side_loaded_verification_key.dummy
+                          { With_hash.data= Side_loaded_verification_key.dummy
                           ; hash= read_var snapp'.verification_key }
                     ; app_state=
-                        read
-                          (Snapp_lib.Snapp_state.typ Field.typ)
-                          snapp'.app_state }
-                    : Snapp_lib.Snapp_account.t ))
+                        read (Snapp_state.typ Field.typ) snapp'.app_state }
+                    : Snapp_account.t ))
         in
-        (Snapp_lib.Snapp_account.Checked.digest' snapp', r)
+        (Snapp_account.Checked.digest' snapp', r)
       in
       let delegate =
         update_authorized a.permissions.set_delegate
@@ -1419,10 +1414,10 @@ module Base = struct
         ; Snapp_predicate.Hash.(check_checked Tc.field)
             o.account_vk
             (Lazy.force a.snapp.verification_key.hash)
-        ; Snapp_lib.Snapp_basic.Account_state.Checked.check
-            o.account_transition.prev ~is_empty:Boolean.false_
-        ; Snapp_lib.Snapp_basic.Account_state.Checked.check
-            o.account_transition.next ~is_empty:Boolean.false_ ]
+        ; Snapp_basic.Account_state.Checked.check o.account_transition.prev
+            ~is_empty:Boolean.false_
+        ; Snapp_basic.Account_state.Checked.check o.account_transition.next
+            ~is_empty:Boolean.false_ ]
 
       let signed_self nonce (a : Account.Checked.Unhashed.t) =
         let open Impl in
@@ -2964,8 +2959,8 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> snapp_account1:Snapp_lib.Snapp_account.t option
-    -> snapp_account2:Snapp_lib.Snapp_account.t option
+    -> snapp_account1:Snapp_account.t option
+    -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
@@ -3742,9 +3737,9 @@ let%test_module "transaction_snark" =
       let acct1 = wallets.(i) in
       let acct2 = wallets.(j) in
       let open Snapp_command in
-      let open Snapp_lib.Snapp_basic in
-      let new_state : _ Snapp_lib.Snapp_state.t =
-        Vector.init Snapp_lib.Snapp_state.Max_state_size.n ~f:Field.of_int
+      let open Snapp_basic in
+      let new_state : _ Snapp_state.t =
+        Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
       in
       let data1 : Party.Predicated.Signed.t =
         { predicate= acct1.account.nonce
