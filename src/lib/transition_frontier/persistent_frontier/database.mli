@@ -22,7 +22,7 @@ module Error : sig
     | `Frontier_hash
     | `Root_transition
     | `Best_tip_transition
-    | `Parent_transition
+    | `Parent_transition of State_hash.t
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
@@ -66,7 +66,8 @@ val add :
      t
   -> transition:External_transition.Validated.t
   -> ( unit
-     , [> `Not_found of [> `Parent_transition | `Arcs of State_hash.t]] )
+     , [> `Not_found of
+          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
 
 val move_root :

@@ -153,7 +153,7 @@ module Error = struct
     | `Frontier_hash
     | `Root_transition
     | `Best_tip_transition
-    | `Parent_transition
+    | `Parent_transition of State_hash.t
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
@@ -177,8 +177,8 @@ module Error = struct
           ("root transition", None)
       | `Best_tip_transition ->
           ("best tip transition", None)
-      | `Parent_transition ->
-          ("parent transition", None)
+      | `Parent_transition hash ->
+          ("parent transition", Some hash)
       | `New_root_transition ->
           ("new root transition", None)
       | `Old_root_transition ->
@@ -308,7 +308,7 @@ let add t ~transition =
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
-      ~error:(`Not_found `Parent_transition)
+      ~error:(`Not_found (`Parent_transition parent_hash))
   in
   let%map parent_arcs =
     get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
