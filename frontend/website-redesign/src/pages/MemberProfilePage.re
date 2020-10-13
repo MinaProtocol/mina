@@ -279,11 +279,12 @@ let make = () => {
     [|router.query|],
   );
 
-  <Page title="Member Profile">
+  <Page title="Mina Cryptocurrency Protocol">
     <Wrapped>
       <div className=Styles.page>
         {switch (state.currentMember) {
-         | Some(member) => <div> <ProfileHero member /> </div>
+         | Some(member) =>
+           <> <div className=Nav.Styles.spacer /> <ProfileHero member /> </>
          | None => React.null
          }}
         <div className=Styles.table>
