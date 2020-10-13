@@ -130,7 +130,10 @@ module LeftSide = {
       ]);
 
     let emailInputSection =
-      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))])]);
+      style([
+        marginTop(`rem(4.)),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))]),
+      ]);
 
     let logo = style([height(`rem(3.1)), width(`rem(11.))]);
 

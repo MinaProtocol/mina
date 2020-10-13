@@ -3,25 +3,6 @@ open Pipe_lib
 open Network_peer
 open Core_kernel
 
-module Snark_tables : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Transaction_snark_work.Statement.Stable.V1.Table.t
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Core.Time.Stable.With_utc_sexp.V2.t )
-            Transaction_snark_work.Statement.Stable.V1.Table.t }
-      [@@deriving sexp]
-    end
-  end]
-end
-
 module type S = sig
   type transition_frontier
 
@@ -29,7 +10,6 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
-       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -65,9 +45,8 @@ module type S = sig
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * (bool -> unit) )
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
