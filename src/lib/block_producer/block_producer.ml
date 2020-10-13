@@ -653,6 +653,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         ~local_state:consensus_local_state ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
+                let check_next_block_timing =
+                  match recheck_timing_reader with
+                  | Some _ ->
+                      (* Next timing check will be triggered by the reader. *)
+                      fun () ->
+                       [%log info]
+                         "Skipping next timing check, waiting for next \
+                          message before resuming."
+                  | None ->
+                      check_next_block_timing
+                in
                 match next_producer_timing with
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
@@ -930,11 +941,22 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     | Some _transition_frontier -> (
       match precomputed_blocks with
       | precomputed_block :: precomputed_blocks ->
-          Block_time.Controller.set_time_offset
-            (Core_kernel.Time.diff
-               (Block_time.to_time
-                  precomputed_block.Precomputed_block.scheduled_time)
-               (Core_kernel.Time.now ())) ;
+          let new_time_offset =
+            Core_kernel.Time.diff (Core_kernel.Time.now ())
+              (Block_time.to_time
+                 precomputed_block.Precomputed_block.scheduled_time)
+          in
+          [%log info]
+            "Changing time offset from $old_time_offset to $new_time_offset"
+            ~metadata:
+              [ ( "old_time_offset"
+                , `String
+                    (Core_kernel.Time.Span.to_string_hum
+                       (Block_time.Controller.get_time_offset ~logger)) )
+              ; ( "new_time_offset"
+                , `String (Core_kernel.Time.Span.to_string_hum new_time_offset)
+                ) ] ;
+          Block_time.Controller.set_time_offset new_time_offset ;
           let%bind () = produce precomputed_block in
           emit_next_block precomputed_blocks
       | [] ->

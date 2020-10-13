@@ -808,6 +808,17 @@ let generate_precomputed_blocks t ~filename ~skip_slots =
                in
                let now = Time.now () in
                let time_offset = Time.diff now next_slot_start_time in
+               [%log' info t.config.logger]
+                 "Changing time offset from $old_time_offset to \
+                  $new_time_offset"
+                 ~metadata:
+                   [ ( "old_time_offset"
+                     , `String
+                         (Time.Span.to_string_hum
+                            (Block_time.Controller.get_time_offset
+                               ~logger:t.config.logger)) )
+                   ; ( "new_time_offset"
+                     , `String (Time.Span.to_string_hum time_offset) ) ] ;
                Block_time.Controller.set_time_offset time_offset ;
                Strict_pipe.Writer.write recheck_timing_writer () ;
                return ()

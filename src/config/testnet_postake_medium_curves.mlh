@@ -1,4 +1,4 @@
-[%%define ledger_depth 14]
+[%%define ledger_depth 17]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/realistic.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
