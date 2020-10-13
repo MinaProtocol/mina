@@ -4,6 +4,11 @@ open Otp_lib
 open Coda_base
 open Frontier_base
 
+type input =
+  { diffs: Diff.Lite.E.t list
+  ; target_hash: Frontier_hash.t
+  ; garbage: State_hash.Hash_set.t }
+
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
    * should just be a directory, but while this is still in process,
@@ -11,9 +16,9 @@ module Worker = struct
    *)
   type t = {db: Database.t; logger: Logger.t}
 
-  type create_args = t
+  type nonrec input = input
 
-  type input = Diff.Lite.E.t list * Frontier_hash.t
+  type create_args = t
 
   type output = unit
 
@@ -30,7 +35,7 @@ module Worker = struct
     [ `Not_found of
       [ `New_root_transition
       | `Old_root_transition
-      | `Parent_transition
+      | `Parent_transition of State_hash.t
       | `Arcs of State_hash.t
       | `Best_tip ] ]
 
@@ -39,26 +44,37 @@ module Worker = struct
         "new root transition not found"
     | `Not_found `Old_root_transition ->
         "old root transition not found"
-    | `Not_found `Parent_transition ->
-        "parent transition not found"
+    | `Not_found (`Parent_transition hash) ->
+        Printf.sprintf "parent transition %s not found"
+          (State_hash.to_string hash)
     | `Not_found `Best_tip ->
         "best tip not found"
     | `Not_found (`Arcs hash) ->
         Printf.sprintf "arcs not found for %s" (State_hash.to_string hash)
 
-  let apply_diff (type mutant) (t : t) (diff : mutant Diff.Lite.t) :
-      (mutant, apply_diff_error) Result.t =
+  let apply_diff (type mutant) (t : t) ~garbage (diff : mutant Diff.Lite.t) :
+      [`Normal of (mutant, apply_diff_error) Result.t | `Irrelevant_diff] =
     let map_error result ~diff_type ~diff_type_name =
-      Result.map_error result ~f:(fun err ->
-          [%log' error t.logger] "error applying %s diff: %s" diff_type_name
-            (apply_diff_error_internal_to_string err) ;
-          `Apply_diff diff_type )
+      `Normal
+        (Result.map_error result ~f:(fun err ->
+             [%log' error t.logger] "error applying %s diff: %s" diff_type_name
+               (apply_diff_error_internal_to_string err) ;
+             `Apply_diff diff_type ))
     in
     match diff with
-    | New_node (Lite transition) ->
-        map_error ~diff_type:`New_node ~diff_type_name:"New_node"
+    | New_node (Lite transition) -> (
+        let r =
           ( Database.add t.db ~transition
             :> (mutant, apply_diff_error_internal) Result.t )
+        in
+        match r with
+        | Ok x ->
+            `Normal (Ok x)
+        | Error (`Not_found (`Parent_transition h | `Arcs h))
+          when Hash_set.mem garbage h ->
+            `Irrelevant_diff
+        | _ ->
+            map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned {new_root; garbage= Lite garbage} ->
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
@@ -78,10 +94,14 @@ module Worker = struct
     | New_node (Full _) ->
         failwith "impossible"
 
-  let handle_diff t hash (Diff.Lite.E.E diff) =
+  let handle_diff t hash ~garbage (Diff.Lite.E.E diff) =
     let open Result.Let_syntax in
-    let%map mutant = apply_diff t diff in
-    Frontier_hash.merge_diff hash diff mutant
+    match apply_diff t ~garbage diff with
+    | `Normal m ->
+        let%map mutant = m in
+        Frontier_hash.merge_diff hash diff mutant
+    | `Irrelevant_diff ->
+        Ok hash
 
   (* result equivalent of Deferred.Or_error.List.fold *)
   let rec deferred_result_list_fold ls ~init ~f =
@@ -99,7 +119,7 @@ module Worker = struct
     | [`Invalid_resulting_frontier_hash of Frontier_hash.t] ]
 
   (* TODO: rewrite with open polymorphic variants to avoid type coercion *)
-  let perform t (diffs, target_hash) =
+  let perform t {diffs; target_hash; garbage} =
     let open Deferred.Let_syntax in
     match%map
       let open Deferred.Result.Let_syntax in
@@ -123,7 +143,7 @@ module Worker = struct
         deferred_result_list_fold diffs ~init:base_hash
           ~f:(fun acc_hash diff ->
             Deferred.return
-              ( handle_diff t acc_hash diff
+              ( handle_diff ~garbage t acc_hash diff
                 :> (Frontier_hash.t, perform_error) Result.t ) )
       in
       let%map () =
