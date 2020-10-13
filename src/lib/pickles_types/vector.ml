@@ -352,6 +352,10 @@ module With_length (N : Nat.Intf) = struct
   include Stable.Latest
 
   let map (t : 'a t) = map t
+
+  let of_list_exn : 'a list -> 'a t = fun ls -> of_list_and_length_exn ls N.n
+
+  let to_list : 'a t -> 'a list = to_list
 end
 
 let rec typ' : type f var value n.
