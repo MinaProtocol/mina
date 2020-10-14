@@ -1403,8 +1403,11 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
       termination_hack_ref := Some t ;
       Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
         ~f:(fun line ->
-          ( match Go_log.record_of_yojson (Yojson.Safe.from_string line) with
-          | Ok record -> (
+          ( match
+              Or_error.try_with (fun () -> Yojson.Safe.from_string line)
+              |> Or_error.map ~f:Go_log.record_of_yojson
+            with
+          | Ok (Ok record) -> (
               let r = Go_log.(record_to_message record) in
               let r =
                 if
@@ -1422,21 +1425,34 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   } )
           | Error err ->
               [%log debug]
+                ~metadata:
+                  [ ("line", `String line)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+                "failed to parse log line $line from helper stderr as json"
+          | Ok (Error err) ->
+              [%log debug]
                 ~metadata:[("line", `String line); ("error", `String err)]
-                "failed to parse log line from helper stderr" ) ;
+                "failed to parse log line $line from helper stderr" ) ;
           Deferred.unit )
       |> don't_wait_for ;
       Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
         ~f:(fun line ->
           let open Yojson.Safe.Util in
-          let v = Yojson.Safe.from_string line in
+          let v = Or_error.try_with (fun () -> Yojson.Safe.from_string line) in
           ( match
-              if member "upcall" v = `Null then Helper.handle_response t v
-              else Helper.handle_upcall t v
+              Or_error.map v ~f:(fun v ->
+                  if member "upcall" v = `Null then Helper.handle_response t v
+                  else Helper.handle_upcall t v )
             with
-          | Ok () ->
+          | Ok (Ok ()) ->
               ()
-          | Error e ->
+          | Error err ->
+              [%log debug]
+                ~metadata:
+                  [ ("line", `String line)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+                "failed to parse log line $line from helper stderr as json"
+          | Ok (Error e) ->
               [%log error] "handling line from helper failed! $err"
                 ~metadata:
                   [ ("line", `String line)
