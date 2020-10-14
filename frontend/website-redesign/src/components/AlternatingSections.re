@@ -47,7 +47,7 @@ module Section = {
         display(`flex),
         alignItems(`center),
         justifyContent(`center),
-        marginLeft(`rem(0.5)),
+        marginLeft(`rem(0.3)),
         marginTop(`rem(0.2)),
       ]);
 
@@ -56,10 +56,8 @@ module Section = {
         width(`percent(100.)),
         maxWidth(`rem(23.)),
         height(`auto),
-        media(
-          Theme.MediaQuery.desktop,
-          [maxWidth(`rem(35.)), marginTop(`rem(2.))],
-        ),
+        marginTop(`rem(2.)),
+        media(Theme.MediaQuery.desktop, [maxWidth(`rem(35.))]),
       ]);
   };
   module SimpleRow = {
@@ -140,7 +138,7 @@ module Section = {
           borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
           before([
             contentRule(seperatorNumber),
-            Theme.Typeface.monumentGrotesk,
+            Theme.Typeface.monumentGroteskMono,
             color(Theme.Colors.digitalBlack),
             lineHeight(`rem(1.5)),
             letterSpacing(`px(-1)),
@@ -176,7 +174,7 @@ module Section = {
                    <span className=Theme.Type.buttonLink>
                      <span> {React.string(row.linkCopy)} </span>
                      <span className=SectionStyles.icon>
-                       <Icon kind=Icon.ArrowRightMedium />
+                       <Icon kind=Icon.ArrowRightSmall />
                      </span>
                    </span>
                  </span>

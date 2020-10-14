@@ -44,7 +44,7 @@ let time_deferred deferred =
   let start_time = Time.now () in
   let%map result = deferred in
   let end_time = Time.now () in
-  (Time.diff start_time end_time, result)
+  (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
   `Take
