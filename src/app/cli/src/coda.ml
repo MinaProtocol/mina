@@ -946,11 +946,17 @@ let replay_blocks logger =
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
          let blocks =
-           In_channel.with_file blocks_filename ~f:(fun blocks_file ->
-               In_channel.input_lines blocks_file
-               |> List.map ~f:(fun s ->
-                      Sexp.of_string_conv_exn s
-                        Block_producer.Precomputed_block.t_of_sexp ) )
+           Sequence.unfold ~init:(In_channel.create blocks_filename)
+             ~f:(fun blocks_file ->
+               match In_channel.input_line blocks_file with
+               | Some line ->
+                   Some
+                     ( Sexp.of_string_conv_exn line
+                         Block_producer.Precomputed_block.t_of_sexp
+                     , blocks_file )
+               | None ->
+                   In_channel.close blocks_file ;
+                   None )
          in
          let%bind coda = setup_daemon () in
          let%bind () = Coda_lib.start_with_precomputed_blocks coda blocks in

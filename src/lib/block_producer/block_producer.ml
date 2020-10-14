@@ -842,8 +842,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         in
         emit_next_block precomputed_blocks
     | Some _transition_frontier -> (
-      match precomputed_blocks with
-      | precomputed_block :: precomputed_blocks ->
+      match Sequence.next precomputed_blocks with
+      | Some (precomputed_block, precomputed_blocks) ->
           let new_time_offset =
             Core_kernel.Time.diff (Core_kernel.Time.now ())
               (Block_time.to_time
@@ -862,7 +862,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Block_time.Controller.set_time_offset new_time_offset ;
           let%bind () = produce precomputed_block in
           emit_next_block precomputed_blocks
-      | [] ->
+      | None ->
           return () )
   in
   emit_next_block precomputed_blocks
