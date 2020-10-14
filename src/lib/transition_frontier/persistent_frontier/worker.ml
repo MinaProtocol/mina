@@ -6,8 +6,6 @@ open Frontier_base
 
 type input = Diff.Lite.E.t list
 
-let oc = Out_channel.create "/home/izzy/repos/coda/ff/persistent_frontier"
-
 type create_args = {db: Database.t; logger: Logger.t}
 
 module Worker = struct
