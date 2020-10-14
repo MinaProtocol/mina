@@ -137,14 +137,14 @@ let make = (~profiles) => {
         link:
           {FeaturedSingleRow.Row.Button({
              buttonColor: Theme.Colors.mint,
-             buttonTextColor: Theme.Colors.white,
+             buttonTextColor: Theme.Colors.digitalBlack,
              buttonText: "Apply now",
              dark: true,
              href: `Internal("/genesis"),
            })},
       }>
       <Spacer height=4. />
-      <Rule color=Theme.Colors.digitalBlack />
+      <Rule color=Theme.Colors.white />
       <Spacer height=4. />
       <h2 className=Styles.h2>
         {React.string("Genesis Founding Members")}
@@ -226,7 +226,7 @@ let make = (~profiles) => {
         copySize: `Small,
         description: "From front-end sprints and protocol development to community building initiatives and content creation, our Grants Program invites you to help strengthen the network in exchange for Mina tokens. ",
         textColor: Theme.Colors.white,
-        image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
+        image: "/static/img/MinaGrantsDevelopers.jpg",
         background: Color(Theme.Colors.white),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
         link:
@@ -234,13 +234,11 @@ let make = (~profiles) => {
             FeaturedSingleRow.Row.buttonText: "See All Opportunities",
             buttonColor: Theme.Colors.orange,
             buttonTextColor: Theme.Colors.white,
-            dark: false,
+            dark: true,
             href: `Internal("/grants"),
           }),
       }>
-      <TypesOfGrants
-        backgroundImg={Theme.desktop: "", Theme.tablet: "", Theme.mobile: ""}
-      />
+      <div> <TypesOfGrants /> </div>
     </FeaturedSingleRow>
     <div className=Styles.background>
       <FeaturedSingleRow

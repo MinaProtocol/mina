@@ -10,17 +10,16 @@ module Styles = {
       position(`relative),
       important(backgroundSize(`cover)),
       background(`url(backgroundImg.mobile)),
-      padding2(~v=`rem(4.), ~h=`rem(1.5)),
+      padding2(~v=`rem(4.), ~h=`zero),
       media(
         Theme.MediaQuery.tablet,
-        [background(`url(backgroundImg.tablet)), height(`rem(42.))],
+        [background(`url(backgroundImg.tablet)), height(`percent(100.))],
       ),
       media(
         Theme.MediaQuery.desktop,
         [
           justifyContent(`flexEnd),
           alignContent(`spaceAround),
-          padding2(~v=`zero, ~h=`rem(9.5)),
           background(`url(backgroundImg.desktop)),
         ],
       ),
@@ -96,17 +95,19 @@ let make =
       ~backgroundImg: Theme.backgroundImage,
     ) => {
   <div className={Styles.container(backgroundImg)}>
-    <div className={Styles.quoteContainer(small)}>
-      <p className=Styles.quote> {React.string(copy)} </p>
-      <div className=Styles.attribute>
-        <img className=Styles.headshot src=authorImg />
-        <div className=Styles.name>
-          <p className=Theme.Type.pageLabel> {React.string(author)} </p>
-          <p className=Theme.Type.contributorLabel>
-            {React.string(authorTitle)}
-          </p>
+    <Wrapped>
+      <div className={Styles.quoteContainer(small)}>
+        <p className=Styles.quote> {React.string(copy)} </p>
+        <div className=Styles.attribute>
+          <img className=Styles.headshot src=authorImg />
+          <div className=Styles.name>
+            <p className=Theme.Type.pageLabel> {React.string(author)} </p>
+            <p className=Theme.Type.contributorLabel>
+              {React.string(authorTitle)}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </Wrapped>
   </div>;
 };

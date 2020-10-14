@@ -50,6 +50,24 @@ module Styles = {
       ),
     ]);
 
+  let typesOfGrantsImage =
+    style([
+      important(backgroundSize(`cover)),
+      backgroundImage(`url("/static/img/MinaSpectrumBackground.jpg")),
+      width(`percent(100.)),
+      height(`rem(43.)),
+      display(`flex),
+      justifyContent(`center),
+      alignItems(`center),
+    ]);
+
+  let typeOfGrantsContainer =
+    style([
+      width(`percent(90.)),
+      padding(`rem(2.)),
+      backgroundColor(white),
+    ]);
+
   let grantColumnContainer =
     style([
       display(`flex),
@@ -729,13 +747,11 @@ let make = () => {
     //   buttonCopy="Learn More"
     //   buttonUrl="/docs"
     // />
-    <TypesOfGrants
-      backgroundImg={
-        Theme.desktop: "/static/img/MinaSpectrumBackground.jpg",
-        Theme.tablet: "/static/img/MinaSpectrumBackground.jpg",
-        Theme.mobile: "/static/img/MinaSpectrumBackground.jpg",
-      }
-    />
+    <div className=Styles.typesOfGrantsImage>
+      <Wrapped>
+        <div className=Styles.typeOfGrantsContainer> <TypesOfGrants /> </div>
+      </Wrapped>
+    </div>
     <GrantsSideNav />
     <FrontEndProjects />
     <ProtocolProjects />

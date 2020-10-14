@@ -166,6 +166,7 @@ module SingleRow = {
             {switch (row.link) {
              | Button(button) =>
                <Button
+                 textColor={button.buttonTextColor}
                  bgColor={button.buttonColor}
                  dark={button.dark}
                  href={button.href}>
@@ -239,6 +240,7 @@ module SingleRow = {
             {switch (row.link) {
              | Button(button) =>
                <Button
+                 textColor={button.buttonTextColor}
                  bgColor={button.buttonColor}
                  dark={button.dark}
                  href={button.href}>

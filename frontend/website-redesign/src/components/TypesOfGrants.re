@@ -64,7 +64,6 @@ module Styles = {
           flexDirection(`row),
           alignItems(`flexStart),
           height(`percent(80.)),
-          width(`percent(90.)),
         ],
       ),
       selector(
@@ -86,29 +85,25 @@ module TypeOfGrant = {
 };
 
 [@react.component]
-let make = (~backgroundImg) => {
-  <div className={Styles.typesOfGrantsImage(backgroundImg)}>
-    <Wrapped>
-      <div className=Styles.typesOfGrantsOuterContainer>
-        <div className=Styles.typesOfGrantsInnerContainer>
-          <h3 className=Theme.Type.h3> {React.string("Types of Grants")} </h3>
-          <TypeOfGrant
-            img="static/img/TechinalGrants.png"
-            title="Technical Grants"
-            copy="Contribute to engineering projects like web interfaces or to protocol enhancements like stablecoins."
-          />
-          <TypeOfGrant
-            img="static/img/CommunityGrants.png"
-            title="Community Grants"
-            copy="Help with community organizing or create much-needed content to better serve our members."
-          />
-          <TypeOfGrant
-            img="static/img/SubmitYourOwnGrant.png"
-            title="Submit Your Own"
-            copy="Share an idea for how to improve the Mina network or build the Mina community."
-          />
-        </div>
-      </div>
-    </Wrapped>
+let make = () => {
+  <div className=Styles.typesOfGrantsOuterContainer>
+    <div className=Styles.typesOfGrantsInnerContainer>
+      <h3 className=Theme.Type.h3> {React.string("Types of Grants")} </h3>
+      <TypeOfGrant
+        img="static/img/TechinalGrants.png"
+        title="Technical Grants"
+        copy="Contribute to engineering projects like web interfaces or to protocol enhancements like stablecoins."
+      />
+      <TypeOfGrant
+        img="static/img/CommunityGrants.png"
+        title="Community Grants"
+        copy="Help with community organizing or create much-needed content to better serve our members."
+      />
+      <TypeOfGrant
+        img="static/img/SubmitYourOwnGrant.png"
+        title="Submit Your Own"
+        copy="Share an idea for how to improve the Mina network or build the Mina community."
+      />
+    </div>
   </div>;
 };
