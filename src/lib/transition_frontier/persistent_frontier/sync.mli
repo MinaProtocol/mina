@@ -16,10 +16,7 @@ val create :
   -> db:Database.t
   -> t
 
-val notify :
-     t
-  -> diffs:Diff.Lite.E.t list
-  -> unit
+val notify : t -> diffs:Diff.Lite.E.t list -> unit
 
 val close : t -> unit Deferred.t
 

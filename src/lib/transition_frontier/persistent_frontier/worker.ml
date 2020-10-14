@@ -20,52 +20,49 @@ module Worker = struct
   type t =
     { db: Database.t
     ; logger: Logger.t
-(* Invariant:
+          (* Invariant:
 
    If there are root transitions in this queue which can be performed, we perform
    them immediately. This invariant is potentially violated whenever we touch the
    database (i.e., whenever we process any other kind of diff) so we eagerly perform
    work in this queue immediately after applying any other kind of diff. *)
-    ; root_transitions : Diff.Root_transition.Lite.t Queue.t
-    }
+    ; root_transitions: Diff.Root_transition.Lite.t Queue.t }
 
   type nonrec create_args = create_args
 
   type output = unit
 
   (* worker assumes database has already been checked and initialized *)
-  let create ({ db; logger } : create_args) : t =
-    { db
-    ; logger
-    ; root_transitions= Queue.create ()
-    }
+  let create ({db; logger} : create_args) : t =
+    {db; logger; root_transitions= Queue.create ()}
 
   let eagerly_perform_root_transitions t =
     let start = Time.now () in
     let finish count =
-      [%log' trace t.logger]
-        "Eagerly performed $n root transitions in $time"
-        ~metadata:[
-          ("n", `Int count)
-        ; ("time", `String (Time.(Span.to_string_hum (diff (now ()) start))))
-        ]
+      [%log' trace t.logger] "Eagerly performed $n root transitions in $time"
+        ~metadata:
+          [ ("n", `Int count)
+          ; ("time", `String Time.(Span.to_string_hum (diff (now ()) start)))
+          ]
     in
     let rec go count =
       match Queue.peek t.root_transitions with
-      | None -> finish count
-      | Some { new_root; garbage } ->
-        let garbage =
-          match garbage with
-          | Lite garbage -> garbage
-          | Full _ -> assert false
-        in
-        match
-          Database.move_root t.db ~new_root ~garbage
-        with
-        | Ok _old_root ->
-          ignore (Queue.dequeue_exn t.root_transitions) ;
-          go (count + 1)
-        | Error _ -> finish count
+      | None ->
+          finish count
+      | Some {new_root; garbage} -> (
+          let garbage =
+            match garbage with
+            | Lite garbage ->
+                garbage
+            | Full _ ->
+                assert false
+          in
+          match Database.move_root t.db ~new_root ~garbage with
+          | Ok _old_root ->
+              ignore (Queue.dequeue_exn t.root_transitions) ;
+              go (count + 1)
+          | Error _ ->
+              finish count )
     in
     go 0
 
@@ -74,7 +71,7 @@ module Worker = struct
       List.partition_map diffs ~f:(fun (Diff.Lite.E.E d) ->
           match d with
           | Root_transitioned rt ->
-                `Fst rt
+              `Fst rt
           | _ ->
               `Snd (Diff.Lite.E.E d) )
     in
@@ -119,23 +116,27 @@ module Worker = struct
     in
     match diff with
     | New_node (Lite transition) -> (
-      let r =
-        ( Database.add t.db ~transition
-          :> (mutant, apply_diff_error_internal) Result.t )
-      in
-      match r with
-      | Ok x ->
-          Ok x
-      | Error (`Not_found (`Parent_transition h | `Arcs h)) ->
-        [%log' trace t.logger]
-          "Did not add node $hash to DB. Its $parent has already been thrown away"
-          ~metadata:[
-            ("hash", `String (State_hash.to_base58_check (Coda_transition.External_transition.Validated.state_hash transition)))
-          ; ("parent", `String (State_hash.to_base58_check h))
-          ] ;
-          Ok ()
-      | _ ->
-          map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
+        let r =
+          ( Database.add t.db ~transition
+            :> (mutant, apply_diff_error_internal) Result.t )
+        in
+        match r with
+        | Ok x ->
+            Ok x
+        | Error (`Not_found (`Parent_transition h | `Arcs h)) ->
+            [%log' trace t.logger]
+              "Did not add node $hash to DB. Its $parent has already been \
+               thrown away"
+              ~metadata:
+                [ ( "hash"
+                  , `String
+                      (State_hash.to_base58_check
+                         (Coda_transition.External_transition.Validated
+                          .state_hash transition)) )
+                ; ("parent", `String (State_hash.to_base58_check h)) ] ;
+            Ok ()
+        | _ ->
+            map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned {new_root; garbage= Lite garbage} ->
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
@@ -171,22 +172,19 @@ module Worker = struct
         deferred_result_list_fold t ~init ~f
 
   let perform t input =
-    let `Unprocessed other_diffs = make_immediate_progress t input in
-    match%map (
+    let (`Unprocessed other_diffs) = make_immediate_progress t input in
+    match%map
       [%log' trace t.logger]
         "Applying %d other diffs to the persistent frontier"
         (List.length other_diffs) ;
-        (* Iterating over the diff application in this way
+      (* Iterating over the diff application in this way
          * effectively allows the scheduler to scheduler
          * other tasks in between diff applications.
          * If implemented otherwise, all diffs would be
          * applied during the same scheduler cycle.
          *)
-        deferred_result_list_fold other_diffs ~init:()
-          ~f:(fun () diff ->
-              Deferred.return (
-                  handle_diff t diff
-              ) ) )
+      deferred_result_list_fold other_diffs ~init:() ~f:(fun () diff ->
+          Deferred.return (handle_diff t diff) )
     with
     | Ok () ->
         ()

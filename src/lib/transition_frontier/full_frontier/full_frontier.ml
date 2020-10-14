@@ -102,8 +102,8 @@ let close t =
     (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
        (Breadcrumb.mask (root t)))
 
-let create ~logger ~root_data ~root_ledger ~consensus_local_state
-    ~max_length ~precomputed_values =
+let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
+    ~precomputed_values =
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
@@ -611,8 +611,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
-  [%log' trace t.logger]
-    "after applying diffs to full frontier" ;
+  [%log' trace t.logger] "after applying diffs to full frontier" ;
   if not ignore_consensus_local_state then
     Debug_assert.debug_assert (fun () ->
         match

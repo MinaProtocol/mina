@@ -59,8 +59,7 @@ val check :
             | `Protocol_states_for_root_scan_state ] ] ] )
      Result.t
 
-val initialize :
-  t -> root_data:Root_data.Limited.t -> unit
+val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
@@ -69,8 +68,6 @@ val add :
      , [> `Not_found of
           [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
-
-val can_move_root : t -> new_root:Root_data.Limited.t -> bool
 
 val move_root :
      t

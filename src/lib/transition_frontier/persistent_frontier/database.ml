@@ -272,8 +272,7 @@ let initialize t ~root_data =
     External_transition.Validated.erase (transition root_data)
   in
   [%log' trace t.logger]
-    ~metadata:
-      [ ("root_data", Root_data.Limited.to_yojson root_data) ]
+    ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
@@ -302,27 +301,22 @@ let add t ~transition =
       Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
-let old_root t ~new_root =
+let move_root t ~new_root ~garbage =
+  let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition (Root_data.Limited.hash new_root)))
+      (mem t.db ~key:(Transition (hash new_root)))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
     get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
   in
-  old_root
-
-let can_move_root t ~new_root = Result.is_ok (old_root t ~new_root)
-
-let move_root t ~new_root ~garbage =
-  let%map old_root = old_root t ~new_root in
   let old_root_hash = Root_data.Minimal.hash old_root in
   (* TODO: Result compatible rocksdb batch transaction *)
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:snd (Root_data.Limited.protocol_states new_root)) ;
+        ~data:(List.map ~f:snd (protocol_states new_root)) ;
       List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node

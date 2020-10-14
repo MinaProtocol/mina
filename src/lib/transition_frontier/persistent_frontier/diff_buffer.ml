@@ -67,9 +67,7 @@ let flush t =
     let diffs = DynArray.to_list t.diff_array in
     DynArray.clear t.diff_array ;
     DynArray.compact t.diff_array ;
-    let%bind () =
-      Worker.dispatch t.worker diffs
-    in
+    let%bind () = Worker.dispatch t.worker diffs in
     if should_flush t then flush_job t
     else (
       t.flush_job <- None ;
@@ -97,7 +95,7 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
 
 let write t ~diffs =
   if t.closed then failwith "attempt to write to diff buffer after closed" ;
-  let `Unprocessed diffs = Worker.make_immediate_progress t.worker diffs in
+  let (`Unprocessed diffs) = Worker.make_immediate_progress t.worker diffs in
   List.iter diffs ~f:(DynArray.add t.diff_array) ;
   if should_flush t && t.flush_job = None then flush t
   else check_for_overflow t

@@ -28,7 +28,7 @@ end
 module type Worker_intf = sig
   include Base_intf
 
-  val make_immediate_progress : t -> input -> [ `Unprocessed of input ]
+  val make_immediate_progress : t -> input -> [`Unprocessed of input]
 
   val perform : t -> input -> output Deferred.t
 end
@@ -39,7 +39,7 @@ module type S = sig
 
   val is_working : t -> bool
 
-  val make_immediate_progress : t -> input -> [ `Unprocessed of input ]
+  val make_immediate_progress : t -> input -> [`Unprocessed of input]
 
   val dispatch : t -> input -> output Deferred.t
 end

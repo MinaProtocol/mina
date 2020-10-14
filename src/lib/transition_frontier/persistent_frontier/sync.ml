@@ -10,8 +10,7 @@ let buffer t = DynArray.to_list t.buffer.diff_array
 let create ~constraint_constants ~logger ~time_controller ~db =
   let worker = Worker.create {db; logger} in
   let buffer =
-    Diff_buffer.create ~constraint_constants ~time_controller
-      ~worker
+    Diff_buffer.create ~constraint_constants ~time_controller ~worker
   in
   {worker; buffer}
 
@@ -19,5 +18,4 @@ let close t =
   let%bind () = Diff_buffer.close_and_finish_copy t.buffer in
   Worker.close t.worker
 
-let notify t ~diffs =
-  Diff_buffer.write t.buffer ~diffs
+let notify t ~diffs = Diff_buffer.write t.buffer ~diffs

@@ -135,8 +135,7 @@ module Instance = struct
 
   let notify_sync t ~diffs =
     assert_sync t ~f:(fun sync ->
-        Sync.notify sync ~diffs ;
-        Deferred.Result.return () )
+        Sync.notify sync ~diffs ; Deferred.Result.return () )
 
   let destroy t =
     let open Deferred.Let_syntax in
@@ -211,11 +210,7 @@ module Instance = struct
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind ( root
-             , root_transition
-             , best_tip
-             , protocol_states
-             , root_hash ) =
+    let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
