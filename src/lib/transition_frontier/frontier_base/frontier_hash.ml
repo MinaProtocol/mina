@@ -4,58 +4,72 @@ open Coda_transition
 open Signature_lib
 open Digestif.SHA256
 
-[%%versioned_binable
+module H = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Digestif.SHA256.t [@@deriving eq]
+
+      let to_latest = Fn.id
+
+      module Base58_check = Base58_check.Make (struct
+        let description = "Frontier hash"
+
+        let version_byte = Base58_check.Version_bytes.frontier_hash
+      end)
+
+      let to_yojson hash =
+        [%derive.to_yojson: string] (Base58_check.encode (to_raw_string hash))
+
+      let of_yojson json =
+        let open Result.Let_syntax in
+        let%bind raw_str = [%derive.of_yojson: string] json in
+        let%bind str =
+          Base58_check.decode raw_str
+          |> Result.map_error ~f:Error.to_string_hum
+        in
+        match of_raw_string_opt str with
+        | Some hash ->
+            Ok hash
+        | None ->
+            Error "invalid raw hash"
+
+      include Binable.Of_stringable (struct
+        type nonrec t = t
+
+        let of_string = of_hex
+
+        let to_string = to_hex
+      end)
+    end
+  end]
+
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
+
+  module Base58_check = Stable.Latest.Base58_check
+
+  let empty = digest_string ""
+end
+
+[%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Digestif.SHA256.t
+    type t = {root_transitions: H.Stable.V1.t; other: H.Stable.V1.t}
+    [@@deriving yojson, eq]
 
     let to_latest = Fn.id
-
-    module Base58_check = Base58_check.Make (struct
-      let description = "Frontier hash"
-
-      let version_byte = Base58_check.Version_bytes.frontier_hash
-    end)
-
-    let to_yojson hash =
-      [%derive.to_yojson: string] (Base58_check.encode (to_raw_string hash))
-
-    let of_yojson json =
-      let open Result.Let_syntax in
-      let%bind raw_str = [%derive.of_yojson: string] json in
-      let%bind str =
-        Base58_check.decode raw_str |> Result.map_error ~f:Error.to_string_hum
-      in
-      match of_raw_string_opt str with
-      | Some hash ->
-          Ok hash
-      | None ->
-          Error "invalid raw hash"
-
-    include Binable.Of_stringable (struct
-      type nonrec t = t
-
-      let of_string = of_hex
-
-      let to_string = to_hex
-    end)
   end
 end]
 
-[%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
-
-module Base58_check = Stable.Latest.Base58_check
-
 type transition = {source: t; target: t}
-
-let equal t1 t2 = equal t1 t2
-
-let empty = digest_string ""
 
 let merge_string t1 string = digestv_string [to_hex t1; string]
 
-let to_string = to_hex
+let to_string {root_transitions; other} =
+  digest_string (to_hex root_transitions ^ to_hex other) |> to_hex
+
+let empty = {root_transitions= H.empty; other= H.empty}
 
 let merge_state_hash acc state_hash =
   merge_string acc (State_hash.raw_hash_bytes state_hash)
@@ -104,27 +118,29 @@ let merge_diff : type mutant. t -> (Diff.lite, mutant) Diff.t -> t =
  fun acc diff ->
   match diff with
   | New_node (Lite node) ->
-      merge_transition acc node
+      {acc with other= merge_transition acc.other node}
   | Root_transitioned {new_root; garbage= Lite garbage_hashes} ->
-      List.fold_left garbage_hashes
-        ~init:(merge_root_data acc new_root)
-        ~f:merge_state_hash
+      { acc with
+        root_transitions=
+          List.fold_left garbage_hashes
+            ~init:(merge_root_data acc.root_transitions new_root)
+            ~f:merge_state_hash }
   | Best_tip_changed best_tip ->
-      merge_state_hash acc best_tip
+      {acc with other= merge_state_hash acc.other best_tip}
   (* Despite the fact that OCaml won't allow you to pass in a (full, mutant) Diff.t to this function,
-     * the exhaustiveness checker is not convinced. This case cannot be reached. *)
+      * the exhaustiveness checker is not convinced. This case cannot be reached. *)
   | _ ->
       failwith "impossible"
 
 let merge_mutant : type mutant. t -> mutant Diff.Lite.t -> mutant -> t =
- fun acc diff mutant ->
+ fun (acc : t) diff mutant ->
   match diff with
   | New_node _ ->
       acc
   | Root_transitioned _ ->
-      merge_state_hash acc mutant
+      {acc with root_transitions= merge_state_hash acc.root_transitions mutant}
   | Best_tip_changed _ ->
-      merge_state_hash acc mutant
+      {acc with other= merge_state_hash acc.other mutant}
 
 let merge_diff : type mutant. t -> mutant Diff.Lite.t -> mutant -> t =
  fun acc diff mutant -> merge_mutant (merge_diff acc diff) diff mutant
