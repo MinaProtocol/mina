@@ -36,7 +36,6 @@ module SingleRow = {
       style([
         position(`relative),
         width(`percent(100.)),
-        height(`rem(41.)),
         display(`flex),
         flexDirection(`column),
         alignItems(`center),
@@ -50,7 +49,7 @@ module SingleRow = {
         };
       style([
         position(`absolute),
-        width(`rem(21.)),
+        width(`rem(22.)),
         maxHeight(`rem(35.)),
         overflow(`scroll),
         unsafe("height", "fit-content"),
@@ -106,7 +105,11 @@ module SingleRow = {
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        display(`none),
+        media(
+          Theme.MediaQuery.tablet,
+          [display(`block), width(`percent(80.))],
+        ),
         media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
@@ -236,7 +239,8 @@ module Styles = {
 
   let singleRowBackground = (backgroundImg: Row.backgroundType) =>
     style([
-      minHeight(`rem(32.5)),
+      minHeight(`rem(23.)),
+      media(Theme.MediaQuery.tablet, [minHeight(`rem(32.5))]),
       width(`percent(100.)),
       important(backgroundSize(`cover)),
       switch (backgroundImg) {
