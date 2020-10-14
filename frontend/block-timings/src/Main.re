@@ -128,8 +128,14 @@ module CloudLogging = {
       };
       type t = { fields: fields };
     };
+
+    module Labels = {
+      type t =
+        { [@bs.as "k8s-pod/app"] k8sPodApp: string };
+    };
+
     module Metadata = {
-      type t = { timestamp : Js.Date.t, resource: Resource.t, jsonPayload: JsonPayload.t };
+      type t = { timestamp : Js.Date.t, resource: Resource.t, jsonPayload: JsonPayload.t, labels: Labels.t };
     };
 
     module Data = {
@@ -153,7 +159,7 @@ module CloudLogging = {
       autoPaginate: bool,
       resourceNames: array(string),
       orderBy: string,
-      pageToken: option(string)
+      pageToken: option(string),
     };
 
     type getEntryResponse = {
@@ -179,7 +185,7 @@ module CloudLogging = {
 };
 
 // TODO: Figure out how to get bs-let/ppx to work
-module Usage = {
+module TopLevel = {
   open CloudLogging;
 
   Js.log("Starting scrape from cloud logging");
@@ -196,12 +202,14 @@ module Usage = {
 
   let blockLifetimes = BlockLifetime.empty();
 
-  let rec go = (i, req) => {
+  let rec go = (i) => fun
+    | None => P.resolved(())
+    | Some(req) => {
     Log.getEntries(log, req)
-    -> P.tap(((es, _, _)) => {
-        Js.Json.stringifyAny(es)
-        |> Js.log
-    })
+    /*-> P.tap(((es, _, _)) => {*/
+        /*Js.Json.stringifyAny(es)*/
+        /*|> Js.log*/
+    /*})*/
     -> P.tap(((es, _, _)) => {
       let _ =
         es
@@ -220,12 +228,12 @@ module Usage = {
               BlockLifetime.produced(
                 blockLifetimes,
                 ~instant={ BlockLifetime.Instant.time: e.metadata.timestamp
-                  , podRealName: e.metadata.resource.labels.pod_name },
+                  , podRealName: e.metadata.labels.k8sPodApp },
                 ~stateHash=metadata.structValue.fields.breadcrumb.structValue.fields.validated_transition.structValue.fields.hash.stringValue
               );
             } else if (event_id.stringValue == StructuredLog.BlockReceived.id) {
               let metadata: StructuredLog.BlockReceived.Metadata.t =
-                Obj.magic(e.metadata.jsonPayload.fields.metadata);
+                Obj.magic(e.metadata.labels.k8sPodApp);
 
               BlockLifetime.received(
                 blockLifetimes,
@@ -240,17 +248,18 @@ module Usage = {
 
       Js.log("Finished processing entries for this page")
     })
-    -> P.flatMap(((_, {pageToken}, _)) =>
-                 if (i == 0) {
+    -> P.flatMap(((_, {pageToken}, _)) => {
+      let is_none = fun | None => true | Some(_) => false;
+                 if (i == 0 || is_none(pageToken)) {
                    P.resolved(())
                  } else {
-                   go(i-1, { ...req, pageToken })
-                 })
+                   go(i-1, Some { ...req, pageToken })
+                 }})
   };
 
-    go(3, {
+    go(3, Js.Null.return({
       resourceNames: [| "projects/o1labs-192920" |],
-      pageSize: 2,
+      pageSize: 100,
       autoPaginate: false,
       orderBy: "timestamp desc",
       pageToken: None,
@@ -264,7 +273,8 @@ resource.labels.container_name="coda" AND
 jsonPayload.event_id = "%s" OR
 jsonPayload.event_id = "%s"
 )
+timestamp > "2020-10-13T22:48:30Z"
 |}, testnetName, StructuredLog.BlockProduced.id, StructuredLog.BlockReceived.id)
-    }) -> P.get(_ => Js.log2("All done", Js.Json.stringifyAny(BlockLifetime.render(blockLifetimes))));
+    })) -> P.get(_ => Js.log2("All done", Js.Json.stringifyAny(BlockLifetime.render(blockLifetimes))));
 };
 
