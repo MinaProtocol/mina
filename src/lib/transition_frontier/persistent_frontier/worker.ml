@@ -53,13 +53,12 @@ module Worker = struct
         Printf.sprintf "arcs not found for %s" (State_hash.to_string hash)
 
   let apply_diff (type mutant) (t : t) ~garbage (diff : mutant Diff.Lite.t) :
-      [`Normal of (mutant, apply_diff_error) Result.t | `Irrelevant_diff] =
+      (mutant, apply_diff_error) Result.t =
     let map_error result ~diff_type ~diff_type_name =
-      `Normal
-        (Result.map_error result ~f:(fun err ->
-             [%log' error t.logger] "error applying %s diff: %s" diff_type_name
-               (apply_diff_error_internal_to_string err) ;
-             `Apply_diff diff_type ))
+      Result.map_error result ~f:(fun err ->
+          [%log' error t.logger] "error applying %s diff: %s" diff_type_name
+            (apply_diff_error_internal_to_string err) ;
+          `Apply_diff diff_type )
     in
     match diff with
     | New_node (Lite transition) -> (
@@ -69,10 +68,10 @@ module Worker = struct
         in
         match r with
         | Ok x ->
-            `Normal (Ok x)
+            Ok x
         | Error (`Not_found (`Parent_transition h | `Arcs h))
           when Hash_set.mem garbage h ->
-            `Irrelevant_diff
+            Ok ()
         | _ ->
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned {new_root; garbage= Lite garbage} ->
@@ -96,12 +95,8 @@ module Worker = struct
 
   let handle_diff t hash ~garbage (Diff.Lite.E.E diff) =
     let open Result.Let_syntax in
-    match apply_diff t ~garbage diff with
-    | `Normal m ->
-        let%map mutant = m in
-        Frontier_hash.merge_diff hash diff mutant
-    | `Irrelevant_diff ->
-        Ok hash
+    let%map mutant = apply_diff t ~garbage diff in
+    Frontier_hash.merge_diff hash diff mutant
 
   (* result equivalent of Deferred.Or_error.List.fold *)
   let rec deferred_result_list_fold ls ~init ~f =

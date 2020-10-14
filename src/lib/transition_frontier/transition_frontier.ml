@@ -271,10 +271,30 @@ let genesis_state_hash {genesis_state_hash; _} = genesis_state_hash
 let root_snarked_ledger {persistent_root_instance; _} =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
+(* Reorder diffs so that Root_transition diffs are brought toward the front if possible.
+   This is done to lessen the chance of a root de-sync. *)
+let separate_root_transitions t ds =
+  let db = t.persistent_frontier_instance.db in
+  List.partition_map ds ~f:(fun (Diff.Full.E.E d) ->
+      match d with
+      | Root_transitioned ({new_root; _} as rt) ->
+          if Persistent_frontier.Database.can_move_root db ~new_root then
+            `Fst rt
+          else `Snd (Diff.Full.E.E d)
+      | _ ->
+          `Snd (E d) )
+
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
   let old_hash = Full_frontier.hash t.full_frontier in
-  let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
+  let root_transitions, other_diffs =
+    Full_frontier.calculate_diffs t.full_frontier breadcrumb
+    |> separate_root_transitions t
+  in
+  let diffs =
+    List.map root_transitions ~f:(fun r -> Diff.Full.E.E (Root_transitioned r))
+    @ other_diffs
+  in
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -316,71 +336,57 @@ let add_breadcrumb_exn t breadcrumb =
           , `List
               (List.map user_cmds
                  ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
-  let lite_diffs, root_transitions =
-    List.partition_map diffs
-      ~f:
-        Diff.(
-          fun (Full.E.E diff) ->
-            match to_lite diff with
-            | Root_transitioned r ->
-                `Snd r
-            | diff ->
-                `Fst (Lite.E.E diff))
-  in
   (* Eagerly perform root transitions so that root de-sync only occurs if daemon
       terminates between the call to [Full_frontier.apply_diffs] and here. *)
-  let garbage =
-    let db = t.persistent_frontier_instance.db in
-    let n = List.length root_transitions in
-    [%log' debug t.logger] "applying $n root transitions"
-      ~metadata:[("n", `Int n)] ;
-    let start = Time.now () in
-    let res, garbage =
-      with_return (fun {return} ->
-          let err ?(acc_garbage = []) = function
-            | Error e ->
-                return (Error e, acc_garbage)
-            | Ok x ->
-                x
-          in
-          let init = err (Persistent_frontier.Database.get_frontier_hash db) in
-          let res, garbage =
-            List.fold root_transitions ~init:(init, [])
-              ~f:(fun (acc, acc_garbage) ({new_root; garbage} as r) ->
-                match garbage with
-                | Full _ ->
-                    failwith "impossible"
-                | Lite garbage ->
-                    let old_root_hash =
-                      (* TODO: Maybe we should just keep going instead of returning early? *)
-                      err ~acc_garbage
-                        (Persistent_frontier.Database.move_root ~new_root
-                           ~garbage db)
-                    in
-                    ( Frontier_hash.merge_diff acc (Root_transitioned r)
-                        old_root_hash
-                    , old_root_hash :: List.rev_append garbage acc_garbage ) )
-          in
-          (Ok res, garbage) )
+  let lite_diffs, garbage =
+    let log_ok ~start =
+      [%log' debug t.logger] "successfully applied root transition in $time ms"
+        ~metadata:[("time", `Float Time.(Span.to_ms (diff (now ()) start)))]
     in
-    ( match res with
-    | Ok r ->
+    let db = t.persistent_frontier_instance.db in
+    let to_lite =
+      List.map ~f:(fun (Diff.Full.E.E d) -> Diff.Lite.E.E (Diff.to_lite d))
+    in
+    match Persistent_frontier.Database.get_frontier_hash db with
+    | Error (`Not_found `Frontier_hash) ->
         [%log' debug t.logger]
-          "successfully applied $n root transitions in $time ms"
-          ~metadata:
-            [ ("n", `Int n)
-            ; ("time", `Float Time.(Span.to_ms (diff (now ()) start))) ] ;
-        Persistent_frontier.Database.set_frontier_hash db r
-    | Error e ->
-        let e =
-          [%sexp_of:
-            [ `Not_found of
-              [`Frontier_hash | `New_root_transition | `Old_root_transition] ]]
-            e
+          "could not get frontier hash. will not eagerly apply root transitions"
+          ~metadata:[] ;
+        (to_lite diffs, [])
+    | Ok init ->
+        let garbage, h =
+          List.fold root_transitions ~init:([], init)
+            ~f:(fun (acc_garbage, acc_hash) {new_root; garbage} ->
+              let garbage =
+                match garbage with
+                | Full x ->
+                    Diff.Node_list.to_lite x
+                | Lite x ->
+                    x
+              in
+              let d =
+                Diff.Root_transitioned {new_root; garbage= Lite garbage}
+              in
+              let start = Time.now () in
+              match
+                Persistent_frontier.Database.move_root ~new_root ~garbage db
+              with
+              | Ok old_root_hash ->
+                  log_ok ~start ;
+                  let acc_hash =
+                    Frontier_hash.merge_diff acc_hash d old_root_hash
+                  in
+                  ( old_root_hash :: List.rev_append garbage acc_garbage
+                  , acc_hash )
+              | Error e ->
+                  failwithf
+                    !"move_root failed: %{sexp:[ `Not_found of \
+                      [`Frontier_hash | `New_root_transition | \
+                      `Old_root_transition] ]}"
+                    e () )
         in
-        [%log' warn t.logger] "applying root transition failed with $error"
-          ~metadata:[("error", `String (Sexp.to_string_hum e))] ) ;
-    garbage
+        Persistent_frontier.Database.set_frontier_hash db h ;
+        (to_lite other_diffs, garbage)
   in
   let%bind sync_result =
     (* Diffs get put into a buffer here. They're processed asynchronously *)

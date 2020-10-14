@@ -70,6 +70,8 @@ val add :
           [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
 
+val can_move_root : t -> new_root:Root_data.Limited.t -> bool
+
 val move_root :
      t
   -> new_root:Root_data.Limited.t
