@@ -46,7 +46,9 @@ module Styles = {
 
 type itemKind =
   | Blog
-  | TestnetRetro;
+  | TestnetRetro
+  | Announcement
+  | Press;
 
 module MainListing = {
   module MainListingStyles = {
@@ -68,13 +70,18 @@ module MainListing = {
     <div className=MainListingStyles.container>
       <div className=Styles.metadata>
         {switch (itemKind) {
-         | Blog => <span> {React.string("Press")} </span>
+         | Blog => <span> {React.string("Blog")} </span>
+         | Announcement => <span> {React.string("Announcement")} </span>
          | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
+         | Press => <span> {React.string("Press")} </span>
          }}
         <span> {React.string(" / ")} </span>
         <span> {React.string(item.date)} </span>
         <span> {React.string(" / ")} </span>
-        <span> {React.string(item.publisher)} </span>
+        {switch (item.publisher) {
+         | Some(publisher) => <span> {React.string(publisher)} </span>
+         | None => React.null
+         }}
       </div>
       {ReactExt.fromOpt(item.image, ~f=src =>
          <img src={src.ContentType.System.fields.ContentType.Image.file.url} />
@@ -144,13 +151,18 @@ module Listing = {
          <div className=ListingStyles.container key={item.title}>
            <div className=Styles.metadata>
              {switch (itemKind) {
-              | Blog => <span> {React.string("Press")} </span>
+              | Blog => <span> {React.string("Blog")} </span>
+              | Announcement => <span> {React.string("Announcement")} </span>
+              | Press => <span> {React.string("Press")} </span>
               | TestnetRetro => <span> {React.string("Testnet Retro")} </span>
               }}
              <span> {React.string(" / ")} </span>
              <span> {React.string(item.date)} </span>
              <span> {React.string(" / ")} </span>
-             <span> {React.string(item.publisher)} </span>
+             {switch (item.publisher) {
+              | Some(publisher) => <span> {React.string(publisher)} </span>
+              | None => React.null
+              }}
            </div>
            <h5 className=Styles.title> {React.string(item.title)} </h5>
            {button(item)}

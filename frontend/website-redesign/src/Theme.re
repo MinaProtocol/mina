@@ -200,9 +200,9 @@ module Type = {
       fontSize(`rem(1.125)),
       lineHeight(`rem(1.7)),
       textDecoration(`none),
+      cursor(`pointer),
       display(`flex),
       alignItems(`center),
-      cursor(`pointer),
       unsafe("width", "fit-content"),
       padding2(~h=`zero, ~v=`rem(0.5)),
       hover([
@@ -399,6 +399,15 @@ module Type = {
       lineHeight(`rem(1.5)),
       opacity(0.5),
       color(Colors.digitalBlack),
+    ]);
+
+  let divider =
+    style([
+      maxWidth(`rem(71.)),
+      width(`percent(100.)),
+      margin2(~v=`zero, ~h=`auto),
+      height(`px(1)),
+      backgroundColor(Colors.digitalBlack),
     ]);
 };
 
