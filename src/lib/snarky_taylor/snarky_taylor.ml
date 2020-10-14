@@ -77,11 +77,27 @@ let binary_expansion x =
       let rem = if b then Bignum.(rem - pt) else rem in
       Some (b, Bignum.(rem, pt / two)) )
 
+module Coeff_integer_part = struct
+  type t = [`Zero | `One] [@@deriving sexp]
+
+  let of_int_exn : int -> t = function
+    | 0 ->
+        `Zero
+    | 1 ->
+        `One
+    | _ ->
+        assert false
+
+  let to_int = function `Zero -> 0 | `One -> 1
+end
+
 module Params = struct
   type t =
     { total_precision: int
     ; per_term_precision: int
     ; terms_needed: int
+          (* As a special case, we permite the x^1 coefficient to have absolute value < 2 (rather than < 1) *)
+    ; linear_term_integer_part: Coeff_integer_part.t
     ; coefficients: ([`Neg | `Pos] * B.t) array }
 end
 
@@ -115,9 +131,14 @@ module Exp = struct
    if our field has 298 bits and x has 32 bits, then we cannot easily compute
    x^10, since representing it exactly requires 320 bits. *)
   let bit_params ~field_size_in_bits ~log_base =
+    let using_linear_term_whole_part = true in
     greatest ~such_that:(fun k ->
         let kk = B.of_int k in
         let n = terms_needed ~log_base ~bits_of_precision:kk in
+        let n =
+          (* To account for our use of the linear term whole part. *)
+          if using_linear_term_whole_part then n + 1 else n
+        in
         let per_term_precision = ceil_log2 (B.of_int n) + k in
         if (n * per_term_precision) + per_term_precision < field_size_in_bits
         then Some {per_term_precision; terms_needed= n; total_precision= k}
@@ -127,9 +148,7 @@ module Exp = struct
     let abs_log_base =
       let log_base = log base ~terms:100 in
       assert (Bignum.(log_base < zero)) ;
-      let r = Bignum.abs log_base in
-      assert (Bignum.(r < one)) ;
-      r
+      Bignum.abs log_base
     in
     let {total_precision; terms_needed; per_term_precision} =
       bit_params ~field_size_in_bits ~log_base:abs_log_base
@@ -140,15 +159,42 @@ module Exp = struct
 
        as fixed point numbers.
     *)
-    let coefficients =
-      Array.init terms_needed ~f:(fun i ->
-          (* Starts from 1 *)
-          let i = i + 1 in
-          ( (if i mod 2 = 0 then `Neg else `Pos)
-          , Bignum.((abs_log_base ** i) / of_bigint (factorial (B.of_int i)))
-            |> bignum_as_fixed_point per_term_precision ) )
+    let coefficients, linear_term_integer_part =
+      let linear_term_integer_part = ref `Zero in
+      ( Array.init terms_needed ~f:(fun i ->
+            (* Starts from 1 *)
+            let i = i + 1 in
+            let c =
+              Bignum.((abs_log_base ** i) / of_bigint (factorial (B.of_int i)))
+            in
+            let c_frac =
+              if i = 1 then (
+                let c_whole = Bignum.round_as_bigint_exn ~dir:`Down c in
+                let c_frac = Bignum.(c - of_bigint c_whole) in
+                linear_term_integer_part :=
+                  Coeff_integer_part.of_int_exn (Bigint.to_int_exn c_whole) ;
+                Core_kernel.printf
+                  !"ltip: %{sexp:Coeff_integer_part.t}\n%!"
+                  !linear_term_integer_part ;
+                Core_kernel.printf "c_whole, c_frac: %s, %s\n%!"
+                  (B.to_string_hum c_whole)
+                  (Bignum.to_string_hum c_frac) ;
+                c_frac )
+              else (
+                assert (Bignum.(c < one)) ;
+                c )
+            in
+            ( (if i mod 2 = 0 then `Neg else `Pos)
+            , c_frac |> bignum_as_fixed_point per_term_precision ) )
+      , !linear_term_integer_part )
     in
-    {Params.total_precision; terms_needed; per_term_precision; coefficients}
+    Core_kernel.printf "%d %d %d\n%!" total_precision terms_needed
+      per_term_precision ;
+    { Params.total_precision
+    ; terms_needed
+    ; per_term_precision
+    ; coefficients
+    ; linear_term_integer_part }
 
   module Unchecked = struct
     let one_minus_exp (params : Params.t) x =
@@ -162,25 +208,38 @@ module Exp = struct
           let c = match sgn with `Pos -> c | `Neg -> Bignum.neg c in
           (Bignum.(acc + (x_i * c)), x_i) )
       |> fst
+      |> fun acc ->
+      Bignum.(
+        acc
+        + x
+          * of_int (Coeff_integer_part.to_int params.linear_term_integer_part))
   end
 
   (* Zip together coefficients and powers of x and sum *)
-  let taylor_sum ~m x_powers coefficients =
-    Array.fold2_exn coefficients x_powers ~init:None
-      ~f:(fun sum (sgn, ci) xi ->
-        let term = Floating_point.(mul ~m ci xi) in
-        match sum with
-        | None ->
-            assert (sgn = `Pos) ;
-            Some term
-        | Some s ->
-            Some (Floating_point.add_signed ~m s (sgn, term)) )
-    |> Option.value_exn
+  let taylor_sum ~m x_powers coefficients linear_term_integer_part =
+    let acc =
+      Array.fold2_exn coefficients x_powers ~init:None
+        ~f:(fun sum (sgn, ci) xi ->
+          let term = Floating_point.(mul ~m ci xi) in
+          match sum with
+          | None ->
+              assert (sgn = `Pos) ;
+              Some term
+          | Some s ->
+              Some (Floating_point.add_signed ~m s (sgn, term)) )
+      |> Option.value_exn
+    in
+    match linear_term_integer_part with
+    | `Zero ->
+        acc
+    | `One ->
+        Floating_point.add ~m acc x_powers.(0)
 
   let one_minus_exp ~m
       { Params.total_precision= _
       ; terms_needed
       ; per_term_precision
+      ; linear_term_integer_part
       ; coefficients } x =
     let powers = Floating_point.powers ~m x terms_needed in
     let coefficients =
@@ -189,5 +248,5 @@ module Exp = struct
           , Floating_point.constant ~m ~value:c ~precision:per_term_precision
           ) )
     in
-    taylor_sum ~m powers coefficients
+    taylor_sum ~m powers coefficients linear_term_integer_part
 end
