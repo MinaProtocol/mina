@@ -3264,7 +3264,8 @@ let%test_module "Proof of stake tests" =
       let tolerance = 100. in
       (* 100 is a reasonable choice for samples = 1000 and for very low likelihood of failure; this should be recalculated if sample count was to be adjusted *)
       let within_tolerance = diff < tolerance in
-      assert within_tolerance
+      if not within_tolerance then
+        failwithf "actual vs. expected: %d vs %f" actual expected ()
   end )
 
 module Exported = struct
