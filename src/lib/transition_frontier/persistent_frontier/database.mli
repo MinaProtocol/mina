@@ -60,7 +60,7 @@ val check :
      Result.t
 
 val initialize :
-  t -> root_data:Root_data.Limited.t -> base_hash:Frontier_hash.t -> unit
+  t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
@@ -107,11 +107,6 @@ val get_best_tip :
 
 val set_best_tip :
   t -> State_hash.t -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
-
-val get_frontier_hash :
-  t -> (Frontier_hash.t, [> `Not_found of [> `Frontier_hash]]) Result.t
-
-val set_frontier_hash : t -> Frontier_hash.t -> unit
 
 val crawl_successors :
      t

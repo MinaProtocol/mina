@@ -58,7 +58,6 @@ type t =
   { root_ledger: Ledger.Any_ledger.witness
   ; mutable root: State_hash.t
   ; mutable best_tip: State_hash.t
-  ; mutable hash: Frontier_hash.t
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
   ; mutable protocol_states_for_root_scan_state:
@@ -68,10 +67,6 @@ type t =
   ; precomputed_values: Precomputed_values.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
-
-let set_hash_unsafe t (`I_promise_this_is_safe hash) = t.hash <- hash
-
-let hash t = t.hash
 
 let all_breadcrumbs t =
   List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
@@ -107,7 +102,7 @@ let close t =
     (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
        (Breadcrumb.mask (root t)))
 
-let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
+let create ~logger ~root_data ~root_ledger ~consensus_local_state
     ~max_length ~precomputed_values =
   let open Root_data in
   let root_hash =
@@ -143,7 +138,6 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; root_ledger
     ; root= root_hash
     ; best_tip= root_hash
-    ; hash= base_hash
     ; table
     ; consensus_local_state
     ; max_length
@@ -591,9 +585,8 @@ let update_metrics_with_diff (type mutant) t
 
 let apply_diffs t diffs ~ignore_consensus_local_state =
   let open Root_identifier.Stable.Latest in
-  [%log' trace t.logger] "Applying %d diffs to full frontier (%s --> ?)"
-    (List.length diffs)
-    (Frontier_hash.to_string t.hash) ;
+  [%log' trace t.logger] "Applying %d diffs to full frontier "
+    (List.length diffs) ;
   let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
@@ -607,21 +600,19 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         let mutant, new_root =
           apply_diff t diff ~ignore_consensus_local_state
         in
-        t.hash <- Frontier_hash.merge_diff t.hash (Diff.to_lite diff) mutant ;
         update_metrics_with_diff t diff ;
         let new_root =
           match new_root with
           | None ->
               prev_root
           | Some state_hash ->
-              Some {state_hash; frontier_hash= t.hash}
+              Some {state_hash}
         in
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
   [%log' trace t.logger]
-    "Reached state %s after applying diffs to full frontier"
-    (Frontier_hash.to_string t.hash) ;
+    "after applying diffs to full frontier" ;
   if not ignore_consensus_local_state then
     Debug_assert.debug_assert (fun () ->
         match

@@ -8,7 +8,6 @@ open Async_kernel
 open Coda_base
 open Coda_transition
 include Frontier_base
-module Hash = Frontier_hash
 module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
@@ -74,15 +73,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
             persistent_frontier_instance root_identifier
         with
       | Ok () ->
-          Ok ()
-      | Error `Frontier_hash_does_not_match ->
-          [%log warn]
-            ~metadata:
-              [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
-            "Persistent frontier hash did not match persistent root frontier \
-             hash (resetting frontier hash)" ;
-          Persistent_frontier.Instance.set_frontier_hash
-            persistent_frontier_instance root_identifier.frontier_hash ;
           Ok ()
       | Error `Sync_cannot_be_running ->
           Error (`Failure "sync job is already running on persistent frontier")
@@ -286,7 +276,6 @@ let separate_root_transitions t ds =
 
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
-  let old_hash = Full_frontier.hash t.full_frontier in
   let root_transitions, other_diffs =
     Full_frontier.calculate_diffs t.full_frontier breadcrumb
     |> separate_root_transitions t
@@ -336,64 +325,13 @@ let add_breadcrumb_exn t breadcrumb =
           , `List
               (List.map user_cmds
                  ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
-  (* Eagerly perform root transitions so that root de-sync only occurs if daemon
-      terminates between the call to [Full_frontier.apply_diffs] and here. *)
-  let lite_diffs, garbage =
-    let log_ok ~start =
-      [%log' debug t.logger] "successfully applied root transition in $time ms"
-        ~metadata:[("time", `Float Time.(Span.to_ms (diff (now ()) start)))]
-    in
-    let db = t.persistent_frontier_instance.db in
-    let to_lite =
-      List.map ~f:(fun (Diff.Full.E.E d) -> Diff.Lite.E.E (Diff.to_lite d))
-    in
-    match Persistent_frontier.Database.get_frontier_hash db with
-    | Error (`Not_found `Frontier_hash) ->
-        [%log' debug t.logger]
-          "could not get frontier hash. will not eagerly apply root transitions"
-          ~metadata:[] ;
-        (to_lite diffs, [])
-    | Ok init ->
-        let garbage, h =
-          List.fold root_transitions ~init:([], init)
-            ~f:(fun (acc_garbage, acc_hash) {new_root; garbage} ->
-              let garbage =
-                match garbage with
-                | Full x ->
-                    Diff.Node_list.to_lite x
-                | Lite x ->
-                    x
-              in
-              let d =
-                Diff.Root_transitioned {new_root; garbage= Lite garbage}
-              in
-              let start = Time.now () in
-              match
-                Persistent_frontier.Database.move_root ~new_root ~garbage db
-              with
-              | Ok old_root_hash ->
-                  log_ok ~start ;
-                  let acc_hash =
-                    Frontier_hash.merge_diff acc_hash d old_root_hash
-                  in
-                  ( old_root_hash :: List.rev_append garbage acc_garbage
-                  , acc_hash )
-              | Error e ->
-                  failwithf
-                    !"move_root failed: %{sexp:[ `Not_found of \
-                      [`Frontier_hash | `New_root_transition | \
-                      `Old_root_transition] ]}"
-                    e () )
-        in
-        Persistent_frontier.Database.set_frontier_hash db h ;
-        (to_lite other_diffs, garbage)
+  let lite_diffs =
+    List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
   let%bind sync_result =
-    (* Diffs get put into a buffer here. They're processed asynchronously *)
+    (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
-      ~garbage ~diffs:lite_diffs
-      ~hash_transition:
-        {source= old_hash; target= Full_frontier.hash t.full_frontier}
+      ~diffs:lite_diffs
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
