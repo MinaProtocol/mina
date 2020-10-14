@@ -58,8 +58,14 @@ ls -lh coda*.deb
 
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
-
-DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
+#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
+#>> Checking for existing lock file
+#>> Repository is locked by another user:  at host dc7eaad3c537
+#>> Attempting to obtain a lock
+#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions 
+--lock 
+--cache-control=max-age=120'
 
 # check for AWS Creds
 set +u
@@ -104,7 +110,7 @@ else
 
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-    docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPTPATH/Dockerfile docker_build
+    docker build -t codaprotocol/coda-archive:$DOCKER_TAG -f $SCRIPTPATH/Dockerfile docker_build
 
-    docker push codaprotocol/coda-archive:$VERSION
+    docker push codaprotocol/coda-archive:$DOCKER_TAG
 fi

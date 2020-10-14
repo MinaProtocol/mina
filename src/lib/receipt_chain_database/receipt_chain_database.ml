@@ -150,7 +150,7 @@ let%test_module "receipt_database" =
       Signed_command.Gen.payment_with_random_participants
         ~keys:
           (Array.init 5 ~f:(fun (_ : int) -> Signature_lib.Keypair.create ()))
-        ~max_amount:10000 ~max_fee:1000 ()
+        ~max_amount:10000 ~fee_range:1000 ()
 
     let ucs = List.map ~f:(fun x -> User_command.Poly.Signed_command x)
 

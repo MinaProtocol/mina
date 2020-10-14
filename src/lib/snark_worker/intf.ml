@@ -13,7 +13,10 @@ module type Inputs_intf = sig
     type t
 
     val create :
-      proof_level:Genesis_constants.Proof_level.t -> unit -> t Deferred.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> proof_level:Genesis_constants.Proof_level.t
+      -> unit
+      -> t Deferred.t
 
     val worker_wait_time : float
   end

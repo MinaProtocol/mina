@@ -13,7 +13,7 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
   | Check | None ->
       Deferred.return ()
 
-let verify_blockchain_snark _ _ = Deferred.Or_error.return true
+let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
 
 let verify_commands _ (cs : User_command.Verifiable.t list) :
     [ `Valid of Coda_base.User_command.Valid.t
