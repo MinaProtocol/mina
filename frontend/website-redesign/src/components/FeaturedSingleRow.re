@@ -72,6 +72,8 @@ module SingleRow = {
       ]);
     };
 
+    let h2 = merge([Theme.Type.h2, style([width(`rem(16.))])]);
+
     let copyText = textColor => {
       style([
         display(`flex),
@@ -147,7 +149,7 @@ module SingleRow = {
         <div
           className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
-            <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
+            <h2 className=RowStyles.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
               {React.string(row.description)}
             </p>
@@ -207,7 +209,7 @@ module SingleRow = {
         <div
           className={Styles.contentBlock(row.copySize, row.contentBackground)}>
           <div className={RowStyles.copyText(row.textColor)}>
-            <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
+            <h2 className=RowStyles.h2> {React.string(row.title)} </h2>
             <p className=RowStyles.description>
               {React.string(row.description)}
             </p>
