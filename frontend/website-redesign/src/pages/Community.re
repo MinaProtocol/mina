@@ -55,7 +55,7 @@ module Styles = {
 
   let leaderboardContainer =
     style([
-      height(`rem(66.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -64,7 +64,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
-      media(Theme.MediaQuery.tablet, [height(`rem(41.))]),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 
   let leaderboardTextContainer =
@@ -94,7 +94,11 @@ module Styles = {
       ),
     ]);
   let leaderboardLink =
-    style([width(`percent(100.)), textDecoration(`none)]);
+    style([
+      width(`percent(100.)),
+      textDecoration(`none),
+      height(`percent(100.)),
+    ]);
 };
 
 [@react.component]
@@ -130,16 +134,17 @@ let make = (~profiles) => {
         background:
           Image("/static/img/community-page/CommunityBackground.jpg"),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        button: {
-          buttonColor: Theme.Colors.mint,
-          buttonTextColor: Theme.Colors.white,
-          buttonText: "Apply now",
-          dark: true,
-          href: `Internal("/genesis"),
-        },
+        link:
+          {FeaturedSingleRow.Row.Button({
+             buttonColor: Theme.Colors.mint,
+             buttonTextColor: Theme.Colors.white,
+             buttonText: "Apply now",
+             dark: true,
+             href: `Internal("/genesis"),
+           })},
       }>
       <Spacer height=4. />
-      <Rule color=Theme.Colors.white />
+      <Rule color=Theme.Colors.digitalBlack />
       <Spacer height=4. />
       <h2 className=Styles.h2>
         {React.string("Genesis Founding Members")}
@@ -202,6 +207,41 @@ let make = (~profiles) => {
         </p>
       </Wrapped>
     </div>
+    <QuoteSection
+      small=false
+      copy={js|My measure of a project isn't the quality of the tech. It’s the quality of the community. I wouldn't have been able to spin my node up if it weren't for the insanely great members that helped me. And that's something special.”|js}
+      author="Jeff Flowers"
+      authorTitle="Testnet Community Member"
+      authorImg=""
+      backgroundImg={
+        Theme.desktop: "/static/img/MinaSpectrumPrimarySilver.jpg",
+        Theme.tablet: "/static/img/MinaSpectrumPrimarySilver.jpg",
+        Theme.mobile: "/static/img/MinaSpectrumPrimarySilver.jpg",
+      }
+    />
+    <FeaturedSingleRow
+      row={
+        FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+        title: "Grants Program",
+        copySize: `Small,
+        description: "From front-end sprints and protocol development to community building initiatives and content creation, our Grants Program invites you to help strengthen the network in exchange for Mina tokens. ",
+        textColor: Theme.Colors.white,
+        image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
+        background: Color(Theme.Colors.white),
+        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+        link:
+          FeaturedSingleRow.Row.Button({
+            FeaturedSingleRow.Row.buttonText: "See All Opportunities",
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Theme.Colors.white,
+            dark: false,
+            href: `Internal("/grants"),
+          }),
+      }>
+      <TypesOfGrants
+        backgroundImg={Theme.desktop: "", Theme.tablet: "", Theme.mobile: ""}
+      />
+    </FeaturedSingleRow>
     <div className=Styles.background>
       <FeaturedSingleRow
         row={
@@ -214,16 +254,15 @@ let make = (~profiles) => {
           background:
             Image("/static/img/community-page/SectionCulture_Values.jpg"),
           contentBackground: Color(Theme.Colors.white),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Read the Code of Conduct",
-            buttonColor: Theme.Colors.white,
-            buttonTextColor: Theme.Colors.orange,
-            dark: false,
-            href: `External(Constants.codeOfConductUrl),
-          },
+          link:
+            FeaturedSingleRow.Row.Label({
+              FeaturedSingleRow.Row.labelText: "Read the Code of Conduct",
+              labelColor: Theme.Colors.orange,
+              href: `External(Constants.codeOfConductUrl),
+            }),
         }>
         <Spacer height=4. />
-        <Rule color=Theme.Colors.white />
+        <Rule color=Theme.Colors.digitalBlack />
         <Spacer height=4. />
         <CultureGrid
           title="What Unites Us"

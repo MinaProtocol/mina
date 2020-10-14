@@ -7,7 +7,7 @@ module Styles = {
       display(`flex),
       paddingBottom(`rem(3.)),
       width(`rem(23.)),
-      height(`rem(38.)),
+      height(`rem(33.)),
       background(`hex("F5F5F5")),
     ]);
   let memberName =
@@ -53,7 +53,7 @@ module Styles = {
         width(`rem(18.)),
       ]),
     ]);
-  let quote = style([marginTop(`rem(1.)), marginBottom(`rem(1.))]);
+  let quote = style([marginTop(`rem(1.5)), marginBottom(`rem(1.5))]);
   let socials =
     style([
       display(`flex),
@@ -96,6 +96,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
       <div className=Styles.quoteSection>
         <Rule />
         <p className=Styles.quote> {React.string(quote)} </p>
+        <Rule />
       </div>
       <div className=Styles.socials>
         <>

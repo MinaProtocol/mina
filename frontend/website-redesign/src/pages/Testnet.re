@@ -60,7 +60,7 @@ module Styles = {
 
   let leaderboardContainer =
     style([
-      height(`rem(45.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -69,6 +69,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 };
 
@@ -136,13 +137,14 @@ let make = () => {
           background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
           contentBackground:
             Image("/static/img/TestnetContentBlockBackground.png"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "See the Latest Challenges",
-            buttonColor: Theme.Colors.mint,
-            buttonTextColor: Theme.Colors.digitalBlack,
-            dark: true,
-            href: `External("http://bit.ly/TestnetChallenges"),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "See the Latest Challenges",
+              buttonColor: Theme.Colors.mint,
+              buttonTextColor: Theme.Colors.digitalBlack,
+              dark: true,
+              href: `External("http://bit.ly/TestnetChallenges"),
+            }),
         }
       />
       <TestnetRetroModule />

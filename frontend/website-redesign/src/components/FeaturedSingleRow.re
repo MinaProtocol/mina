@@ -15,6 +15,16 @@ module Row = {
     href: [ | `External(string) | `Internal(string)],
   };
 
+  type label = {
+    labelColor: Css.color,
+    labelText: string,
+    href: [ | `External(string) | `Internal(string)],
+  };
+
+  type link =
+    | Button(buttonType)
+    | Label(label);
+
   type t = {
     rowType,
     copySize: [ | `Large | `Small],
@@ -24,7 +34,7 @@ module Row = {
     image: string,
     background: backgroundType,
     contentBackground: backgroundType,
-    button: buttonType,
+    link,
   };
 };
 
@@ -153,15 +163,28 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button
-              bgColor={row.button.buttonColor}
-              dark={row.button.dark}
-              href={row.button.href}>
-              <span className=RowStyles.buttonText>
-                {React.string(row.button.buttonText)}
-                <Icon kind=Icon.ArrowRightSmall size=1.5 />
-              </span>
-            </Button>
+            {switch (row.link) {
+             | Button(button) =>
+               <Button
+                 bgColor={button.buttonColor}
+                 dark={button.dark}
+                 href={button.href}>
+                 <span className=RowStyles.buttonText>
+                   {React.string(button.buttonText)}
+                   <Icon kind=Icon.ArrowRightSmall size=1.5 />
+                 </span>
+               </Button>
+             | Label(label) =>
+               <Button.Link href={label.href}>
+                 <span>
+                   <Spacer height=1. />
+                   <span className=Theme.Type.buttonLink>
+                     <span> {React.string(label.labelText)} </span>
+                     <Icon kind=Icon.ArrowRightMedium />
+                   </span>
+                 </span>
+               </Button.Link>
+             }}
           </div>
         </div>
       </div>;
@@ -213,15 +236,28 @@ module SingleRow = {
             </p>
           </div>
           <div className=Css.(style([marginTop(`rem(1.))]))>
-            <Button
-              bgColor={row.button.buttonColor}
-              dark={row.button.dark}
-              href={row.button.href}>
-              <span className={Styles.buttonText(row.button.buttonTextColor)}>
-                {React.string(row.button.buttonText)}
-                <Icon kind=Icon.ArrowRightSmall />
-              </span>
-            </Button>
+            {switch (row.link) {
+             | Button(button) =>
+               <Button
+                 bgColor={button.buttonColor}
+                 dark={button.dark}
+                 href={button.href}>
+                 <span className=RowStyles.buttonText>
+                   {React.string(button.buttonText)}
+                   <Icon kind=Icon.ArrowRightSmall size=1.5 />
+                 </span>
+               </Button>
+             | Label(label) =>
+               <Button.Link href={label.href}>
+                 <span>
+                   <Spacer height=1. />
+                   <span className=Theme.Type.link>
+                     <span> {React.string(label.labelText)} </span>
+                     <Icon kind=Icon.ArrowRightMedium />
+                   </span>
+                 </span>
+               </Button.Link>
+             }}
           </div>
         </div>
       </div>;
