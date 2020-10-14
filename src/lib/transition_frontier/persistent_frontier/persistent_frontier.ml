@@ -4,9 +4,7 @@ open Coda_base
 open Coda_state
 open Coda_transition
 open Frontier_base
-module Worker = Worker
 module Database = Database
-module Sync = Sync
 
 exception Invalid_genesis_state_hash of External_transition.Validated.t
 

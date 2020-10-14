@@ -261,29 +261,9 @@ let genesis_state_hash {genesis_state_hash; _} = genesis_state_hash
 let root_snarked_ledger {persistent_root_instance; _} =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
-(* Reorder diffs so that Root_transition diffs are brought toward the front if possible.
-   This is done to lessen the chance of a root de-sync. *)
-let separate_root_transitions t ds =
-  let db = t.persistent_frontier_instance.db in
-  List.partition_map ds ~f:(fun (Diff.Full.E.E d) ->
-      match d with
-      | Root_transitioned ({new_root; _} as rt) ->
-          if Persistent_frontier.Database.can_move_root db ~new_root then
-            `Fst rt
-          else `Snd (Diff.Full.E.E d)
-      | _ ->
-          `Snd (E d) )
-
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
-  let root_transitions, other_diffs =
-    Full_frontier.calculate_diffs t.full_frontier breadcrumb
-    |> separate_root_transitions t
-  in
-  let diffs =
-    List.map root_transitions ~f:(fun r -> Diff.Full.E.E (Root_transitioned r))
-    @ other_diffs
-  in
+  let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
