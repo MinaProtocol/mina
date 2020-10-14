@@ -73,7 +73,7 @@ installed: [
   "conduit.1.4.0"
   "conduit-async.1.4.0"
   "conf-g++.1.0"
-  "conf-gmp.1"
+  "conf-gmp.2"
   "conf-libssl.2"
   "conf-m4.1"
   "conf-openssl.1"
