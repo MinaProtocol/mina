@@ -570,10 +570,15 @@ module Data = struct
     module Threshold = struct
       open Bignum_bigint
 
-      (* TEMPORARY HACK FOR TESTNETS: c should be 1 (or possibly 2) otherwise *)
-      let c = `Two_to_the 1
+      (* c is a constant factor on vrf-win likelihood *)
+      (* c = 2^0 is production behavior *)
+      (* c > 2^0 is a temporary hack for testnets *)
+      let c = `Two_to_the 0
 
-      let base = Bignum.(one / of_int 2)
+      (* f determines the fraction of slots that will have blocks if c = 2^0 *)
+      let f = Bignum.(of_int 3 / of_int 4)
+
+      let base = Bignum.(of_int 1 - f)
 
       let c_bias =
         let (`Two_to_the i) = c in
@@ -3199,6 +3204,67 @@ let%test_module "Proof of stake tests" =
                   ~collapse_threshold:1000 ())
              diff) ;
         failwith "Test failed" )
+
+    let%test_unit "vrf win rate" =
+      let constants = Lazy.force Constants.for_unit_tests in
+      let logger = Logger.create () in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
+      let previous_protocol_state_hash = Coda_base.State_hash.(of_hash zero) in
+      let previous_consensus_state =
+        Consensus_state.create_genesis
+          ~negative_one_protocol_state_hash:previous_protocol_state_hash
+          ~genesis_ledger:Genesis_ledger.t ~constraint_constants ~constants
+      in
+      let seed = previous_consensus_state.staking_epoch_data.seed in
+      let maybe_sk, account = Genesis_ledger.largest_account_exn () in
+      let private_key = Option.value_exn maybe_sk in
+      let public_key_compressed = Account.public_key account in
+      let public_key = Public_key.decompress_exn public_key_compressed in
+      let total_stake =
+        genesis_ledger_total_currency ~ledger:Genesis_ledger.t
+      in
+      let block_producer_pubkeys =
+        Public_key.Compressed.Set.of_list [public_key_compressed]
+      in
+      let ledger =
+        Coda_base.Sparse_ledger.of_any_ledger
+          (Coda_base.Ledger.Any_ledger.cast
+             (module Coda_base.Ledger)
+             (Lazy.force Genesis_ledger.t))
+      in
+      let delegatee_table =
+        compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
+      in
+      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      let balance = Balance.to_int account.balance in
+      let total_stake_int = Currency.Amount.to_int total_stake in
+      let stake_fraction =
+        float_of_int balance /. float_of_int total_stake_int
+      in
+      let expected = stake_fraction *. 0.75 in
+      let samples = 1000 in
+      let check i =
+        let global_slot = UInt32.of_int i in
+        let result =
+          Vrf.check ~constraint_constants ~global_slot ~seed ~private_key
+            ~public_key ~public_key_compressed ~total_stake ~logger
+            ~epoch_snapshot
+        in
+        match result with Some _ -> 1 | None -> 0
+      in
+      let rec loop i =
+        match i < samples with true -> check i + loop (i + 1) | false -> 0
+      in
+      let actual = loop 0 in
+      let diff =
+        Float.abs (float_of_int actual -. (expected *. float_of_int samples))
+      in
+      let tolerance = 100. in
+      (* 100 is a reasonable choice for samples = 1000 and for very low likelihood of failure; this should be recalculated if sample count was to be adjusted *)
+      let within_tolerance = diff < tolerance in
+      assert within_tolerance
   end )
 
 module Exported = struct
