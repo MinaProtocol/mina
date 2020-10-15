@@ -47,10 +47,17 @@ module Make (Inputs : Inputs_intf) :
   let prove ~logger frontier =
     let open Option.Let_syntax in
     let genesis_constants = Transition_frontier.genesis_constants frontier in
+    let root = Transition_frontier.root frontier in
+    let root_state_hash = Frontier_base.Breadcrumb.state_hash root in
+    let root_is_genesis =
+      State_hash.(
+        root_state_hash = Transition_frontier.genesis_state_hash frontier)
+    in
     let%map () =
       Option.some_if
         ( Transition_frontier.best_tip_path_length_exn frontier
-        = Transition_frontier.global_max_length genesis_constants )
+          = Transition_frontier.global_max_length genesis_constants
+        || root_is_genesis )
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
