@@ -443,7 +443,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -464,7 +464,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -485,7 +485,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -502,7 +502,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -540,7 +540,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -561,7 +561,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -609,7 +609,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -626,7 +626,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.genesisGrantApplication
           />
           <Spacer height=5. />
           <p className=Theme.Type.paragraph>
@@ -662,7 +662,7 @@ module HowToApply = {
                 buttonColor: Theme.Colors.orange,
                 buttonTextColor: Theme.Colors.white,
                 dark: false,
-                href: `External("https://forms.gle/ekPwDKE1BArTqVCu9"),
+                href: `External(Constants.genesisGrantApplication),
               }),
           }>
           <Spacer height=4. />
