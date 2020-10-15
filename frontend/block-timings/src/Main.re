@@ -8,6 +8,7 @@ open These;
 
 module BlockLifetime = {
   module Instant = {
+    /// When and where an event occurred
     type t = {
       time: Js.Date.t,
       podRealName: string,
@@ -16,6 +17,8 @@ module BlockLifetime = {
 
   module Entry = {
     module Rendered = {
+      /// A fully-rendered entry corresponds to one block that is produced at
+      /// some instant and received at others
       type t = {
         stateHash: string,
         produced: Instant.t,
@@ -23,6 +26,8 @@ module BlockLifetime = {
       };
     };
 
+    /// A (partially) complete entry is either the instant a block was produced
+    /// or a list of instants that a block was received
     type t = These.t([ | `Produced(Instant.t)], list(Instant.t));
 
     let render: (t, string) => option(Rendered.t) =
@@ -52,6 +57,7 @@ module BlockLifetime = {
     type t = array(Entry.Rendered.t);
   };
 
+  /// We map state-hashes to partially complete entries as we build up the data
   type t = Js.Dict.t(Entry.t);
 
   let empty = () => Js.Dict.empty();
@@ -116,6 +122,8 @@ module Reflected = {
   };
 };
 
+/// Bindings to @google-cloud/logging nodejs library for pulling logs from
+/// stackdriver
 module CloudLogging = {
   module Entry = {
     module Resource = {
@@ -228,6 +236,8 @@ module CloudLogging = {
 };
 
 // TODO: Pull the ids from `coda internal dump-structured-events`
+/// Information about the specific structured log events we'll be needing to
+/// pull
 module StructuredLog = {
   module BlockProduced = {
     module Metadata = {
@@ -268,16 +278,15 @@ module StructuredLog = {
 };
 
 // TODO: Figure out how to get bs-let/ppx to work
+/// The top-level execution of this script when you run with `node`
 module TopLevel = {
   open CloudLogging;
 
   Js.log("Starting scrape from cloud logging");
   let logging = CloudLogging.create({projectId: "o1labs-192920"});
 
+  // TODO: Pass this from the CLi
   let testnetName = "pickles-nightly";
-  /*Logging.getLogs(logging)
-    -> P.tap(logs => Js.log2("Finished listing logs", logs))*/
-  /*-> P.map(_ => Logging.log(logging, "projects/o1labs-192920/logs/stdout"))*/
 
   module P = Promise;
 
@@ -288,10 +297,6 @@ module TopLevel = {
   let rec go: (int, Log.getEntryOptions) => Promise.t(unit) =
     (i, req) => {
       Log.getEntries(log, req)
-      /*-> P.tap(((es, _, _)) => {*/
-      /*Js.Json.stringifyAny(es)*/
-      /*|> Js.log*/
-      /*})*/
       ->P.tap(((es, _, _)) => {
           let _ =
             es
