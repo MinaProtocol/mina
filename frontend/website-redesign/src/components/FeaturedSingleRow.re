@@ -104,8 +104,7 @@ module SingleRow = {
         width(`percent(100.)),
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
-        bottom(`zero),
-        display(`none),
+        bottom(`rem(-20.)),
         media(
           Theme.MediaQuery.tablet,
           [display(`block), width(`percent(80.))],
