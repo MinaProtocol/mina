@@ -64,13 +64,13 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1` and `rosetta-cli @ v0.5.12`
-using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf) next to it.
+`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
+using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/CodaProtocol/coda/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type and exit**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
 
 $ docker logs --follow coda-rosetta-test
 
@@ -86,7 +86,7 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 **Run a fast sandbox network forever**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
 
 $ docker logs --follow coda-rosetta-test
 
