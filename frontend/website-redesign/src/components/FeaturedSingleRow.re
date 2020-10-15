@@ -91,7 +91,7 @@ module SingleRow = {
         };
       style([
         position(`absolute),
-        width(`percent(90.)),
+        width(`percent(92.5)),
         maxHeight(`rem(35.)),
         overflow(`scroll),
         unsafe("height", "fit-content"),
@@ -104,7 +104,12 @@ module SingleRow = {
         backgroundSize(`cover),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
+          [
+            width(`percent(100.)),
+            margin(`zero),
+            overflow(`hidden),
+            ...additionalNotMobileStyles,
+          ],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
