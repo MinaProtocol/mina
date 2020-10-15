@@ -355,11 +355,7 @@ let make = (~profiles) => {
       }>
       <Spacer height=2. />
       <Button
-        href={
-               `External(
-                 "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
-               )
-             }
+        href={`External(Constants.genesisGrantApplication)}
         bgColor=Theme.Colors.black>
         {React.string("Apply Now")}
         <Icon kind=Icon.ArrowRightMedium />
@@ -383,10 +379,7 @@ let make = (~profiles) => {
               buttonColor: Theme.Colors.orange,
               buttonTextColor: Theme.Colors.white,
               dark: false,
-              href:
-                `External(
-                  "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
-                ),
+              href: `External(Constants.genesisGrantApplication),
             }),
         }>
         <Spacer height=4. />
