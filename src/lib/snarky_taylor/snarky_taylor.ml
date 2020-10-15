@@ -161,7 +161,8 @@ module Exp = struct
     *)
     let coefficients, linear_term_integer_part =
       let linear_term_integer_part = ref `Zero in
-      ( Array.init terms_needed ~f:(fun i ->
+      let coefficients =
+        Array.init terms_needed ~f:(fun i ->
             (* Starts from 1 *)
             let i = i + 1 in
             let c =
@@ -186,7 +187,8 @@ module Exp = struct
             in
             ( (if i mod 2 = 0 then `Neg else `Pos)
             , c_frac |> bignum_as_fixed_point per_term_precision ) )
-      , !linear_term_integer_part )
+      in
+      (coefficients, !linear_term_integer_part)
     in
     Core_kernel.printf "%d %d %d\n%!" total_precision terms_needed
       per_term_precision ;

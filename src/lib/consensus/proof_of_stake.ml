@@ -591,11 +591,7 @@ module Data = struct
       let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
 
       (*  Check if
-          vrf_output / 2^256 <= c * my_stake / total_currency
-
-          So that we don't have to do division we check
-
-          vrf_output * total_currency <= c * my_stake * 2^256
+          vrf_output / 2^256 <= c * (1 - f)^(amount / total_stake)
       *)
       let is_satisfied ~my_stake ~total_stake vrf_output =
         let input =
