@@ -749,7 +749,13 @@ let make = () => {
     // />
     <div className=Styles.typesOfGrantsImage>
       <Wrapped>
-        <div className=Styles.typeOfGrantsContainer> <TypesOfGrants /> </div>
+        <div className=Styles.typeOfGrantsContainer>
+          <Spacer height=2. />
+          <Rule />
+          <TypesOfGrants />
+          <Rule />
+          <Spacer height=2. />
+        </div>
       </Wrapped>
     </div>
     <GrantsSideNav />

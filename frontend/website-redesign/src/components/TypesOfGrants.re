@@ -3,10 +3,14 @@ module Styles = {
   let grantContainer =
     style([
       width(`rem(17.)),
-      margin2(~h=`rem(1.), ~v=`rem(1.)),
+      margin2(~h=`rem(1.), ~v=`rem(1.5)),
       media(
         Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`center)],
+        [
+          margin2(~h=`rem(1.), ~v=`zero),
+          flexDirection(`row),
+          alignItems(`center),
+        ],
       ),
     ]);
 
@@ -56,8 +60,6 @@ module Styles = {
       height(`percent(100.)),
       width(`percent(100.)),
       padding2(~v=`rem(2.), ~h=`zero),
-      borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
-      borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
       media(
         Theme.MediaQuery.notMobile,
         [

@@ -26,7 +26,7 @@ module Styles = {
 
   let leaderboardContainer =
     style([
-      height(`rem(66.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),

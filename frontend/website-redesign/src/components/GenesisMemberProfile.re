@@ -26,8 +26,8 @@ module Styles = {
       left(`rem(2.5)),
       background(white),
       marginTop(`rem(-3.)),
-      height(`rem(6.25)),
-      width(`rem(6.25)),
+      height(`rem(7.75)),
+      width(`rem(8.125)),
     ]);
   let link =
     merge([
