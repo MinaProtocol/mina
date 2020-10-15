@@ -24,7 +24,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      alignItems(`center),
+      alignItems(`flexStart),
       justifyContent(`center),
       marginTop(`rem(4.)),
       marginBottom(`rem(2.)),
@@ -53,8 +53,9 @@ module Styles = {
       style([
         display(`listItem),
         listStylePosition(`inside),
-        marginBottom(`rem(14.)),
+        marginBottom(`rem(4.)),
         marginTop(`rem(3.)),
+        media(Theme.MediaQuery.notMobile, [marginBottom(`rem(12.))]),
       ]),
     ]);
 
@@ -129,7 +130,7 @@ let make = () => {
       <FeaturedSingleRow
         row={
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
-          copySize: `Small,
+          copySize: `Large,
           title: "Testnet Challenges",
           description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,

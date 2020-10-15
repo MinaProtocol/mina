@@ -69,7 +69,7 @@ module SingleRow = {
         flexDirection(`column),
         alignItems(`flexStart),
         justifyContent(`spaceBetween),
-        padding(`rem(3.)),
+        padding(`rem(2.)),
         backgroundSize(`cover),
         media(
           Theme.MediaQuery.notMobile,
@@ -111,10 +111,14 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
+        height(`percent(70.)),
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        media(
+          Theme.MediaQuery.tablet,
+          [height(`percent(110.)), width(`percent(80.))],
+        ),
         media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
@@ -127,6 +131,7 @@ module SingleRow = {
           RowStyles.image,
           style([
             left(`zero),
+            bottom(`percent(25.)),
             media(Theme.MediaQuery.notMobile, [bottom(`zero)]),
           ]),
         ]);
@@ -135,7 +140,7 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, backgroundImg),
           style([
-            bottom(`zero),
+            bottom(`percent(5.)),
             media(
               Theme.MediaQuery.tablet,
               [
@@ -210,10 +215,10 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, contentBackground),
           style([
-            top(`rem(12.6)),
+            top(`percent(5.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), width(`rem(32.))],
+              [left(`zero), width(`rem(32.)), top(`percent(35.))],
             ),
           ]),
         ]);

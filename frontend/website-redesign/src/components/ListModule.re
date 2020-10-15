@@ -122,11 +122,7 @@ module Listing = {
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
         width(`percent(100.)),
-        marginTop(`rem(3.)),
-        media(
-          Theme.MediaQuery.notMobile,
-          [marginTop(`zero), width(`percent(80.))],
-        ),
+        media(Theme.MediaQuery.notMobile, [width(`percent(80.))]),
       ]);
 
     let link = merge([Styles.link, style([marginBottom(`rem(2.))])]);
