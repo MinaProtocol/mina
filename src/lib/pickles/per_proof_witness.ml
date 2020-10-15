@@ -13,9 +13,7 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
     , Pairing_main.Make(Step_main_inputs).Other_field.t
     , unit
     , Digest.Make(Impl).t
-    , ( Challenge.Make(Impl).t Scalar_challenge.t
-      , Impl.Boolean.var )
-      Types.Bulletproof_challenge.t
+    , Challenge.Make(Impl).t Scalar_challenge.t Types.Bulletproof_challenge.t
       Types.Step_bp_vec.t
     , 'local_num_branches One_hot_vector.t )
     Types.Dlog_based.Proof_state.In_circuit.t
@@ -37,9 +35,7 @@ module Constant = struct
       , Tock.Field.t
       , unit
       , Digest.Constant.t
-      , ( Challenge.Constant.t Scalar_challenge.t
-        , bool )
-        Types.Bulletproof_challenge.t
+      , Challenge.Constant.t Scalar_challenge.t Types.Bulletproof_challenge.t
         Types.Step_bp_vec.t
       , Types.Index.t )
       Types.Dlog_based.Proof_state.In_circuit.t

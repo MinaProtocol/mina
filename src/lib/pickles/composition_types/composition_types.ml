@@ -295,14 +295,14 @@ module Dlog_based = struct
         let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
         let typ (type f fp) ~challenge ~scalar_challenge
-            (fp : (fp, _, f) Snarky_backendless.Typ.t) fq index bool =
+            (fp : (fp, _, f) Snarky_backendless.Typ.t) fq index =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ ~challenge ~scalar_challenge fp
             ; fp
             ; fp
             ; Scalar_challenge.typ scalar_challenge
             ; Vector.typ
-                (Bulletproof_challenge.typ scalar_challenge bool)
+                (Bulletproof_challenge.typ scalar_challenge)
                 Backend.Tick.Rounds.n
             ; index ]
             ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -413,7 +413,7 @@ module Dlog_based = struct
           index =
         Snarky_backendless.Typ.of_hlistable
           [ Deferred_values.In_circuit.typ ~challenge ~scalar_challenge fp fq
-              index bool
+              index
           ; bool
           ; digest
           ; me_only ]

@@ -141,33 +141,10 @@ struct
               squeeze_scalar sponge )
         in
         let term_and_challenge (l, r) pre =
-          let pre_is_square =
-            exists Boolean.typ
-              ~compute:
-                As_prover.(
-                  fun () ->
-                    Other_field.Constant.(
-                      is_square
-                        (Scalar_challenge.Constant.to_field
-                           (read Scalar_challenge.typ_unchecked pre))))
-          in
-          let left_term =
-            let base =
-              Inner_curve.if_ pre_is_square ~then_:l
-                ~else_:(Inner_curve.scale_by_quadratic_nonresidue l)
-            in
-            Scalar_challenge.endo base pre
-          in
-          let right_term =
-            let base =
-              Inner_curve.if_ pre_is_square ~then_:r
-                ~else_:(Inner_curve.scale_by_quadratic_nonresidue_inv r)
-            in
-            Scalar_challenge.endo_inv base pre
-          in
+          let left_term = Scalar_challenge.endo_inv l pre in
+          let right_term = Scalar_challenge.endo r pre in
           ( Inner_curve.(left_term + right_term)
-          , {Bulletproof_challenge.prechallenge= pre; is_square= pre_is_square}
-          )
+          , {Bulletproof_challenge.prechallenge= pre} )
         in
         let terms, challenges =
           Array.map2_exn gammas prechallenges ~f:term_and_challenge
@@ -480,16 +457,10 @@ struct
   let compute_challenges ~scalar chals =
     with_label __LOC__ (fun () ->
         (* TODO: Put this in the functor argument. *)
-        let nonresidue = Field.of_int 5 in
-        Vector.map chals
-          ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-            let pre = scalar prechallenge in
-            let sq =
-              Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
-            in
-            det_sqrt sq ) )
+        Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
+            scalar prechallenge ) )
 
-  let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~inv)
+  let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~one)
 
   module Pseudo = Pseudo.Make (Impl)
 
@@ -1158,10 +1129,8 @@ struct
           (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
           ~f:(fun i c1 ->
             let c2 = bulletproof_challenges_actual.(i) in
-            Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
-              (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
             let (Pickles_types.Scalar_challenge.Scalar_challenge c1) =
-              c1.prechallenge
+              c1.Bulletproof_challenge.prechallenge
             in
             let c2 =
               Field.if_ is_base_case ~then_:c1

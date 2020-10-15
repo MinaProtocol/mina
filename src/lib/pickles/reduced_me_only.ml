@@ -25,8 +25,7 @@ end
 module Dlog_based = struct
   module Challenges_vector = struct
     type t =
-      ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-      , bool )
+      Challenge.Constant.t Scalar_challenge.Stable.Latest.t
       Bulletproof_challenge.t
       Wrap_bp_vec.t
     [@@deriving bin_io, sexp, compare, yojson, hash, eq]

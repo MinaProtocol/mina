@@ -39,8 +39,7 @@ module Base = struct
           , 'dlog_me_only
           , Digest.Constant.t
           , 'pairing_me_only
-          , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-            , bool )
+          , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
             Step_bp_vec.t
           , Index.t )
@@ -60,8 +59,7 @@ type ('s, 'mlmb, _) with_data =
       ( 'mlmb Base.Me_only.Dlog_based.t
       , ( 's
         , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
-        , ( ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-            , bool )
+        , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
             Step_bp_vec.t
           , 'most_recent_width )
@@ -154,8 +152,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Dlog_based.Proof_state.Me_only.t
       , ( unit
         , Tock.Curve.Affine.t Max_branching_at_most.t
-        , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , bool )
+        , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
           Bulletproof_challenge.t
           Step_bp_vec.t
           Max_branching_at_most.t )

@@ -110,14 +110,12 @@ struct
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t
-        , ( Challenge.Constant.t Scalar_challenge.t
-          , bool )
-          Bulletproof_challenge.t
+        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
         , Index.t )
         Dlog_based.Statement.In_circuit.t
     end in
-    let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~inv) in
+    let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one) in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
       let f : type var value max local_max_branching m.
              max Nat.t
@@ -254,14 +252,10 @@ struct
         let new_bulletproof_challenges, b =
           let prechals =
             Array.map (O.opening_prechallenges o) ~f:(fun x ->
-                let x =
-                  Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x
-                in
-                (x, Tock.Field.is_square (to_field x)) )
+                Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
           in
           let chals =
-            Array.map prechals ~f:(fun (x, is_square) ->
-                Ipa.Wrap.compute_challenge ~is_square x )
+            Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
           in
           let b_poly = unstage (b_poly chals) in
           let open As_field in
@@ -271,8 +265,8 @@ struct
           in
           let prechals =
             Vector.of_list_and_length_exn
-              ( Array.map prechals ~f:(fun (x, is_square) ->
-                    {Bulletproof_challenge.prechallenge= x; is_square} )
+              ( Array.map prechals ~f:(fun x ->
+                    {Bulletproof_challenge.prechallenge= x} )
               |> Array.to_list )
               Tock.Rounds.n
           in
@@ -426,9 +420,7 @@ struct
       let old_bulletproof_challenges =
         let module VV = struct
           type t =
-            ( Challenge.Constant.t Scalar_challenge.t
-            , bool )
-            Bulletproof_challenge.t
+            Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
             Step_bp_vec.t
         end in
         let module M =

@@ -18,7 +18,7 @@ let vector_of_list (type a t)
   List.iter xs ~f:(V.emplace_back r) ;
   r
 
-let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~inv)
+let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
 
 let combined_inner_product (type actual_branching)
     ~actual_branching:(module AB : Nat.Add.Intf with type n = actual_branching)
@@ -247,11 +247,10 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
             let x =
               Scalar_challenge.map ~f:Challenge.Constant.of_tick_field x
             in
-            (x, Tick.Field.is_square (to_field x)) )
+            x )
       in
       let chals =
-        Array.map prechals ~f:(fun (x, is_square) ->
-            Ipa.Step.compute_challenge ~is_square x )
+        Array.map prechals ~f:(fun x -> Ipa.Step.compute_challenge x)
       in
       let b_poly = unstage (b_poly chals) in
       let open As_field in
@@ -260,8 +259,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         b_poly zeta + (r * b_poly zetaw)
       in
       let prechals =
-        Array.map prechals ~f:(fun (x, is_square) ->
-            {Bulletproof_challenge.prechallenge= x; is_square} )
+        Array.map prechals ~f:(fun x -> {Bulletproof_challenge.prechallenge= x})
       in
       (prechals, b)
     in

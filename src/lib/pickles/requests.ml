@@ -31,8 +31,7 @@ module Wrap = struct
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
               , Field.Constant.t Shifted_value.t
-              , ( ( Challenge.Constant.t Scalar_challenge.t
-                  , bool )
+              , ( Challenge.Constant.t Scalar_challenge.t
                   Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
@@ -86,8 +85,7 @@ module Wrap = struct
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
                 , Tock.Field.t Shifted_value.t
-                , ( ( Challenge.Constant.t Scalar_challenge.t
-                    , bool )
+                , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
                   Vector.t

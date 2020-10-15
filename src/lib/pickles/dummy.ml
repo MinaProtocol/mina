@@ -25,14 +25,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.is_square=
-              Tock.Field.is_square (Endo.Dee.to_field prechallenge)
-          ; prechallenge } )
+          {Bulletproof_challenge.prechallenge} )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {is_square; prechallenge} ->
-          (Ipa.Wrap.compute_challenge ~is_square prechallenge : Tock.Field.t)
-      )
+      Vector.map challenges ~f:(fun {prechallenge} ->
+          (Ipa.Wrap.compute_challenge prechallenge : Tock.Field.t) )
 
     let sg =
       lazy
@@ -43,14 +40,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          { Bulletproof_challenge.is_square=
-              Tick.Field.is_square (Endo.Dum.to_field prechallenge)
-          ; prechallenge } )
+          {Bulletproof_challenge.prechallenge} )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {is_square; prechallenge} ->
-          (Ipa.Step.compute_challenge ~is_square prechallenge : Tick.Field.t)
-      )
+      Vector.map challenges ~f:(fun {prechallenge} ->
+          (Ipa.Step.compute_challenge prechallenge : Tick.Field.t) )
 
     let sg =
       lazy
