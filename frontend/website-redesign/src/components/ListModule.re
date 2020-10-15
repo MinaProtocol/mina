@@ -18,7 +18,11 @@ module Styles = {
       height(`percent(100.)),
     ]);
 
-  let title = merge([Theme.Type.h5, style([marginTop(`rem(1.))])]);
+  let title =
+    merge([
+      Theme.Type.h5,
+      style([fontWeight(`normal), marginTop(`rem(1.))]),
+    ]);
 
   let description =
     merge([Theme.Type.paragraphSmall, style([marginTop(`rem(1.))])]);
@@ -95,7 +99,7 @@ module MainListing = {
       {let inner =
          <div className=Styles.link>
            <span> {React.string("Read more")} </span>
-           <Icon kind=Icon.ArrowRightMedium />
+           <Icon kind=Icon.ArrowRightSmall />
          </div>;
        switch (item.link) {
        | `Slug(slug) =>
@@ -134,7 +138,7 @@ module Listing = {
       let inner =
         <div className=ListingStyles.link>
           <span> {React.string("Read more")} </span>
-          <Icon kind=Icon.ArrowRightMedium />
+          <Icon kind=Icon.ArrowRightSmall />
         </div>;
       switch (item.link) {
       | `Slug(slug) =>

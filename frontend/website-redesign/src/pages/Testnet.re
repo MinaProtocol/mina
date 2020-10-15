@@ -133,7 +133,7 @@ let make = () => {
           title: "Testnet Challenges",
           description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,
-          image: "/static/img/AboutHeroDesktopBackground.jpg",
+          image: "/static/img/TestnetCopyBackgroundDesktop.jpg",
           background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
           contentBackground:
             Image("/static/img/TestnetContentBlockBackground.png"),
