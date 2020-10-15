@@ -1,13 +1,5 @@
 module Styles = {
   open Css;
-  let cultureBackground =
-    style([
-      backgroundImage(
-        `url("/static/img/community-page/SectionCulture&Values.png"),
-      ),
-      backgroundSize(`cover),
-      paddingTop(`rem(4.)),
-    ]);
   let rowContainer = style([]);
   let h2 = merge([Theme.Type.h2, style([color(white)])]);
   let sectionSubhead =
