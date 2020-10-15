@@ -67,8 +67,7 @@ let make = () => {
       <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Join Genesis")} </a>
       </Next.Link>
-      <Next.Link
-        href="https://github.com/MinaProtocol/mina-grants#how-to-apply">
+      <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Apply for Grants")} </a>
       </Next.Link>
     </div>
@@ -111,7 +110,7 @@ let make = () => {
       <Next.Link href="/leaderboard">
         <a className=Styles.linkStyle> {React.string("Leaderboard")} </a>
       </Next.Link>
-      <Next.Link href="https://github.com/MinaProtocol/mina-grants">
+      <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
       </Next.Link>
     </div>

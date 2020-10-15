@@ -580,72 +580,82 @@ module Ledger = struct
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path
 
+  let padded_accounts_from_runtime_config_opt ~logger ~proof_level
+      (config : Runtime_config.Ledger.t) =
+    let add_genesis_winner_account accounts =
+      (* We allow configurations to explicitly override adding the genesis
+         winner, so that we can guarantee a certain ledger layout for
+         integration tests.
+         If the configuration does not include this setting, we add the
+         genesis winner when we have [proof_level = Full] so that we can
+         create a genesis proof. For all other proof levels, we do not add
+         the winner.
+      *)
+      let add_genesis_winner_account =
+        match config.add_genesis_winner with
+        | Some add_genesis_winner ->
+            add_genesis_winner
+        | None ->
+            Genesis_constants.Proof_level.equal Full proof_level
+      in
+      if add_genesis_winner_account then
+        let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+        match accounts with
+        | (_, account) :: _
+          when Public_key.Compressed.equal (Account.public_key account) pk ->
+            accounts
+        | _ ->
+            ( None
+            , Account.create
+                (Account_id.create pk Token_id.default)
+                (Currency.Balance.of_int 1000) )
+            :: accounts
+      else accounts
+    in
+    let accounts_opt =
+      match config.base with
+      | Hash _ ->
+          None
+      | Accounts accounts ->
+          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+      | Named name -> (
+        match Genesis_ledger.fetch_ledger name with
+        | Some (module M) ->
+            [%log info] "Found genesis ledger with name $ledger_name"
+              ~metadata:[("ledger_name", `String name)] ;
+            Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
+        | None ->
+            [%log warn]
+              "Could not find a built-in genesis ledger named $ledger_name"
+              ~metadata:[("ledger_name", `String name)] ;
+            None )
+    in
+    let padded_accounts_with_balances_opt =
+      Option.map accounts_opt
+        ~f:
+          (Lazy.map
+             ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
+    in
+    Option.map padded_accounts_with_balances_opt
+      ~f:
+        (Lazy.map
+           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)))
+
+  let packed_genesis_ledger_of_accounts ~depth accounts :
+      Genesis_ledger.Packed.t =
+    ( module Genesis_ledger.Make (struct
+      let accounts = accounts
+
+      let directory = `New
+
+      let depth = depth
+    end) )
+
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
-        let add_genesis_winner_account accounts =
-          (* We allow configurations to explicitly override adding the genesis
-             winner, so that we can guarantee a certain ledger layout for
-             integration tests.
-             If the configuration does not include this setting, we add the
-             genesis winner when we have [proof_level = Full] so that we can
-             create a genesis proof. For all other proof levels, we do not add
-             the winner.
-          *)
-          let add_genesis_winner_account =
-            match config.add_genesis_winner with
-            | Some add_genesis_winner ->
-                add_genesis_winner
-            | None ->
-                Genesis_constants.Proof_level.equal Full proof_level
-          in
-          if add_genesis_winner_account then
-            let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
-            match accounts with
-            | (_, account) :: _
-              when Public_key.Compressed.equal (Account.public_key account) pk
-              ->
-                accounts
-            | _ ->
-                ( None
-                , Account.create
-                    (Account_id.create pk Token_id.default)
-                    (Currency.Balance.of_int 1000) )
-                :: accounts
-          else accounts
-        in
-        let accounts_opt =
-          match config.base with
-          | Hash _ ->
-              None
-          | Accounts accounts ->
-              Some
-                (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
-          | Named name -> (
-            match Genesis_ledger.fetch_ledger name with
-            | Some (module M) ->
-                [%log info] "Found genesis ledger with name $ledger_name"
-                  ~metadata:[("ledger_name", `String name)] ;
-                Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
-            | None ->
-                [%log warn]
-                  "Could not find a built-in genesis ledger named $ledger_name"
-                  ~metadata:[("ledger_name", `String name)] ;
-                None )
-        in
-        let padded_accounts_with_balances_opt =
-          Option.map accounts_opt
-            ~f:
-              (Lazy.map
-                 ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
-        in
         let padded_accounts_opt =
-          Option.map padded_accounts_with_balances_opt
-            ~f:
-              (Lazy.map
-                 ~f:
-                   (Accounts.pad_to
-                      (Option.value ~default:0 config.num_accounts)))
+          padded_accounts_from_runtime_config_opt ~logger ~proof_level config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -694,14 +704,9 @@ module Ledger = struct
                 Deferred.Or_error.errorf "Genesis ledger '%s' not found"
                   ledger_name )
           | Some accounts -> (
-              let (packed : Genesis_ledger.Packed.t) =
-                ( module Genesis_ledger.Make (struct
-                  let accounts = accounts
-
-                  let directory = `New
-
-                  let depth = constraint_constants.ledger_depth
-                end) )
+              let packed =
+                packed_genesis_ledger_of_accounts
+                  ~depth:constraint_constants.ledger_depth accounts
               in
               let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
               let%bind tar_path = generate_tar ~genesis_dir ~logger ledger in
