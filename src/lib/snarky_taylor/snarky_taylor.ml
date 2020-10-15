@@ -174,12 +174,6 @@ module Exp = struct
                 let c_frac = Bignum.(c - of_bigint c_whole) in
                 linear_term_integer_part :=
                   Coeff_integer_part.of_int_exn (Bigint.to_int_exn c_whole) ;
-                Core_kernel.printf
-                  !"ltip: %{sexp:Coeff_integer_part.t}\n%!"
-                  !linear_term_integer_part ;
-                Core_kernel.printf "c_whole, c_frac: %s, %s\n%!"
-                  (B.to_string_hum c_whole)
-                  (Bignum.to_string_hum c_frac) ;
                 c_frac )
               else (
                 assert (Bignum.(c < one)) ;
@@ -190,8 +184,6 @@ module Exp = struct
       in
       (coefficients, !linear_term_integer_part)
     in
-    Core_kernel.printf "%d %d %d\n%!" total_precision terms_needed
-      per_term_precision ;
     { Params.total_precision
     ; terms_needed
     ; per_term_precision
