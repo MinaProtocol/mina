@@ -208,7 +208,7 @@ module Type = {
       hover([
         padding2(~h=`rem(0.8), ~v=`rem(0.5)),
         color(white),
-        backgroundColor(Colors.digitalBlack),
+        backgroundImage(`url("/static/ButtonHoverLight.png")),
       ]),
     ]);
 
