@@ -4,7 +4,8 @@
   "scripts": {
     "build": "bsb -make-world",
     "clean": "bsb -clean-world",
-    "start": "bsb -make-world -w"
+    "start": "bsb -make-world -w",
+    "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei')"
   },
   "keywords": ["rescript"],
   "author": "",
