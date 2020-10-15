@@ -64,10 +64,8 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1`
-and
-[`rosetta-cli` @ 4bb48b24a794deb3635973e32d1ea806e5b30729](https://github.com/coinbase/rosetta-cli/commit/4bb48b24a794deb3635973e32d1ea806e5b30729)
-using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf)
+`gcr.io/o1labs-192920/coda-rosetta:debug-v1` and `rosetta-cli @ v0.5.12`
+using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/CodaProtocol/coda/blob/5625847fa820da3a4d34ef35e013db11fad2ada4/src/app/rosetta/rosetta.conf) next to it.
 
 **Create one of each transaction type and exit**
 
@@ -105,8 +103,6 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 
 Sorted by priority (highest priority first)
 
-- Supports v1.4.2, will upgrade to v1.4.4 soon
-- "Failed transactions" do not decode into operations properly. If such transactions are crafted, there will be reconcilliation errors for rosetta.
 - Untested on a live network
 - On a live network, you must _bootstrap your archive node_ if you join the network after the genesis block. Instructions will be provided when the network is online.
 - Not fully robust to crashes on adversarial input

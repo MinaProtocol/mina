@@ -196,9 +196,25 @@ end = struct
                 ; ("error", `String context1)
                 ; ("extra", `String context2) ]) ) }
 
+  (* The most recent rosetta-cli denies errors that have details in them. When
+   * future versions of the spec allow for more detailed descriptions we can
+   * remove this filtering. *)
   let all_errors =
+    (* This is n^2, but |input| is small enough that the performance doesn't
+     * matter here. Plus this is likely cheaper than sorting first due to the
+     * small size *)
+    let rec uniq ~eq = function
+      | [] ->
+          []
+      | x :: xs ->
+          x :: (xs |> List.filter ~f:(fun x' -> not (eq x x')) |> uniq ~eq)
+    in
     Variant.to_representatives
     |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
+    |> Lazy.map ~f:(fun es ->
+           List.map es ~f:(fun e -> {e with Rosetta_models.Error.details= None})
+           |> uniq ~eq:(fun {Rosetta_models.Error.code; _} {code= code2; _} ->
+                  Int32.equal code code2 ) )
 
   module Lift = struct
     let parse ?context res =
