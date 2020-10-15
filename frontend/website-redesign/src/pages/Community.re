@@ -1,12 +1,5 @@
 module Styles = {
   open Css;
-  let background =
-    style([
-      backgroundImage(
-        `url("/static/img/community-page/SectionCulture&Values.png"),
-      ),
-      backgroundSize(`cover),
-    ]);
   let rowContainer = style([]);
   let h2 = merge([Theme.Type.h2, style([color(white)])]);
   let sectionSubhead =
@@ -53,9 +46,30 @@ module Styles = {
       backgroundSize(`cover),
     ]);
 
+  let genesisBackground =
+    style([
+      backgroundImage(
+        `url("/static/img/community-page/CommunityBackground.jpg"),
+      ),
+      backgroundSize(`cover),
+      paddingTop(`rem(4.)),
+    ]);
+
+  let cultureBackground =
+    style([
+      backgroundImage(
+        `url("/static/img/community-page/SectionCulture_Values.jpg"),
+      ),
+      backgroundSize(`cover),
+      paddingTop(`rem(4.)),
+    ]);
+
+  let grantsBackground =
+    style([backgroundColor(white), paddingTop(`rem(4.))]);
+
   let leaderboardContainer =
     style([
-      height(`rem(66.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -64,7 +78,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
-      media(Theme.MediaQuery.tablet, [height(`rem(41.))]),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 
   let leaderboardTextContainer =
@@ -94,7 +108,11 @@ module Styles = {
       ),
     ]);
   let leaderboardLink =
-    style([width(`percent(100.)), textDecoration(`none)]);
+    style([
+      width(`percent(100.)),
+      textDecoration(`none),
+      height(`percent(100.)),
+    ]);
 };
 
 [@react.component]
@@ -119,59 +137,62 @@ let make = (~profiles) => {
       kind=ButtonBar.CommunityLanding
       backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
-    <FeaturedSingleRow
-      row=FeaturedSingleRow.Row.{
-        rowType: ImageRightCopyLeft,
-        copySize: `Large,
-        title: "Genesis Program",
-        description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
-        textColor: Theme.Colors.white,
-        image: "/static/img/BlogLandingHero.jpg",
-        background:
-          Image("/static/img/community-page/CommunityBackground.jpg"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        button: {
-          buttonColor: Theme.Colors.mint,
-          buttonTextColor: Theme.Colors.white,
-          buttonText: "Apply now",
-          dark: true,
-          href: `Internal("/genesis"),
-        },
-      }>
-      <Spacer height=4. />
-      <Rule color=Theme.Colors.white />
-      <Spacer height=4. />
-      <h2 className=Styles.h2>
-        {React.string("Genesis Founding Members")}
-      </h2>
-      <p className=Styles.sectionSubhead>
-        {React.string(
-           "Get to know some of the founding members working to strengthen the protocol and build our community.",
-         )}
-      </p>
+    <div className=Styles.genesisBackground>
+      <FeaturedSingleRow
+        row=FeaturedSingleRow.Row.{
+          rowType: ImageRightCopyLeft,
+          copySize: `Large,
+          title: "Genesis Program",
+          description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
+          textColor: Theme.Colors.white,
+          image: "/static/img/BlogLandingHero.jpg",
+          background: Image(""),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            {FeaturedSingleRow.Row.Button({
+               buttonColor: Theme.Colors.mint,
+               buttonTextColor: Theme.Colors.digitalBlack,
+               buttonText: "Apply now",
+               dark: true,
+               href: `Internal("/genesis"),
+             })},
+        }>
+        <Spacer height=4. />
+        <Rule color=Theme.Colors.white />
+        <Spacer height=4. />
+        <h2 className=Styles.h2>
+          {React.string("Genesis Founding Members")}
+        </h2>
+        <p className=Styles.sectionSubhead>
+          {React.string(
+             "Get to know some of the founding members working to strengthen the protocol and build our community.",
+           )}
+        </p>
+        <Spacer height=6. />
+        <div className=Styles.profileRow>
+          {React.array(
+             Array.map(
+               (p: ContentType.GenesisProfile.t) => {
+                 <div className=Styles.profile>
+                   <GenesisMemberProfile
+                     key={p.name}
+                     name={p.name}
+                     photo={p.profilePhoto.fields.file.url}
+                     quote={"\"" ++ p.quote ++ "\""}
+                     location={p.memberLocation}
+                     twitter={p.twitter}
+                     github={p.github}
+                     blogPost={p.blogPost.fields.slug}
+                   />
+                 </div>
+               },
+               profiles,
+             ),
+           )}
+        </div>
+      </FeaturedSingleRow>
       <Spacer height=6. />
-      <div className=Styles.profileRow>
-        {React.array(
-           Array.map(
-             (p: ContentType.GenesisProfile.t) => {
-               <div className=Styles.profile>
-                 <GenesisMemberProfile
-                   key={p.name}
-                   name={p.name}
-                   photo={p.profilePhoto.fields.file.url}
-                   quote={"\"" ++ p.quote ++ "\""}
-                   location={p.memberLocation}
-                   twitter={p.twitter}
-                   github={p.github}
-                   blogPost={p.blogPost.fields.slug}
-                 />
-               </div>
-             },
-             profiles,
-           ),
-         )}
-      </div>
-    </FeaturedSingleRow>
+    </div>
     <div className=Styles.leaderboardBackground>
       <Wrapped>
         <div className=Styles.leaderboardTextContainer>
@@ -181,7 +202,7 @@ let make = (~profiles) => {
           <Spacer height=1. />
           <p className=Theme.Type.paragraphMono>
             {React.string(
-               "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program. ",
+               "Mina rewards community members for contributing to Testnet with Testnet Points, making them stronger applicants for the Genesis Program.",
              )}
           </p>
           <Button
@@ -202,28 +223,67 @@ let make = (~profiles) => {
         </p>
       </Wrapped>
     </div>
-    <div className=Styles.background>
+    <QuoteSection
+      small=false
+      copy={js|"My measure of a project isn't the quality of the tech. It’s the quality of the community. I wouldn't have been able to spin my node up if it weren't for the insanely great members that helped me. And that's something special.”|js}
+      author="Jeff Flowers"
+      authorTitle="Testnet Community Member"
+      authorImg="/static/img/JeffFlowers.jpg"
+      backgroundImg={
+        Theme.desktop: "/static/img/MinaSpectrumPrimarySilver.jpg",
+        Theme.tablet: "/static/img/MinaSpectrumPrimarySilver.jpg",
+        Theme.mobile: "/static/img/MinaSpectrumPrimarySilver.jpg",
+      }
+    />
+    <div className=Styles.grantsBackground>
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          title: "Grants Program",
+          copySize: `Small,
+          description: "From front-end sprints and protocol development to community building initiatives and content creation, our Grants Program invites you to help strengthen the network in exchange for Mina tokens. ",
+          textColor: Theme.Colors.white,
+          image: "/static/img/MinaGrantsDevelopers.jpg",
+          background: Color(Theme.Colors.white),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "See All Opportunities",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: true,
+              href: `Internal("/grants"),
+            }),
+        }>
+        <>
+          <Spacer height=4. />
+          <Rule />
+          <TypesOfGrants />
+          <Spacer height=8. />
+        </>
+      </FeaturedSingleRow>
+    </div>
+    <div className=Styles.cultureBackground>
       <FeaturedSingleRow
         row={
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
           title: "Our Culture",
-          copySize: `Small,
+          copySize: `Large,
           description: "It's hard to quantify, but it's not hard to see: in any community, culture is everything. It's the values that drive us. It's how we see the world and how we show up. Culture is who we are and becomes what we create.",
           textColor: Theme.Colors.black,
           image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
           background:
             Image("/static/img/community-page/SectionCulture_Values.jpg"),
           contentBackground: Color(Theme.Colors.white),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Read the Code of Conduct",
-            buttonColor: Theme.Colors.white,
-            buttonTextColor: Theme.Colors.orange,
-            dark: false,
-            href: `External(Constants.codeOfConductUrl),
-          },
+          link:
+            FeaturedSingleRow.Row.Label({
+              FeaturedSingleRow.Row.labelText: "Read the Code of Conduct",
+              labelColor: Theme.Colors.orange,
+              href: `External(Constants.codeOfConductUrl),
+            }),
         }>
         <Spacer height=4. />
-        <Rule color=Theme.Colors.white />
+        <Rule color=Theme.Colors.digitalBlack />
         <Spacer height=4. />
         <CultureGrid
           title="What Unites Us"

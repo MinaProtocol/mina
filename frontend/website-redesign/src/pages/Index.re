@@ -68,13 +68,14 @@ let make = () => {
           image: "/static/img/homepage-cta.jpg",
           background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
           contentBackground: Color(Theme.Colors.white),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "More on Mina",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: false,
-            href: `Internal("/about"),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "More on Mina",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: false,
+              href: `Internal("/about"),
+            }),
         }
       />
       <BlogModule source=`Press />
