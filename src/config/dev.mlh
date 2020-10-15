@@ -2,7 +2,7 @@
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/consensus/postake_short.mlh"]
-[%%import "/src/config/scan_staste/medium.mlh"]
+[%%import "/src/config/scan_state/medium.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
 [%%import "/src/config/proof_level/check.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
