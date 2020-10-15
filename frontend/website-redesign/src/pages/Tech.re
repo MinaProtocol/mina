@@ -184,7 +184,7 @@ module HowMinaWorks = {
           </b>
           {React.string(
              {js|
-            WheknowledgeBaseCategoryn anyone can enforce the rules by validating an irrevocable public
+            When anyone can enforce the rules by validating an irrevocable public
             ledger — power remains in the hands of the many, not the few. This
             decentralized structure is what allows the network to conduct trustless
             transactions.
