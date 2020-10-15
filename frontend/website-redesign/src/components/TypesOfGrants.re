@@ -14,29 +14,6 @@ module Styles = {
       ),
     ]);
 
-  let typesOfGrantsImage = (backgroundImg: Theme.backgroundImage) =>
-    style([
-      important(backgroundSize(`cover)),
-      backgroundImage(`url(backgroundImg.mobile)),
-      width(`percent(100.)),
-      height(`rem(43.)),
-      display(`flex),
-      justifyContent(`center),
-      alignItems(`center),
-      media(Theme.MediaQuery.notMobile, [height(`rem(37.5))]),
-      media(
-        Theme.MediaQuery.tablet,
-        [background(`url(backgroundImg.tablet))],
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [
-          padding2(~v=`zero, ~h=`rem(9.5)),
-          background(`url(backgroundImg.desktop)),
-        ],
-      ),
-    ]);
-
   let typesOfGrantsOuterContainer =
     style([
       display(`flex),
