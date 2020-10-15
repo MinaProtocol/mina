@@ -43,7 +43,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     [
         Cmd.run (
           "if [ ! -f ${spec.deploy_env_file} ]; then " ++
-              "buildkite-agent artifact download --debug-http --debug --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${spec.deploy_env_file} .; " ++
+              "buildkite-agent artifact download --debug-http --debug --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${spec.deploy_env_file} .; " ++
           "fi"
         ),
         Cmd.run (
