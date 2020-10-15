@@ -230,6 +230,8 @@ module Type = {
       textDecoration(`none),
       cursor(`pointer),
       color(Colors.orange),
+      display(`flex),
+      alignItems(`center),
       hover([textDecoration(`underline)]),
     ]);
 

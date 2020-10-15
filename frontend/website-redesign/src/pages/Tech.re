@@ -151,13 +151,12 @@ module TechSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-
-        <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
-        <SideNav.Item title="Projects & Possibilities" slug="#projects" />
-        <SideNav.Item title="Incentive Structure" slug="#incentives" />
-        <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      </SideNav>;
-      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
+      <SideNav.Item title="Projects & Possibilities" slug="#projects" />
+      <SideNav.Item title="Incentive Structure" slug="#incentives" />
+      <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+    </SideNav>;
+    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -526,13 +525,14 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
         background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          href: `Internal("/docs/getting-started"),
-          buttonText: "Run a Node",
-          dark: false,
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            href: `Internal("/docs/getting-started"),
+            buttonText: "Run a Node",
+            dark: false,
+          }),
         contentBackground: Color(Css.white),
       }
     />
@@ -557,13 +557,14 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-touch.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          buttonText: "Get Started",
-          dark: false,
-          href: `Internal("/docs"),
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            buttonText: "Get Started",
+            dark: false,
+            href: `Internal("/docs"),
+          }),
         contentBackground: Color(Css.white),
       }
     />

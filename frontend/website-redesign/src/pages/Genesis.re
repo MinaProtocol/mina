@@ -26,7 +26,7 @@ module Styles = {
 
   let leaderboardContainer =
     style([
-      height(`rem(66.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -35,7 +35,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
-      media(Theme.MediaQuery.tablet, [height(`rem(41.))]),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 
   let leaderboardTextContainer =
@@ -377,16 +377,17 @@ let make = (~profiles) => {
           background:
             Image("/static/img/backgrounds/SectionGenesisBackground.png"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Apply Now",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: false,
-            href:
-              `External(
-                "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
-              ),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "Apply Now",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: false,
+              href:
+                `External(
+                  "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
+                ),
+            }),
         }>
         <Spacer height=4. />
         <Rule color=Theme.Colors.white />
