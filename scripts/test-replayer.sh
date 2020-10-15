@@ -26,9 +26,11 @@ psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
 
 # build with `dev`, because the archive db was created by using Rosetta's `start.sh`, which
 # uses that profile; using `make replayer` would generate different ledger hashes
-echo "Running replayer"
+
+echo "Building replayer"
 dune b $REPLAYER_DIR/replayer.exe --profile=dev
 
+echo "Running replayer"
 ./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
 
 RESULT=$?
