@@ -127,7 +127,7 @@ let combine_errors (malleable_errors : 'a t list) : 'a list t =
 let try_with (type a) ?(backtrace = false) (f : unit -> a) : a t =
   of_or_error_hard (Or_error.try_with ~backtrace f)
 
-let of_option opt msg : 'a t =
+let of_option_hard opt msg : 'a t =
   Option.value_map opt
     ~default:
       (Deferred.return
@@ -135,6 +135,16 @@ let of_option opt msg : 'a t =
             { Hard_fail.hard_error=
                 Test_error.raw_internal_error (Error.of_string msg)
             ; Hard_fail.soft_errors= [] }))
+    ~f:T.return
+
+let of_option_soft opt msg default_val : 'a t =
+  Option.value_map opt
+    ~default:
+      (Deferred.return
+         (Ok
+            { Accumulator.computation_result= default_val
+            ; Accumulator.soft_errors=
+                [Test_error.raw_internal_error (Error.of_string msg)] }))
     ~f:T.return
 
 let lift_error_set (type a) (m : a t) :

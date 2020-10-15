@@ -223,6 +223,7 @@ module Node = struct
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let graphql_port = 3085 in
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
       exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true

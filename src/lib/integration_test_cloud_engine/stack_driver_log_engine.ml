@@ -269,7 +269,7 @@ module Json_parsing = struct
       ) *)
     | key :: path', `Assoc assoc ->
         let%bind entry =
-          Malleable_error.of_option
+          Malleable_error.of_option_hard
             (List.Assoc.find assoc key ~equal:String.equal)
             "failed to find path in json object"
         in
@@ -676,10 +676,12 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         let open Malleable_error.Let_syntax in
         [%log info] "Handling initialization log for node \"%s\"" result.pod_id ;
         let%bind ivar =
-          Malleable_error.of_option
+          (* TEMP hack, this probably should be of_option_hard *)
+          Malleable_error.of_option_soft
             (String.Map.find initialization_table result.pod_id)
             (Printf.sprintf "Node not found in initialization table: %s"
                result.pod_id)
+            (Ivar.create ())
         in
         if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
         else
@@ -1017,7 +1019,7 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
     ~metadata:[("node", `String node.pod_id)]
     "Waiting for $node to initialize" ;
   let%bind init =
-    Malleable_error.of_option
+    Malleable_error.of_option_hard
       (String.Map.find t.initialization_table node.pod_id)
       "failed to find node in initialization table"
   in
