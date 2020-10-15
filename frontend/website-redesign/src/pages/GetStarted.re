@@ -78,13 +78,14 @@ let make = () => {
           image: "/static/img/GenesisCopy.jpg",
           background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Learn More",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: false,
-            href: `Internal("/genesis"),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "Learn More",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: false,
+              href: `Internal("/genesis"),
+            }),
         }
       />
     </div>
