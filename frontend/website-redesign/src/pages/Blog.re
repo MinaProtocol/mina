@@ -175,13 +175,14 @@ let make = (~posts) => {
           image: "/static/img/BlogLandingHero.jpg",
           background: Image("/static/img/MinaSimplePattern1.jpg"),
           contentBackground: Image("/static/img/MinaSepctrumSecondary.png"),
-          button: {
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            buttonText: "Read more",
-            dark: true,
-            href: `Internal("/blog/" ++ featured.slug),
-          },
+          link:
+            {FeaturedSingleRow.Row.Button({
+               buttonColor: Theme.Colors.orange,
+               buttonTextColor: Theme.Colors.white,
+               buttonText: "Read more",
+               dark: true,
+               href: `Internal("/blog/" ++ featured.slug),
+             })},
         }
       />
       <Wrapped>

@@ -138,7 +138,6 @@ module Styles = {
       background(white),
       width(`percent(100.)),
       borderRadius(px(3)),
-      paddingTop(`rem(1.)),
       Theme.Typeface.monumentGrotesk,
       fontSize(rem(1.5)),
       lineHeight(rem(1.5)),
