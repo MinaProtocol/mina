@@ -7,7 +7,11 @@ struct
   open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint
   open Impl
 
+  let seal = Tuple_lib.Double.map ~f:(Util.seal (module Impl))
+
   let add_fast p1 p2 =
+    let p1 = seal p1 in
+    let p2 = seal p2 in
     let p3 =
       exists G.typ_unchecked
         ~compute:
@@ -117,10 +121,7 @@ struct
 
   let scale_fast t (`Plus_two_to_len_minus_1 k) =
     with_label __LOC__ (fun () ->
-        let t =
-          with_label __LOC__ (fun () ->
-              Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t )
-        in
+        let t = with_label __LOC__ (fun () -> seal t) in
         let m = Array.length k - 1 in
         let r = Array.init m ~f:(fun i -> k.(i + 1)) in
         let two_r_plus_1_plus_two_to_m =
@@ -204,9 +205,7 @@ struct
                 As_prover.(
                   fun () ->
                     let xt, yt = Tuple_lib.Double.map t ~f:read_var in
-                    if Field.Constant.(equal xt zero) then begin
-                      failwith "badd"
-                    end ;
+                    if Field.Constant.(equal xt zero) then failwith "badd" ;
                     let state = ref [] in
                     let pl = ref (read G.typ p) in
                     let tl = ref (read G.typ t) in
@@ -248,17 +247,28 @@ struct
                     (EC_scale {state}) } ] ;
           let post = !Zexe_backend_common.Plonk_constraint_system.next_row in
           let bad = 194037 - 141 in
-          if pre <= bad && bad <= post then begin
-            as_prover As_prover.(fun () ->
-                Core.printf !"xt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n%!" xt ;
-                Core.printf !"yt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n%!" yt ;
-              Array.iteri state ~f:(fun i r ->
-                    Core.printf !"v[%d]: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t S.t}\n%!" i
-                      (r );
-                    Core.printf !"w[%d]: %{sexp:Field.Constant.t S.t}\n%!" i
-                      (read (S.typ Field.typ) r ) ) 
-              ) 
-          end ;
+          if pre <= bad && bad <= post then
+            as_prover
+              As_prover.(
+                fun () ->
+                  Core.printf
+                    !"xt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n\
+                      %!"
+                    xt ;
+                  Core.printf
+                    !"yt: %{sexp:Field.Constant.t Snarky_backendless.Cvar.t}\n\
+                      %!"
+                    yt ;
+                  Array.iteri state ~f:(fun i r ->
+                      Core.printf
+                        !"v[%d]: %{sexp:Field.Constant.t \
+                          Snarky_backendless.Cvar.t S.t}\n\
+                          %!"
+                        i r ;
+                      Core.printf
+                        !"w[%d]: %{sexp:Field.Constant.t S.t}\n%!"
+                        i
+                        (read (S.typ Field.typ) r) )) ;
           let fin = state.(Int.(n - 2)) in
           (fin.xs, fin.ys)
       in

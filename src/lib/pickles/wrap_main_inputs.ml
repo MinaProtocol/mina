@@ -234,7 +234,7 @@ module Generators = struct
   let h =
     lazy
       ( Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.h
-          (Zexe_backend.Tweedle.Dum_based_plonk.Keypair.load_urs ())
+          (Backend.Tick.Keypair.load_urs ())
       |> Zexe_backend.Tweedle.Dum.Affine.of_backend |> Or_infinity.finite_exn
       )
 end

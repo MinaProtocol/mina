@@ -395,9 +395,11 @@ struct
           let ( + ) = Inner_curve.( + ) in
           let ( * ) = Fn.flip scale_fast in
           let generic =
-            (plonk.gnrc_l * ((with_label __LOC__ (fun () -> plonk.gnrc_r * m.qm_comm)) + m.ql_comm))
-            + with_label __LOC__ (fun () -> (plonk.gnrc_r * m.qr_comm) )
-            + with_label __LOC__ (fun () -> (plonk.gnrc_o * m.qo_comm))
+            plonk.gnrc_l
+            * ( with_label __LOC__ (fun () -> plonk.gnrc_r * m.qm_comm)
+              + m.ql_comm )
+            + with_label __LOC__ (fun () -> plonk.gnrc_r * m.qr_comm)
+            + with_label __LOC__ (fun () -> plonk.gnrc_o * m.qo_comm)
             + m.qc_comm
           in
           let poseidon =
@@ -410,22 +412,6 @@ struct
             m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
             |> ( * ) a |> ( * ) a |> ( * ) a
           in
-          as_prover As_prover.(fun () ->
-              Core.printf !"oh %{sexp:Inner_curve.Constant.t Plonk_verification_key_evals.t}\n%!"
-                (read (Plonk_verification_key_evals.typ Inner_curve.typ) m ) ;
-              Core.printf !"oh %{sexp: Field.Constant.t Snarky_backendless.Cvar.t Tuple_lib.Double.t Plonk_verification_key_evals.t}\n%!"
-                ( m ) ;
-(*
-              let x, y = (Inner_curve.Constant.to_affine_exn
-                            (read Inner_curve.typ m.add_comm))
-              in 
-              Core.printf "hi %s\n%!" __LOC__ ;
-              Field.Constant.print x ; 
-              Core.printf "\n%!" ;
-              Field.Constant.print y  ;
-              Core.printf "\n%!" 
-*)
-            ); (* TODO: sigma_comm_0 is in the problem constraint. *)
           let g =
             List.reduce_exn ~f:( + )
               [ with_label __LOC__ (fun () -> plonk.perm1 * m.sigma_comm_2)
@@ -437,7 +423,7 @@ struct
               ; with_label __LOC__ (fun () -> plonk.vbmul1 * m.mul2_comm)
               ; with_label __LOC__ (fun () -> plonk.endomul0 * m.emul1_comm)
               ; with_label __LOC__ (fun () -> plonk.endomul1 * m.emul2_comm)
-              ; with_label __LOC__ (fun () -> plonk.endomul2 * m.emul3_comm ) ]
+              ; with_label __LOC__ (fun () -> plonk.endomul2 * m.emul3_comm) ]
           in
           let res = Array.map z_comm ~f:(( * ) plonk.perm0) in
           res.(0) <- res.(0) + g ;
@@ -467,13 +453,13 @@ struct
               (snd (Branching.add Nat.N8.n))
           in
           with_label __LOC__ (fun () ->
-          check_bulletproof
-            ~pcs_batch:
-              (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
-                 ~max_quot_size:((5 * (Domain.size domain + 2)) - 5))
-            ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
-            ~advice ~openings_proof
-            ~polynomials:(without_degree_bound, [t_comm]) )
+              check_bulletproof
+                ~pcs_batch:
+                  (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
+                     ~max_quot_size:((5 * (Domain.size domain + 2)) - 5))
+                ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
+                ~advice ~openings_proof
+                ~polynomials:(without_degree_bound, [t_comm]) )
         in
         assert_eq_marlin
           { alpha= plonk.alpha

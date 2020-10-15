@@ -54,7 +54,11 @@ struct
 
   let block_cipher (params : _ Sponge.Params.t) init =
     Impl.with_label __LOC__ (fun () ->
-        let init = Array.map2_exn ~f:( + ) init params.round_constants.(0) in
+        let init =
+          Array.map2_exn
+            ~f:(fun c x -> Util.seal (module Impl) (c + x))
+            init params.round_constants.(0)
+        in
         let t =
           exists
             (Typ.array
@@ -72,7 +76,8 @@ struct
         t.(Int.(Array.length t - 1)) )
 
   (* TODO: experiment with sealing version of this *)
-  let add_assign ~state i x = state.(i) <- state.(i) + x
+  let add_assign ~state i x =
+    state.(i) <- Util.seal (module Impl) (state.(i) + x)
 
   let copy = Array.copy
 end

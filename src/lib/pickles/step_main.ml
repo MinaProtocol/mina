@@ -303,7 +303,6 @@ let step_main
                       { Types.Dlog_based.Statement.pass_through= prev_me_only
                       ; proof_state= {state with me_only= pass_through} }
                     in
-                    Core.printf "verify\n%!";
                     let verified =
                       with_label __LOC__ (fun () ->
                           verify ~branching:d.max_branching

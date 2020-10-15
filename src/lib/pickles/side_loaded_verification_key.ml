@@ -156,7 +156,7 @@ include Make
                 Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
                   ~max_poly_size:(u (1 lsl Nat.to_int Backend.Tock.Rounds.n))
                   ~max_quot_size:(u max_quot_size)
-                  ~urs:(Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
+                  ~urs:(Backend.Tock.Keypair.load_urs ())
                   ~sigma_comm0:(g c.sigma_comm_0)
                   ~sigma_comm1:(g c.sigma_comm_1)
                   ~sigma_comm2:(g c.sigma_comm_2) ~ql_comm:(g c.ql_comm)

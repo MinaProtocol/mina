@@ -99,7 +99,7 @@ module Input_domain = struct
            Array.init domain_size ~f:(fun i ->
                let v =
                  Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
-                   (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
+                   (Backend.Tock.Keypair.load_urs ())
                    (u domain_size) (u i)
                  |> Snarky_bn382.Tweedle.Dee.Field_poly_comm.unshifted
                in
@@ -247,7 +247,7 @@ module Generators = struct
   let h =
     lazy
       ( Snarky_bn382.Tweedle.Dee.Plonk.Field_urs.h
-          (Zexe_backend.Tweedle.Dee_based_plonk.Keypair.load_urs ())
+          (Backend.Tock.Keypair.load_urs ())
       |> Zexe_backend.Tweedle.Dee.Affine.of_backend |> Or_infinity.finite_exn
       )
 end

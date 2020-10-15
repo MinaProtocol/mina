@@ -371,9 +371,7 @@ struct
               let state = ref [] in
               let xpl, ypl = (ref (read_var xp), ref (read_var yp)) in
               let xtl, ytl = (read_var xt, read_var yt) in
-              if Field.Constant.(equal xtl zero) then begin
-                failwith "bad"
-              end ;
+              if Field.Constant.(equal xtl zero) then failwith "bad" ;
               for i = Int.(n - 1) downto 0 do
                 let b2il = read_var (scalar.(Int.(2 * i)) :> Field.t) in
                 let b2i1l =

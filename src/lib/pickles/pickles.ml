@@ -18,6 +18,7 @@ open Common
 open Backend
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
+module Util = Util
 module Tick_field_sponge = Tick_field_sponge
 module Impls = Impls
 module Inductive_rule = Inductive_rule
@@ -25,6 +26,7 @@ module Tag = Tag
 module Dirty = Dirty
 module Cache_handle = Cache_handle
 module Step_main_inputs = Step_main_inputs
+module Pairing_main = Pairing_main
 
 let verify = Verify.verify
 
@@ -200,7 +202,7 @@ module Verification_key = struct
     let dummy_id = Type_equal.Id.(uid (create ~name:"dummy" sexp_of_opaque))
 
     let dummy : unit -> t =
-      let t = lazy (dummy_id, Md5.digest_string "") in
+      let t = lazy (dummy_id, "dummy", Md5.digest_string "") in
       fun () -> Lazy.force t
   end
 
@@ -489,6 +491,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               let k_p =
                 lazy
                   ( Type_equal.Id.uid self.id
+                  , name
                   , Index.to_int b.index
                   , constraint_system ~exposing:[typ] main )
               in
@@ -498,8 +501,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                     Lazy.return ks.(Index.to_int b.index)
                 | None ->
                     lazy
-                      (let x, y, z = Lazy.force k_p in
-                       (x, y, R1CS_constraint_system.digest z))
+                      (let a, b, c, d = Lazy.force k_p in
+                       (a, b, c, R1CS_constraint_system.digest d))
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
@@ -597,16 +600,16 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
-        lazy (self_id, constraint_system ~exposing:[typ] main)
+        lazy (self_id, name, constraint_system ~exposing:[typ] main)
       in
       let disk_key_verifier =
         match disk_keys with
-        | Some (_, (_, digest)) ->
-            Lazy.return (self_id, digest)
         | None ->
             lazy
-              (let id, cs = Lazy.force disk_key_prover in
-               (id, R1CS_constraint_system.digest cs))
+              (let id, name, cs = Lazy.force disk_key_prover in
+               (id, name, R1CS_constraint_system.digest cs))
+        | Some (_, (_id, name, digest)) ->
+            Lazy.return (self_id, name, digest)
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
@@ -618,6 +621,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.clock __LOC__ ;
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
+    accum_dirty (Lazy.map wrap_vk ~f:snd) ;
+    let wrap_vk = Lazy.map wrap_vk ~f:fst in
     let module S = Step.Make (A) (A_value) (Max_branching) in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in

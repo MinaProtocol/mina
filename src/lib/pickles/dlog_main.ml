@@ -92,7 +92,7 @@ struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
-  let print_g1 lab (x, y) =
+  let print_g lab (x, y) =
     if debug then
       as_prover
         As_prover.(
@@ -392,27 +392,35 @@ struct
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
         in
+        print_g "combined_polynomial" combined_polynomial ;
         let lr_prod, challenges = bullet_reduce sponge lr in
+        print_g "lr_prod" lr_prod ;
         let p_prime =
           let uc = scale_fast u combined_inner_product in
-          combined_polynomial + uc
+          print_g "uc" uc ; combined_polynomial + uc
         in
+        print_g "p_prime" p_prime ;
         let q = p_prime + lr_prod in
+        print_g "q" q ;
         absorb sponge PC delta ;
         let c = squeeze_scalar sponge in
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
-          cq + delta
+          print_g "cq" cq ; cq + delta
         in
+        print_g "lhs" lhs ;
         let rhs =
           let b_u = scale_fast u advice.b in
+          print_g "b_u" b_u ;
           let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
+          print_g "z_1_g_plus_b_u" z_1_g_plus_b_u ;
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in
-          z_1_g_plus_b_u + z2_h
+          print_g "z2_h" z2_h ; z_1_g_plus_b_u + z2_h
         in
+        print_g "rhs" rhs ;
         (`Success (equal_g lhs rhs), challenges) )
 
   module Opt =
@@ -570,6 +578,14 @@ struct
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;
+        let print_w lab gs =
+          if debug then
+            Array.iteri gs ~f:(fun i (fin, g) ->
+                as_prover
+                  As_prover.(
+                    fun () -> Core.printf "fin=%b %!" (read Boolean.typ fin)) ;
+                ksprintf print_g "%s[%d]" lab i g )
+        in
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
@@ -601,46 +617,44 @@ struct
 
        Then, in the other proof, we can witness the evaluations and check their correctness
        against "combined_inner_product" *)
-        let bulletproof_challenges =
-          let f_comm =
-            let ( + ) = Ops.add_fast in
-            let ( * ) = Fn.flip scale_fast in
-            let generic =
-              (plonk.gnrc_l * ((plonk.gnrc_r * m.qm_comm) + m.ql_comm))
-              + (plonk.gnrc_r * m.qr_comm) + (plonk.gnrc_o * m.qo_comm)
-              + m.qc_comm
-            in
-            let poseidon =
-              let ( * ) = Fn.flip Scalar_challenge.endo in
-              (* alpha^3 rcm_comm[0] + alpha^4 rcm_comm[1] + alpha^5 rcm_comm[2]
-                 =
-                 alpha^3 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
-              *)
-              let a = alpha in
-              m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
-              |> ( * ) a |> ( * ) a |> ( * ) a
-            in
-            let g =
-              List.reduce_exn ~f:( + )
-                [ plonk.perm1 * m.sigma_comm_2
-                ; generic
-                ; poseidon
-                ; plonk.psdn0 * m.psm_comm
-                ; plonk.ecad0 * m.add_comm
-                ; plonk.vbmul0 * m.mul1_comm
-                ; plonk.vbmul1 * m.mul2_comm
-                ; plonk.endomul0 * m.emul1_comm
-                ; plonk.endomul1 * m.emul2_comm
-                ; plonk.endomul2 * m.emul3_comm ]
-            in
-            let res =
-              Array.map z_comm ~f:(fun (b, x) -> (b, plonk.perm0 * x))
-            in
-            res.(0)
-            <- (let b, r = res.(0) in
-                (Boolean.true_, Inner_curve.if_ b ~then_:(r + g) ~else_:g)) ;
-            res
+        let f_comm =
+          let ( + ) = Ops.add_fast in
+          let ( * ) = Fn.flip scale_fast in
+          let generic =
+            (plonk.gnrc_l * ((plonk.gnrc_r * m.qm_comm) + m.ql_comm))
+            + (plonk.gnrc_r * m.qr_comm) + (plonk.gnrc_o * m.qo_comm)
+            + m.qc_comm
           in
+          let poseidon =
+            let ( * ) = Fn.flip Scalar_challenge.endo in
+            (* alpha^3 rcm_comm[0] + alpha^4 rcm_comm[1] + alpha^5 rcm_comm[2]
+                =
+                alpha^3 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
+            *)
+            let a = alpha in
+            m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
+            |> ( * ) a |> ( * ) a |> ( * ) a
+          in
+          let g =
+            List.reduce_exn ~f:( + )
+              [ plonk.perm1 * m.sigma_comm_2
+              ; generic
+              ; poseidon
+              ; plonk.psdn0 * m.psm_comm
+              ; plonk.ecad0 * m.add_comm
+              ; plonk.vbmul0 * m.mul1_comm
+              ; plonk.vbmul1 * m.mul2_comm
+              ; plonk.endomul0 * m.emul1_comm
+              ; plonk.endomul1 * m.emul2_comm
+              ; plonk.endomul2 * m.emul3_comm ]
+          in
+          let res = Array.map z_comm ~f:(fun (b, x) -> (b, plonk.perm0 * x)) in
+          res.(0)
+          <- (let b, r = res.(0) in
+              (Boolean.true_, Inner_curve.if_ b ~then_:(r + g) ~else_:g)) ;
+          res
+        in
+        let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
          1. The polynomial commitments
          2. The combined inner product
@@ -675,6 +689,13 @@ struct
                   |> Dlog_plonk_types.Poly_comm.With_degree_bound.map
                        ~f:(fun (keep, x) -> (keep, `Maybe_finite x)) ] )
         in
+        print_w "l" l_comm ;
+        print_w "r" r_comm ;
+        print_w "o" o_comm ;
+        print_w "z" z_comm ;
+        print_w "f" f_comm ;
+        print_g "sigma_comm0" m.sigma_comm_0 ;
+        print_g "sigma_comm1" m.sigma_comm_1 ;
         assert_eq_marlin
           { alpha= plonk.alpha
           ; beta= plonk.beta

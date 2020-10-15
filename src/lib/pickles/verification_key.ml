@@ -66,8 +66,7 @@ include Binable.Of_binable
             let to_binable {commitments; step_domains; data; index= _} =
               {Repr.commitments; data; step_domains}
 
-            let of_binable r =
-              of_repr (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ()) r
+            let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
           end)
 
 let dummy_commitments g =
