@@ -44,6 +44,7 @@ module Styles = {
   let mainListingContainer =
     style([
       width(`percent(100.)),
+      marginBottom(`rem(2.)),
       media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
     ]);
 };

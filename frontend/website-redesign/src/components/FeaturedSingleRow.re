@@ -38,6 +38,37 @@ module Row = {
   };
 };
 
+/* The reason we have a custom wrapped component here is because we want the
+   image to be the full width of the screen on mobile. If we wrap our component
+   in a normal wrap, a width margin is applied on mobile which we don't want. Instead
+   we create a custom wrapped component for this component only */
+
+module CustomWrapped = {
+  open Css;
+
+  [@react.component]
+  let make = (~overflowHidden=false, ~children) => {
+    let paddingX = m => [paddingLeft(m), paddingRight(m)];
+    <div
+      className={style(
+        (overflowHidden ? [overflow(`hidden)] : [])
+        @ [
+          margin(`auto),
+          media(
+            Theme.MediaQuery.tablet,
+            [maxWidth(`rem(85.0)), ...paddingX(`rem(2.5))],
+          ),
+          media(
+            Theme.MediaQuery.desktop,
+            [maxWidth(`rem(90.0)), ...paddingX(`rem(9.5))],
+          ),
+        ],
+      )}>
+      children
+    </div>;
+  };
+};
+
 module SingleRow = {
   module RowStyles = {
     open Css;
@@ -60,7 +91,7 @@ module SingleRow = {
         };
       style([
         position(`absolute),
-        width(`rem(21.)),
+        width(`percent(90.)),
         maxHeight(`rem(35.)),
         overflow(`scroll),
         unsafe("height", "fit-content"),
@@ -131,7 +162,7 @@ module SingleRow = {
           RowStyles.image,
           style([
             left(`zero),
-            bottom(`percent(25.)),
+            bottom(`percent(30.)),
             media(Theme.MediaQuery.notMobile, [bottom(`zero)]),
           ]),
         ]);
@@ -290,7 +321,7 @@ module Styles = {
 [@react.component]
 let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
-    <Wrapped>
+    <CustomWrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
@@ -299,6 +330,6 @@ let make = (~row: Row.t, ~children=?) => {
        | Some(children) => children
        | None => <> </>
        }}
-    </Wrapped>
+    </CustomWrapped>
   </div>;
 };
