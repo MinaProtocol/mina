@@ -202,9 +202,7 @@ module TopLevel = {
 
   let blockLifetimes = BlockLifetime.empty();
 
-  let rec go = (i) => fun
-    | None => P.resolved(())
-    | Some(req) => {
+  let rec go: int => Log.getEntryOptions => Promise.t(unit) = (i, req) => {
     Log.getEntries(log, req)
     /*-> P.tap(((es, _, _)) => {*/
         /*Js.Json.stringifyAny(es)*/
@@ -214,11 +212,12 @@ module TopLevel = {
       let _ =
         es
           |> Array.to_list
-          |> List.map((e : Entry.t) => 
+          |> List.map((e : Entry.t) =>
             switch (e.metadata.jsonPayload.fields.event_id) {
             | None => []
             | Some(id) => [(e, id)]
-            })
+            }
+          )
           |> List.concat
           |> List.iter(((e: Entry.t, event_id: Reflected.String.t)) => {
             if (event_id.stringValue == StructuredLog.BlockProduced.id) {
@@ -233,12 +232,12 @@ module TopLevel = {
               );
             } else if (event_id.stringValue == StructuredLog.BlockReceived.id) {
               let metadata: StructuredLog.BlockReceived.Metadata.t =
-                Obj.magic(e.metadata.labels.k8sPodApp);
+                Obj.magic(e.metadata.jsonPayload.fields.metadata);
 
               BlockLifetime.received(
                 blockLifetimes,
                 ~instant={ BlockLifetime.Instant.time: e.metadata.timestamp
-                  , podRealName: e.metadata.resource.labels.pod_name },
+                  , podRealName: e.metadata.labels.k8sPodApp },
                 ~stateHash=metadata.structValue.fields.state_hash.stringValue
               );
             } else {
@@ -253,28 +252,29 @@ module TopLevel = {
                  if (i == 0 || is_none(pageToken)) {
                    P.resolved(())
                  } else {
-                   go(i-1, Some { ...req, pageToken })
+                   go(i-1, { ...req, pageToken })
                  }})
   };
 
-    go(3, Js.Null.return({
+    go(3, {
       resourceNames: [| "projects/o1labs-192920" |],
       pageSize: 100,
       autoPaginate: false,
       orderBy: "timestamp desc",
       pageToken: None,
-      filter: Printf.sprintf({|resource.type="k8s_container" AND
-resource.labels.project_id="o1labs-192920" AND
-resource.labels.location="us-east1" AND
-resource.labels.cluster_name="coda-infra-east" AND
-resource.labels.namespace_name="%s" AND
-resource.labels.container_name="coda" AND
-(
-jsonPayload.event_id = "%s" OR
-jsonPayload.event_id = "%s"
-)
+      filter: Printf.sprintf({|
+resource.type="k8s_container"
+resource.labels.project_id="o1labs-192920"
+resource.labels.location="us-east1"
+resource.labels.cluster_name="coda-infra-east"
+resource.labels.namespace_name="%s"
+resource.labels.container_name="coda"
+jsonPayload.event_id = ("%s" OR "%s")
 timestamp > "2020-10-13T22:48:30Z"
-|}, testnetName, StructuredLog.BlockProduced.id, StructuredLog.BlockReceived.id)
-    })) -> P.get(_ => Js.log2("All done", Js.Json.stringifyAny(BlockLifetime.render(blockLifetimes))));
+|},
+    testnetName,
+    StructuredLog.BlockProduced.id,
+    StructuredLog.BlockReceived.id)
+  }) -> P.get(_ => Js.log2("All done", Js.Json.stringifyAny(BlockLifetime.render(blockLifetimes))));
 };
 
