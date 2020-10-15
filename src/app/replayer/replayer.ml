@@ -345,7 +345,7 @@ let main ~input_file ~output_file ~archive_uri () =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
-      [%log info] "Loading global slots" ;
+      [%log info] "Loading global slots and ledger hashes" ;
       let%bind global_slots =
         match%bind
           Caqti_async.Pool.use
@@ -362,7 +362,7 @@ let main ~input_file ~output_file ~archive_uri () =
                   ~data:(Ledger_hash.of_string hash) ) ;
             return (Int64.Set.of_list slots)
         | Error msg ->
-            [%log error] "Error getting global slots"
+            [%log error] "Error getting global slots and ledger hashes"
               ~metadata:[("error", `String (Caqti_error.show msg))] ;
             exit 1
       in
@@ -464,31 +464,31 @@ let main ~input_file ~output_file ~archive_uri () =
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot =
+        let log_ledger_hash_after_last_slot () =
+          let expected_ledger_hash =
+            Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
+          in
+          if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
+          then
+            [%log info]
+              "Applied all commands at global slot %Ld, got expected ledger \
+               hash"
+              ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)]
+              last_global_slot
+          else (
+            [%log error]
+              "Applied all commands at global slot %Ld, ledger hash differs \
+               from expected ledger hash"
+              ~metadata:
+                [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                ; ( "expected_ledger_hash"
+                  , Ledger_hash.to_yojson expected_ledger_hash ) ]
+              last_global_slot ;
+            Core_kernel.exit 1 )
+        in
         let log_on_slot_change curr_global_slot =
           if Int64.( > ) curr_global_slot last_global_slot then
-            let expected_ledger_hash =
-              Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
-            in
-            if
-              Ledger_hash.equal
-                (Ledger.merkle_root ledger)
-                expected_ledger_hash
-            then
-              [%log info]
-                "Applied all commands at global slot %Ld, got expected ledger \
-                 hash"
-                ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)]
-                last_global_slot
-            else (
-              [%log error]
-                "Applied all commands at global slot %Ld, ledger hash differs \
-                 from expected ledger hash"
-                ~metadata:
-                  [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-                  ; ( "expected_ledger_hash"
-                    , Ledger_hash.to_yojson expected_ledger_hash ) ]
-                last_global_slot ;
-              Core_kernel.exit 1 )
+            log_ledger_hash_after_last_slot ()
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -521,6 +521,7 @@ let main ~input_file ~output_file ~archive_uri () =
         in
         match (internal_cmds, user_cmds) with
         | [], [] ->
+            log_ledger_hash_after_last_slot () ;
             Deferred.unit
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot ;
