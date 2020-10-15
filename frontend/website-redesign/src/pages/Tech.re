@@ -151,13 +151,12 @@ module TechSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-
-        <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
-        <SideNav.Item title="Projects & Possibilities" slug="#projects" />
-        <SideNav.Item title="Incentive Structure" slug="#incentives" />
-        <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      </SideNav>;
-      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
+      <SideNav.Item title="Projects & Possibilities" slug="#projects" />
+      <SideNav.Item title="Incentive Structure" slug="#incentives" />
+      <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+    </SideNav>;
+    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -185,7 +184,7 @@ module HowMinaWorks = {
           </b>
           {React.string(
              {js|
-            When anyone can enforce the rules by validating an irrevocable public
+            WheknowledgeBaseCategoryn anyone can enforce the rules by validating an irrevocable public
             ledger — power remains in the hands of the many, not the few. This
             decentralized structure is what allows the network to conduct trustless
             transactions.
@@ -536,15 +535,13 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
-    /*
-     <div className=Styles.sectionContainer("")>
-       <Spacer height=6. />
-       <div className=Styles.section id="knowledge">
-         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-       </div>
-     </div>
-     <Spacer height=12. />
-     */
+    <div className={Styles.sectionContainer("")}>
+      <section className=Styles.section id="knowledge">
+        <Spacer height=6. />
+        <KnowledgeBase />
+      </section>
+    </div>
+    <Spacer height=12. />
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
