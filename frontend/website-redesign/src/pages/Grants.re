@@ -443,7 +443,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -464,7 +464,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -485,7 +485,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -502,7 +502,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
         </Section>
@@ -540,7 +540,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -561,7 +561,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
         </Section>
@@ -609,7 +609,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -626,7 +626,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl=Constants.genesisGrantApplication
+            buttonUrl="Constants.projectGrantApplication"
           />
           <Spacer height=5. />
           <p className=Theme.Type.paragraph>
@@ -662,7 +662,7 @@ module HowToApply = {
                 buttonColor: Theme.Colors.orange,
                 buttonTextColor: Theme.Colors.white,
                 dark: false,
-                href: `External(Constants.genesisGrantApplication),
+                href: `External(Constants.projectGrantApplication),
               }),
           }>
           <Spacer height=4. />
