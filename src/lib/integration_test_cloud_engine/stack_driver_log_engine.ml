@@ -805,6 +805,7 @@ let wait_for' :
     let timeout_safety =
       let ( ! ) = Int64.of_int in
       let ( * ) = Int64.( * ) in
+      let ( +! ) = Int64.( + ) in
       let estimated_time =
         match timeout with
         | `Slots n ->
@@ -815,11 +816,17 @@ let wait_for' :
             * !(t.constants.constraints.c)
             * !(t.constants.constraints.block_window_duration_ms)
         | `Snarked_ledgers_generated n ->
-            (* TODO *)
-            !n * 2L * 3L
-            * !(t.constants.genesis.protocol.k)
-            * !(t.constants.constraints.c)
+            (* Assuming at least 1/3 rd of the max throughput otherwise this could take forever depending on the scan state size*)
+            (*first snarked ledger*)
+            3L
             * !(t.constants.constraints.block_window_duration_ms)
+            * ( !(t.constants.constraints.work_delay + 1)
+                * !(t.constants.constraints.transaction_capacity_log_2 + 1)
+              +! 1L )
+            +! (*subsequent snarked ledgers*)
+               !(n - 1)
+               * !(t.constants.constraints.block_window_duration_ms)
+               * 3L
         | `Milliseconds n ->
             n
       in
