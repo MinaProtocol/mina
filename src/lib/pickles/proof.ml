@@ -26,31 +26,29 @@ module Base = struct
       ; proof: Tick.Proof.t }
   end
 
-  type 'a triple = 'a * 'a * 'a
-  [@@deriving bin_io, compare, sexp, yojson, hash, eq]
+  type 'a double = 'a * 'a [@@deriving bin_io, compare, sexp, yojson, hash, eq]
 
   module Dlog_based = struct
     type ('dlog_me_only, 'pairing_me_only) t =
       { statement:
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , Tick.Field.t
+          , Tick.Field.t Shifted_value.Stable.Latest.t
           , bool
           , Tock.Field.t
           , 'dlog_me_only
           , Digest.Constant.t
           , 'pairing_me_only
-          , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-            , bool )
+          , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
             Step_bp_vec.t
           , Index.t )
-          Types.Dlog_based.Statement.t
+          Types.Dlog_based.Statement.Minimal.t
       ; prev_evals:
-          Tick.Field.t Dlog_marlin_types.Pc_array.Stable.Latest.t
-          Dlog_marlin_types.Evals.Stable.Latest.t
-          triple
-      ; prev_x_hat: Tick.Field.t triple
+          Tick.Field.t Dlog_plonk_types.Pc_array.Stable.Latest.t
+          Dlog_plonk_types.Evals.Stable.Latest.t
+          double
+      ; prev_x_hat: Tick.Field.t double
       ; proof: Tock.Proof.t }
     [@@deriving bin_io, compare, sexp, yojson, hash, eq]
   end
@@ -61,8 +59,7 @@ type ('s, 'mlmb, _) with_data =
       ( 'mlmb Base.Me_only.Dlog_based.t
       , ( 's
         , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
-        , ( ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-            , bool )
+        , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
             Step_bp_vec.t
           , 'most_recent_width )
@@ -92,20 +89,15 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
         { proof_state=
             { deferred_values=
                 { xi= scalar_chal ()
-                ; combined_inner_product= tick ()
-                ; b= tick ()
+                ; combined_inner_product= Shifted_value (tick ())
+                ; b= Shifted_value (tick ())
                 ; which_branch= Option.value_exn (Index.of_int 0)
                 ; bulletproof_challenges= Dummy.Ipa.Step.challenges
-                ; marlin=
-                    { sigma_2= tick ()
-                    ; sigma_3= tick ()
-                    ; alpha= chal ()
-                    ; eta_a= chal ()
-                    ; eta_b= chal ()
-                    ; eta_c= chal ()
-                    ; beta_1= scalar_chal ()
-                    ; beta_2= scalar_chal ()
-                    ; beta_3= scalar_chal () } }
+                ; plonk=
+                    { alpha= scalar_chal ()
+                    ; beta= chal ()
+                    ; gamma= chal ()
+                    ; zeta= scalar_chal () } }
             ; sponge_digest_before_evaluations=
                 Digest.Constant.of_tock_field Tock.Field.zero
             ; was_base_case= true
@@ -125,16 +117,14 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                     Lazy.force Dummy.Ipa.Wrap.sg ) } }
     ; proof=
         { messages=
-            { w_hat= g lengths.w_hat
-            ; z_hat_a= g lengths.z_hat_a
-            ; z_hat_b= g lengths.z_hat_a
-            ; gh_1= ({unshifted= g lengths.g_1; shifted= g0}, g lengths.h_1)
-            ; sigma_gh_2=
-                ( Ro.tock ()
-                , ({unshifted= g lengths.g_2; shifted= g0}, g lengths.h_2) )
-            ; sigma_gh_3=
-                ( Ro.tock ()
-                , ({unshifted= g lengths.g_3; shifted= g0}, g lengths.h_3) ) }
+            { l_comm= g lengths.l
+            ; r_comm= g lengths.r
+            ; o_comm= g lengths.o
+            ; z_comm= g lengths.z
+            ; t_comm=
+                { unshifted=
+                    Array.map (g lengths.t) ~f:(fun x -> Or_infinity.Finite x)
+                ; shifted= Finite g0 } }
         ; openings=
             { proof=
                 { lr=
@@ -144,12 +134,12 @@ let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
                 ; delta= g0
                 ; sg= g0 }
             ; evals=
-                (let e () = Dlog_marlin_types.Evals.map lengths ~f:tock in
-                 (e (), e (), e ())) } }
+                (let e () = Dlog_plonk_types.Evals.map lengths ~f:tock in
+                 (e (), e ())) } }
     ; prev_evals=
-        (let e () = Dlog_marlin_types.Evals.map lengths ~f:tick_arr in
-         (e (), e (), e ()))
-    ; prev_x_hat= (tick (), tick (), tick ()) }
+        (let e () = Dlog_plonk_types.Evals.map lengths ~f:tick_arr in
+         (e (), e ()))
+    ; prev_x_hat= (tick (), tick ()) }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module Max_branching_at_most = At_most.With_length (W)
@@ -162,8 +152,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
         Dlog_based.Proof_state.Me_only.t
       , ( unit
         , Tock.Curve.Affine.t Max_branching_at_most.t
-        , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , bool )
+        , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
           Bulletproof_challenge.t
           Step_bp_vec.t
           Max_branching_at_most.t )

@@ -101,17 +101,12 @@ module Domains = struct
            ~there:(fun (Domain.Pow_2_roots_of_unity n) -> n)
            ~back:(fun n -> Domain.Pow_2_roots_of_unity n)
     in
-    Typ.of_hlistable [dom; dom] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
+    Typ.of_hlistable [dom] ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_of_hlist:of_hlist
-
-  let iter {h; k} ~f = f h ; f k
-
-  let map {h; k} ~f = {h= f h; k= f k}
 end
 
 (* TODO: Probably better to have these match the step rounds. *)
-let max_domains =
-  {Domains.h= Domain.Pow_2_roots_of_unity 20; k= Domain.Pow_2_roots_of_unity 20}
+let max_domains = {Domains.h= Domain.Pow_2_roots_of_unity 20}
 
 let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
@@ -124,7 +119,7 @@ let max_domains_with_x =
          + input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
              (Nat.to_int Width.Max.n) ))
   in
-  {Ds.h= conv max_domains.h; k= conv max_domains.k; x}
+  {Ds.h= conv max_domains.h; x}
 
 module Vk = struct
   type t = Impls.Wrap.Verification_key.t sexp_opaque [@@deriving sexp]
@@ -155,20 +150,25 @@ include Make
                   .without_degree_bound_to_backend Array.of_list
               in
               let t =
-                let h = Import.Domain.size Common.wrap_domains.h in
-                let k = Import.Domain.size Common.wrap_domains.k in
-                Snarky_bn382.Tweedle.Dee.Field_verifier_index.make
-                  (u
-                     (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-                        (Width.to_int max_width)))
-                  (u h) (u h) (u k) (u Common.Max_degree.wrap)
-                  (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
-                  (g c.row.a) (g c.col.a) (g c.value.a) (g c.rc.a) (g c.row.b)
-                  (g c.col.b) (g c.value.b) (g c.rc.b) (g c.row.c) (g c.col.c)
-                  (g c.value.c) (g c.rc.c)
+                let d = Common.wrap_domains.h in
+                let max_quot_size = (5 * (Import.Domain.size d + 2)) - 5 in
+                let r, o = Common.tock_shifts d in
+                Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
+                  ~max_poly_size:(u (1 lsl Nat.to_int Backend.Tock.Rounds.n))
+                  ~max_quot_size:(u max_quot_size)
+                  ~urs:(Backend.Tock.Keypair.load_urs ())
+                  ~sigma_comm0:(g c.sigma_comm_0)
+                  ~sigma_comm1:(g c.sigma_comm_1)
+                  ~sigma_comm2:(g c.sigma_comm_2) ~ql_comm:(g c.ql_comm)
+                  ~qr_comm:(g c.qr_comm) ~qo_comm:(g c.qo_comm)
+                  ~qm_comm:(g c.qm_comm) ~qc_comm:(g c.qc_comm)
+                  ~rcm_comm0:(g c.rcm_comm_0) ~rcm_comm1:(g c.rcm_comm_1)
+                  ~rcm_comm2:(g c.rcm_comm_2) ~psm_comm:(g c.psm_comm)
+                  ~add_comm:(g c.add_comm) ~mul1_comm:(g c.mul1_comm)
+                  ~mul2_comm:(g c.mul2_comm) ~emul1_comm:(g c.emul1_comm)
+                  ~emul2_comm:(g c.emul2_comm) ~emul3_comm:(g c.emul3_comm) ~r
+                  ~o
               in
-              Caml.Gc.finalise
-                Snarky_bn382.Tweedle.Dee.Field_verifier_index.delete t ;
               t
           end)
 
@@ -177,8 +177,24 @@ let dummy : t =
   ; max_width= Width.zero
   ; wrap_index=
       (let g = [Backend.Tock.Curve.(to_affine_exn one)] in
-       let t : _ Abc.t = {a= g; b= g; c= g} in
-       {row= t; col= t; value= t; rc= t})
+       { sigma_comm_0= g
+       ; sigma_comm_1= g
+       ; sigma_comm_2= g
+       ; ql_comm= g
+       ; qr_comm= g
+       ; qo_comm= g
+       ; qm_comm= g
+       ; qc_comm= g
+       ; rcm_comm_0= g
+       ; rcm_comm_1= g
+       ; rcm_comm_2= g
+       ; psm_comm= g
+       ; add_comm= g
+       ; mul1_comm= g
+       ; mul2_comm= g
+       ; emul1_comm= g
+       ; emul2_comm= g
+       ; emul3_comm= g })
   ; wrap_vk= None }
 
 module Checked = struct
@@ -189,7 +205,7 @@ module Checked = struct
     { step_domains: (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
     ; step_widths: (Width.Checked.t, Max_branches.n) Vector.t
     ; max_width: Width.Checked.t
-    ; wrap_index: Inner_curve.t array Abc.t Matrix_evals.t
+    ; wrap_index: Inner_curve.t array Plonk_verification_key_evals.t
     ; num_branches: (Boolean.var, Max_branches.Log2.n) Vector.t }
   [@@deriving hlist, fields]
 
@@ -198,8 +214,8 @@ module Checked = struct
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
     fun {step_domains; step_widths; max_width; wrap_index; num_branches} ->
       ( List.reduce_exn ~f:append
-          [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h; k} ->
-                map_reduce [|h; k|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
+          [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
+                map_reduce [|h|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
                     bitstring (Field.unpack x ~length:max_log2_degree) ) )
           ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
             |> bitstrings
@@ -231,12 +247,11 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
     [ Vector.typ Domains.typ Max_branches.n
     ; Vector.typ Width.typ Max_branches.n
     ; Width.typ
-    ; Matrix_evals.typ
-        (Abc.typ
-           (Typ.array Inner_curve.typ
-              ~length:
-                (index_commitment_length ~max_degree:Max_degree.wrap
-                   Common.wrap_domains.k)))
+    ; Plonk_verification_key_evals.typ
+        (Typ.array Inner_curve.typ
+           ~length:
+             (index_commitment_length ~max_degree:Max_degree.wrap
+                Common.wrap_domains.h))
     ; Vector.typ Boolean.typ Max_branches.Log2.n ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
@@ -249,7 +264,7 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
           (At_most.map step_data ~f:snd)
           dummy_width Max_branches.n
       ; max_width
-      ; Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) wrap_index
+      ; Plonk_verification_key_evals.map ~f:Array.of_list wrap_index
       ; (let n = At_most.length step_data in
          Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1)) ]
       )
