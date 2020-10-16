@@ -928,6 +928,22 @@ module Base = struct
               ~receiver_account txn)
   end
 
+  (* Currently, a circuit must have at least 1 of every type of constraint. *)
+  let dummy_constraints () =
+    make_checked
+      Impl.(
+        fun () ->
+          let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+          let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
+          let _ =
+            Pickles.Step_main_inputs.Ops.scale_fast g
+              (`Plus_two_to_len [|b; b|])
+          in
+          let _ =
+            Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+          in
+          ())
+
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
     let%bind input = Transaction_union_payload.Checked.to_input payload in
@@ -2756,6 +2772,7 @@ module Base = struct
   *)
   let%snarkydef main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
+    let%bind () = dummy_constraints () in
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
