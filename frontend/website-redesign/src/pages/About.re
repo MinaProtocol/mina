@@ -17,7 +17,17 @@ let make = () => {
       }
     />
     <AboutpageRows />
-    <QuoteSection />
+    <QuoteSection
+      copy="\"What attracted me was a small, scalable blockchain that's still independently verifiable on small nodes.\""
+      author="Naval Ravikant"
+      authorTitle="AngelList Co-Founder, O(1) Labs Investor"
+      authorImg="/static/img/headshots/naval.jpg"
+      backgroundImg={
+        Theme.desktop: "/static/img/SectionQuoteDesktop.jpg",
+        Theme.tablet: "/static/img/SectionQuoteTablet.jpg",
+        Theme.mobile: "/static/img/SectionQuoteMobile.png",
+      }
+    />
     <SecuredBySection />
     <Contributors />
     <Investors />
