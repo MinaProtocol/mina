@@ -14,9 +14,8 @@ open Import
 
 (* given [chals], compute
    \prod_i (1 / chals.(i) + chals.(i) * x^{2^i}) *)
-let b_poly ~add ~mul ~inv chals =
+let b_poly ~one ~add ~mul chals =
   let ( + ) = add and ( * ) = mul in
-  let chal_invs = Array.map chals ~f:inv in
   stage (fun pt ->
       let k = Array.length chals in
       let pow_two_pows =
@@ -34,7 +33,7 @@ let b_poly ~add ~mul ~inv chals =
         done ;
         !r
       in
-      prod (fun i -> chal_invs.(i) + (chals.(i) * pow_two_pows.(k - 1 - i))) )
+      prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
 
 module Make
     (Inputs : Inputs
@@ -137,32 +136,10 @@ struct
           squeeze_scalar sponge )
     in
     let term_and_challenge (l, r) pre =
-      let pre_is_square =
-        exists Boolean.typ
-          ~compute:
-            As_prover.(
-              fun () ->
-                Other_field.Packed.Constant.(
-                  is_square
-                    (Scalar_challenge.Constant.to_field
-                       (read Scalar_challenge.typ pre))))
-      in
-      let left_term =
-        let base =
-          Inner_curve.if_ pre_is_square ~then_:l
-            ~else_:(Inner_curve.scale_by_quadratic_nonresidue l)
-        in
-        Scalar_challenge.endo base pre
-      in
-      let right_term =
-        let base =
-          Inner_curve.if_ pre_is_square ~then_:r
-            ~else_:(Inner_curve.scale_by_quadratic_nonresidue_inv r)
-        in
-        Scalar_challenge.endo_inv base pre
-      in
-      ( Inner_curve.(left_term + right_term)
-      , {Bulletproof_challenge.prechallenge= pre; is_square= pre_is_square} )
+      let left_term = Scalar_challenge.endo_inv l pre in
+      let right_term = Scalar_challenge.endo r pre in
+      ( Ops.add_fast left_term right_term
+      , {Bulletproof_challenge.prechallenge= pre} )
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -608,16 +585,10 @@ struct
          ~two_adicity:33 ~det_sqrt_witness:Backend.Tock.Field.det_sqrt_witness)
 
   let compute_challenges ~scalar chals =
-    (* TODO: Put this in the functor argument. *)
-    let nonresidue = Field.of_int 5 in
-    Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-        let pre = scalar prechallenge in
-        let sq =
-          Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
-        in
-        det_sqrt sq )
+    Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
+        scalar prechallenge )
 
-  let b_poly = Field.(b_poly ~add ~mul ~inv)
+  let b_poly = Field.(b_poly ~add ~mul ~one)
 
   let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
       =
