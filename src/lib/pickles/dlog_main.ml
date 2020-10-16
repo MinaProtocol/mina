@@ -722,14 +722,6 @@ struct
       (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
       without_degree_bound with_degree_bound
 
-  let det_sqrt =
-    unstage
-      (Common.det_sqrt
-         (module Impl)
-         ~det_sqrt:Backend.Tock.Field.det_sqrt
-         ~two_adic_root_of_unity:(Backend.Tock.Field.two_adic_root_of_unity ())
-         ~two_adicity:33 ~det_sqrt_witness:Backend.Tock.Field.det_sqrt_witness)
-
   let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->

@@ -446,14 +446,6 @@ struct
           {alpha; beta; gamma; zeta} ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
-  let det_sqrt =
-    unstage
-      (Common.det_sqrt
-         (module Impl)
-         ~det_sqrt:Backend.Tick.Field.det_sqrt
-         ~two_adic_root_of_unity:(Backend.Tick.Field.two_adic_root_of_unity ())
-         ~two_adicity:34 ~det_sqrt_witness:Backend.Tick.Field.det_sqrt_witness)
-
   let compute_challenges ~scalar chals =
     with_label __LOC__ (fun () ->
         (* TODO: Put this in the functor argument. *)
