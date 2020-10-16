@@ -238,7 +238,7 @@ let make = () => {
             <Button
               bgColor=Theme.Colors.orange dark=true href={`Internal("/docs")}>
               {React.string("Get Started")}
-              <Icon kind=Icon.ArrowRightMedium />
+              <Icon kind=Icon.ArrowRightSmall />
             </Button>
           </span>
         </span>
