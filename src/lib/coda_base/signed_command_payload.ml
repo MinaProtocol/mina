@@ -145,10 +145,30 @@ module Common = struct
 end
 
 module Body = struct
+  module Binable_arg = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Payment of Payment_payload.Stable.V1.t
+          | Stake_delegation of Stake_delegation.Stable.V1.t
+          | Create_new_token of New_token_payload.Stable.V1.t
+          | Create_token_account of New_account_payload.Stable.V1.t
+          | Mint_tokens of Minting_payload.Stable.V1.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  [%%if
+  feature_tokens]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
+      type t = Binable_arg.Stable.V1.t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
         | Create_new_token of New_token_payload.Stable.V1.t
@@ -159,6 +179,42 @@ module Body = struct
       let to_latest = Fn.id
     end
   end]
+
+  [%%else]
+
+  let check (t : Binable_arg.t) =
+    match t with
+    | Payment _ | Stake_delegation _ ->
+        t
+    | Create_new_token _ | Create_token_account _ | Mint_tokens _ ->
+        failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
+
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Binable_arg.Stable.V1.t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Create_new_token of New_token_payload.Stable.V1.t
+        | Create_token_account of New_account_payload.Stable.V1.t
+        | Mint_tokens of Minting_payload.Stable.V1.t
+      [@@deriving compare, eq, sexp, hash, yojson]
+
+      include Binable.Of_binable
+                (Binable_arg.Stable.V1)
+                (struct
+                  type nonrec t = t
+
+                  let of_binable = check
+
+                  let to_binable = check
+                end)
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  [%%endif]
 
   module Tag = Transaction_union_tag
 
