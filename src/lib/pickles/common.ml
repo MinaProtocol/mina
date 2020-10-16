@@ -11,9 +11,16 @@ module Max_degree = struct
   let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
 end
 
+let tick_shifts : Domain.t -> Backend.Tick.Field.t Tuple_lib.Double.t =
+  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
+      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
+
+let tock_shifts : Domain.t -> Backend.Tock.Field.t Tuple_lib.Double.t =
+  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
+      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
+
 let wrap_domains =
-  { Domains.h= Pow_2_roots_of_unity 18
-  ; k= Pow_2_roots_of_unity 19
+  { Domains.h= Pow_2_roots_of_unity 17
   ; x=
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
@@ -28,8 +35,8 @@ let hash_pairing_me_only ~app_state
        ~comm:
          (fun (x :
                 Tock.Curve.Affine.t
-                Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
-         List.concat_map (Array.to_list x) ~f:g )
+                Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
+         Array.concat_map x ~f:(Fn.compose Array.of_list g) )
        ~app_state)
 
 let hash_dlog_me_only (type n) (max_branching : n Nat.t)
@@ -43,10 +50,8 @@ let hash_dlog_me_only (type n) (max_branching : n Nat.t)
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
-      total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~h_minus_1
-    ~k_minus_1 =
-  Pcs_batch.create ~without_degree_bound
-    ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1]
+      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
 
 module Pairing_pcs_batch = struct
   let beta_1 : (int, _, _) Pcs_batch.t =
@@ -100,6 +105,14 @@ let group_map m ~a ~b =
   let params = Group_map.Params.create m {a; b} in
   stage (fun x -> Group_map.to_group m ~params x)
 
+module Shifts = struct
+  let tock : Tock.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tock.Field)
+
+  let tick : Tick.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tick.Field)
+end
+
 module Ipa = struct
   open Backend
 
@@ -129,10 +142,10 @@ module Ipa = struct
         Snarky_bn382.Tweedle.Dee.Field_urs.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
           (Backend.Tock.Field.Vector.of_array
-             (Vector.to_array (compute_challenges chals)))
+             (Pickles_types.Vector.to_array (compute_challenges chals)))
       in
       Backend.Tock.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tock.Curve.Affine.of_backend
+      |> Backend.Tock.Curve.Affine.of_backend |> Or_infinity.finite_exn
   end
 
   module Step = struct
@@ -151,18 +164,18 @@ module Ipa = struct
         Snarky_bn382.Tweedle.Dum.Field_urs.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
           (Backend.Tick.Field.Vector.of_array
-             (Vector.to_array (compute_challenges chals)))
+             (Pickles_types.Vector.to_array (compute_challenges chals)))
       in
       Backend.Tick.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tick.Curve.Affine.of_backend
+      |> Backend.Tick.Curve.Affine.of_backend |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
-      let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
+      let open Snarky_bn382.Tweedle.Dum.Plonk.Field_poly_comm in
       let chals =
         let open Backend.Tick.Field.Vector in
         let v = create () in
         List.iter comm_chals ~f:(fun (_, chals) ->
-            Vector.iter chals ~f:(emplace_back v) ) ;
+            Pickles_types.Vector.iter chals ~f:(emplace_back v) ) ;
         v
       in
       let comms =
@@ -170,10 +183,10 @@ module Ipa = struct
         let open Backend.Vector in
         let v = create () in
         List.iter comm_chals ~f:(fun (comm, _) ->
-            emplace_back v (to_backend comm) ) ;
+            emplace_back v (to_backend (Finite comm)) ) ;
         v
       in
-      Snarky_bn382.Tweedle.Dum.Field_urs.batch_accumulator_check
+      Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.batch_accumulator_check
         (Backend.Tick.Keypair.load_urs ())
         comms chals
   end
@@ -191,7 +204,7 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s =
   let open Zexe_backend in
-  Backend.Tock.Field.one :: tock_unpadded_public_input_of_statement s
+  tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
     (prev_statement : _ Types.Pairing_based.Statement.t) =
@@ -202,12 +215,15 @@ let tick_public_input_of_statement ~max_branching
     in
     Impls.Step.generate_public_input [input] prev_statement
   in
-  Backend.Tick.Field.one
-  :: List.init
-       (Backend.Tick.Field.Vector.length input)
-       ~f:(Backend.Tick.Field.Vector.get input)
+  List.init
+    (Backend.Tick.Field.Vector.length input)
+    ~f:(Backend.Tick.Field.Vector.get input)
 
 let index_commitment_length k ~max_degree =
-  Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+  let actual =
+    Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+  in
+  [%test_eq: int] actual 1 ;
+  1
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
