@@ -75,7 +75,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
-      marginTop(`rem(6.)),
       media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
     ]);
 };
