@@ -182,14 +182,14 @@ let make = () => {
         <div className=Styles.flexRow>
           <span className=Styles.imageColumn>
             <img src="/static/img/AboutBlockProducers.svg" />
-            <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
+            <h3 className=Theme.Type.h3> {React.string("100s")} </h3>
             <p className=Theme.Type.label>
               {React.string("Block Producers")}
             </p>
           </span>
           <span className=Styles.imageColumn>
             <img src="/static/img/AboutSnarkProducers.svg" />
-            <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
+            <h3 className=Theme.Type.h3> {React.string("100s")} </h3>
             <p className=Theme.Type.label>
               {React.string("Snark Workers")}
             </p>
