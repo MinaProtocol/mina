@@ -30,3 +30,4 @@
 
 [%%undef consensus_mechanism]
 [%%import "/src/config/fork.mlh"]
+[%%import "/src/config/features/mainnet.mlh"]
