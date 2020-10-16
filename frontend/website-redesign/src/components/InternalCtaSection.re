@@ -25,7 +25,7 @@ module Item = {
       style([
         width(`percent(100.)),
         height(`rem(16.125)),
-        unsafe("object-fit", "cover"),
+        unsafe("objectFit", "cover"),
         marginBottom(`rem(1.0625)),
         media(
           Theme.MediaQuery.notMobile,
