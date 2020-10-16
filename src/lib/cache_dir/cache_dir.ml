@@ -27,11 +27,8 @@ let cache =
   ; dir brew_install_path false
   ; dir s3_install_path false
   ; dir autogen_path true
-    (*
   ; Key_cache.Spec.S3
-      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} 
-*)
-   ]
+      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} ]
 
 let env_path =
   match Sys.getenv "CODA_KEYS_PATH" with
