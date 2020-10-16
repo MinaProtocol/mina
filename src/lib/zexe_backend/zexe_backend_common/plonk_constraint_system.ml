@@ -61,10 +61,6 @@ module Hash_state = struct
   let empty = H.feed_string H.empty "plonk_constraint_system"
 end
 
-let fail = ref false
-
-let next_row = ref 0
-
 module Plonk_constraint = struct
   open Core_kernel
 
@@ -440,7 +436,6 @@ struct
                ; coeffs= c }
              :: gates ) ;
         sys.next_row <- sys.next_row + 1 ;
-        next_row := sys.next_row ;
         sys.rows_rev <- row :: sys.rows_rev
 
   let add_generic_constraint ?l ?r ?o c sys : unit =
