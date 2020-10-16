@@ -1,5 +1,14 @@
 open Core_kernel
 
+let padded_array_typ ~length ~dummy elt =
+  let typ = Snarky_backendless.Typ.array ~length elt in
+  { typ with
+    store=
+      (fun a ->
+        let n = Array.length a in
+        if n > length then failwithf "Expected %d <= %d" n length () ;
+        typ.store (Array.append a (Array.create ~len:(length - n) dummy)) ) }
+
 module Pc_array = struct
   [%%versioned
   module Stable = struct
@@ -44,10 +53,11 @@ module Evals = struct
     ; sigma1= f t1.sigma1 t2.sigma1
     ; sigma2= f t1.sigma2 t2.sigma2 }
 
-  let to_vector {l; r; o; z; t; f; sigma1; sigma2} =
-    Vector.[l; r; o; z; t; f; sigma1; sigma2]
+  let to_vectors {l; r; o; z; t; f; sigma1; sigma2} =
+    (Vector.[l; r; o; z; f; sigma1; sigma2], Vector.[t])
 
-  let of_vector ([l; r; o; z; t; f; sigma1; sigma2] : ('a, _) Vector.t) : 'a t
+  let of_vectors
+      (([l; r; o; z; f; sigma1; sigma2] : ('a, _) Vector.t), Vector.[t]) : 'a t
       =
     {l; r; o; z; t; f; sigma1; sigma2}
 
@@ -64,9 +74,12 @@ module Evals = struct
                      (Array.create ~len:(length - Array.length arr) default))
                 ) } )
     in
-    let t = lengths |> to_vector |> v |> Vector.typ' in
-    Snarky_backendless.Typ.transport t ~there:to_vector ~back:of_vector
-    |> Snarky_backendless.Typ.transport_var ~there:to_vector ~back:of_vector
+    let t =
+      let l1, l2 = to_vectors lengths in
+      Snarky_backendless.Typ.tuple2 (Vector.typ' (v l1)) (Vector.typ' (v l2))
+    in
+    Snarky_backendless.Typ.transport t ~there:to_vectors ~back:of_vectors
+    |> Snarky_backendless.Typ.transport_var ~there:to_vectors ~back:of_vectors
 end
 
 module Openings = struct
@@ -118,13 +131,51 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
+        type 'g_opt t =
+          {unshifted: 'g_opt Pc_array.Stable.V1.t; shifted: 'g_opt}
         [@@deriving sexp, compare, yojson, hlist, hash, eq]
       end
     end]
 
-    let typ ?(array = Snarky_backendless.Typ.array) g ~length =
-      Snarky_backendless.Typ.of_hlistable [array ~length g; g]
+    let map {unshifted; shifted} ~f =
+      {unshifted= Array.map ~f unshifted; shifted= f shifted}
+
+    let padded_array_typ elt ~length ~dummy ~bool =
+      let open Snarky_backendless.Typ in
+      let typ = array ~length (tuple2 bool elt) in
+      { typ with
+        store=
+          (fun a ->
+            let a = Array.map a ~f:(fun x -> (true, x)) in
+            let n = Array.length a in
+            if n > length then failwithf "Expected %d <= %d" n length () ;
+            typ.store
+              (Array.append a (Array.create ~len:(length - n) (false, dummy)))
+            )
+      ; read=
+          (fun a ->
+            let open Snarky_backendless.Typ_monads.Read.Let_syntax in
+            let%map a = typ.read a in
+            Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
+      }
+
+    let typ (type f g g_var bool_var)
+        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
+        ~dummy_group_element
+        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
+        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
+      let open Snarky_backendless.Typ in
+      let g_inf =
+        transport (tuple2 bool g)
+          ~there:(function
+            | Or_infinity.Infinity ->
+                (false, dummy_group_element)
+            | Finite x ->
+                (true, x) )
+          ~back:(fun (b, x) -> if b then Infinity else Finite x)
+      in
+      of_hlistable
+        [array ~length g_inf; g_inf]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -148,32 +199,29 @@ module Messages = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'g t =
+      type ('g, 'g_opt) t =
         { l_comm: 'g Without_degree_bound.Stable.V1.t
         ; r_comm: 'g Without_degree_bound.Stable.V1.t
         ; o_comm: 'g Without_degree_bound.Stable.V1.t
         ; z_comm: 'g Without_degree_bound.Stable.V1.t
-        ; t_comm: 'g Without_degree_bound.Stable.V1.t }
+        ; t_comm: 'g_opt With_degree_bound.Stable.V1.t }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
 
-  let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t) =
+  let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t)
+      ~bool =
     let open Snarky_backendless.Typ in
     let {Evals.l; r; o; z; t; _} = commitment_lengths in
-    let array ~length elt =
-      let typ = Snarky_backendless.Typ.array ~length elt in
-      { typ with
-        store=
-          (fun a ->
-            let n = Array.length a in
-            if n > length then failwithf "Expected %d <= %d" n length () ;
-            typ.store (Array.append a (Array.create ~len:(length - n) dummy))
-            ) }
-    in
+    let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
+    let w n =
+      With_degree_bound.typ g
+        ~length:(Vector.reduce_exn n ~f:Int.max)
+        ~dummy_group_element:dummy ~bool
+    in
     of_hlistable
-      [wo l; wo r; wo o; wo z; wo t]
+      [wo l; wo r; wo o; wo z; w t]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -182,8 +230,8 @@ module Proof = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('g, 'fq, 'fqv) t =
-        { messages: 'g Messages.Stable.V1.t
+      type ('g, 'g_opt, 'fq, 'fqv) t =
+        { messages: ('g, 'g_opt) Messages.Stable.V1.t
         ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
       [@@deriving sexp, compare, yojson, hash, eq]
     end

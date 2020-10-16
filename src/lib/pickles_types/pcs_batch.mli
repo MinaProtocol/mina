@@ -42,7 +42,7 @@ val combine_evaluations' :
   -> ('f, 'm) Vector.t
   -> 'f
 
-open Dlog_marlin_types.Poly_comm
+open Dlog_plonk_types.Poly_comm
 
 val combine_split_commitments :
      (_, 'n, 'm) t

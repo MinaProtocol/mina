@@ -219,13 +219,7 @@ end
 
 module Poly_comm = struct
   module With_degree_bound = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'g t = {unshifted: 'g Pc_array.Stable.V1.t; shifted: 'g}
-        [@@deriving sexp, compare, yojson, hlist, hash, eq]
-      end
-    end]
+    include Dlog_plonk_types.Poly_comm.With_degree_bound
 
     let typ ?(array = Snarky_backendless.Typ.array) g ~length =
       Snarky_backendless.Typ.of_hlistable [array ~length g; g]
