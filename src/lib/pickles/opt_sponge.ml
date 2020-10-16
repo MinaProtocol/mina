@@ -23,10 +23,12 @@ type 'f t =
   ; mutable sponge_state: 'f sponge_state }
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit) =
+    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) =
 struct
+  (*
   module Inputs = Sponge_inputs.Make (Impl)
-  module P = Sponge.Poseidon (Inputs)
+  module P = Sponge.Poseidon (Inputs) *)
   open P
   open Impl
 

@@ -4,14 +4,15 @@ open Pickles_types
 
 type m = Abc.Label.t = A | B | C
 
-let rec absorb : type a g1 f scalar.
+let rec absorb : type a g1 g1_opt f scalar.
        absorb_field:(f -> unit)
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
-    -> (a, < scalar: scalar ; g1: g1 >) Type.t
+    -> mask_g1_opt:(g1_opt -> g1)
+    -> (a, < scalar: scalar ; g1: g1 ; g1_opt: g1_opt >) Type.t
     -> a
     -> unit =
- fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ty t ->
+ fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
   match ty with
   | PC ->
       List.iter ~f:absorb_field (g1_to_field_elements t)
@@ -23,11 +24,14 @@ let rec absorb : type a g1 f scalar.
         t
   | With_degree_bound ->
       Array.iter t.unshifted ~f:(fun t ->
-          absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements PC t ) ;
-      absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements PC t.shifted
+          absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements
+            ~mask_g1_opt PC (mask_g1_opt t) ) ;
+      absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt PC
+        (mask_g1_opt t.shifted)
   | ty1 :: ty2 ->
       let absorb t =
         absorb t ~absorb_field ~absorb_scalar ~g1_to_field_elements
+          ~mask_g1_opt
       in
       let t1, t2 = t in
       absorb ty1 t1 ; absorb ty2 t2
@@ -63,3 +67,21 @@ let split_last xs =
         failwith "Empty list"
   in
   go [] xs
+
+let boolean_constrain (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    (xs : Impl.Boolean.var list) : unit =
+  let open Impl in
+  assert_all (List.map xs ~f:(fun x -> Constraint.boolean (x :> Field.t)))
+
+(* Should seal constants too *)
+let seal (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    (x : Impl.Field.t) : Impl.Field.t =
+  let open Impl in
+  match Field.to_constant_and_terms x with
+  | None, [(x, i)] when Field.Constant.(equal x one) ->
+      Snarky_backendless.Cvar.Var (Impl.Var.index i)
+  | _ ->
+      let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
+      Field.Assert.equal x y ; y
