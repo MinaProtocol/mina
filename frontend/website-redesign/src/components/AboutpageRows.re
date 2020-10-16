@@ -120,7 +120,14 @@ module Styles = {
       border(`px(1), `solid, black),
     ]);
   let orange =
-    merge([copy, style([display(`inlineBlock), color(orange)])]);
+    merge([
+      copy,
+      style([
+        display(`inlineBlock),
+        textDecoration(`none),
+        color(Theme.Colors.orange),
+      ]),
+    ]);
 };
 
 [@react.component]
@@ -186,9 +193,11 @@ let make = () => {
                to introduce Mina to the wider world. Here, developers
                can build ",
            )}
-          <span className=Styles.orange>
-            {React.string("powerful applications ")}
-          </span>
+          <Next.Link href="/docs">
+            <span className=Styles.orange>
+              {React.string("powerful applications ")}
+            </span>
+          </Next.Link>
           {React.string(
              " like Snapps (SNARK-powered apps)
                to offer financial services without compromising data privacy
