@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core digestif snark_params)
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
  (synopsis "SNARK keys"))

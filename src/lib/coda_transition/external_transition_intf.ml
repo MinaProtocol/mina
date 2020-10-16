@@ -41,6 +41,8 @@ module type External_transition_common_intf = sig
 
   val payments : t -> Signed_command.t With_status.t list
 
+  val global_slot : t -> Unsigned.uint32
+
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
   val current_protocol_version : t -> Protocol_version.t
@@ -51,7 +53,8 @@ module type External_transition_common_intf = sig
 
   val don't_broadcast : t -> unit
 
-  val poke_validation_callback : t -> (bool -> unit) -> unit
+  val poke_validation_callback :
+    t -> (Coda_net2.validation_result -> unit) -> unit
 end
 
 module type External_transition_base_intf = sig
@@ -283,7 +286,7 @@ module type S = sig
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-    -> validation_callback:(bool -> unit)
+    -> validation_callback:(Coda_net2.validation_result -> unit)
     -> ?proposed_protocol_version_opt:Protocol_version.t
     -> unit
     -> t
@@ -296,7 +299,7 @@ module type S = sig
       -> protocol_state_proof:Proof.t
       -> staged_ledger_diff:Staged_ledger_diff.t
       -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-      -> validation_callback:(bool -> unit)
+      -> validation_callback:(Coda_net2.validation_result -> unit)
       -> ?proposed_protocol_version_opt:Protocol_version.t
       -> unit
       -> t
@@ -426,7 +429,7 @@ module type S = sig
        , [> `Invalid_genesis_protocol_state] )
        Result.t
 
-  val validate_proof :
+  val validate_proofs :
        ( 'time_received
        , 'genesis_state
        , [`Proof] * unit Truth.false_t
@@ -435,6 +438,7 @@ module type S = sig
        , 'staged_ledger_diff
        , 'protocol_versions )
        Validation.with_transition
+       list
     -> verifier:Verifier.t
     -> ( ( 'time_received
          , 'genesis_state
@@ -444,6 +448,7 @@ module type S = sig
          , 'staged_ledger_diff
          , 'protocol_versions )
          Validation.with_transition
+         list
        , [> `Invalid_proof | `Verifier_error of Error.t] )
        Deferred.Result.t
 
@@ -523,7 +528,7 @@ module type S = sig
            , 'staged_ledger_diff
            , 'protocol_versions )
            Validation.with_transition
-         , [ `Already_in_frontier
+         , [> `Already_in_frontier
            | `Parent_missing_from_frontier
            | `Not_selected_over_frontier_root ] )
          Result.t

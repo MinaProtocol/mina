@@ -5,7 +5,11 @@ module Styles = {
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(8.), ~h=`rem(9.5)), maxWidth(`rem(89.))],
+        [
+          padding2(~v=`rem(8.), ~h=`rem(9.5)),
+          maxWidth(`rem(89.)),
+          margin2(~v=`zero, ~h=`auto),
+        ],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -82,10 +86,6 @@ module GenesisMembersGrid = {
              "Meet the node operators, developers, and community builders making Mina happen.",
            )}
         </p>
-        <Button bgColor=Theme.Colors.orange width={`rem(13.5)}>
-          {React.string("See More Members ")}
-          <Icon kind=Icon.ArrowRightSmall size=1. />
-        </Button>
       </div>
       <TeamMember
         fullName="Greg | DeFidog"

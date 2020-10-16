@@ -6,7 +6,7 @@
  (libraries core genesis_constants snarky.backendless snarky_curves test_util)
  (preprocess
   (pps
-   bisect_ppx -conditional
+   bisect_ppx --conditional
    h_list.ppx
    ppx_bench
    ppx_deriving.eq

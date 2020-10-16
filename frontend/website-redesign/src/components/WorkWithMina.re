@@ -141,11 +141,12 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerCopy>
       <h2 className=Styles.header> {React.string("Work with Mina")} </h2>
-      <Button bgColor=Theme.Colors.black width={`rem(14.6)} paddingX=1.3>
-        {React.string("See All Opportunities")}
-        <Icon kind=Icon.ArrowRightMedium />
-      </Button>
     </div>
+    /* TODO: Re-enable when we have an href for this
+       <Button bgColor=Theme.Colors.black width={`rem(14.6)} paddingX=1.3>
+         {React.string("See All Opportunities")}
+         <Icon kind=Icon.ArrowRightMedium />
+       </Button> */
     <div className=Styles.content> <FeaturedContent /> <ContentColumn /> </div>
   </div>;
 };

@@ -4,7 +4,8 @@ module Styles = {
     style([
       width(`percent(100.)),
       height(`percent(100.)),
-      margin2(~v=`rem(3.), ~h=`zero),
+      marginBottom(`rem(3.)),
+      media(Theme.MediaQuery.tablet, [margin2(~v=`rem(3.), ~h=`zero)]),
     ]);
 
   let flex =
@@ -24,12 +25,12 @@ module Styles = {
       justifyContent(`spaceBetween),
       width(`percent(100.)),
       height(`percent(100.)),
-      marginTop(`rem(3.)),
+      marginTop(`rem(5.)),
       media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`flexEnd)],
+        Theme.MediaQuery.tablet,
+        [flexDirection(`row), alignItems(`flexEnd), maxWidth(`rem(30.))],
       ),
-      media(Theme.MediaQuery.tablet, [maxWidth(`rem(30.))]),
+      media(Theme.MediaQuery.desktop, [maxWidth(`rem(40.))]),
     ]);
 
   let contentContainer =
@@ -40,10 +41,14 @@ module Styles = {
       flexDirection(`column),
       height(`percent(100.)),
       width(`percent(100.)),
-      media(Theme.MediaQuery.notMobile, [height(`rem(14.))]),
       media(
         Theme.MediaQuery.tablet,
-        [flexDirection(`row), marginTop(`zero), height(`rem(20.))],
+        [
+          flexDirection(`row),
+          marginTop(`zero),
+          width(`percent(50.)),
+          height(`rem(20.)),
+        ],
       ),
     ]);
 
@@ -51,15 +56,15 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`row),
-      justifyContent(`spaceBetween),
       width(`percent(100.)),
       height(`percent(100.)),
       maxWidth(`rem(35.)),
       borderLeft(`px(1), `solid, Theme.Colors.digitalBlack),
-      paddingLeft(`rem(0.5)),
+      paddingLeft(`rem(1.5)),
       media(Theme.MediaQuery.notMobile, [flexDirection(`column)]),
     ]);
 
+  let h3 = merge([Theme.Type.h3, style([width(`rem(9.75))])]);
   let textContainer =
     style([
       display(`flex),
@@ -67,6 +72,7 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`flexStart),
       marginLeft(`rem(1.)),
+      marginTop(`rem(1.5)),
       media(
         Theme.MediaQuery.notMobile,
         [marginLeft(`zero), marginTop(`rem(1.))],
@@ -82,7 +88,7 @@ module Styles = {
     ]);
 
   let formatText =
-    style([Theme.Typeface.monumentGrotesk, fontSize(`rem(3.))]);
+    style([Theme.Typeface.monumentGrotesk, fontSize(`rem(2.))]);
 
   let comparisonImage =
     style([
@@ -90,32 +96,27 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`center),
       alignItems(`center),
-      marginTop(`rem(1.5)),
-      width(`percent(100.)),
-      height(`rem(20.)),
+      width(`rem(30.)),
+      height(`rem(30.)),
       marginLeft(`zero),
+      overflow(`hidden),
       media(
         Theme.MediaQuery.notMobile,
-        [marginLeft(`rem(1.)), width(`rem(21.)), height(`rem(14.))],
+        [width(`percent(50.)), maxWidth(`rem(26.)), height(`rem(14.))],
       ),
-      media(
-        Theme.MediaQuery.tablet,
-        [justifyContent(`flexEnd), height(`rem(20.))],
-      ),
+      media(Theme.MediaQuery.tablet, [height(`rem(20.))]),
     ]);
 
-  let minaBlockChainImage = style([width(`rem(5.)), height(`rem(5.))]);
+  let minaBlockChainImage = style([height(`percent(90.))]);
 
   let comparisonLabel =
-    merge([Theme.Type.label, style([fontSize(`rem(1.25))])]);
+    merge([
+      Theme.Type.label,
+      style([fontSize(`rem(1.25)), marginTop(`rem(1.))]),
+    ]);
 
   let otherBlockChainImage =
-    style([
-      width(`percent(100.)),
-      height(`percent(100.)),
-      marginLeft(`zero),
-      media(Theme.MediaQuery.tablet, [marginLeft(`rem(3.))]),
-    ]);
+    style([height(`percent(100.)), marginLeft(`zero)]);
 };
 
 [@react.component]
@@ -126,10 +127,8 @@ let make = () => {
         <div className=Styles.comparisonContainer>
           <div className=Styles.contentContainer>
             <div className=Styles.content>
-              <h3 className=Theme.Type.h3>
-                {React.string("Mina Blockchain")}
-              </h3>
-              <span className=Styles.textContainer>
+              <h3 className=Styles.h3> {React.string("Mina Blockchain")} </h3>
+              <div className=Styles.textContainer>
                 <span>
                   <span className=Styles.sizeText>
                     {React.string("22")}
@@ -141,12 +140,12 @@ let make = () => {
                 <span className=Styles.comparisonLabel>
                   {React.string("Fixed Size")}
                 </span>
-              </span>
+              </div>
             </div>
           </div>
           <div className=Styles.comparisonImage>
             <img
-              src="/static/img/MinaBlockchain.png"
+              src="/static/img/mina-cubes.gif"
               className=Styles.minaBlockChainImage
               alt="Mina Blockchain Size"
             />
@@ -155,7 +154,7 @@ let make = () => {
         <div className=Styles.comparisonContainer>
           <div className=Styles.contentContainer>
             <div className=Styles.content>
-              <h3 className=Theme.Type.h3>
+              <h3 className=Styles.h3>
                 {React.string("Other Blockchains")}
               </h3>
               <span className=Styles.textContainer>
@@ -175,7 +174,7 @@ let make = () => {
           </div>
           <div className=Styles.comparisonImage>
             <img
-              src="/static/img/OtherBlockchains.png"
+              src="/static/img/mina-heavy.gif"
               className=Styles.otherBlockChainImage
               alt="Other Blockchain Size"
             />

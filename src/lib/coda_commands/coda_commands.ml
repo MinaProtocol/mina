@@ -85,7 +85,7 @@ let get_balance t (addr : Account_id.t) =
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.lookup trust_system ip_address
+  Trust_system.lookup_ip trust_system ip_address
 
 let get_trust_status_all t =
   let config = Coda_lib.config t in
@@ -95,7 +95,7 @@ let get_trust_status_all t =
 let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Coda_lib.config t in
   let trust_system = config.trust_system in
-  Trust_system.reset trust_system ip_address
+  Trust_system.reset_ip trust_system ip_address
 
 let replace_block_production_keys keys pks =
   let kps =
@@ -134,8 +134,22 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
         ( txn
         , record_payment t (Signed_command txn) (Option.value_exn account_opt)
         )
-  | Ok _ ->
-      Error (Error.of_string "Invalid result from scheduling a payment")
+  | Ok (valid_commands, invalid_commands) ->
+      [%log' info (Coda_lib.top_level_logger t)]
+        ~metadata:
+          [ ( "valid_commands"
+            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+          ; ( "invalid_commands"
+            , `List
+                (List.map
+                   ~f:
+                     (Fn.compose
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .Diff_error
+                        .to_yojson snd)
+                   invalid_commands) ) ]
+        "Invalid result from scheduling a payment" ;
+      Error (Error.of_string "Internal error while scheduling a payment")
   | Error e ->
       Error e
 

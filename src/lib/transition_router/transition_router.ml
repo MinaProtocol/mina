@@ -6,6 +6,13 @@ open Coda_transition
 open O1trace
 open Network_peer
 
+type Structured_log_events.t += Starting_transition_frontier_controller
+  [@@deriving
+    register_event {msg= "Starting transition frontier controller phase"}]
+
+type Structured_log_events.t += Starting_bootstrap_controller
+  [@@deriving register_event {msg= "Starting bootstrap controller phase"}]
+
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
@@ -32,7 +39,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w
     ~precomputed_values frontier =
-  [%log info] "Starting Transition Frontier Controller phase" ;
+  [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -59,6 +66,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~consensus_local_state ~frontier_w ~initial_root_transition
     ~persistent_root ~persistent_frontier ~best_seen_transition
     ~precomputed_values =
+  [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     create_bufferred_pipe ~name:"bootstrap controller pipe" ()
@@ -111,7 +119,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(
-                    record trust_system logger peer.host
+                    record trust_system logger peer
                       Actions.
                         ( Violated_protocol
                         , Some ("Peer sent us bad proof for their best tip", [])
@@ -120,8 +128,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 acc
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 let enveloped_candidate_best_tip =
-                  Envelope.Incoming.wrap ~data:candidate_best_tip
-                    ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
+                  Envelope.Incoming.wrap_peer ~data:candidate_best_tip
+                    ~sender:peer
                 in
                 return
                 @@ Option.merge acc
@@ -231,6 +239,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
          ~consensus_local_state ~precomputed_values)
   with
   | best_tip, None ->
+      [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
           with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
@@ -243,6 +252,9 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         ~persistent_root ~persistent_frontier ~initial_root_transition
         ~best_seen_transition:best_tip ~precomputed_values
   | None, Some frontier ->
+      [%log info]
+        "Successfully loaded frontier, but failed to download best tip from \
+         network; starting participation" ;
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
            ~network ~time_controller ~producer_transition_reader
@@ -250,11 +262,15 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
            ~transition_reader_ref ~transition_writer_ref ~frontier_w
            ~precomputed_values frontier
   | Some best_tip, Some frontier ->
+      [%log info]
+        "Successfully loaded frontier and downloaded best tip from network" ;
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
           ~precomputed_values
-      then
+      then (
+        [%log info]
+          "Network best tip is too new to catchup to; starting bootstrap" ;
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
@@ -264,8 +280,11 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
-          ~best_seen_transition:(Some best_tip) ~precomputed_values
-      else
+          ~best_seen_transition:(Some best_tip) ~precomputed_values )
+      else (
+        [%log info]
+          "Network best tip is recent enough to catchup to; syncing local \
+           state and starting participation" ;
         let root = Transition_frontier.root frontier in
         let%map () =
           match
@@ -276,8 +295,10 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
               ~local_state:consensus_local_state
           with
           | None ->
+              [%log info] "Local state already in sync" ;
               Deferred.unit
           | Some sync_jobs -> (
+              [%log info] "Local state is out of sync; " ;
               match%map
                 Consensus.Hooks.sync_local_state
                   ~local_state:consensus_local_state ~logger ~trust_system
@@ -299,7 +320,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w ~precomputed_values frontier
+          ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -413,38 +434,40 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           don't_wait_for
           @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
                ~f:(fun enveloped_transition ->
-                 Strict_pipe.Writer.write !transition_writer_ref
-                   enveloped_transition ;
                  don't_wait_for
-                 @@
-                 let incoming_transition =
-                   Envelope.Incoming.data enveloped_transition
-                 in
-                 match Broadcast_pipe.Reader.peek frontier_r with
-                 | Some frontier ->
-                     if
-                       is_transition_for_bootstrap ~logger frontier
-                         incoming_transition ~precomputed_values
-                     then (
-                       Strict_pipe.Writer.kill !transition_writer_ref ;
-                       let initial_root_transition =
-                         Transition_frontier.(
-                           Breadcrumb.validated_transition (root frontier))
-                       in
-                       let%bind () =
-                         Strict_pipe.Writer.write clear_writer `Clear
-                       in
-                       let%map () = Transition_frontier.close frontier in
-                       start_bootstrap_controller ~logger ~trust_system
-                         ~verifier ~network ~time_controller
-                         ~producer_transition_reader
-                         ~verified_transition_writer ~clear_reader
-                         ~transition_reader_ref ~transition_writer_ref
-                         ~consensus_local_state ~frontier_w ~persistent_root
-                         ~persistent_frontier ~initial_root_transition
-                         ~best_seen_transition:(Some enveloped_transition)
-                         ~precomputed_values )
-                     else Deferred.unit
-                 | None ->
-                     Deferred.unit ) ) ) ;
+                 @@ let%map () =
+                      let incoming_transition =
+                        Envelope.Incoming.data enveloped_transition
+                      in
+                      match Broadcast_pipe.Reader.peek frontier_r with
+                      | Some frontier ->
+                          if
+                            is_transition_for_bootstrap ~logger frontier
+                              incoming_transition ~precomputed_values
+                          then (
+                            Strict_pipe.Writer.kill !transition_writer_ref ;
+                            let initial_root_transition =
+                              Transition_frontier.(
+                                Breadcrumb.validated_transition (root frontier))
+                            in
+                            let%bind () =
+                              Strict_pipe.Writer.write clear_writer `Clear
+                            in
+                            let%map () = Transition_frontier.close frontier in
+                            start_bootstrap_controller ~logger ~trust_system
+                              ~verifier ~network ~time_controller
+                              ~producer_transition_reader
+                              ~verified_transition_writer ~clear_reader
+                              ~transition_reader_ref ~transition_writer_ref
+                              ~consensus_local_state ~frontier_w
+                              ~persistent_root ~persistent_frontier
+                              ~initial_root_transition
+                              ~best_seen_transition:(Some enveloped_transition)
+                              ~precomputed_values )
+                          else Deferred.unit
+                      | None ->
+                          Deferred.unit
+                    in
+                    Strict_pipe.Writer.write !transition_writer_ref
+                      enveloped_transition ) ) ) ;
   (verified_transition_reader, initialization_finish_signal)

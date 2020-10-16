@@ -19,8 +19,6 @@ module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states
 
 [%%endif]
 
-module Frozen_ledger_hash = Frozen_ledger_hash0
-module Ledger_hash = Ledger_hash0
 open Snapp_basic
 
 module Poly = struct
@@ -56,7 +54,7 @@ open Pickles_types
 
 let digest_vk (t : Side_loaded_verification_key.t) =
   Random_oracle.(
-    hash ~init:Hash_prefix.side_loaded_vk
+    hash ~init:Hash_prefix_states.side_loaded_vk
       (pack_input (Side_loaded_verification_key.to_input t)))
 
 [%%ifdef
@@ -83,7 +81,7 @@ module Checked = struct
 
   let digest_vk t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix.side_loaded_vk
+      hash ~init:Hash_prefix_states.side_loaded_vk
         (pack_input (Pickles.Side_loaded.Verification_key.Checked.to_input t)))
 
   let digest t =

@@ -328,7 +328,7 @@ let step_main
                         pi
                     in
                     ( chals :: chalss
-                    , Boolean.((verified && finalized) || not should_verify)
+                    , Boolean.(verified &&& finalized ||| not should_verify)
                       :: vs )
               in
               let chalss, vs =

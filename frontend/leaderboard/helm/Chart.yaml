@@ -1,0 +1,15 @@
+apiVersion: v2
+name: leaderboard
+description: A Helm chart for Coda Protocol's Testnet leaderboard service
+type: application
+version: 0.1.8
+appVersion: 1.16.0
+icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+keywords:
+- coda protocol
+- testnet
+- leaderboard
+- points
+home: https://codaprotocol.com/
+sources:
+- https://github.com/CodaProtocol/coda/tree/develop/frontend/leaderboard

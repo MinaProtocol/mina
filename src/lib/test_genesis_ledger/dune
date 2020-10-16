@@ -3,4 +3,4 @@
   (name test_genesis_ledger)
   (libraries genesis_ledger)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_optcomp ppx_let)))
+  (preprocess (pps ppx_version ppx_optcomp ppx_let bisect_ppx -- --conditional)))

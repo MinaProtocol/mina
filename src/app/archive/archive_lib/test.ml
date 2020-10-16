@@ -32,7 +32,7 @@ let%test_module "Archive node unit tests" =
 
     let user_command_gen =
       User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~max_fee:10 ()
+        ~fee_range:10 ()
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10

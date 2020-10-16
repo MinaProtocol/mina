@@ -3,25 +3,6 @@ open Pipe_lib
 open Network_peer
 open Core_kernel
 
-module Snark_tables : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Transaction_snark_work.Statement.Stable.V1.Table.t
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Core.Time.Stable.With_utc_sexp.V2.t )
-            Transaction_snark_work.Statement.Stable.V1.Table.t }
-      [@@deriving sexp]
-    end
-  end]
-end
-
 module type S = sig
   type transition_frontier
 
@@ -29,7 +10,6 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
-       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -39,7 +19,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Core.Time.t -> [`Expired | `Ok])
+      -> has_timed_out:(Core.Time.t -> [`Timed_out | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -47,7 +27,7 @@ module type S = sig
     Intf.Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
-     and type resource_pool_diff_verified := Resource_pool.Diff.t
+     and type resource_pool_diff_verified := Resource_pool.Diff.verified
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
@@ -63,9 +43,10 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> disk_location:string
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * (bool -> unit) )
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)

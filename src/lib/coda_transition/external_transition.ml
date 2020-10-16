@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = bool -> unit
+  type t = Coda_net2.validation_result -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 
@@ -107,6 +107,9 @@ module Stable = struct
         | _ ->
             None )
 
+    let global_slot t =
+      consensus_state t |> Consensus.Data.Consensus_state.curr_global_slot
+
     let equal =
       Comparable.lift Consensus.Data.Consensus_state.Value.equal
         ~f:consensus_state
@@ -118,9 +121,9 @@ type t_ = t
 
 type external_transition = t
 
-let broadcast {validation_callback; _} = validation_callback true
+let broadcast {validation_callback; _} = validation_callback `Accept
 
-let don't_broadcast {validation_callback; _} = validation_callback false
+let don't_broadcast {validation_callback; _} = validation_callback `Reject
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
@@ -142,6 +145,7 @@ Stable.Latest.
   , transactions
   , commands
   , payments
+  , global_slot
   , to_yojson )]
 
 let equal = Stable.Latest.equal
@@ -627,15 +631,22 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 
-let validate_proof (t, validation) ~verifier =
+let validate_proofs tvs ~verifier =
   let open Blockchain_snark.Blockchain in
   let open Deferred.Let_syntax in
-  let {protocol_state= state; protocol_state_proof= proof; _} =
-    With_hash.data t
-  in
-  match%map Verifier.verify_blockchain_snark verifier {state; proof} with
+  match%map
+    Verifier.verify_blockchain_snarks verifier
+      (List.map tvs ~f:(fun (t, _validation) ->
+           let {protocol_state= state; protocol_state_proof= proof; _} =
+             With_hash.data t
+           in
+           {state; proof} ))
+  with
   | Ok verified ->
-      if verified then Ok (t, Validation.Unsafe.set_valid_proof validation)
+      if verified then
+        Ok
+          (List.map tvs ~f:(fun (t, validation) ->
+               (t, Validation.Unsafe.set_valid_proof validation) ))
       else Error `Invalid_proof
   | Error e ->
       Error (`Verifier_error e)
@@ -716,6 +727,8 @@ module With_validation = struct
     lift (transactions ~constraint_constants) t
 
   let payments t = lift payments t
+
+  let global_slot t = lift global_slot t
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
 
@@ -877,6 +890,7 @@ module Validated = struct
     , transactions
     , commands
     , payments
+    , global_slot
     , erase
     , to_yojson )]
 

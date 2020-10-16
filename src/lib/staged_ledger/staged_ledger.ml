@@ -484,7 +484,6 @@ module T = struct
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s txn_state_view state_and_body_hash =
-    let open Deferred.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -503,13 +502,11 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
@@ -519,6 +516,13 @@ module T = struct
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
+
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
@@ -533,18 +537,23 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       try
+        let tss = partition 10 ts in
         let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_state_view state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
+              let%map () = Async.Scheduler.yield () in
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      current_state_view state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) )
         in
         return ret
       with Exit err -> Deferred.Result.fail err
@@ -1706,8 +1715,8 @@ module T = struct
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
-      Sequence.fold_until transactions_by_fee ~init:Sequence.empty
-        ~f:(fun seq txn ->
+      Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
+        ~f:(fun (seq, count) txn ->
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction ~constraint_constants
@@ -1715,25 +1724,22 @@ module T = struct
                   (Command (txn :> User_command.t)) )
           with
           | Error e ->
-              let error_message =
-                sprintf
-                  !"Staged_ledger_diff creation: Invalid user command! Error \
-                    was: %s, command was: $user_command"
-                  (Error.to_string_hum e)
-              in
-              [%log fatal]
-                ~metadata:[("user_command", User_command.Valid.to_yojson txn)]
-                !"%s" error_message ;
-              Stop seq
+              [%log error]
+                ~metadata:
+                  [ ("user_command", User_command.Valid.to_yojson txn)
+                  ; ("error", `String (Error.to_string_hum e)) ]
+                "Staged_ledger_diff creation: Skipping user command: \
+                 $user_command due to error: $error" ;
+              Continue (seq, count)
           | Ok status ->
               let txn_with_status = {With_status.data= txn; status} in
               let seq' =
                 Sequence.append (Sequence.singleton txn_with_status) seq
               in
-              if Sequence.length seq' = Scan_state.free_space t.scan_state then
-                Stop seq'
-              else Continue seq' )
-        ~finish:Fn.id
+              let count' = count + 1 in
+              if count' >= Scan_state.free_space t.scan_state then Stop seq'
+              else Continue (seq', count') )
+        ~finish:fst
     in
     let diff, log =
       O1trace.measure "generate diff" (fun () ->

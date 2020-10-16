@@ -2,4 +2,4 @@
  (public_name coda_plugins)
  (name coda_plugins)
  (libraries core_kernel dynlink coda_lib)
- (preprocess (pps ppx_coda ppx_version)))
+ (preprocess (pps ppx_coda ppx_version bisect_ppx -- --conditional)))

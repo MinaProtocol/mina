@@ -122,7 +122,7 @@ module For_tests = struct
       List.init num_foreign ~f:(fun _ -> Keypair.create ())
     in
     let max_amount = 10_000 in
-    let max_fee = 100 in
+    let fee_range = 100 in
     let key_gen =
       let open Quickcheck.Generator.Let_syntax in
       match%map
@@ -135,11 +135,11 @@ module For_tests = struct
             "Need to select two elements from a list with at least two elements"
     in
     let payment_gen =
-      Signed_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+      Signed_command.Gen.payment ~key_gen ~max_amount ~fee_range ()
       |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let delegation_gen =
-      Signed_command.Gen.stake_delegation ~key_gen ~max_fee ()
+      Signed_command.Gen.stake_delegation ~key_gen ~fee_range ()
       |> Quickcheck.Generator.map ~f:Transaction_with_hash.create
     in
     let command_gen =
@@ -175,13 +175,13 @@ module For_tests = struct
         in
         let%bind delegation_with_time =
           tuple2
-            ( Signed_command.Gen.stake_delegation ~key_gen ~max_fee ()
+            ( Signed_command.Gen.stake_delegation ~key_gen ~fee_range ()
             |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in
         let%map payment_with_time =
           tuple2
-            ( Signed_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+            ( Signed_command.Gen.payment ~key_gen ~max_amount ~fee_range ()
             |> Quickcheck.Generator.map ~f:Transaction_with_hash.create )
             time_gen
         in

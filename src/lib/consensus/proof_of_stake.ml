@@ -1104,6 +1104,8 @@ module Data = struct
         Global_slot.diff ~constants t (gc_width_epoch, gc_width_slot)
 
     let to_uint32 t = Global_slot.slot_number t
+
+    let to_global_slot = slot_number
   end
 
   [%%if
@@ -1822,10 +1824,18 @@ module Data = struct
     let same_checkpoint_window ~constants ~prev ~next =
       make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
 
-    let negative_one ~genesis_ledger ~(constants : Constants.t) =
+    let negative_one ~genesis_ledger ~(constants : Constants.t)
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
       let max_sub_window_density = constants.slots_per_sub_window in
       let max_window_density = constants.slots_per_window in
-      { Poly.blockchain_length= Length.zero
+      let blockchain_length =
+        match constraint_constants.fork with
+        | None ->
+            Length.zero
+        | Some {previous_length; _} ->
+            previous_length
+      in
+      { Poly.blockchain_length
       ; epoch_count= Length.zero
       ; min_window_density= max_window_density
       ; sub_window_densities=
@@ -1856,7 +1866,8 @@ module Data = struct
       in
       Or_error.ok_exn
         (update ~constants ~producer_vrf_result
-           ~previous_consensus_state:(negative_one ~genesis_ledger ~constants)
+           ~previous_consensus_state:
+             (negative_one ~genesis_ledger ~constants ~constraint_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash)
@@ -2474,7 +2485,7 @@ module Hooks = struct
             | Connected {data= Ok (Ok snapshot_ledger); _} ->
                 let%bind () =
                   Trust_system.(
-                    record trust_system logger peer.host
+                    record trust_system logger peer
                       Actions.(Epoch_ledger_provided, None))
                 in
                 let delegatee_table =
@@ -2814,6 +2825,8 @@ module Hooks = struct
     let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let negative_one =
       Consensus_state.negative_one ~genesis_ledger ~constants
+        ~constraint_constants:
+          Genesis_constants.Constraint_constants.for_unit_tests
     in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot negative_one
@@ -2831,6 +2844,8 @@ module Hooks = struct
     let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
     let negative_one =
       Consensus_state.negative_one ~genesis_ledger ~constants
+        ~constraint_constants:
+          Genesis_constants.Constraint_constants.for_unit_tests
     in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =

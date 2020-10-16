@@ -109,19 +109,32 @@ let%snarkydef step ~(logger : Logger.t)
        Protocol_state.genesis_state_hash_checked
          ~state_hash:previous_state_hash previous_state)
   in
-  let%bind new_state =
-    with_label __LOC__
-      (let t =
-         Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
-           ~blockchain_state:(Snark_transition.blockchain_state transition)
-           ~consensus_state
-           ~constants:(Protocol_state.constants previous_state)
-       in
-       let%map () =
-         let%bind h, _ = Protocol_state.hash_checked t in
-         with_label __LOC__ (State_hash.assert_equal h new_state_hash)
-       in
-       t)
+  let%bind new_state, is_base_case =
+    let t =
+      Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
+        ~blockchain_state:(Snark_transition.blockchain_state transition)
+        ~consensus_state
+        ~constants:(Protocol_state.constants previous_state)
+    in
+    let%bind is_base_case =
+      Protocol_state.consensus_state t
+      |> Consensus.Data.Consensus_state.is_genesis_state_var
+    in
+    let%bind previous_state_hash =
+      match constraint_constants.fork with
+      | Some {previous_state_hash= fork_prev; _} ->
+          State_hash.if_ is_base_case
+            ~then_:(State_hash.var_of_t fork_prev)
+            ~else_:t.previous_state_hash
+      | None ->
+          Checked.return t.previous_state_hash
+    in
+    let t = {t with previous_state_hash} in
+    let%map () =
+      let%bind h, _ = Protocol_state.hash_checked t in
+      with_label __LOC__ (State_hash.assert_equal h new_state_hash)
+    in
+    (t, is_base_case)
   in
   let%bind txn_snark_should_verify, success =
     let%bind ledger_hash_didn't_change =
@@ -253,11 +266,6 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         txn_snark_should_verify
   in
-  let%bind is_base_case =
-    with_label __LOC__
-      ( Protocol_state.consensus_state new_state
-      |> Consensus.Data.Consensus_state.is_genesis_state_var )
-  in
   let prev_should_verify =
     match proof_level with
     | Check | None ->
@@ -357,15 +365,16 @@ module type S = sig
        Pickles.Prover.t
 end
 
-let verify state proof ~key =
-  Pickles.verify (module Nat.N2) (module Statement) key [(state, proof)]
+let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 module Make (T : sig
   val tag : Transaction_snark.tag
-end) : S = struct
-  let proof_level = Genesis_constants.Proof_level.compiled
 
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
+end) : S = struct
+  open T
 
   include Crypto_params
 
@@ -387,7 +396,7 @@ end) : S = struct
   module Proof = (val p)
 end
 
-let constraint_system_digests () =
+let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
     , digest
@@ -396,10 +405,8 @@ let constraint_system_digests () =
            let%bind x1 = exists Coda_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
-             step ~proof_level:Genesis_constants.Proof_level.compiled
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~logger:(Logger.create ()) [x1; x2] x
+             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
+               [x1; x2] x
            in
            ()
          in

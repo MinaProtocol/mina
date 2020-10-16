@@ -3,4 +3,4 @@
   (name genesis_ledger)
   (libraries core_kernel coda_base signature_lib runtime_config)
   (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_optcomp ppx_let)))
+  (preprocess (pps ppx_version ppx_optcomp ppx_let bisect_ppx -- --conditional)))

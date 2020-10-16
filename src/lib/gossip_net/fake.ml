@@ -30,7 +30,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Message.msg Envelope.Incoming.t
+            * (Coda_net2.validation_result -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -77,8 +78,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 let intf = get_interface node in
                 let msg =
                   Envelope.(
-                    Incoming.wrap ~data:msg
-                      ~sender:(Sender.Remote (sender.host, sender.peer_id)))
+                    Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
                 in
                 Strict_pipe.Writer.write intf.broadcast_message_writer
                   (msg, Fn.const ()) ) )
@@ -109,11 +109,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; rpc_handlers: rpc_handler list
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
+      ; connection_gating: Coda_net2.connection_gating ref
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          ( Message.msg Envelope.Incoming.t
+          * (Coda_net2.validation_result -> unit) )
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Message.msg Envelope.Incoming.t
+            * (Coda_net2.validation_result -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -168,6 +171,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         ; rpc_handlers
         ; peer_table
         ; initial_peers
+        ; connection_gating=
+            ref Coda_net2.{banned_peers= []; trusted_peers= []; isolate= false}
         ; received_message_reader
         ; received_message_writer
         ; ban_notification_reader
@@ -218,6 +223,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let ip_for_peer t peer_id =
       Deferred.return (Hashtbl.find t.peer_table peer_id)
+
+    let connection_gating t = Deferred.return !(t.connection_gating)
+
+    let set_connection_gating t config =
+      t.connection_gating := config ;
+      Deferred.return config
   end
 
   type network = Network.t

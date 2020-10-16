@@ -1,7 +1,6 @@
 .merlin
 .bsb.lock
 .graphql_ppx_cache
-graphql_schema.json
 npm-debug.log
 package-lock.json
 node_modules

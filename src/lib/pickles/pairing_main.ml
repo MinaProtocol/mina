@@ -413,7 +413,7 @@ struct
          3. The challenge points.
 
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
-         the combined inner product. 
+         the combined inner product.
       *)
           let without_degree_bound =
             let T = Branching.eq in
@@ -653,7 +653,7 @@ struct
 
     let last =
       Array.reduce_exn ~f:(fun (b_acc, x_acc) (b, x) ->
-          (Boolean.(b_acc || b), Field.if_ b ~then_:x ~else_:x_acc) )
+          (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc) )
 
     let rec pow x bits_lsb =
       let rec go acc bs =
@@ -788,7 +788,7 @@ struct
   let%test_unit "endo scalar" = SC.test (module Impl) ~endo:Endo.Dum.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
-   It 
+   It
    1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
    evaluation openings and then squeezing.
    2. Checks that the "combined inner product" value used in the elliptic curve part of

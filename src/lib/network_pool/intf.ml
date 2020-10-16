@@ -25,6 +25,8 @@ module type Resource_pool_base_intf = sig
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
@@ -50,13 +52,20 @@ module type Resource_pool_diff_intf = sig
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
 
+  (** Used to check whether or not information was filtered out of diffs
+   *  during diff application. Assumes that diff size will be the equal or
+   *  smaller after application is completed. *)
+  val size : t -> int
+
+  val verified_size : verified -> int
+
   val summary : t -> string
 
   (** Warning: It must be safe to call this function asynchronously! *)
   val verify :
        pool
     -> t Envelope.Incoming.t
-    -> verified Envelope.Incoming.t option Deferred.t
+    -> verified Envelope.Incoming.t Deferred.Or_error.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
   conincides with applying locally generated diffs or diffs from the network
@@ -82,13 +91,13 @@ module type Resource_pool_intf = sig
   (** Locally generated items (user commands and snarks) should be periodically
       rebroadcast, to ensure network unreliability doesn't mean they're never
       included in a block. This function gets the locally generated items that
-      are currently rebroadcastable. [is_expired] is a function that returns
+      are currently rebroadcastable. [has_timed_out] is a function that returns
       true if an item that was added at a given time should not be rebroadcast
       anymore. If it does, the implementation should not return that item, and
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
+    t -> has_timed_out:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -116,10 +125,19 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
+  module Broadcast_callback : sig
+    type t =
+      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+      | External of (Coda_net2.validation_result -> unit)
+  end
+
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -134,7 +152,8 @@ module type Network_pool_base_intf = sig
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * (Coda_net2.validation_result -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -150,8 +169,7 @@ module type Network_pool_base_intf = sig
   val apply_and_broadcast :
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
-       * (bool -> unit)
-       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    -> Broadcast_callback.t
     -> unit Deferred.t
 end
 
@@ -161,12 +179,10 @@ module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
   val make_config :
-    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
-
-  (* TODO: we don't seem to be using the bin_io here, can this type be removed? *)
-  type serializable [@@deriving bin_io]
-
-  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
+       trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> disk_location:string
+    -> Config.t
 
   val add_snark :
        ?is_local:bool
@@ -249,6 +265,7 @@ module type Transaction_pool_diff_intf = sig
       | Overflow
       | Bad_token
       | Unwanted_fee_token
+      | Expired
     [@@deriving sexp, yojson]
   end
 

@@ -151,9 +151,12 @@ let run_test () : unit Deferred.t =
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; gossip_type= `Gossipsub
+          ; isolate= false
           ; conf_dir= temp_conf_dir
           ; chain_id
+          ; flooding= false
+          ; direct_peers= []
+          ; peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
@@ -187,9 +190,12 @@ let run_test () : unit Deferred.t =
       let largest_account_keypair =
         Genesis_ledger.largest_account_keypair_exn ()
       in
-      let fee = Currency.Fee.of_int in
+      let fee n =
+        Currency.Fee.of_int
+          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+      in
       let snark_work_fee, transaction_fee =
-        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
+        if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
       let%bind coda =
         Coda_lib.create
@@ -292,7 +298,7 @@ let run_test () : unit Deferred.t =
                    (Keypair.of_private_key_exn sender_sk))
               () )
       in
-      let assert_ok x = assert (Or_error.is_ok x) in
+      let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
         Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
@@ -373,7 +379,8 @@ let run_test () : unit Deferred.t =
                 (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
-              receiver (f_amount i) acc (Currency.Fee.of_int 0) )
+              receiver (f_amount i) acc
+              Coda_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
         Coda_lib.best_protocol_state t

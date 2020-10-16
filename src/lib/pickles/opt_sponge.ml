@@ -2,7 +2,7 @@ open Core_kernel
 
 (* This module implements snarky functions for a sponge that can *conditionally* absorb input,
    while branching minimally. Specifically, if absorbing N field elements, this sponge can absorb
-   a variable subset of N field elements, while performing N + 1 invocations of the sponge's 
+   a variable subset of N field elements, while performing N + 1 invocations of the sponge's
    underlying permutation. *)
 
 let m = 3
@@ -70,7 +70,7 @@ struct
   let add_in a i x =
     let i_equals_0 = Boolean.not i in
     let i_equals_1 = i in
-    (* 
+    (*
       a.(0) <- a.(0) + i_equals_0 * x
       a.(1) <- a.(1) + i_equals_1 * x *)
     List.iteri [i_equals_0; i_equals_1] ~f:(fun j i_equals_j ->
@@ -125,7 +125,7 @@ struct
       let y = Field.(y * (b' :> t)) in
       let add_in_y_after_perm =
         (* post
-          add in 
+          add in
           (1, 1, 1)
 
           do not add in
@@ -159,7 +159,7 @@ struct
            (1, 0, 0)
         *)
         (* (b && b') || (p && (b || b')) *)
-        Boolean.(any [all [b; b']; all [p; b || b']])
+        Boolean.(any [all [b; b']; all [p; b ||| b']])
       in
       cond_permute permute ;
       add_in state p' Field.(y * (add_in_y_after_perm :> t))
@@ -170,7 +170,7 @@ struct
     let should_permute =
       match remaining with
       | 0 ->
-          Boolean.(empty_imput || !pos)
+          Boolean.(empty_imput ||| !pos)
       | 1 ->
           let b, x = input.(n - 1) in
           let p = !pos in

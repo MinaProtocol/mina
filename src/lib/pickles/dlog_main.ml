@@ -638,7 +638,7 @@ struct
          3. The challenge points.
 
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
-         the combined inner product. 
+         the combined inner product.
       *)
           let without_degree_bound =
             Vector.append sg_old
@@ -777,7 +777,7 @@ struct
   let%test_unit "endo scalar" = SC.test (module Impl) ~endo:Endo.Dee.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
-   It 
+   It
    1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
    evaluation openings and then squeezing.
    2. Checks that the "combined inner product" value used in the elliptic curve part of
