@@ -49,6 +49,7 @@ module Styles = {
   let gridItem3 =
     style([
       backgroundColor(Theme.Colors.digitalBlack),
+      height(`rem(57.)),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
       unsafe("grid-area", "3/1"),
       media(
