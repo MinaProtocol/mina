@@ -198,6 +198,7 @@ module HelpAndSupport = {
           Theme.Typeface.monumentGrotesk,
           color(Theme.Colors.white),
           fontSize(`rem(0.75)),
+          textAlign(`center),
           lineHeight(`rem(1.)),
           textTransform(`uppercase),
           letterSpacing(`em(0.02)),
