@@ -1053,6 +1053,7 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
@@ -1071,6 +1072,12 @@ module Staged_ledger_validation = struct
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
+        ]
+      "Staged_ledger.apply takes $time_elapsed" ;
     let target_ledger_hash =
       match proof_opt with
       | None ->
