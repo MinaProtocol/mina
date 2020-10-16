@@ -21,7 +21,7 @@ end
 let verify_heterogenous (ts : Instance.t list) =
   let module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin in
   let module Tick_field = Backend.Tick.Field in
-  let tick_field : _ Marlin_checks.field = (module Tick_field) in
+  let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
     let r = ref [] in
     let result () =
@@ -65,7 +65,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let step_domains = key.step_domains.(Index.to_int which_branch) in
         let marlin_checks =
-          let open Marlin_checks in
+          let open Plonk_checks in
           checks tick_field marlin
             (evals_of_split_evals ~rounds:(Nat.to_int Tick.Rounds.n)
                (module Tick.Field)
@@ -74,7 +74,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ~x_hat_beta_1
             ~input_domain:
               ( domain tick_field step_domains.x
-                :> _ Marlin_checks.vanishing_polynomial_domain )
+                :> _ Plonk_checks.vanishing_polynomial_domain )
             ~domain_h:(domain tick_field step_domains.h)
             ~domain_k:(domain tick_field step_domains.k)
         in

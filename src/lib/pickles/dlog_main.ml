@@ -729,7 +729,7 @@ struct
     in
     let marlin_checks_passed =
       let e = actual_evaluation in
-      Marlin_checks.checked
+      Plonk_checks.checked
         (module Impl)
         ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1 marlin
         { w_hat= e beta_1_evals.w_hat marlin.beta_1

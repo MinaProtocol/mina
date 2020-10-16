@@ -459,7 +459,7 @@ struct
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list possibilities) ~f:(fun i d ->
             let d_unchecked =
-              Marlin_checks.domain
+              Plonk_checks.domain
                 (module Field.Constant)
                 (Pow_2_roots_of_unity d)
             in
@@ -481,7 +481,7 @@ struct
         List.iteri (Vector.to_list domains) ~f:(fun i ds ->
             let check field1 field2 =
               let d_unchecked =
-                Marlin_checks.domain
+                Plonk_checks.domain
                   (module Field.Constant)
                   (Pow_2_roots_of_unity (field1 ds))
               in
@@ -691,7 +691,7 @@ struct
           ( `Known domains
           , ( Pseudo.Domain.to_domain
                 (which_branch, Vector.map domains ~f:Domains.x)
-              :> _ Marlin_checks.vanishing_polynomial_domain ) )
+              :> _ Plonk_checks.vanishing_polynomial_domain ) )
       | `Side_loaded ds ->
           ( `Side_loaded (side_loaded_domains ds which_branch)
           , (* This has to be the max_width of this proof system rather than actual width *)
@@ -818,11 +818,11 @@ struct
           ( Pseudo.Domain.to_domain (which_branch, hs)
           , Pseudo.Domain.to_domain (which_branch, ks) )
       | `Side_loaded {h; k} ->
-          ((h :> _ Marlin_checks.domain), (k :> _ Marlin_checks.domain))
+          ((h :> _ Plonk_checks.domain), (k :> _ Plonk_checks.domain))
     in
     let marlin_checks_passed =
       let e = actual_evaluation in
-      Marlin_checks.checked
+      Plonk_checks.checked
         (module Impl)
         ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1 marlin
         { w_hat= e beta_1_evals.w_hat marlin.beta_1

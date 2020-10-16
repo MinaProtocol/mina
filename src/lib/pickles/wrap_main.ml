@@ -303,7 +303,7 @@ let wrap_main
                 (Nat.Add.create max_local_max_branching)
                 ~actual_branching ~h_minus_1 ~k_minus_1
                 ~input_domain:
-                  (input_domain :> _ Marlin_checks.vanishing_polynomial_domain)
+                  (input_domain :> _ Plonk_checks.vanishing_polynomial_domain)
                 ~domain_k ~domain_h ~sponge deferred_values
                 ~old_bulletproof_challenges evals
             in
