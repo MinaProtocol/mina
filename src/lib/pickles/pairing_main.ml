@@ -448,7 +448,6 @@ struct
 
   let compute_challenges ~scalar chals =
     with_label __LOC__ (fun () ->
-        (* TODO: Put this in the functor argument. *)
         Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
             scalar prechallenge ) )
 
@@ -732,7 +731,6 @@ struct
           ~init:Field.((b :> t) * e)
           es
           ~f:(fun acc (keep, fx) ->
-            (* Field.(y + (pt_n * acc))) *)
             Field.if_ keep ~then_:Field.(fx + (pt_n * acc)) ~else_:acc )
     | [] ->
         failwith "empty list"

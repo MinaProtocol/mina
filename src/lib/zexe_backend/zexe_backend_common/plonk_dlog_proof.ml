@@ -168,8 +168,6 @@ module type Inputs_intf = sig
   end
 end
 
-module type S = sig end
-
 module Challenge_polynomial = struct
   [%%versioned
   module Stable = struct

@@ -681,17 +681,6 @@ struct
           {alpha; beta; gamma; zeta} ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
-  (*
-        , { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
-          ; sigma_3
-          ; alpha
-          ; eta_a
-          ; eta_b
-          ; eta_c
-          ; beta_1
-          ; beta_2
-          ; beta_3 } ) ) *)
-
   module Split_evaluations = struct
     let combine_split_evaluations' s =
       Pcs_batch.combine_split_evaluations s
@@ -723,7 +712,6 @@ struct
       without_degree_bound with_degree_bound
 
   let compute_challenges ~scalar chals =
-    (* TODO: Put this in the functor argument. *)
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
         scalar prechallenge )
 
