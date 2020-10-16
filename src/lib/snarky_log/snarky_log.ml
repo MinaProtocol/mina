@@ -20,10 +20,10 @@ module Constraints (Snarky_backendless : Snark_intf.Basic) = struct
   open Snarky_backendless
 
   (** Generate a flamechart for the labels of a checked computation. *)
-  let log (t : (_, _) Checked.t) : events =
+  let log ?weight (t : (_, _) Checked.t) : events =
     let rev_events = ref [] in
     let _total =
-      constraint_count t ~log:(fun ?(start = false) label count ->
+      constraint_count ?weight t ~log:(fun ?(start = false) label count ->
           rev_events :=
             create_event label
               ~phase:(if start then Measure_start else Measure_end)
