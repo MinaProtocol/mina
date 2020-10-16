@@ -220,7 +220,7 @@ module FAQ = {
               <span> {React.string("Visit ")} </span>
               <Next.Link href="/docs">
                 <span className=Theme.Type.link>
-                  {React.string("the Mina Docs")}
+                  {React.string("the Mina Docs.")}
                 </span>
               </Next.Link>
             </span>
