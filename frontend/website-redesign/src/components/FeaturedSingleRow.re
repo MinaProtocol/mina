@@ -73,6 +73,16 @@ module SingleRow = {
   module RowStyles = {
     open Css;
 
+    let childreWrapped =
+      style([
+        margin(`auto),
+        padding2(~v=`zero, ~h=`rem(1.5)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [margin(`zero), padding2(~v=`zero, ~h=`zero)],
+        ),
+      ]);
+
     let container =
       style([
         position(`relative),
@@ -332,7 +342,8 @@ let make = (~row: Row.t, ~children=?) => {
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
        }}
       {switch (children) {
-       | Some(children) => children
+       | Some(children) =>
+         <div className=SingleRow.RowStyles.childreWrapped> children </div>
        | None => <> </>
        }}
     </CustomWrapped>
