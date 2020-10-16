@@ -4,6 +4,7 @@ open Parsetree
 open Longident
 open Core_kernel
 open Zexe_backend.Tweedle
+open Pickles_types
 
 let () =
   Dee_based_plonk.Keypair.set_urs_info [] ;
@@ -22,30 +23,36 @@ let unwrap = function
   | `Without_degree_bound a ->
       Array.to_list a
 
+let max_public_input_size = 128
+
 let dee =
-  let pub = 150 in
+  let max_domain_log2 = Nat.to_int Backend.Tock.Rounds.n in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 1 18)
+    (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
-      List.init pub ~f:(fun i ->
+      let domain_size = 1 lsl d in
+      let n = Int.min max_public_input_size domain_size in
+      List.init n ~f:(fun i ->
           ksprintf time "dee %d" i (fun () ->
               Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
                 (Dee_based_plonk.Keypair.load_urs ())
-                (Unsigned.Size_t.of_int (1 lsl d))
+                (Unsigned.Size_t.of_int domain_size)
                 (Unsigned.Size_t.of_int i) )
           |> Zexe_backend.Tweedle.Fp_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )
 
 let dum =
-  let pub = 150 in
+  let max_domain_log2 = Nat.to_int Backend.Tick.Rounds.n in
   List.map
-    (List.range ~start:`inclusive ~stop:`inclusive 1 18)
+    (List.range ~start:`inclusive ~stop:`inclusive 1 max_domain_log2)
     ~f:(fun d ->
-      List.init pub ~f:(fun i ->
+      let domain_size = 1 lsl d in
+      let n = Int.min max_public_input_size domain_size in
+      List.init n ~f:(fun i ->
           ksprintf time "dum %d" i (fun () ->
               Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
                 (Dum_based_plonk.Keypair.load_urs ())
-                (Unsigned.Size_t.of_int (1 lsl d))
+                (Unsigned.Size_t.of_int domain_size)
                 (Unsigned.Size_t.of_int i) )
           |> Zexe_backend.Tweedle.Fq_poly_comm.of_backend_without_degree_bound
           |> unwrap ) )

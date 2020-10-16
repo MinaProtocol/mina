@@ -1,6 +1,7 @@
 (executable
  (name gen_values)
  (libraries
+   backend
    ppxlib
    ppx_util
    core_kernel

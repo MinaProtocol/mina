@@ -375,7 +375,6 @@ module Make (T : sig
   val proof_level : Genesis_constants.Proof_level.t
 end) : S = struct
   open T
-
   include Crypto_params
 
   let tag, cache_handle, p, Pickles.Provers.[step] =
