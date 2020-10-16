@@ -113,6 +113,7 @@ module Section = {
                  </Button>
                </div>
              </div>
+             <Spacer width=1.5 />
              <img src={row.image} className=Styles.image />
            </div>
          })
@@ -181,6 +182,7 @@ module Section = {
                  </span>
                </Next.Link>
              </div>
+             <Spacer width=1.5 />
              <img src={row.image} className=SectionStyles.image />
            </div>
          })
