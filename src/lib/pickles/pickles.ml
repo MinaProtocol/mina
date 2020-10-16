@@ -18,11 +18,15 @@ open Common
 open Backend
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
+module Util = Util
+module Tick_field_sponge = Tick_field_sponge
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
 module Dirty = Dirty
 module Cache_handle = Cache_handle
+module Step_main_inputs = Step_main_inputs
+module Pairing_main = Pairing_main
 
 let verify = Verify.verify
 
@@ -198,7 +202,7 @@ module Verification_key = struct
     let dummy_id = Type_equal.Id.(uid (create ~name:"dummy" sexp_of_opaque))
 
     let dummy : unit -> t =
-      let t = lazy (dummy_id, Md5.digest_string "") in
+      let t = lazy (dummy_id, "dummy", Md5.digest_string "") in
       fun () -> Lazy.force t
   end
 
@@ -311,10 +315,67 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Snarky_bn382.Tweedle.Dum.Field_verifier_index.t * Dirty.t) Lazy.t
+      * (Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.t * Dirty.t)
+        Lazy.t
 
     (* TODO Think this is right.. *)
   end
+
+  let log_step main typ name index =
+    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
+    let log =
+      let weight =
+        let sys =
+          Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
+        in
+        fun (c : Impls.Step.Constraint.t) ->
+          let prev = sys.next_row in
+          List.iter c ~f:(fun {annotation; basic} ->
+              Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system
+              .add_constraint sys ?label:annotation basic ) ;
+          let next = sys.next_row in
+          next - prev
+      in
+      Constraints.log ~weight
+        Impls.Step.(
+          make_checked (fun () ->
+              ( let x = with_label __LOC__ (fun () -> exists typ) in
+                main x ()
+                : unit ) ))
+    in
+    Snarky_log.to_file
+      (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
+      log
+
+  let log_wrap main typ name id =
+    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
+    let log =
+      let sys =
+        Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
+      in
+      let weight (c : Impls.Wrap.Constraint.t) =
+        let prev = sys.next_row in
+        List.iter c ~f:(fun {annotation; basic} ->
+            Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
+            .add_constraint sys ?label:annotation basic ) ;
+        let next = sys.next_row in
+        next - prev
+      in
+      let log =
+        Constraints.log ~weight
+          Impls.Wrap.(
+            make_checked (fun () ->
+                ( let x = with_label __LOC__ (fun () -> exists typ) in
+                  main x ()
+                  : unit ) ))
+      in
+      log
+    in
+    Snarky_log.to_file
+      (sprintf
+         !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
+         name (Type_equal.Id.uid id))
+      log
 
   let compile
       : type prev_varss prev_valuess widthss heightss max_branching branches.
@@ -447,11 +508,17 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, conv)) = etyp in
-              let main x () : unit = b.main (conv x) ~step_domains in
+              let main x () : unit =
+                b.main
+                  (Impls.Step.with_label "conv" (fun () -> conv x))
+                  ~step_domains
+              in
+              let () = if debug then log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
                 lazy
                   ( Type_equal.Id.uid self.id
+                  , name
                   , Index.to_int b.index
                   , constraint_system ~exposing:[typ] main )
               in
@@ -461,8 +528,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                     Lazy.return ks.(Index.to_int b.index)
                 | None ->
                     lazy
-                      (let x, y, z = Lazy.force k_p in
-                       (x, y, R1CS_constraint_system.digest z))
+                      (let a, b, c, d = Lazy.force k_p in
+                       (a, b, c, R1CS_constraint_system.digest d))
               in
               let ((pk, vk) as res) =
                 Common.time "step read or generate" (fun () ->
@@ -525,18 +592,19 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
+      let () = if debug then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
-        lazy (self_id, constraint_system ~exposing:[typ] main)
+        lazy (self_id, name, constraint_system ~exposing:[typ] main)
       in
       let disk_key_verifier =
         match disk_keys with
-        | Some (_, (_, digest)) ->
-            Lazy.return (self_id, digest)
         | None ->
             lazy
-              (let id, cs = Lazy.force disk_key_prover in
-               (id, R1CS_constraint_system.digest cs))
+              (let id, name, cs = Lazy.force disk_key_prover in
+               (id, name, R1CS_constraint_system.digest cs))
+        | Some (_, (_id, name, digest)) ->
+            Lazy.return (self_id, name, digest)
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
@@ -548,6 +616,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.clock __LOC__ ;
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
+    accum_dirty (Lazy.map wrap_vk ~f:snd) ;
+    let wrap_vk = Lazy.map wrap_vk ~f:fst in
     let module S = Step.Make (A) (A_value) (Max_branching) in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
@@ -568,7 +638,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_marlin_index:wrap_vk.commitments
+            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
             (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
             wrap_vk.index prevs
         in
@@ -603,9 +673,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           in
           let proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
-              wrap_requests ~dlog_marlin_index:wrap_vk.commitments wrap_main
+              wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
-              ~pairing_marlin_indices:(Lazy.force step_vks) ~wrap_domains
+              ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
@@ -665,12 +735,12 @@ module Side_loaded = struct
       { wrap_vk= Some (Lazy.force d.wrap_vk)
       ; wrap_index=
           Lazy.force d.wrap_key
-          |> Matrix_evals.map ~f:(Abc.map ~f:Array.to_list)
+          |> Plonk_verification_key_evals.map ~f:Array.to_list
       ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data=
           At_most.of_vector
             (Vector.map2 d.branchings d.step_domains ~f:(fun width ds ->
-                 ({Domains.h= ds.h; k= ds.k}, Width.of_int_exn width) ))
+                 ({Domains.h= ds.h}, Width.of_int_exn width) ))
             (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n) }
 
     module Max_width = Width.Max
@@ -725,7 +795,8 @@ module Side_loaded = struct
         List.map ts ~f:(fun (vk, x, p) ->
             let vk : V.t =
               { commitments=
-                  Matrix_evals.map ~f:(Abc.map ~f:Array.of_list) vk.wrap_index
+                  Plonk_verification_key_evals.map ~f:Array.of_list
+                    vk.wrap_index
               ; step_domains=
                   Array.map (At_most.to_array vk.step_data) ~f:(fun (d, w) ->
                       let input_size =
@@ -735,17 +806,12 @@ module Side_loaded = struct
                       in
                       { Domains.x=
                           Pow_2_roots_of_unity (Int.ceil_log2 (1 + input_size))
-                      ; h= d.h
-                      ; k= d.k } )
+                      ; h= d.h } )
               ; index=
                   (match vk.wrap_vk with None -> return false | Some x -> x)
               ; data=
                   (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
-                  { variables= 0
-                  ; public_inputs= 0
-                  ; constraints= 0
-                  ; nonzero_entries= 0
-                  ; max_degree= 0 } }
+                  {constraints= 0} }
             in
             Verify.Instance.T (max_branching, m, vk, x, p) )
         |> Verify.verify_heterogenous )
@@ -812,7 +878,6 @@ let compile
     module Max_local_max_branching = Max_branching
     module Max_branching_vec = Nvector (Max_branching)
     include Proof.Make (Max_branching) (Max_local_max_branching)
-    module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
 
     let id = wrap_disk_key
 
@@ -832,6 +897,85 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
+let%test_module "test no side-loaded" =
+  ( module struct
+    let () =
+      Tock.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    let () =
+      Tick.Keypair.set_urs_info
+        [On_disk {directory= "/tmp/"; should_write= true}]
+
+    open Impls.Step
+
+    let () = Snarky_backendless.Snark0.set_eval_constraints true
+
+    module Statement = struct
+      type t = Field.t
+
+      let to_field_elements x = [|x|]
+
+      module Constant = struct
+        type t = Field.Constant.t [@@deriving bin_io]
+
+        let to_field_elements x = [|x|]
+      end
+    end
+
+    module Blockchain_snark = struct
+      module Statement = Statement
+
+      let tag, _, p, Provers.[step] =
+        Common.time "compile" (fun () ->
+            compile
+              (module Statement)
+              (module Statement.Constant)
+              ~typ:Field.typ
+              ~branches:(module Nat.N1)
+              ~max_branching:(module Nat.N2)
+              ~name:"blockchain-snark"
+              ~choices:(fun ~self ->
+                [ { prevs= [self; self]
+                  ; main=
+                      (fun [prev; _] self ->
+                        let is_base_case = Field.equal Field.zero self in
+                        let proof_must_verify = Boolean.not is_base_case in
+                        let self_correct = Field.(equal (one + prev) self) in
+                        Boolean.Assert.any [self_correct; is_base_case] ;
+                        [proof_must_verify; Boolean.false_] )
+                  ; main_value=
+                      (fun _ self ->
+                        let is_base_case = Field.Constant.(equal zero self) in
+                        let proof_must_verify = not is_base_case in
+                        [proof_must_verify; false] ) } ] ) )
+
+      module Proof = (val p)
+    end
+
+    let xs =
+      let s_neg_one = Field.Constant.(negate one) in
+      let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
+        Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n
+      in
+      let b0 =
+        Common.time "b0" (fun () ->
+            Blockchain_snark.step
+              [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
+              Field.Constant.zero )
+      in
+      let b1 =
+        Common.time "b1" (fun () ->
+            Blockchain_snark.step
+              [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
+              Field.Constant.one )
+      in
+      [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
+
+    let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
+  end )
+
+(*
 let%test_module "test" =
   ( module struct
     let () =
@@ -858,6 +1002,7 @@ let%test_module "test" =
       end
 
       (* A snark proving one knows a preimage of a hash *)
+(*
       module Know_preimage = struct
         module Statement = Statement
 
@@ -915,6 +1060,7 @@ let%test_module "test" =
 
         let side_loaded_vk = Side_loaded.Verification_key.of_compiled tag
       end
+*)
 
       let side_loaded =
         Side_loaded.create
@@ -923,12 +1069,12 @@ let%test_module "test" =
           ~value_to_field_elements:Statement.to_field_elements
           ~var_to_field_elements:Statement.to_field_elements ~typ:Field.typ
 
-      let tag, _, p, Provers.[base; preimage_base; merge] =
+      let tag, _, p, Provers.[base; (*preimage_base; *) merge] =
         compile
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
-          ~branches:(module Nat.N3)
+          ~branches:(module Nat.N2)
           ~max_branching:(module Nat.N2)
           ~name:"txn-snark"
           ~choices:(fun ~self ->
@@ -936,11 +1082,12 @@ let%test_module "test" =
               ; main=
                   (fun [] x ->
                     let t = (Field.is_square x :> Field.t) in
-                    for i = 0 to 400000 do
+                    for i = 0 to 10_000 do
                       assert_r1cs t t t
                     done ;
                     [] )
               ; main_value= (fun [] _ -> []) }
+(*
             ; { prevs= [side_loaded]
               ; main=
                   (fun [hash] x ->
@@ -950,6 +1097,7 @@ let%test_module "test" =
                     Field.Assert.equal hash x ;
                     [Boolean.true_] )
               ; main_value= (fun [_] _ -> [true]) }
+*)
             ; { prevs= [self; self]
               ; main=
                   (fun [l; r] res ->
@@ -962,15 +1110,19 @@ let%test_module "test" =
 
     let t_proof =
       let preimage = Field.Constant.of_int 10 in
-      let base1, preimage_proof = Txn_snark.Know_preimage.prove ~preimage in
+      let base1 = preimage in
+(*       let base1, preimage_proof = Txn_snark.Know_preimage.prove ~preimage in *)
       let base2 = Field.Constant.of_int 9 in
       let base12 = Field.Constant.(base1 * base2) in
+      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
+(*
       let t1 =
         Common.time "t1" (fun () ->
             Side_loaded.in_prover Txn_snark.side_loaded
               Txn_snark.Know_preimage.side_loaded_vk ;
             Txn_snark.preimage_base [(base1, preimage_proof)] base1 )
       in
+*)
       let module M = struct
         type t = Field.Constant.t * Txn_snark.Proof.t [@@deriving bin_io]
       end in
@@ -995,13 +1147,15 @@ let%test_module "test" =
       Common.time "verify" (fun () ->
           assert (
             Verify.verify_heterogenous
+(*
               [ T
                   ( (module Nat.N2)
                   , (module Txn_snark.Know_preimage.Statement.Constant)
                   , Lazy.force Txn_snark.Know_preimage.Proof.verification_key
                   , base1
                   , preimage_proof )
-              ; T
+*)
+              [ T
                   ( (module Nat.N2)
                   , (module Txn_snark.Statement.Constant)
                   , Lazy.force Txn_snark.Proof.verification_key
@@ -1071,4 +1225,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end )
+  end ) *)
