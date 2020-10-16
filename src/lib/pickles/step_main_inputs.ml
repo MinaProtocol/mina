@@ -1,6 +1,7 @@
 open Core_kernel
 open Common
 open Backend
+open Pickles_types
 module Impl = Impls.Step
 open Import
 
@@ -24,7 +25,7 @@ let unrelated_g =
 open Impl
 
 module Other_field = struct
-  type t = Impls.Wrap.Field.Constant.t [@@deriving sexp]
+  type t = Tock.Field.t [@@deriving sexp]
 
   include (Tock.Field : module type of Tock.Field with type t := t)
 
@@ -34,18 +35,40 @@ end
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
+module Unsafe = struct
+  let unpack_unboolean ?(length = Field.size_in_bits) x =
+    let res =
+      exists
+        (Typ.list Boolean.typ_unchecked ~length)
+        ~compute:
+          As_prover.(
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+    in
+    Field.Assert.equal x (Field.project res) ;
+    res
+end
+
 module Sponge = struct
-  module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
+  module Permutation =
+    Sponge_inputs.Make
+      (Impl)
+      (struct
+        include Tick_field_sponge.Inputs
+
+        let params = Tick_field_sponge.params
+      end)
+
+  module S = Sponge.Make_sponge (Permutation)
 
   include Sponge.Bit_sponge.Make (struct
               type t = Impl.Boolean.var
             end)
             (struct
-              include Impl.Field
+              type t = Impl.Field.t
 
-              let to_bits t =
-                Bitstring_lib.Bitstring.Lsb_first.to_list
-                  (Impl.Field.unpack_full t)
+              let to_bits t = Unsafe.unpack_unboolean t
+
+              let finalize_discarded = Util.boolean_constrain (module Impl)
 
               let high_entropy_bits = high_entropy_bits
             end)
@@ -60,6 +83,11 @@ module Sponge = struct
         absorb t (Field.pack bs)
 end
 
+let%test_unit "sponge" =
+  let module T = Make_sponge.Test (Impl) (Tick_field_sponge.Field) (Sponge.S)
+  in
+  T.test Tick_field_sponge.params
+
 module Input_domain = struct
   let domain = Domain.Pow_2_roots_of_unity 6
 
@@ -71,13 +99,14 @@ module Input_domain = struct
            Array.init domain_size ~f:(fun i ->
                let v =
                  Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
-                   (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
+                   (Backend.Tock.Keypair.load_urs ())
                    (u domain_size) (u i)
                  |> Snarky_bn382.Tweedle.Dee.Field_poly_comm.unshifted
                in
                assert (Tick.Inner_curve.Affine.Backend.Vector.length v = 1) ;
                Tick.Inner_curve.Affine.Backend.Vector.get v 0
-               |> Tick.Inner_curve.Affine.of_backend ) ))
+               |> Tick.Inner_curve.Affine.of_backend |> Or_infinity.finite_exn
+           ) ))
 end
 
 module Inner_curve = struct
@@ -159,7 +188,9 @@ module Inner_curve = struct
 
   let ( + ) = T.add_exn
 
-  let scale t bs = T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs)
+  let scale t bs =
+    with_label __LOC__ (fun () ->
+        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [x; y]
 
@@ -181,28 +212,6 @@ module Inner_curve = struct
     assert_equal t (scale res bs) ;
     res
 
-  (* g -> 5 * g *)
-  let scale_by_quadratic_nonresidue t =
-    let t2 = T.double t in
-    let t4 = T.double t2 in
-    t + t4
-
-  let quadratic_nonresidue_inv = Tock.Field.(inv (of_int 5))
-
-  let scale_by_quadratic_nonresidue_inv t =
-    let res =
-      exists typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              Tweedle.Dee.to_affine_exn
-                (Tweedle.Dee.scale
-                   (Tweedle.Dee.of_affine (read typ t))
-                   quadratic_nonresidue_inv))
-    in
-    ignore (scale_by_quadratic_nonresidue res) ;
-    res
-
   let negate = T.negate
 
   let one = T.one
@@ -210,10 +219,13 @@ module Inner_curve = struct
   let if_ = T.if_
 end
 
+module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
+
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Tweedle.Dee.Field_urs.h
-          (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dee.Affine.of_backend )
+      ( Snarky_bn382.Tweedle.Dee.Plonk.Field_urs.h
+          (Backend.Tock.Keypair.load_urs ())
+      |> Zexe_backend.Tweedle.Dee.Affine.of_backend |> Or_infinity.finite_exn
+      )
 end
