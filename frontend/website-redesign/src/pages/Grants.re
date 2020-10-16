@@ -29,64 +29,12 @@ module Styles = {
     style([
       display(`none),
       position(sticky ? `fixed : `absolute),
-      top(sticky ? `rem(3.5) : `rem(66.)),
+      top(sticky ? `rem(3.5) : `rem(107.)),
       marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
       width(`rem(14.)),
       zIndex(100),
       background(white),
       media(Theme.MediaQuery.desktop, [display(`block)]),
-    ]);
-
-  let typesOfGrantsImage =
-    style([
-      important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/MinaSpectrumBackground.jpg")),
-      width(`percent(100.)),
-      height(`rem(43.)),
-      display(`flex),
-      justifyContent(`center),
-      alignItems(`center),
-      media(Theme.MediaQuery.notMobile, [height(`rem(37.5))]),
-    ]);
-
-  let typesOfGrantsOuterContainer =
-    style([
-      display(`flex),
-      justifyContent(`center),
-      alignItems(`center),
-      width(`percent(100.)),
-      height(`percent(100.)),
-      backgroundColor(white),
-      media(
-        Theme.MediaQuery.notMobile,
-        [alignItems(`center), height(`rem(21.))],
-      ),
-    ]);
-
-  let typesOfGrantsInnerContainer =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      height(`percent(100.)),
-      width(`percent(100.)),
-      padding2(~v=`rem(2.), ~h=`zero),
-      borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
-      borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
-      media(
-        Theme.MediaQuery.notMobile,
-        [
-          flexDirection(`row),
-          alignItems(`flexStart),
-          height(`percent(80.)),
-          width(`percent(90.)),
-        ],
-      ),
-      selector(
-        "h3",
-        [width(`rem(17.)), marginRight(`rem(1.)), marginBottom(`auto)],
-      ),
     ]);
 
   let grantRowContainer =
@@ -100,6 +48,24 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [flexDirection(`row), alignItems(`center)],
       ),
+    ]);
+
+  let typesOfGrantsImage =
+    style([
+      important(backgroundSize(`cover)),
+      backgroundImage(`url("/static/img/MinaSpectrumBackground.jpg")),
+      width(`percent(100.)),
+      height(`rem(43.)),
+      display(`flex),
+      justifyContent(`center),
+      alignItems(`center),
+    ]);
+
+  let typeOfGrantsContainer =
+    style([
+      width(`percent(90.)),
+      padding(`rem(2.)),
+      backgroundColor(white),
     ]);
 
   let grantColumnContainer =
@@ -119,16 +85,6 @@ module Styles = {
     style([
       width(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`rem(35.))]),
-    ]);
-
-  let grantContainer =
-    style([
-      width(`rem(17.)),
-      margin2(~h=`rem(1.), ~v=`rem(1.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`center)],
-      ),
     ]);
 
   let faqList =
@@ -183,7 +139,7 @@ module GrantsSideNav = {
       );
     });
 
-    <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
+    <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1800)}>
       <SideNav.Item title="Product / Front-end Projects" slug="#frontend" />
       <SideNav.Item title="Protocol Projects" slug="#protocol" />
       <SideNav.Item
@@ -208,49 +164,6 @@ module Section = {
       children
       <Spacer height=6.5 />
     </section>;
-  };
-};
-
-module TypesOfGrants = {
-  module TypeOfGrant = {
-    [@react.component]
-    let make = (~img, ~title, ~copy) => {
-      <div className=Styles.grantContainer>
-        <img src=img />
-        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
-        <p className=Theme.Type.paragraph> {React.string(copy)} </p>
-      </div>;
-    };
-  };
-
-  [@react.component]
-  let make = () => {
-    <div className=Styles.typesOfGrantsImage>
-      <Wrapped>
-        <div className=Styles.typesOfGrantsOuterContainer>
-          <div className=Styles.typesOfGrantsInnerContainer>
-            <h3 className=Theme.Type.h3>
-              {React.string("Types of Grants")}
-            </h3>
-            <TypeOfGrant
-              img="static/img/TechinalGrants.png"
-              title="Technical Grants"
-              copy="Contribute to engineering projects like web interfaces or to protocol enhancements like stablecoins."
-            />
-            <TypeOfGrant
-              img="static/img/CommunityGrants.png"
-              title="Community Grants"
-              copy="Help with community organizing or create much-needed content to better serve our members."
-            />
-            <TypeOfGrant
-              img="static/img/SubmitYourOwnGrant.png"
-              title="Submit Your Own"
-              copy="Share an idea for how to improve the Mina network or build the Mina community."
-            />
-          </div>
-        </div>
-      </Wrapped>
-    </div>;
   };
 };
 
@@ -530,7 +443,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -551,7 +464,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -572,7 +485,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -589,7 +502,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -627,7 +540,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -648,7 +561,7 @@ module ProtocolProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -696,7 +609,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -713,7 +626,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=5. />
           <p className=Theme.Type.paragraph>
@@ -743,13 +656,14 @@ module HowToApply = {
             background:
               Image("/static/img/community-page/SectionCulture_Values.jpg"),
             contentBackground: Color(Theme.Colors.white),
-            button: {
-              FeaturedSingleRow.Row.buttonText: "Apply Now",
-              buttonColor: Theme.Colors.orange,
-              buttonTextColor: Theme.Colors.white,
-              dark: false,
-              href: `External("https://forms.gle/ekPwDKE1BArTqVCu9"),
-            },
+            link:
+              FeaturedSingleRow.Row.Button({
+                FeaturedSingleRow.Row.buttonText: "Apply Now",
+                buttonColor: Theme.Colors.orange,
+                buttonTextColor: Theme.Colors.white,
+                dark: false,
+                href: `External(Constants.projectGrantApplication),
+              }),
           }>
           <Spacer height=4. />
           <hr className=Theme.Type.divider />
@@ -833,7 +747,17 @@ let make = () => {
     //   buttonCopy="Learn More"
     //   buttonUrl="/docs"
     // />
-    <TypesOfGrants />
+    <div className=Styles.typesOfGrantsImage>
+      <Wrapped>
+        <div className=Styles.typeOfGrantsContainer>
+          <Spacer height=2. />
+          <Rule />
+          <TypesOfGrants />
+          <Rule />
+          <Spacer height=2. />
+        </div>
+      </Wrapped>
+    </div>
     <GrantsSideNav />
     <FrontEndProjects />
     <ProtocolProjects />
