@@ -42,9 +42,9 @@ module type Inputs_intf = sig
         module Pair : Intf.Pair with type elt := t
       end
 
-      val of_backend : Backend.t -> t
+      val of_backend : Backend.t -> t Or_infinity.t
 
-      val to_backend : t -> Backend.t
+      val to_backend : t Or_infinity.t -> Backend.t
     end
   end
 
@@ -53,7 +53,9 @@ module type Inputs_intf = sig
 
     module Backend : Type_with_delete
 
-    val of_backend : Backend.t -> t
+    val of_backend_with_degree_bound : Backend.t -> t
+
+    val of_backend_without_degree_bound : Backend.t -> t
 
     val to_backend : t -> Backend.t
   end
@@ -113,6 +115,8 @@ module type Inputs_intf = sig
 
   module Verifier_index : sig
     type t
+
+    module Vector : Vector with type elt := t
   end
 
   module Backend : sig
@@ -146,7 +150,7 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.Vector.t
       -> t
 
-    val batch_verify : Verifier_index.t -> Vector.t -> bool
+    val batch_verify : Verifier_index.Vector.t -> Vector.t -> bool
 
     val proof : t -> Opening_proof_backend.t
 
@@ -211,6 +215,7 @@ module Make (Inputs : Inputs_intf) = struct
     module V1 = struct
       type t =
         ( G.Affine.Stable.V1.t
+        , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
         , Fq.Stable.V1.t
         , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
         Dlog_plonk_types.Proof.Stable.V1.t
@@ -252,13 +257,13 @@ module Make (Inputs : Inputs_intf) = struct
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
-  let gpair (type a) (t : a) (f : a -> G.Affine.Backend.Pair.t) :
-      G.Affine.t * G.Affine.t =
-    let t = f t in
-    let g = G.Affine.of_backend in
-    G.Affine.Backend.Pair.(g (f0 t), g (f1 t))
-
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
+    let gpair (type a) (t : a) (f : a -> G.Affine.Backend.Pair.t) :
+        G.Affine.t * G.Affine.t =
+      let t = f t in
+      let g x = G.Affine.of_backend x |> Or_infinity.finite_exn in
+      G.Affine.Backend.Pair.(g (f0 t), g (f1 t))
+    in
     let fq = fq t in
     let g = g t in
     let open Opening_proof_backend in
@@ -270,8 +275,8 @@ module Make (Inputs : Inputs_intf) = struct
     { Dlog_plonk_types.Openings.Bulletproof.lr
     ; z_1= fq z1
     ; z_2= fq z2
-    ; delta= g delta
-    ; sg= g sg }
+    ; delta= g delta |> Or_infinity.finite_exn
+    ; sg= g sg |> Or_infinity.finite_exn }
 
   let of_backend (t : Backend.t) : t =
     let open Backend in
@@ -296,16 +301,26 @@ module Make (Inputs : Inputs_intf) = struct
              ; sigma1= fqv sigma1_eval
              ; sigma2= fqv sigma2_eval } )
     in
-    let pc f = Poly_comm.of_backend (f t) in
     let wo x =
-      match pc x with `Without_degree_bound gs -> gs | _ -> assert false
+      match Poly_comm.of_backend_without_degree_bound (x t) with
+      | `Without_degree_bound gs ->
+          gs
+      | _ ->
+          assert false
+    in
+    let w x =
+      match Poly_comm.of_backend_with_degree_bound (x t) with
+      | `With_degree_bound t ->
+          t
+      | _ ->
+          assert false
     in
     { messages=
         { l_comm= wo l_comm
         ; r_comm= wo r_comm
         ; o_comm= wo o_comm
         ; z_comm= wo z_comm
-        ; t_comm= wo t_comm }
+        ; t_comm= w t_comm }
     ; openings= {proof; evals} }
 
   let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2}
@@ -327,7 +342,8 @@ module Make (Inputs : Inputs_intf) = struct
       ({ messages= {l_comm; r_comm; o_comm; z_comm; t_comm}
        ; openings= {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1} } :
         t) : Backend.t =
-    let g = G.Affine.to_backend in
+    let g x = G.Affine.to_backend (Or_infinity.Finite x) in
+    let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr =
       let v = G.Affine.Backend.Pair.Vector.create () in
@@ -344,11 +360,11 @@ module Make (Inputs : Inputs_intf) = struct
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun {Challenge_polynomial.commitment; challenges= _} ->
-          G.Affine.to_backend commitment )
+          G.Affine.to_backend (Finite commitment) )
       |> g_array_to_vec
     in
     Backend.make ~primary_input ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
-      ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcwo t_comm) ~lr
+      ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcw t_comm) ~lr
       ~z1:z_1 ~z2:z_2 ~delta:(g delta) ~sg:(g sg)
       ~evals0:(eval_to_backend evals0) ~evals1:(eval_to_backend evals1)
       ~prev_challenges:challenges ~prev_sgs:commitments
@@ -368,7 +384,7 @@ module Make (Inputs : Inputs_intf) = struct
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun {Challenge_polynomial.commitment; _} ->
-          G.Affine.to_backend commitment )
+          G.Affine.to_backend (Finite commitment) )
       |> g_array_to_vec
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
@@ -376,26 +392,26 @@ module Make (Inputs : Inputs_intf) = struct
     Backend.delete res ; t
 
   let batch_verify' (conv : 'a -> Fq.Vector.t)
-      (ts : (t * 'a * message option) list) (vk : Verifier_index.t) =
+      (ts : (Verifier_index.t * t * 'a * message option) list) =
+    let vks = Verifier_index.Vector.create () in
     let v = Backend.Vector.create () in
-    List.iter ts ~f:(fun (t, xs, m) ->
+    List.iter ts ~f:(fun (vk, t, xs, m) ->
         let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+        Verifier_index.Vector.emplace_back vks vk ;
         Backend.Vector.emplace_back v p ;
         Backend.delete p ) ;
-    let res = Backend.batch_verify vk v in
+    let res = Backend.batch_verify vks v in
     Backend.Vector.delete v ; res
 
-  let batch_verify =
-    batch_verify' (fun xs -> field_vector_of_list (Fq.one :: xs))
+  let batch_verify = batch_verify' (fun xs -> field_vector_of_list xs)
 
   let verify ?message t vk (xs : Fq.Vector.t) : bool =
     batch_verify'
       (fun xs ->
         let v = Fq.Vector.create () in
-        Fq.Vector.emplace_back v Fq.one ;
         for i = 0 to Fq.Vector.length xs - 1 do
           Fq.Vector.emplace_back v (Fq.Vector.get xs i)
         done ;
         v )
-      [(t, xs, message)] vk
+      [(vk, t, xs, message)]
 end
