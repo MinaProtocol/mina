@@ -20,7 +20,13 @@ let make = (~posts) => {
       kind=ButtonBar.CommunityLanding
       backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
-    <Blog.InternalCtaSection />
+    <Blog.InternalCtaSection
+      backgroundImg={
+        Theme.desktop: "/static/img/MinaSpectrumBackground.jpg",
+        Theme.tablet: "/static/img/MinaSpectrumBackground.jpg",
+        Theme.mobile: "/static/img/MinaSpectrumBackground.jpg",
+      }
+    />
   </Page>;
 };
 

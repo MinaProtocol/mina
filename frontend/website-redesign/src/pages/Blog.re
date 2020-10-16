@@ -37,7 +37,7 @@ module Style = {
       textTransform(`uppercase),
     ]);
 
-  let container = style([maxWidth(`rem(71.))]);
+  let container = style([width(`percent(100.))]);
 
   let morePostsSpacing = style([marginTop(`rem(7.1875))]);
 
@@ -78,8 +78,9 @@ module MorePosts = {
         flexWrap(`wrap),
         display(`flex),
         justifyContent(`flexStart),
-        width(`percent(110.)),
+        width(`percent(100.)),
         marginLeft(`rem(-2.)),
+        media(Theme.MediaQuery.notMobile, [width(`percent(110.))]),
       ]);
 
     let postItem =
@@ -141,8 +142,9 @@ module List = {
 
 module InternalCtaSection = {
   [@react.component]
-  let make = () => {
+  let make = (~backgroundImg) => {
     <InternalCtaSection
+      backgroundImg
       leftItem=InternalCtaSection.Item.{
         title: "About the Tech",
         img: "/static/img/AboutTechCta.png",
@@ -194,7 +196,13 @@ let make = (~posts) => {
         kind=ButtonBar.CommunityLanding
         backgroundImg="/static/img/ButtonBarBackground.jpg"
       />
-      <InternalCtaSection />
+      <InternalCtaSection
+        backgroundImg={
+          Theme.desktop: "/static/img/MinaSpectrumBackground.jpg",
+          Theme.tablet: "/static/img/MinaSpectrumBackground.jpg",
+          Theme.mobile: "/static/img/MinaSpectrumBackground.jpg",
+        }
+      />
     </Page>
   };
 };
