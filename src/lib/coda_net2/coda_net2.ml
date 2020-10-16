@@ -1424,7 +1424,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
@@ -1447,7 +1447,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
           | Ok (Ok ()) ->
               ()
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
