@@ -14,6 +14,7 @@ type t =
   ; trust_system: Trust_system.t
   ; consensus_constants: Consensus.Constants.t
   ; verifier: Verifier.t
+  ; precomputed_values: Precomputed_values.t
   ; mutable best_seen_transition: External_transition.Initial_validated.t
   ; mutable current_root: External_transition.Initial_validated.t
   ; network: Coda_networking.t }
@@ -134,7 +135,8 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
             ~consensus_constants:t.consensus_constants ~genesis_constants
-            candidate_state peer_root_with_proof.data
+            ~precomputed_values:t.precomputed_values candidate_state
+            peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -215,6 +217,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       ; logger
       ; trust_system
       ; verifier
+      ; precomputed_values
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition }
     in
@@ -594,6 +597,7 @@ let%test_module "Bootstrap_controller tests" =
           Precomputed_values.consensus_constants precomputed_values
       ; trust_system
       ; verifier
+      ; precomputed_values
       ; best_seen_transition= transition
       ; current_root= transition
       ; network }
