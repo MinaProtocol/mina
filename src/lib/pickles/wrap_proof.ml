@@ -10,8 +10,7 @@ type dlog_opening =
 type t =
   dlog_opening
   * ( Tock.Curve.Affine.t
-    , Tock.Curve.Affine.t Or_infinity.t
-    , Tock.Field.t )
+    , Tock.Curve.Affine.t Or_infinity.t )
     Dlog_plonk_types.Messages.t
 
 open Step_main_inputs
@@ -21,8 +20,7 @@ type var =
   , Impls.Step.Other_field.t Shifted_value.t )
   Types.Pairing_based.Openings.Bulletproof.t
   * ( Inner_curve.t
-    , Impls.Step.Boolean.var * Inner_curve.t
-    , Impls.Step.Other_field.t )
+    , Impls.Step.Boolean.var * Inner_curve.t )
     Dlog_plonk_types.Messages.t
 
 open Impls.Step

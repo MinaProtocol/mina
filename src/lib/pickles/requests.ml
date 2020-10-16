@@ -45,8 +45,7 @@ module Wrap = struct
           t
       | Messages :
           ( Tock.Inner_curve.Affine.t
-          , Tock.Inner_curve.Affine.t Or_infinity.t
-          , Tick.Field.t )
+          , Tock.Inner_curve.Affine.t Or_infinity.t )
           Dlog_plonk_types.Messages.t
           t
       | Openings_proof :
@@ -99,8 +98,7 @@ module Wrap = struct
             t
         | Messages :
             ( Tock.Inner_curve.Affine.t
-            , Tock.Inner_curve.Affine.t Or_infinity.t
-            , Tick.Field.t )
+            , Tock.Inner_curve.Affine.t Or_infinity.t )
             Dlog_plonk_types.Messages.t
             t
         | Openings_proof :

@@ -478,7 +478,7 @@ struct
       ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t)
       ~xi ~sponge ~public_input ~(sg_old : (_, Max_branching.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.t) ~advice
-      ~(messages : (_, Boolean.var * _, _) Messages.t) ~which_branch
+      ~(messages : (_, Boolean.var * _) Messages.t) ~which_branch
       ~openings_proof
       ~(plonk :
          _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =

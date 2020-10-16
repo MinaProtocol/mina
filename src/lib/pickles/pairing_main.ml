@@ -308,7 +308,7 @@ struct
       ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~xi
       ~sponge ~public_input ~(sg_old : (_, Branching.n) Vector.t)
       ~combined_inner_product ~advice
-      ~(messages : (_, Boolean.var * _, _) Dlog_plonk_types.Messages.t)
+      ~(messages : (_, Boolean.var * _) Dlog_plonk_types.Messages.t)
       ~openings_proof
       ~(plonk :
          ( _
@@ -1081,10 +1081,10 @@ struct
         [|Step_main_inputs.Unsafe.unpack_unboolean x|]
       in
       with_label __LOC__ (fun () ->
-            (Spec.pack
-               (module Impl)
-               fp Types.Dlog_based.Statement.In_circuit.spec
-               (Types.Dlog_based.Statement.In_circuit.to_data statement)) )
+          Spec.pack
+            (module Impl)
+            fp Types.Dlog_based.Statement.In_circuit.spec
+            (Types.Dlog_based.Statement.In_circuit.to_data statement) )
     in
     let sponge = Sponge.create sponge_params in
     let { Types.Pairing_based.Proof_state.Deferred_values.xi
