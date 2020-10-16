@@ -6,7 +6,6 @@
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std bisect_ppx -- --conditional))
   (libraries
     zexe_backend.common
-    zexe_backend.bn382
     zexe_backend.tweedle
     hex
     pickles_types
