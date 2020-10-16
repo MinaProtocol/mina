@@ -121,15 +121,14 @@ let step_main
     let open Impls.Step in
     with_label "step_main" (fun () ->
         let T = Max_branching.eq in
-        let dlog_marlin_index =
+        let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Matrix_evals.typ
-               (Abc.typ
-                  (Typ.array Inner_curve.typ
-                     ~length:
-                       (index_commitment_length ~max_degree:Max_degree.wrap
-                          basic.wrap_domains.k))))
+            (Plonk_verification_key_evals.typ
+               (Typ.array Inner_curve.typ
+                  ~length:
+                    (index_commitment_length ~max_degree:Max_degree.wrap
+                       basic.wrap_domains.h)))
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
@@ -165,7 +164,7 @@ let step_main
             ; value_to_field_elements= basic.value_to_field_elements
             ; wrap_domains= basic.wrap_domains
             ; step_domains= `Known basic.step_domains
-            ; wrap_key= dlog_marlin_index }
+            ; wrap_key= dlog_plonk_index }
           in
           let module M =
             H4.Map (Tag) (Types_map.For_step)
@@ -253,59 +252,64 @@ let step_main
                       p
                     in
                     let finalized, chals =
-                      let sponge_digest =
-                        state.sponge_digest_before_evaluations
-                      in
-                      let sponge =
-                        let open Step_main_inputs in
-                        let sponge = Sponge.create sponge_params in
-                        Sponge.absorb sponge (`Field sponge_digest) ;
-                        S.Bit_sponge.map sponge
-                          ~f:Opt_sponge.Underlying.of_sponge
-                      in
-                      finalize_other_proof d.max_branching
-                        ~max_width:d.max_width ~step_widths:d.branchings
-                        ~step_domains:d.step_domains ~sponge
-                        ~old_bulletproof_challenges state.deferred_values
-                        prev_evals
+                      with_label __LOC__ (fun () ->
+                          let sponge_digest =
+                            state.sponge_digest_before_evaluations
+                          in
+                          let sponge =
+                            let open Step_main_inputs in
+                            let sponge = Sponge.create sponge_params in
+                            Sponge.absorb sponge (`Field sponge_digest) ;
+                            S.Bit_sponge.map sponge
+                              ~f:Opt_sponge.Underlying.of_sponge
+                          in
+                          finalize_other_proof d.max_branching
+                            ~max_width:d.max_width ~step_widths:d.branchings
+                            ~step_domains:d.step_domains ~sponge
+                            ~old_bulletproof_challenges state.deferred_values
+                            prev_evals )
                     in
                     let which_branch = state.deferred_values.which_branch in
                     let state =
-                      { state with
-                        deferred_values=
-                          { state.deferred_values with
-                            which_branch=
-                              Pseudo.choose
-                                ( state.deferred_values.which_branch
-                                , Vector.init d.branches ~f:Field.of_int )
-                                ~f:Fn.id
-                              |> Types.Index.of_field (module Impl) } }
+                      with_label __LOC__ (fun () ->
+                          { state with
+                            deferred_values=
+                              { state.deferred_values with
+                                which_branch=
+                                  Pseudo.choose
+                                    ( state.deferred_values.which_branch
+                                    , Vector.init d.branches ~f:Field.of_int )
+                                    ~f:Fn.id
+                                  |> Types.Index.of_field (module Impl) } } )
                     in
                     let statement =
                       let prev_me_only =
-                        let hash =
-                          (* TODO: Don't rehash when it's not necessary *)
-                          unstage
-                            (hash_me_only_opt ~index:d.wrap_key
-                               d.var_to_field_elements)
-                        in
-                        hash ~widths:d.branchings
-                          ~max_width:(Nat.Add.n d.max_branching)
-                          ~which_branch
-                          (* Use opt sponge for cutting off the bulletproof challenges early *)
-                          { app_state
-                          ; dlog_marlin_index= d.wrap_key
-                          ; sg= sg_old
-                          ; old_bulletproof_challenges }
+                        with_label __LOC__ (fun () ->
+                            let hash =
+                              (* TODO: Don't rehash when it's not necessary *)
+                              unstage
+                                (hash_me_only_opt ~index:d.wrap_key
+                                   d.var_to_field_elements)
+                            in
+                            hash ~widths:d.branchings
+                              ~max_width:(Nat.Add.n d.max_branching)
+                              ~which_branch
+                              (* Use opt sponge for cutting off the bulletproof challenges early *)
+                              { app_state
+                              ; dlog_plonk_index= d.wrap_key
+                              ; sg= sg_old
+                              ; old_bulletproof_challenges } )
                       in
                       { Types.Dlog_based.Statement.pass_through= prev_me_only
                       ; proof_state= {state with me_only= pass_through} }
                     in
                     let verified =
-                      verify ~branching:d.max_branching
-                        ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
-                        ~is_base_case:should_verify ~sg_old ~opening ~messages
-                        ~wrap_verification_key:d.wrap_key statement unfinalized
+                      with_label __LOC__ (fun () ->
+                          verify ~branching:d.max_branching
+                            ~wrap_domain:d.wrap_domains.h
+                            ~is_base_case:should_verify ~sg_old ~opening
+                            ~messages ~wrap_verification_key:d.wrap_key
+                            statement unfinalized )
                     in
                     if debug then
                       as_prover
@@ -337,13 +341,13 @@ let step_main
           with_label "hash_me_only" (fun () ->
               let hash_me_only =
                 unstage
-                  (hash_me_only ~index:dlog_marlin_index
+                  (hash_me_only ~index:dlog_plonk_index
                      basic.var_to_field_elements)
               in
               Field.Assert.equal stmt.proof_state.me_only
                 (hash_me_only
                    { app_state
-                   ; dlog_marlin_index
+                   ; dlog_plonk_index
                    ; sg= sgs
                    ; old_bulletproof_challenges=
                        (* Note: the bulletproof_challenges here are unpadded! *)
