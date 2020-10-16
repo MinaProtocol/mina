@@ -1,4 +1,4 @@
-open Pickles_types.Dlog_marlin_types.Poly_comm
+open Pickles_types.Dlog_plonk_types.Poly_comm
 
 type (_, _) t =
   | PC : ('g1, < g1: 'g1 ; .. >) t

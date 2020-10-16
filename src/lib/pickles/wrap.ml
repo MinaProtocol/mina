@@ -264,17 +264,17 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       (prechals, b)
     in
     let plonk =
-      Marlin_checks.derive_plonk
+      Plonk_checks.derive_plonk
         (module Tick.Field)
         ~shift:Shifts.tick ~endo:Endo.Dee.base
         ~mds:Tick_field_sponge.params.mds
         ~domain:
-          (Marlin_checks.domain
+          (Plonk_checks.domain
              (module Tick.Field)
              domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
              ~domain_generator:Backend.Tick.Field.domain_generator)
         {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
-        (Marlin_checks.evals_of_split_evals
+        (Plonk_checks.evals_of_split_evals
            (module Tick.Field)
            proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
            ~zeta:As_field.zeta ~zetaw)

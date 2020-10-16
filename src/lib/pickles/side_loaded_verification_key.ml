@@ -94,7 +94,7 @@ module Domains = struct
     let open Impls.Step in
     let dom =
       Typ.transport Typ.field
-        ~there:(fun (Marlin_checks.Domain.Pow_2_roots_of_unity n) ->
+        ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
           Field.Constant.of_int n )
         ~back:(fun _ -> assert false)
       |> Typ.transport_var
@@ -110,10 +110,10 @@ let max_domains = {Domains.h= Domain.Pow_2_roots_of_unity 20}
 
 let max_domains_with_x =
   let conv (Domain.Pow_2_roots_of_unity n) =
-    Marlin_checks.Domain.Pow_2_roots_of_unity n
+    Plonk_checks.Domain.Pow_2_roots_of_unity n
   in
   let x =
-    Marlin_checks.Domain.Pow_2_roots_of_unity
+    Plonk_checks.Domain.Pow_2_roots_of_unity
       (Int.ceil_log2
          ( 1
          + input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )

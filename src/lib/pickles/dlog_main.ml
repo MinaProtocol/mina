@@ -889,7 +889,7 @@ struct
     let marlin_checks_passed =
       with_label __LOC__ (fun () ->
           let e = Fn.flip actual_evaluation in
-          Marlin_checks.checked
+          Plonk_checks.checked
             (module Impl)
             ~endo:(Impl.Field.constant Endo.Dum.base)
             ~domain ~shift plonk ~mds:sponge_params.mds

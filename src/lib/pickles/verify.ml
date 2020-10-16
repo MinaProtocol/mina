@@ -21,7 +21,7 @@ end
 let verify_heterogenous (ts : Instance.t list) =
   let module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
-  let tick_field : _ Marlin_checks.field = (module Tick_field) in
+  let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
     let r = ref [] in
     let result () =
@@ -74,19 +74,19 @@ let verify_heterogenous (ts : Instance.t list) =
         let plonk =
           let chal = Challenge.Constant.to_tick_field in
           let p =
-            Marlin_checks.derive_plonk
+            Plonk_checks.derive_plonk
               (module Tick.Field)
               ~endo:Endo.Dee.base ~shift:Shifts.tick
               ~mds:Tick_field_sponge.params.mds
               ~domain:
                 (* TODO: Cache the shifts and domain_generator *)
-                (Marlin_checks.domain
+                (Plonk_checks.domain
                    (module Tick.Field)
                    step_domains.h
                    ~shifts:Backend.Tick.B.Field_verifier_index.shifts
                    ~domain_generator:Backend.Tick.Field.domain_generator)
               {zeta; beta= chal plonk0.beta; gamma= chal plonk0.gamma; alpha}
-              (Marlin_checks.evals_of_split_evals
+              (Plonk_checks.evals_of_split_evals
                  (module Tick.Field)
                  evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
           in
@@ -98,7 +98,7 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         (*
         let marlin_checks =
-          let open Marlin_checks in
+          let open Plonk_checks in
           checks tick_field marlin
             (evals_of_split_evals ~rounds:(Nat.to_int Tick.Rounds.n)
                (module Tick.Field)
@@ -107,7 +107,7 @@ let verify_heterogenous (ts : Instance.t list) =
             ~x_hat_beta_1
             ~input_domain:
               ( domain tick_field step_domains.x
-                :> _ Marlin_checks.vanishing_polynomial_domain )
+                :> _ Plonk_checks.vanishing_polynomial_domain )
             ~domain_h:(domain tick_field step_domains.h)
             ~domain_k:(domain tick_field step_domains.k)
         in *)

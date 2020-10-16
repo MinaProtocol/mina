@@ -1,6 +1,6 @@
 (library
-  (name marlin_checks)
-  (public_name pickles.marlin_checks)
+  (name plonk_checks)
+  (public_name pickles.plonk_checks)
   (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- --conditional))
   (libraries
     composition_types

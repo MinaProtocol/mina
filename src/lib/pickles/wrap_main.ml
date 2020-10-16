@@ -287,7 +287,7 @@ let wrap_main
                         Vector.for_all ds ~f:(fun { h; _ } ->
                             Domain.equal wrap_domains.h h ) );
 *)
-                    Marlin_checks.domain
+                    Plonk_checks.domain
                       (module Field)
                       ~shifts ~domain_generator wrap_domains.h
                   in
@@ -352,7 +352,7 @@ let wrap_main
                       finalize_other_proof
                         (Nat.Add.create max_local_max_branching)
                         ~max_quot_size ~actual_branching
-                        ~domain:(domain :> _ Marlin_checks.plonk_domain)
+                        ~domain:(domain :> _ Plonk_checks.plonk_domain)
                         ~sponge deferred_values ~old_bulletproof_challenges
                         evals )
                 in

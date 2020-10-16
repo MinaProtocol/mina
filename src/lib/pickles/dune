@@ -11,7 +11,7 @@
     pickles_base
     pickles.composition_types
     pickles.limb_vector
-    pickles.marlin_checks
+    pickles.plonk_checks
     pickles.precomputed
     pickles.one_hot_vector
     pickles.pseudo

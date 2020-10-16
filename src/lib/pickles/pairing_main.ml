@@ -585,7 +585,7 @@ struct
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list possibilities) ~f:(fun i d ->
             let d_unchecked =
-              Marlin_checks.domain
+              Plonk_checks.domain
                 (module Field.Constant)
                 (Pow_2_roots_of_unity d)
                 ~shifts:Backend.Tick.B.Field_verifier_index.shifts
@@ -609,7 +609,7 @@ struct
         List.iteri (Vector.to_list domains) ~f:(fun i ds ->
             let check field1 field2 =
               let d_unchecked =
-                Marlin_checks.domain
+                Plonk_checks.domain
                   (module Field.Constant)
                   (Pow_2_roots_of_unity (field1 ds))
                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts
@@ -890,7 +890,7 @@ struct
           let hs = map ds ~f:(fun {Domains.h; _} -> h) in
           Pseudo.Domain.to_domain (which_branch, hs) ~shifts ~domain_generator
       | `Side_loaded {h} ->
-          (h :> _ Marlin_checks.plonk_domain)
+          (h :> _ Plonk_checks.plonk_domain)
     in
     let zetaw = Field.mul domain#generator plonk.zeta in
     let xi = scalar xi in
@@ -958,7 +958,7 @@ struct
     in
     let marlin_checks_passed =
       let e = Fn.flip actual_evaluation in
-      Marlin_checks.checked
+      Plonk_checks.checked
         (module Impl)
         ~endo:(Impl.Field.constant Endo.Dee.base)
         ~domain ~shift plonk ~mds:sponge_params.mds
@@ -986,7 +986,7 @@ struct
            ~g:
              (fun (z :
                     Inputs.Inner_curve.t
-                    Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
+                    Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
              Array.concat_map z
                ~f:(Fn.compose List.to_array Inner_curve.to_field_elements) )
            index)
@@ -1011,7 +1011,7 @@ struct
            ~g:
              (fun (z :
                     Inputs.Inner_curve.t
-                    Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
+                    Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
              Array.concat_map z
                ~f:(Fn.compose List.to_array Inner_curve.to_field_elements) )
            index)

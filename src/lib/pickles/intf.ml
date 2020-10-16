@@ -155,7 +155,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
       val negate : t -> t
 
       module Scalar : sig
-        include Marlin_checks.Field_intf
+        include Plonk_checks.Field_intf
 
         include Sexpable.S with type t := t
 

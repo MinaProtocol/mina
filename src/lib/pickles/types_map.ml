@@ -22,7 +22,7 @@ module Basic = struct
     ; wrap_domains: Domains.t
     ; wrap_key:
         Tick.Inner_curve.Affine.t
-        Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+        Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
     ; wrap_vk: Impls.Wrap.Verification_key.t }
 end
@@ -104,7 +104,7 @@ module Compiled = struct
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; wrap_key:
         Tick.Inner_curve.Affine.t
-        Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+        Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
         Lazy.t
     ; wrap_vk: Impls.Wrap.Verification_key.t Lazy.t
@@ -146,7 +146,7 @@ module For_step = struct
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; wrap_key:
-        inner_curve_var Dlog_marlin_types.Poly_comm.Without_degree_bound.t
+        inner_curve_var Dlog_plonk_types.Poly_comm.Without_degree_bound.t
         Plonk_verification_key_evals.t
     ; wrap_domains: Domains.t
     ; step_domains:

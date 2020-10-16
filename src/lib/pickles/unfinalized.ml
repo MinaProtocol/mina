@@ -43,12 +43,12 @@ module Constant = struct
     let zeta = scalar_chal () in
     { deferred_values=
         { plonk=
-            { (Marlin_checks.derive_plonk
+            { (Plonk_checks.derive_plonk
                  (module Tock.Field)
                  ~shift ~endo:Endo.Dum.base (* I think this is right *)
                  ~mds:Tock_field_sponge.params.mds
                  ~domain:
-                   (Marlin_checks.domain
+                   (Plonk_checks.domain
                       (module Tock.Field)
                       wrap_domains.h ~shifts:Tock.B.Field_verifier_index.shifts
                       ~domain_generator:Tock.Field.domain_generator)

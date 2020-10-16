@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-module Domain = Marlin_checks.Domain
+module Domain = Plonk_checks.Domain
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
@@ -48,7 +48,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     type nonrec 'n t = (Domain.t, 'n) t
 
     let to_domain ~shifts:s ~domain_generator (type n) (t : n t) :
-        Field.t Marlin_checks.plonk_domain =
+        Field.t Plonk_checks.plonk_domain =
       (* TODO: Special case when all the domains happen to be the same. *)
       let size = seal (choose t ~f:(fun d -> Field.of_int (Domain.size d))) in
       let log2_sizes = Vector.map (snd t) ~f:Domain.log2_size in

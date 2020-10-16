@@ -149,12 +149,12 @@ struct
             Tick.Field.(
               zeta * domain_generator ~log2_size:(Domain.log2_size domain))
           in
-          Marlin_checks.derive_plonk
+          Plonk_checks.derive_plonk
             (module Tick.Field)
             ~endo:Endo.Dee.base ~shift:Shifts.tick
             ~mds:Tick_field_sponge.params.mds
             ~domain:
-              (Marlin_checks.domain
+              (Plonk_checks.domain
                  (module Tick.Field)
                  domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
                  ~domain_generator:Backend.Tick.Field.domain_generator)
@@ -162,7 +162,7 @@ struct
             ; alpha
             ; beta= Challenge.Constant.to_tick_field plonk0.beta
             ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
-            (Marlin_checks.evals_of_split_evals
+            (Plonk_checks.evals_of_split_evals
                (module Tick.Field)
                t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
         in
@@ -325,18 +325,18 @@ struct
         in
         let chal = Challenge.Constant.of_tock_field in
         let plonk =
-          Marlin_checks.derive_plonk
+          Plonk_checks.derive_plonk
             (module Tock.Field)
             ~shift:Shifts.tock ~endo:Endo.Dum.base
             ~mds:Tock_field_sponge.params.mds
             ~domain:
-              (Marlin_checks.domain
+              (Plonk_checks.domain
                  (module Tock.Field)
                  data.wrap_domains.h
                  ~shifts:Backend.Tock.B.Field_verifier_index.shifts
                  ~domain_generator:Backend.Tock.Field.domain_generator)
             {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
-            (Marlin_checks.evals_of_split_evals
+            (Plonk_checks.evals_of_split_evals
                (module Tock.Field)
                t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
                ~zeta:As_field.zeta ~zetaw)
