@@ -321,6 +321,62 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     (* TODO Think this is right.. *)
   end
 
+  let log_step main typ name index =
+    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
+    let log =
+      let weight =
+        let sys =
+          Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
+        in
+        fun (c : Impls.Step.Constraint.t) ->
+          let prev = sys.next_row in
+          List.iter c ~f:(fun {annotation; basic} ->
+              Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system
+              .add_constraint sys ?label:annotation basic ) ;
+          let next = sys.next_row in
+          next - prev
+      in
+      Constraints.log ~weight
+        Impls.Step.(
+          make_checked (fun () ->
+              ( let x = with_label __LOC__ (fun () -> exists typ) in
+                main x ()
+                : unit ) ))
+    in
+    Snarky_log.to_file
+      (sprintf "step-snark-%s-%d.json" name (Index.to_int index))
+      log
+
+  let log_wrap main typ name id =
+    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
+    let log =
+      let sys =
+        Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
+      in
+      let weight (c : Impls.Wrap.Constraint.t) =
+        let prev = sys.next_row in
+        List.iter c ~f:(fun {annotation; basic} ->
+            Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
+            .add_constraint sys ?label:annotation basic ) ;
+        let next = sys.next_row in
+        next - prev
+      in
+      let log =
+        Constraints.log ~weight
+          Impls.Wrap.(
+            make_checked (fun () ->
+                ( let x = with_label __LOC__ (fun () -> exists typ) in
+                  main x ()
+                  : unit ) ))
+      in
+      log
+    in
+    Snarky_log.to_file
+      (sprintf
+         !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
+         name (Type_equal.Id.uid id))
+      log
+
   let compile
       : type prev_varss prev_valuess widthss heightss max_branching branches.
          self:(A.t, A_value.t, max_branching, branches) Tag.t
@@ -457,36 +513,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                   (Impls.Step.with_label "conv" (fun () -> conv x))
                   ~step_domains
               in
-              let () =
-                let module Constraints =
-                  Snarky_log.Constraints (Impls.Step.Internal_Basic) in
-                let log =
-                  let weight =
-                    let sys =
-                      Zexe_backend.Tweedle.Dum_based_plonk
-                      .R1CS_constraint_system
-                      .create ()
-                    in
-                    fun (c : Impls.Step.Constraint.t) ->
-                      let prev = sys.next_row in
-                      List.iter c ~f:(fun {annotation; basic} ->
-                          Zexe_backend.Tweedle.Dum_based_plonk
-                          .R1CS_constraint_system
-                          .add_constraint sys ?label:annotation basic ) ;
-                      let next = sys.next_row in
-                      next - prev
-                  in
-                  Constraints.log ~weight
-                    Impls.Step.(
-                      make_checked (fun () ->
-                          ( let x = with_label __LOC__ (fun () -> exists typ) in
-                            main x ()
-                            : unit ) ))
-                in
-                Snarky_log.to_file
-                  (sprintf "step-snark-%s-%d.json" name (Index.to_int b.index))
-                  log
-              in
+              let () = if debug then log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
                 lazy
@@ -565,39 +592,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
-      let () =
-        let module Constraints =
-          Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
-        let log =
-          let sys =
-            Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create
-              ()
-          in
-          let weight (c : Impls.Wrap.Constraint.t) =
-            let prev = sys.next_row in
-            List.iter c ~f:(fun {annotation; basic} ->
-                Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
-                .add_constraint sys ?label:annotation basic ) ;
-            let next = sys.next_row in
-            next - prev
-          in
-          let log =
-            Constraints.log ~weight
-              Impls.Wrap.(
-                make_checked (fun () ->
-                    ( let x = with_label __LOC__ (fun () -> exists typ) in
-                      main x ()
-                      : unit ) ))
-          in
-          log
-        in
-        Snarky_log.to_file
-          (sprintf
-             !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
-             name
-             (Type_equal.Id.uid self.id))
-          log
-      in
+      let () = if debug then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy (self_id, name, constraint_system ~exposing:[typ] main)
@@ -902,7 +897,7 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-let%test_module "testh no sidele-loaded" =
+let%test_module "test no side-loaded" =
   ( module struct
     let () =
       Tock.Keypair.set_urs_info

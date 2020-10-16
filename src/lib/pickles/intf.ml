@@ -223,10 +223,6 @@ module type Inputs_base = sig
     val if_ : Boolean.var -> then_:t -> else_:t -> t
 
     val scale_inv : t -> Boolean.var list -> t
-
-    val scale_by_quadratic_nonresidue : t -> t
-
-    val scale_by_quadratic_nonresidue_inv : t -> t
   end
 
   module Other_field : sig
@@ -262,12 +258,6 @@ module Wrap_main_inputs = struct
   module type S = sig
     include Inputs_base
 
-    module Input_domain : sig
-      val domain : Domain.t
-
-      val lagrange_commitments : Domain.t -> Inner_curve.Constant.t array
-    end
-
     module Sponge : sig
       open Impl
 
@@ -281,12 +271,6 @@ end
 module Pairing_main_inputs = struct
   module type S = sig
     include Inputs_base
-
-    module Input_domain : sig
-      val domain : Domain.t
-
-      (*       val lagrange_commitments : Inner_curve.Constant.t array Lazy.t *)
-    end
 
     module Sponge : sig
       include

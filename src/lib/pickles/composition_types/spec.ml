@@ -35,11 +35,6 @@ module rec T : sig
     | Scalar :
         ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
         -> ('a Sc.t, 'b Sc.t, 'env) t
-    (*
-    | Shifted :
-        ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
-        -> ('a Shifted_value.t, 'b Shifted_value.t, 'env) t
-*)
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
         -> (('t1, 'n) Vector.t, ('t2, 'n) Vector.t, 'env) t

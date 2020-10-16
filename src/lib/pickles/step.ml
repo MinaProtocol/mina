@@ -10,7 +10,6 @@ open Types
 open Common
 
 (* This contains the "step" prover *)
-let () = Printexc.record_backtrace true
 
 module Make
     (A : T0) (A_value : sig

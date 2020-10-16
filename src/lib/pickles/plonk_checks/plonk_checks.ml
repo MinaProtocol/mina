@@ -226,32 +226,3 @@ let checked (type t)
         ; endomul1
         ; endomul2 ]
       |> Boolean.all )
-
-(*
-let checked (type t)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-    ~input_domain ~domain_h ~domain_k ~x_hat_beta_1 marlin evals =
-  let open Impl in
-  let eqns =
-    checks
-      (module Field)
-      ~input_domain ~domain_h ~domain_k ~x_hat_beta_1 marlin evals
-  in
-  List.mapi
-    ~f:(fun i (x, y) ->
-      if debug then
-        as_prover
-          As_prover.(
-            fun () ->
-              let x = read_var x in
-              let y = read_var y in
-              if not (Field.Constant.equal x y) then (
-                printf "bad marlin %d\n%!" i ;
-                Field.Constant.print x ;
-                printf "%!" ;
-                Field.Constant.print y ;
-                printf "%!" )) ;
-      Field.equal x y )
-    eqns
-  |> Boolean.all
-*)

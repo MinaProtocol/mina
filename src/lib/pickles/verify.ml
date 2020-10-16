@@ -96,21 +96,6 @@ let verify_heterogenous (ts : Instance.t list) =
           ; beta= plonk0.beta
           ; gamma= plonk0.gamma }
         in
-        (*
-        let marlin_checks =
-          let open Plonk_checks in
-          checks tick_field marlin
-            (evals_of_split_evals ~rounds:(Nat.to_int Tick.Rounds.n)
-               (module Tick.Field)
-               (marlin.beta_1, marlin.beta_2, marlin.beta_3)
-               evals)
-            ~x_hat_beta_1
-            ~input_domain:
-              ( domain tick_field step_domains.x
-                :> _ Plonk_checks.vanishing_polynomial_domain )
-            ~domain_h:(domain tick_field step_domains.h)
-            ~domain_k:(domain tick_field step_domains.k)
-        in *)
         Timer.clock __LOC__ ;
         let absorb, squeeze =
           let open Tick_field_sponge.Bits in

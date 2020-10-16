@@ -338,12 +338,6 @@ let wrap_main
             
                Need to compute this value from the which_branch.
             *)
-                (* One way to fix this is to reverse the order of the summation and
-               to mask out the sg_poly evaluations that aren't supposed to be there.
-
-               Actually no need to reverse the order... just need to make sure to
-               append the dummies to the LHS instead of the RHS.
-            *)
                 let (T (max_local_max_branching, old_bulletproof_challenges)) =
                   old_bulletproof_challenges
                 in

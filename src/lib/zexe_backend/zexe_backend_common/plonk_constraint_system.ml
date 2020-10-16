@@ -1,25 +1,8 @@
 open Sponge
 open Unsigned.Size_t
 
-module Gate = struct
-  type g =
-    | Zero
-    | Generic
-    | Poseidon
-    | EC_add1
-    | EC_add2
-    | EC_vbmul1
-    | EC_vbmul2
-    | EC_vbmul3
-    | EC_emul1
-    | EC_emul2
-    | EC_emul3
-    | EC_emul4
-end
-
 module type Gate_vector_intf = sig
   open Unsigned
-  open Gate
 
   type field_vector
 
@@ -39,8 +22,6 @@ module type Gate_vector_intf = sig
     -> ocol:int
     -> field_vector
     -> unit
-
-  val wrap_gate : t -> size_t -> int -> size_t -> int -> unit
 end
 
 module Row = struct

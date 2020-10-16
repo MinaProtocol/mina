@@ -203,26 +203,6 @@ module Inner_curve = struct
     assert_equal t (scale res bs) ;
     res
 
-  (* g -> 5 * g *)
-  let scale_by_quadratic_nonresidue t =
-    let t2 = T.double t in
-    let t4 = T.double t2 in
-    t + t4
-
-  let quadratic_nonresidue_inv = Other.Field.(inv (of_int 5))
-
-  let scale_by_quadratic_nonresidue_inv t =
-    let res =
-      exists typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              C.to_affine_exn
-                (C.scale (C.of_affine (read typ t)) quadratic_nonresidue_inv))
-    in
-    ignore (scale_by_quadratic_nonresidue res) ;
-    res
-
   let negate = T.negate
 
   let one = T.one
