@@ -1083,9 +1083,6 @@ struct
         [|Step_main_inputs.Unsafe.unpack_unboolean x|]
       in
       with_label __LOC__ (fun () ->
-          Array.append
-            (* [|[Boolean.true_]|] *)
-            [||]
             (Spec.pack
                (module Impl)
                fp Types.Dlog_based.Statement.In_circuit.spec
