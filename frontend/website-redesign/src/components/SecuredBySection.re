@@ -175,7 +175,7 @@ let make = () => {
         <Spacer height=1. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-             "The Mina network is secured by an uncapped number of block producers via inclusive proof-of-stake consensus. A uniquely decentralized blockchain, Mina gets even more secure and resilient as it grows.",
+             "The Mina network is secured by an uncapped number of block producers via proof-of-stake consensus. A uniquely decentralized blockchain, Mina gets even more secure and resilient as it grows.",
            )}
         </p>
         <Spacer height=3. />
