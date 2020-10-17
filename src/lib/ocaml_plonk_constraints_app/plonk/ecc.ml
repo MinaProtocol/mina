@@ -81,9 +81,14 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
                 Array.of_list !state
               ))
           in
-          Array.iteri state ~f:(fun i s -> (s.xt <- xt; s.yt <- yt; s.b <- scalar.(Int.(n-i-1))));
-          state.(0).xp <- xp;
-          state.(0).yp <- yp;
+          Array.iteri state ~f:(fun i s ->
+          (
+            s.xt <- xt;
+            s.yt <- yt;
+            s.b <- scalar.(Int.(n-i-1));
+            state.(i).xp <- if i = 0 then xp else state.(Int.(i-1)).xs;
+            state.(i).yp <- if i = 0 then yp else state.(Int.(i-1)).ys;
+          ));
           Intf.assert_
             [{
               basic= Plonk_constraint.T (EC_scale { state }) ;
@@ -142,10 +147,10 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     (
       s.xt <- xt; s.yt <- yt;
       s.b2i <- scalar.(Int.(2*(n-i-1)));
-      s.b2i1 <- Int.(if 2*(n-i-1)+1 < (Array.length scalar) then scalar.(2*(n-i-1)+1) else Field.zero)
+      s.b2i1 <- Int.(if 2*(n-i-1)+1 < (Array.length scalar) then scalar.(2*(n-i-1)+1) else Field.zero);
+      state.(i).xp <- if i = 0 then xp else state.(Int.(i-1)).xs;
+      state.(i).yp <- if i = 0 then yp else state.(Int.(i-1)).ys;
     ));
-    state.(0).xp <- xp;
-    state.(0).yp <- yp;
     Intf.assert_
       [{
         basic= Plonk_constraint.T (EC_endoscale { state }) ;
