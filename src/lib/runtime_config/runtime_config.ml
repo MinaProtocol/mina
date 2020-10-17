@@ -845,7 +845,7 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 1
+      , "c": 8
       , "ledger_depth": 6
       , "work_delay": 1
       , "block_window_duration_ms": 10000
