@@ -1,6 +1,8 @@
 open Core
 open Async
 
+include Heartbeat.Make ()
+
 let name = "coda-shared-state-test"
 
 let runtime_config = Runtime_config.Test_configs.transactions
@@ -13,6 +15,7 @@ let main () =
       (Lazy.force runtime_config)
     >>| Or_error.ok_exn
   in
+  (* keep CI alive *)
   let n = 2 in
   let keypairs =
     List.map
@@ -29,6 +32,7 @@ let main () =
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
+  Deferred.don't_wait_for (print_heartbeat logger) ;
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
       ~keypairs ~n:3
