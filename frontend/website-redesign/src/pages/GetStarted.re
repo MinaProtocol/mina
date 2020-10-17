@@ -23,15 +23,16 @@ let make = () => {
         )
       }
       background={
-        Theme.desktop: "/static/img/backgrounds/04_GetStarted_1_2880x1504.jpg",
-        Theme.tablet: "/static/img/backgrounds/04_GetStarted_1_1536x1504_tablet.jpg",
-        Theme.mobile: "/static/img/backgrounds/04_GetStarted_1_750x1056_mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/GetStartedHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/GetStartedHeroDesktop.jpg",
+        Theme.mobile: "/static/img/backgrounds/GetStartedHeroDesktop.jpg",
       }
     />
     <ButtonBar
       kind=ButtonBar.GetStarted
       backgroundImg="/static/img/ButtonBarBackground.jpg"
     />
+    <Spacer height=7. />
     <AlternatingSections
       backgroundImg="/static/img/MinaSimplePattern1.jpg"
       sections={
@@ -39,14 +40,14 @@ let make = () => {
           {
             AlternatingSections.Section.SimpleRow.title: "Run a Node",
             description: "Other protocols are so heavy they require intermediaries to run nodes, recreating the same old power dynamics. But Mina is light, so anyone can connect peer-to-peer and sync and verify the chain in seconds. Built on a consistent-sized cryptographic proof, the blockchain will stay accessible - even as it scales to millions of users.",
-            buttonCopy: "Explore the Tech",
+            buttonCopy: "Get Started",
             buttonUrl: `Internal("/docs/getting-started"),
             image: "/static/img/rowImages/RunANode.jpg",
           },
           {
             title: "Build on Mina",
             description: "Interested in building decentralized apps that use SNARKs to verify off-chain data with full verifiability, privacy and scaling? Just download the SDK, follow our step-by-step documentation and put your imagination to work.",
-            buttonCopy: "Run a node",
+            buttonCopy: "Get Started",
             buttonUrl: `Internal("/docs/getting-started"),
             image: "/static/img/rowImages/BuildOnMina.jpg",
           },
@@ -83,7 +84,7 @@ let make = () => {
               FeaturedSingleRow.Row.buttonText: "Learn More",
               buttonColor: Theme.Colors.orange,
               buttonTextColor: Theme.Colors.white,
-              dark: false,
+              dark: true,
               href: `Internal("/genesis"),
             }),
         }
