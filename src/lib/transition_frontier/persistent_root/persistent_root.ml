@@ -102,12 +102,7 @@ module Instance = struct
               "Loaded persistent root identifier" ;
             Some root_identifier )
 
-  let set_root_state_hash t state_hash ~genesis_state_hash =
-    let _root_identifier =
-      load_root_identifier t
-      |> Option.value ~default:(genesis_root_identifier ~genesis_state_hash)
-    in
-    set_root_identifier t {state_hash}
+  let set_root_state_hash t state_hash = set_root_identifier t {state_hash}
 end
 
 type t = Factory_type.t

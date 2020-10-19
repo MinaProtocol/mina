@@ -513,12 +513,6 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~ignore_consensus_local_state ;
       (old_root_hash, Some new_root_hash)
-  (* These are invalid inhabitants for the type signature of this function,
-   * but the OCaml compiler isn't smart enough to realize this. *)
-  | Root_transitioned {garbage= Lite _; _} ->
-      failwith "impossible"
-  | New_node (Lite _) ->
-      failwith "impossible"
 
 let update_metrics_with_diff (type mutant) t
     (diff : (Diff.full, mutant) Diff.t) : unit =

@@ -36,33 +36,24 @@ module Worker = struct
 
   let eagerly_perform_root_transitions t =
     let start = Time.now () in
-    let finish count =
-      [%log' trace t.logger] "Eagerly performed $n root transitions in $time"
-        ~metadata:
-          [ ("n", `Int count)
-          ; ("time", `String Time.(Span.to_string_hum (diff (now ()) start)))
-          ]
-    in
     let rec go count =
       match Queue.peek t.root_transitions with
       | None ->
-          finish count
+          count
       | Some {new_root; garbage} -> (
-          let garbage =
-            match garbage with
-            | Lite garbage ->
-                garbage
-            | Full _ ->
-                assert false
-          in
+          let garbage = match garbage with Lite garbage -> garbage in
           match Database.move_root t.db ~new_root ~garbage with
           | Ok _old_root ->
               ignore (Queue.dequeue_exn t.root_transitions) ;
               go (count + 1)
           | Error _ ->
-              finish count )
+              count )
     in
-    go 0
+    let count = go 0 in
+    [%log' trace t.logger] "Eagerly performed $n root transitions in $time"
+      ~metadata:
+        [ ("n", `Int count)
+        ; ("time", `String Time.(Span.to_string_hum (diff (now ()) start))) ]
 
   let make_immediate_progress t diffs =
     let root_transitions, other_diffs =
@@ -145,14 +136,6 @@ module Worker = struct
           ~diff_type_name:"Best_tip_changed"
           ( Database.set_best_tip t.db best_tip_hash
             :> (mutant, apply_diff_error_internal) Result.t )
-    (* HACK: the ocaml compiler will not allow refutation
-     * of this case despite the fact that it also won't
-     * let you pass in a full node representation
-     *)
-    | Root_transitioned {garbage= Full _; _} ->
-        failwith "impossible"
-    | New_node (Full _) ->
-        failwith "impossible"
 
   let handle_diff t (Diff.Lite.E.E diff) =
     let open Result.Let_syntax in

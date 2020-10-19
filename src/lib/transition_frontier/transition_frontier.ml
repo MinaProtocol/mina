@@ -541,9 +541,6 @@ module For_tests = struct
         gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier
           ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
-    let genesis_state_hash =
-      Precomputed_values.genesis_state_hash precomputed_values
-    in
     let verifier =
       match verifier with
       | Some x ->
@@ -596,7 +593,6 @@ module For_tests = struct
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
-          ~genesis_state_hash
           (External_transition.Validated.state_hash
              (Root_data.Limited.transition root_data)) ;
         ignore
