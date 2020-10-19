@@ -91,7 +91,12 @@ let make = () => {
           {React.string("A Growing Global Community")}
         </h2>
         <span className=Styles.sectionSubhead>
-          {React.string("See where Genesis members are around the world ->")}
+          <span>
+            {React.string("See where Genesis members are around the world")}
+          </span>
+          <span className=Css.(style([position(`absolute)]))>
+            <Icon kind=Icon.ArrowRightSmall />
+          </span>
         </span>
       </div>
       <div className=Styles.remainingSpots>

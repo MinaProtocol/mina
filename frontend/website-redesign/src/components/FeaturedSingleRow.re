@@ -190,7 +190,7 @@ module SingleRow = {
             media(
               Theme.MediaQuery.tablet,
               [
-                bottom(`percent(6.)),
+                bottom(`percent(25.)),
                 top(`inherit_),
                 right(`zero),
                 width(`rem(29.)),
@@ -264,7 +264,7 @@ module SingleRow = {
             top(`percent(5.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), width(`rem(32.)), top(`percent(35.))],
+              [left(`zero), width(`rem(32.)), top(`percent(15.))],
             ),
           ]),
         ]);
