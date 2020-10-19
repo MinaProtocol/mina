@@ -76,7 +76,8 @@ module GenesisMembersGrid = {
   };
   [@react.component]
   let make = () => {
-    <div className=Styles.grid>
+    <>
+      <Spacer height=3. />
       <div className=Styles.genesisCopy>
         <h2 className=Styles.genesisHeader>
           {React.string("Genesis Members")}
@@ -87,22 +88,24 @@ module GenesisMembersGrid = {
            )}
         </p>
       </div>
-      <TeamMember
-        fullName="Greg | DeFidog"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/Greg.jpg"
-      />
-      <TeamMember
-        fullName="Alexander#4542"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/Alexander.jpg"
-      />
-      <TeamMember
-        fullName="GarethDavies"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/GarethDavies.jpg"
-      />
-    </div>;
+      <div className=Styles.grid>
+        <TeamMember
+          fullName="Greg | DeFidog"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/Greg.jpg"
+        />
+        <TeamMember
+          fullName="Alexander#4542"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/Alexander.jpg"
+        />
+        <TeamMember
+          fullName="GarethDavies"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/GarethDavies.jpg"
+        />
+      </div>
+    </>;
   };
 };
 
