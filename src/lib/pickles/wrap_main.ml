@@ -6,6 +6,7 @@ open Import
 open Types
 open Wrap_main_inputs
 open Impl
+module SC = Scalar_challenge
 
 (* Let's define an OCaml encoding for inductive NP sets. Let A be an inductive NP set.
 
@@ -213,8 +214,9 @@ let wrap_main
                  (Plonk_verification_key_evals.map ~f:(function
                    | [|g|] ->
                        Inner_curve.constant g
-                   | _ ->
-                       assert false ))) )
+                   | xs ->
+                       failwithf "Expected commitment to have length 1. Got %d"
+                         (Array.length xs) () ))) )
     in
     let prev_step_accs =
       with_label __LOC__ (fun () ->
@@ -445,6 +447,13 @@ let wrap_main
          ; old_bulletproof_challenges= new_bulletproof_challenges }) ;
     Field.Assert.equal sponge_digest_before_evaluations
       sponge_digest_before_evaluations_actual ;
+    (* TODO: This could be done way more efficiently. The "bulletproof_challenges" actual
+    are packed elsewhere, and that could be reused. *)
+    Array.iter2_exn bulletproof_challenges_actual
+      (Vector.to_array bulletproof_challenges)
+      ~f:(fun {prechallenge= Scalar_challenge x1}
+         ({prechallenge= Scalar_challenge x2} : _ SC.t Bulletproof_challenge.t)
+         -> Field.Assert.equal (Field.project x1) x2 ) ;
     ()
   in
   Timer.clock __LOC__ ;
