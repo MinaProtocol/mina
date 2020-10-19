@@ -79,7 +79,7 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="/static/pdf/economicsWP.pdf">
+      <Next.Link href="/static/pdf/technicalWhitepaper.pdf">
         <a className=Styles.linkStyle>
           {React.string("Technical Whitepaper")}
         </a>
