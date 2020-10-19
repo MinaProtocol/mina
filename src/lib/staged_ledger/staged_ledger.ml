@@ -784,11 +784,20 @@ module T = struct
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
+    let update_coinbase_stack_start_time = Core.Time.now () in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
       update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
         new_ledger t.pending_coinbase_collection transactions
         current_state_view state_and_body_hash
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(
+                Span.to_ms @@ diff (now ()) update_coinbase_stack_start_time)
+          ) ]
+      "update_coinbase_stack_start_time take $time_elapsed" ;
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs =
@@ -811,6 +820,7 @@ module T = struct
       else Deferred.return (Ok ())
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let fill_work_start_time = Core.Time.now () in
     let%bind res_opt, scan_state' =
       let r =
         Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
@@ -833,6 +843,12 @@ module T = struct
               scan_state $scan_state: $error" ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_ms @@ diff (now ()) fill_work_start_time)
+          ) ]
+      "fill_work_and_enqueue_transactions take $time_elapsed" ;
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection
         ~depth:t.constraint_constants.pending_coinbase_depth
@@ -944,12 +960,20 @@ module T = struct
              (Result.map_error ~f:(fun error ->
                   Staged_ledger_error.Pre_diff error ))
     in
+    let apply_diff_start_time = Core.Time.now () in
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
       apply_diff ~constraint_constants t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
         ~log_prefix:"apply_diff" ~coinbase_receiver:witness.coinbase_receiver
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time) )
+        ]
+      "Staged_ledger.apply_diff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
