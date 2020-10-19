@@ -58,9 +58,8 @@ module Styles = {
       style([
         backgroundColor(white),
         marginRight(`rem(1.)),
-        fontSize(`rem(1.5)),
         padding2(~v=`rem(1.3), ~h=`rem(1.3)),
-        unsafe("width", "max-content"),
+        width(`percent(100.)),
         media(
           Theme.MediaQuery.desktop,
           [padding2(~v=`rem(1.5), ~h=`rem(1.5)), maxWidth(`rem(46.25))],
@@ -78,7 +77,7 @@ module Styles = {
         marginRight(`rem(1.)),
         marginTop(`zero),
         marginBottom(`zero),
-        maxWidth(`rem(19.)),
+        width(`percent(100.)),
         media(Theme.MediaQuery.tablet, [maxWidth(`rem(40.))]),
       ]),
     ]);
