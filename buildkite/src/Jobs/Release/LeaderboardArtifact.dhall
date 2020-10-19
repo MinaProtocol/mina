@@ -19,7 +19,7 @@ let spec = DockerImage.ReleaseSpec::{
     commit="\\\${BUILDKITE_COMMIT}",
     deploy_env_file="LEADERBOARD_DEPLOY_ENV",
     extra_args="",
-    step_key="leaderboard-docker-artifact"
+    step_key="leaderboard-docker-image"
 }
 
 in
