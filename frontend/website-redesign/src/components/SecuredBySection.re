@@ -18,7 +18,7 @@ module Styles = {
       display(`grid),
       padding2(~v=rem(4.), ~h=`rem(1.25)),
       gridTemplateColumns([`rem(21.)]),
-      gridTemplateRows([`rem(40.), `rem(31.), `rem(54.)]),
+      gridTemplateRows([`rem(35.), `rem(31.), `rem(54.)]),
       gridRowGap(`rem(4.)),
       media(
         Theme.MediaQuery.tablet,
