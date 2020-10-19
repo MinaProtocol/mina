@@ -57,7 +57,7 @@ module Styles = {
 
   let header =
     merge([
-      Theme.Type.h2,
+      Theme.Type.h1,
       style([
         marginTop(`rem(2.06)),
         media(Theme.MediaQuery.desktop, [width(`rem(18.2))]),
