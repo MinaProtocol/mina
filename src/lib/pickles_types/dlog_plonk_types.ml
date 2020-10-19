@@ -140,6 +140,8 @@ module Poly_comm = struct
     let map {unshifted; shifted} ~f =
       {unshifted= Array.map ~f unshifted; shifted= f shifted}
 
+    let padded_array_typ0 = padded_array_typ
+
     let padded_array_typ elt ~length ~dummy ~bool =
       let open Snarky_backendless.Typ in
       let typ = array ~length (tuple2 bool elt) in
@@ -174,10 +176,9 @@ module Poly_comm = struct
                 (true, x) )
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
-      of_hlistable
-        [array ~length g_inf; g_inf]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+      let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in
+      of_hlistable [arr; g_inf] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
   module Without_degree_bound = struct
