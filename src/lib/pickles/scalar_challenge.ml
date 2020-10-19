@@ -213,66 +213,58 @@ struct
     let n = Array.length scalar in
     let n = Int.(if n % 2 = 0 then n / 2 else (n + 1) / 2) in
     let endo = Endo.base in
-    let xp, yp = G.double (G.( + ) (Field.scale xt endo, yt) (xt, yt)) in
-    let state =
-      exists
-        (Typ.array ~length:n
-           (Zexe_backend_common.Endoscale_round.typ Field.typ))
-        ~compute:
-          As_prover.(
-            fun () ->
-              let state = ref [] in
-              let xpl, ypl = (ref (read_var xp), ref (read_var yp)) in
-              let xtl, ytl = (read_var xt, read_var yt) in
-              if Field.Constant.(equal xtl zero) then failwith "bad" ;
-              for i = Int.(n - 1) downto 0 do
-                let b2il = read_var (scalar.(Int.(2 * i)) :> Field.t) in
-                let b2i1l =
-                  Int.(
-                    if (2 * i) + 1 < Array.length scalar then
-                      read_var (scalar.((2 * i) + 1) :> Field.t)
-                    else Field.Constant.zero)
-                in
-                let xql = (one + ((endo - one) * b2i1l)) * xtl in
-                let xsl, ysl =
+    let ( ! ) = As_prover.read_var in
+    let rec go rows ((xp, yp) as p) i =
+      if i < 0 then Array.of_list_rev rows
+      else
+        let b2il = (scalar.(Int.(2 * i)) :> Field.t) in
+        let b2i1l =
+          Int.(
+            if (2 * i) + 1 < Array.length scalar then
+              (scalar.((2 * i) + 1) :> Field.t)
+            else Field.zero)
+        in
+        let ((xs, ys) as s), xq =
+          exists
+            Typ.(G.typ_unchecked * field)
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let xq =
+                    Field.Constant.((one + ((endo - one) * !b2i1l)) * !xt)
+                  in
                   let open G.Constant in
-                  of_affine (!xpl, !ypl)
-                  + ( of_affine (!xpl, !ypl)
-                    + of_affine (xql, Field.Constant.(b2il + b2il - one) * ytl)
-                    )
-                  |> G.Constant.to_affine_exn
-                in
-                let round =
-                  { Zexe_backend_common.Endoscale_round.b2i1= b2i1l
-                  ; xt= xtl
-                  ; b2i= b2il
-                  ; xq= xql
-                  ; yt= ytl
-                  ; xp= !xpl
-                  ; l1= (!ypl - ((b2il + b2il - one) * ytl)) / (!xpl - xql)
-                  ; yp= !ypl
-                  ; xs= xsl
-                  ; ys= ysl }
-                in
-                state := !state @ [round] ;
-                xpl := xsl ;
-                ypl := ysl
-              done ;
-              Array.of_list !state)
-    in
-    let state =
-      Array.mapi state ~f:(fun i s ->
-          { s with
-            xt
+                  let p = read G.typ p in
+                  ( p
+                    + ( p
+                      + of_affine
+                          (xq, Field.Constant.(!b2il + !b2il - one) * !yt) )
+                  , xq ))
+        in
+        let l1 =
+          exists Field.typ
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let open Field.Constant in
+                  (!yp - ((!b2il + !b2il - one) * !yt)) / (!xp - !xq))
+        in
+        let row =
+          { Zexe_backend_common.Endoscale_round.b2i1= b2i1l
+          ; xt
+          ; b2i= b2il
+          ; xq
           ; yt
-          ; b2i= (scalar.(Int.(2 * (n - i - 1))) :> Field.t)
-          ; b2i1=
-              Int.(
-                if (2 * (n - i - 1)) + 1 < Array.length scalar then
-                  (scalar.((2 * (n - i - 1)) + 1) :> Field.t)
-                else Field.zero) } )
+          ; xp
+          ; l1
+          ; yp
+          ; xs
+          ; ys }
+        in
+        go (row :: rows) s (i - 1)
     in
-    state.(0) <- {(state.(0)) with xp; yp} ;
+    let p = G.double (G.( + ) (Field.scale xt endo, yt) (xt, yt)) in
+    let state = go [] p Int.(n - 1) in
     assert_
       [ { basic=
             Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
