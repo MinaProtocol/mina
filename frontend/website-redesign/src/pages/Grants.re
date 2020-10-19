@@ -29,64 +29,12 @@ module Styles = {
     style([
       display(`none),
       position(sticky ? `fixed : `absolute),
-      top(sticky ? `rem(3.5) : `rem(66.)),
+      top(sticky ? `rem(3.5) : `rem(107.)),
       marginLeft(`calc((`sub, `vw(50.), `rem(71. /. 2.)))),
       width(`rem(14.)),
       zIndex(100),
       background(white),
       media(Theme.MediaQuery.desktop, [display(`block)]),
-    ]);
-
-  let typesOfGrantsImage =
-    style([
-      important(backgroundSize(`cover)),
-      backgroundImage(`url("/static/img/MinaSpectrumBackground.jpg")),
-      width(`percent(100.)),
-      height(`rem(43.)),
-      display(`flex),
-      justifyContent(`center),
-      alignItems(`center),
-      media(Theme.MediaQuery.notMobile, [height(`rem(37.5))]),
-    ]);
-
-  let typesOfGrantsOuterContainer =
-    style([
-      display(`flex),
-      justifyContent(`center),
-      alignItems(`center),
-      width(`percent(100.)),
-      height(`percent(100.)),
-      backgroundColor(white),
-      media(
-        Theme.MediaQuery.notMobile,
-        [alignItems(`center), height(`rem(21.))],
-      ),
-    ]);
-
-  let typesOfGrantsInnerContainer =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      height(`percent(100.)),
-      width(`percent(100.)),
-      padding2(~v=`rem(2.), ~h=`zero),
-      borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
-      borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
-      media(
-        Theme.MediaQuery.notMobile,
-        [
-          flexDirection(`row),
-          alignItems(`flexStart),
-          height(`percent(80.)),
-          width(`percent(90.)),
-        ],
-      ),
-      selector(
-        "h3",
-        [width(`rem(17.)), marginRight(`rem(1.)), marginBottom(`auto)],
-      ),
     ]);
 
   let grantRowContainer =
@@ -100,6 +48,29 @@ module Styles = {
         Theme.MediaQuery.notMobile,
         [flexDirection(`row), alignItems(`center)],
       ),
+    ]);
+
+  let typesOfGrantsImage =
+    style([
+      important(backgroundSize(`cover)),
+      backgroundImage(`url("/static/img/MinaSpectrumBackground.jpg")),
+      width(`percent(100.)),
+      height(`percent(100.)),
+      padding2(~v=`rem(4.), ~h=`zero),
+      display(`flex),
+      justifyContent(`center),
+      alignItems(`center),
+      media(
+        Theme.MediaQuery.notMobile,
+        [padding2(~v=`zero, ~h=`zero), height(`rem(43.))],
+      ),
+    ]);
+
+  let typeOfGrantsContainer =
+    style([
+      width(`percent(100.)),
+      padding(`rem(2.)),
+      backgroundColor(white),
     ]);
 
   let grantColumnContainer =
@@ -121,16 +92,6 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [width(`rem(35.))]),
     ]);
 
-  let grantContainer =
-    style([
-      width(`rem(17.)),
-      margin2(~h=`rem(1.), ~v=`rem(1.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`center)],
-      ),
-    ]);
-
   let faqList =
     style([
       marginLeft(`rem(2.)),
@@ -140,9 +101,11 @@ module Styles = {
   let background =
     style([
       backgroundImage(
-        `url("/static/img/community-page/SectionCulture&Values.png"),
+        `url("/static/img/community-page/SectionCulture_Values.jpg"),
       ),
       backgroundSize(`cover),
+      paddingTop(`rem(4.)),
+      media(Theme.MediaQuery.notMobile, [paddingTop(`rem(12.))]),
     ]);
 
   let grantDescriptionOuterContainer =
@@ -183,7 +146,7 @@ module GrantsSideNav = {
       );
     });
 
-    <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
+    <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1800)}>
       <SideNav.Item title="Product / Front-end Projects" slug="#frontend" />
       <SideNav.Item title="Protocol Projects" slug="#protocol" />
       <SideNav.Item
@@ -208,49 +171,6 @@ module Section = {
       children
       <Spacer height=6.5 />
     </section>;
-  };
-};
-
-module TypesOfGrants = {
-  module TypeOfGrant = {
-    [@react.component]
-    let make = (~img, ~title, ~copy) => {
-      <div className=Styles.grantContainer>
-        <img src=img />
-        <h4 className=Theme.Type.h4> {React.string(title)} </h4>
-        <p className=Theme.Type.paragraph> {React.string(copy)} </p>
-      </div>;
-    };
-  };
-
-  [@react.component]
-  let make = () => {
-    <div className=Styles.typesOfGrantsImage>
-      <Wrapped>
-        <div className=Styles.typesOfGrantsOuterContainer>
-          <div className=Styles.typesOfGrantsInnerContainer>
-            <h3 className=Theme.Type.h3>
-              {React.string("Types of Grants")}
-            </h3>
-            <TypeOfGrant
-              img="static/img/TechinalGrants.png"
-              title="Technical Grants"
-              copy="Contribute to engineering projects like web interfaces or to protocol enhancements like stablecoins."
-            />
-            <TypeOfGrant
-              img="static/img/CommunityGrants.png"
-              title="Community Grants"
-              copy="Help with community organizing or create much-needed content to better serve our members."
-            />
-            <TypeOfGrant
-              img="static/img/SubmitYourOwnGrant.png"
-              title="Submit Your Own"
-              copy="Share an idea for how to improve the Mina network or build the Mina community."
-            />
-          </div>
-        </div>
-      </Wrapped>
-    </div>;
   };
 };
 
@@ -294,13 +214,13 @@ module FAQ = {
         <hr className=Theme.Type.divider />
         <div>
           <FAQRow
-            title="Where do I begin if I want to understand how Coda works?">
+            title="Where do I begin if I want to understand how Mina works?">
             <Spacer height=1. />
             <span className=Theme.Type.paragraph>
               <span> {React.string("Visit ")} </span>
               <Next.Link href="/docs">
                 <span className=Theme.Type.link>
-                  {React.string("the Mina Docs")}
+                  {React.string("the Mina Docs.")}
                 </span>
               </Next.Link>
             </span>
@@ -320,7 +240,7 @@ module FAQ = {
             <Spacer height=1. />
             <span className=Theme.Type.paragraph>
               <span> {React.string("See the ")} </span>
-              <Next.Link href="/">
+              <Next.Link href=Constants.projectGrantApplication>
                 <span className=Theme.Type.link>
                   {React.string("Application Process ")}
                 </span>
@@ -330,7 +250,7 @@ module FAQ = {
                    "section for selection criteria. Please also reach out to us if you have any unique skills that don't apply to current projects. You can also start ",
                  )}
               </span>
-              <Next.Link href="/">
+              <Next.Link href=Constants.githubUrl>
                 <span className=Theme.Type.link>
                   {React.string("Contributing code to Mina ")}
                 </span>
@@ -522,15 +442,15 @@ module FrontEndProjects = {
               {
                 firstColumn: {
                   title: "Allocation",
-                  copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+                  copy: {js|Minimum of $10,000 USD per month of Mina tokens (minimum 2 months commitment)|js},
                 },
                 secondColumn: {
                   title: "Description",
-                  copy: {js|Help Coda update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js},
+                  copy: {js|Help Mina update its GraphQL API to support new use cases. Work closely with O(1) Labs Engineering to gather requirements. You must be familiar with OCaml.|js},
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -539,7 +459,7 @@ module FrontEndProjects = {
               {
                 firstColumn: {
                   title: "Allocation",
-                  copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
+                  copy: {js|Minimum of $10,000 USD per month of Mina tokens|js},
                 },
                 secondColumn: {
                   title: "Project Type",
@@ -551,7 +471,7 @@ module FrontEndProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -560,7 +480,7 @@ module FrontEndProjects = {
               {
                 firstColumn: {
                   title: "Allocation",
-                  copy: {js|Minimum of $10,000 USD per month of Coda tokens|js},
+                  copy: {js|Minimum of $10,000 USD per month of Mina tokens|js},
                 },
                 secondColumn: {
                   title: "Project Type",
@@ -568,11 +488,11 @@ module FrontEndProjects = {
                 },
                 thirdColumn: {
                   title: "Overview",
-                  copy: {js|Enable sending, receiving, and delegating Coda tokens using a web wallet with support for the Ledger.|js},
+                  copy: {js|Enable sending, receiving, and delegating Mina tokens using a web wallet with support for the Ledger.|js},
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -581,15 +501,15 @@ module FrontEndProjects = {
               {
                 firstColumn: {
                   title: "Allocation",
-                  copy: {js|Minimum of $10,000 USD per month of Coda tokens (minimum 2 months commitment)|js},
+                  copy: {js|Minimum of $10,000 USD per month of Mina tokens (minimum 2 months commitment)|js},
                 },
                 secondColumn: {
                   title: "Overview",
-                  copy: {js|Enable sending, receiving, and delegating Coda tokens using a Mobile Wallet.|js},
+                  copy: {js|Enable sending, receiving, and delegating Mina tokens using a Mobile Wallet.|js},
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -623,11 +543,11 @@ module ProtocolProjects = {
                 },
                 secondColumn: {
                   title: "Description",
-                  copy: {js|Offer a US dollar backed programmable stablecoin on the Coda Protocol.|js},
+                  copy: {js|Offer a US dollar backed programmable stablecoin on the Mina Protocol.|js},
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.ThreeColumn
@@ -636,7 +556,7 @@ module ProtocolProjects = {
               {
                 firstColumn: {
                   title: "Allocation",
-                  copy: {js|Minimum of $100,000 USD of Coda tokens|js},
+                  copy: {js|Minimum of $100,000 USD of Mina tokens|js},
                 },
                 secondColumn: {
                   title: "Project Type",
@@ -644,11 +564,11 @@ module ProtocolProjects = {
                 },
                 thirdColumn: {
                   title: "Overview",
-                  copy: {js|Enable Coda nodes to parse and verify the Coda transactions, its smart contracts and everything related. Provide an interfaces to create transactions, product blocks, and create snarks in Coda.|js},
+                  copy: {js|Enable Mina nodes to parse and verify the Mina transactions, its smart contracts and everything related. Provide an interfaces to create transactions, product blocks, and create snarks in Mina.|js},
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
         </Section>
@@ -696,7 +616,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=3. />
           <Project.TwoColumn
@@ -713,7 +633,7 @@ module MarketingAndCommunityProjects = {
                 },
               },
             |]
-            buttonUrl="https://forms.gle/ekPwDKE1BArTqVCu9"
+            buttonUrl=Constants.projectGrantApplication
           />
           <Spacer height=5. />
           <p className=Theme.Type.paragraph>
@@ -740,16 +660,16 @@ module HowToApply = {
             description: {js|Fill out this form to apply for an open project. Applicants who are selected will have the opportunity to claim or “lock” the project so that they can work on it exclusively.|js},
             textColor: Theme.Colors.black,
             image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
-            background:
-              Image("/static/img/community-page/SectionCulture_Values.jpg"),
+            background: Image(""),
             contentBackground: Color(Theme.Colors.white),
-            button: {
-              FeaturedSingleRow.Row.buttonText: "Apply Now",
-              buttonColor: Theme.Colors.orange,
-              buttonTextColor: Theme.Colors.white,
-              dark: false,
-              href: `External("https://forms.gle/ekPwDKE1BArTqVCu9"),
-            },
+            link:
+              FeaturedSingleRow.Row.Button({
+                FeaturedSingleRow.Row.buttonText: "Apply Now",
+                buttonColor: Theme.Colors.orange,
+                buttonTextColor: Theme.Colors.white,
+                dark: false,
+                href: `External(Constants.projectGrantApplication),
+              }),
           }>
           <Spacer height=4. />
           <hr className=Theme.Type.divider />
@@ -764,17 +684,12 @@ module HowToApply = {
                        "All grants are subject to approval by O(1) Labs. ",
                      )}
                   </span>
-                  <Next.Link href="/">
-                    <span className=Theme.Type.link>
-                      {React.string("Terms and Conditions")}
-                    </span>
-                  </Next.Link>
                   <span>
                     {React.string(
-                       " will apply. By submitting an application, you agree to our ",
+                       "By submitting an application, you agree to our ",
                      )}
                   </span>
-                  <Next.Link href="/">
+                  <Next.Link href="/privacy">
                     <span className=Theme.Type.link>
                       {React.string("Privacy Policy")}
                     </span>
@@ -793,7 +708,7 @@ module HowToApply = {
               },
               {
                 title: "03",
-                copy: "Prior involvement in the Coda community is a plus, but not necessary",
+                copy: "Prior involvement in the Mina community is a plus, but not necessary",
               },
               {
                 title: "04",
@@ -816,7 +731,7 @@ let make = () => {
       header="Grants Program"
       copy={
         Some(
-          "The Project Grant program is designed to encourage community members to work on projects related to developing the Coda protocol and community.",
+          "The Project Grant program is designed to encourage community members to work on projects related to developing the Mina protocol and community.",
         )
       }
       background={
@@ -829,11 +744,21 @@ let make = () => {
     // <GrantRow
     //   img="/static/img/GrantsRow.jpg"
     //   title="Work on projects with us and earn Mina tokens"
-    //   copy={js|About $2.1M USD in Coda token grants has been allocated to support these efforts prior to Coda’s mainnet launch. There will be additional Coda token grants allocated after mainnet.|js}
+    //   copy={js|About $2.1M USD in Mina token grants has been allocated to support these efforts prior to Mina’s mainnet launch. There will be additional Mina token grants allocated after mainnet.|js}
     //   buttonCopy="Learn More"
     //   buttonUrl="/docs"
     // />
-    <TypesOfGrants />
+    <div className=Styles.typesOfGrantsImage>
+      <Wrapped>
+        <div className=Styles.typeOfGrantsContainer>
+          <Spacer height=2. />
+          <Rule />
+          <TypesOfGrants />
+          <Rule />
+          <Spacer height=2. />
+        </div>
+      </Wrapped>
+    </div>
     <GrantsSideNav />
     <FrontEndProjects />
     <ProtocolProjects />
