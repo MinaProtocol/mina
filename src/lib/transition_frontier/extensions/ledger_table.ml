@@ -51,8 +51,6 @@ module T = struct
           in
           let ledger_hash = Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger
-      | E (New_node (Lite _), _) ->
-          failwith "ledger_table extension: unexpected new lite node"
       | E (Root_transitioned transition, _) -> (
         match transition.garbage with
         | Full nodes ->
@@ -72,10 +70,7 @@ module T = struct
                 let ledger_hash =
                   Staged_ledger_hash.ledger_hash staged_ledger
                 in
-                remove_entry t ~ledger_hash )
-        | Lite _ ->
-            failwith
-              "ledger_table extension: unexpected garbage with lite nodes" )
+                remove_entry t ~ledger_hash ) )
       | E (Best_tip_changed _, _) ->
           () ) ;
     None
