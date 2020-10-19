@@ -9,11 +9,11 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
-let DockerArtifact = ../../Command/DockerArtifact.dhall
+let DockerImage = ../../Command/DockerImage.dhall
 
-let dependsOn = [ { name = "LeaderboardArtifact", key = "leaderboard-artifacts-build" } ]
+let dependsOn = [ { name = "LeaderboardArtifact", key = "setup-deploy-env" } ]
 
-let spec = DockerArtifact.ReleaseSpec::{
+let spec = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     service="leaderboard",
     commit="\\\${BUILDKITE_COMMIT}",
@@ -41,11 +41,11 @@ Pipeline.build
           commands = [
               Cmd.run "echo export CODA_VERSION=$(cat frontend/leaderboard/package.json | jq '.version') > LEADERBOARD_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh LEADERBOARD_DEPLOY_ENV"
           ],
-          label = "Build Mina testnet leaderboard artifacts",
-          key = "leaderboard-artifacts-build",
+          label = "Setup Mina's Leaderboard docker image deploy environment",
+          key = "setup-deploy-env",
           target = Size.Small,
           artifact_paths = [ S.contains "frontend/leaderboard/package.json" ]
         },
-      DockerArtifact.generateStep spec
+      DockerImage.generateStep spec
     ]
   }
