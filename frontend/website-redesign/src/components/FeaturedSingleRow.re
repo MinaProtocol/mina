@@ -151,7 +151,20 @@ module SingleRow = {
       ]);
 
     let description =
-      merge([Theme.Type.sectionSubhead, style([marginTop(`rem(1.))])]);
+      merge([
+        Theme.Type.sectionSubhead,
+        style([
+          marginTop(`rem(1.)),
+          media(
+            Theme.MediaQuery.desktop,
+            [
+              unsafe("display", "-webkit-box"),
+              unsafe("-webkit-line-clamp", "5"),
+              unsafe("-webkit-box-orient", "vertical"),
+            ],
+          ),
+        ]),
+      ]);
 
     let image =
       style([

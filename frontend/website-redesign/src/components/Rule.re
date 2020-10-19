@@ -6,7 +6,8 @@ module Styles = {
       marginBottom(`zero),
       marginLeft(`zero),
       marginRight(`zero),
-      border(`px(1), `solid, ruleColor),
+      borderBottom(`px(1), `solid, ruleColor),
+      width(`percent(100.)),
     ]);
 };
 

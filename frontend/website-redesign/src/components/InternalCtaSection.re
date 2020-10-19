@@ -41,9 +41,7 @@ module Item = {
         {React.string(item.title)}
       </h2>
       <img className=Styles.image src={item.img} />
-      <p className={Css.merge([Theme.Type.sectionSubhead])}>
-        {React.string(item.snippet)}
-      </p>
+      <p className=Theme.Type.paragraph> {React.string(item.snippet)} </p>
       <div className=ListModule.Listing.ListingStyles.link>
         <span> {React.string("Read more")} </span>
         <Icon kind=Icon.ArrowRightMedium />

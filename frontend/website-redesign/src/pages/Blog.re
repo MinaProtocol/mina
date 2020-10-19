@@ -1,5 +1,16 @@
 module Style = {
   open Css;
+
+  let background =
+    style([
+      backgroundImage(`url("/static/img/BlogLandingHeaderBackground.jpg")),
+      backgroundSize(`cover),
+      padding2(~v=`rem(4.), ~h=`zero),
+      display(`flex),
+      flexDirection(`column),
+      media(Theme.MediaQuery.desktop, [padding2(~v=`rem(8.), ~h=`zero)]),
+    ]);
+
   let title =
     style([
       color(black),
@@ -75,20 +86,20 @@ module MorePosts = {
     let postList =
       style([
         listStyleType(`none),
-        flexWrap(`wrap),
-        display(`flex),
-        justifyContent(`flexStart),
         width(`percent(100.)),
-        marginLeft(`rem(-2.)),
-        media(Theme.MediaQuery.notMobile, [width(`percent(110.))]),
+        display(`grid),
+        gridTemplateColumns([
+          `repeat((`autoFit, `minmax((`minContent, `rem(23.5))))),
+        ]),
+        gridColumnGap(`rem(2.)),
+        media(
+          Theme.MediaQuery.desktop,
+          [gridTemplateColumns([`repeat((`num(3), `fr(1.)))])],
+        ),
       ]);
 
     let postItem =
-      style([
-        width(`rem(25.)),
-        marginBottom(`rem(3.25)),
-        padding2(~h=`rem(2.), ~v=`zero),
-      ]);
+      style([width(`percent(100.)), marginBottom(`rem(3.25))]);
   };
 
   module Content = {
@@ -166,27 +177,34 @@ let make = (~posts) => {
   | [featured, ...posts] =>
     <Page title="Mina Protocol Blog">
       <Next.Head> Markdown.katexStylesheet </Next.Head>
-      <div className=Nav.Styles.spacerLarge />
-      <FeaturedSingleRow
-        row=FeaturedSingleRow.Row.{
-          rowType: ImageLeftCopyRight,
-          copySize: `Large,
-          title: featured.ContentType.BlogPost.title,
-          description: featured.snippet,
-          textColor: Theme.Colors.white,
-          image: "/static/img/BlogLandingHero.jpg",
-          background: Image("/static/img/MinaSimplePattern1.jpg"),
-          contentBackground: Image("/static/img/MinaSepctrumSecondary.png"),
-          link:
-            {FeaturedSingleRow.Row.Button({
-               buttonColor: Theme.Colors.orange,
-               buttonTextColor: Theme.Colors.white,
-               buttonText: "Read more",
-               dark: true,
-               href: `Internal("/blog/" ++ featured.slug),
-             })},
-        }
-      />
+      <div className=Nav.Styles.spacer />
+      <div className=Style.background>
+        <FeaturedSingleRowFull
+          row=FeaturedSingleRowFull.Row.{
+            header:
+              Some({
+                kind: "Blog",
+                author: featured.ContentType.BlogPost.author,
+                date: featured.ContentType.BlogPost.date,
+              }),
+
+            title: featured.ContentType.BlogPost.title,
+            description: featured.snippet,
+            textColor: Theme.Colors.white,
+            image: "/static/img/BlogLandingHero.jpg",
+            background: Image(""),
+            contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+            link:
+              {FeaturedSingleRowFull.Row.Button({
+                 buttonColor: Theme.Colors.orange,
+                 buttonTextColor: Theme.Colors.white,
+                 buttonText: "Read more",
+                 dark: true,
+                 href: `Internal("/blog/" ++ featured.slug),
+               })},
+          }
+        />
+      </div>
       <Wrapped>
         <div className=Style.morePostsSpacing>
           <MorePosts posts={List.take(9, posts) |> Array.of_list} />
@@ -198,9 +216,9 @@ let make = (~posts) => {
       />
       <InternalCtaSection
         backgroundImg={
-          Theme.desktop: "/static/img/MinaSpectrumBackground.jpg",
-          Theme.tablet: "/static/img/MinaSpectrumBackground.jpg",
-          Theme.mobile: "/static/img/MinaSpectrumBackground.jpg",
+          Theme.desktop: "/static/img/BlogLandingHeaderBackground.jpg",
+          Theme.tablet: "/static/img/BlogLandingHeaderBackground.jpg",
+          Theme.mobile: "/static/img/BlogLandingHeaderBackground.jpg",
         }
       />
     </Page>
