@@ -1,5 +1,5 @@
 {{/*
-liveness/readiness check common settings
+Liveness/readiness check common settings
 */}}
 {{- define "healthcheck.common.settings" -}}
 initialDelaySeconds: {{- default 30 .Values.healthcheck.initialDelaySeconds -}}
@@ -10,28 +10,28 @@ failureThreshold: {{- default 3 .Values.healthcheck.failureThreshold -}}
 ### Mina daemon healthcheck TEMPLATES ###
 
 {{/*
-daemon startup probe settings
+Daemon startup probe settings
 */}}
 {{- define "healthcheck.daemon.startupProbe" -}}
 startupProbe:
   tcpSocket:
-    port: libp2p-port
+    port: p2p-port
   failureThreshold: {{- default 60 .Values.healthcheck.failureThreshold -}}
   periodSeconds: {{- default 5 .Values.healthcheck.periodSeconds -}}
 {{- end -}}
 
 {{/*
-daemon liveness check settings
+Daemon liveness check settings
 */}}
 {{- define "healthcheck.daemon.livenessCheck" -}}
 livenessProbe:
   tcpSocket:
-    port: libp2p-port
+    port: p2p-port
   {{ template "healthcheck.common.settings" . }}
 {{- end -}}
 
 {{/*
-daemon readiness check settings
+Daemon readiness check settings
 */}}
 {{- define "healthcheck.daemon.readinessCheck" -}}
 readinessProbe:
@@ -44,7 +44,7 @@ readinessProbe:
 ALL daemon healthchecks
 */}}
 {{- define "healthcheck.daemon.healthChecks" -}}
-{{ include "healthcheck.daemon.startupProbe" . }}
-{{ include "healthcheck.daemon.livenessCheck" . }}
-{{ include "healthcheck.daemon.readinessCheck" . }}
+{{ template "healthcheck.daemon.startupProbe" . }}
+{{ template "healthcheck.daemon.livenessCheck" . }}
+{{ template "healthcheck.daemon.readinessCheck" . }}
 {{- end -}}
