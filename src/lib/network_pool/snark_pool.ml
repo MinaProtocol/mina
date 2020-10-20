@@ -458,9 +458,13 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
           pool ~tf_diff_writer ;
         network_pool
     | Error _e ->
-        create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~incoming_diffs ~local_diffs
-          ~frontier_broadcast_pipe
+        let res =
+          create ~config ~logger ~constraint_constants ~consensus_constants
+            ~time_controller ~incoming_diffs ~local_diffs
+            ~frontier_broadcast_pipe
+        in
+        store_periodically (resource_pool res) ;
+        res
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
