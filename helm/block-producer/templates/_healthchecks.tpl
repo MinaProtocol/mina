@@ -45,7 +45,7 @@ user-agent liveness check settings
 {{- define "healthcheck.userAgent.livenessCheck" -}}
 livenessProbe:
   tcpSocket:
-    port: metrics
+    port: metrics-port
 {{ include "healthcheck.common.settings" . | indent 2 }}
 {{- end -}}
 
@@ -55,7 +55,7 @@ block-producer readiness check settings
 {{- define "healthcheck.userAgent.readinessCheck" -}}
 readinessProbe:
   exec:
-    command: "<curl localhost:8000/metrics | check-count-against-graphql>"
+    command: "curl localhost:8000/metrics"
 {{ include "healthcheck.common.settings" . | indent 2 }}
 {{- end -}}
 
@@ -83,7 +83,7 @@ Mina testnet bot liveness check settings
 {{- define "healthcheck.bots.livenessCheck" -}}
 livenessProbe:
   tcpSocket:
-    port: graphql
+    port: graphql-port
 {{ include "healthcheck.common.settings" . | indent 2 }}
 {{- end -}}
 

@@ -29,8 +29,10 @@ spec:
             cpu: 1000m
         image: {{ $.Values.exporter.image }}
         env:
-          - name: BUILDKITE_API_KEY
-            value: {{ .Values.exporter.buildkiteApiKey }}
+        - name: BUILDKITE_API_KEY
+          value: {{ .Values.exporter.buildkiteApiKey }}
+        - name: METRICS_PORT
+          value: {{ .Values.exporter.ports.metricsPort }}
 {{- if .Values.exporter.optionalEnv }}
 {{ toYaml .Values.exporter.optionalEnv | nindent 10 }}
 {{- end }}
