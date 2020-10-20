@@ -2,7 +2,7 @@ apiVersion: v2
 name: block-producer
 description: A Helm chart for Coda Protocol's block producing network nodes
 type: application
-version: 0.1.8
+version: 0.1.9
 appVersion: 1.16.0
 dependencies:
 icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png

@@ -16,7 +16,7 @@ spec:
         app: archive-node-{{ .Values.archive.nodeName }}
         testnet: {{ $.Values.testnetName }}
         role: archive-node
-        version: {{ (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -26,10 +26,9 @@ spec:
       - name: coda
         resources:
           limits:
-            memory: 6.0Gi
           requests:
-            memory: 2.0Gi
-            cpu: 1000m
+            memory: 14.0Gi
+            cpu: 2.0
         image: {{ $.Values.coda.image }}
         command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
         args: [ "daemon",
@@ -44,15 +43,6 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          {{- if $.Values.coda.enableFlooding }}
-          "-enable-flooding true"
-          {{- end -}}
-          {{- if $.Values.coda.peerExchange }}
-          "-peer-exchange true"
-          {{- end -}}
-          {{- range $.Values.coda.directPeers }}
-          "-direct-peers", {{ . | quote }},
-          {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -60,7 +50,7 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "3086",
-          {{- if (ne $.Values.coda.runtimeConfig "") -}}
+          {{- if (ne $.Values.coda.runtimeConfig "") }}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
           {{- end -}}
@@ -92,7 +82,7 @@ spec:
       - name: archive
         image: {{ $.Values.archive.image }}
         command: ["bash", "-c"]
-        args: [ "coda-archive -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port 3086" ]
+        args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port 3086" ]
         env:
         imagePullPolicy: Always
       volumes:

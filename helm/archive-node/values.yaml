@@ -13,6 +13,7 @@ coda:
 archive: 
   hostPort: "10909"
   image: codaprotocol/coda-archive:0.0.12-beta-fix-archive-debs-62bae52
+  listenPort: "3086"
   nodeName: "dev"
   remoteSchemaFile: "https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql"
   postgresHost: '{{ .Release.Name }}-postgresql'

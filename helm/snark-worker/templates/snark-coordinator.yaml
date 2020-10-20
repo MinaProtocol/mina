@@ -16,7 +16,7 @@ spec:
         app: {{tpl $.Values.coordinator.fullname .}}
         testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
-        version: {{ (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -26,10 +26,9 @@ spec:
       - name: coordinator
         resources:
           limits:
-            memory: 6.0Gi
           requests:
-            memory: 2.0Gi
-            cpu: 2.0
+            memory: 18.5Gi
+            cpu: 8.0
         image: {{ $.Values.coda.image }}
         command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
         args: [ "daemon",
@@ -45,7 +44,8 @@ spec:
           "-run-snark-coordinator", "$(CODA_SNARK_KEY)",
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
-          {{- if $.Values.coda.genesis.active }}
+          "-enable-peer-exchange", "true",
+          {{- if (ne $.Values.coda.runtimeConfig "") }}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
           {{- end }}
@@ -54,6 +54,8 @@ spec:
           {{- end }}
         ]
         env:
+          - name: "RAYON_NUM_THREADS"
+            value: "7"
           - name: DAEMON_REST_PORT
             value: "3085"
           - name: DAEMON_CLIENT_PORT
@@ -75,7 +77,7 @@ spec:
             hostPort: {{ .Values.coordinator.hostPort }}
             protocol: TCP
         imagePullPolicy: Always
-      {{- if $.Values.coda.genesis.active }}
+      {{- if (ne $.Values.coda.runtimeConfig "")}}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"

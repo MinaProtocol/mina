@@ -6,12 +6,11 @@ coda:
     delta: 3
     txpool_max_size: 3000
     genesis_state_timestamp: "2020-04-20 11:00:00-07:00"
-    ledger: "{}"
+    runtimeConfig: ""
   image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
   seedPeers: 
     - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
     - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
-  runtimeConfig: ""
 
 worker: 
   fullname: "snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"
