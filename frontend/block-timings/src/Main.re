@@ -233,6 +233,14 @@ module CloudLogging = {
 
   [@bs.module "@google-cloud/logging"] [@bs.new]
   external create: input => Logging.t = "Logging";
+
+  let structuredLogFilter = (structuredLogIds) => {
+    let idDisjunction =
+      structuredLogIds
+      |> List.map(Printf.sprintf("\"%s\""))
+      |> String.concat(" OR ");
+    Printf.sprintf("jsonPayload.event_id=(%s)", idDisjunction)
+  };
 };
 
 // TODO: Pull the ids from `coda internal dump-structured-events`
@@ -277,117 +285,254 @@ module StructuredLog = {
   };
 };
 
+module Operations = {
+  module type Intf = {
+    type input;
+    type state;
+    type output;
+
+    // TODO: wire into toplevel cli
+    let inputTerm: Cmdliner.Term.t(input);
+
+    let init: input => state;
+    let logFilter: input => string;
+    let processLogEntry: state => CloudLogging.Entry.t => StructuredLog.metadata => state;
+    let render: state => output;
+  };
+
+  module BlockGossipConsistency : Intf = {
+    type input = unit;
+    type state = BlockLifetime.t;
+    type output = BlockLifetime.Rendered.t;
+
+    let inputTerm = Cmdliner.Term.const();
+
+    let init = (_input) => BlockLifetime.empty();
+
+    let structuredLogIds = [
+      StructuredLog.BlockProduced.id,
+      StructuredLog.BlockReceived.id
+    ]
+
+    let logFilter = (_input) => CloudLogging.structuredLogFilter(structuredLogIds)
+
+    let processLogEntry = (blockLifetimes, entry, structuredMetadata) => {
+      let open CloudLogging.Entry;
+      let open StructuredLog;
+
+      let instant = BlockLifetime.Instant.{
+        time: entry.metadata.timestamp,
+        podRealName: entry.metadata.labels.k8sPodApp,
+      };
+
+      switch (structuredMetadata) {
+      | BlockProduced(metadata) =>
+        BlockLifetime.produced(
+          blockLifetimes,
+          ~instant,
+          ~stateHash=
+            metadata.structValue.fields.breadcrumb.structValue.
+              fields.
+              validated_transition.
+              structValue.
+              fields.
+              hash.
+              stringValue,
+        )
+      | BlockReceived(metadata) =>
+        BlockLifetime.received(
+          blockLifetimes,
+          ~instant,
+          ~stateHash=
+            metadata.structValue.fields.state_hash.stringValue,
+        )
+      };
+
+      blockLifetimes
+    }
+
+    let render = BlockLifetime.render
+  };
+};
+
+
 // TODO: Figure out how to get bs-let/ppx to work
 /// The top-level execution of this script when you run with `node`
 module TopLevel = {
   open CloudLogging;
 
-  Js.log("Starting scrape from cloud logging");
-  let logging = CloudLogging.create({projectId: "o1labs-192920"});
-
-  // TODO: Pass this from the CLi
-  let testnetName = "pickles-nightly";
-
   module P = Promise;
 
-  let log = Logging.log(logging, "projects/o1labs-192920/logs/stdout");
+  type inputs = {
+    gcloudProjectId: string,
+    gcloudRegion: string,
+    gcloudKubernetesCluster: string,
+    testnetName: string,
+    startTimestamp: string
+  };
 
-  let blockLifetimes = BlockLifetime.empty();
+  let maxLogPulls = 6;
 
-  let rec go: (int, Log.getEntryOptions) => Promise.t(unit) =
-    (i, req) => {
-      Log.getEntries(log, req)
-      ->P.tap(((es, _, _)) => {
-          let _ =
-            es
-            |> Array.map((e: Entry.t) =>
-                 switch (StructuredLog.ofLogEntry(e)) {
-                 | None =>
-                   failwith(
-                     Printf.sprintf(
-                       "Invalid structured log returned from filter query; unexpected event id \"%s\"",
-                       Entry.eventIdExn(e),
-                     ),
-                   )
-                 | Some(log) => (e, log)
-                 }
-               )
-            |> Array.iter(
-                 ((log: Entry.t, structuredMetadata: StructuredLog.metadata)) => {
-                 let instant =
-                   BlockLifetime.Instant.{
-                     time: log.metadata.timestamp,
-                     podRealName: log.metadata.labels.k8sPodApp,
-                   };
+  let globalLogFilter = (config) => {
+    let {gcloudProjectId, gcloudRegion, gcloudKubernetesCluster, testnetName, startTimestamp} = config;
+    {j|
+resource.type="k8s_container"
+resource.labels.project_id="$gcloudProjectId"
+resource.labels.location="$gcloudRegion"
+resource.labels.cluster_name="$gcloudKubernetesCluster"
+resource.labels.namespace_name="$testnetName"
+resource.labels.container_name="coda"
+timestamp > "$startTimestamp"|j};
+  };
 
-                 switch (structuredMetadata) {
-                 | BlockProduced(metadata) =>
-                   BlockLifetime.produced(
-                     blockLifetimes,
-                     ~instant,
-                     ~stateHash=
-                       metadata.structValue.fields.breadcrumb.structValue.
-                         fields.
-                         validated_transition.
-                         structValue.
-                         fields.
-                         hash.
-                         stringValue,
-                   )
-                 | BlockReceived(metadata) =>
-                   BlockLifetime.received(
-                     blockLifetimes,
-                     ~instant,
-                     ~stateHash=
-                       metadata.structValue.fields.state_hash.stringValue,
-                   )
-                 };
-               });
+  let rec foldLogEntries = (i, log, request, acc, f) => {
+    Log.getEntries(log, request)
+    -> P.map(((es, options, _)) => {
+         let acc =
+           Array.fold_left((acc, e) =>
+             switch(StructuredLog.ofLogEntry(e)) {
+             | None =>
+                 failwith(
+                   Printf.sprintf(
+                     "Invalid structured log returned from filter query; unexpected event id \"%s\"",
+                     Entry.eventIdExn(e),
+                   ),
+                 )
+             | Some(log) => f(acc, e, log)
+           }, acc, es);
 
-          Js.log("Finished processing entries for this page");
-        })
-      ->P.flatMap(((_, options, _)) => {
-          let pageToken =
-            Js.Null_undefined.toOption(options)
-            |> Js.Option.andThen((. opt) => opt.Log.pageToken);
-          if (i == 0 || Js.Option.isNone(pageToken)) {
-            P.resolved();
-          } else {
-            go(i - 1, {...req, pageToken});
-          };
-        });
-    };
+         Js.log("Finished processing entries for this page");
 
-  go(
-    3,
-    {
-      resourceNames: [|"projects/o1labs-192920"|],
+         (options, acc)
+       })
+    -> P.flatMap(((options, acc)) => {
+         let pageToken =
+           Js.Null_undefined.toOption(options)
+           |> Js.Option.andThen((. opt) => opt.Log.pageToken);
+         if(Js.Option.isNone(pageToken)) {
+           Js.log("All logs were processed");
+           P.resolved(acc);
+         } else if(i >= maxLogPulls) {
+           Js.log("Hit max log pulls -- refusing to continue");
+           P.resolved(acc);
+         } else {
+           foldLogEntries(i + 1, log, {...request, pageToken}, acc, f);
+         };
+       });
+  }
+
+  let run = (type input, config, module Operation: Operations.Intf with type input = input, input: input) => {
+    let {gcloudProjectId, _} = config;
+    let logging = CloudLogging.create({projectId: gcloudProjectId});
+    let log = Logging.log(logging, {j|projects/$gcloudProjectId/logs/stdout|j});
+    let state = Operation.init(input);
+    let request = Log.{
+      resourceNames: [|{j|projects/$gcloudProjectId|j}|],
       pageSize: 100,
       autoPaginate: false,
       orderBy: "timestamp desc",
       pageToken: None,
-      filter:
-        Printf.sprintf(
-          {|
-resource.type="k8s_container"
-resource.labels.project_id="o1labs-192920"
-resource.labels.location="us-east1"
-resource.labels.cluster_name="coda-infra-east"
-resource.labels.namespace_name="%s"
-resource.labels.container_name="coda"
-jsonPayload.event_id = ("%s" OR "%s")
-timestamp > "2020-10-15T00:00:00Z"
-|},
-          testnetName,
-          StructuredLog.BlockProduced.id,
-          StructuredLog.BlockReceived.id,
-        ),
-    },
-  )
-  ->P.get(_ =>
-      Js.log2(
-        "All done",
-        Js.Json.stringifyAny(BlockLifetime.render(blockLifetimes)),
-      )
-    );
+      filter: globalLogFilter(config) ++ Operation.logFilter(input)
+    };
+
+    Js.log("Starting scrape from cloud logging");
+
+    foldLogEntries(0, log, request, state, Operation.processLogEntry)
+    -> P.get(state => Js.log2("All done", Js.Json.stringifyAny(Operation.render(state))));
+  };
 };
+
+module Cli = {
+  open Cmdliner;
+
+  let config = {
+    let open Arg;
+
+    // optional terms
+    let gcloudProjectId =
+      value
+      & opt(string, "o1labs-192920")
+      & info(
+          ~doc="Google cloud project id of the project the network was deployed in.",
+          ~docv="project-id",
+          ~env=env_var("GCLOUD_PROJECT_ID"),
+          ["gcloud-project-id"]
+        );
+    let gcloudRegion =
+      value
+      & opt(string, "us-east1")
+      & info(
+          ~doc="Google cloud region the network was deployed in.",
+          ~docv="region",
+          ~env=env_var("GCLOUD_REGION"),
+          ["gcloud-region"]
+        );
+    let gcloudKubernetesCluster =
+      value
+      & opt(string, "coda-infra-east")
+      & info(
+          ~doc="Google cloud kubernetes cluster name of the cluster the network was deployed in.",
+          ~docv="cluster-id",
+          ~env=env_var("GCLOUD_KUBERNETES_CLUSTER"),
+          ["gcloud-kubernetes-cluster"]
+        );
+    let testnetName =
+      required
+      & opt(some(string), None)
+      & info(
+          ~doc="The name the network was deployed with (used as the namespace logs are queried from).",
+          ~docv="name",
+          ~docs="REQUIRED",
+          ["testnet-name", "n"]
+        );
+    let startTimestamp =
+      required
+      & opt(some(string), None)
+      & info(
+          ~doc="Start timestamp of the network. Example format: \"2020-10-15T20:00:00Z\"",
+          ~docv="timestamp",
+          ~docs="REQUIRED",
+          ["start-timestamp", "t"]
+        );
+
+    // configuration term (important: lift argument order needs to match term application order)
+    let lift = (gcloudProjectId, gcloudRegion, gcloudKubernetesCluster, testnetName, startTimestamp) => TopLevel.{
+      gcloudProjectId,
+      gcloudRegion,
+      gcloudKubernetesCluster,
+      testnetName,
+      startTimestamp
+    };
+    Term.(
+      const(lift)
+        $ gcloudProjectId
+        $ gcloudRegion
+        $ gcloudKubernetesCluster
+        $ testnetName
+        $ startTimestamp)
+  };
+
+  type operation = Operation((module Operations.Intf with type input = 'a), 'a): operation;
+
+  // TODO: parse different choices w/ their respective cli inputs
+  let op : Term.t(operation) = {
+    let open Term;
+    const(input => Operation((module Operations.BlockGossipConsistency : Operations.Intf with type input = Operations.BlockGossipConsistency.input), input))
+      $ Operations.BlockGossipConsistency.inputTerm;
+  };
+
+  let main = {
+    let open Term;
+    let run = (config, Operation(opMod, input)) => TopLevel.run(config, opMod, input);
+    let term = const(run) $ config $ op;
+    let info = info(
+      ~doc="Analyzes intra-network communication of testnets from StackDriver logs.",
+      "block-timing"
+    );
+    (term, info)
+  };
+};
+
+// this line is necessary to make bs-cmdliner work correctly (because nodejs stdlib weirdness)
+%raw "process.argv.shift()";
+let () = Cmdliner.Term.(exit(eval(Cli.main)))

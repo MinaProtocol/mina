@@ -11,7 +11,7 @@
     "in-source": true
   },
   "suffix": ".bs.js",
-  "bs-dependencies": ["reason-promise"],
+  "bs-dependencies": ["reason-promise", "@elliottcable/bs-cmdliner"],
   "ppx-flags": ["bs-let/ppx"],
   "warnings": {
     "error": "+101"

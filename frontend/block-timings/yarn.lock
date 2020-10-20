@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@elliottcable/bs-cmdliner@^10.2.2":
+  version "10.2.2"
+  resolved "https://registry.yarnpkg.com/@elliottcable/bs-cmdliner/-/bs-cmdliner-10.2.2.tgz#88d8bdfe500836eda0d42b7a36faa8289990b63d"
+  integrity sha512-wcOOs1paCmvpTWbEhheNGlI4TqpDmNOrIyD4cZmw8+HCfkxpHW6OzNNg7cpIimK1HBEgIDA7dR9xizw8T1T6oQ==
+
 "@google-cloud/common@^3.4.1":
   version "3.4.1"
   resolved "https://registry.yarnpkg.com/@google-cloud/common/-/common-3.4.1.tgz#a1920d73c38437923b4b134e245c392d36c442e9"
@@ -236,10 +241,10 @@ bs-let@^0.1.16:
   resolved "https://registry.yarnpkg.com/bs-let/-/bs-let-0.1.16.tgz#63cd449ed02c75f87eceb248d45963937afdd4ed"
   integrity sha512-pdbSNe/QRpqgqS72dYDlkZ7kqMHc5aJkLgipLS8BFMRx+hQqkOo0JOpxWZQeDj1T677e302xgmV+Mid5gvmnBg==
 
-bs-platform@*:
-  version "8.3.1"
-  resolved "https://registry.yarnpkg.com/bs-platform/-/bs-platform-8.3.1.tgz#49ac0d7b84bcec190a7361353557cae965f92c67"
-  integrity sha512-U7nKEGF1BfvODzcv1g2loeltE8YRCgX8mMlCojImsgI0HwfQKEq7ggO5dF1ae9ZfFxiLaI0069ZyoK5GLBO2OQ==
+bs-platform@^7.1.1:
+  version "7.3.2"
+  resolved "https://registry.yarnpkg.com/bs-platform/-/bs-platform-7.3.2.tgz#301f5c9b4e8cf5713cb60ca22e145e56e793affe"
+  integrity sha512-seJL5g4anK9la4erv+B2o2sMHQCxDF6OCRl9en3hbaUos/S3JsusQ0sPp4ORsbx5eXfHLYBwPljwKXlgpXtsgQ==
 
 buffer-equal-constant-time@1.0.1:
   version "1.0.1"

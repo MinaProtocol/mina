@@ -7,14 +7,17 @@
     "start": "bsb -make-world -w",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei')"
   },
-  "keywords": ["rescript"],
+  "keywords": [
+    "rescript"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "bs-platform": "*",
+    "bs-platform": "^7.1.1",
     "bs-let": "^0.1.16"
   },
   "dependencies": {
+    "@elliottcable/bs-cmdliner": "^10.2.2",
     "@google-cloud/logging": "^8.0.8",
     "reason-promise": "^1.1.2"
   }
