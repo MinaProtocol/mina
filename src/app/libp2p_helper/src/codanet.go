@@ -171,7 +171,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
 		p2p.ConnectionGater(&gatingState),
-		p2p.ConnectionManager(connmgr.NewConnManager(25, 250, time.Duration(30*time.Second))),
+		p2p.ConnectionManager(connmgr.NewConnManager(15, 125, time.Duration(30*time.Second))),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
 			as = append(as, externalAddr)
