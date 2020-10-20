@@ -54,7 +54,12 @@ module Styles = {
       unsafe("grid-area", "3/1"),
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`row), unsafe("grid-area", "3/1")],
+        [
+          display(`flex),
+          flexDirection(`row),
+          unsafe("grid-area", "3/1"),
+          height(`rem(73.4)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
