@@ -8,8 +8,9 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    - port: {{ $.Values.coordinator.rpcPort }}
-      name: rpc
+    - name: rpc
+      port: {{ $.Values.coordinator.rpcPort }}
+
   selector:
     app: {{tpl $.Values.coordinator.fullname .}}
 {{ end }}

@@ -1,4 +1,3 @@
-# Coda Daemon
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,27 +47,37 @@ spec:
           "-insecure-rest-server",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
-          "-archive-address", "3086",
-          {{- if (ne $.Values.coda.runtimeConfig "") }}
+          "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
+          {{- if (ne $.Values.coda.runtimeConfig "") -}}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
           {{- end -}}
         ]
         env:
-          - name: DAEMON_REST_PORT
-            value: "3085"
-          - name: DAEMON_ARCHIVE_PORT
-            value: "3086"
-          - name: DAEMON_CLIENT_PORT
-            value: "8301"
-          - name: DAEMON_METRICS_PORT
-            value: "10000"
-          - name: DAEMON_EXTERNAL_PORT
-            value: {{ .Values.archive.hostPort | quote }}
+        - name: DAEMON_REST_PORT
+          value: {{ .Values.coda.ports.graphql | quote }}
+        - name: DAEMON_ARCHIVE_PORT
+          value: {{ .Values.archive.ports.server | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ .Values.coda.ports.libp2p | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ .Values.coda.ports.metrics | quote }}
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ .Values.coda.ports.external | quote }}
         ports:
-          - containerPort: {{ .Values.archive.hostPort }}
-            hostPort: {{ .Values.archive.hostPort }}
-            protocol: TCP
+        - name: libp2p
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.libp2p }}
+        - name: graphql
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.graphql }}
+        - name: metrics
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.metrics }}
+        - name: external
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ .Values.coda.ports.external }}
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
@@ -83,6 +92,13 @@ spec:
         args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port 3086" ]
         env:
         imagePullPolicy: Always
+        ports:
+        - name: archive-server
+          protocol: TCP
+          containerPort: {{ .Values.archive.ports.server }}
+        - name: archive-postgres
+          protocol: TCP
+          containerPort: {{ .Values.archive.ports.postgres }}
       volumes:
       - name: config-dir
         emptyDir: {}

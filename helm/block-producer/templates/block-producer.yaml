@@ -104,8 +104,8 @@ spec:
           - name: PYTHONUNBUFFERED
             value: "1"
         ports: 
-          - name: metrics
-            containerPort: 8000
+        - name: metrics
+          containerPort: {{ $.Values.userAgent.ports.metrics }}
         imagePullPolicy: Always
       {{- end }}
       {{ if $config.runWithBots -}}
@@ -119,7 +119,7 @@ spec:
           - name: CODA_GRAPHQL_HOST
             value: "0.0.0.0"
           - name: CODA_GRAPHQL_PORT
-            value: "3085"
+            value: {{ $.Values.bots.ports.graphql | quote }}
           - name: ECHO_PUBLICKEY
             valueFrom:
               secretKeyRef:
@@ -143,6 +143,9 @@ spec:
             value: {{ $.Values.bots.faucet.amount | quote }}
           - name: FEE_AMOUNT
             value: {{ $.Values.bots.faucet.fee | quote }}
+        ports:
+        - name: graphql
+          containerPort: {{ $.Values.bots.ports.graphql }}
         imagePullPolicy: Always
       {{- end }}
       - name: coda
@@ -186,26 +189,32 @@ spec:
           {{- end -}}
         ]
         env:
-          - name: "RAYON_NUM_THREADS"
-            value: "6"
-          - name: DAEMON_REST_PORT
-            value: "3085"
-          - name: DAEMON_CLIENT_PORT
-            value: "8301"
-          - name: DAEMON_METRICS_PORT
-            value: "10000"
-          - name: DAEMON_EXTERNAL_PORT
-            value: {{ $config.externalPort | quote }}
-          - name: CODA_PRIVKEY_PASS
-            value: {{ $.Values.coda.privkeyPass | quote }}
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ $.Values.coda.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ $.Values.coda.ports.libp2p | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ $.Values.coda.ports.metrics | quote }}
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ $.Values.coda.ports.external | quote }}
+        - name: CODA_PRIVKEY_PASS
+          value: {{ $.Values.coda.privkeyPass | quote }}
         ports:
-          - containerPort: {{ $config.externalPort }}
-            hostPort: {{ $config.externalPort }}
-            protocol: TCP
-          - name: graphql
-            containerPort: 3085
-          - name: metrics
-            containerPort: 10000
+        - name: libp2p
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.libp2p }}
+        - name: graphql
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.graphql }}
+        - name: metrics
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.metrics }}
+        - name: external
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.external }}
+          hostPort: {{ $.Values.coda.ports.external }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys

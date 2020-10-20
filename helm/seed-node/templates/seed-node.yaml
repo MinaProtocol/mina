@@ -67,19 +67,29 @@ spec:
           - name: "RAYON_NUM_THREADS"
             value: "6"
           - name: DAEMON_REST_PORT
-            value: "3085"
+            value: {{ $.Values.coda.ports.graphql | quote }}
           - name: DAEMON_CLIENT_PORT
-            value: {{ .Values.seed.rpcPort | quote }}
+            value: {{ $.Values.coda.ports.libp2p | quote }}
           - name: DAEMON_METRICS_PORT
-            value: "10000"
+            value: {{ $.Values.coda.ports.metrics | quote }}
           - name: CODA_CLIENT_TRUSTLIST
             value: "10.0.0.0/8"
           - name: DAEMON_EXTERNAL_PORT
-            value: {{ .Values.seed.hostPort | quote }}
+            value: {{ $.Values.coda.ports.external | quote }}
         ports:
-        - containerPort: {{ .Values.seed.hostPort }}
-          hostPort: {{ .Values.seed.hostPort }}
-          protocol: TCP
+        - name: libp2p
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.libp2p }}
+        - name: graphql
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.graphql }}
+        - name: metrics
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.metrics }}
+        - name: external
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.external }}
+          hostPort: {{ $.Values.coda.ports.external }}
         imagePullPolicy: Always
       {{- if (ne $.Values.coda.runtimeConfig "") }}
         volumeMounts:

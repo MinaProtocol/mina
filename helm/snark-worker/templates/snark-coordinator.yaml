@@ -55,26 +55,36 @@ spec:
         env:
           - name: "RAYON_NUM_THREADS"
             value: "7"
-          - name: DAEMON_REST_PORT
-            value: "3085"
-          - name: DAEMON_CLIENT_PORT
-            value: {{ .Values.coordinator.rpcPort | quote }}
-          - name: DAEMON_METRICS_PORT
-            value: "10000"
-          - name: CODA_CLIENT_TRUSTLIST
-            value: "10.0.0.0/8"
-          - name: CODA_SNARK_KEY
-            value: {{ .Values.coordinator.publicKey | quote }}
-          - name: CODA_SNARK_FEE
-            value: {{ .Values.coordinator.snarkFee | quote }}
-          - name: DAEMON_EXTERNAL_PORT
-            value: {{ .Values.coordinator.hostPort | quote }}
-          - name: WORK_SELECTION
-            value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
+        - name: DAEMON_REST_PORT
+          value: {{ .Values.coordinator.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ .Values.coordinator.ports.p2p | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ .Values.coordinator.ports.metrics | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: CODA_SNARK_KEY
+          value: {{ .Values.coordinator.publicKey | quote }}
+        - name: CODA_SNARK_FEE
+          value: {{ .Values.coordinator.snarkFee | quote }}
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ .Values.coordinator.ports.external | quote }}
+        - name: WORK_SELECTION
+          value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
         ports:
-          - containerPort: {{ .Values.coordinator.hostPort }}
-            hostPort: {{ .Values.coordinator.hostPort }}
-            protocol: TCP
+        - name: p2p
+          protocol: TCP 
+          containerPort: {{ $.Values.coordinator.ports.p2p }}
+        - name: graphql
+          protocol: TCP 
+          containerPort: {{ $.Values.coordinator.ports.graphql }}
+        - name: metrics
+          protocol: TCP 
+          containerPort: {{ $.Values.coordinator.ports.metrics }}
+        - name: external
+          protocol: TCP 
+          containerPort: {{ $.Values.coordinator.ports.external }}
+          hostPort: {{ $.Values.coordinator.ports.external }}
         imagePullPolicy: Always
       {{- if $.Values.coda.runtimeConfig }}
         volumeMounts:
