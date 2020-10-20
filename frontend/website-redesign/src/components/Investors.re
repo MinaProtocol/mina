@@ -80,11 +80,12 @@ module Styles = {
   let advisorGrid =
     style([
       display(`grid),
-      gridTemplateColumns([`repeat((`num(2), `rem(10.)))]),
+      gridTemplateColumns([`repeat((`num(2), `rem(11.)))]),
       gridAutoRows(`rem(17.3)),
+      gridColumnGap(`rem(1.)),
       media(
         Theme.MediaQuery.tablet,
-        [gridTemplateColumns([`repeat((`num(4), `rem(10.)))])],
+        [gridTemplateColumns([`repeat((`num(4), `rem(11.)))])],
       ),
       media(
         Theme.MediaQuery.desktop,

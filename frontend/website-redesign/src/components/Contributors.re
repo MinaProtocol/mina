@@ -61,7 +61,7 @@ module GenesisMembersGrid = {
         gridRowGap(`rem(1.)),
         media(
           Theme.MediaQuery.tablet,
-          [gridTemplateColumns([`rem(21.), `rem(10.), `rem(10.)])],
+          [gridTemplateColumns([`repeat((`num(3), `rem(10.)))])],
         ),
         media(
           Theme.MediaQuery.desktop,

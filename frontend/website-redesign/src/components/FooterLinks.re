@@ -118,7 +118,7 @@ let make = () => {
       <h4 className=Styles.linksHeader>
         {React.string("Help and Support")}
       </h4>
-      <Next.Link href="https://discord.com/invite/Vexf4ED">
+      <Next.Link href="https://discord.com/invite/RDQc43H">
         <a className=Styles.linkStyle> {React.string("Discord")} </a>
       </Next.Link>
       <Next.Link href="https://forums.minaprotocol.com/">
