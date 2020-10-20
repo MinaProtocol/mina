@@ -31,7 +31,7 @@ let ReleaseSpec = {
     commit = "\\\${CODA_GIT_HASH}",
     build_rosetta_override = False,
     extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
-    step_key = "docker-artifact"
+    step_key = "mina-docker-image"
   }
 }
 
@@ -57,7 +57,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     Command.build
       Command.Config::{
         commands  = commands,
-        label = "Build and release Docker artifacts: ${spec.step_key}",
+        label = "Build and release Docker images: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,
         docker_login = Some DockerLogin::{=},

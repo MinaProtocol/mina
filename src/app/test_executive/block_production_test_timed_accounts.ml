@@ -55,8 +55,11 @@ module Make (Engine : Engine_intf) = struct
     let open Malleable_error.Let_syntax in
     let block_producer = List.nth_exn network.Network.block_producers 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
-    let%bind `Blocks_produced blocks_produced, `Slots_passed slots =
-      Log_engine.wait_for ~blocks:8 ~timeout:(`Slots 30) log_engine
+    let%bind ( `Blocks_produced blocks_produced
+             , `Slots_passed slots
+             , `Snarked_ledgers_generated _snarked_ledger_generated ) =
+      Log_engine.wait_for ~blocks:8 ~snarked_ledgers_generated:1
+        ~timeout:(`Slots 30) log_engine
     in
     let logger = Logger.create () in
     [%log info] "blocks produced %d slots passed %d" blocks_produced slots ;
