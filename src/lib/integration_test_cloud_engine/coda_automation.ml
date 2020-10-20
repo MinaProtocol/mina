@@ -13,7 +13,9 @@ module Network_config = struct
     ; private_key_secret: string
     ; enable_gossip_flooding: bool
     ; run_with_user_agent: bool
-    ; run_with_bots: bool }
+    ; run_with_bots: bool
+    ; enable_peer_exchange: bool
+    ; isolated: bool }
   [@@deriving to_yojson]
 
   type terraform_config =
@@ -174,7 +176,9 @@ module Network_config = struct
       ; private_key_secret= secret_name
       ; enable_gossip_flooding= false
       ; run_with_user_agent= false
-      ; run_with_bots= false }
+      ; run_with_bots= false
+      ; enable_peer_exchange= false
+      ; isolated= false }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location

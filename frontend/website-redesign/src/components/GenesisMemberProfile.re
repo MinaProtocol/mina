@@ -7,7 +7,7 @@ module Styles = {
       display(`flex),
       paddingBottom(`rem(3.)),
       width(`rem(23.)),
-      height(`rem(38.)),
+      height(`rem(33.)),
       background(`hex("F5F5F5")),
     ]);
   let memberName =
@@ -26,8 +26,8 @@ module Styles = {
       left(`rem(2.5)),
       background(white),
       marginTop(`rem(-3.)),
-      height(`rem(6.25)),
-      width(`rem(6.25)),
+      height(`rem(7.75)),
+      width(`rem(8.125)),
     ]);
   let link =
     merge([
@@ -41,7 +41,12 @@ module Styles = {
   let genesisLabel =
     merge([
       Theme.Type.paragraphMono,
-      style([position(`absolute), top(`rem(9.25)), left(`rem(2.5))]),
+      style([
+        fontSize(`rem(0.875)),
+        position(`absolute),
+        top(`rem(9.25)),
+        left(`rem(2.5)),
+      ]),
     ]);
   let quoteSection =
     merge([
@@ -53,7 +58,7 @@ module Styles = {
         width(`rem(18.)),
       ]),
     ]);
-  let quote = style([marginTop(`rem(1.)), marginBottom(`rem(1.))]);
+  let quote = style([marginTop(`rem(1.5)), marginBottom(`rem(1.5))]);
   let socials =
     style([
       display(`flex),
@@ -96,6 +101,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
       <div className=Styles.quoteSection>
         <Rule />
         <p className=Styles.quote> {React.string(quote)} </p>
+        <Rule />
       </div>
       <div className=Styles.socials>
         <>
@@ -107,12 +113,15 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
         </>
         <div className=Styles.socialTags>
           <a
-            href={"https://twitter.com/" ++ twitter} className=Styles.iconLink>
+            target="_blank"
+            href={"https://twitter.com/" ++ twitter}
+            className=Styles.iconLink>
             <Icon kind=Icon.Twitter />
           </a>
           {switch (github) {
            | Some(github) =>
              <a
+               target="_blank"
                href={"https://github.com/" ++ github}
                className=Styles.iconLink>
                <Icon kind=Icon.Github />

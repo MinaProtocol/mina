@@ -123,15 +123,14 @@ module NodeOperatorsSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-
-        <SideNav.Item title="Node Overview" slug="#how-mina-works" />
-        <SideNav.Item title="Help And Support" slug="#help-and-support" />
-      </SideNav>;
-      // <SideNav.Item
-      //   title="Block Explorers & Tools"
-      //   slug="#block-explorers-tools"
-      // />
-      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      <SideNav.Item title="Node Overview" slug="#how-mina-works" />
+      <SideNav.Item title="Help And Support" slug="#help-and-support" />
+    </SideNav>;
+    // <SideNav.Item
+    //   title="Block Explorers & Tools"
+    //   slug="#block-explorers-tools"
+    // />
+    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -383,13 +382,14 @@ let make = () => {
         image: "/static/img/NodeOperators_large.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        button: {
-          FeaturedSingleRow.Row.buttonText: "Go to Testnet",
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Theme.Colors.white,
-          dark: true,
-          href: `Internal("/testnet"),
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            FeaturedSingleRow.Row.buttonText: "Go to Testnet",
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Theme.Colors.white,
+            dark: true,
+            href: `Internal("/testnet"),
+          }),
       }
     />
     // TODO: Not currently ready to ship. Update component with proper info when available.
@@ -405,13 +405,14 @@ let make = () => {
         background:
           Image("/static/img/community-page/CommunityBackground.jpg"),
         contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        button: {
-          buttonColor: Theme.Colors.mint,
-          buttonTextColor: Theme.Colors.digitalBlack,
-          buttonText: "Learn More",
-          dark: true,
-          href: `Internal("/genesis"),
-        },
+        link:
+          {FeaturedSingleRow.Row.Button({
+             buttonColor: Theme.Colors.mint,
+             buttonTextColor: Theme.Colors.digitalBlack,
+             buttonText: "Learn More",
+             dark: true,
+             href: `Internal("/genesis"),
+           })},
       }
     />
     // TODO: Knowledge Base
