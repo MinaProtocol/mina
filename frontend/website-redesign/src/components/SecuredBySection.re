@@ -51,6 +51,7 @@ module Styles = {
       backgroundColor(Theme.Colors.digitalBlack),
       height(`rem(57.)),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
+      unsafe("grid-area", "3"),
       media(
         Theme.MediaQuery.tablet,
         [
