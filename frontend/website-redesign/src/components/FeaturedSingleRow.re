@@ -38,9 +38,50 @@ module Row = {
   };
 };
 
+/* The reason we have a custom wrapped component here is because we want the
+   image to be the full width of the screen on mobile. If we wrap our component
+   in a normal wrap, a width margin is applied on mobile which we don't want. Instead
+   we create a custom wrapped component for this component only */
+
+module CustomWrapped = {
+  open Css;
+
+  [@react.component]
+  let make = (~overflowHidden=false, ~children) => {
+    let paddingX = m => [paddingLeft(m), paddingRight(m)];
+    <div
+      className={style(
+        (overflowHidden ? [overflow(`hidden)] : [])
+        @ [
+          margin(`auto),
+          media(
+            Theme.MediaQuery.tablet,
+            [maxWidth(`rem(85.0)), ...paddingX(`rem(2.5))],
+          ),
+          media(
+            Theme.MediaQuery.desktop,
+            [maxWidth(`rem(90.0)), ...paddingX(`rem(9.5))],
+          ),
+        ],
+      )}>
+      children
+    </div>;
+  };
+};
+
 module SingleRow = {
   module RowStyles = {
     open Css;
+
+    let childreWrapped =
+      style([
+        margin(`auto),
+        padding2(~v=`zero, ~h=`rem(1.5)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [margin(`zero), padding2(~v=`zero, ~h=`zero)],
+        ),
+      ]);
 
     let container =
       style([
@@ -60,7 +101,7 @@ module SingleRow = {
         };
       style([
         position(`absolute),
-        width(`rem(21.)),
+        width(`percent(92.5)),
         maxHeight(`rem(35.)),
         overflow(`scroll),
         unsafe("height", "fit-content"),
@@ -69,11 +110,16 @@ module SingleRow = {
         flexDirection(`column),
         alignItems(`flexStart),
         justifyContent(`spaceBetween),
-        padding(`rem(3.)),
+        padding(`rem(2.)),
         backgroundSize(`cover),
         media(
           Theme.MediaQuery.notMobile,
-          [margin(`zero), overflow(`hidden), ...additionalNotMobileStyles],
+          [
+            width(`percent(100.)),
+            margin(`zero),
+            overflow(`hidden),
+            ...additionalNotMobileStyles,
+          ],
         ),
         switch (contentBackground) {
         | Image(url) => backgroundImage(`url(url))
@@ -111,10 +157,14 @@ module SingleRow = {
       style([
         position(`absolute),
         width(`percent(100.)),
+        height(`percent(70.)),
         maxWidth(`rem(53.)),
         paddingTop(`rem(8.)),
         bottom(`zero),
-        media(Theme.MediaQuery.tablet, [width(`percent(80.))]),
+        media(
+          Theme.MediaQuery.tablet,
+          [height(`percent(110.)), width(`percent(80.))],
+        ),
         media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
       ]);
   };
@@ -127,6 +177,7 @@ module SingleRow = {
           RowStyles.image,
           style([
             left(`zero),
+            bottom(`percent(30.)),
             media(Theme.MediaQuery.notMobile, [bottom(`zero)]),
           ]),
         ]);
@@ -135,11 +186,11 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, backgroundImg),
           style([
-            bottom(`zero),
+            bottom(`percent(5.)),
             media(
               Theme.MediaQuery.tablet,
               [
-                bottom(`percent(6.)),
+                bottom(`percent(25.)),
                 top(`inherit_),
                 right(`zero),
                 width(`rem(29.)),
@@ -210,10 +261,10 @@ module SingleRow = {
         merge([
           RowStyles.contentBlock(size, contentBackground),
           style([
-            top(`rem(12.6)),
+            top(`percent(5.)),
             media(
               Theme.MediaQuery.tablet,
-              [left(`zero), width(`rem(32.))],
+              [left(`zero), width(`rem(32.)), top(`percent(15.))],
             ),
           ]),
         ]);
@@ -285,15 +336,16 @@ module Styles = {
 [@react.component]
 let make = (~row: Row.t, ~children=?) => {
   <div className={Styles.singleRowBackground(row.background)}>
-    <Wrapped>
+    <CustomWrapped>
       {switch (row.rowType) {
        | ImageLeftCopyRight => <SingleRow.ImageLeftCopyRight row />
        | ImageRightCopyLeft => <SingleRow.ImageRightCopyLeft row />
        }}
       {switch (children) {
-       | Some(children) => children
+       | Some(children) =>
+         <div className=SingleRow.RowStyles.childreWrapped> children </div>
        | None => <> </>
        }}
-    </Wrapped>
+    </CustomWrapped>
   </div>;
 };
