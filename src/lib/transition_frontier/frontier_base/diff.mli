@@ -1,9 +1,9 @@
 open Coda_base
 open Coda_transition
 
-type full
+type full = Full
 
-type lite
+type lite = Lite
 
 (** A node can be represented in two different formats.
  *  A full node representation is a breadcrumb, which

@@ -2610,21 +2610,7 @@ module Hooks = struct
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , let newest_epoch =
-            Epoch.max
-              (Consensus_state.curr_epoch existing)
-              (Consensus_state.curr_epoch candidate)
-          in
-          let virtual_min_length (s : Consensus_state.Value.t) =
-            let curr_epoch = Consensus_state.curr_epoch s in
-            if Epoch.(succ curr_epoch < newest_epoch) then Length.zero
-              (* There is a gap of an entire epoch *)
-            else if Epoch.(succ curr_epoch = newest_epoch) then
-              Length.(min s.min_window_density s.next_epoch_data.epoch_length)
-              (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
-            else s.min_window_density
-          in
-          Length.(virtual_min_length existing < virtual_min_length candidate)
+        , Length.(existing.min_window_density < candidate.min_window_density)
         )
     in
     let choice = if should_take then `Take else `Keep in

@@ -365,6 +365,17 @@ let main ~input_file ~output_file ~archive_uri () =
               ~metadata:[("error", `String (Caqti_error.show msg))] ;
             exit 1
       in
+      (* check that genesis block is in chain to target hash
+         assumption: genesis block occupies global slot 0
+      *)
+      if Int64.Table.mem global_slot_ledger_hash_tbl Int64.zero then
+        [%log info]
+          "Block chain leading to target state hash includes genesis block"
+      else (
+        [%log fatal]
+          "Block chain leading to target state hash does not include genesis \
+           block" ;
+        Core_kernel.exit 1 ) ;
       [%log info] "Loading user command ids" ;
       let%bind user_cmd_ids =
         match%bind
@@ -460,6 +471,9 @@ let main ~input_file ~output_file ~archive_uri () =
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      [%log info] "Applying %d user commands and %d internal commands"
+        (List.length sorted_user_cmds)
+        (List.length sorted_internal_cmds) ;
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot =
