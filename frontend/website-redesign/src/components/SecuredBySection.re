@@ -51,14 +51,13 @@ module Styles = {
       backgroundColor(Theme.Colors.digitalBlack),
       height(`rem(57.)),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
-      unsafe("grid-area", "3/1"),
       media(
         Theme.MediaQuery.tablet,
         [
           display(`flex),
           flexDirection(`row),
-          unsafe("grid-area", "3/1"),
-          height(`rem(73.4)),
+          unsafe("grid-area", "3 / 1 / 3 / 3"),
+          height(`rem(29.)),
         ],
       ),
       media(
@@ -75,7 +74,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`column)],
+        [display(`flex), flexDirection(`column), height(`rem(73.4))],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -159,7 +158,10 @@ module Styles = {
   let dotsImage =
     style([
       marginBottom(`rem(3.)),
-      media(Theme.MediaQuery.tablet, [marginRight(`rem(3.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginRight(`rem(3.)), height(`rem(25.))],
+      ),
       media(
         Theme.MediaQuery.desktop,
         [marginRight(`zero), marginBottom(`zero), height(`rem(35.6))],

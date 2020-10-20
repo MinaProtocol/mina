@@ -65,12 +65,7 @@ module GenesisMembersGrid = {
         ),
         media(
           Theme.MediaQuery.desktop,
-          [
-            gridTemplateColumns([
-              `rem(23.),
-              `repeat((`num(5), `rem(11.))),
-            ]),
-          ],
+          [gridTemplateColumns([`repeat((`num(5), `rem(11.)))])],
         ),
       ]);
   };
