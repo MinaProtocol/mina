@@ -346,7 +346,6 @@ struct
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC x_hat ;
-        print_g "x_hat" x_hat ;
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
@@ -486,7 +485,7 @@ struct
       Field.sub (go x 0) Field.one
 
   let shifts ~log2_size =
-    Backend.Tick.B.Field_verifier_index.shifts ~log2_size
+    Common.tick_shifts ~log2_size
     |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
 
   let domain_generator ~log2_size =
@@ -593,8 +592,7 @@ struct
             let d_unchecked =
               Plonk_checks.domain
                 (module Field.Constant)
-                (Pow_2_roots_of_unity d)
-                ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                (Pow_2_roots_of_unity d) ~shifts:Common.tick_shifts
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
             let checked_domain () =
@@ -618,7 +616,7 @@ struct
                 Plonk_checks.domain
                   (module Field.Constant)
                   (Pow_2_roots_of_unity (field1 ds))
-                  ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                  ~shifts:Common.tick_shifts
                   ~domain_generator:Backend.Tick.Field.domain_generator
               in
               let checked_domain () =
@@ -679,23 +677,23 @@ struct
         let d = Number.of_bits (Field.unpack ~length:max_log2_degree d) in
         Number.mod_pow_2 d (`Two_to_the k)
 
-    let combine_split_evaluations' b_plus_19 ~max_quot_size =
+    let combine_split_evaluations' b_plus_8 ~max_quot_size =
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
-        (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
+        (Common.dlog_pcs_batch b_plus_8 ~max_quot_size)
         ~shifted_pow:
           (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
 
-    let combine_split_evaluations_side_loaded b_plus_19 ~max_quot_size =
+    let combine_split_evaluations_side_loaded b_plus_8 ~max_quot_size =
       Pcs_batch.combine_split_evaluations ~last
         ~mul:(fun (keep, x) (y : Field.t) -> (keep, Field.(y * x)))
         ~mul_and_add:(fun ~acc ~xi (keep, fx) ->
           Field.if_ keep ~then_:Field.(fx + (xi * acc)) ~else_:acc )
         ~init:(fun (_, fx) -> fx)
-        (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
+        (Common.dlog_pcs_batch b_plus_8 ~max_quot_size)
         ~shifted_pow:(fun deg x -> pow x deg)
 
     let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -705,8 +703,8 @@ struct
           Array.zip_exn (mask ~lengths choice) e )
   end
 
-  let combined_evaluation (type b b_plus_19) b_plus_19 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+  let combined_evaluation (type b b_plus_8) b_plus_8 ~xi ~evaluation_point
+      ((without_degree_bound : (_, b_plus_8) Vector.t), with_degree_bound)
       ~max_quot_size =
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul
@@ -714,7 +712,7 @@ struct
       ~shifted_pow:
         (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Max_degree.step)
       ~init:Fn.id ~evaluation_point ~xi
-      (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
+      (Common.dlog_pcs_batch b_plus_8 ~max_quot_size)
       without_degree_bound with_degree_bound
 
   let absorb_field sponge x = Sponge.absorb sponge (`Field x)

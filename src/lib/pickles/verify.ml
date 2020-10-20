@@ -82,8 +82,7 @@ let verify_heterogenous (ts : Instance.t list) =
                 (* TODO: Cache the shifts and domain_generator *)
                 (Plonk_checks.domain
                    (module Tick.Field)
-                   step_domains.h
-                   ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                   step_domains.h ~shifts:Common.tick_shifts
                    ~domain_generator:Backend.Tick.Field.domain_generator)
               {zeta; beta= chal plonk0.beta; gamma= chal plonk0.gamma; alpha}
               (Plonk_checks.evals_of_split_evals

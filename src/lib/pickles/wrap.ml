@@ -271,7 +271,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
         ~domain:
           (Plonk_checks.domain
              (module Tick.Field)
-             domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+             domain ~shifts:Common.tick_shifts
              ~domain_generator:Backend.Tick.Field.domain_generator)
         {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
         (Plonk_checks.evals_of_split_evals

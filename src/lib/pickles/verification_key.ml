@@ -48,8 +48,11 @@ module Stable = struct
         Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend
       in
       let t =
-        let d = Domain.Pow_2_roots_of_unity (Int.ceil_log2 d.constraints) in
-        let r, o = Common.tock_shifts d in
+        let log2_size = Int.ceil_log2 d.constraints in
+        let d = Domain.Pow_2_roots_of_unity log2_size in
+        let {Snarky_bn382_bindings.Shifts.r; o} =
+          Common.tock_shifts ~log2_size
+        in
         let max_quot_size = (5 * (Domain.size d + 2)) - 5 in
         Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
           ~max_poly_size:(u (1 lsl Nat.to_int Rounds.Wrap.n))

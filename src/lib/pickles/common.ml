@@ -11,13 +11,16 @@ module Max_degree = struct
   let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
 end
 
-let tick_shifts : Domain.t -> Backend.Tick.Field.t Tuple_lib.Double.t =
-  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
-      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
-
-let tock_shifts : Domain.t -> Backend.Tock.Field.t Tuple_lib.Double.t =
-  Memo.general ~cache_size_bound:20 ~hashable:Domain.Table.hashable (function
-      | Pow_2_roots_of_unity x -> failwithf "sample_shifts %d" x () )
+let tick_shifts, tock_shifts =
+  let mk g =
+    let f =
+      Memo.general ~cache_size_bound:20 ~hashable:Int.hashable
+        (fun log2_size -> g ~log2_size)
+    in
+    fun ~log2_size -> f log2_size
+  in
+  ( mk Backend.Tick.B.Field_verifier_index.shifts
+  , mk Backend.Tock.B.Field_verifier_index.shifts )
 
 let wrap_domains =
   { Domains.h= Pow_2_roots_of_unity 17

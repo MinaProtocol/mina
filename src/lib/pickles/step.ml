@@ -155,7 +155,7 @@ struct
             ~domain:
               (Plonk_checks.domain
                  (module Tick.Field)
-                 domain ~shifts:Backend.Tick.B.Field_verifier_index.shifts
+                 domain ~shifts:Common.tick_shifts
                  ~domain_generator:Backend.Tick.Field.domain_generator)
             { zeta
             ; alpha
@@ -331,8 +331,7 @@ struct
             ~domain:
               (Plonk_checks.domain
                  (module Tock.Field)
-                 data.wrap_domains.h
-                 ~shifts:Backend.Tock.B.Field_verifier_index.shifts
+                 data.wrap_domains.h ~shifts:Common.tock_shifts
                  ~domain_generator:Backend.Tock.Field.domain_generator)
             {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
             (Plonk_checks.evals_of_split_evals

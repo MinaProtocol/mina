@@ -122,7 +122,7 @@ let pack_statement max_branching =
           (Types.Pairing_based.Statement.to_data t) )
 
 let shifts ~log2_size =
-  Backend.Tock.B.Field_verifier_index.shifts ~log2_size
+  Common.tock_shifts ~log2_size
   |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
 
 let domain_generator ~log2_size =

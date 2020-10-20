@@ -152,7 +152,10 @@ include Make
               let t =
                 let d = Common.wrap_domains.h in
                 let max_quot_size = (5 * (Import.Domain.size d + 2)) - 5 in
-                let r, o = Common.tock_shifts d in
+                let {Snarky_bn382_bindings.Shifts.r; o} =
+                  Common.tock_shifts
+                    ~log2_size:(Pickles_base.Domain.log2_size d)
+                in
                 Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
                   ~max_poly_size:(u (1 lsl Nat.to_int Backend.Tock.Rounds.n))
                   ~max_quot_size:(u max_quot_size)

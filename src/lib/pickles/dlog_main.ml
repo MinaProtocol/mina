@@ -101,6 +101,14 @@ struct
             Field.Constant.print (read_var y) ;
             Core.printf "\n%!")
 
+  let print_w lab gs =
+    if debug then
+      Array.iteri gs ~f:(fun i (fin, g) ->
+          as_prover
+            As_prover.(
+              fun () -> Core.printf "fin=%b %!" (read Boolean.typ fin)) ;
+          ksprintf print_g "%s[%d]" lab i g )
+
   let print_chal lab x =
     if debug then
       as_prover
@@ -369,35 +377,27 @@ struct
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
         in
-        print_g "combined_polynomial" combined_polynomial ;
         let lr_prod, challenges = bullet_reduce sponge lr in
-        print_g "lr_prod" lr_prod ;
         let p_prime =
           let uc = scale_fast u combined_inner_product in
-          print_g "uc" uc ; combined_polynomial + uc
+          combined_polynomial + uc
         in
-        print_g "p_prime" p_prime ;
         let q = p_prime + lr_prod in
-        print_g "q" q ;
         absorb sponge PC delta ;
         let c, _c_packed = squeeze_scalar sponge in
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
-          print_g "cq" cq ; cq + delta
+          cq + delta
         in
-        print_g "lhs" lhs ;
         let rhs =
           let b_u = scale_fast u advice.b in
-          print_g "b_u" b_u ;
           let z_1_g_plus_b_u = scale_fast (sg + b_u) z_1 in
-          print_g "z_1_g_plus_b_u" z_1_g_plus_b_u ;
           let z2_h =
             scale_fast (Inner_curve.constant (Lazy.force Generators.h)) z_2
           in
-          print_g "z2_h" z2_h ; z_1_g_plus_b_u + z2_h
+          z_1_g_plus_b_u + z2_h
         in
-        print_g "rhs" rhs ;
         (`Success (equal_g lhs rhs), challenges) )
 
   module Opt =
@@ -555,14 +555,6 @@ struct
         let without = Type.Without_degree_bound in
         let with_ = Type.With_degree_bound in
         absorb sponge PC (Boolean.true_, x_hat) ;
-        let print_w lab gs =
-          if debug then
-            Array.iteri gs ~f:(fun i (fin, g) ->
-                as_prover
-                  As_prover.(
-                    fun () -> Core.printf "fin=%b %!" (read Boolean.typ fin)) ;
-                ksprintf print_g "%s[%d]" lab i g )
-        in
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
@@ -669,13 +661,6 @@ struct
                   |> Dlog_plonk_types.Poly_comm.With_degree_bound.map
                        ~f:(fun (keep, x) -> (keep, `Maybe_finite x)) ] )
         in
-        print_w "l" l_comm ;
-        print_w "r" r_comm ;
-        print_w "o" o_comm ;
-        print_w "z" z_comm ;
-        print_w "f" f_comm ;
-        print_g "sigma_comm0" m.sigma_comm_0 ;
-        print_g "sigma_comm1" m.sigma_comm_1 ;
         assert_eq_marlin
           { alpha= plonk.alpha
           ; beta= plonk.beta
@@ -702,8 +687,8 @@ struct
     Evals.map2 lengths e ~f:(fun lengths e ->
         Array.zip_exn (mask lengths choice) e )
 
-  let combined_evaluation (type b b_plus_19) b_plus_19 ~xi ~evaluation_point
-      ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
+  let combined_evaluation (type b b_plus_8) b_plus_8 ~xi ~evaluation_point
+      ((without_degree_bound : (_, b_plus_8) Vector.t), with_degree_bound)
       ~max_quot_size =
     let open Field in
     Pcs_batch.combine_split_evaluations ~mul ~last:Array.last
@@ -711,7 +696,7 @@ struct
       ~shifted_pow:
         (Pseudo.Degree_bound.shifted_pow ~crs_max_degree:Common.Max_degree.wrap)
       ~init:Fn.id ~evaluation_point ~xi
-      (Common.dlog_pcs_batch b_plus_19 ~max_quot_size)
+      (Common.dlog_pcs_batch b_plus_8 ~max_quot_size)
       without_degree_bound with_degree_bound
 
   let compute_challenges ~scalar chals =
