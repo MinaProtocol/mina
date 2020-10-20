@@ -46,7 +46,7 @@ module Title = {
       <h2 className=Theme.Type.h2> {React.string(copy)} </h2>
       <Button bgColor=Theme.Colors.digitalBlack href=buttonHref>
         {React.string(buttonCopy)}
-        <Icon kind=Icon.ArrowRightMedium />
+        <Icon kind=Icon.ArrowRightSmall />
       </Button>
     </div>;
   };
