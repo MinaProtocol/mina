@@ -46,7 +46,6 @@ module Schema = struct
     | Arcs : State_hash.t -> State_hash.t list t
     | Root : Root_data.Minimal.t t
     | Best_tip : State_hash.t t
-    | Frontier_hash : Frontier_hash.t t
     | Protocol_states_for_root_scan_state
         : Coda_state.Protocol_state.value list t
 
@@ -61,8 +60,6 @@ module Schema = struct
         "Root"
     | Best_tip ->
         "Best_tip"
-    | Frontier_hash ->
-        "Frontier_hash"
     | Protocol_states_for_root_scan_state ->
         "Protocol_states_for_root_scan_state"
 
@@ -77,8 +74,6 @@ module Schema = struct
         [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
-    | Frontier_hash ->
-        [%bin_type_class: Frontier_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
         [%bin_type_class: Coda_state.Protocol_state.Value.Stable.Latest.t list]
 
@@ -133,11 +128,6 @@ module Schema = struct
           (module Keys.String)
           ~to_gadt:(fun _ -> Best_tip)
           ~of_gadt:(fun Best_tip -> "best_tip")
-    | Frontier_hash ->
-        gadt_input_type_class
-          (module Keys.String)
-          ~to_gadt:(fun _ -> Frontier_hash)
-          ~of_gadt:(fun Frontier_hash -> "frontier_hash")
     | Protocol_states_for_root_scan_state ->
         gadt_input_type_class
           (module Keys.String)
@@ -153,7 +143,7 @@ module Error = struct
     | `Frontier_hash
     | `Root_transition
     | `Best_tip_transition
-    | `Parent_transition
+    | `Parent_transition of State_hash.t
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
@@ -177,8 +167,8 @@ module Error = struct
           ("root transition", None)
       | `Best_tip_transition ->
           ("best tip transition", None)
-      | `Parent_transition ->
-          ("parent transition", None)
+      | `Parent_transition hash ->
+          ("parent transition", Some hash)
       | `New_root_transition ->
           ("new root transition", None)
       | `Old_root_transition ->
@@ -246,9 +236,6 @@ let check t =
       get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
     in
     let%bind _ =
-      get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash))
-    in
-    let%bind _ =
       get t.db ~key:(Transition root_hash)
         ~error:(`Corrupt (`Not_found `Root_transition))
     in
@@ -279,24 +266,20 @@ let check t =
   let%bind root_hash = check_base () in
   check_arcs root_hash
 
-let initialize t ~root_data ~base_hash =
+let initialize t ~root_data =
   let open Root_data.Limited in
   let {With_hash.hash= root_state_hash; data= root_transition}, _ =
     External_transition.Validated.erase (transition root_data)
   in
   [%log' trace t.logger]
-    ~metadata:
-      [ ("root_data", Root_data.Limited.to_yojson root_data)
-      ; ("frontier_hash", Frontier_hash.to_yojson base_hash) ]
-    "Initializing persistent frontier database with $root_data and \
-     $frontier_hash" ;
+    ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
+    "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
-      Batch.set batch ~key:Frontier_hash ~data:base_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(List.unzip (protocol_states root_data) |> snd) )
 
@@ -308,7 +291,7 @@ let add t ~transition =
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
-      ~error:(`Not_found `Parent_transition)
+      ~error:(`Not_found (`Parent_transition parent_hash))
   in
   let%map parent_arcs =
     get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
@@ -374,11 +357,6 @@ let set_best_tip t hash =
   (* no need to batch because we only do one operation *)
   set t.db ~key:Best_tip ~data:hash ;
   old_best_tip_hash
-
-let get_frontier_hash t =
-  get t.db ~key:Frontier_hash ~error:(`Not_found `Frontier_hash)
-
-let set_frontier_hash t hash = set t.db ~key:Frontier_hash ~data:hash
 
 let rec crawl_successors t hash ~init ~f =
   let open Deferred.Result.Let_syntax in

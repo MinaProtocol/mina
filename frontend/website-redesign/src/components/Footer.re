@@ -5,7 +5,7 @@ module Styles = {
       position(`relative),
       left(`zero),
       bottom(`zero),
-      height(`rem(106.)),
+      height(`percent(100.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       backgroundImage(`url("/static/img/Small.jpg")),
       backgroundSize(`cover),
@@ -13,7 +13,7 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [
           padding2(~v=`rem(4.), ~h=`rem(2.68)),
-          height(`rem(75.)),
+          height(`percent(100.)),
           backgroundImage(`url("/static/img/Medium.jpg")),
         ],
       ),
@@ -130,7 +130,10 @@ module LeftSide = {
       ]);
 
     let emailInputSection =
-      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))])]);
+      style([
+        marginTop(`rem(4.)),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))]),
+      ]);
 
     let logo = style([height(`rem(3.1)), width(`rem(11.))]);
 

@@ -58,21 +58,253 @@ let file_exists ?follow_symlinks filename =
       false
 
 module Accounts = struct
+  module Single = struct
+    let to_account_with_pk :
+        Runtime_config.Accounts.Single.t -> Coda_base.Account.t Or_error.t =
+     fun t ->
+      let open Or_error.Let_syntax in
+      let%bind pk =
+        match t.pk with
+        | Some pk ->
+            Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
+        | None ->
+            Or_error.errorf
+              !"No public key to create the account from runtime config \
+                %{sexp: Runtime_config.Accounts.Single.t}"
+              t
+      in
+      let delegate =
+        Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+          t.delegate
+      in
+      let token_id =
+        Option.value_map t.token ~default:Token_id.default
+          ~f:Coda_base.Token_id.of_uint64
+      in
+      let account_id = Coda_base.Account_id.create pk token_id in
+      let account =
+        match t.timing with
+        | Some
+            { initial_minimum_balance
+            ; cliff_time
+            ; vesting_period
+            ; vesting_increment } ->
+            Coda_base.Account.create_timed account_id t.balance
+              ~initial_minimum_balance ~cliff_time ~vesting_period
+              ~vesting_increment
+            |> Or_error.ok_exn
+        | None ->
+            Coda_base.Account.create account_id t.balance
+      in
+      let permissions =
+        match t.permissions with
+        | None ->
+            account.permissions
+        | Some
+            { stake
+            ; edit_state
+            ; send
+            ; receive
+            ; set_delegate
+            ; set_permissions
+            ; set_verification_key } ->
+            let auth_required a =
+              match a with
+              | Runtime_config.Accounts.Single.Permissions.Auth_required.None
+                ->
+                  Coda_base.Permissions.Auth_required.None
+              | Either ->
+                  Either
+              | Proof ->
+                  Proof
+              | Signature ->
+                  Signature
+              | Both ->
+                  Both
+              | Impossible ->
+                  Impossible
+            in
+            { Coda_base.Permissions.Poly.stake
+            ; edit_state= auth_required edit_state
+            ; send= auth_required send
+            ; receive= auth_required receive
+            ; set_delegate= auth_required set_delegate
+            ; set_permissions= auth_required set_permissions
+            ; set_verification_key= auth_required set_verification_key }
+      in
+      let token_permissions =
+        Option.value_map t.token_permissions ~default:account.token_permissions
+          ~f:(fun {token_owned; disable_new_accounts; account_disabled} ->
+            if token_owned then
+              Coda_base.Token_permissions.Token_owned {disable_new_accounts}
+            else Not_owned {account_disabled} )
+      in
+      let%map snapp =
+        match t.snapp with
+        | None ->
+            Ok None
+        | Some {state; verification_key} ->
+            let%bind app_state =
+              if
+                Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
+                <> List.length state
+              then
+                Or_error.errorf
+                  !"Snap account state has invalid length %{sexp: \
+                    Runtime_config.Accounts.Single.t} length: %d"
+                  t (List.length state)
+              else Ok (Snapp_state.of_list_exn state)
+            in
+            let%map verification_key =
+              (* Use a URI-safe alphabet to make life easier for maintaining json
+                   We prefer this to base58-check here because users should not
+                   be manually entering verification keys.
+                *)
+              Option.value_map ~default:(Ok None) verification_key
+                ~f:(fun verification_key ->
+                  let%map vk =
+                    Base64.decode ~alphabet:Base64.uri_safe_alphabet
+                      verification_key
+                    |> Result.map_error ~f:(function `Msg s ->
+                           Error.createf
+                             !"Could not parse verification key account \
+                               %{sexp:Runtime_config.Accounts.Single.t}: %s"
+                             t s )
+                    |> Result.map
+                         ~f:
+                           (Binable.of_string
+                              ( module Pickles.Side_loaded.Verification_key
+                                       .Stable
+                                       .Latest ))
+                  in
+                  Some
+                    (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk)
+              )
+            in
+            Some {Snapp_account.verification_key; app_state}
+      in
+      { account with
+        delegate=
+          (if Option.is_some delegate then delegate else account.delegate)
+      ; token_id
+      ; token_permissions
+      ; nonce= Account.Nonce.of_uint32 t.nonce
+      ; receipt_chain_hash=
+          Option.value_map t.receipt_chain_hash
+            ~default:account.receipt_chain_hash
+            ~f:Coda_base.Receipt.Chain_hash.of_base58_check_exn
+      ; voting_for=
+          Option.value_map ~default:account.voting_for
+            ~f:Coda_base.State_hash.of_base58_check_exn t.voting_for
+      ; snapp
+      ; permissions }
+
+    let of_account :
+           Coda_base.Account.t
+        -> Signature_lib.Private_key.t option
+        -> Runtime_config.Accounts.Single.t =
+     fun account sk ->
+      let timing =
+        match account.timing with
+        | Account.Timing.Untimed ->
+            None
+        | Timed t ->
+            Some
+              { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                  t.initial_minimum_balance
+              ; cliff_time= t.cliff_time
+              ; vesting_period= t.vesting_period
+              ; vesting_increment= t.vesting_increment }
+      in
+      let token_permissions =
+        match account.token_permissions with
+        | Coda_base.Token_permissions.Token_owned {disable_new_accounts} ->
+            Some
+              { Runtime_config.Accounts.Single.Token_permissions.token_owned=
+                  true
+              ; disable_new_accounts
+              ; account_disabled= false }
+        | Not_owned {account_disabled} ->
+            Some
+              { token_owned= false
+              ; disable_new_accounts= false
+              ; account_disabled }
+      in
+      let permissions =
+        let auth_required a =
+          match a with
+          | Coda_base.Permissions.Auth_required.None ->
+              Runtime_config.Accounts.Single.Permissions.Auth_required.None
+          | Either ->
+              Either
+          | Proof ->
+              Proof
+          | Signature ->
+              Signature
+          | Both ->
+              Both
+          | Impossible ->
+              Impossible
+        in
+        let { Coda_base.Permissions.Poly.stake
+            ; edit_state
+            ; send
+            ; receive
+            ; set_delegate
+            ; set_permissions
+            ; set_verification_key } =
+          account.permissions
+        in
+        Some
+          { Runtime_config.Accounts.Single.Permissions.stake
+          ; edit_state= auth_required edit_state
+          ; send= auth_required send
+          ; receive= auth_required receive
+          ; set_delegate= auth_required set_delegate
+          ; set_permissions= auth_required set_permissions
+          ; set_verification_key= auth_required set_verification_key }
+      in
+      let snapp =
+        Option.map account.snapp ~f:(fun {app_state; verification_key} ->
+            let state = Snapp_state.to_list app_state in
+            let verification_key =
+              Option.map verification_key ~f:(fun vk ->
+                  With_hash.data vk
+                  |> Binable.to_string
+                       ( module Pickles.Side_loaded.Verification_key.Stable
+                                .Latest )
+                  |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet )
+            in
+            { Runtime_config.Accounts.Single.Snapp_account.state
+            ; verification_key } )
+      in
+      { pk=
+          Some
+            (Signature_lib.Public_key.Compressed.to_base58_check
+               account.public_key)
+      ; sk= Option.map ~f:Signature_lib.Private_key.to_base58_check sk
+      ; balance= account.balance
+      ; delegate=
+          Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
+            account.delegate
+      ; timing
+      ; token= Some (Coda_base.Token_id.to_uint64 account.token_id)
+      ; token_permissions
+      ; nonce= account.nonce
+      ; receipt_chain_hash=
+          Some
+            (Coda_base.Receipt.Chain_hash.to_base58_check
+               account.receipt_chain_hash)
+      ; voting_for=
+          Some (Coda_base.State_hash.to_base58_check account.voting_for)
+      ; snapp
+      ; permissions }
+  end
+
   let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.mapi
-      ~f:(fun i {Runtime_config.Accounts.pk; sk; balance; delegate; timing} ->
-        let pk =
-          match pk with
-          | Some pk ->
-              Public_key.Compressed.of_base58_check_exn pk
-          | None ->
-              Quickcheck.random_value
-                ~seed:
-                  (`Deterministic
-                    ("fake pk for genesis ledger " ^ string_of_int i))
-                Public_key.Compressed.gen
-        in
+      ~f:(fun i ({Runtime_config.Accounts.pk; sk; _} as account_config) ->
         let sk =
           match sk with
           | Some sk -> (
@@ -84,28 +316,23 @@ module Accounts = struct
           | None ->
               None
         in
-        let delegate =
-          Option.map ~f:Public_key.Compressed.of_base58_check_exn delegate
-        in
-        let account_id = Account_id.create pk Token_id.default in
-        let account =
-          match timing with
+        let pk =
+          match pk with
+          | Some pk ->
+              pk
           | None ->
-              Account.create account_id balance
-          | Some
-              { initial_minimum_balance
-              ; cliff_time
-              ; vesting_period
-              ; vesting_increment } ->
-              Account.create_timed account_id balance ~initial_minimum_balance
-                ~cliff_time ~vesting_period ~vesting_increment
-              |> Or_error.ok_exn
+              Public_key.Compressed.to_base58_check
+                (Quickcheck.random_value
+                   ~seed:
+                     (`Deterministic
+                       ("fake pk for genesis ledger " ^ string_of_int i))
+                   Public_key.Compressed.gen)
         in
-        ( sk
-        , { account with
-            delegate=
-              (if Option.is_some delegate then delegate else account.delegate)
-          } ) )
+        let account =
+          Single.to_account_with_pk {account_config with pk= Some pk}
+          |> Or_error.ok_exn
+        in
+        (sk, account) )
 
   let gen_with_balance balance :
       (Private_key.t option * Account.t) Quickcheck.Generator.t =
@@ -353,72 +580,82 @@ module Ledger = struct
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path
 
+  let padded_accounts_from_runtime_config_opt ~logger ~proof_level
+      (config : Runtime_config.Ledger.t) =
+    let add_genesis_winner_account accounts =
+      (* We allow configurations to explicitly override adding the genesis
+         winner, so that we can guarantee a certain ledger layout for
+         integration tests.
+         If the configuration does not include this setting, we add the
+         genesis winner when we have [proof_level = Full] so that we can
+         create a genesis proof. For all other proof levels, we do not add
+         the winner.
+      *)
+      let add_genesis_winner_account =
+        match config.add_genesis_winner with
+        | Some add_genesis_winner ->
+            add_genesis_winner
+        | None ->
+            Genesis_constants.Proof_level.equal Full proof_level
+      in
+      if add_genesis_winner_account then
+        let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+        match accounts with
+        | (_, account) :: _
+          when Public_key.Compressed.equal (Account.public_key account) pk ->
+            accounts
+        | _ ->
+            ( None
+            , Account.create
+                (Account_id.create pk Token_id.default)
+                (Currency.Balance.of_int 1000) )
+            :: accounts
+      else accounts
+    in
+    let accounts_opt =
+      match config.base with
+      | Hash _ ->
+          None
+      | Accounts accounts ->
+          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+      | Named name -> (
+        match Genesis_ledger.fetch_ledger name with
+        | Some (module M) ->
+            [%log info] "Found genesis ledger with name $ledger_name"
+              ~metadata:[("ledger_name", `String name)] ;
+            Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
+        | None ->
+            [%log warn]
+              "Could not find a built-in genesis ledger named $ledger_name"
+              ~metadata:[("ledger_name", `String name)] ;
+            None )
+    in
+    let padded_accounts_with_balances_opt =
+      Option.map accounts_opt
+        ~f:
+          (Lazy.map
+             ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
+    in
+    Option.map padded_accounts_with_balances_opt
+      ~f:
+        (Lazy.map
+           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)))
+
+  let packed_genesis_ledger_of_accounts ~depth accounts :
+      Genesis_ledger.Packed.t =
+    ( module Genesis_ledger.Make (struct
+      let accounts = accounts
+
+      let directory = `New
+
+      let depth = depth
+    end) )
+
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
-        let add_genesis_winner_account accounts =
-          (* We allow configurations to explicitly override adding the genesis
-             winner, so that we can guarantee a certain ledger layout for
-             integration tests.
-             If the configuration does not include this setting, we add the
-             genesis winner when we have [proof_level = Full] so that we can
-             create a genesis proof. For all other proof levels, we do not add
-             the winner.
-          *)
-          let add_genesis_winner_account =
-            match config.add_genesis_winner with
-            | Some add_genesis_winner ->
-                add_genesis_winner
-            | None ->
-                Genesis_constants.Proof_level.equal Full proof_level
-          in
-          if add_genesis_winner_account then
-            let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
-            match accounts with
-            | (_, account) :: _
-              when Public_key.Compressed.equal (Account.public_key account) pk
-              ->
-                accounts
-            | _ ->
-                ( None
-                , Account.create
-                    (Account_id.create pk Token_id.default)
-                    (Currency.Balance.of_int 1000) )
-                :: accounts
-          else accounts
-        in
-        let accounts_opt =
-          match config.base with
-          | Hash _ ->
-              None
-          | Accounts accounts ->
-              Some
-                (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
-          | Named name -> (
-            match Genesis_ledger.fetch_ledger name with
-            | Some (module M) ->
-                [%log info] "Found genesis ledger with name $ledger_name"
-                  ~metadata:[("ledger_name", `String name)] ;
-                Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
-            | None ->
-                [%log warn]
-                  "Could not find a built-in genesis ledger named $ledger_name"
-                  ~metadata:[("ledger_name", `String name)] ;
-                None )
-        in
-        let padded_accounts_with_balances_opt =
-          Option.map accounts_opt
-            ~f:
-              (Lazy.map
-                 ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
-        in
         let padded_accounts_opt =
-          Option.map padded_accounts_with_balances_opt
-            ~f:
-              (Lazy.map
-                 ~f:
-                   (Accounts.pad_to
-                      (Option.value ~default:0 config.num_accounts)))
+          padded_accounts_from_runtime_config_opt ~logger ~proof_level config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -467,14 +704,9 @@ module Ledger = struct
                 Deferred.Or_error.errorf "Genesis ledger '%s' not found"
                   ledger_name )
           | Some accounts -> (
-              let (packed : Genesis_ledger.Packed.t) =
-                ( module Genesis_ledger.Make (struct
-                  let accounts = accounts
-
-                  let directory = `New
-
-                  let depth = constraint_constants.ledger_depth
-                end) )
+              let packed =
+                packed_genesis_ledger_of_accounts
+                  ~depth:constraint_constants.ledger_depth accounts
               in
               let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
               let%bind tar_path = generate_tar ~genesis_dir ~logger ledger in
@@ -1126,28 +1358,7 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
             Accounts
               (List.map
                  (Lazy.force (Precomputed_values.accounts precomputed_values))
-                 ~f:(fun (sk, {public_key; balance; delegate; timing; _}) ->
-                   let timing =
-                     match timing with
-                     | Account.Timing.Untimed ->
-                         None
-                     | Timed t ->
-                         Some
-                           { Runtime_config.Accounts.Single.Timed
-                             .initial_minimum_balance=
-                               t.initial_minimum_balance
-                           ; cliff_time= t.cliff_time
-                           ; vesting_period= t.vesting_period
-                           ; vesting_increment= t.vesting_increment }
-                   in
-                   { Runtime_config.Accounts.pk=
-                       Some (Public_key.Compressed.to_base58_check public_key)
-                   ; sk= Option.map ~f:Private_key.to_base58_check sk
-                   ; balance
-                   ; delegate=
-                       Option.map ~f:Public_key.Compressed.to_base58_check
-                         delegate
-                   ; timing } ))
+                 ~f:(fun (sk, account) -> Accounts.Single.of_account account sk))
         ; name= None
         ; balances= []
         ; num_accounts= genesis_constants.num_accounts
@@ -1164,3 +1375,16 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
               |> Option.value ~default:Public_key.Compressed.empty
               |> Public_key.Compressed.equal
                    (fst Coda_state.Consensus_state_hooks.genesis_winner) ) } }
+
+let%test_module "Account config test" =
+  ( module struct
+    let%test_unit "Runtime config <=> Account" =
+      let module Ledger = (val Genesis_ledger.for_unit_tests) in
+      let accounts = Lazy.force Ledger.accounts in
+      List.iter accounts ~f:(fun (sk, acc) ->
+          let acc_config = Accounts.Single.of_account acc sk in
+          let acc' =
+            Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
+          in
+          [%test_eq: Account.t] acc acc' )
+  end )

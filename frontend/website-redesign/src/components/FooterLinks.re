@@ -67,8 +67,7 @@ let make = () => {
       <Next.Link href="/genesis">
         <a className=Styles.linkStyle> {React.string("Join Genesis")} </a>
       </Next.Link>
-      <Next.Link
-        href="https://github.com/MinaProtocol/mina-grants#how-to-apply">
+      <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Apply for Grants")} </a>
       </Next.Link>
     </div>
@@ -80,16 +79,20 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="/static/pdf/economicsWP.pdf">
-        <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
+      <Next.Link href="/static/pdf/technicalWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Technical Whitepaper")}
+        </a>
+      </Next.Link>
+      <Next.Link href="/static/pdf/economicsWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Economics Whitepaper")}
+        </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle>
           {React.string("Incentive Structure")}
         </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
     </div>
     <div
@@ -111,7 +114,7 @@ let make = () => {
       <Next.Link href="/leaderboard">
         <a className=Styles.linkStyle> {React.string("Leaderboard")} </a>
       </Next.Link>
-      <Next.Link href="https://github.com/MinaProtocol/mina-grants">
+      <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
       </Next.Link>
     </div>

@@ -10,6 +10,7 @@ module Card = {
     let container =
       style([
         display(`flex),
+        height(`percent(100.)),
         justifyContent(`spaceBetween),
         flexDirection(`column),
         padding2(~h=`rem(1.), ~v=`rem(1.)),
@@ -75,26 +76,19 @@ module ButtonBarStyles = {
       | GetStarted => (1.5, 5.75, 2.5)
       | Developers => (1.5, 5.75, 6.)
       | CommunityLanding => (1.5, 4.25, 4.25)
-      | HelpAndSupport => (1.5, 5.75, 2.5)
-      };
-    let (mobileH, tabletH, desktopH) =
-      switch (kind) {
-      | GetStarted => (1.25, 2.75, 9.5)
-      | Developers => (1.25, 2.75, 9.5)
-      | CommunityLanding => (1.25, 1.25, 1.25)
-      | HelpAndSupport => (1.25, 2.75, 9.5)
+      | HelpAndSupport => (1.5, 5.75, 5.75)
       };
     style([
-      padding2(~v=`rem(mobileV), ~h=`rem(mobileH)),
+      padding2(~v=`rem(mobileV), ~h=`zero),
       backgroundImage(`url(backgroundImg)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(tabletV), ~h=`rem(tabletH))],
+        [padding2(~v=`rem(tabletV), ~h=`zero)],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(desktopV), ~h=`rem(desktopH))],
+        [padding2(~v=`rem(desktopV), ~h=`zero)],
       ),
     ]);
   };
@@ -204,6 +198,7 @@ module HelpAndSupport = {
           Theme.Typeface.monumentGrotesk,
           color(Theme.Colors.white),
           fontSize(`rem(0.75)),
+          textAlign(`center),
           lineHeight(`rem(1.)),
           textTransform(`uppercase),
           letterSpacing(`em(0.02)),
@@ -224,6 +219,7 @@ module HelpAndSupport = {
       merge([
         Theme.Type.paragraphSmall,
         style([
+          Theme.Typeface.monumentGroteskMono,
           display(`none),
           color(Theme.Colors.white),
           media(Theme.MediaQuery.tablet, [display(`block)]),

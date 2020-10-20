@@ -44,7 +44,7 @@ let time_deferred deferred =
   let start_time = Time.now () in
   let%map result = deferred in
   let end_time = Time.now () in
-  (Time.diff start_time end_time, result)
+  (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
   `Take
@@ -460,8 +460,6 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
                   Instance.set_root_state_hash instance
-                    ~genesis_state_hash:
-                      (Precomputed_values.genesis_state_hash precomputed_values)
                     (External_transition.Validated.state_hash new_root) )) ;
             let%map new_frontier =
               let fail msg =

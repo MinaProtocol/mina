@@ -60,7 +60,7 @@ module Styles = {
         Some(Theme.Colors.digitalBlack),
         true,
         `rem(3.25),
-        `rem(7.75),
+        Some(`rem(7.75)),
         1.5,
         1.,
       ),

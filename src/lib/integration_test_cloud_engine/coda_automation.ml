@@ -13,7 +13,9 @@ module Network_config = struct
     ; private_key_secret: string
     ; enable_gossip_flooding: bool
     ; run_with_user_agent: bool
-    ; run_with_bots: bool }
+    ; run_with_bots: bool
+    ; enable_peer_exchange: bool
+    ; isolated: bool }
   [@@deriving to_yojson]
 
   type terraform_config =
@@ -90,21 +92,22 @@ module Network_config = struct
         failwith
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
-        let timing =
-          match timing with
-          | Timed t ->
-              Some
-                { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
-                    t.initial_minimum_balance
-                ; cliff_time= t.cliff_time
-                ; vesting_period= t.vesting_period
-                ; vesting_increment= t.vesting_increment }
-          | Untimed ->
-              None
-        in
         let runtime_account =
-          { Runtime_config.Accounts.pk=
-              Some (Public_key.Compressed.to_string pk)
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                      t.initial_minimum_balance
+                  ; cliff_time= t.cliff_time
+                  ; vesting_period= t.vesting_period
+                  ; vesting_increment= t.vesting_increment }
+          in
+          let default = Runtime_config.Accounts.Single.default in
+          { default with
+            pk= Some (Public_key.Compressed.to_string pk)
           ; sk= None
           ; balance=
               Balance.of_formatted_string balance
@@ -173,7 +176,9 @@ module Network_config = struct
       ; private_key_secret= secret_name
       ; enable_gossip_flooding= false
       ; run_with_user_agent= false
-      ; run_with_bots= false }
+      ; run_with_bots= false
+      ; enable_peer_exchange= false
+      ; isolated= false }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
