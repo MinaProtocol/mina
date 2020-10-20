@@ -37,7 +37,7 @@ module GenesisMembersGrid = {
     let genesisCopy =
       style([
         unsafe("grid-area", "1 /1 / span 1 / span 2"),
-        media(Theme.MediaQuery.tablet, [width(`rem(23.))]),
+        media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
       ]);
     let sectionSubhead =
       merge([
