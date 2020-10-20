@@ -35,7 +35,8 @@ val replace_block_production_keypairs :
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
-val staking_ledger : t -> Sparse_ledger.t option
+val staking_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option

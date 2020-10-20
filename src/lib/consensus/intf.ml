@@ -295,6 +295,15 @@ module type S = sig
 
   module Data : sig
     module Local_state : sig
+      module Snapshot : sig
+        module Ledger_snapshot : sig
+          type t =
+            | Genesis_ledger of Coda_base.Ledger.t
+            | Sparse_ledger of Coda_base.Sparse_ledger.t
+          [@@deriving sexp]
+        end
+      end
+
       type t [@@deriving sexp, to_yojson]
 
       val create :
@@ -581,7 +590,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> Coda_base.Sparse_ledger.t
+      -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]

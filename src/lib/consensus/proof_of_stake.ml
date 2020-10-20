@@ -70,6 +70,10 @@ let compute_delegatee_table_sparse_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Coda_base.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
+let compute_delegatee_table_genesis_ledger keys ledger =
+  compute_delegatee_table keys ~iter_accounts:(fun f ->
+      Coda_base.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
+
 module Segment_id = Coda_numbers.Nat.Make32 ()
 
 module Typ = Snark_params.Tick.Typ
@@ -167,8 +171,39 @@ module Data = struct
 
   module Local_state = struct
     module Snapshot = struct
+      module Ledger_snapshot = struct
+        type t =
+          | Genesis_ledger of Coda_base.Ledger.t
+          | Sparse_ledger of Coda_base.Sparse_ledger.t
+        [@@deriving sexp]
+
+        let merkle_root = function
+          | Genesis_ledger ledger ->
+              Coda_base.Ledger.merkle_root ledger
+          | Sparse_ledger ledger ->
+              Coda_base.Sparse_ledger.merkle_root ledger
+
+        let compute_delegatee_table keys ledger =
+          match ledger with
+          | Genesis_ledger ledger ->
+              compute_delegatee_table_genesis_ledger keys ledger
+          | Sparse_ledger ledger ->
+              compute_delegatee_table_sparse_ledger keys ledger
+
+        let ledger_subset keys ledger =
+          match ledger with
+          | Genesis_ledger ledger ->
+              Coda_base.Sparse_ledger.of_ledger_subset_exn ledger keys
+          | Sparse_ledger ledger ->
+              (* We could create a sparser sparse ledger here, but this one is
+                 already held memory with all the data we need, so there's no
+                 point creating a new one.
+              *)
+              ledger
+      end
+
       type t =
-        { ledger: Coda_base.Sparse_ledger.t
+        { ledger: Ledger_snapshot.t
         ; delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t }
@@ -180,8 +215,8 @@ module Data = struct
       let to_yojson {ledger; delegatee_table} =
         `Assoc
           [ ( "ledger_hash"
-            , Coda_base.(
-                Sparse_ledger.merkle_root ledger |> Ledger_hash.to_yojson) )
+            , Ledger_snapshot.merkle_root ledger
+              |> Coda_base.Ledger_hash.to_yojson )
           ; ( "delegators"
             , `Assoc
                 ( Hashtbl.to_alist delegatee_table
@@ -253,13 +288,11 @@ module Data = struct
     let create block_producer_pubkeys ~genesis_ledger =
       (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
-        Coda_base.Sparse_ledger.of_any_ledger
-          (Coda_base.Ledger.Any_ledger.cast
-             (module Coda_base.Ledger)
-             (Lazy.force genesis_ledger))
+        Snapshot.Ledger_snapshot.Genesis_ledger (Lazy.force genesis_ledger)
       in
       let delegatee_table =
-        compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
+        Snapshot.Ledger_snapshot.compute_delegatee_table block_producer_pubkeys
+          ledger
       in
       let genesis_epoch_snapshot = {Snapshot.delegatee_table; ledger} in
       ref
@@ -278,8 +311,8 @@ module Data = struct
       let s {Snapshot.ledger; delegatee_table= _} =
         { Snapshot.ledger
         ; delegatee_table=
-            compute_delegatee_table_sparse_ledger block_production_pubkeys
-              ledger }
+            Snapshot.Ledger_snapshot.compute_delegatee_table
+              block_production_pubkeys ledger }
       in
       t :=
         { Data.staking_epoch_snapshot= s old.staking_epoch_snapshot
@@ -821,7 +854,14 @@ module Data = struct
                            { private_key
                            ; public_key
                            ; delegator
-                           ; ledger= epoch_snapshot.ledger }
+                           ; ledger=
+                               Local_state.Snapshot.Ledger_snapshot
+                               .ledger_subset
+                                 [ Coda_base.(
+                                     Account_id.create
+                                       (Public_key.compress public_key)
+                                       Token_id.default) ]
+                                 epoch_snapshot.ledger }
                        ; global_slot
                        ; vrf_result }
                      , account.public_key )) ) ;
@@ -2285,11 +2325,15 @@ module Hooks = struct
                   ; !local_state.Data.next_epoch_snapshot ]
                 in
                 List.find_map candidate_snapshots ~f:(fun snapshot ->
-                    if
-                      Ledger_hash.equal ledger_hash
-                        (Sparse_ledger.merkle_root snapshot.ledger)
-                    then Some snapshot.ledger
-                    else None )
+                    match snapshot.ledger with
+                    | Genesis_ledger _ledger ->
+                        None
+                    | Sparse_ledger ledger ->
+                        if
+                          Ledger_hash.equal ledger_hash
+                            (Coda_base.Sparse_ledger.merkle_root ledger)
+                        then Some ledger
+                        else None )
                 |> Result.of_option ~error:"epoch ledger not found"
             in
             Result.iter_error response ~f:(fun err ->
@@ -2423,7 +2467,7 @@ module Hooks = struct
         (not
            (Ledger_hash.equal
               (Frozen_ledger_hash.to_ledger_hash expected_root)
-              (Sparse_ledger.merkle_root
+              (Local_state.Snapshot.Ledger_snapshot.merkle_root
                  (Local_state.get_snapshot local_state snapshot_id).ledger)))
         {snapshot_id; expected_root}
     in
@@ -2468,7 +2512,7 @@ module Hooks = struct
         && Coda_base.(
              Ledger_hash.equal
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-               (Sparse_ledger.merkle_root
+               (Local_state.Snapshot.Ledger_snapshot.merkle_root
                   !local_state.next_epoch_snapshot.ledger))
       then (
         set_snapshot local_state Staking_epoch_snapshot
@@ -2495,7 +2539,7 @@ module Hooks = struct
                     snapshot_ledger
                 in
                 set_snapshot local_state snapshot_id
-                  {ledger= snapshot_ledger; delegatee_table} ;
+                  {ledger= Sparse_ledger snapshot_ledger; delegatee_table} ;
                 return true
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)
@@ -2685,7 +2729,7 @@ module Hooks = struct
           [%log debug]
             !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             (epoch_snapshot_name source)
-            (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
+            (Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger) ;
           snapshot
         in
         let block_data unseen_pks slot =
@@ -2776,7 +2820,9 @@ module Hooks = struct
             Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
-      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      let epoch_snapshot =
+        {Local_state.Snapshot.delegatee_table; ledger= Sparse_ledger ledger}
+      in
       !local_state.last_epoch_delegatee_table
       <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
@@ -3210,16 +3256,13 @@ let%test_module "Proof of stake tests" =
       let block_producer_pubkeys =
         Public_key.Compressed.Set.of_list [public_key_compressed]
       in
-      let ledger =
-        Coda_base.Sparse_ledger.of_any_ledger
-          (Coda_base.Ledger.Any_ledger.cast
-             (module Coda_base.Ledger)
-             (Lazy.force Genesis_ledger.t))
-      in
+      let ledger = Lazy.force Genesis_ledger.t in
       let delegatee_table =
-        compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
+        compute_delegatee_table_genesis_ledger block_producer_pubkeys ledger
       in
-      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      let epoch_snapshot =
+        {Local_state.Snapshot.delegatee_table; ledger= Genesis_ledger ledger}
+      in
       let balance = Balance.to_int account.balance in
       let total_stake_int = Currency.Amount.to_int total_stake in
       let stake_fraction =
