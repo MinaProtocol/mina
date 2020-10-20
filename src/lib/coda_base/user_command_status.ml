@@ -1,5 +1,9 @@
 open Core_kernel
 
+(* if these items change, please also change
+   Transaction_snark.Base.User_command_failure.t
+   and update the code following it
+*)
 module Failure = struct
   [%%versioned
   module Stable = struct

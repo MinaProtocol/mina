@@ -467,12 +467,13 @@ module Base = struct
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
+      ; source_minimum_balance_violation: 'bool (* Payment only *)
       ; source_bad_timing: 'bool (* Payment only *)
       ; receiver_exists: 'bool (* Create_account only *)
       ; not_token_owner: 'bool (* Create_account, Mint_tokens *)
       ; token_auth: 'bool (* Create_account *) }
 
-    let num_fields = 10
+    let num_fields = 11
 
     let to_list
         { predicate_failed
@@ -481,6 +482,7 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
+        ; source_minimum_balance_violation
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
@@ -491,6 +493,7 @@ module Base = struct
       ; amount_insufficient_to_create
       ; token_cannot_create
       ; source_insufficient_balance
+      ; source_minimum_balance_violation
       ; source_bad_timing
       ; receiver_exists
       ; not_token_owner
@@ -503,6 +506,7 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
+        ; source_minimum_balance_violation
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
@@ -513,6 +517,7 @@ module Base = struct
           ; amount_insufficient_to_create
           ; token_cannot_create
           ; source_insufficient_balance
+          ; source_minimum_balance_violation
           ; source_bad_timing
           ; receiver_exists
           ; not_token_owner
@@ -626,6 +631,7 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
+              ; source_minimum_balance_violation= false
               ; source_bad_timing= false
               ; receiver_exists= false
               ; not_token_owner= false
@@ -678,16 +684,30 @@ module Base = struct
                     Balance.to_amount source_account.balance
                     < payload.body.amount)
               in
+              let timing_or_error =
+                Transaction_logic.validate_timing
+                  ~txn_amount:payload.body.amount ~txn_global_slot
+                  ~account:source_account
+              in
+              let source_minimum_balance_violation =
+                match timing_or_error with
+                | Ok _ ->
+                    false
+                | Error err ->
+                    let open Coda_base in
+                    User_command_status.Failure.equal
+                      (Transaction_logic.timing_error_to_user_command_status
+                         err)
+                      User_command_status.Failure
+                      .Source_minimum_balance_violation
+              in
               let source_bad_timing =
                 (* This failure is fatal if fee-payer and source account are
                    the same. This is checked in the transaction pool.
                 *)
                 (not fee_payer_is_source)
                 && ( source_insufficient_balance
-                   || Or_error.is_error
-                        (Transaction_logic.validate_timing
-                           ~txn_amount:payload.body.amount ~txn_global_slot
-                           ~account:source_account) )
+                   || Or_error.is_error timing_or_error )
               in
               { predicate_failed
               ; source_not_present
@@ -695,6 +715,7 @@ module Base = struct
               ; amount_insufficient_to_create
               ; token_cannot_create
               ; source_insufficient_balance
+              ; source_minimum_balance_violation
               ; source_bad_timing
               ; receiver_exists= false
               ; not_token_owner= false
@@ -765,6 +786,7 @@ module Base = struct
                 ; amount_insufficient_to_create= false
                 ; token_cannot_create= false
                 ; source_insufficient_balance= false
+                ; source_minimum_balance_violation= false
                 ; source_bad_timing= false
                 ; receiver_exists
                 ; not_token_owner
@@ -823,6 +845,7 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
+              ; source_minimum_balance_violation= false
               ; source_bad_timing= false
               ; receiver_exists= false
               ; not_token_owner
