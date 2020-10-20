@@ -11,6 +11,7 @@ module Styles = {
       media(
         Theme.MediaQuery.desktop,
         [
+          height(`rem(100.)),
           backgroundImage(url("/static/img/InvestorsBackgroundDesktop.jpg")),
         ],
       ),
@@ -90,7 +91,7 @@ let make = () => {
   <>
     <div className=Styles.backgroundImage>
       <Wrapped>
-        <Spacer height=3. />
+        <Spacer height=7. />
         <h2 className=Styles.header> {React.string("Investors")} </h2>
         <p className=Styles.advisorsSubhead>
           {React.string("Supporting O(1) Labs")}
@@ -179,6 +180,7 @@ let make = () => {
               src="/static/img/headshots/sahai.jpg"
             />
           </div>
+        <Spacer height=7. />
       </Wrapped>
     </div>
   </>;
