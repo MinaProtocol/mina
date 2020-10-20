@@ -29,7 +29,6 @@ val create :
      logger:Logger.t
   -> root_data:Root_data.t
   -> root_ledger:Ledger.Any_ledger.witness
-  -> base_hash:Frontier_hash.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
@@ -38,10 +37,6 @@ val create :
 val close : t -> unit
 
 val root_data : t -> Root_data.t
-
-val set_hash_unsafe : t -> [`I_promise_this_is_safe of Frontier_hash.t] -> unit
-
-val hash : t -> Frontier_hash.t
 
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 
