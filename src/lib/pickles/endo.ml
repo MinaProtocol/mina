@@ -1,4 +1,3 @@
-open Zexe_backend
 module SC = Scalar_challenge
 open Pickles_types
 open Snarky_bn382.Tweedle.Endo

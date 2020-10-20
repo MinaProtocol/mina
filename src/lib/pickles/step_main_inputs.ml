@@ -59,21 +59,12 @@ module Sponge = struct
       end)
 
   module S = Sponge.Make_sponge (Permutation)
+  include S
 
-  include Sponge.Bit_sponge.Make (struct
-              type t = Impl.Boolean.var
-            end)
-            (struct
-              type t = Impl.Field.t
+  let squeeze_field = squeeze
 
-              let to_bits t = Unsafe.unpack_unboolean t
-
-              let finalize_discarded = Util.boolean_constrain (module Impl)
-
-              let high_entropy_bits = high_entropy_bits
-            end)
-            (Impl.Field)
-            (S)
+  let squeeze =
+    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
 
   let absorb t input =
     match input with

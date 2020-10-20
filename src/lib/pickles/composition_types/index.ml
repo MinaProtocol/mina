@@ -1,7 +1,14 @@
 open Core_kernel
 open Pickles_types
 
-type t = char [@@deriving sexp, bin_io, sexp, compare, yojson, hash, eq]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = char [@@deriving sexp, sexp, compare, yojson, hash, eq]
+
+    let to_latest = Fn.id
+  end
+end]
 
 let of_int = Char.of_int
 

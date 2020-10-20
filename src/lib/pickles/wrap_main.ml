@@ -447,13 +447,11 @@ let wrap_main
          ; old_bulletproof_challenges= new_bulletproof_challenges }) ;
     Field.Assert.equal sponge_digest_before_evaluations
       sponge_digest_before_evaluations_actual ;
-    (* TODO: This could be done way more efficiently. The "bulletproof_challenges" actual
-    are packed elsewhere, and that could be reused. *)
     Array.iter2_exn bulletproof_challenges_actual
       (Vector.to_array bulletproof_challenges)
       ~f:(fun {prechallenge= Scalar_challenge x1}
          ({prechallenge= Scalar_challenge x2} : _ SC.t Bulletproof_challenge.t)
-         -> Field.Assert.equal (Field.project x1) x2 ) ;
+         -> Field.Assert.equal x1 x2 ) ;
     ()
   in
   Timer.clock __LOC__ ;

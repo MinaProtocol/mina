@@ -146,7 +146,7 @@ module Wrap = struct
         (let k_v = Lazy.force k_v in
          let s_v =
            Key_cache.Sync.Disk_storable.of_binable Key.Verification.to_string
-             (module Vk)
+             (module Vk.Stable.Latest)
          in
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->

@@ -1,5 +1,4 @@
 open Core_kernel
-open Import
 open Pickles_types
 
 type m = Abc.Label.t = A | B | C
@@ -85,3 +84,32 @@ let seal (type f)
   | _ ->
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
+
+let unsafe_unpack_with_partial_sum (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x ~n
+    =
+  let open Impl in
+  let res =
+    let length = Field.size_in_bits in
+    exists
+      (Typ.list Boolean.typ_unchecked ~length)
+      ~compute:
+        As_prover.(
+          fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+  in
+  let lo_bits, hi_bits = List.split_n res n in
+  let lo = seal (module Impl) (Field.project lo_bits) in
+  let two_to_the n =
+    Fn.apply_n_times ~n (fun x -> Field.Constant.( + ) x x) Field.Constant.one
+  in
+  Field.(Assert.equal x (lo + scale (project hi_bits) (two_to_the n))) ;
+  ((lo_bits, lo), hi_bits)
+
+let squeeze_with_packed (type f)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~squeeze ~high_entropy_bits t ~length:n =
+  assert (n = high_entropy_bits) ;
+  let x = squeeze t in
+  let lo, hi_bits = unsafe_unpack_with_partial_sum (module Impl) x ~n in
+  boolean_constrain (module Impl) hi_bits ;
+  lo

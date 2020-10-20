@@ -3,7 +3,6 @@ module type Inputs = Intf.Wrap_main_inputs.S
 module S = Sponge
 open Backend
 open Core_kernel
-open Import
 open Util
 module SC = Scalar_challenge
 open Pickles_types
@@ -130,22 +129,23 @@ struct
       ~g1_to_field_elements:Inner_curve.to_field_elements
       ~absorb_scalar:(Sponge.absorb sponge) ty t
 
-  let squeeze_scalar sponge : Scalar_challenge.t =
+  let squeeze_scalar sponge : Scalar_challenge.t * Field.t SC.SC.t =
     (* No need to boolean constrain scalar challenges. *)
-    Scalar_challenge (Sponge.squeeze sponge ~length:Challenge.length)
+    let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
+    (Scalar_challenge bits, Scalar_challenge packed)
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
     let prechallenges =
-      Array.mapi gammas ~f:(fun i gammas_i ->
+      Array.map gammas ~f:(fun gammas_i ->
           absorb (PC :: PC) gammas_i ;
           squeeze_scalar sponge )
     in
-    let term_and_challenge (l, r) pre =
+    let term_and_challenge (l, r) (pre, pre_packed) =
       let left_term = Scalar_challenge.endo_inv l pre in
       let right_term = Scalar_challenge.endo r pre in
       ( Ops.add_fast left_term right_term
-      , {Bulletproof_challenge.prechallenge= pre} )
+      , {Bulletproof_challenge.prechallenge= pre_packed} )
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -380,7 +380,7 @@ struct
         let q = p_prime + lr_prod in
         print_g "q" q ;
         absorb sponge PC delta ;
-        let c = squeeze_scalar sponge in
+        let c, _c_packed = squeeze_scalar sponge in
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -454,7 +454,7 @@ struct
   module Plonk = Types.Dlog_based.Proof_state.Deferred_values.Plonk
 
   (* Just for exhaustiveness over fields *)
-  let iter2 ~fp ~chal ~scalar_chal
+  let iter2 ~chal ~scalar_chal
       {Plonk.Minimal.alpha= alpha_0; beta= beta_0; gamma= gamma_0; zeta= zeta_0}
       {Plonk.Minimal.alpha= alpha_1; beta= beta_1; gamma= gamma_1; zeta= zeta_1}
       =
@@ -466,7 +466,7 @@ struct
   let assert_eq_marlin
       (m1 : (_, Field.t Pickles_types.Scalar_challenge.t) Plonk.Minimal.t)
       (m2 : (Boolean.var list, Scalar_challenge.t) Plonk.Minimal.t) =
-    iter2 m1 m2 ~fp:Field.Assert.equal
+    iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 (Field.project c2))
       ~scalar_chal:
         (fun (Scalar_challenge t1 : _ Pickles_types.Scalar_challenge.t)
@@ -572,18 +572,21 @@ struct
         let alpha = sample_scalar () in
         let t_comm = receive with_ t_comm in
         let zeta = sample_scalar () in
+        Util.boolean_constrain
+          (module Impl)
+          (match zeta with Scalar_challenge x -> x) ;
         (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
        where f is the polynomial corresponding to sg_old
     *)
         let sponge =
-          S.Bit_sponge.map sponge
-            ~f:(fun ({state; sponge_state; params} : _ Opt_sponge.t) ->
-              match sponge_state with
-              | Squeezed n ->
-                  S.make ~state ~sponge_state:(Squeezed n) ~params
-              | _ ->
-                  assert false )
+          match S.Bit_sponge.underlying sponge with
+          | {state; sponge_state; params} -> (
+            match sponge_state with
+            | Squeezed n ->
+                S.make ~state ~sponge_state:(Squeezed n) ~params
+            | _ ->
+                assert false )
         in
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
@@ -800,16 +803,16 @@ struct
     absorb_evals x_hat2 evals2 ;
     let squeeze () =
       with_label __LOC__ (fun () ->
-          let x = Sponge.squeeze sponge ~length:Challenge.length in
+          let x, x_packed = Sponge.squeeze sponge ~length:Challenge.length in
           Util.boolean_constrain (module Impl) x ;
-          x )
+          (x, x_packed) )
     in
-    let xi_actual = squeeze () in
-    let r_actual = squeeze () in
+    let _, xi_actual = squeeze () in
+    let r_actual, _ = squeeze () in
     let xi_correct =
       with_label __LOC__ (fun () ->
           (* Sample new sg challenge point here *)
-          Field.equal (pack xi_actual) (pack_scalar_challenge xi) )
+          Field.equal xi_actual (pack_scalar_challenge xi) )
     in
     let scalar = SC.to_field_checked (module Impl) ~endo:Endo.Dee.scalar in
     let plonk =
@@ -917,7 +920,7 @@ struct
    that we compute when verifying the previous proof. That is a commitment
    to them. *)
 
-  let hash_me_only (type n) (max_branching : n Nat.t)
+  let hash_me_only (type n) (_max_branching : n Nat.t)
       (t : (_, (_, n) Vector.t) Types.Dlog_based.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)

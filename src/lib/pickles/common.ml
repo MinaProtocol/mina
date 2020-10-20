@@ -39,7 +39,7 @@ let hash_pairing_me_only ~app_state
          Array.concat_map x ~f:(Fn.compose Array.of_list g) )
        ~app_state)
 
-let hash_dlog_me_only (type n) (max_branching : n Nat.t)
+let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
@@ -49,7 +49,7 @@ let hash_dlog_me_only (type n) (max_branching : n Nat.t)
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [x; y]))
 
 let dlog_pcs_batch (type n_branching total)
-    ((without_degree_bound, pi) :
+    ((without_degree_bound, _pi) :
       total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
 
@@ -170,7 +170,6 @@ module Ipa = struct
       |> Backend.Tick.Curve.Affine.of_backend |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
-      let open Snarky_bn382.Tweedle.Dum.Plonk.Field_poly_comm in
       let chals =
         let open Backend.Tick.Field.Vector in
         let v = create () in
@@ -193,7 +192,6 @@ module Ipa = struct
 end
 
 let tock_unpadded_public_input_of_statement prev_statement =
-  let open Zexe_backend in
   let input =
     let (T (typ, _conv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input [typ] prev_statement
@@ -203,14 +201,12 @@ let tock_unpadded_public_input_of_statement prev_statement =
     ~f:(Backend.Tock.Field.Vector.get input)
 
 let tock_public_input_of_statement s =
-  let open Zexe_backend in
   tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
     (prev_statement : _ Types.Pairing_based.Statement.t) =
-  let open Zexe_backend in
   let input =
-    let (T (input, conv)) =
+    let (T (input, _conv)) =
       Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [input] prev_statement

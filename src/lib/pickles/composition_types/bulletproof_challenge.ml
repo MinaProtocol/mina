@@ -1,5 +1,12 @@
-type 'challenge t = {prechallenge: 'challenge}
-[@@deriving bin_io, sexp, compare, yojson, hash, eq]
+open Core_kernel
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'challenge t = {prechallenge: 'challenge}
+    [@@deriving sexp, compare, yojson, hash, eq]
+  end
+end]
 
 let pack {prechallenge} = prechallenge
 

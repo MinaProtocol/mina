@@ -38,7 +38,7 @@ let generic map ~h ~max_degree : _ Dlog_plonk_types.Evals.t =
     ; sigma1= h
     ; sigma2= h }
 
-let of_domains {Domains.h} ~max_degree : int Dlog_plonk_types.Evals.t =
+let of_domains {Domains.h; _} ~max_degree : int Dlog_plonk_types.Evals.t =
   let h = Domain.size h in
   generic ~max_degree (fun x ~f -> f x) ~h
 

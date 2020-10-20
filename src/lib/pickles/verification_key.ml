@@ -30,44 +30,53 @@ module Repr = struct
   end]
 end
 
-type t =
-  { commitments: Dee.Affine.t array Plonk_verification_key_evals.t
-  ; step_domains: Domains.t array
-  ; index: Impls.Wrap.Verification_key.t
-  ; data: Data.t }
-[@@deriving fields]
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t =
+      { commitments: Dee.Affine.t array Plonk_verification_key_evals.t
+      ; step_domains: Domains.t array
+      ; index: Impls.Wrap.Verification_key.t
+      ; data: Data.t }
+    [@@deriving fields]
 
-let of_repr urs {Repr.commitments= c; step_domains; data= d} =
-  let u = Unsigned.Size_t.of_int in
-  let g = Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend in
-  let t =
-    let d = Domain.Pow_2_roots_of_unity (Int.ceil_log2 d.constraints) in
-    let r, o = Common.tock_shifts d in
-    let max_quot_size = (5 * (Domain.size d + 2)) - 5 in
-    Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
-      ~max_poly_size:(u (1 lsl Nat.to_int Rounds.Wrap.n))
-      ~max_quot_size:(u max_quot_size) ~urs ~sigma_comm0:(g c.sigma_comm_0)
-      ~sigma_comm1:(g c.sigma_comm_1) ~sigma_comm2:(g c.sigma_comm_2)
-      ~ql_comm:(g c.ql_comm) ~qr_comm:(g c.qr_comm) ~qo_comm:(g c.qo_comm)
-      ~qm_comm:(g c.qm_comm) ~qc_comm:(g c.qc_comm) ~rcm_comm0:(g c.rcm_comm_0)
-      ~rcm_comm1:(g c.rcm_comm_1) ~rcm_comm2:(g c.rcm_comm_2)
-      ~psm_comm:(g c.psm_comm) ~add_comm:(g c.add_comm)
-      ~mul1_comm:(g c.mul1_comm) ~mul2_comm:(g c.mul2_comm)
-      ~emul1_comm:(g c.emul1_comm) ~emul2_comm:(g c.emul2_comm)
-      ~emul3_comm:(g c.emul3_comm) ~r ~o
-  in
-  {commitments= c; step_domains; data= d; index= t}
+    let to_latest = Fn.id
 
-include Binable.Of_binable
-          (Repr.Stable.Latest)
-          (struct
-            type nonrec t = t
+    let of_repr urs {Repr.commitments= c; step_domains; data= d} =
+      let u = Unsigned.Size_t.of_int in
+      let g =
+        Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend
+      in
+      let t =
+        let d = Domain.Pow_2_roots_of_unity (Int.ceil_log2 d.constraints) in
+        let r, o = Common.tock_shifts d in
+        let max_quot_size = (5 * (Domain.size d + 2)) - 5 in
+        Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
+          ~max_poly_size:(u (1 lsl Nat.to_int Rounds.Wrap.n))
+          ~max_quot_size:(u max_quot_size) ~urs ~sigma_comm0:(g c.sigma_comm_0)
+          ~sigma_comm1:(g c.sigma_comm_1) ~sigma_comm2:(g c.sigma_comm_2)
+          ~ql_comm:(g c.ql_comm) ~qr_comm:(g c.qr_comm) ~qo_comm:(g c.qo_comm)
+          ~qm_comm:(g c.qm_comm) ~qc_comm:(g c.qc_comm)
+          ~rcm_comm0:(g c.rcm_comm_0) ~rcm_comm1:(g c.rcm_comm_1)
+          ~rcm_comm2:(g c.rcm_comm_2) ~psm_comm:(g c.psm_comm)
+          ~add_comm:(g c.add_comm) ~mul1_comm:(g c.mul1_comm)
+          ~mul2_comm:(g c.mul2_comm) ~emul1_comm:(g c.emul1_comm)
+          ~emul2_comm:(g c.emul2_comm) ~emul3_comm:(g c.emul3_comm) ~r ~o
+      in
+      {commitments= c; step_domains; data= d; index= t}
 
-            let to_binable {commitments; step_domains; data; index= _} =
-              {Repr.commitments; data; step_domains}
+    include Binable.Of_binable
+              (Repr.Stable.V1)
+              (struct
+                type nonrec t = t
 
-            let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
-          end)
+                let to_binable {commitments; step_domains; data; index= _} =
+                  {Repr.commitments; data; step_domains}
+
+                let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+              end)
+  end
+end]
 
 let dummy_commitments g =
   { Plonk_verification_key_evals.sigma_comm_0= g
@@ -102,4 +111,5 @@ let dummy =
      { Repr.commitments= dummy_commitments g
      ; step_domains= [||]
      ; data= {constraints= rows} }
-     |> of_repr (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one))
+     |> Stable.Latest.of_repr
+          (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one))

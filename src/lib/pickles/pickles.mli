@@ -26,7 +26,12 @@ module type Statement_value_intf =
   Statement_intf with type field := Impls.Step.field
 
 module Verification_key : sig
-  include Binable.S
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
 
   val dummy : t Lazy.t
 

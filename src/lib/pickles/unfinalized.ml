@@ -20,8 +20,6 @@ type t =
   * Boolean.var
 
 module Constant = struct
-  open Zexe_backend
-
   type t =
     ( Challenge.Constant.t
     , Challenge.Constant.t Scalar_challenge.t

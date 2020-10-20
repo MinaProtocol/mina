@@ -132,11 +132,11 @@ module Make_real () = struct
       let t =
         lazy
           (Core.Binable.of_string
-             (module Pickles.Verification_key)
+             (module Pickles.Verification_key.Stable.Latest)
              [%e
                estring
                  (Binable.to_string
-                    (module Pickles.Verification_key)
+                    (module Pickles.Verification_key.Stable.Latest)
                     (Lazy.force T.verification_key))])
       in
       fun () -> Lazy.force t]
@@ -146,11 +146,11 @@ module Make_real () = struct
       let t =
         lazy
           (Core.Binable.of_string
-             (module Pickles.Verification_key)
+             (module Pickles.Verification_key.Stable.Latest)
              [%e
                estring
                  (Binable.to_string
-                    (module Pickles.Verification_key)
+                    (module Pickles.Verification_key.Stable.Latest)
                     (Lazy.force B.Proof.verification_key))])
       in
       fun () -> Lazy.force t]

@@ -26,31 +26,45 @@ module Base = struct
       ; proof: Tick.Proof.t }
   end
 
-  type 'a double = 'a * 'a [@@deriving bin_io, compare, sexp, yojson, hash, eq]
+  module Double = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, eq]
+      end
+    end]
+  end
 
   module Dlog_based = struct
-    type ('dlog_me_only, 'pairing_me_only) t =
-      { statement:
-          ( Challenge.Constant.t
-          , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          , Tick.Field.t Shifted_value.Stable.Latest.t
-          , bool
-          , Tock.Field.t
-          , 'dlog_me_only
-          , Digest.Constant.t
-          , 'pairing_me_only
-          , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-            Bulletproof_challenge.t
-            Step_bp_vec.t
-          , Index.t )
-          Types.Dlog_based.Statement.Minimal.t
-      ; prev_evals:
-          Tick.Field.t Dlog_plonk_types.Pc_array.Stable.Latest.t
-          Dlog_plonk_types.Evals.Stable.Latest.t
-          double
-      ; prev_x_hat: Tick.Field.t double
-      ; proof: Tock.Proof.t }
-    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
+    [%%versioned_asserted
+    module Stable = struct
+      module V1 = struct
+        type ('dlog_me_only, 'pairing_me_only) t =
+          { statement:
+              ( Challenge.Constant.t
+              , Challenge.Constant.t Scalar_challenge.Stable.V1.t
+              , Tick.Field.t Shifted_value.Stable.V1.t
+              , bool
+              , Tock.Field.Stable.V1.t
+              , 'dlog_me_only
+              , Digest.Constant.t
+              , 'pairing_me_only
+              , Challenge.Constant.t Scalar_challenge.Stable.V1.t
+                Bulletproof_challenge.Stable.V1.t
+                Step_bp_vec.Stable.V1.t
+              , Index.Stable.V1.t )
+              Types.Dlog_based.Statement.Minimal.t
+          ; prev_evals:
+              Tick.Field.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t
+              Dlog_plonk_types.Evals.Stable.V1.t
+              Double.Stable.V1.t
+          ; prev_x_hat: Tick.Field.Stable.V1.t Double.Stable.V1.t
+          ; proof: Tock.Proof.Stable.V1.t }
+        [@@deriving compare, sexp, yojson, hash, eq]
+      end
+
+      module Tests = struct end
+    end]
   end
 end
 
@@ -74,7 +88,7 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (w : w Nat.t) (h : h Nat.t)
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     (most_recent_width : r Nat.t) : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
@@ -146,19 +160,29 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module MLMB_vec = Nvector (MLMB)
 
   module Repr = struct
-    type t =
-      ( ( Tock.Inner_curve.Affine.t
-        , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
-        Dlog_based.Proof_state.Me_only.t
-      , ( unit
-        , Tock.Curve.Affine.t Max_branching_at_most.t
-        , Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-          Bulletproof_challenge.t
-          Step_bp_vec.t
-          Max_branching_at_most.t )
-        Base.Me_only.Pairing_based.t )
-      Base.Dlog_based.t
-    [@@deriving bin_io, compare, sexp, yojson, hash, eq]
+    [%%versioned_asserted
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
+              MLMB_vec.Stable.V1.t )
+            Dlog_based.Proof_state.Me_only.t
+          , ( unit
+            , Tock.Curve.Affine.t Max_branching_at_most.t
+            , Challenge.Constant.t Scalar_challenge.Stable.V1.t
+              Bulletproof_challenge.Stable.V1.t
+              Step_bp_vec.Stable.V1.t
+              Max_branching_at_most.Stable.V1.t )
+            Base.Me_only.Pairing_based.Stable.V1.t )
+          Base.Dlog_based.Stable.V1.t
+        [@@deriving compare, sexp, yojson, hash, eq]
+
+        let to_latest = Fn.id
+      end
+
+      module Tests = struct end
+    end]
   end
 
   type nonrec t = (W.n, MLMB.n) t
@@ -201,7 +225,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let hash t = Repr.hash (to_repr t)
 
   include Binable.Of_binable
-            (Repr)
+            (Repr.Stable.V1)
             (struct
               type nonrec t = t
 

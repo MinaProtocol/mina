@@ -61,21 +61,12 @@ module Sponge = struct
       end)
 
   module S = Sponge.Make_sponge (Permutation)
+  include S
 
-  include Sponge.Bit_sponge.Make (struct
-              type t = Impl.Boolean.var
-            end)
-            (struct
-              type t = Impl.Field.t
+  let squeeze_field = squeeze
 
-              let high_entropy_bits = high_entropy_bits
-
-              let finalize_discarded = Util.boolean_constrain (module Impl)
-
-              let to_bits t = Unsafe.unpack_unboolean t
-            end)
-            (Impl.Field)
-            (S)
+  let squeeze =
+    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
 end
 
 let%test_unit "sponge" =
@@ -105,7 +96,6 @@ module Inner_curve = struct
     module Impl = Impl
 
     module Params = struct
-      open Impl.Field.Constant
       include C.Params
 
       let one = C.to_affine_exn C.one

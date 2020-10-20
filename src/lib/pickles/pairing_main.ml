@@ -128,9 +128,10 @@ struct
         in
         Inner_curve.(acc + constant (Constant.negate correction)) )
 
-  let squeeze_scalar sponge : Scalar_challenge.t =
+  let squeeze_scalar sponge : Scalar_challenge.t * Field.t SC.SC.t =
+    let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
     (* No need to boolean constrain scalar challenges. *)
-    Scalar_challenge (Sponge.squeeze sponge ~length:Challenge.length)
+    (Scalar_challenge bits, Scalar_challenge packed)
 
   let bullet_reduce sponge gammas =
     with_label __LOC__ (fun () ->
@@ -140,11 +141,11 @@ struct
               absorb (PC :: PC) gammas_i ;
               squeeze_scalar sponge )
         in
-        let term_and_challenge (l, r) pre =
+        let term_and_challenge (l, r) (pre, pre_packed) =
           let left_term = Scalar_challenge.endo_inv l pre in
           let right_term = Scalar_challenge.endo r pre in
           ( Inner_curve.(left_term + right_term)
-          , {Bulletproof_challenge.prechallenge= pre} )
+          , {Bulletproof_challenge.prechallenge= pre_packed} )
         in
         let terms, challenges =
           Array.map2_exn gammas prechallenges ~f:term_and_challenge
@@ -255,7 +256,7 @@ struct
         in
         let q = p_prime + lr_prod in
         absorb sponge PC delta ;
-        let c = squeeze_scalar sponge in
+        let c, _c_packed = squeeze_scalar sponge in
         (* c Q + delta = z1 (G + b U) + z2 H *)
         let lhs =
           let cq = Scalar_challenge.endo q c in
@@ -278,14 +279,14 @@ struct
         , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t)
       (m2 :
-        ( Inputs.Impl.Boolean.var list
-        , Scalar_challenge.t )
+        ( Inputs.Impl.Field.t
+        , Inputs.Impl.Field.t Pickles_types.Scalar_challenge.t )
         Types.Pairing_based.Proof_state.Deferred_values.Plonk.Minimal.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal in
-    let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
+    let chal c1 c2 = Field.Assert.equal c1 c2 in
     let scalar_chal (Scalar_challenge t1 : _ Pickles_types.Scalar_challenge.t)
-        (Scalar_challenge t2 : Scalar_challenge.t) =
-      Field.Assert.equal t1 (Field.project t2)
+        (Scalar_challenge t2 : _ Pickles_types.Scalar_challenge.t) =
+      Field.Assert.equal t1 t2
     in
     chal m1.beta m2.beta ;
     chal m1.gamma m2.gamma ;
@@ -329,9 +330,9 @@ struct
               absorb sponge ty x ; x )
         in
         let sample () =
-          let xs = Sponge.squeeze sponge ~length:Challenge.length in
-          Util.boolean_constrain (module Impl) xs ;
-          xs
+          let bits, packed = Sponge.squeeze sponge ~length:Challenge.length in
+          Util.boolean_constrain (module Impl) bits ;
+          (bits, packed)
         in
         let sample_scalar () = squeeze_scalar sponge in
         let open Dlog_plonk_types.Messages in
@@ -349,12 +350,15 @@ struct
         let l_comm = receive without l_comm in
         let r_comm = receive without r_comm in
         let o_comm = receive without o_comm in
-        let beta = sample () in
-        let gamma = sample () in
+        let beta, beta_packed = sample () in
+        let gamma, gamma_packed = sample () in
         let z_comm = receive without z_comm in
-        let alpha = sample_scalar () in
+        let alpha, alpha_packed = sample_scalar () in
         let t_comm = receive with_ t_comm in
-        let zeta = sample_scalar () in
+        let zeta, zeta_packed = sample_scalar () in
+        Util.boolean_constrain
+          (module Impl)
+          (match zeta with Scalar_challenge x -> x) ;
         (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
        where f is the polynomial corresponding to sg_old
@@ -443,7 +447,10 @@ struct
           ; beta= plonk.beta
           ; gamma= plonk.gamma
           ; zeta= plonk.zeta }
-          {alpha; beta; gamma; zeta} ;
+          { alpha= alpha_packed
+          ; beta= beta_packed
+          ; gamma= gamma_packed
+          ; zeta= zeta_packed } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =
@@ -1049,7 +1056,7 @@ struct
                   acc
               | `Not_opt sponge, `Opt t ->
                   let sponge =
-                    S.Bit_sponge.map sponge ~f:Opt_sponge.Underlying.of_sponge
+                    S.Bit_sponge.make (Opt_sponge.Underlying.of_sponge sponge)
                   in
                   Opt_sponge.absorb sponge t ; `Opt sponge
               | `Opt sponge, `Opt t ->
@@ -1121,7 +1128,7 @@ struct
             in
             let c2 =
               Field.if_ is_base_case ~then_:c1
-                ~else_:(pack_scalar_challenge c2.prechallenge)
+                ~else_:(match c2.prechallenge with Scalar_challenge c2 -> c2)
             in
             Field.Assert.equal c1 c2 ) ) ;
     bulletproof_success

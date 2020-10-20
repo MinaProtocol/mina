@@ -10,9 +10,14 @@ open Backend
    pairing me-onlys on the wire. There is no need to send the wrap-key since everyone
    knows it. *)
 module Pairing_based = struct
-  type ('s, 'sgs, 'bpcs) t =
-    {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
-  [@@deriving sexp, bin_io, yojson, sexp, compare, hash, eq]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('s, 'sgs, 'bpcs) t =
+        {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
+      [@@deriving sexp, yojson, sexp, compare, hash, eq]
+    end
+  end]
 
   let prepare ~dlog_plonk_index {app_state; sg; old_bulletproof_challenges} =
     { Pairing_based.Proof_state.Me_only.app_state
@@ -24,11 +29,20 @@ end
 
 module Dlog_based = struct
   module Challenges_vector = struct
-    type t =
-      Challenge.Constant.t Scalar_challenge.Stable.Latest.t
-      Bulletproof_challenge.t
-      Wrap_bp_vec.t
-    [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+    [%%versioned_asserted
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Challenge.Constant.t Scalar_challenge.Stable.V1.t
+          Bulletproof_challenge.Stable.V1.t
+          Wrap_bp_vec.Stable.V1.t
+        [@@deriving sexp, compare, yojson, hash, eq]
+
+        let to_latest = Fn.id
+      end
+
+      module Tests = struct end
+    end]
 
     module Prepared = struct
       type t = (Tock.Field.t, Tock.Rounds.n) Vector.t
