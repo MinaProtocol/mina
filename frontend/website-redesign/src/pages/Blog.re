@@ -87,19 +87,24 @@ module MorePosts = {
       style([
         listStyleType(`none),
         width(`percent(100.)),
+        height(`percent(100.)),
         display(`grid),
+        gridColumnGap(`rem(2.)),
+        gridRowGap(`rem(3.)),
+        marginBottom(`rem(4.)),
         gridTemplateColumns([
           `repeat((`autoFit, `minmax((`minContent, `rem(23.5))))),
         ]),
-        gridColumnGap(`rem(2.)),
         media(
           Theme.MediaQuery.desktop,
-          [gridTemplateColumns([`repeat((`num(3), `fr(1.)))])],
+          [
+            marginBottom(`rem(8.)),
+            gridTemplateColumns([`repeat((`num(3), `fr(1.)))]),
+          ],
         ),
       ]);
 
-    let postItem =
-      style([width(`percent(100.)), marginBottom(`rem(3.25))]);
+    let postItem = style([height(`percent(100.)), width(`percent(100.))]);
   };
 
   module Content = {
