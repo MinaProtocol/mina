@@ -41,7 +41,12 @@ module Styles = {
   let genesisLabel =
     merge([
       Theme.Type.paragraphMono,
-      style([position(`absolute), top(`rem(9.25)), left(`rem(2.5))]),
+      style([
+        fontSize(`rem(0.875)),
+        position(`absolute),
+        top(`rem(9.25)),
+        left(`rem(2.5)),
+      ]),
     ]);
   let quoteSection =
     merge([
@@ -108,12 +113,15 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
         </>
         <div className=Styles.socialTags>
           <a
-            href={"https://twitter.com/" ++ twitter} className=Styles.iconLink>
+            target="_blank"
+            href={"https://twitter.com/" ++ twitter}
+            className=Styles.iconLink>
             <Icon kind=Icon.Twitter />
           </a>
           {switch (github) {
            | Some(github) =>
              <a
+               target="_blank"
                href={"https://github.com/" ++ github}
                className=Styles.iconLink>
                <Icon kind=Icon.Github />
