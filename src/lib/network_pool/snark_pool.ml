@@ -443,28 +443,29 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
       Strict_pipe.(
         create ~name:"Snark pool Transition frontier diffs" Synchronous)
     in
-    match%map
-      Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
-        Snark_tables.Serializable.Stable.Latest.bin_reader_t
-    with
-    | Ok snark_table ->
-        let pool = Resource_pool.of_serializable snark_table ~config ~logger in
-        let network_pool =
-          of_resource_pool_and_diffs pool ~logger ~constraint_constants
-            ~incoming_diffs ~local_diffs ~tf_diffs:tf_diff_reader
-        in
-        store_periodically (resource_pool network_pool) ;
-        Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
-          pool ~tf_diff_writer ;
-        network_pool
-    | Error _e ->
-        let res =
+    let%map res =
+      match%map
+        Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
+          Snark_tables.Serializable.Stable.Latest.bin_reader_t
+      with
+      | Ok snark_table ->
+          let pool =
+            Resource_pool.of_serializable snark_table ~config ~logger
+          in
+          let network_pool =
+            of_resource_pool_and_diffs pool ~logger ~constraint_constants
+              ~incoming_diffs ~local_diffs ~tf_diffs:tf_diff_reader
+          in
+          Resource_pool.listen_to_frontier_broadcast_pipe
+            frontier_broadcast_pipe pool ~tf_diff_writer ;
+          network_pool
+      | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
             ~time_controller ~incoming_diffs ~local_diffs
             ~frontier_broadcast_pipe
-        in
-        store_periodically (resource_pool res) ;
-        res
+    in
+    store_periodically (resource_pool res) ;
+    res
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
