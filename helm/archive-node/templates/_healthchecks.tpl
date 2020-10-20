@@ -6,7 +6,7 @@ archive-node startup probe settings
 {{- define "healthcheck.archive.startupProbe" -}}
 startupProbe:
   tcpSocket:
-    port: archive-postgres
+    port: archive-postgres-port
   failureThreshold: {{- default 60 .Values.healthcheck.failureThreshold -}}
   periodSeconds: {{- default 5 .Values.healthcheck.periodSeconds -}}
 {{- end -}}
@@ -17,7 +17,7 @@ archive-node liveness check settings
 {{- define "healthcheck.archive.livenessCheck" -}}
 livenessProbe:
   tcpSocket:
-    port: archive-server
+    port: archive-server-port
   {{ template "healthcheck.common.settings" . }}
 {{- end -}}
 

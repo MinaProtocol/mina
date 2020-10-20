@@ -59,22 +59,22 @@ spec:
         - name: DAEMON_ARCHIVE_PORT
           value: {{ .Values.archive.ports.server | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.libp2p | quote }}
+          value: {{ .Values.coda.ports.p2p | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
           value: {{ .Values.coda.ports.external | quote }}
         ports:
-        - name: libp2p
+        - name: p2p-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.libp2p }}
-        - name: graphql
+          containerPort: {{ .Values.coda.ports.p2p }}
+        - name: graphql-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.graphql }}
-        - name: metrics
+        - name: metrics-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.metrics }}
-        - name: external
+        - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.external }}
           hostPort: {{ .Values.coda.ports.external }}
@@ -93,10 +93,10 @@ spec:
         env:
         imagePullPolicy: Always
         ports:
-        - name: archive-server
+        - name: archive-server-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.server }}
-        - name: archive-postgres
+        - name: archive-postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
       volumes:

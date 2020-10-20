@@ -69,7 +69,7 @@ spec:
           - name: DAEMON_REST_PORT
             value: {{ $.Values.coda.ports.graphql | quote }}
           - name: DAEMON_CLIENT_PORT
-            value: {{ $.Values.coda.ports.libp2p | quote }}
+            value: {{ $.Values.coda.ports.p2p | quote }}
           - name: DAEMON_METRICS_PORT
             value: {{ $.Values.coda.ports.metrics | quote }}
           - name: CODA_CLIENT_TRUSTLIST
@@ -77,9 +77,9 @@ spec:
           - name: DAEMON_EXTERNAL_PORT
             value: {{ $.Values.coda.ports.external | quote }}
         ports:
-        - name: libp2p
+        - name: p2p-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.libp2p }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
         - name: graphql
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.graphql }}

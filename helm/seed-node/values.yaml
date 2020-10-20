@@ -6,7 +6,7 @@ coda:
     - /ip4/35.185.66.37/tcp/10105/p2p/12D3KooWQ7Pz3SPizarzx9ZhCJ6jNmQ2iDPgHQxVzRzqYU2SgRSd
     - /ip4/35.237.214.144/tcp/10120/p2p/12D3KooWGtjWnCcvkaSEbKuNbPivEogxqtLWcsJiQtURydptvrsA
   ports:
-    libp2p: "8301"
+    p2p: "8301"
     graphql: "3085"
     metrics: "10001"
     external: "10909"

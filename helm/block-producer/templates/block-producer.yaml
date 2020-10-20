@@ -104,7 +104,7 @@ spec:
           - name: PYTHONUNBUFFERED
             value: "1"
         ports: 
-        - name: metrics
+        - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
         imagePullPolicy: Always
       {{- end }}
@@ -144,7 +144,7 @@ spec:
           - name: FEE_AMOUNT
             value: {{ $.Values.bots.faucet.fee | quote }}
         ports:
-        - name: graphql
+        - name: graphql-port
           containerPort: {{ $.Values.bots.ports.graphql }}
         imagePullPolicy: Always
       {{- end }}
@@ -194,7 +194,7 @@ spec:
         - name: DAEMON_REST_PORT
           value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ $.Values.coda.ports.libp2p | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
@@ -202,16 +202,16 @@ spec:
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         ports:
-        - name: libp2p
+        - name: p2p-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.libp2p }}
-        - name: graphql
+          containerPort: {{ $.Values.coda.ports.p2p }}
+        - name: graphql-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.graphql }}
-        - name: metrics
+        - name: metrics-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.metrics }}
-        - name: external
+        - name: external-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.external }}
           hostPort: {{ $.Values.coda.ports.external }}
