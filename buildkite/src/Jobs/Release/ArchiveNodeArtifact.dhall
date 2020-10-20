@@ -10,14 +10,14 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let OpamInit = ../../Command/OpamInit.dhall
 let Size = ../../Command/Size.dhall
-let DockerArtifact = ../../Command/DockerArtifact.dhall
+let DockerImage = ../../Command/DockerImage.dhall
 
-let dependsOn = [ { name = "ArchiveNodeArtifact", key = "archive-artifacts-build" } ]
+let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" } ]
 
-let spec = DockerArtifact.ReleaseSpec::{
+let spec = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
-    step_key="archive-docker-artifact"
+    step_key="archive-docker-image"
 }
 
 in
@@ -42,11 +42,11 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             "BUILDKITE"
           ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./${spec.deploy_env_file}" ],
-          label = "Build Mina archive-node artifacts",
-          key = "archive-artifacts-build",
+          label = "Build Mina's archive-node debian package",
+          key = "build-archive-deb-pkg",
           target = Size.XLarge,
           artifact_paths = [ S.contains "./*.deb" ]
         },
-      DockerArtifact.generateStep spec
+      DockerImage.generateStep spec
     ]
   }
