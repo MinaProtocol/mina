@@ -11,7 +11,7 @@
    snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot)))
+  (pps ppx_version ppx_jane ppxlib.metaquot bisect_ppx -- --conditional)))
 
 (rule
  (targets precomputed_values.ml)

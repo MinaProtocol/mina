@@ -3,8 +3,16 @@ open Core
 open Snarky_bn382
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
+module Det_sqrt_witness = struct
+  type 'a t = {c: 'a; d: Unsigned.UInt64.t; sqrt: 'a}
+end
+
+module D = Det_sqrt_witness
+
 module type Input_intf = sig
   include Type_with_delete
+
+  val really_delete : t -> unit
 
   module Bigint : Bigint.Intf
 
@@ -40,6 +48,22 @@ module type Input_intf = sig
 
   val sqrt : t -> t
 
+  val det_sqrt : t -> t
+
+  module rec Det_sqrt_witness : sig
+    val c : Det_sqrt_witness.t -> t
+
+    val d : Det_sqrt_witness.t -> Unsigned.UInt64.t
+
+    val success : Det_sqrt_witness.t -> bool
+
+    val sqrt : Det_sqrt_witness.t -> t
+
+    val create : t -> Det_sqrt_witness.t
+
+    type t
+  end
+
   val is_square : t -> bool
 
   val equal : t -> t -> bool
@@ -47,6 +71,8 @@ module type Input_intf = sig
   val print : t -> unit
 
   val random : unit -> t
+
+  val two_adic_root_of_unity : unit -> t
 
   val mut_add : t -> t -> unit
 
@@ -102,6 +128,10 @@ module type S = sig
 
   val sqrt : t -> t
 
+  val det_sqrt : t -> t
+
+  val det_sqrt_witness : t -> t Det_sqrt_witness.t option
+
   val is_square : t -> bool
 
   val equal : t -> t -> bool
@@ -115,6 +145,8 @@ module type S = sig
   val print : t -> unit
 
   val random : unit -> t
+
+  val two_adic_root_of_unity : unit -> t
 
   val negate : t -> t
 
@@ -287,6 +319,20 @@ module Make (F : Input_intf) :
 
   let sqrt = gc1 sqrt
 
+  let det_sqrt = gc1 det_sqrt
+
+  let det_sqrt_witness x =
+    let r = Det_sqrt_witness.create x in
+    let c = Det_sqrt_witness.c r in
+    Caml.Gc.finalise really_delete c ;
+    let sqrt = Det_sqrt_witness.sqrt r in
+    Caml.Gc.finalise really_delete sqrt ;
+    match Det_sqrt_witness.success r with
+    | false ->
+        None
+    | true ->
+        Some {D.c; sqrt; d= Det_sqrt_witness.d r}
+
   let is_square = is_square
 
   let to_bits t =
@@ -302,6 +348,8 @@ module Make (F : Input_intf) :
   let print = print
 
   let random = gc1 random
+
+  let two_adic_root_of_unity = gc1 two_adic_root_of_unity
 
   let%test_unit "sexp round trip" =
     let t = random () in

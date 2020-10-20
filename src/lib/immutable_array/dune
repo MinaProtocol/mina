@@ -1,6 +1,6 @@
 (library
  (name immutable_array)
  (public_name immutable_array)
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional))
  (library_flags -linkall)
  (synopsis "Access only array utility"))

@@ -1,4 +1,7 @@
-module Decoders = Graphql_client.Decoders
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
+module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
 [%graphql
@@ -151,8 +154,7 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $token: UInt64,
-          $fee: UInt64!,
+          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input:
@@ -276,5 +278,11 @@ module Next_available_token =
 {|
 query next_available_token {
   nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
 }
 |}]

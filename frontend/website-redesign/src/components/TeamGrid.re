@@ -139,9 +139,24 @@ let make = () => {
       src="/static/img/headshots/ChristineYip.jpg"
     />
     <TeamMember
-      fullName="Ember Arlynx"
+      fullName="Andrew Trainor"
       title="Protocol Engineer, O(1) Labs"
-      src="/static/img/headshots/Ember.jpg"
+      src="/static/img/headshots/AndrewTrainor.jpg"
+    />
+    <TeamMember
+      fullName="Helena Li"
+      title="Protocol Engineer, O(1) Labs"
+      src="/static/img/headshots/HelenaLi.jpg"
+    />
+    <TeamMember
+      fullName="Chris Pryor"
+      title="Lead Product Designer, O(1) Labs"
+      src="/static/img/headshots/ChrisPryor.jpg"
+    />
+    <TeamMember
+      fullName="Joon Kim"
+      title="General Counsel, O(1) Labs"
+      src="/static/img/headshots/JoonKim.jpg"
     />
   </div>;
 };

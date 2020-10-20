@@ -250,6 +250,20 @@ module type S = sig
     -> Signed_command.With_valid_signature.t
     -> Undo.Signed_command_undo.t Or_error.t
 
+  val apply_fee_transfer :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
+    -> ledger
+    -> Fee_transfer.t
+    -> Undo.Fee_transfer_undo.t Or_error.t
+
+  val apply_coinbase :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> txn_global_slot:Global_slot.t
+    -> ledger
+    -> Coinbase.t
+    -> Undo.Coinbase_undo.t Or_error.t
+
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> txn_state_view:Snapp_predicate.Protocol_state.View.t
@@ -292,6 +306,20 @@ module type S = sig
   end
 end
 
+(* tags for timing validation errors *)
+let nsf_tag = "nsf"
+
+let min_balance_tag = "minbal"
+
+let timing_error_to_user_command_status err =
+  match Error.Internal_repr.of_info err with
+  | Tag_t (tag, _) when String.equal tag nsf_tag ->
+      User_command_status.Failure.Source_insufficient_balance
+  | Tag_t (tag, _) when String.equal tag min_balance_tag ->
+      User_command_status.Failure.Source_minimum_balance_violation
+  | _ ->
+      failwith "Unexpected timed account validation error"
+
 let validate_timing ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
@@ -311,6 +339,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
               Amount.t} at global slot %{sexp: Global_slot.t}, the balance \
               %{sexp: Balance.t} is insufficient"
             txn_amount txn_global_slot account_balance
+          |> Or_error.tag ~tag:nsf_tag
         in
         let min_balance_error min_balance =
           Or_error.errorf
@@ -319,6 +348,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
               transaction would put the balance below the calculated minimum \
               balance of %{sexp: Balance.t}"
             txn_amount txn_global_slot min_balance
+          |> Or_error.tag ~tag:min_balance_tag
         in
         match Balance.(account_balance - txn_amount) with
         | None ->
@@ -665,8 +695,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%map timing =
             validate_timing ~txn_amount:Amount.zero
               ~txn_global_slot:current_global_slot ~account:source_account
-            |> Result.map_error ~f:(fun _ ->
-                   User_command_status.Failure.Source_insufficient_balance )
+            |> Result.map_error ~f:timing_error_to_user_command_status
           in
           let source_account =
             { source_account with
@@ -725,9 +754,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%bind timing =
                 validate_timing ~txn_amount:amount
                   ~txn_global_slot:current_global_slot ~account
-                |> Result.map_error ~f:(fun _ ->
-                       User_command_status.Failure.Source_insufficient_balance
-                   )
+                |> Result.map_error ~f:timing_error_to_user_command_status
               in
               let%map balance =
                 Result.map_error (sub_amount account.balance amount)
@@ -860,8 +887,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%map timing =
               validate_timing ~txn_amount:Amount.zero
                 ~txn_global_slot:current_global_slot ~account:source_account
-              |> Result.map_error ~f:(fun _ ->
-                     User_command_status.Failure.Source_insufficient_balance )
+              |> Result.map_error ~f:timing_error_to_user_command_status
             in
             {source_account with timing}
           in
@@ -923,8 +949,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%map timing =
               validate_timing ~txn_amount:Amount.zero
                 ~txn_global_slot:current_global_slot ~account
-              |> Result.map_error ~f:(fun _ ->
-                     User_command_status.Failure.Source_insufficient_balance )
+              |> Result.map_error ~f:timing_error_to_user_command_status
             in
             (location, source_timing, {account with timing})
           in
@@ -1019,7 +1044,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Neg ->
           validate_timing ~txn_amount:delta.magnitude
             ~txn_global_slot:state_view.curr_global_slot ~account:a
-          |> with_err Source_insufficient_balance
+          |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
@@ -1149,7 +1174,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           r.data.body.delta
         in
         (* TODO:
-           If there is an excess for the native token of the transaction, currently 
+           If there is an excess for the native token of the transaction, currently
            this just burns it. Probably we should assert that if another fee payer is
            present, the excess is 0. *)
         let f

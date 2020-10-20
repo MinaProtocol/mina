@@ -457,9 +457,10 @@ module Rpcs = struct
 
   module Get_telemetry_data = struct
     module Telemetry_data = struct
-      let yojson_of_ban_status (inet_addr, peer_status) =
+      let yojson_of_ban_status (peer, peer_status) =
         `Assoc
-          [ ("IP_address", `String (Unix.Inet_addr.to_string inet_addr))
+          [ ("IP_address", `String (Unix.Inet_addr.to_string peer.Peer.host))
+          ; ("peer_id", `String peer.peer_id)
           ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
 
       let yojson_of_ban_statuses ban_statuses =
@@ -479,7 +480,7 @@ module Rpcs = struct
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash: State_hash.Stable.V1.t
             ; ban_statuses:
-                ( Core.Unix.Inet_addr.Stable.V1.t
+                ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
                   [@to_yojson yojson_of_ban_statuses]
@@ -652,14 +653,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
-      (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+      ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
@@ -1033,21 +1035,7 @@ let create (config : Config.t)
               [%str_log debug]
                 (Transactions_received
                    {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
-            let diff' =
-              List.filter diff ~f:(fun cmd ->
-                  if User_command.has_insufficient_fee cmd then (
-                    [%log debug]
-                      "Filtering user command with insufficient fee from \
-                       transaction-pool diff $cmd from $sender"
-                      ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
-                        ; ( "sender"
-                          , Envelope.(
-                              Sender.to_yojson (Incoming.sender envelope)) ) ] ;
-                    false )
-                  else true )
-            in
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff'), valid_cb)
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
     )
   in
   { gossip_net
@@ -1084,6 +1072,11 @@ include struct
 
   let ip_for_peer t peer_id =
     (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
+
+  let connection_gating_config t = lift connection_gating t
+
+  let set_connection_gating_config t config =
+    lift set_connection_gating t config
 end
 
 let on_first_received_message {first_received_message_signal; _} ~f =
@@ -1189,7 +1182,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
           | Connected ({data= Ok (Some data); _} as envelope) ->
               let%bind () =
                 Trust_system.(
-                  record t.trust_system t.logger peer.host
+                  record t.trust_system t.logger peer
                     Actions.
                       ( Fulfilled_request
                       , Some ("Nonpreferred peer returned valid response", [])
@@ -1215,9 +1208,9 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
         match sender with
         | Local ->
             return ()
-        | Remote (sender, _) ->
+        | Remote peer ->
             Trust_system.(
-              record t.trust_system t.logger sender
+              record t.trust_system t.logger peer
                 Actions.
                   ( Fulfilled_request
                   , Some ("Preferred peer returned valid response", []) ))
@@ -1226,9 +1219,9 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
   | Connected {data= Ok None; sender} ->
       let%bind () =
         match sender with
-        | Remote (sender, _) ->
+        | Remote peer ->
             Trust_system.(
-              record t.trust_system t.logger sender
+              record t.trust_system t.logger peer
                 Actions.
                   ( Violated_protocol
                   , Some ("When querying preferred peer, got no response", [])
@@ -1241,9 +1234,9 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
       (* FIXME #4094: determine if more specific actions apply here *)
       let%bind () =
         match sender with
-        | Remote (sender, _) ->
+        | Remote peer ->
             Trust_system.(
-              record t.trust_system t.logger sender
+              record t.trust_system t.logger peer
                 Actions.
                   ( Outgoing_connection_error
                   , Some

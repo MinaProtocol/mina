@@ -393,6 +393,8 @@ module type S = sig
       val start_time : constants:Constants.t -> t -> Block_time.t
 
       val end_time : constants:Constants.t -> t -> Block_time.t
+
+      val to_global_slot : t -> Coda_numbers.Global_slot.t
     end
 
     module Consensus_state : sig
@@ -418,7 +420,10 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-        genesis_ledger:Ledger.t Lazy.t -> constants:Constants.t -> Value.t
+           genesis_ledger:Ledger.t Lazy.t
+        -> constants:Constants.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t

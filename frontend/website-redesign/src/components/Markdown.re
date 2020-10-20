@@ -28,7 +28,21 @@ let make = (~content) => {
     ->Unified.use(katex, ())
     ->Unified.use(
         rehypeReact,
-        {"createElement": createElement, "Fragment": ReasonReact.fragment},
+        {
+          "createElement": createElement,
+          "Fragment": ReasonReact.fragment,
+          "components": {
+            a: DocsComponents.A.make,
+            p: DocsComponents.P.make,
+            h2: DocsComponents.H2.make,
+            h3: DocsComponents.H3.make,
+            h4: DocsComponents.H4.make,
+            ol: DocsComponents.Ol.make,
+            ul: DocsComponents.Ul.make,
+            strong: DocsComponents.Strong.make,
+            img: DocsComponents.Blog.Img.make,
+          },
+        },
       )
     ->Unified.processSync(~content);
 

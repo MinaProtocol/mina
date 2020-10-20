@@ -27,8 +27,11 @@ module Config = struct
     ; chain_id: string
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
+    ; isolate: bool
     ; trust_system: Trust_system.t
-    ; gossip_type: [`Gossipsub | `Flood | `Random]
+    ; flooding: bool
+    ; direct_peers: Coda_net2.Multiaddr.t list
+    ; peer_exchange: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -53,7 +56,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          ( Message.msg Envelope.Incoming.t
+          * (Coda_net2.validation_result -> unit) )
           Strict_pipe.Reader.t
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
@@ -135,7 +139,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[] ~gossip_type:config.gossip_type
+              configure net2 ~me
+                ~maddrs:
+                  [ Multiaddr.of_string
+                      (sprintf "/ip4/0.0.0.0/tcp/%d"
+                         (Option.value_exn config.addrs_and_ports.peer)
+                           .libp2p_port) ]
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
@@ -146,6 +155,22 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:config.initial_peers
+                ~direct_peers:config.direct_peers
+                ~peer_exchange:config.peer_exchange ~flooding:config.flooding
+                ~initial_gating_config:
+                  Coda_net2.
+                    { banned_peers=
+                        Trust_system.peer_statuses config.trust_system
+                        |> List.filter_map ~f:(fun (peer, status) ->
+                               match status.banned with
+                               | Banned_until _ ->
+                                   Some peer
+                               | _ ->
+                                   None )
+                    ; trusted_peers=
+                        List.filter_map ~f:Coda_net2.Multiaddr.to_peer
+                          config.initial_peers
+                    ; isolate= config.isolate }
                 ~on_new_peer:(fun _ ->
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
@@ -169,8 +194,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               let handle_unknown_rpc conn_state ~rpc_tag ~version =
                 Deferred.don't_wait_for
                   Trust_system.(
-                    record config.trust_system config.logger
-                      conn_state.Peer.host
+                    record config.trust_system config.logger conn_state
                       Actions.
                         ( Violated_protocol
                         , Some
@@ -205,7 +229,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
                       Trust_system.(
-                        record config.trust_system config.logger peer.host
+                        record config.trust_system config.logger peer
                           Actions.
                             ( Incoming_connection_error
                             , Some
@@ -250,29 +274,29 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Deferred.return true
-                  | Remote (_, sender_peer_id) ->
-                      if not (Peer.Id.equal sender_peer_id my_peer_id) then
+                      Deferred.return `Accept
+                  | Remote sender ->
+                      if not (Peer.Id.equal sender.peer_id my_peer_id) then
                         let valid_ivar = Ivar.create () in
                         Deferred.bind
                           (Strict_pipe.Writer.write message_writer
                              (envelope, Ivar.fill valid_ivar))
                           ~f:(fun () -> Ivar.read valid_ivar)
-                      else Deferred.return true )
+                      else Deferred.return `Accept )
                 ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call
                     (fun envelope (err : Error.t) ->
-                      let host, peer_id =
+                      let peer =
                         Envelope.Incoming.sender envelope
                         |> Envelope.Sender.remote_exn
                       in
                       let metadata =
-                        [ ("sender_peer_id", `String peer_id)
+                        [ ("sender_peer_id", `String peer.peer_id)
                         ; ("error", `String (Error.to_string_hum err)) ]
                       in
                       Trust_system.(
-                        record config.trust_system config.logger host
+                        record config.trust_system config.logger peer
                           Actions.
                             ( Violated_protocol
                             , Some ("failed to decode gossip message", metadata)
@@ -369,14 +393,26 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         let%map _ = res in
         ()
       in
-      let do_ban (addr, expiration) =
+      let ban_configuration =
+        ref {Coda_net2.banned_peers= []; trusted_peers= []; isolate= false}
+      in
+      let do_ban (banned_peer, expiration) =
         don't_wait_for
           ( Clock.at expiration
           >>= fun () ->
           let%bind net2 = !net2_ref in
-          Coda_net2.unban_ip net2 addr |> Deferred.ignore ) ;
+          ban_configuration :=
+            { !ban_configuration with
+              banned_peers=
+                List.filter !ban_configuration.banned_peers ~f:(fun p ->
+                    not (Peer.equal p banned_peer) ) } ;
+          Coda_net2.set_connection_gating_config net2 !ban_configuration
+          |> Deferred.ignore ) ;
         (let%bind net2 = !net2_ref in
-         Coda_net2.ban_ip net2 addr)
+         ban_configuration :=
+           { !ban_configuration with
+             banned_peers= banned_peer :: !ban_configuration.banned_peers } ;
+         Coda_net2.set_connection_gating_config net2 !ban_configuration)
         |> Deferred.ignore
       in
       let%map () =
@@ -444,7 +480,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   (fun exn ->
                     let%map () =
                       Trust_system.(
-                        record t.config.trust_system t.config.logger peer.host
+                        record t.config.trust_system t.config.logger peer
                           Actions.
                             ( Outgoing_connection_error
                             , Some
@@ -471,7 +507,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   ; _rpc_version ] ) ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
+                    record t.config.trust_system t.config.logger peer
                       Actions.
                         ( Outgoing_connection_error
                         , Some ("Closed connection", []) ))
@@ -480,7 +516,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             | _ ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger peer.host
+                    record t.config.trust_system t.config.logger peer
                       Actions.
                         ( Outgoing_connection_error
                         , Some
@@ -552,6 +588,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let%bind net2 = !(t.net2) in
       Coda_net2.lookup_peerid net2 peer_id
       >>| function Ok p -> Some p | Error _ -> None
+
+    let connection_gating t =
+      let%bind net2 = !(t.net2) in
+      Coda_net2.connection_gating_config net2
+
+    let set_connection_gating t config =
+      let%bind net2 = !(t.net2) in
+      Coda_net2.set_connection_gating_config net2 config
   end
 
   include T

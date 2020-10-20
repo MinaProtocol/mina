@@ -137,7 +137,13 @@ module Make (Inputs : Intf.Inputs_intf) :
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
       ~proof_level daemon_address shutdown_on_disconnect =
-    let%bind state = Worker_state.create ~proof_level () in
+    let constraint_constants =
+      (* TODO: Make this configurable. *)
+      Genesis_constants.Constraint_constants.compiled
+    in
+    let%bind state =
+      Worker_state.create ~constraint_constants ~proof_level ()
+    in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
     let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
@@ -158,6 +164,23 @@ module Make (Inputs : Intf.Inputs_intf) :
       k ()
     in
     let rec go () =
+      let%bind daemon_address =
+        let%bind cwd = Sys.getcwd () in
+        [%log debug]
+          !"Snark worker working directory $dir"
+          ~metadata:[("dir", `String cwd)] ;
+        let path = "snark_coordinator" in
+        match%bind Sys.file_exists path with
+        | `Yes -> (
+            let%map s = Reader.file_contents path in
+            try Host_and_port.of_string (String.strip s)
+            with _ -> daemon_address )
+        | `No | `Unknown ->
+            return daemon_address
+      in
+      [%log debug]
+        !"Snark worker using daemon $addr"
+        ~metadata:[("addr", `String (Host_and_port.to_string daemon_address))] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address

@@ -120,15 +120,15 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                         Envelope.Incoming.sender (Cached.peek node)
                       in
                       List.fold subtree_nodes
-                        ~init:(Set.empty (module Unix.Inet_addr))
+                        ~init:(Set.empty (module Network_peer.Peer))
                         ~f:(fun inet_addrs node ->
                           match sender_from_tree_node node with
                           | Local ->
                               failwith
                                 "build_subtrees_of_breadcrumbs: sender of \
                                  external transition should not be Local"
-                          | Remote (inet_addr, _peer_id) ->
-                              Set.add inet_addrs inet_addr )
+                          | Remote peer ->
+                              Set.add inet_addrs peer )
                     in
                     let ip_addresses = Set.to_list ip_address_set in
                     let trust_system_record_invalid msg error =

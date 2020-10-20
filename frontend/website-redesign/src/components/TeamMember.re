@@ -2,12 +2,7 @@ module Styles = {
   open Css;
   let memberContainer =
     style([height(`rem(17.)), width(`rem(11.)), color(orange)]);
-  let image =
-    style([
-      width(`rem(10.)),
-      marginBottom(`rem(1.)),
-      media(Theme.MediaQuery.desktop, [width(`rem(11.))]),
-    ]);
+  let image = style([width(`rem(10.)), marginBottom(`rem(1.))]);
   let name =
     merge([
       Theme.Type.h5,
@@ -35,14 +30,15 @@ module Styles = {
       width(`rem(10.)),
     ]);
 };
+
 [@react.component]
 let make = (~fullName="", ~title="", ~src="") => {
   <div className=Styles.memberContainer>
     <img className=Styles.image src />
     <div className=Styles.flexRow>
       <h5 className=Styles.name> {React.string(fullName)} </h5>
-      <Icon kind=Icon.Plus />
     </div>
+    //<Icon kind=Icon.Plus />
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
 };

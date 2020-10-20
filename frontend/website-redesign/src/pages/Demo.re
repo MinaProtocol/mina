@@ -28,23 +28,40 @@ module Styles = {
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
+    <div className=Nav.Styles.spacer />
     <div className=Styles.page>
+      <div>
+        <SideNav currentSlug="">
+          <SideNav.Item title="Overview" slug="" />
+          <SideNav.Item title="Getting Started" slug="getting-started" />
+          <SideNav.Section title="Developers" slug="developers">
+            <SideNav.Item title="Developers Overview" slug="" />
+            <SideNav.Item title="Codebase Overview" slug="codebase-overview" />
+          </SideNav.Section>
+          <SideNav.Section title="SNARKs" slug="snarks">
+            <SideNav.Item title="SNARKs Overview" slug="" />
+          </SideNav.Section>
+          <SideNav.Item title="Archive Node" slug="archive-node" />
+          <SideNav.Item title="Snapps" slug="snapps" />
+          <SideNav.Item title="Glossary" slug="glossary" />
+        </SideNav>
+      </div>
       <div className=Styles.container>
         /*** Regular buttons */
 
-          <Button bgColor=Theme.Colors.orange>
+          <Button href=`Scroll_to_top bgColor=Theme.Colors.orange>
             {React.string("Button Label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.mint dark=true>
+          <Button href=`Scroll_to_top bgColor=Theme.Colors.mint dark=true>
             {React.string("Button label ")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.black>
+          <Button href=`Scroll_to_top bgColor=Theme.Colors.black>
             {React.string("Button label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
-          <Button bgColor=Theme.Colors.white>
+          <Button href=`Scroll_to_top bgColor=Theme.Colors.white>
             {React.string("Button label")}
             <Icon kind=Icon.ArrowRightMedium />
           </Button>
@@ -56,7 +73,11 @@ let make = () => {
             </span>
           </PromoButton>
           /***Join Genesis Button, uses the CoreProtocolLarge icon */
-          <Button bgColor=Theme.Colors.orange paddingX=1. paddingY=0.5>
+          <Button
+            href=`Scroll_to_top
+            bgColor=Theme.Colors.orange
+            paddingX=1.
+            paddingY=0.5>
             <Icon kind=Icon.CoreProtocolLarge size=2.5 />
             <span className=Styles.joinGenesisButton>
               {React.string("Join Genesis + Earn Mina")}
@@ -119,6 +140,28 @@ let make = () => {
            "Quote / Lorem ipsum dolor sit amet, consectetur amet adipiscing elit, sed do eiusmod tempor.",
          )}
       </p>
+      <AlternatingSections
+        backgroundImg=""
+        sections={
+          AlternatingSections.Section.SimpleRow([|
+            {
+              AlternatingSections.Section.SimpleRow.title: "Run a Node",
+              description: "You don't have to have expensive hardware, wait days for the blockchain to sync, or use a ton of compute power to participate in consensus. Just follow clear, straightforward instructions and connect to the live peer-to-peer Mina network.",
+              buttonCopy: "Get Started",
+              buttonUrl: `Internal("/"),
+              image: "/static/img/ProgrammableMoney.png",
+            },
+          |])
+        }
+      />
     </div>
+    <ButtonBar
+      kind=ButtonBar.HelpAndSupport
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
+    />
+    <ButtonBar
+      kind=ButtonBar.CommunityLanding
+      backgroundImg="/static/img/ButtonBarBackground.jpg"
+    />
   </Page>;
 };

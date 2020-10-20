@@ -3,15 +3,15 @@ module Styles = {
   let backgroundImage =
     style([
       backgroundSize(`cover),
-      backgroundImage(url("/static/img/InvestorsBackgroundMobile.png")),
+      backgroundImage(url("/static/img/InvestorsBackgroundMobile.jpg")),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(url("/static/img/InvestorsBackgroundTablet.png"))],
+        [backgroundImage(url("/static/img/InvestorsBackgroundTablet.jpg"))],
       ),
       media(
         Theme.MediaQuery.desktop,
         [
-          backgroundImage(url("/static/img/InvestorsBackgroundDesktop.png")),
+          backgroundImage(url("/static/img/InvestorsBackgroundDesktop.jpg")),
         ],
       ),
     ]);
@@ -20,8 +20,8 @@ module Styles = {
       display(`grid),
       gridTemplateColumns([`rem(10.), `rem(10.)]),
       gridAutoRows(`rem(5.5)),
-      gridColumnGap(`rem(1.)),
-      gridRowGap(`rem(1.)),
+      gridGap(`rem(1.)),
+      selector("div, img", [height(`rem(5.5)), width(`rem(10.))]),
       media(
         Theme.MediaQuery.tablet,
         [gridTemplateColumns([`repeat((`num(4), `rem(10.)))])],
@@ -40,7 +40,11 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [padding2(~v=`rem(7.), ~h=`rem(9.5)), maxWidth(`rem(84.))],
+        [
+          margin2(~v=`zero, ~h=`auto),
+          padding2(~v=`rem(7.), ~h=`rem(9.5)),
+          maxWidth(`rem(84.)),
+        ],
       ),
     ]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
@@ -52,7 +56,10 @@ module Styles = {
       fontSize(`rem(1.125)),
       textAlign(`center),
       background(white),
-      padding2(~v=`rem(2.), ~h=`rem(1.)),
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
+      padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
   let investorGridItemLarge =
     style([
@@ -60,6 +67,9 @@ module Styles = {
       fontSize(`rem(1.125)),
       textAlign(`center),
       background(white),
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
       padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
   let rule =
@@ -70,7 +80,6 @@ module Styles = {
   let advisorGrid =
     style([
       display(`grid),
-      gridColumnGap(`rem(1.)),
       gridTemplateColumns([`repeat((`num(2), `rem(10.)))]),
       gridAutoRows(`rem(17.3)),
       media(
@@ -79,7 +88,10 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [gridTemplateColumns([`repeat((`num(6), `rem(11.)))])],
+        [
+          gridTemplateColumns([`repeat((`num(6), `rem(11.)))]),
+          marginBottom(`rem(7.)),
+        ],
       ),
     ]);
   let advisors =
@@ -155,35 +167,34 @@ let make = () => {
           <TeamMember
             fullName="Jill Carlson"
             title="Co-founder, Open Money Initiative"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/carlson.jpg"
           />
           <TeamMember
             fullName="Paul Davidson"
             title="Co-founder & CEO, Alpha Exploration Co."
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/davidson.jpg"
           />
           <TeamMember
             fullName="Joseph Bonneau"
-            title="Head of Product Engineering, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bonneau.jpg"
           />
           <TeamMember
             fullName="Akis Kattis"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/kattis.jpg"
           />
           <TeamMember
             fullName="Benedikt Bunz"
-            title="Head of Marketing & Community, O(1) Labs"
-            src="/static/img/headshots/Headshot.jpg"
+            title="Advisor"
+            src="/static/img/headshots/bunz.jpg"
           />
           <TeamMember
             fullName="Amit Sahai"
             title="Director, Center for Encrypted Functionalities"
-            src="/static/img/headshots/Headshot.jpg"
+            src="/static/img/headshots/sahai.jpg"
           />
         </div>
-      <Rule color=Theme.Colors.black />
     </div>
   </div>;
 };

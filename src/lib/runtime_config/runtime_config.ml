@@ -1,5 +1,10 @@
 open Core_kernel
 
+module Fork_config = struct
+  type t = {previous_state_hash: string; previous_length: int}
+  [@@deriving yojson, dhall_type, bin_io_unversioned]
+end
+
 let yojson_strip_fields ~keep_fields = function
   | `Assoc l ->
       `Assoc
@@ -36,16 +41,129 @@ let dump_on_error yojson x =
       str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
   )
 
+let of_yojson_generic ~fields of_yojson json =
+  dump_on_error json @@ of_yojson
+  @@ yojson_strip_fields ~keep_fields:fields json
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
       module Timed = struct
         type t =
           { initial_minimum_balance: Currency.Balance.t
-          ; cliff_time: Coda_numbers.Global_slot.t (*slot number*)
-          ; vesting_period: Coda_numbers.Global_slot.t (*slots*)
+          ; cliff_time: Coda_numbers.Global_slot.t
+          ; vesting_period: Coda_numbers.Global_slot.t
           ; vesting_increment: Currency.Amount.t }
-        [@@deriving yojson, dhall_type]
+        [@@deriving yojson, dhall_type, sexp]
+
+        let fields =
+          [| "initial_minimum_balance"
+           ; "cliff_time"
+           ; "vesting_period"
+           ; "vesting_increment" |]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
+      end
+
+      module Permissions = struct
+        module Auth_required = struct
+          type t = None | Either | Proof | Signature | Both | Impossible
+          [@@deriving dhall_type, sexp, bin_io_unversioned]
+
+          let to_yojson = function
+            | None ->
+                `String "none"
+            | Either ->
+                `String "either"
+            | Proof ->
+                `String "proof"
+            | Signature ->
+                `String "signature"
+            | Both ->
+                `String "both"
+            | Impossible ->
+                `String "impossible"
+
+          let of_yojson = function
+            | `String s -> (
+              match String.lowercase s with
+              | "none" ->
+                  Ok None
+              | "either" ->
+                  Ok Either
+              | "proof" ->
+                  Ok Proof
+              | "signature" ->
+                  Ok Signature
+              | "both" ->
+                  Ok Both
+              | "impossible" ->
+                  Ok Impossible
+              | _ ->
+                  Error (sprintf "Invalid Auth_required.t value: %s" s) )
+            | _ ->
+                Error
+                  "Runtime_config.Json_Account.Single.Permissions.Auth_Required.t"
+        end
+
+        type t =
+          { stake: bool [@default false]
+          ; edit_state: Auth_required.t [@default None]
+          ; send: Auth_required.t [@default None]
+          ; receive: Auth_required.t [@default None]
+          ; set_delegate: Auth_required.t [@default None]
+          ; set_permissions: Auth_required.t [@default None]
+          ; set_verification_key: Auth_required.t [@default None] }
+        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+
+        let fields =
+          [| "stake"
+           ; "edit_state"
+           ; "send"
+           ; "receive"
+           ; "set_delegate"
+           ; "set_permissions"
+           ; "set_verification_key" |]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
+      end
+
+      module Token_permissions = struct
+        type t =
+          { token_owned: bool [@default false]
+          ; account_disabled: bool [@default false]
+          ; disable_new_accounts: bool [@default false] }
+        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+
+        let fields =
+          [|"token_owned"; "account_disabled"; "disable_new_accounts"|]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
+      end
+
+      module Snapp_account = struct
+        module Field = struct
+          type t = Snark_params.Tick.Field.t
+          [@@deriving sexp, bin_io_unversioned]
+
+          (* can't be automatically derived *)
+          let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
+          let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
+
+          let of_yojson = function
+            | `String s ->
+                Ok (Snark_params.Tick.Field.of_string s)
+            | _ ->
+                Error "Invalid Field.t runtime config Snapp_account.state"
+        end
+
+        type t = {state: Field.t list; verification_key: string option}
+        [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
+
+        let fields = [|"state"; "verification_key"|]
+
+        let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       type t =
@@ -53,34 +171,76 @@ module Json_layout = struct
         ; sk: (string option[@default None])
         ; balance: Currency.Balance.t
         ; delegate: (string option[@default None])
-        ; timing: (Timed.t option[@default None]) }
-      [@@deriving yojson, dhall_type]
+        ; timing: (Timed.t option[@default None])
+        ; token: (Unsigned_extended.UInt64.t option[@default None])
+        ; token_permissions: (Token_permissions.t option[@default None])
+        ; nonce:
+            (Coda_numbers.Account_nonce.t[@default
+                                           Coda_numbers.Account_nonce.zero])
+        ; receipt_chain_hash: (string option[@default None])
+        ; voting_for: (string option[@default None])
+        ; snapp: (Snapp_account.t option[@default None])
+        ; permissions: (Permissions.t option[@default None]) }
+      [@@deriving sexp, yojson, dhall_type]
 
-      let fields = [|"pk"; "sk"; "balance"; "delegate"; "timing"|]
+      let fields =
+        [| "pk"
+         ; "sk"
+         ; "balance"
+         ; "delegate"
+         ; "timing"
+         ; "token"
+         ; "token_permissions"
+         ; "nonce"
+         ; "receipt_chain_hash"
+         ; "voting_for"
+         ; "snapp"
+         ; "permissions" |]
 
-      let of_yojson json =
-        dump_on_error json @@ of_yojson
-        @@ yojson_strip_fields ~keep_fields:fields json
+      let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+      let default : t =
+        { pk= None
+        ; sk= None
+        ; balance= Currency.Balance.zero
+        ; delegate= None
+        ; timing= None
+        ; token= None
+        ; token_permissions= None
+        ; nonce= Coda_numbers.Account_nonce.zero
+        ; receipt_chain_hash= None
+        ; voting_for= None
+        ; snapp= None
+        ; permissions= None }
     end
 
     type t = Single.t list [@@deriving yojson, dhall_type]
   end
 
   module Ledger = struct
+    module Balance_spec = struct
+      type t = {number: int; balance: Currency.Balance.t}
+      [@@deriving yojson, dhall_type]
+    end
+
     type t =
       { accounts: (Accounts.t option[@default None])
       ; num_accounts: (int option[@default None])
+      ; balances: (Balance_spec.t list[@default []])
       ; hash: (string option[@default None])
       ; name: (string option[@default None])
       ; add_genesis_winner: (bool option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
-      [|"accounts"; "num_accounts"; "hash"; "name"; "add_genesis_winner"|]
+      [| "accounts"
+       ; "num_accounts"
+       ; "balances"
+       ; "hash"
+       ; "name"
+       ; "add_genesis_winner" |]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Proof_keys = struct
@@ -111,7 +271,8 @@ module Json_layout = struct
       ; transaction_capacity: (Transaction_capacity.t option[@default None])
       ; coinbase_amount: (Currency.Amount.t option[@default None])
       ; supercharged_coinbase_factor: (int option[@default None])
-      ; account_creation_fee: (Currency.Fee.t option[@default None]) }
+      ; account_creation_fee: (Currency.Fee.t option[@default None])
+      ; fork: (Fork_config.t option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -125,9 +286,7 @@ module Json_layout = struct
        ; "supercharged_coinbase_factor"
        ; "account_creation_fee" |]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Genesis = struct
@@ -139,9 +298,7 @@ module Json_layout = struct
 
     let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   module Daemon = struct
@@ -150,9 +307,7 @@ module Json_layout = struct
 
     let fields = [|"txpool_max_size"|]
 
-    let of_yojson json =
-      dump_on_error json @@ of_yojson
-      @@ yojson_strip_fields ~keep_fields:fields json
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
   type t =
@@ -164,9 +319,7 @@ module Json_layout = struct
 
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
 
-  let of_yojson json =
-    dump_on_error json @@ of_yojson
-    @@ yojson_strip_fields ~keep_fields:fields json
+  let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
 
 (** JSON representation:
@@ -213,16 +366,27 @@ module Accounts = struct
         ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
         ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
         ; vesting_increment: Currency.Amount.Stable.Latest.t }
-      [@@deriving bin_io_unversioned]
+      [@@deriving bin_io_unversioned, sexp]
     end
+
+    module Permissions = Json_layout.Accounts.Single.Permissions
+    module Token_permissions = Json_layout.Accounts.Single.Token_permissions
+    module Snapp_account = Json_layout.Accounts.Single.Snapp_account
 
     type t = Json_layout.Accounts.Single.t =
       { pk: string option
       ; sk: string option
       ; balance: Currency.Balance.Stable.Latest.t
       ; delegate: string option
-      ; timing: Timed.t option }
-    [@@deriving bin_io_unversioned]
+      ; timing: Timed.t option
+      ; token: Unsigned_extended.UInt64.Stable.Latest.t option
+      ; token_permissions: Token_permissions.t option
+      ; nonce: Coda_numbers.Account_nonce.Stable.Latest.t
+      ; receipt_chain_hash: string option
+      ; voting_for: string option
+      ; snapp: Snapp_account.t option
+      ; permissions: Permissions.t option }
+    [@@deriving bin_io_unversioned, sexp]
 
     let to_json_layout : t -> Json_layout.Accounts.Single.t = Fn.id
 
@@ -235,6 +399,8 @@ module Accounts = struct
     let of_yojson json =
       Result.bind ~f:of_json_layout
         (Json_layout.Accounts.Single.of_yojson json)
+
+    let default = Json_layout.Accounts.Single.default
   end
 
   type single = Single.t =
@@ -242,7 +408,14 @@ module Accounts = struct
     ; sk: string option
     ; balance: Currency.Balance.t
     ; delegate: string option
-    ; timing: Single.Timed.t option }
+    ; timing: Single.Timed.t option
+    ; token: Unsigned_extended.UInt64.t option
+    ; token_permissions: Single.Token_permissions.t option
+    ; nonce: Coda_numbers.Account_nonce.t
+    ; receipt_chain_hash: string option
+    ; voting_for: string option
+    ; snapp: Single.Snapp_account.t option
+    ; permissions: Single.Permissions.t option }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
 
@@ -277,15 +450,21 @@ module Ledger = struct
   type t =
     { base: base
     ; num_accounts: int option
+    ; balances: (int * Currency.Balance.Stable.Latest.t) list
     ; hash: string option
     ; name: string option
     ; add_genesis_winner: bool option }
   [@@deriving bin_io_unversioned]
 
-  let to_json_layout {base; num_accounts; hash; name; add_genesis_winner} :
+  let to_json_layout
+      {base; num_accounts; balances; hash; name; add_genesis_winner} :
       Json_layout.Ledger.t =
+    let balances =
+      List.map balances ~f:(fun (number, balance) ->
+          {Json_layout.Ledger.Balance_spec.number; balance} )
+    in
     let without_base : Json_layout.Ledger.t =
-      {accounts= None; num_accounts; hash; name; add_genesis_winner}
+      {accounts= None; num_accounts; balances; hash; name; add_genesis_winner}
     in
     match base with
     | Named name ->
@@ -296,7 +475,7 @@ module Ledger = struct
         {without_base with hash= Some hash}
 
   let of_json_layout
-      ({accounts; num_accounts; hash; name; add_genesis_winner} :
+      ({accounts; num_accounts; balances; hash; name; add_genesis_winner} :
         Json_layout.Ledger.t) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
@@ -317,7 +496,12 @@ module Ledger = struct
                 "Runtime_config.Ledger.of_json_layout: Expected a field \
                  'accounts', 'name' or 'hash'" ) )
     in
-    {base; num_accounts; hash; name; add_genesis_winner}
+    let balances =
+      List.map balances
+        ~f:(fun {Json_layout.Ledger.Balance_spec.number; balance} ->
+          (number, balance) )
+    in
+    {base; num_accounts; balances; hash; name; add_genesis_winner}
 
   let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
@@ -407,7 +591,8 @@ module Proof_keys = struct
     ; transaction_capacity: Transaction_capacity.t option
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor: int option
-    ; account_creation_fee: Currency.Fee.Stable.Latest.t option }
+    ; account_creation_fee: Currency.Fee.Stable.Latest.t option
+    ; fork: Fork_config.t option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
@@ -419,7 +604,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; c
     ; ledger_depth
@@ -429,7 +615,8 @@ module Proof_keys = struct
         Option.map ~f:Transaction_capacity.to_json_layout transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let of_json_layout
       { Json_layout.Proof_keys.level
@@ -440,7 +627,8 @@ module Proof_keys = struct
       ; transaction_capacity
       ; coinbase_amount
       ; supercharged_coinbase_factor
-      ; account_creation_fee } =
+      ; account_creation_fee
+      ; fork } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
@@ -454,7 +642,8 @@ module Proof_keys = struct
     ; transaction_capacity
     ; coinbase_amount
     ; supercharged_coinbase_factor
-    ; account_creation_fee }
+    ; account_creation_fee
+    ; fork }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
 
@@ -479,7 +668,8 @@ module Proof_keys = struct
           t2.supercharged_coinbase_factor
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
-          t2.account_creation_fee }
+          t2.account_creation_fee
+    ; fork= opt_fallthrough ~default:t1.fork t2.fork }
 end
 
 module Genesis = struct
@@ -650,15 +840,15 @@ module Test_configs = struct
   { "daemon":
       { "txpool_max_size": 3000 }
   , "genesis":
-      { "k": 6
+      { "k": 1
       , "delta": 3
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 1
+      , "c": 8
       , "ledger_depth": 6
       , "work_delay": 1
-      , "block_window_duration_ms": 10000
+      , "block_window_duration_ms": 5000
       , "transaction_capacity": {"2_to_the": 2}
       , "coinbase_amount": "20"
       , "supercharged_coinbase_factor": 2

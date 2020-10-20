@@ -1,9 +1,9 @@
 open Coda_base
 open Coda_transition
 
-type full
+type full = Full
 
-type lite
+type lite = Lite
 
 (** A node can be represented in two different formats.
  *  A full node representation is a breadcrumb, which
@@ -138,7 +138,7 @@ module Full : sig
   type 'mutant t = (full, 'mutant) diff
 
   module E : sig
-    type t = E : (full, 'mutant) diff -> t
+    type t = E : (full, 'mutant) diff -> t [@@deriving to_yojson]
 
     val to_lite : t -> Lite.E.t
   end

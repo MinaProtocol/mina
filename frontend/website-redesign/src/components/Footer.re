@@ -5,16 +5,16 @@ module Styles = {
       position(`relative),
       left(`zero),
       bottom(`zero),
-      height(`rem(106.)),
+      height(`percent(100.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      backgroundImage(`url("/static/img/Small.png")),
+      backgroundImage(`url("/static/img/Small.jpg")),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
         [
           padding2(~v=`rem(4.), ~h=`rem(2.68)),
-          height(`rem(75.)),
-          backgroundImage(`url("/static/img/Medium.png")),
+          height(`percent(100.)),
+          backgroundImage(`url("/static/img/Medium.jpg")),
         ],
       ),
       media(
@@ -22,13 +22,13 @@ module Styles = {
         [
           padding2(~v=`rem(5.5), ~h=`rem(9.5)),
           height(`auto),
-          backgroundImage(`url("/static/img/Large.png")),
+          backgroundImage(`url("/static/img/Large.jpg")),
         ],
       ),
     ]);
   let backToTopButton =
     style([
-      position(`absolute),
+      position(`fixed),
       right(`rem(1.2)),
       bottom(`rem(1.2)),
       media(
@@ -45,15 +45,26 @@ module Styles = {
       display(`flex),
       height(`rem(2.62)),
       flexDirection(`column),
-      alignContent(`center),
+      alignItems(`center),
       justifyContent(`spaceBetween),
       color(white),
     ]);
+
   let innerContainer =
     style([
       display(`flex),
       flexDirection(`column),
+      justifyContent(`spaceBetween),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
+    ]);
+
+  let whiteLine =
+    style([
+      border(`px(1), `solid, white),
+      marginTop(`rem(3.0)),
+      width(`percent(100.)),
+      opacity(0.2),
+      marginBottom(`rem(0.)),
     ]);
 };
 
@@ -69,16 +80,39 @@ module SocialIcons = {
         width(`rem(14.)),
         height(`rem(2.)),
         color(white),
+        selector(
+          "a",
+          [
+            width(`rem(2.)),
+            color(white),
+            hover([color(Theme.Colors.orange)]),
+          ],
+        ),
       ]);
+
+    let anchor = style([textDecoration(`none)]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <Icon kind=Icon.Discord size=2. />
-      <Icon kind=Icon.Twitter size=2. />
-      <Icon kind=Icon.Facebook size=2. />
-      <Icon kind=Icon.Telegram size=2. />
-      <Icon kind=Icon.WeChat size=2. />
+      <a className=Styles.anchor href="https://bit.ly/MinaDiscord">
+        <Icon kind=Icon.Discord size=2. />
+      </a>
+      <a className=Styles.anchor href="https://twitter.com/minaprotocol">
+        <Icon kind=Icon.Twitter size=2. />
+      </a>
+      <a className=Styles.anchor href="http://bit.ly/MinaProtocolFacebook">
+        <Icon kind=Icon.Facebook size=2. />
+      </a>
+      <a className=Styles.anchor href="http://bit.ly/MinaTelegram">
+        <Icon kind=Icon.Telegram size=2. />
+      </a>
+      <a
+        className=Styles.anchor
+        href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200">
+        <Icon kind=Icon.WeChat size=2. />
+      </a>
     </div>;
   };
 };
@@ -94,16 +128,18 @@ module LeftSide = {
         alignContent(`spaceBetween),
         media(Theme.MediaQuery.desktop, [marginRight(`rem(10.6))]),
       ]);
+
     let emailInputSection =
-      style([media(Theme.MediaQuery.desktop, [marginTop(`rem(10.5))])]);
-    let logo =
       style([
-        height(`rem(3.1)),
-        width(`rem(11.)),
-        marginBottom(`rem(4.)),
+        marginTop(`rem(4.)),
+        media(Theme.MediaQuery.desktop, [marginTop(`rem(10.3))]),
       ]);
+
+    let logo = style([height(`rem(3.1)), width(`rem(11.))]);
+
     let label =
       merge([Theme.Type.h4, style([color(white), lineHeight(`rem(2.))])]);
+
     let emailSubtext =
       merge([
         Theme.Type.paragraph,
@@ -116,6 +152,7 @@ module LeftSide = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.leftSide>
@@ -127,7 +164,7 @@ module LeftSide = {
       <div className=Styles.emailInputSection>
         <div className=Styles.label> {React.string("Get Updates")} </div>
         <p className=Styles.emailSubtext>
-          {React.string("Mina's growing fast! Sign up and stay in the loop.")}
+          {React.string("Mina is growing fast! Subscribe to stay updated")}
         </p>
         <EmailInput />
         <Spacer height=2. />
@@ -173,6 +210,7 @@ module Subfooter = {
           media(Theme.MediaQuery.desktop, [marginTop(`zero)]),
         ]),
       ]);
+
     let linksContainer =
       style([
         display(`flex),
@@ -183,10 +221,12 @@ module Subfooter = {
             flexDirection(`row),
             justifyContent(`spaceBetween),
             alignContent(`center),
-            width(`rem(36.5)),
+            width(`rem(39.3)),
+            marginRight(`rem(5.25)),
           ],
         ),
       ]);
+
     let copyright =
       merge([
         Theme.Type.paragraphSmall,
@@ -199,29 +239,25 @@ module Subfooter = {
         ]),
       ]);
   };
+
   [@react.component]
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Mina Foundation")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks> {React.string("O(1) Labs")} </a>
-        </Next.Link>
-        <Next.Link href="">
-          <a className=Styles.smallLinks>
-            {React.string("Code of Conduct")}
-          </a>
-        </Next.Link>
-        <Next.Link href="">
+        <a href="https://o1labs.org/" className=Styles.smallLinks>
+          {React.string("O(1) Labs")}
+        </a>
+        <a
+          href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
+          className=Styles.smallLinks>
+          {React.string("Code of Conduct")}
+        </a>
+        <Next.Link href="/privacy">
           <a className=Styles.smallLinks>
             {React.string("Privacy Policy")}
           </a>
         </Next.Link>
-        <Next.Link href="">
+        <Next.Link href="/tos">
           <a className=Styles.smallLinks>
             {React.string("Terms of Service")}
           </a>
@@ -234,32 +270,15 @@ module Subfooter = {
   };
 };
 
-module WhiteLine = {
-  module Styles = {
-    open Css;
-    let whiteLine =
-      style([
-        border(`px(1), `solid, white),
-        marginTop(`rem(3.0)),
-        width(`percent(100.)),
-        opacity(0.2),
-        marginBottom(`rem(0.)),
-      ]);
-  };
-  [@react.component]
-  let make = () => {
-    <hr className=Styles.whiteLine />;
-  };
-};
-
 [@react.component]
 let make = () => {
-  <div className=Styles.footerContainer>
+  <footer className=Styles.footerContainer>
     <div className=Styles.innerContainer> <LeftSide /> <FooterLinks /> </div>
-    <WhiteLine />
+    <hr className=Styles.whiteLine />
     <Subfooter />
     <div className=Styles.backToTopButton>
       <Button
+        href=`Scroll_to_top
         height={`rem(4.125)}
         width={`rem(3.75)}
         bgColor=Theme.Colors.black
@@ -267,11 +286,11 @@ let make = () => {
         paddingX=1.1
         paddingY=0.75
         dark=true>
-        <span className=Styles.backToTopButtonContent>
+        <div className=Styles.backToTopButtonContent>
           <Icon kind=Icon.ArrowUpMedium size=1. />
           {React.string("Top")}
-        </span>
+        </div>
       </Button>
     </div>
-  </div>;
+  </footer>;
 };

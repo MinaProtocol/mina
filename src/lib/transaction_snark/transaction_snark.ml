@@ -758,16 +758,41 @@ module Base = struct
                           || predicate_result )
                       , true )
               in
-              { predicate_failed= false
-              ; source_not_present
-              ; receiver_not_present= false
-              ; amount_insufficient_to_create= false
-              ; token_cannot_create= false
-              ; source_insufficient_balance= false
-              ; source_bad_timing= false
-              ; receiver_exists
-              ; not_token_owner
-              ; token_auth }
+              let ret =
+                { predicate_failed= false
+                ; source_not_present
+                ; receiver_not_present= false
+                ; amount_insufficient_to_create= false
+                ; token_cannot_create= false
+                ; source_insufficient_balance= false
+                ; source_bad_timing= false
+                ; receiver_exists
+                ; not_token_owner
+                ; token_auth }
+              in
+              (* Note: This logic is dependent upon all failures above, so we
+                 have to calculate it separately here. *)
+              if
+                (* If we think the source exists *)
+                (not source_not_present)
+                (* and there is a failure *)
+                && List.exists ~f:Fn.id (to_list ret)
+                (* and the receiver account did not exist *)
+                && (not receiver_exists)
+                (* and the source account was the receiver account *)
+                && Account_id.equal source receiver
+              then
+                (* then the receiver account will not be initialized, and so
+                   the source (=receiver) account will not be present.
+                *)
+                { ret with
+                  source_not_present= true
+                ; not_token_owner=
+                    not Token_id.(equal default (Account_id.token_id receiver))
+                ; token_auth=
+                    not ((not payload.body.token_locked) || predicate_result)
+                }
+              else ret
           | Mint_tokens ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -960,7 +985,7 @@ module Base = struct
           Snarky_integer.Integer.equal ~m curr_min_balance zero_int )
     in
     (* if current min balance is zero, then timing becomes untimed *)
-    let%bind is_untimed = Boolean.((not is_timed) || is_timed_balance_zero) in
+    let%bind is_untimed = Boolean.((not is_timed) ||| is_timed_balance_zero) in
     let%map timing =
       Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
         ~else_:account.timing
@@ -1123,15 +1148,15 @@ module Base = struct
       let update_authorized (type a) perm ~is_keep
           ~(updated : [`Ok of a | `Flagged of a * Boolean.var]) =
         let speculative_success, `proof_must_verify x = check_auth perm in
-        r := lazy Boolean.((not is_keep) && x) :: !r ;
+        r := lazy Boolean.((not is_keep) &&& x) :: !r ;
         match updated with
         | `Ok res ->
             add_check ?label:(Some __LOC__)
-              Boolean.(speculative_success || is_keep) ;
+              Boolean.(speculative_success ||| is_keep) ;
             res
         | `Flagged (res, failed) ->
             add_check ?label:(Some __LOC__)
-              Boolean.(((not failed) && speculative_success) || is_keep) ;
+              Boolean.((not failed) &&& speculative_success ||| is_keep) ;
             res
       in
       let proof_must_verify () = Boolean.any (List.map !r ~f:Lazy.force) in
@@ -1181,7 +1206,7 @@ module Base = struct
                        !(Balance.Checked.if_ is_new ~then_:balance_when_new
                            ~else_:balance)
                      in
-                     let failed = Boolean.(failed1 || (is_new && failed2)) in
+                     let failed = Boolean.(failed1 ||| (is_new &&& failed2)) in
                      `Flagged (res, failed)) )
       in
       let snapp =
@@ -1259,8 +1284,8 @@ module Base = struct
             Public_key.Compressed.Checked.equal acct.public_key
               Public_key.Compressed.(var_of_t empty)
           in
-          let%bind there_ok = (not is_new) && account_there in
-          let%bind empty_ok = is_new && is_empty in
+          let%bind there_ok = (not is_new) &&& account_there in
+          let%bind empty_ok = is_new &&& is_empty in
           with_label __LOC__ (Assert.any [there_ok; empty_ok])
       | `No ->
           Assert.is_true account_there
@@ -1412,7 +1437,7 @@ module Base = struct
       let proof_must_verify = Set_once.create () in
       let public_key = body.pk in
       let body =
-        (* 
+        (*
           delta = second_delta + (if is_fee_payer then -fee else 0)
           second_delta = delta - (if is_fee_payer then -fee else 0)
           second_delta = delta + (if is_fee_payer then fee else 0)
@@ -1498,8 +1523,8 @@ module Base = struct
       let account1_is_sender = Sgn.Checked.is_neg body1.delta.sgn in
       let account1_is_fee_payer, account2_is_fee_payer =
         Boolean.
-          ( (not fee_payer_is_other) && account1_is_sender
-          , (not fee_payer_is_other) && not account1_is_sender )
+          ( (not fee_payer_is_other) &&& account1_is_sender
+          , (not fee_payer_is_other) &&& not account1_is_sender )
       in
       let fee_payer_id =
         !(Account_id.Checked.if_ fee_payer_is_other
@@ -1756,7 +1781,7 @@ module Base = struct
                 Permissions.Auth_required.Checked.eval_no_proof perm
                   ~signature_verifies
               in
-              ( Boolean.(res || second_starts_empty)
+              ( Boolean.(res ||| second_starts_empty)
               , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
@@ -1767,7 +1792,7 @@ module Base = struct
         in
         (* No deleting accounts for now. *)
         Boolean.(
-          Assert.is_true (not (second_ends_empty && not second_starts_empty))) ;
+          Assert.is_true (not (second_ends_empty &&& not second_starts_empty))) ;
         let root =
           let checks_succeeded1 = checks_succeeded1 () in
           let checks_succeeded2 = checks_succeeded2 () in
@@ -1778,7 +1803,7 @@ module Base = struct
                     ~else_:root_after_fee_payer)
               ~else_:
                 !(if_
-                    Boolean.(checks_succeeded1 && checks_succeeded2)
+                    Boolean.(checks_succeeded1 &&& checks_succeeded2)
                     ~then_:root_after_account2 ~else_:root_after_fee_payer))
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
@@ -1893,7 +1918,7 @@ module Base = struct
                 Permissions.Auth_required.Checked.eval_no_proof perm
                   ~signature_verifies
               in
-              ( Boolean.(res || second_starts_empty)
+              ( Boolean.(res ||| second_starts_empty)
               , `proof_must_verify Boolean.true_ ) )
             ~is_new:(`Maybe second_starts_empty)
             ~is_fee_payer:account2_is_fee_payer ~which:`Two ~tag:snapp2_tag
@@ -1908,7 +1933,7 @@ module Base = struct
         in
         (* No deleting accounts for now. *)
         Boolean.(
-          Assert.is_true (not (second_ends_empty && not second_starts_empty))) ;
+          Assert.is_true (not (second_ends_empty &&& not second_starts_empty))) ;
         let checks_succeeded1 = checks_succeeded1 () in
         let checks_succeeded2 = checks_succeeded2 () in
         let root =
@@ -1919,7 +1944,7 @@ module Base = struct
                     ~else_:root_after_fee_payer)
               ~else_:
                 !(if_
-                    Boolean.(checks_succeeded1 && checks_succeeded2)
+                    Boolean.(checks_succeeded1 &&& checks_succeeded2)
                     ~then_:root_after_account2 ~else_:root_after_fee_payer))
         in
         let fee_excess = compute_fee_excess ~fee ~fee_payer_id in
@@ -2049,7 +2074,7 @@ module Base = struct
       |> Consensus.Data.Consensus_state.curr_global_slot_var
     in
     let%bind creating_new_token =
-      Boolean.(is_create_account && token_invalid)
+      Boolean.(is_create_account &&& token_invalid)
     in
     (* Query user command predicted failure/success. *)
     let%bind user_command_failure =
@@ -2066,7 +2091,7 @@ module Base = struct
           ~else_:token
       in
       let%bind will_create_new_token =
-        Boolean.(creating_new_token && not user_command_fails)
+        Boolean.(creating_new_token &&& not user_command_fails)
       in
       let%map next_available_token =
         Token_id.Checked.next_if next_available_token will_create_new_token
@@ -2151,7 +2176,7 @@ module Base = struct
                   pending_coinbase_stack_with_state
                   pending_coinbase_stack_before
               in
-              Boolean.(equal_source || equal_source_with_state)
+              Boolean.(equal_source ||| equal_source_with_state)
             in
             Boolean.Assert.all [correct_coinbase_target_stack; valid_init_state]))
     in
@@ -2176,12 +2201,12 @@ module Base = struct
         (* TODO: Predicates. *)
         Boolean.false_
       in
-      Boolean.(is_own_account || predicate_result)
+      Boolean.(is_own_account ||| predicate_result)
     in
     let%bind () =
       [%with_label "Check predicate failure against predicted"]
         (let%bind predicate_failed =
-           Boolean.((not predicate_result) && not predicate_deferred)
+           Boolean.((not predicate_result) &&& not predicate_deferred)
          in
          assert_r1cs
            (predicate_failed :> Field.Var.t)
@@ -2205,9 +2230,9 @@ module Base = struct
         (* If the fee is zero, we do not create the account at all, so we allow
            this through. Otherwise, the fee must be the default.
         *)
-        Boolean.(token_default || is_zero_fee)
+        Boolean.(token_default ||| is_zero_fee)
       in
-      Boolean.(is_coinbase_or_fee_transfer && fee_may_be_charged)
+      Boolean.(is_coinbase_or_fee_transfer &&& fee_may_be_charged)
     in
     let%bind root_after_fee_payer_update =
       [%with_label "Update fee payer"]
@@ -2247,7 +2272,7 @@ module Base = struct
                (* If this is a coinbase with zero fee, do not create the
                   account, since the fee amount won't be enough to pay for it.
                *)
-               Boolean.(is_empty_and_writeable && not is_zero_fee)
+               Boolean.(is_empty_and_writeable &&& not is_zero_fee)
              in
              let%bind should_pay_to_create =
                (* Coinbases and fee transfers may create, or we may be creating
@@ -2255,9 +2280,9 @@ module Base = struct
                   encode this as a boolean.
                *)
                let%bind is_create_account =
-                 Boolean.(is_create_account && not user_command_fails)
+                 Boolean.(is_create_account &&& not user_command_fails)
                in
-               Boolean.(is_empty_and_writeable || is_create_account)
+               Boolean.(is_empty_and_writeable ||| is_create_account)
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
@@ -2353,6 +2378,7 @@ module Base = struct
          in
          Amount.Checked.sub base_amount coinbase_receiver_fee)
     in
+    let receiver_overflow = ref Boolean.false_ in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
         (Frozen_ledger_hash.modify_account_recv
@@ -2368,9 +2394,9 @@ module Base = struct
              *)
              let%bind is_empty_failure =
                let%bind must_not_be_empty =
-                 Boolean.(is_stake_delegation || is_mint_tokens)
+                 Boolean.(is_stake_delegation ||| is_mint_tokens)
                in
-               Boolean.(is_empty_and_writeable && must_not_be_empty)
+               Boolean.(is_empty_and_writeable &&& must_not_be_empty)
              in
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
@@ -2380,7 +2406,8 @@ module Base = struct
              let%bind () =
                [%with_label "Receiver creation failure matches predicted"]
                  (let%bind is_nonempty_creating =
-                    Boolean.((not is_empty_and_writeable) && is_create_account)
+                    Boolean.(
+                      (not is_empty_and_writeable) &&& is_create_account)
                   in
                   Boolean.Assert.( = ) is_nonempty_creating
                     user_command_failure.receiver_exists)
@@ -2392,16 +2419,17 @@ module Base = struct
                     sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
              in
              let%bind should_pay_to_create =
-               Boolean.(is_empty_and_writeable && not is_create_account)
+               Boolean.(is_empty_and_writeable &&& not is_create_account)
              in
              let%bind () =
                [%with_label
                  "Check whether creation fails due to a non-default token"]
                  (let%bind token_should_not_create =
-                    Boolean.(should_pay_to_create && Boolean.not token_default)
+                    Boolean.(
+                      should_pay_to_create &&& Boolean.not token_default)
                   in
                   let%bind token_cannot_create =
-                    Boolean.(token_should_not_create && is_user_command)
+                    Boolean.(token_should_not_create &&& is_user_command)
                   in
                   let%bind () =
                     [%with_label
@@ -2446,19 +2474,42 @@ module Base = struct
                    ~then_:Amount.(var_of_t zero)
                    ~else_:amount_for_new_account
                in
-               (* TODO: This case can be contrived using minted tokens, handle
-                  it in the transaction logic and add a case for it to
-                  [User_command_failure.t].
-                *)
-               Balance.Checked.(account.balance + receiver_amount)
+               (* NOTE: Instead of capturing this as part of the user command
+                  failures, we capture it inline here and bubble it out to a
+                  reference. This behavior is still in line with the
+                  out-of-snark transaction logic.
+
+                  Updating [user_command_fails] to include this value from here
+                  onwards will ensure that we do not update the source or
+                  receiver accounts. The only places where [user_command_fails]
+                  may have already affected behaviour are
+                  * when the fee-payer is paying the account creation fee, and
+                  * when a new token is created.
+                  In both of these, this account is new, and will have a
+                  balance of 0, so we can guarantee that there is no overflow.
+               *)
+               let%bind balance, `Overflow overflow =
+                 Balance.Checked.add_amount_flagged account.balance
+                   receiver_amount
+               in
+               let%bind () =
+                 [%with_label "Overflow error only occurs in user commands"]
+                   Boolean.(Assert.any [is_user_command; not overflow])
+               in
+               receiver_overflow := overflow ;
+               Balance.Checked.if_ overflow ~then_:account.balance
+                 ~else_:balance
+             in
+             let%bind user_command_fails =
+               Boolean.(!receiver_overflow ||| user_command_fails)
              in
              let%bind is_empty_and_writeable =
                (* Do not create a new account if the user command will fail. *)
-               Boolean.(is_empty_and_writeable && not user_command_fails)
+               Boolean.(is_empty_and_writeable &&& not user_command_fails)
              in
              let%bind may_delegate =
                (* Only default tokens may participate in delegation. *)
-               Boolean.(is_empty_and_writeable && token_default)
+               Boolean.(is_empty_and_writeable &&& token_default)
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ may_delegate
@@ -2490,6 +2541,9 @@ module Base = struct
              ; timing= account.timing
              ; permissions= account.permissions
              ; snapp= account.snapp } ))
+    in
+    let%bind user_command_fails =
+      Boolean.(!receiver_overflow ||| user_command_fails)
     in
     let%bind fee_payer_is_source = Account_id.Checked.equal fee_payer source in
     let%bind root_after_source_update =
@@ -2555,9 +2609,9 @@ module Base = struct
                       (let%bind ok =
                          Boolean.(
                            ok
-                           && not
-                                user_command_failure
-                                  .source_insufficient_balance)
+                           &&& not
+                                 user_command_failure
+                                   .source_insufficient_balance)
                        in
                        Boolean.Assert.( = ) ok
                          (Boolean.not user_command_failure.source_bad_timing))
@@ -2580,7 +2634,7 @@ module Base = struct
                [%with_label "Check not_token_owner failure matches predicted"]
                  (let%bind token_owner_ok =
                     let%bind command_needs_token_owner =
-                      Boolean.(is_create_account || is_mint_tokens)
+                      Boolean.(is_create_account ||| is_mint_tokens)
                     in
                     Boolean.(
                       any
@@ -2648,11 +2702,19 @@ module Base = struct
           (let user_command_excess =
              Signed.Checked.of_unsigned (Checked.of_fee payload.common.fee)
            in
-           let%bind fee_transfer_excess =
-             let%map magnitude =
-               Checked.(payload.body.amount + of_fee payload.common.fee)
+           let%bind fee_transfer_excess, fee_transfer_excess_overflowed =
+             let%map magnitude, `Overflow overflowed =
+               Checked.(
+                 add_flagged payload.body.amount (of_fee payload.common.fee))
              in
-             Signed.create ~magnitude ~sgn:Sgn.Checked.neg
+             (Signed.create ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
+           in
+           let%bind () =
+             (* TODO: Reject this in txn pool before fees-in-tokens. *)
+             [%with_label "Fee excess does not overflow"]
+               Boolean.(
+                 Assert.any
+                   [not is_fee_transfer; not fee_transfer_excess_overflowed])
            in
            Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
              ~else_:user_command_excess)
@@ -2679,7 +2741,7 @@ module Base = struct
 
   (* spec for [main statement]:
    constraints pass iff there exists
-      t : Tagged_transaction.t 
+      t : Tagged_transaction.t
    such that
     - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
     - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
@@ -3211,10 +3273,14 @@ let verify (ts : (t * _) list) ~key =
        key
        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
-module Make () = struct
+module Make (Inputs : sig
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+end) =
+struct
+  open Inputs
+
   let tag, cache_handle, p, Pickles.Provers.[base; merge] =
-    system
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    system ~constraint_constants
 
   module Proof = (val p)
 
@@ -3461,7 +3527,9 @@ let%test_module "transaction_snark" =
         ~receiver_pk:(Account.public_key receiver.account)
         ~fee_token ~token amt fee nonce memo
 
-    include Make ()
+    include Make (struct
+      let constraint_constants = constraint_constants
+    end)
 
     let state_body =
       let compile_time_genesis =
@@ -5208,6 +5276,44 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none receiver_account) ) )
 
+    let%test_unit "create new token account fails if claimed token owner is \
+                   also the account creation target and does not exist" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = random_wallets ~n:3 () in
+              let signer = wallets.(0).private_key in
+              (* Fee-payer, receiver, and token owner are the same. *)
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let fee_token = Token_id.default in
+              let token_id =
+                Quickcheck.random_value Token_id.gen_non_default
+              in
+              let accounts =
+                [|create_account fee_payer_pk fee_token 20_000_000_000|]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account token_owner_account
+                  , `Receiver_account receiver_account ) =
+                test_user_command_with_accounts ~constraint_constants ~ledger
+                  ~accounts ~signer ~fee ~fee_payer_pk ~fee_token
+                  (Create_token_account
+                     { token_owner_pk= fee_payer_pk
+                     ; token_id
+                     ; receiver_pk= fee_payer_pk
+                     ; account_disabled= false })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              (* No account creation fee: the command fails. *)
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              assert (Option.is_none token_owner_account) ;
+              assert (Option.is_none receiver_account) ) )
+
     let%test_unit "create new token account works for default token" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -5727,7 +5833,11 @@ let%test_module "account timing check" =
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
-      | Error _ ->
+      | Error err ->
+          assert (
+            User_command_status.Failure.equal
+              (Transaction_logic.timing_error_to_user_command_status err)
+              User_command_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -5749,7 +5859,11 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.of_int 2000_000_000_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
-      | Error _ ->
+      | Error err ->
+          assert (
+            User_command_status.Failure.equal
+              (Transaction_logic.timing_error_to_user_command_status err)
+              User_command_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -5779,7 +5893,7 @@ let%test_module "account timing check" =
           false
   end )
 
-let constraint_system_digests () =
+let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
     , digest
@@ -5793,6 +5907,4 @@ let constraint_system_digests () =
     , digest
         Base.(
           Tick.constraint_system ~exposing:[Statement.With_sok.typ]
-            (main
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled)) ) ]
+            (main ~constraint_constants)) ) ]

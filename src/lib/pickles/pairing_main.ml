@@ -284,7 +284,7 @@ struct
          3. The challenge points.
 
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
-         the combined inner product. 
+         the combined inner product.
       *)
           let without_degree_bound =
             let T = Branching.eq in
@@ -333,6 +333,13 @@ struct
           ; beta_2
           ; beta_3 } ) )
 
+  let det_sqrt =
+    unstage
+      (Common.det_sqrt
+         (module Impl)
+         ~two_adic_root_of_unity:(Backend.Tick.Field.two_adic_root_of_unity ())
+         ~two_adicity:34 ~det_sqrt_witness:Backend.Tick.Field.det_sqrt_witness)
+
   let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Field.of_int 5 in
@@ -341,8 +348,7 @@ struct
         let sq =
           Field.if_ is_square ~then_:pre ~else_:Field.(nonresidue * pre)
         in
-        (* TODO: Make deterministic *)
-        Field.sqrt sq )
+        det_sqrt sq )
 
   let b_poly = Field.(Dlog_main.b_poly ~add ~mul ~inv)
 
@@ -517,7 +523,7 @@ struct
 
     let last =
       Array.reduce_exn ~f:(fun (b_acc, x_acc) (b, x) ->
-          (Boolean.(b_acc || b), Field.if_ b ~then_:x ~else_:x_acc) )
+          (Boolean.(b_acc ||| b), Field.if_ b ~then_:x ~else_:x_acc) )
 
     let rec pow x bits_lsb =
       let rec go acc bs =
@@ -649,7 +655,7 @@ struct
            Split_evaluations.mask' {actual; max} )
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
-   It 
+   It
    1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
    evaluation openings and then squeezing.
    2. Checks that the "combined inner product" value used in the elliptic curve part of

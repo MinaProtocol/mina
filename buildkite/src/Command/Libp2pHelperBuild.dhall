@@ -15,7 +15,7 @@ let commands : List Cmd.Type =
         extraEnv = [ "GO=/usr/lib/go/bin/go" ]
       }
       "make libp2p_helper",
-    Cmd.run "cd src/app/libp2p_helper/result/bin/ && buildkite-agent artifact upload libp2p_helper"
+    Cmd.run "cp src/app/libp2p_helper/result/bin/libp2p_helper . && buildkite/scripts/buildkite-artifact-helper.sh libp2p_helper"
   ]
 
 in

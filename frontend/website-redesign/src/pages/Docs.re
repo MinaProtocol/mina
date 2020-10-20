@@ -5,17 +5,11 @@ module Style = {
 
   let content =
     style([
-      maxWidth(`rem(43.)),
+      maxWidth(`rem(53.)),
+      marginBottom(`rem(2.875)),
       media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.))]),
-      selector(
-        "p > code, li > code",
-        [
-          boxSizing(`borderBox),
-          padding2(~v=`px(2), ~h=`px(6)),
-          backgroundColor(Theme.Colors.black),
-          borderRadius(`px(4)),
-        ],
-      ),
+      selector("p > code, li > code", Theme.Type.inlineCode_),
+      selector("h1 + p", Theme.Type.sectionSubhead_),
     ]);
 
   let page =
@@ -23,18 +17,21 @@ module Style = {
       display(`block),
       justifyContent(`center),
       margin(`auto),
-      marginTop(`rem(4.)),
+      marginTop(`rem(2.)),
+      marginBottom(`rem(6.)),
       padding2(~v=`zero, ~h=`rem(2.)),
       media(Theme.MediaQuery.desktop, [display(`flex)]),
       media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
     ]);
+
+  let eyebrow = style([marginBottom(`rem(1.))]);
 
   let editLink =
     style([
       media(Theme.MediaQuery.tablet, [position(`relative), float(`right)]),
       display(`flex),
       alignItems(`center),
-      marginTop(`rem(3.25)),
+      marginTop(`rem(1.5)),
       marginBottom(`rem(0.5)),
       hover([color(Theme.Colors.black)]),
     ]);
@@ -47,7 +44,7 @@ module EditLink = {
       name="Edit Link"
       target="_blank"
       href={
-        "https://github.com/CodaProtocol/coda/edit/develop/frontend/website/pages"
+        "https://github.com/MinaProtocol/mina/edit/develop/frontend/website/pages"
         ++ route
         ++ ".mdx"
       }
@@ -75,17 +72,30 @@ type metadata = {title: string};
 let make = (~metadata, ~children) => {
   let router = Next.Router.useRouter();
   let currentSlug =
-    Js.String.replaceByRe(Js.Re.fromString("^/docs/?"), "", router.route);
+    if (router.route == "/docs") {
+      "/docs";
+    } else {
+      Js.String.replaceByRe(
+        Js.Re.fromString("^/docs/?"),
+        "/docs/",
+        router.route,
+      );
+    };
   <Page title={metadata.title}>
     <Next.Head>
       <link rel="stylesheet" href="/static/css/a11y-light.css" />
     </Next.Head>
+    <div className=Nav.Styles.spacer />
     <div className=Style.page>
       <DocsSideNav currentSlug />
       <div className=Style.content>
+        <div className=Style.eyebrow>
+          <LabelEyebrow copy="Documentation" />
+        </div>
         <EditLink route={router.route} />
-        // <Next.MDXProvider components={DocsComponents.allComponents()}>
-        <Next.MDXProvider> children </Next.MDXProvider>
+        <Next.MDXProvider components={DocsComponents.allComponents()}>
+          children
+        </Next.MDXProvider>
       </div>
     </div>
   </Page>;

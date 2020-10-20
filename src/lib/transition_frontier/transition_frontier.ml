@@ -8,7 +8,6 @@ open Async_kernel
 open Coda_base
 open Coda_transition
 include Frontier_base
-module Hash = Frontier_hash
 module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
@@ -28,6 +27,14 @@ type t =
   ; persistent_frontier_instance: Persistent_frontier.Instance.t
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
+
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
+(* There is no Diff.Full.E.of_yojson, so we store raw Yojson.Safe.t here so that
+ * we can still deserialize something to inspect *)
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event {msg= "Applying diffs: $diffs"}]
 
 let genesis_root_data ~precomputed_values =
   let open Root_data.Limited in
@@ -66,15 +73,6 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
             persistent_frontier_instance root_identifier
         with
       | Ok () ->
-          Ok ()
-      | Error `Frontier_hash_does_not_match ->
-          [%log warn]
-            ~metadata:
-              [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
-            "Persistent frontier hash did not match persistent root frontier \
-             hash (resetting frontier hash)" ;
-          Persistent_frontier.Instance.set_frontier_hash
-            persistent_frontier_instance root_identifier.frontier_hash ;
           Ok ()
       | Error `Sync_cannot_be_running ->
           Error (`Failure "sync job is already running on persistent frontier")
@@ -265,27 +263,21 @@ let root_snarked_ledger {persistent_root_instance; _} =
 
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
-  let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
-        )
+            (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "PRE: ($state_hash, $n)" ;
-  [%log' trace t.logger]
-    ~metadata:
-      [ ( "diffs"
-        , `List
-            (List.map diffs ~f:(fun (Diff.Full.E.E diff) -> Diff.to_yojson diff))
-        ) ]
-    "Applying diffs: $diffs" ;
+  [%str_log' trace t.logger]
+    (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
+    (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~ignore_consensus_local_state:false
   in
@@ -302,14 +294,24 @@ let add_breadcrumb_exn t breadcrumb =
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "POST: ($state_hash, $n)" ;
+  let user_cmds = Breadcrumb.commands breadcrumb in
+  if not (List.is_empty user_cmds) then
+    (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
+       command or snapp command
+    *)
+    [%str_log' trace t.logger] Added_breadcrumb_user_commands
+      ~metadata:
+        [ ( "user_commands"
+          , `List
+              (List.map user_cmds
+                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
   let%bind sync_result =
+    (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
       ~diffs:lite_diffs
-      ~hash_transition:
-        {source= old_hash; target= Full_frontier.hash t.full_frontier}
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
@@ -539,9 +541,6 @@ module For_tests = struct
         gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier
           ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
-    let genesis_state_hash =
-      Precomputed_values.genesis_state_hash precomputed_values
-    in
     let verifier =
       match verifier with
       | Some x ->
@@ -594,7 +593,6 @@ module For_tests = struct
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
-          ~genesis_state_hash
           (External_transition.Validated.state_hash
              (Root_data.Limited.transition root_data)) ;
         ignore
