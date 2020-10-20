@@ -79,16 +79,20 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="/static/pdf/economicsWP.pdf">
-        <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
+      <Next.Link href="/static/pdf/technicalWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Technical Whitepaper")}
+        </a>
+      </Next.Link>
+      <Next.Link href="/static/pdf/economicsWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Economics Whitepaper")}
+        </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle>
           {React.string("Incentive Structure")}
         </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
     </div>
     <div
