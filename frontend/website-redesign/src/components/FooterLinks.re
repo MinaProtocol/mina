@@ -89,10 +89,8 @@ let make = () => {
           {React.string("Economics Whitepaper")}
         </a>
       </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Incentive Structure")}
-        </a>
+      <Next.Link href="/media">
+        <a className=Styles.linkStyle> {React.string("Press and Media")} </a>
       </Next.Link>
     </div>
     <div
