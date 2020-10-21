@@ -150,7 +150,7 @@ let make = () => {
         <img src="/static/img/logos/Skytale Capital 1.png" />
         <img src="/static/img/logos/SNZ.png" />
         <img src="/static/img/logos/Three Arrows Capital 1.png" />
-        <img src="/static/img/logos/YBB Foundation 1.png" />
+        <img src="/static/img/logos/Investor Logos_YBB Foundation 1.png" />
       </div>
       <div className=Styles.rule> <Rule color=Theme.Colors.black /> </div>
       <h2 className=Styles.advisors> {React.string("Advisors")} </h2>
