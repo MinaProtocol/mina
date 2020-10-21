@@ -3345,16 +3345,34 @@ let%test_module "Proof of stake tests" =
       let block_producer_pubkeys =
         Public_key.Compressed.Set.of_list [public_key_compressed]
       in
+      let genesis_ledger = Lazy.force Genesis_ledger.t in
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
           (Coda_base.Ledger.Any_ledger.cast
              (module Coda_base.Ledger)
-             (Lazy.force Genesis_ledger.t))
+             genesis_ledger)
       in
+      let module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db) in
+      let depth =
+        Genesis_constants.Constraint_constants.compiled.ledger_depth
+      in
+      let directory_name =
+        let open Core in
+        Stdlib.Filename.get_temp_dir_name ()
+        ^/ "epoch_ledger"
+        ^ (Random.int 100000 |> string_of_int)
+      in
+      let epoch_ledger = Ledger.Db.create ~directory_name ~depth () in
+      ignore @@ Ledger_transfer.transfer_accounts genesis_ledger epoch_ledger ;
       let delegatee_table =
         compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
       in
-      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      let merkle_root = Ledger.Db.merkle_root epoch_ledger in
+      let epoch_snapshot =
+        { Local_state.Snapshot.delegatee_table
+        ; ledger= epoch_ledger
+        ; merkle_root }
+      in
       let balance = Balance.to_int account.balance in
       let total_stake_int = Currency.Amount.to_int total_stake in
       let stake_fraction =
