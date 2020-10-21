@@ -3437,7 +3437,7 @@ struct
     }
 end
 
-let%test_module "transaction_snark" =
+(* let%test_module "transaction_snark" =
   ( module struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
@@ -5693,7 +5693,7 @@ let%test_module "transaction_snark" =
               List.iter transactions ~f:(fun txn ->
                   test_transaction ~txn_global_slot ~constraint_constants
                     ledger txn ) ) )
-  end )
+   end ) *)
 
 let%test_module "account timing check" =
   ( module struct
@@ -5704,36 +5704,89 @@ let%test_module "account timing check" =
 
     (* test that unchecked and checked calculations for timing agree *)
 
-    let make_checked_computation account txn_amount txn_global_slot =
+    let checked_min_balance_and_timing account txn_amount txn_global_slot =
       let account = Account.var_of_t account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
-      let open Snarky_backendless.Checked.Let_syntax in
-      let%map _, timing =
+      let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
           ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
           ~txn_global_slot
       in
+      (min_balance, timing)
+
+    let make_checked_timing_computation account txn_amount txn_global_slot =
+      let open Snarky_backendless.Checked.Let_syntax in
+      let%map _min_balance, timing =
+        checked_min_balance_and_timing account txn_amount txn_global_slot
+      in
       Snarky_backendless.As_prover.read Account.Timing.typ timing
 
+    let make_checked_min_balance_computation account txn_amount txn_global_slot
+        =
+      let%map min_balance, _timing =
+        checked_min_balance_and_timing account txn_amount txn_global_slot
+      in
+      min_balance
+
+    let snarky_integer_of_bools bools =
+      let snarky_bools =
+        List.map bools ~f:(fun b ->
+            let open Snark_params.Tick.Boolean in
+            if b then true_ else false_ )
+      in
+      let bitstring_lsb =
+        Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
+      in
+      Snarky_integer.Integer.of_bits ~m:Snark_params.Tick.m bitstring_lsb
+
     let run_checked_timing_and_compare account txn_amount txn_global_slot
-        unchecked_timing =
-      let checked_computation =
-        make_checked_computation account txn_amount txn_global_slot
+        unchecked_timing unchecked_min_balance =
+      let checked_timing_computation =
+        make_checked_timing_computation account txn_amount txn_global_slot
       in
       let (), checked_timing =
         Or_error.ok_exn
-        @@ Snark_params.Tick.run_and_check checked_computation ()
+        @@ Snark_params.Tick.run_and_check checked_timing_computation ()
       in
+      (* if timings match, check equality of min balances *)
       Account.Timing.equal checked_timing unchecked_timing
+      &&
+      let checked_min_balance =
+        make_checked_min_balance_computation account txn_amount txn_global_slot
+      in
+      (* ???? *)
+      let (), checked_min_balance =
+        Tick.run_unchecked checked_min_balance ()
+      in
+      let unchecked_min_balance_as_snarky_integer =
+        snarky_integer_of_bools (Balance.to_bits unchecked_min_balance)
+      in
+      let equal_balances =
+        Snarky_integer.Integer.equal ~m checked_min_balance
+          unchecked_min_balance_as_snarky_integer
+      in
+      (* ???? *)
+      let equal_balances_computation =
+        make_checked (fun () ->
+            Snarky_backendless.As_prover.read Snark_params.Tick.Boolean.typ
+              equal_balances )
+      in
+      (* ???? *)
+      (* EXN IN FOLLOWING *)
+      let (), equal_balances =
+        Or_error.ok_exn
+        @@ Snark_params.Tick.run_and_check equal_balances_computation ()
+      in
+      equal_balances
 
     (* confirm the checked computation fails *)
     let checked_timing_should_fail account txn_amount txn_global_slot =
-      let checked_computation =
-        make_checked_computation account txn_amount txn_global_slot
+      let checked_timing_computation =
+        make_checked_timing_computation account txn_amount txn_global_slot
       in
       Or_error.is_error
-      @@ Snark_params.Tick.run_and_check checked_computation ()
+      @@ Snark_params.Tick.run_and_check checked_timing_computation ()
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
@@ -5750,11 +5803,14 @@ let%test_module "account timing check" =
         @@ Account.create_timed account_id balance ~initial_minimum_balance
              ~cliff_time ~vesting_period ~vesting_increment
       in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
-      match timing with
-      | Ok (Timed _ as unchecked_timing) ->
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
+      match timing_with_min_balance with
+      | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5773,8 +5829,8 @@ let%test_module "account timing check" =
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_900 in
-      let timing =
-        validate_timing ~account
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~account
           ~txn_amount:(Currency.Amount.of_int 100_000_000_000)
           ~txn_global_slot:(Coda_numbers.Global_slot.of_int 1_900)
       in
@@ -5782,10 +5838,11 @@ let%test_module "account timing check" =
           subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
           so we should still be timed
         *)
-      match timing with
-      | Ok (Timed _ as unchecked_timing) ->
+      match timing_with_min_balance with
+      | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5804,15 +5861,18 @@ let%test_module "account timing check" =
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Global_slot.of_int 2_000 in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
       (* we're 2_000 - 1_000 = 1_000 slots past the cliff, which is 100 vesting periods
           subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance
           of 10_000_000_000 to get zero, so we should be untimed now
         *)
-      match timing with
-      | Ok (Untimed as unchecked_timing) ->
+      match timing_with_min_balance with
+      | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5882,11 +5942,14 @@ let%test_module "account timing check" =
       (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
       let txn_global_slot = Global_slot.of_int 3000 in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
-      match timing with
-      | Ok (Untimed as unchecked_timing) ->
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
+      match timing_with_min_balance with
+      | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
   end )
