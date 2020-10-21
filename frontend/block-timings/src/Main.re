@@ -3,6 +3,10 @@ open CloudLogging;
 
 [@bs.module "fs"] external writeFileSync: string => string => unit = "writeFileSync";
 
+let getTimeNow: unit => float = () => {
+  %raw "new Date().getTime() / 1000"
+}
+
 type inputs = {
   gcloudProjectId: string,
   gcloudRegion: string,
@@ -12,11 +16,16 @@ type inputs = {
   outputFile: string
 };
 
+// asynchronously folds over stackdriver log entries
 let foldLogEntries = (f, init, log, request) => {
   let open ReadableStream;
-  let promise_ref = ref(Promise.resolved(init));
+  let promise_ref = ref(Promise.resolved((init, 0)));
+  let print_progress = (n) => {
+    if(n mod 20 == 0) {
+      Js.log3("Processed", n, "logs...");
+    }
+  };
   Promise.exec((resolve) => {
-    Js.log("ho");
     let _ =
       Log.getEntriesStream(log, request)
       |> onError(err => resolve(Error(err)))
@@ -30,10 +39,16 @@ let foldLogEntries = (f, init, log, request) => {
                  ),
                )
            | Some(log) =>
-               promise_ref := promise_ref^ -> Promise.flatMap((acc) => f(acc, entry, log))
+               promise_ref := promise_ref^ -> Promise.flatMap(((acc, n)) =>
+                 f(acc, entry, log) -> Promise.map(acc' => {
+                   let n' = n + 1;
+                   print_progress(n');
+                   (acc', n')
+                 })
+               )
            }
          )
-      |> onEnd(() => resolve(Ok(promise_ref^)))
+      |> onEnd(() => resolve(Ok(promise_ref^)));
   })
 };
 
@@ -54,30 +69,26 @@ let run = (config, OperationIntf.OperationWithInput((module Operation), input)) 
   let logging = CloudLogging.create({projectId: gcloudProjectId});
   let log = Logging.log(logging, {j|projects/$gcloudProjectId/logs/stdout|j});
   let state = Operation.init(input);
-  Js.log(globalLogFilter(config) ++ Operation.logFilter(input));
   let request = Log.{
     resourceNames: [|{j|projects/$gcloudProjectId|j}|],
     filter: String.concat("\n", [globalLogFilter(config), Operation.logFilter(input)])
   };
 
   Js.log("Starting scrape from cloud logging");
-  foldLogEntries(Operation.processLogEntry, state, log, request) -> Promise.get(fun
-    | Error(err) => {
-        Js.log("der she blows");
-        failwith(err);
-    }
-    | Ok(promise) => {
-        Js.log("and a bottle of rum");
-        promise -> Promise.get(resultingState => {
-          Js.log({j|All done. Writing results to "$outputFile".|j});
+  let processingStartTime = getTimeNow();
+  foldLogEntries(Operation.processLogEntry, state, log, request) -> Promise.map(fun
+    | Error(err) => failwith(err)
+    | Ok(promise) =>
+        promise -> Promise.get(((resultingState, logsProcessed)) => {
+          let secondsElapsed = getTimeNow() -. processingStartTime;
+          Js.log({j|All done. Processed $logsProcessed in $secondsElapsed seconds. Writing results to "$outputFile".|j});
           let output = switch(Js.Json.stringifyAny(Operation.render(resultingState))) {
           | Some(json) => json
           | None => failwith("failed to render resulting operation state to json")
           };
           writeFileSync(outputFile, output);
         })
-      }
-  );
+  )
 };
 
 module Cli = {
@@ -181,10 +192,10 @@ module Cli = {
 // this line is necessary to make bs-cmdliner work correctly (because nodejs stdlib weirdness)
 %raw "process.argv.shift()";
 let () = {
-  let exitStatus = Cmdliner.Term.(exit_status_of_result(eval(Cli.main)));
+  let cliResult = Cmdliner.Term.eval(Cli.main);
+  let exitStatus = Cmdliner.Term.exit_status_of_result(cliResult);
   if(exitStatus > 0) {
     exit(exitStatus);
-  }
-  Js.log("yo");
+  };
   // otherwise, wait for promise in main to terminate
 };

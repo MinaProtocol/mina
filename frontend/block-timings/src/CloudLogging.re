@@ -7,7 +7,7 @@ module ReadableStream = {
   [@bs.send "on"] external on: t('a) => string => ('b => 'c) => t('a);
 
   let onError = (f: string => unit) => (s: t('a)) => on(s, "error", f);
-  let onData = (f: 'a => unit) => (s: t('a)) => on(s, "error", f);
+  let onData = (f: 'a => unit) => (s: t('a)) => on(s, "data", f);
   let onEnd = (f: unit => unit) => (s: t('a)) => on(s, "end", f);
 }
 
