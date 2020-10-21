@@ -60,7 +60,7 @@ module Styles = {
       Theme.Type.h1,
       style([
         marginTop(`rem(2.06)),
-        media(Theme.MediaQuery.desktop, [width(`rem(18.2))]),
+        media(Theme.MediaQuery.desktop, [width(`rem(25.2))]),
       ]),
     ]);
   let subhead =
