@@ -1511,7 +1511,6 @@ let compile_time_constants =
                      .block_window_duration_ms )
              ; ( "delta"
                , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
-             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
              ; ( "sub_windows_per_window"
                , `Int
                    (Unsigned.UInt32.to_int

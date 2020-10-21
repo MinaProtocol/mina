@@ -478,8 +478,7 @@ let run_test () : unit Deferred.t =
                 blockchain_length t
                 > Length.add blockchain_length' wait_till_length )
               ~timeout_min:
-                ( ( Length.to_int consensus_constants.delta
-                  + Length.to_int consensus_constants.c )
+                ( (Length.to_int consensus_constants.delta + 8)
                   * ( ( Block_time.Span.to_ms
                           consensus_constants.block_window_duration_ms
                       |> Int64.to_int_exn )
