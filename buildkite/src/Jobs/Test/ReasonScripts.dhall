@@ -16,7 +16,7 @@ Pipeline.build
     { spec =
       JobSpec::
         { dirtyWhen =
-          [ S.strictlyStart (S.contains "buildkite/src/Jobs/ReasonScripts")
+          [ S.strictlyStart (S.contains "buildkite/src/Jobs/Test/ReasonScripts")
           , S.strictlyStart (S.contains "frontend/block-timings")
           ]
         , path = "Test"

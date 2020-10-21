@@ -11,6 +11,7 @@ module Styles = {
       media(
         Theme.MediaQuery.desktop,
         [
+          height(`rem(100.)),
           backgroundImage(url("/static/img/InvestorsBackgroundDesktop.jpg")),
         ],
       ),
@@ -31,22 +32,7 @@ module Styles = {
         [gridTemplateColumns([`repeat((`num(6), `rem(10.)))])],
       ),
     ]);
-  let innerContainer =
-    style([
-      padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      media(
-        Theme.MediaQuery.tablet,
-        [padding2(~v=`rem(4.), ~h=`rem(2.5))],
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [
-          margin2(~v=`zero, ~h=`auto),
-          padding2(~v=`rem(7.), ~h=`rem(9.5)),
-          maxWidth(`rem(84.)),
-        ],
-      ),
-    ]);
+
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let subhead =
     merge([Theme.Type.sectionSubhead, style([marginBottom(`rem(4.))])]);
@@ -72,19 +58,16 @@ module Styles = {
       justifyContent(`center),
       padding2(~v=`rem(1.5), ~h=`rem(1.)),
     ]);
-  let rule =
-    style([
-      marginTop(`rem(2.)),
-      media(Theme.MediaQuery.desktop, [marginTop(`rem(7.93))]),
-    ]);
+  let rule = style([marginTop(`rem(3.))]);
   let advisorGrid =
     style([
       display(`grid),
-      gridTemplateColumns([`repeat((`num(2), `rem(10.)))]),
+      gridTemplateColumns([`repeat((`num(2), `rem(11.)))]),
       gridAutoRows(`rem(17.3)),
+      gridColumnGap(`rem(1.)),
       media(
         Theme.MediaQuery.tablet,
-        [gridTemplateColumns([`repeat((`num(4), `rem(10.)))])],
+        [gridTemplateColumns([`repeat((`num(4), `rem(11.)))])],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -106,7 +89,8 @@ module Styles = {
 [@react.component]
 let make = () => {
   <div className=Styles.backgroundImage>
-    <div className=Styles.innerContainer>
+    <Wrapped>
+        <Spacer height=7. />
       <h2 className=Styles.header> {React.string("Investors")} </h2>
       <p className=Styles.advisorsSubhead>
         {React.string("Supporting O(1) Labs")}
@@ -174,38 +158,37 @@ let make = () => {
       </p>
       <div className=Styles.advisorGrid>
         // all images are placeholder for now
-
-          <TeamMember
-            fullName="Jill Carlson"
-            title="Co-founder, Open Money Initiative"
-            src="/static/img/headshots/carlson.jpg"
-          />
-          <TeamMember
-            fullName="Paul Davidson"
-            title="Co-founder & CEO, Alpha Exploration Co."
-            src="/static/img/headshots/davidson.jpg"
-          />
-          <TeamMember
-            fullName="Joseph Bonneau"
-            title="Advisor"
-            src="/static/img/headshots/bonneau.jpg"
-          />
-          <TeamMember
-            fullName="Akis Kattis"
-            title="Advisor"
-            src="/static/img/headshots/kattis.jpg"
-          />
-          <TeamMember
-            fullName="Benedikt Bunz"
-            title="Advisor"
-            src="/static/img/headshots/bunz.jpg"
-          />
-          <TeamMember
-            fullName="Amit Sahai"
-            title="Director, Center for Encrypted Functionalities"
-            src="/static/img/headshots/sahai.jpg"
-          />
-        </div>
-    </div>
-  </div>;
+            <TeamMember
+              fullName="Jill Carlson"
+              title="Co-founder, Open Money Initiative"
+              src="/static/img/headshots/carlson.jpg"
+            />
+            <TeamMember
+              fullName="Paul Davidson"
+              title="Co-founder & CEO, Alpha Exploration Co."
+              src="/static/img/headshots/davidson.jpg"
+            />
+            <TeamMember
+              fullName="Joseph Bonneau"
+              title="Advisor"
+              src="/static/img/headshots/bonneau.jpg"
+            />
+            <TeamMember
+              fullName="Akis Kattis"
+              title="Advisor"
+              src="/static/img/headshots/kattis.jpg"
+            />
+            <TeamMember
+              fullName="Benedikt Bunz"
+              title="Advisor"
+              src="/static/img/headshots/bunz.jpg"
+            />
+            <TeamMember
+              fullName="Amit Sahai"
+              title="Director, Center for Encrypted Functionalities"
+              src="/static/img/headshots/sahai.jpg"
+            />
+          </div>
+      </Wrapped>
+    </div>;
 };
