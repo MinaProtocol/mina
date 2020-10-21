@@ -101,37 +101,40 @@ end)
           (Error.to_string_hum e) ;
         Broadcast_callback.error e cb
 
-  let process_incoming_resource_pool_diff t diff cb =
-    [%log' debug t.logger] "Verifying $diff"
-      ~metadata:
-        [("diff", Resource_pool.Diff.to_yojson @@ Envelope.Incoming.data diff)] ;
+  let filter_verified pipe t ~f =
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered (`Capacity 1024, `Overflow Drop_head))
     in
-    (*verify the diff*)
-    don't_wait_for
-      ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
-      | Error err ->
-          [%log' info t.logger]
-            "Refusing to rebroadcast %s. Verification error: %s"
-            (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
-            (Error.to_string_hum err) ;
-          Broadcast_callback.error err cb
-      | Ok verified_diff ->
-          [%log' debug t.logger] "Verified diff: $verified_diff"
-            ~metadata:
-              [ ( "verified_diff"
-                , Resource_pool.Diff.verified_to_yojson
-                  @@ Envelope.Incoming.data verified_diff )
-              ; ( "sender"
-                , Envelope.Sender.to_yojson
-                  @@ Envelope.Incoming.sender verified_diff ) ] ;
-          return (Strict_pipe.Writer.write w (verified_diff, cb)) ) ;
-    (*apply and (re)broadcast the verified diff*)
-    Strict_pipe.Reader.iter_without_pushback r ~f:(fun (verified_diff, cb) ->
-        apply_and_broadcast t verified_diff cb |> don't_wait_for )
-    |> don't_wait_for
+    Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
+        let diff, cb = f d in
+        [%log' debug t.logger] "Verifying $diff"
+          ~metadata:
+            [ ( "diff"
+              , Resource_pool.Diff.to_yojson @@ Envelope.Incoming.data diff )
+            ] ;
+        don't_wait_for
+          ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
+          | Error err ->
+              [%log' info t.logger]
+                "Refusing to rebroadcast %s. Verification error: %s"
+                (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
+                (Error.to_string_hum err) ;
+              (*reject incoming messages*)
+              Broadcast_callback.error err cb
+          | Ok verified_diff ->
+              [%log' debug t.logger] "Verified diff: $verified_diff"
+                ~metadata:
+                  [ ( "verified_diff"
+                    , Resource_pool.Diff.verified_to_yojson
+                      @@ Envelope.Incoming.data verified_diff )
+                  ; ( "sender"
+                    , Envelope.Sender.to_yojson
+                      @@ Envelope.Incoming.sender verified_diff ) ] ;
+              Deferred.return @@ Strict_pipe.Writer.write w (verified_diff, cb)
+          ) )
+    |> don't_wait_for ;
+    r
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
       ~incoming_diffs ~local_diffs ~tf_diffs =
@@ -147,20 +150,20 @@ end)
     Strict_pipe.Reader.Merge.iter
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
-      ; Strict_pipe.Reader.map local_diffs ~f:(fun (diff, cb) ->
-            `Local (Envelope.Incoming.local diff, cb) )
-      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun (diff, cb) ->
-            `Incoming (diff, cb) ) ]
+      ; Strict_pipe.Reader.map
+          (filter_verified local_diffs network_pool ~f:(fun (diff, cb) ->
+               (Envelope.Incoming.local diff, Broadcast_callback.Local cb) ))
+          ~f:(fun d -> `Local d)
+      ; Strict_pipe.Reader.map
+          (filter_verified incoming_diffs network_pool ~f:(fun (diff, cb) ->
+               (diff, Broadcast_callback.External cb) ))
+          ~f:(fun d -> `Incoming d) ]
       ~f:(fun diff_source ->
         match diff_source with
-        | `Incoming (diff, cb) ->
-            return
-              (process_incoming_resource_pool_diff network_pool diff
-                 (Broadcast_callback.External cb))
-        | `Local (diff, cb) ->
-            return
-              (process_incoming_resource_pool_diff network_pool diff
-                 (Broadcast_callback.Local cb))
+        | `Incoming (verified_diff, cb) ->
+            apply_and_broadcast network_pool verified_diff cb
+        | `Local (verified_diff, cb) ->
+            apply_and_broadcast network_pool verified_diff cb
         | `Transition_frontier_extension diff ->
             Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;
