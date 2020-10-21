@@ -22,6 +22,11 @@ if [ -n "$charts" ]; then
 
   if [ -n "${HELM_LINT+x}" ]; then
     for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not lint charts contained within the coda-automation submodule
+        continue
+      fi
+
       echo "--- Linting: ${dir}"
       helm lint $dir
 
@@ -38,6 +43,11 @@ if [ -n "$charts" ]; then
     gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
 
     for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not release charts contained within the coda-automation submodule
+        continue
+      fi
+
       echo "--- Preparing chart for Release: ${dir}"
       helm package $dir --destination $stageDir
 
