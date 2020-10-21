@@ -5716,11 +5716,10 @@ let%test_module "account timing check" =
       (min_balance, timing)
 
     let make_checked_timing_computation account txn_amount txn_global_slot =
-      let open Snarky_backendless.Checked.Let_syntax in
       let%map _min_balance, timing =
         checked_min_balance_and_timing account txn_amount txn_global_slot
       in
-      Snarky_backendless.As_prover.read Account.Timing.typ timing
+      timing
 
     let make_checked_min_balance_computation account txn_amount txn_global_slot
         =
@@ -5742,38 +5741,36 @@ let%test_module "account timing check" =
 
     let run_checked_timing_and_compare account txn_amount txn_global_slot
         unchecked_timing unchecked_min_balance =
-      let checked_timing_computation =
-        make_checked_timing_computation account txn_amount txn_global_slot
-      in
-      let (), checked_timing =
-        Or_error.ok_exn
-        @@ Snark_params.Tick.run_and_check checked_timing_computation ()
-      in
-      (* if timings match, check equality of min balances *)
-      Account.Timing.equal checked_timing unchecked_timing
-      &&
-      let checked_min_balance =
-        make_checked_min_balance_computation account txn_amount txn_global_slot
-      in
-      (* ???? *)
-      let (), checked_min_balance =
-        Tick.run_unchecked checked_min_balance ()
-      in
-      let unchecked_min_balance_as_snarky_integer =
-        snarky_integer_of_bools (Balance.to_bits unchecked_min_balance)
-      in
-      let equal_balances =
-        Snarky_integer.Integer.equal ~m checked_min_balance
-          unchecked_min_balance_as_snarky_integer
-      in
-      (* ???? *)
       let equal_balances_computation =
-        make_checked (fun () ->
-            Snarky_backendless.As_prover.read Snark_params.Tick.Boolean.typ
-              equal_balances )
+        let open Snarky_backendless.Checked in
+        let%bind checked_timing =
+          make_checked_timing_computation account txn_amount txn_global_slot
+        in
+        let%bind () =
+          as_prover
+            As_prover.(
+              let%map checked_timing =
+                read Account.Timing.typ checked_timing
+              in
+              assert (Account.Timing.equal checked_timing unchecked_timing))
+        in
+        let%bind checked_min_balance =
+          make_checked_min_balance_computation account txn_amount
+            txn_global_slot
+        in
+        let%bind unchecked_min_balance_as_snarky_integer =
+          Run.make_checked (fun () ->
+              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance)
+          )
+        in
+        let%map equal_balances =
+          Run.make_checked (fun () ->
+              Snarky_integer.Integer.equal ~m checked_min_balance
+                unchecked_min_balance_as_snarky_integer )
+        in
+        Snarky_backendless.As_prover.read Snark_params.Tick.Boolean.typ
+          equal_balances
       in
-      (* ???? *)
-      (* EXN IN FOLLOWING *)
       let (), equal_balances =
         Or_error.ok_exn
         @@ Snark_params.Tick.run_and_check equal_balances_computation ()
@@ -5783,7 +5780,10 @@ let%test_module "account timing check" =
     (* confirm the checked computation fails *)
     let checked_timing_should_fail account txn_amount txn_global_slot =
       let checked_timing_computation =
-        make_checked_timing_computation account txn_amount txn_global_slot
+        let%map checked_timing =
+          make_checked_timing_computation account txn_amount txn_global_slot
+        in
+        As_prover.read Account.Timing.typ checked_timing
       in
       Or_error.is_error
       @@ Snark_params.Tick.run_and_check checked_timing_computation ()
