@@ -1,6 +1,16 @@
 /// Bindings to @google-cloud/logging nodejs library for pulling logs from
 /// stackdriver
 
+module ReadableStream = {
+  type t('a);
+
+  [@bs.send "on"] external on: t('a) => string => ('b => 'c) => t('a);
+
+  let onError = (f: string => unit) => (s: t('a)) => on(s, "error", f);
+  let onData = (f: 'a => unit) => (s: t('a)) => on(s, "error", f);
+  let onEnd = (f: unit => unit) => (s: t('a)) => on(s, "end", f);
+}
+
 /// Metadata from google logs "reflects" type information. Use these wrappers to workaround it
 module Reflected = {
   module String = {
@@ -89,28 +99,14 @@ module Entry = {
 module Log = {
   type t = {name: string};
 
-  type getEntryOptions = {
+  // more options (which are unused here) are hidden
+  // https://googleapis.dev/nodejs/logging/latest/global.html#GetEntriesRequest
+  type getEntriesRequest = {
     filter: string,
-    pageSize: int,
-    autoPaginate: bool,
-    resourceNames: array(string),
-    orderBy: string,
-    pageToken: option(string),
+    resourceNames: array(string)
   };
 
-  type getEntryResponse = {nextPageToken: string};
-
-  // returns: Entries, nextPageQuery, options
-  [@bs.send "getEntries"]
-  external getEntries:
-    (t, getEntryOptions) =>
-    Promise.t(
-      (
-        array(Entry.t),
-        Js.Null_undefined.t(getEntryOptions),
-        getEntryResponse,
-      ),
-    );
+  [@bs.send "getEntriesStream"] external getEntriesStream: (t, getEntriesRequest) => ReadableStream.t(Entry.t);
 };
 
 module Logging = {

@@ -8,7 +8,7 @@ module type S = {
 
   let init: input => state;
   let logFilter: input => string;
-  let processLogEntry: state => CloudLogging.Entry.t => StructuredLogs.metadata => state;
+  let processLogEntry: state => CloudLogging.Entry.t => StructuredLogs.metadata => Promise.t(state);
   let render: state => output;
 };
 

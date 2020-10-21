@@ -146,7 +146,7 @@ let processLogEntry = (blockLifetimes, entry, structuredMetadata) => {
     )
   };
 
-  blockLifetimes
+  Promise.resolved(blockLifetimes)
 }
 
 let render = BlockLifetime.render
