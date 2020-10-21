@@ -71,11 +71,7 @@ module T = struct
             in
             {num_removed= num_removed + extra_num_removed; is_added}
         | E (Best_tip_changed _, _) ->
-            init
-        | E (Root_transitioned {garbage= Lite _; _}, _) ->
-            failwith "impossible"
-        | E (New_node (Lite _), _) ->
-            failwith "impossible" )
+            init )
     in
     if num_removed > 0 || is_added then Some (num_removed, t) else None
 end

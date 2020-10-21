@@ -765,7 +765,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "none"
@@ -789,7 +789,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
@@ -815,7 +815,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 24
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
@@ -840,15 +840,15 @@ module Test_configs = struct
   { "daemon":
       { "txpool_max_size": 3000 }
   , "genesis":
-      { "k": 6
-      , "delta": 3
+      { "k": 1
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 1
+      , "c": 8
       , "ledger_depth": 6
       , "work_delay": 1
-      , "block_window_duration_ms": 10000
+      , "block_window_duration_ms": 5000
       , "transaction_capacity": {"2_to_the": 2}
       , "coinbase_amount": "20"
       , "supercharged_coinbase_factor": 2

@@ -35,7 +35,7 @@ module Styles = {
       alignItems(`center),
       width(`percent(100.)),
       marginBottom(`rem(3.)),
-      media(Theme.MediaQuery.notMobile, [width(`percent(93.))]),
+      media(Theme.MediaQuery.notMobile, [width(`percent(100.))]),
     ]);
 };
 
@@ -46,7 +46,7 @@ module Title = {
       <h2 className=Theme.Type.h2> {React.string(copy)} </h2>
       <Button bgColor=Theme.Colors.digitalBlack href=buttonHref>
         {React.string(buttonCopy)}
-        <Icon kind=Icon.ArrowRightMedium />
+        <Icon kind=Icon.ArrowRightSmall />
       </Button>
     </div>;
   };

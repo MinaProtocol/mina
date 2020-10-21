@@ -21,7 +21,7 @@ module Styles = {
   let title =
     merge([
       Theme.Type.h5,
-      style([fontWeight(`normal), marginTop(`rem(1.))]),
+      style([fontWeight(`light), marginTop(`rem(1.))]),
     ]);
 
   let description =
@@ -37,7 +37,7 @@ module Styles = {
         display(`flex),
         alignItems(`center),
         cursor(`pointer),
-        marginTop(`rem(1.)),
+        marginTop(`auto),
       ]),
     ]);
 
