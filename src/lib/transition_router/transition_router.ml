@@ -35,10 +35,10 @@ let is_transition_for_bootstrap ~logger
            , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
-    ~network ~time_controller ~producer_transition_reader
-    ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~transition_reader_ref ~transition_writer_ref ~frontier_w
-    ~precomputed_values frontier =
+    ~network ~time_controller ~producer_transition_reader_ref
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~collected_transitions ~transition_reader_ref ~transition_writer_ref
+    ~frontier_w ~precomputed_values frontier =
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
@@ -46,6 +46,12 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   in
   transition_reader_ref := transition_frontier_controller_reader ;
   transition_writer_ref := transition_frontier_controller_writer ;
+  let producer_transition_reader, producer_transition_writer =
+    Strict_pipe.create ~name:"transition frontier: producer transition"
+      Synchronous
+  in
+  producer_transition_reader_ref := producer_transition_reader ;
+  producer_transition_writer_ref := producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
     trace_recurring "transition frontier controller" (fun () ->
@@ -61,11 +67,11 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   |> don't_wait_for
 
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-    ~time_controller ~producer_transition_reader ~verified_transition_writer
-    ~clear_reader ~transition_reader_ref ~transition_writer_ref
-    ~consensus_local_state ~frontier_w ~initial_root_transition
-    ~persistent_root ~persistent_frontier ~best_seen_transition
-    ~precomputed_values =
+    ~time_controller ~producer_transition_reader_ref
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
+    ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
+    ~best_seen_transition ~precomputed_values =
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -73,6 +79,12 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   in
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
+  let producer_transition_reader, producer_transition_writer =
+    Strict_pipe.create ~name:"bootstrap controller: producer transition"
+      Synchronous
+  in
+  producer_transition_reader_ref := producer_transition_reader ;
+  producer_transition_writer_ref := producer_transition_writer ;
   Option.iter best_seen_transition ~f:(fun best_seen_transition ->
       Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition
   ) ;
@@ -85,10 +97,11 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
            ~precomputed_values) (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
-            ~network ~time_controller ~producer_transition_reader
-            ~verified_transition_writer ~clear_reader ~collected_transitions
-            ~transition_reader_ref ~transition_writer_ref ~frontier_w
-            ~precomputed_values new_frontier ) )
+            ~network ~time_controller ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~collected_transitions ~transition_reader_ref
+            ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier
+      ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
@@ -221,8 +234,9 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
       ) ]
 
 let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
-    ~time_controller ~frontier_w ~producer_transition_reader ~clear_reader
-    ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
+    ~time_controller ~frontier_w ~producer_transition_reader_ref
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~precomputed_values =
   let%bind () =
@@ -247,10 +261,11 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-        ~time_controller ~producer_transition_reader
-        ~verified_transition_writer ~clear_reader ~transition_reader_ref
-        ~consensus_local_state ~transition_writer_ref ~frontier_w
-        ~persistent_root ~persistent_frontier ~initial_root_transition
+        ~time_controller ~producer_transition_reader_ref
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ~transition_reader_ref ~consensus_local_state
+        ~transition_writer_ref ~frontier_w ~persistent_root
+        ~persistent_frontier ~initial_root_transition
         ~best_seen_transition:best_tip ~precomputed_values
   | None, Some frontier ->
       [%log info]
@@ -258,10 +273,10 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
          network; starting participation" ;
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
-           ~network ~time_controller ~producer_transition_reader
-           ~verified_transition_writer ~clear_reader ~collected_transitions:[]
-           ~transition_reader_ref ~transition_writer_ref ~frontier_w
-           ~precomputed_values frontier
+           ~network ~time_controller ~producer_transition_reader_ref
+           ~producer_transition_writer_ref ~verified_transition_writer
+           ~clear_reader ~collected_transitions:[] ~transition_reader_ref
+           ~transition_writer_ref ~frontier_w ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       [%log info]
         "Successfully loaded frontier and downloaded best tip from network" ;
@@ -277,10 +292,11 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         in
         let%map () = Transition_frontier.close frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-          ~time_controller ~producer_transition_reader
-          ~verified_transition_writer ~clear_reader ~transition_reader_ref
-          ~consensus_local_state ~transition_writer_ref ~frontier_w
-          ~persistent_root ~persistent_frontier ~initial_root_transition
+          ~time_controller ~producer_transition_reader_ref
+          ~producer_transition_writer_ref ~verified_transition_writer
+          ~clear_reader ~transition_reader_ref ~consensus_local_state
+          ~transition_writer_ref ~frontier_w ~persistent_root
+          ~persistent_frontier ~initial_root_transition
           ~best_seen_transition:(Some best_tip) ~precomputed_values )
       else (
         [%log info]
@@ -318,10 +334,11 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                   () )
         in
         start_transition_frontier_controller ~logger ~trust_system ~verifier
-          ~network ~time_controller ~producer_transition_reader
-          ~verified_transition_writer ~clear_reader
-          ~collected_transitions:[best_tip] ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
+          ~network ~time_controller ~producer_transition_reader_ref
+          ~producer_transition_writer_ref ~verified_transition_writer
+          ~clear_reader ~collected_transitions:[best_tip]
+          ~transition_reader_ref ~transition_writer_ref ~frontier_w
+          ~precomputed_values frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -380,6 +397,15 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   in
   let transition_reader_ref = ref transition_reader in
   let transition_writer_ref = ref transition_writer in
+  let producer_transition_reader_ref, producer_transition_writer_ref =
+    let reader, writer =
+      Strict_pipe.create ~name:"producer transition" Synchronous
+    in
+    (ref reader, ref writer)
+  in
+  don't_wait_for
+  @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
+         Strict_pipe.Writer.write !producer_transition_writer_ref x ) ;
   upon (wait_till_genesis ~logger ~time_controller ~precomputed_values)
     (fun () ->
       let valid_transition_reader, valid_transition_writer =
@@ -400,7 +426,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
       upon
         (initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
            ~trust_system ~persistent_frontier ~persistent_root ~time_controller
-           ~frontier_w ~producer_transition_reader ~clear_reader
+           ~frontier_w ~producer_transition_reader_ref
+           ~producer_transition_writer_ref ~clear_reader
            ~verified_transition_writer ~transition_reader_ref
            ~transition_writer_ref ~most_recent_valid_block_writer
            ~consensus_local_state ~precomputed_values) (fun () ->
@@ -447,6 +474,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                               incoming_transition ~precomputed_values
                           then (
                             Strict_pipe.Writer.kill !transition_writer_ref ;
+                            Strict_pipe.Writer.kill
+                              !producer_transition_writer_ref ;
                             let initial_root_transition =
                               Transition_frontier.(
                                 Breadcrumb.validated_transition (root frontier))
@@ -457,7 +486,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                             let%map () = Transition_frontier.close frontier in
                             start_bootstrap_controller ~logger ~trust_system
                               ~verifier ~network ~time_controller
-                              ~producer_transition_reader
+                              ~producer_transition_reader_ref
+                              ~producer_transition_writer_ref
                               ~verified_transition_writer ~clear_reader
                               ~transition_reader_ref ~transition_writer_ref
                               ~consensus_local_state ~frontier_w
