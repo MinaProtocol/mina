@@ -85,8 +85,6 @@ module Configuration = struct
       type t =
         { delta: int
         ; k: int
-        ; c: int
-        ; c_times_k: int
         ; slots_per_epoch: int
         ; slot_duration: int
         ; epoch_duration: int
@@ -106,8 +104,6 @@ module Configuration = struct
     let of_span = Fn.compose Int64.to_int Block_time.Span.to_ms in
     { delta= of_int32 constants.delta
     ; k= of_int32 constants.k
-    ; c= of_int32 constants.c
-    ; c_times_k= of_int32 constants.c * of_int32 constants.k
     ; slots_per_epoch= of_int32 constants.epoch_size
     ; slot_duration= of_span constants.slot_duration_ms
     ; epoch_duration= of_span constants.epoch_duration
@@ -1670,7 +1666,9 @@ module Data = struct
     let data_spec
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
       let open Snark_params.Tick.Data_spec in
-      let sub_windows_per_window = constraint_constants.c in
+      let sub_windows_per_window =
+        constraint_constants.sub_windows_per_window
+      in
       [ Length.typ
       ; Length.typ
       ; Length.typ
