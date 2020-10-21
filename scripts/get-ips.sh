@@ -1,6 +1,6 @@
 NAMESPACE="pears-med-gate"
 
-PODS=$(kubectl --namespace=pears-med-gate get pods | egrep Running | awk '{ print $1 }' | egrep -v NAME | egrep 'producer|coordinator')
+PODS=$(kubectl --namespace=pears-med-gate get pods | egrep Running | awk '{ print $1 }' | egrep -v NAME | egrep 'producer|coordinator|seed|archive-node-dev')
 
 for POD in $PODS; do
   PEERS_CMD="coda client status | grep Peers | sed 's/.*(//g' | sed 's/)//g'"
