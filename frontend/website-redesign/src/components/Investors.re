@@ -90,7 +90,7 @@ module Styles = {
 let make = () => {
   <div className=Styles.backgroundImage>
     <Wrapped>
-        <Spacer height=7. />
+      <Spacer height=7. />
       <h2 className=Styles.header> {React.string("Investors")} </h2>
       <p className=Styles.advisorsSubhead>
         {React.string("Supporting O(1) Labs")}
@@ -148,6 +148,7 @@ let make = () => {
         <img src="/static/img/logos/LogoScifiVC.png" />
         <img src="/static/img/logos/Signum Capital 1.png" />
         <img src="/static/img/logos/Skytale Capital 1.png" />
+        <img src="/static/img/logos/SNZ.png" />
         <img src="/static/img/logos/Three Arrows Capital 1.png" />
         <img src="/static/img/logos/YBB Foundation 1.png" />
       </div>
@@ -157,38 +158,37 @@ let make = () => {
         {React.string("Supporting O(1) Labs")}
       </p>
       <div className=Styles.advisorGrid>
-        // all images are placeholder for now
-            <TeamMember
-              fullName="Jill Carlson"
-              title="Co-founder, Open Money Initiative"
-              src="/static/img/headshots/carlson.jpg"
-            />
-            <TeamMember
-              fullName="Paul Davidson"
-              title="Co-founder & CEO, Alpha Exploration Co."
-              src="/static/img/headshots/davidson.jpg"
-            />
-            <TeamMember
-              fullName="Joseph Bonneau"
-              title="Advisor"
-              src="/static/img/headshots/bonneau.jpg"
-            />
-            <TeamMember
-              fullName="Akis Kattis"
-              title="Advisor"
-              src="/static/img/headshots/kattis.jpg"
-            />
-            <TeamMember
-              fullName="Benedikt Bunz"
-              title="Advisor"
-              src="/static/img/headshots/bunz.jpg"
-            />
-            <TeamMember
-              fullName="Amit Sahai"
-              title="Director, Center for Encrypted Functionalities"
-              src="/static/img/headshots/sahai.jpg"
-            />
-          </div>
-      </Wrapped>
-    </div>;
+        <TeamMember
+          fullName="Jill Carlson"
+          title="Co-founder, Open Money Initiative"
+          src="/static/img/headshots/carlson.jpg"
+        />
+        <TeamMember
+          fullName="Paul Davidson"
+          title="Co-founder & CEO, Alpha Exploration Co."
+          src="/static/img/headshots/davidson.jpg"
+        />
+        <TeamMember
+          fullName="Joseph Bonneau"
+          title="Advisor"
+          src="/static/img/headshots/bonneau.jpg"
+        />
+        <TeamMember
+          fullName="Akis Kattis"
+          title="Advisor"
+          src="/static/img/headshots/kattis.jpg"
+        />
+        <TeamMember
+          fullName="Benedikt Bunz"
+          title="Advisor"
+          src="/static/img/headshots/bunz.jpg"
+        />
+        <TeamMember
+          fullName="Amit Sahai"
+          title="Director, Center for Encrypted Functionalities"
+          src="/static/img/headshots/sahai.jpg"
+        />
+      </div>
+    </Wrapped>
+  </div>;
 };
