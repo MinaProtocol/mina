@@ -10,7 +10,6 @@ open Coda_base
 open Frontier_base
 module Breadcrumb = Breadcrumb
 module Diff = Diff
-module Hash = Frontier_hash
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
