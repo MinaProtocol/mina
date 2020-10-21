@@ -117,6 +117,10 @@ let make = () => {
       <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
       </Next.Link>
+      <Next.Link href="/work-with-mina">
+        <a className=Styles.linkStyle> {React.string("Careers")} </a>
+      </Next.Link>
+
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader>
