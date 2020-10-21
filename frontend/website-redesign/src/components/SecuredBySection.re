@@ -58,7 +58,7 @@ module Styles = {
           display(`flex),
           flexDirection(`row),
           unsafe("grid-area", "3 / 1 / 3 / 3"),
-          height(`rem(29.)),
+          height(`rem(20.)),
         ],
       ),
       media(
@@ -162,7 +162,7 @@ module Styles = {
       marginBottom(`rem(3.)),
       media(
         Theme.MediaQuery.tablet,
-        [marginRight(`rem(3.)), height(`rem(25.))],
+        [marginRight(`rem(3.)), height(`rem(15.))],
       ),
       media(
         Theme.MediaQuery.desktop,
