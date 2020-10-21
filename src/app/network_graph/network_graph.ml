@@ -218,11 +218,10 @@ end
 open Core
 
 let () =
-  let network, _events = 
+  let network, events = 
     Sys.argv.(1), Sys.argv.(2)
   in
   let network = read_ips (In_channel.read_all network) in
-  (*
   let events = 
     match Events.of_yojson (Yojson.Safe.from_file events) with
     | Ok x -> x
@@ -234,7 +233,7 @@ let () =
         List.map received ~f:(fun { time=_; podRealName; sender } ->
             ( `Node_name podRealName, { Block_received.state_hash=stateHash
                                       ; sender_ip= `External sender } ) ) ) )
-  in *)
+  in
   to_json_for_vis [] network
   |> Yojson.Safe.to_file "graph.json"
 
