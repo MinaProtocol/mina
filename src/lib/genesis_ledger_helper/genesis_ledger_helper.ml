@@ -1048,7 +1048,9 @@ let make_constraint_constants
     Core_kernel.Int.ceil_log2
       (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
   in
-  { c= Option.value ~default:default.c config.c
+  { sub_windows_per_window=
+      Option.value ~default:default.sub_windows_per_window
+        config.sub_windows_per_window
   ; ledger_depth=
       Option.value ~default:default.ledger_depth config.ledger_depth
   ; work_delay
@@ -1105,6 +1107,12 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; delta=
           Option.value ~default:default.protocol.delta
             (config.genesis >>= fun cfg -> cfg.delta)
+      ; slots_per_epoch=
+          Option.value ~default:default.protocol.slots_per_epoch
+            (config.genesis >>= fun cfg -> cfg.slots_per_epoch)
+      ; slots_per_sub_window=
+          Option.value ~default:default.protocol.slots_per_sub_window
+            (config.genesis >>= fun cfg -> cfg.slots_per_sub_window)
       ; genesis_state_timestamp=
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp }
@@ -1319,6 +1327,11 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
       Some
         { k= Some genesis_constants.protocol.k
         ; delta= Some genesis_constants.protocol.delta
+        ; slots_per_epoch= Some genesis_constants.protocol.slots_per_epoch
+        ; slots_per_sub_window=
+            Some genesis_constants.protocol.slots_per_sub_window
+        ; sub_windows_per_window=
+            Some constraint_constants.sub_windows_per_window
         ; genesis_state_timestamp=
             Some
               (Time.to_string_abs ~zone:Time.Zone.utc
@@ -1334,7 +1347,8 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
                   Check
               | None ->
                   None )
-        ; c= Some constraint_constants.c
+        ; sub_windows_per_window=
+            Some constraint_constants.sub_windows_per_window
         ; ledger_depth= Some constraint_constants.ledger_depth
         ; work_delay= Some constraint_constants.work_delay
         ; block_window_duration_ms=
