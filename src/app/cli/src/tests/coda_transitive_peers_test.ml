@@ -23,7 +23,7 @@ let main () =
   let acceptable_delay =
     Time.Span.of_ms
       ( block_production_interval
-        * Unsigned.UInt32.to_int consensus_constants.delta
+        * (Unsigned.UInt32.to_int consensus_constants.delta + 1)
       |> Float.of_int )
   in
   let work_selection_method =
