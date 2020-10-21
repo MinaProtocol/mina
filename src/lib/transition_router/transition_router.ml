@@ -104,7 +104,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
       ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
-    ~most_recent_valid_block_writer ~genesis_constants =
+    ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
   let num_peers = 8 in
   let%bind peers = Coda_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
@@ -123,6 +123,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
         | Ok peer_best_tip -> (
             match%bind
               Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
+                ~precomputed_values
             with
             | Error e ->
                 [%log warn]
@@ -248,7 +249,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
   match%bind
     Deferred.both
       (download_best_tip ~logger ~network ~verifier ~trust_system
-         ~most_recent_valid_block_writer ~genesis_constants)
+         ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values)
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
          ~consensus_local_state ~precomputed_values)
   with
