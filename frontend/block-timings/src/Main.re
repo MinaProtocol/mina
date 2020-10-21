@@ -1,17 +1,41 @@
 // TODO: Figure out how to get bs-let/ppx to work
 open CloudLogging;
 
-module P = Promise;
+[@bs.module "fs"] external writeFileSync: string => string => unit = "writeFileSync";
 
 type inputs = {
   gcloudProjectId: string,
   gcloudRegion: string,
   gcloudKubernetesCluster: string,
   testnetName: string,
-  startTimestamp: string
+  startTimestamp: string,
+  outputFile: string
 };
 
-let maxLogPulls = 6;
+let foldLogEntries = (f, init, log, request) => {
+  let open ReadableStream;
+  let promise_ref = ref(Promise.resolved(init));
+  Promise.exec((resolve) => {
+    Js.log("ho");
+    let _ =
+      Log.getEntriesStream(log, request)
+      |> onError(err => resolve(Error(err)))
+      |> onData(entry =>
+           switch(StructuredLogs.ofLogEntry(entry)) {
+           | None =>
+               failwith(
+                 Printf.sprintf(
+                   "Invalid structured log returned from filter query; unexpected event id \"%s\"",
+                   Entry.eventIdExn(entry),
+                 ),
+               )
+           | Some(log) =>
+               promise_ref := promise_ref^ -> Promise.flatMap((acc) => f(acc, entry, log))
+           }
+         )
+      |> onEnd(() => resolve(Ok(promise_ref^)))
+  })
+};
 
 let globalLogFilter = (config) => {
   let {gcloudProjectId, gcloudRegion, gcloudKubernetesCluster, testnetName, startTimestamp} = config;
@@ -25,60 +49,35 @@ resource.labels.container_name="coda"
 timestamp > "$startTimestamp"|j};
 };
 
-let rec foldLogEntries = (i, log, request, acc, f) => {
-  Log.getEntries(log, request)
-  -> P.map(((es, options, _)) => {
-       let acc =
-         Array.fold_left((acc, e) =>
-           switch(StructuredLogs.ofLogEntry(e)) {
-           | None =>
-               failwith(
-                 Printf.sprintf(
-                   "Invalid structured log returned from filter query; unexpected event id \"%s\"",
-                   Entry.eventIdExn(e),
-                 ),
-               )
-           | Some(log) => f(acc, e, log)
-         }, acc, es);
-
-       Js.log("Finished processing entries for this page");
-
-       (options, acc)
-     })
-  -> P.flatMap(((options, acc)) => {
-       let pageToken =
-         Js.Null_undefined.toOption(options)
-         |> Js.Option.andThen((. opt) => opt.Log.pageToken);
-       if(Js.Option.isNone(pageToken)) {
-         Js.log("All logs were processed");
-         P.resolved(acc);
-       } else if(i >= maxLogPulls) {
-         Js.log("Hit max log pulls -- refusing to continue");
-         P.resolved(acc);
-       } else {
-         foldLogEntries(i + 1, log, {...request, pageToken}, acc, f);
-       };
-     });
-};
-
 let run = (config, OperationIntf.OperationWithInput((module Operation), input)) => {
-  let {gcloudProjectId, _} = config;
+  let {gcloudProjectId, outputFile, _} = config;
   let logging = CloudLogging.create({projectId: gcloudProjectId});
   let log = Logging.log(logging, {j|projects/$gcloudProjectId/logs/stdout|j});
   let state = Operation.init(input);
+  Js.log(globalLogFilter(config) ++ Operation.logFilter(input));
   let request = Log.{
     resourceNames: [|{j|projects/$gcloudProjectId|j}|],
-    pageSize: 100,
-    autoPaginate: false,
-    orderBy: "timestamp desc",
-    pageToken: None,
-    filter: globalLogFilter(config) ++ Operation.logFilter(input)
+    filter: String.concat("\n", [globalLogFilter(config), Operation.logFilter(input)])
   };
 
   Js.log("Starting scrape from cloud logging");
-
-  foldLogEntries(0, log, request, state, Operation.processLogEntry)
-  -> P.get(state => Js.log2("All done", Js.Json.stringifyAny(Operation.render(state))));
+  foldLogEntries(Operation.processLogEntry, state, log, request) -> Promise.get(fun
+    | Error(err) => {
+        Js.log("der she blows");
+        failwith(err);
+    }
+    | Ok(promise) => {
+        Js.log("and a bottle of rum");
+        promise -> Promise.get(resultingState => {
+          Js.log({j|All done. Writing results to "$outputFile".|j});
+          let output = switch(Js.Json.stringifyAny(Operation.render(resultingState))) {
+          | Some(json) => json
+          | None => failwith("failed to render resulting operation state to json")
+          };
+          writeFileSync(outputFile, output);
+        })
+      }
+  );
 };
 
 module Cli = {
@@ -133,14 +132,23 @@ module Cli = {
           ~docs="REQUIRED",
           ["start-timestamp", "t"]
         );
+    let outputFile =
+      value
+      & opt(string, "results.json")
+      & info(
+          ~doc="File to output json results to.",
+          ~docv="filename",
+          ["output", "o"]
+        );
 
     // configuration term (important: lift argument order needs to match term application order)
-    let lift = (gcloudProjectId, gcloudRegion, gcloudKubernetesCluster, testnetName, startTimestamp) => {
+    let lift = (gcloudProjectId, gcloudRegion, gcloudKubernetesCluster, testnetName, startTimestamp, outputFile) => {
       gcloudProjectId,
       gcloudRegion,
       gcloudKubernetesCluster,
       testnetName,
-      startTimestamp
+      startTimestamp,
+      outputFile
     };
     Term.(
       const(lift)
@@ -148,7 +156,8 @@ module Cli = {
         $ gcloudRegion
         $ gcloudKubernetesCluster
         $ testnetName
-        $ startTimestamp)
+        $ startTimestamp
+        $ outputFile)
   };
 
   // TODO: parse different choices w/ their respective cli inputs
@@ -171,4 +180,11 @@ module Cli = {
 
 // this line is necessary to make bs-cmdliner work correctly (because nodejs stdlib weirdness)
 %raw "process.argv.shift()";
-let () = Cmdliner.Term.(exit(eval(Cli.main)))
+let () = {
+  let exitStatus = Cmdliner.Term.(exit_status_of_result(eval(Cli.main)));
+  if(exitStatus > 0) {
+    exit(exitStatus);
+  }
+  Js.log("yo");
+  // otherwise, wait for promise in main to terminate
+};
