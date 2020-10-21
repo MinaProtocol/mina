@@ -20,7 +20,11 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "helm", S.strictly (S.contains "Chart.yaml") ],
+      dirtyWhen = [
+        S.contains "helm",
+        S.strictly (S.contains "Chart.yaml"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease")
+      ],
       path = "Release",
       name = "HelmRelease"
     },

@@ -32,7 +32,7 @@ Pipeline.build
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/UnitTest"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Test/UnitTest"),
         S.exactly "scripts/link-coredumps" "sh"
       ]
 
