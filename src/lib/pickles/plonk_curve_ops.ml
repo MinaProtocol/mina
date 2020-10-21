@@ -31,6 +31,36 @@ struct
           Tuple_lib.Double.map ~f:(Util.seal (module Impl)) t )
     in
     let module S = Zexe_backend_common.Scale_round in
+    let rec go rows p i =
+      if i < 0 then Array.of_list_rev rows
+      else
+        let b : Boolean.var = scalar.(Int.(i + 1)) in
+        let xp, yp = p in
+        let l1 =
+          exists Field.typ
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let ( ! ) = read_var in
+                  let bit = read_var (b :> Field.t) in
+                  (!yp - (!yt * (bit + bit - one))) / (read_var xp - !xt))
+        in
+        let ((xs, ys) as s) =
+          exists G.typ_unchecked
+            ~compute:
+              As_prover.(
+                fun () ->
+                  let p = read G.typ p in
+                  let t = read G.typ t in
+                  let tl' =
+                    if read Boolean.typ b then t else G.Constant.negate t
+                  in
+                  G.Constant.(p + (p + tl')))
+        in
+        let open Field.Constant in
+        let row = {S.xt; yt; b= (b :> Field.t); xp; yp; l1; xs; ys} in
+        go (row :: rows) s Int.(i - 1)
+    in
     let n = Array.length scalar in
     if n = 0 then t
     else
@@ -38,45 +68,7 @@ struct
       let p =
         if n = 1 then p
         else
-          let state =
-            exists
-              (Typ.array ~length:Int.(n - 1) (S.typ Field.typ))
-              ~compute:
-                As_prover.(
-                  fun () ->
-                    let xt, yt = Tuple_lib.Double.map t ~f:read_var in
-                    let state = ref [] in
-                    let pl = ref (read G.typ p) in
-                    let tl = ref (read G.typ t) in
-                    for i = Int.(n - 2) downto 0 do
-                      let b = read Boolean.typ scalar.(Int.(i + 1)) in
-                      let tl' = if b then !tl else G.Constant.negate !tl in
-                      let sl = G.Constant.(!pl + (!pl + tl')) in
-                      let xp, yp = G.Constant.to_affine_exn !pl in
-                      let xs, ys = G.Constant.to_affine_exn sl in
-                      let open Field.Constant in
-                      let bit = if b then one else zero in
-                      let round =
-                        { S.xt
-                        ; yt
-                        ; b= bit
-                        ; xp
-                        ; yp
-                        ; l1= (yp - (yt * (bit + bit - one))) / (xp - xt)
-                        ; xs
-                        ; ys }
-                      in
-                      state := round :: !state ;
-                      pl := sl
-                    done ;
-                    Array.of_list_rev !state)
-          in
-          let state =
-            Array.mapi state ~f:(fun i s ->
-                {s with S.xt; yt; b= (scalar.(Int.(n - i - 1)) :> Field.t)} )
-          in
-          let xp, yp = p in
-          state.(0) <- {(state.(0)) with xp; yp} ;
+          let state = go [] p Int.(n - 2) in
           assert_
             [ { annotation= Some __LOC__
               ; basic=
