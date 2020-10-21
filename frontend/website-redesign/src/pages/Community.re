@@ -225,7 +225,7 @@ let make = (~profiles) => {
     </div>
     <QuoteSection
       small=false
-      copy={js|"My measure of a project isn't the quality of the tech. It’s the quality of the community. I wouldn't have been able to spin my node up if it weren't for the insanely great members that helped me. And that's something special.”|js}
+      copy={js|My measure of a project isn't the quality of the tech. It’s the quality of the community. I wouldn't have been able to spin my node up if it weren't for the insanely great members that helped me. And that's something special.”|js}
       author="Jeff Flowers"
       authorTitle="Testnet Community Member"
       authorImg="/static/img/JeffFlowers.jpg"
