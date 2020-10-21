@@ -37,7 +37,7 @@ module GenesisMembersGrid = {
     let genesisCopy =
       style([
         unsafe("grid-area", "1 /1 / span 1 / span 2"),
-        media(Theme.MediaQuery.tablet, [width(`rem(23.))]),
+        media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
       ]);
     let sectionSubhead =
       merge([
@@ -61,22 +61,18 @@ module GenesisMembersGrid = {
         gridRowGap(`rem(1.)),
         media(
           Theme.MediaQuery.tablet,
-          [gridTemplateColumns([`rem(21.), `rem(10.), `rem(10.)])],
+          [gridTemplateColumns([`repeat((`num(3), `rem(10.)))])],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [
-            gridTemplateColumns([
-              `rem(23.),
-              `repeat((`num(5), `rem(11.))),
-            ]),
-          ],
+          [gridTemplateColumns([`repeat((`num(5), `rem(11.)))])],
         ),
       ]);
   };
   [@react.component]
   let make = () => {
-    <div className=Styles.grid>
+    <>
+      <Spacer height=3. />
       <div className=Styles.genesisCopy>
         <h2 className=Styles.genesisHeader>
           {React.string("Genesis Members")}
@@ -87,22 +83,24 @@ module GenesisMembersGrid = {
            )}
         </p>
       </div>
-      <TeamMember
-        fullName="Greg | DeFidog"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/Greg.jpg"
-      />
-      <TeamMember
-        fullName="Alexander#4542"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/Alexander.jpg"
-      />
-      <TeamMember
-        fullName="GarethDavies"
-        title="Genesis Founding Member"
-        src="/static/img/headshots/GarethDavies.jpg"
-      />
-    </div>;
+      <div className=Styles.grid>
+        <TeamMember
+          fullName="Greg | DeFidog"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/Greg.jpg"
+        />
+        <TeamMember
+          fullName="Alexander#4542"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/Alexander.jpg"
+        />
+        <TeamMember
+          fullName="GarethDavies"
+          title="Genesis Founding Member"
+          src="/static/img/headshots/GarethDavies.jpg"
+        />
+      </div>
+    </>;
   };
 };
 
