@@ -45,7 +45,7 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
-          {{- if (ne $.Values.coda.runtimeConfig "") }}
+          {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
           {{- end }}
@@ -77,7 +77,7 @@ spec:
             hostPort: {{ .Values.coordinator.hostPort }}
             protocol: TCP
         imagePullPolicy: Always
-      {{- if (ne $.Values.coda.runtimeConfig "")}}
+      {{- if $.Values.coda.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
