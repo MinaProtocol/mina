@@ -90,7 +90,7 @@ let make = () => {
         </a>
       </Next.Link>
       <Next.Link href="/media">
-        <a className=Styles.linkStyle> {React.string("Press and Media")} </a>
+        <a className=Styles.linkStyle> {React.string("Media")} </a>
       </Next.Link>
     </div>
     <div
