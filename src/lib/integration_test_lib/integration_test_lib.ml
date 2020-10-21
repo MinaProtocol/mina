@@ -129,12 +129,15 @@ module type Engine_intf = sig
     val wait_for :
          ?blocks:int
       -> ?epoch_reached:int
+      -> ?snarked_ledgers_generated:int
       -> ?timeout:[ `Slots of int
                   | `Epochs of int
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> ([> `Blocks_produced of int] * [> `Slots_passed of int])
+      -> ( [> `Blocks_produced of int]
+         * [> `Slots_passed of int]
+         * [> `Snarked_ledgers_generated of int] )
          Malleable_error.t
 
     val wait_for_sync :

@@ -79,16 +79,20 @@ let make = () => {
       <Next.Link href="">
         <a className=Styles.linkStyle> {React.string("Knowledge Base")} </a>
       </Next.Link>
-      <Next.Link href="/static/pdf/economicsWP.pdf">
-        <a className=Styles.linkStyle> {React.string("Whitepapers")} </a>
+      <Next.Link href="/static/pdf/technicalWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Technical Whitepaper")}
+        </a>
+      </Next.Link>
+      <Next.Link href="/static/pdf/economicsWhitepaper.pdf">
+        <a className=Styles.linkStyle>
+          {React.string("Economics Whitepaper")}
+        </a>
       </Next.Link>
       <Next.Link href="">
         <a className=Styles.linkStyle>
           {React.string("Incentive Structure")}
         </a>
-      </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle> {React.string("Tokenomics")} </a>
       </Next.Link>
     </div>
     <div
@@ -118,21 +122,24 @@ let make = () => {
       <h4 className=Styles.linksHeader>
         {React.string("Help and Support")}
       </h4>
-      <Next.Link href="https://discord.com/invite/Vexf4ED">
-        <a className=Styles.linkStyle> {React.string("Discord")} </a>
-      </Next.Link>
-      <Next.Link href="https://forums.minaprotocol.com/">
-        <a className=Styles.linkStyle> {React.string("Forums")} </a>
-      </Next.Link>
-      <Next.Link href="https://github.com/MinaProtocol/mina">
-        <a className=Styles.linkStyle> {React.string("Github")} </a>
-      </Next.Link>
-      <Next.Link href="https://minawiki.com/Main_Page">
-        <a className=Styles.linkStyle> {React.string("Wiki")} </a>
-      </Next.Link>
-      <Next.Link href="https://github.com/MinaProtocol/mina/issues">
-        <a className=Styles.linkStyle> {React.string("Report a Bug")} </a>
-      </Next.Link>
+      <a className=Styles.linkStyle href="https://discord.com/invite/RDQc43H">
+        {React.string("Discord")}
+      </a>
+      <a className=Styles.linkStyle href="https://forums.minaprotocol.com/">
+        {React.string("Forums")}
+      </a>
+      <a
+        className=Styles.linkStyle href="https://github.com/MinaProtocol/mina">
+        {React.string("Github")}
+      </a>
+      <a className=Styles.linkStyle href="https://minawiki.com/Main_Page">
+        {React.string("Wiki")}
+      </a>
+      <a
+        className=Styles.linkStyle
+        href="https://github.com/MinaProtocol/mina/issues">
+        {React.string("Report a Bug")}
+      </a>
     </div>
     <div />
   </div>;
