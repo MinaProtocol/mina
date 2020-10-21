@@ -1,7 +1,6 @@
 module Styles = {
   open Css;
 
-  // TODO: Fix background sizes once wrapper is merged in
   let container = (backgroundImg: Theme.backgroundImage) =>
     style([
       display(`flex),
@@ -36,10 +35,7 @@ module Styles = {
       media(Theme.MediaQuery.tablet, [height(`rem(5.5))]),
     ]);
 
-  /**
-   * This is the actual white box of the quote section
-   */
-  let quoteContainer = small =>
+  let statementContainer = small =>
     style([
       position(`relative),
       background(white),
@@ -59,7 +55,7 @@ module Styles = {
       media(Theme.MediaQuery.desktop, [width(small ? `rem(47.) : auto)]),
     ]);
 
-  let quote =
+  let statement =
     merge([
       Theme.Type.quote,
       style([fontSize(`rem(1.3)), marginBottom(`rem(1.))]),
@@ -94,9 +90,9 @@ module Styles = {
 let make = (~small=true, ~title, ~copy, ~backgroundImg: Theme.backgroundImage) => {
   <div className={Styles.container(backgroundImg)}>
     <Wrapped>
-      <div className={Styles.quoteContainer(small)}>
+      <div className={Styles.statementContainer(small)}>
         <label className=Theme.Type.pageLabel> {React.string(title)} </label>
-        <p className=Styles.quote> {React.string(copy)} </p>
+        <p className=Styles.statement> {React.string(copy)} </p>
       </div>
     </Wrapped>
   </div>;

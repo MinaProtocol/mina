@@ -62,7 +62,7 @@ let make = () => {
           FeaturedSingleRowFull.Row.rowType: ImageRightCopyLeft,
           header: None,
           title: "Our Culture",
-          description: "It's hard to quantify, but it's not hard to see: in any community, culture is everything. It's the values that drive us. It's how we see the world and how we show up. Culture is who we are and becomes what we create. testtesttest afjiowej;oiawjefoja ejfiejfijeiwoweioweieieieiefijefjiefijefjief jiefijefjifejiefjiefjifejiefjife jifejifjifeijfejifeijfeji ijfejiefijfeijfeijef",
+          description: "It's hard to quantify, but it's not hard to see: in any community, culture is everything. It's the values that drive us. It's how we see the world and how we show up. Culture is who we are and becomes what we create.",
           textColor: Theme.Colors.black,
           image: "/static/img/community-page/09_Community_4_1504x1040.jpg",
           background: Image(""),
