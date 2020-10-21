@@ -1,0 +1,8 @@
+
+(executable
+  (package network_graph)
+  (name network_graph)
+  (public_name network_graph)
+  (libraries core async)
+  (preprocess (pps ppx_jane ppx_deriving_yojson))
+  )
