@@ -72,13 +72,18 @@ end)
       let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
         [%log' debug t.logger]
-          "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
+          "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
+          ~metadata:
+            [ ( "diff"
+              , Resource_pool.Diff.verified_to_yojson
+                @@ Envelope.Incoming.data diff ) ] ;
         drop diff' rejected cb )
       else if
         Resource_pool.Diff.verified_size diff.data
         = Resource_pool.Diff.size diff'
       then (
-        [%log' trace t.logger] "Rebroadcasting diff" ;
+        [%log' trace t.logger] "Rebroadcasting diff %s"
+          (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
       else (
         [%log' trace t.logger] "Broadcasting %s"
@@ -97,9 +102,14 @@ end)
         Broadcast_callback.error e cb
 
   let process_incoming_resource_pool_diff t diff cb =
+    [%log' debug t.logger] "Verifying $diff"
+      ~metadata:
+        [("diff", Resource_pool.Diff.to_yojson @@ Envelope.Incoming.data diff)] ;
     match%bind Resource_pool.Diff.verify t.resource_pool diff with
     | Error err ->
-        [%log' info t.logger] "Refusing to rebroadcast. Verification error: %s"
+        [%log' info t.logger]
+          "Refusing to rebroadcast %s. Verification error: %s"
+          (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
           (Error.to_string_hum err) ;
         Broadcast_callback.error err cb
     | Ok verified_diff ->
