@@ -765,7 +765,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "none"
@@ -789,7 +789,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
@@ -815,7 +815,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 24
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
@@ -841,7 +841,7 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 1
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
