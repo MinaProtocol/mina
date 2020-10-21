@@ -46,14 +46,13 @@ module Timer = struct
   let reset t = stop t ; start t
 end
 
-type work = {diffs: Diff.Lite.E.t list; target_hash: Frontier_hash.t}
+type work = {diffs: Diff.Lite.E.t list}
 
 type t =
   { diff_array: Diff.Lite.E.t DynArray.t
   ; worker: Worker.t
         (* timer unfortunately needs to be mutable to break recursion *)
   ; mutable timer: Timer.t option
-  ; mutable target_hash: Frontier_hash.t
   ; mutable flush_job: unit Deferred.t option
   ; mutable closed: bool }
 
@@ -68,7 +67,7 @@ let flush t =
     let diffs = DynArray.to_list t.diff_array in
     DynArray.clear t.diff_array ;
     DynArray.compact t.diff_array ;
-    let%bind () = Worker.dispatch t.worker (diffs, t.target_hash) in
+    let%bind () = Worker.dispatch t.worker diffs in
     if should_flush t then flush_job t
     else (
       t.flush_job <- None ;
@@ -78,12 +77,11 @@ let flush t =
   if DynArray.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~time_controller ~base_hash ~worker =
+    ~time_controller ~worker =
   let t =
     { diff_array= DynArray.create ()
     ; worker
     ; timer= None
-    ; target_hash= base_hash
     ; flush_job= None
     ; closed= false }
   in
@@ -95,12 +93,9 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   t.timer <- Some timer ;
   t
 
-let write t ~diffs ~hash_transition =
-  let open Frontier_hash in
+let write t ~diffs =
   if t.closed then failwith "attempt to write to diff buffer after closed" ;
-  if not (Frontier_hash.equal t.target_hash hash_transition.source) then
-    failwith "invalid hash transition received by persistence buffer" ;
-  t.target_hash <- hash_transition.target ;
+  let (`Unprocessed diffs) = Worker.make_immediate_progress t.worker diffs in
   List.iter diffs ~f:(DynArray.add t.diff_array) ;
   if should_flush t && t.flush_job = None then flush t
   else check_for_overflow t
