@@ -10,14 +10,19 @@ module Styles = {
       position(`relative),
       important(backgroundSize(`cover)),
       background(`url(backgroundImg.mobile)),
-      padding2(~v=`rem(4.), ~h=`zero),
+      padding2(~v=`rem(6.), ~h=`zero),
       media(
         Theme.MediaQuery.tablet,
-        [background(`url(backgroundImg.tablet)), height(`percent(100.))],
+        [
+          padding2(~v=`rem(8.), ~h=`zero),
+          background(`url(backgroundImg.tablet)),
+          height(`percent(100.)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
         [
+          padding2(~v=`rem(10.), ~h=`zero),
           justifyContent(`flexEnd),
           alignContent(`spaceAround),
           background(`url(backgroundImg.desktop)),
