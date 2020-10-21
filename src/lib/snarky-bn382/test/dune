@@ -1,0 +1,3 @@
+(executable
+ (name test)
+ (libraries snarky_bn382))

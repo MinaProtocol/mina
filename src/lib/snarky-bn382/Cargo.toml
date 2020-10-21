@@ -1,0 +1,42 @@
+[package]
+name = "snarky-bn382"
+version = "0.1.0"
+authors = ["opensource@o1labs.org"]
+description = "C exports for Bn382 fields"
+repository = "https://github.com/o1-labs/zexe"
+license = "MIT/Apache-2.0"
+edition = "2018"
+
+[lib]
+name = "snarky_bn382_stubs_stubs"
+crate-type = ["staticlib"]
+
+################################# Dependencies ################################
+
+[dependencies]
+groupmap = { path = "../groupmap" }
+libc = { version = "0.2.0" }
+algebra = { path = "../algebra", features = [ "asm", "parallel", "bn_382", "tweedle" ] }
+ff-fft = { path = "../ff-fft" }
+rand = { version = "0.7" }
+num-bigint = { version = "0.2.3" }
+sprs = { version = "0.7.1" }
+rand_core = { version = "0.5" }
+rayon = { version = "1" }
+
+oracle = { path = "../../marlin/oracle" }
+dlog_solver = { path = "../../marlin/dlog_solver" }
+marlin_circuits = { path = "../../marlin/circuits/marlin" }
+plonk_circuits = { path = "../../marlin/circuits/plonk" }
+
+commitment_pairing = { path = "../../marlin/pairing/commitment" }
+marlin_protocol_pairing = { path = "../../marlin/pairing/marlin" }
+
+commitment_dlog = { path = "../../marlin/dlog/commitment" }
+marlin_protocol_dlog = { path = "../../marlin/dlog/marlin/" }
+plonk_protocol_dlog = { path = "../../marlin/dlog/plonk" }
+
+#circuits = { git = "https://github.com/o1-labs/marlin/" }
+#oracle = { git = "https://github.com/o1-labs/marlin/" }
+#protocol = { git = "https://github.com/o1-labs/marlin/" }
+#commitment = { git = "https://github.com/o1-labs/marlin/" }
