@@ -1,0 +1,20 @@
+opam-version: "1.2"
+name: "snarky_bn382"
+maintainer: "opensource@o1labs.org"
+authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+homepage: "https://github.com/o1-labs/zexe"
+bug-reports: "https://github.com/o1-labs/zexe/issues"
+dev-repo: "git+https://github.com/o1-labs/zexe.git"
+license: "MIT"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "bignum"
+  "ctypes" {>= "0.14" & < "0.15"}
+  "ctypes-foreign" {>= "0.4.0" & < "0.5.0"}
+  "dune"                {build & >= "1.6"}
+]
+descr: "
+382-bit Barreto-Naehrig curve bindings for Snarky
+"
