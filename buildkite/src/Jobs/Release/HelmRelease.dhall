@@ -23,7 +23,8 @@ Pipeline.build
       dirtyWhen = [
         S.contains "helm",
         S.strictly (S.contains "Chart.yaml"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease")
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
+        S.exactly "buildkite/scripts/helm-ci" "sh"
       ],
       path = "Release",
       name = "HelmRelease"
