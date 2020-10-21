@@ -1,4 +1,4 @@
-{{ if (ne $.Values.coda.runtimeConfig "") -}}
+{{- if $.Values.coda.runtimeConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
