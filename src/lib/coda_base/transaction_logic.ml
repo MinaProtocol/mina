@@ -1394,11 +1394,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         |> finish )
 
   let update_timing_when_no_deduction ~txn_global_slot account =
-    let open Result.Let_syntax in
-    let%map timing =
-      validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
-    in
-    timing
+    validate_timing ~txn_amount:Amount.zero ~txn_global_slot ~account
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance
       ~modify_timing =
