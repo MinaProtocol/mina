@@ -18,7 +18,7 @@ module Styles = {
       display(`grid),
       padding2(~v=rem(4.), ~h=`rem(1.25)),
       gridTemplateColumns([`rem(21.)]),
-      gridTemplateRows([`rem(40.), `rem(31.), `rem(54.)]),
+      gridTemplateRows([`rem(35.), `rem(31.), `rem(54.)]),
       gridRowGap(`rem(4.)),
       media(
         Theme.MediaQuery.tablet,
@@ -49,11 +49,17 @@ module Styles = {
   let gridItem3 =
     style([
       backgroundColor(Theme.Colors.digitalBlack),
+      height(`rem(57.)),
       padding2(~v=`rem(2.), ~h=`rem(2.)),
-      unsafe("grid-area", "3/1"),
+      unsafe("grid-area", "3"),
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`row), unsafe("grid-area", "3/1")],
+        [
+          display(`flex),
+          flexDirection(`row),
+          unsafe("grid-area", "3 / 1 / 3 / 3"),
+          height(`rem(29.)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -61,6 +67,7 @@ module Styles = {
           unsafe("grid-area", "1 / 2 / 3 / 3"),
           flexDirection(`column),
           padding2(~v=`rem(4.), ~h=`rem(3.5)),
+          height(`rem(73.4)),
         ],
       ),
     ]);
@@ -69,7 +76,7 @@ module Styles = {
     style([
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), flexDirection(`column)],
+        [display(`flex), flexDirection(`column), height(`rem(73.4))],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -153,7 +160,10 @@ module Styles = {
   let dotsImage =
     style([
       marginBottom(`rem(3.)),
-      media(Theme.MediaQuery.tablet, [marginRight(`rem(3.))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginRight(`rem(3.)), height(`rem(25.))],
+      ),
       media(
         Theme.MediaQuery.desktop,
         [marginRight(`zero), marginBottom(`zero), height(`rem(35.6))],
@@ -175,21 +185,21 @@ let make = () => {
         <Spacer height=1. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-             "The Mina network is secured by an uncapped number of block producers via inclusive proof-of-stake consensus. A uniquely decentralized blockchain, Mina gets even more secure and resilient as it grows.",
+             "The Mina network is secured by an uncapped number of block producers via proof-of-stake consensus. A uniquely decentralized blockchain, Mina gets even more secure and resilient as it grows.",
            )}
         </p>
         <Spacer height=3. />
         <div className=Styles.flexRow>
           <span className=Styles.imageColumn>
             <img src="/static/img/AboutBlockProducers.svg" />
-            <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
+            <h3 className=Theme.Type.h3> {React.string("100s")} </h3>
             <p className=Theme.Type.label>
               {React.string("Block Producers")}
             </p>
           </span>
           <span className=Styles.imageColumn>
             <img src="/static/img/AboutSnarkProducers.svg" />
-            <h3 className=Theme.Type.h3> {React.string("XXXX")} </h3>
+            <h3 className=Theme.Type.h3> {React.string("100s")} </h3>
             <p className=Theme.Type.label>
               {React.string("Snark Workers")}
             </p>
@@ -237,7 +247,7 @@ let make = () => {
             <Button
               bgColor=Theme.Colors.orange dark=true href={`Internal("/docs")}>
               {React.string("Get Started")}
-              <Icon kind=Icon.ArrowRightMedium />
+              <Icon kind=Icon.ArrowRightSmall />
             </Button>
           </span>
         </span>
