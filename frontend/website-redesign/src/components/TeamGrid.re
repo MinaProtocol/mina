@@ -65,7 +65,7 @@ let make = () => {
     />
     <TeamMember
       fullName="Bijan Shahrokhi"
-      title="Product Manager, O(1) Labs"
+      title="Head of Product, O(1) Labs"
       src="/static/img/headshots/BijanShahrokhi.jpg"
     />
     <TeamMember
