@@ -19,7 +19,13 @@ module BlockProduced = {
 
 module BlockReceived = {
   module Metadata = {
-    type t_ = {state_hash: Reflected.String.t};
+    type remote_sender = {
+      // TODO: libp2p_port: Reflected.Number.t,
+      peer_id: Reflected.String.t,
+      host: Reflected.String.t
+    };
+    type sender = {[@bs.as "Remote"] _Remote: Reflected.Struct.t(remote_sender)};
+    type t_ = {state_hash: Reflected.String.t, sender: Reflected.Struct.t(sender)};
     type t = Reflected.Struct.t(t_);
   };
   let id = "586638300e6d186ec71e4cf1e1808a1b";

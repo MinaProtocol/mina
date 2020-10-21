@@ -13,6 +13,7 @@ module ReadableStream = {
 
 /// Metadata from google logs "reflects" type information. Use these wrappers to workaround it
 module Reflected = {
+  // TODO: Number (needs to be polymorphic over int and float)
   module String = {
     type t = {
       kind: string,

@@ -1,11 +1,21 @@
 module BlockLifetime = {
   open These;
 
-  module Instant = {
+  module ProducedInstant = {
     /// When and where an event occurred
     type t = {
       time: Js.Date.t,
+      podRealName: string
+    };
+  };
+
+
+  module ReceivedInstant = {
+    type t = {
+      // could nest instant here, but looks nicer this way
+      time: Js.Date.t,
       podRealName: string,
+      sender: string
     };
   };
 
@@ -15,14 +25,14 @@ module BlockLifetime = {
       /// some instant and received at others
       type t = {
         stateHash: string,
-        produced: Instant.t,
-        received: array(Instant.t),
+        produced: ProducedInstant.t,
+        received: array(ReceivedInstant.t)
       };
     };
 
     /// A (partially) complete entry is either the instant a block was produced
     /// or a list of instants that a block was received
-    type t = These.t([ | `Produced(Instant.t)], list(Instant.t));
+    type t = These.t([ | `Produced(ProducedInstant.t)], list(ReceivedInstant.t));
 
     let render: (t, string) => option(Rendered.t) =
       (entry: t, stateHash: string) => {
@@ -56,9 +66,9 @@ module BlockLifetime = {
 
   let empty = () => Js.Dict.empty();
 
-  let produced = (t: t, ~stateHash: string, ~instant: Instant.t) => {
+  let produced = (t: t, ~stateHash: string, ~producedInstant: ProducedInstant.t) => {
     let set = Js.Dict.set(t, stateHash);
-    let x = `Produced(instant);
+    let x = `Produced(producedInstant);
     switch (Js.Dict.get(t, stateHash)) {
     | None => set(This(x))
     | Some(This(_))
@@ -71,13 +81,13 @@ module BlockLifetime = {
     };
   };
 
-  let received = (t: t, ~stateHash: string, ~instant: Instant.t) => {
+  let received = (t: t, ~stateHash: string, ~receivedInstant: ReceivedInstant.t) => {
     let set = Js.Dict.set(t, stateHash);
     switch (Js.Dict.get(t, stateHash)) {
-    | None => set(That([instant]))
-    | Some(This(x)) => set(Those(x, [instant]))
-    | Some(That(y)) => set(That([instant, ...y]))
-    | Some(Those(x, y)) => set(Those(x, [instant, ...y]))
+    | None => set(That([receivedInstant]))
+    | Some(This(x)) => set(Those(x, [receivedInstant]))
+    | Some(That(y)) => set(That([receivedInstant, ...y]))
+    | Some(Those(x, y)) => set(Those(x, [receivedInstant, ...y]))
     };
   };
 
@@ -118,32 +128,37 @@ let processLogEntry = (blockLifetimes, entry, structuredMetadata) => {
   let open CloudLogging.Entry;
   let open StructuredLogs;
 
-  let instant = BlockLifetime.Instant.{
-    time: entry.metadata.timestamp,
-    podRealName: entry.metadata.labels.k8sPodApp,
-  };
-
   switch (structuredMetadata) {
   | BlockProduced(metadata) =>
-    BlockLifetime.produced(
-      blockLifetimes,
-      ~instant,
-      ~stateHash=
-        metadata.structValue.fields.breadcrumb.structValue.
-          fields.
-          validated_transition.
-          structValue.
-          fields.
-          hash.
-          stringValue,
-    )
-  | BlockReceived(metadata) =>
-    BlockLifetime.received(
-      blockLifetimes,
-      ~instant,
-      ~stateHash=
-        metadata.structValue.fields.state_hash.stringValue,
-    )
+      let producedInstant = BlockLifetime.ProducedInstant.{
+        time: entry.metadata.timestamp,
+        podRealName: entry.metadata.labels.k8sPodApp
+      };
+      BlockLifetime.produced(
+        blockLifetimes,
+        ~producedInstant,
+        ~stateHash=
+          metadata.structValue.fields.breadcrumb.structValue.
+            fields.
+            validated_transition.
+            structValue.
+            fields.
+            hash.
+            stringValue,
+      )
+  | BlockReceived(metadata) => {
+      let receivedInstant = BlockLifetime.ReceivedInstant.{
+        time: entry.metadata.timestamp,
+        podRealName: entry.metadata.labels.k8sPodApp,
+        sender: metadata.structValue.fields.sender.structValue.fields._Remote.structValue.fields.host.stringValue
+      };
+      BlockLifetime.received(
+        blockLifetimes,
+        ~receivedInstant,
+        ~stateHash=
+          metadata.structValue.fields.state_hash.stringValue,
+      )
+    }
   };
 
   Promise.resolved(blockLifetimes)
