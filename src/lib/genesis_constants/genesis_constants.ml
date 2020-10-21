@@ -59,7 +59,7 @@ module Constraint_constants = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { c: int
+        { sub_windows_per_window: int
         ; ledger_depth: int
         ; work_delay: int
         ; block_window_duration_ms: int
@@ -84,12 +84,12 @@ module Constraint_constants = struct
         consensus_mechanism]
 
         [%%inject
-        "c", c]
+        "sub_windows_per_window", sub_windows_per_window]
 
         [%%else]
 
         (* Invalid value, this should not be used by nonconsensus nodes. *)
-        let c = -1
+        let sub_windows_per_window = -1
 
         [%%endif]
 
@@ -183,7 +183,7 @@ module Constraint_constants = struct
         [%%endif]
 
         let compiled =
-          { c
+          { sub_windows_per_window
           ; ledger_depth
           ; work_delay
           ; block_window_duration_ms
@@ -225,17 +225,35 @@ let validate_time time_str =
          %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
          UTC-08:00 timezone"
 
+module Genesis_state_timestamp = struct
+  include Time
+
+  let to_yojson (t : t) = `String (Time.to_string_abs t ~zone:Time.Zone.utc)
+
+  let of_yojson j =
+    match j with
+    | `String s ->
+        Result.map_error (validate_time (Some s)) ~f:(fun e ->
+            sprintf !"Genesis_constants.Protocol.of_yojson: %s" e )
+    | _ ->
+        Error "Genesis_state_timestamp: unexpected JSON"
+
+  let sexp_of_t t = String.sexp_of_t (Time.to_string_abs t ~zone:Time.Zone.utc)
+end
+
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('k, 'delta, 'genesis_state_timestamp) t =
-          { k: 'k
+        type ('length, 'delta, 'genesis_state_timestamp) t =
+          { k: 'length
+          ; slots_per_epoch: 'length
+          ; slots_per_sub_window: 'length
           ; delta: 'delta
           ; genesis_state_timestamp: 'genesis_state_timestamp }
-        [@@deriving eq, ord, hash, sexp, yojson, hlist]
+        [@@deriving eq, ord, hash, sexp, yojson, hlist, fields]
       end
     end]
   end
@@ -243,46 +261,12 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t = (int, int, Genesis_state_timestamp.t) Poly.Stable.V1.t
+      [@@deriving eq, ord, hash, yojson, sexp_of]
 
       let to_latest = Fn.id
 
-      let to_yojson (t : t) =
-        `Assoc
-          [ ("k", `Int t.k)
-          ; ("delta", `Int t.delta)
-          ; ( "genesis_state_timestamp"
-            , `String
-                (Time.to_string_abs t.genesis_state_timestamp
-                   ~zone:Time.Zone.utc) ) ]
-
-      let of_yojson = function
-        | `Assoc
-            [ ("k", `Int k)
-            ; ("delta", `Int delta)
-            ; ("genesis_state_timestamp", `String time_str) ] -> (
-          match validate_time time_str with
-          | Ok genesis_state_timestamp ->
-              Ok {Poly.k; delta; genesis_state_timestamp}
-          | Error e ->
-              Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
-        | _ ->
-            Error "Genesis_constants.Protocol.of_yojson: unexpected JSON"
-
       let t_of_sexp _ = failwith "t_of_sexp: not implemented"
-
-      let sexp_of_t (t : t) =
-        let module T = struct
-          type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
-        end in
-        let t' : T.t =
-          { k= t.k
-          ; delta= t.delta
-          ; genesis_state_timestamp=
-              Time.to_string_abs t.genesis_state_timestamp ~zone:Time.Zone.utc
-          }
-        in
-        T.sexp_of_t t'
     end
 
     module Tests = struct
@@ -290,6 +274,8 @@ module Protocol = struct
         let t : V1.t =
           { k= 1
           ; delta= 100
+          ; slots_per_sub_window= 10
+          ; slots_per_epoch= 1000
           ; genesis_state_timestamp=
               Time.of_string "2019-10-08 17:51:23.050849Z" }
         in
@@ -313,6 +299,7 @@ module T = struct
   let hash (t : t) =
     let str =
       ( List.map
+          (* TODO: *)
           [t.protocol.k; t.protocol.delta; t.txpool_max_size]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
@@ -331,6 +318,12 @@ include T
 "k", k]
 
 [%%inject
+"slots_per_epoch", slots_per_epoch]
+
+[%%inject
+"slots_per_sub_window", slots_per_sub_window]
+
+[%%inject
 "delta", delta]
 
 [%%inject
@@ -339,6 +332,8 @@ include T
 let compiled : t =
   { protocol=
       { k
+      ; slots_per_epoch
+      ; slots_per_sub_window
       ; delta
       ; genesis_state_timestamp=
           genesis_timestamp_of_string genesis_state_timestamp_string }
