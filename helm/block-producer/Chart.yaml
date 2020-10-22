@@ -10,6 +10,8 @@ keywords:
 - block-producer
 - stake
 - delegate
+- mina
+- testnet
 home: https://codaprotocol.com/
 sources:
 - https://github.com/CodaProtocol/coda/tree/develop/src/lib/block_producer
