@@ -186,13 +186,13 @@ let make = (~posts) => {
       <div className=Style.background>
         <FeaturedSingleRowFull
           row=FeaturedSingleRowFull.Row.{
+            FeaturedSingleRowFull.Row.rowType: ImageLeftCopyRight,
             header:
               Some({
                 kind: "Blog",
                 author: featured.ContentType.BlogPost.author,
                 date: featured.ContentType.BlogPost.date,
               }),
-
             title: featured.ContentType.BlogPost.title,
             description: featured.snippet,
             textColor: Theme.Colors.white,
