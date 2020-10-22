@@ -28,21 +28,18 @@ let next = T.succ
 
 let invalid = T.of_uint64 Unsigned.UInt64.zero
 
-module Binable_arg = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
 [%%if
 feature_tokens]
 
-include Binable_arg
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = Unsigned_extended.UInt64.Stable.V1.t
+    [@@deriving sexp, eq, compare, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+end]
 
 [%%else]
 
@@ -56,7 +53,7 @@ module Stable = struct
     [@@deriving sexp, eq, compare, hash, yojson]
 
     include Binable.Of_binable
-              (Binable_arg.Stable.V1)
+              (T.Stable.V1)
               (struct
                 type nonrec t = t
 
