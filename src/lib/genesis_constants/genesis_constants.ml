@@ -225,22 +225,6 @@ let validate_time time_str =
          %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
          UTC-08:00 timezone"
 
-module Genesis_state_timestamp = struct
-  include Time
-
-  let to_yojson (t : t) = `String (Time.to_string_abs t ~zone:Time.Zone.utc)
-
-  let of_yojson j =
-    match j with
-    | `String s ->
-        Result.map_error (validate_time (Some s)) ~f:(fun e ->
-            sprintf !"Genesis_constants.Protocol.of_yojson: %s" e )
-    | _ ->
-        Error "Genesis_state_timestamp: unexpected JSON"
-
-  let sexp_of_t t = String.sexp_of_t (Time.to_string_abs t ~zone:Time.Zone.utc)
-end
-
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
   module Poly = struct
@@ -261,12 +245,57 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Genesis_state_timestamp.t) Poly.Stable.V1.t
-      [@@deriving eq, ord, hash, yojson, sexp_of]
+      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
 
       let to_latest = Fn.id
 
+      let to_yojson (t : t) =
+        `Assoc
+          [ ("k", `Int t.k)
+          ; ("slots_per_epoch", `Int t.slots_per_epoch)
+          ; ("slots_per_sub_window", `Int t.slots_per_sub_window)
+          ; ("delta", `Int t.delta)
+          ; ( "genesis_state_timestamp"
+            , `String
+                (Time.to_string_abs t.genesis_state_timestamp
+                   ~zone:Time.Zone.utc) ) ]
+
+      let of_yojson = function
+        | `Assoc
+            [ ("k", `Int k)
+            ; ("slots_per_epoch", `Int slots_per_epoch)
+            ; ("slots_per_sub_window", `Int slots_per_sub_window)
+            ; ("delta", `Int delta)
+            ; ("genesis_state_timestamp", `String time_str) ] -> (
+          match validate_time time_str with
+          | Ok genesis_state_timestamp ->
+              Ok
+                { Poly.k
+                ; slots_per_epoch
+                ; slots_per_sub_window
+                ; delta
+                ; genesis_state_timestamp }
+          | Error e ->
+              Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
+        | _ ->
+            Error "Genesis_constants.Protocol.of_yojson: unexpected JSON"
+
       let t_of_sexp _ = failwith "t_of_sexp: not implemented"
+
+      let sexp_of_t (t : t) =
+        let module T = struct
+          type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
+        end in
+        let t' : T.t =
+          { k= t.k
+          ; delta= t.delta
+          ; slots_per_epoch= t.slots_per_epoch
+          ; slots_per_sub_window= t.slots_per_sub_window
+          ; genesis_state_timestamp=
+              Time.to_string_abs t.genesis_state_timestamp ~zone:Time.Zone.utc
+          }
+        in
+        T.sexp_of_t t'
     end
 
     module Tests = struct
