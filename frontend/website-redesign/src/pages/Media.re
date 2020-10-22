@@ -17,7 +17,13 @@ let make = () => {
       }>
       <Spacer height=1.5 />
       <Button
-        href=`Scroll_to_top bgColor=Theme.Colors.black width={`rem(14.)}>
+        href={
+               `External(
+                 "https://drive.google.com/file/d/177Xzj6Rqd9UnYwzRzMRLPKoyows-iwKx/view?usp=sharing",
+               )
+             }
+        bgColor=Theme.Colors.black
+        width={`rem(14.)}>
         {React.string("Download Media Kit")}
         <Icon kind=Icon.ArrowRightMedium size=1. />
       </Button>

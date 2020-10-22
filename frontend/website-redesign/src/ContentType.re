@@ -17,11 +17,26 @@ module System = {
     updatedAt: string,
   };
 
+  type includes;
+
   type entry('a) = {
     sys,
     fields: 'a,
+    includes,
   };
-  type entries('a) = {items: array(entry('a))};
+  type entries('a) = {
+    items: array(entry('a)),
+    includes,
+  };
+};
+
+module Link = {
+  type t = {
+    linkType: string,
+    id: string,
+  };
+
+  type entry = {sys: t};
 };
 
 module Image = {
@@ -75,17 +90,25 @@ module JobPost = {
   type entries = System.entries(t);
 };
 
-module KnowledgeBase = {
-  let id = "knowledgeBase";
-  type link = {
+module KnowledgeBaseResource = {
+  let id = "knowledgeeBaseResource";
+  type t = {
     title: string,
     url: string,
+    image: Image.entry,
   };
-  type links = {
-    articles: array(link),
-    videos: array(link),
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+  [@bs.get]
+  external getImages: System.includes => array(Image.entry) = "Asset";
+};
+
+module KnowledgeBaseCategory = {
+  let id = "knowledgeBaseCategory";
+  type t = {
+    title: string,
+    resources: array(KnowledgeBaseResource.entry),
   };
-  type t = {links};
   type entry = System.entry(t);
   type entries = System.entries(t);
 };

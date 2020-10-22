@@ -1,5 +1,4 @@
 open Core_kernel
-open Pickles_types
 
 type ('var, 'value, 'n1, 'n2) tag = ('var * 'value * 'n1 * 'n2) Type_equal.Id.t
 
