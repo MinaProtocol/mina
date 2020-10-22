@@ -64,7 +64,8 @@ if [ -n "$charts" ]; then
       fi
     done
 
-    cp --force --recursive "${stageDir}" "${syncDir}"
+    echo "--- Syncing staging and release dirs"
+    cp --force --recursive --verbose ${stageDir}/* ${syncDir}/
 
     helm repo index $syncDir
 
