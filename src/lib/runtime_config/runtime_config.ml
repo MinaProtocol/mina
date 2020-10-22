@@ -277,7 +277,7 @@ module Json_layout = struct
 
     let fields =
       [| "level"
-       ; "c"
+       ; "sub_windows_per_window"
        ; "ledger_depth"
        ; "work_delay"
        ; "block_window_duration_ms"
@@ -338,7 +338,7 @@ end
   , "genesis": { "k": 1, "delta": 1 }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 14
       , "work_delay": 2
       , "block_window_duration_ms": 180000
@@ -793,7 +793,7 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "none"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 1500
@@ -817,7 +817,7 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 15000
@@ -843,7 +843,7 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 30
       , "work_delay": 1
       , "block_window_duration_ms": 10000
@@ -869,7 +869,7 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 6
       , "work_delay": 1
       , "block_window_duration_ms": 5000

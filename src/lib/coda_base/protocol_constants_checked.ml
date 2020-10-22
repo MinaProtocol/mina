@@ -63,18 +63,29 @@ end
 type value = Value.t
 
 let value_of_t (t : Genesis_constants.Protocol.t) : value =
+  (*
+  Core.printf "value_of_t:\n input timestamp:%s\n output timestamp: %s\n%!"
+    (Time.to_span_since_epoch
+       t.genesis_state_timestamp
+    |> Time.Span.to_string)
+    (Block_time.to_string 
+       (Block_time.of_time t.genesis_state_timestamp) ) ; *)
   { k= T.of_int t.k
   ; delta= T.of_int t.delta
   ; slots_per_epoch= T.of_int t.slots_per_epoch
   ; slots_per_sub_window= T.of_int t.slots_per_sub_window
-  ; genesis_state_timestamp= Block_time.of_time t.genesis_state_timestamp }
+  ; genesis_state_timestamp= Block_time.of_int64 t.genesis_state_timestamp }
 
 let t_of_value (v : value) : Genesis_constants.Protocol.t =
+  Core.printf "t_of_value:\n input timestamp:%s\n output timestamp: %s\n%!"
+    (Block_time.to_string v.genesis_state_timestamp)
+    ( Time.to_span_since_epoch (Block_time.to_time v.genesis_state_timestamp)
+    |> Time.Span.to_string ) ;
   { k= T.to_int v.k
   ; delta= T.to_int v.delta
   ; slots_per_epoch= T.to_int v.slots_per_epoch
   ; slots_per_sub_window= T.to_int v.slots_per_sub_window
-  ; genesis_state_timestamp= Block_time.to_time v.genesis_state_timestamp }
+  ; genesis_state_timestamp= Block_time.to_int64 v.genesis_state_timestamp }
 
 let to_input (t : value) =
   Random_oracle.Input.bitstrings
