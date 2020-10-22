@@ -2,7 +2,7 @@
   (inline_tests)
   (name pickles)
   (public_name pickles)
-  (flags -warn-error -27)
+ (flags -warn-error -22+34+33+27)
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx bisect_ppx -- --conditional))
   (libraries
     digestif
@@ -11,7 +11,8 @@
     pickles_base
     pickles.composition_types
     pickles.limb_vector
-    pickles.marlin_checks
+    pickles.plonk_checks
+    pickles.precomputed
     pickles.one_hot_vector
     pickles.pseudo
     snarky_log
