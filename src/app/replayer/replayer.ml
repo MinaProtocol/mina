@@ -8,40 +8,40 @@ open Coda_base
 
    target state hash  = protocol state hash in B
    target proof       = blockchain SNARK proof of the protocol state in B
-   target ledger hash = expected Merkle root of the staged ledger in B
 *)
 type input =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
-  ; target_ledger_hash: Ledger_hash.t
-  ; genesis_ledger: Account.t list }
+  ; genesis_ledger: Runtime_config.Ledger.t }
 [@@deriving yojson]
 
 type output =
   { target_state_hash: State_hash.t
   ; target_proof: Proof.t
-  ; target_ledger: Account.t list }
+  ; target_ledger: Runtime_config.Ledger.t }
 [@@deriving yojson]
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-let create_ledger accounts =
-  let open Coda_base in
-  let depth = constraint_constants.ledger_depth in
-  let ledger = Ledger.create_ephemeral ~depth () in
-  List.iter accounts ~f:(fun acct ->
-      let pk = Account.public_key acct in
-      let token_id = Account.token acct in
-      let acct_id = Account_id.create pk token_id in
-      Ledger.create_new_account_exn ledger acct_id acct ) ;
-  ledger
+let proof_level = Genesis_constants.Proof_level.Full
 
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
-let create_output target_state_hash target_proof ledger =
-  let target_ledger = Ledger.to_list ledger in
+let create_output target_state_hash target_proof ledger
+    (input_genesis_ledger : Runtime_config.Ledger.t) =
+  let ledger_as_list =
+    List.map (Ledger.to_list ledger) ~f:(fun acc ->
+        Genesis_ledger_helper.Accounts.Single.of_account acc None )
+  in
+  let target_ledger =
+    {input_genesis_ledger with base= Accounts ledger_as_list}
+  in
   {target_state_hash; target_proof; target_ledger}
+
+(* map from global slots to expected ledger hashes *)
+let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
+  Int64.Table.create ()
 
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
@@ -314,31 +314,68 @@ let main ~input_file ~output_file ~archive_uri () =
   let archive_uri = Uri.of_string archive_uri in
   match Caqti_async.connect_pool ~max_size:128 archive_uri with
   | Error e ->
-      [%log error]
+      [%log fatal]
         ~metadata:[("error", `String (Caqti_error.show e))]
         "Failed to create a Caqti pool for Postgresql" ;
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti pool for Postgresql" ;
-      let ledger = create_ledger input.genesis_ledger in
+      (* load from runtime config in same way as daemon
+         except that we don't consider loading from a tar file
+      *)
+      let%bind padded_accounts =
+        match
+          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
+            ~logger ~proof_level input.genesis_ledger
+        with
+        | None ->
+            [%log fatal]
+              "Could not load accounts from input runtime genesis ledger" ;
+            exit 1
+        | Some accounts ->
+            return accounts
+      in
+      let packed_ledger =
+        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+          ~depth:constraint_constants.ledger_depth padded_accounts
+      in
+      let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let state_hash =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
-      [%log info] "Loading global slots" ;
-      let%bind global_slots =
+      [%log info] "Loading block information" ;
+      let%bind block_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.Global_slots.run db state_hash)
+            (fun db -> Sql.Block_info.run db state_hash)
             pool
         with
-        | Ok slots ->
-            return (Int64.Set.of_list slots)
+        | Ok block_info ->
+            let ids =
+              List.map block_info ~f:(fun (id, _global_slot, _hash) -> id)
+            in
+            (* build mapping from global slots to ledger hashes *)
+            List.iter block_info ~f:(fun (_id, global_slot, hash) ->
+                Hashtbl.add_exn global_slot_ledger_hash_tbl ~key:global_slot
+                  ~data:(Ledger_hash.of_string hash) ) ;
+            return (Int.Set.of_list ids)
         | Error msg ->
-            [%log error] "Error getting global slots"
+            [%log error] "Error getting block information"
               ~metadata:[("error", `String (Caqti_error.show msg))] ;
             exit 1
       in
+      (* check that genesis block is in chain to target hash
+         assumption: genesis block occupies global slot 0
+      *)
+      if Int64.Table.mem global_slot_ledger_hash_tbl Int64.zero then
+        [%log info]
+          "Block chain leading to target state hash includes genesis block"
+      else (
+        [%log fatal]
+          "Block chain leading to target state hash does not include genesis \
+           block" ;
+        Core_kernel.exit 1 ) ;
       [%log info] "Loading user command ids" ;
       let%bind user_cmd_ids =
         match%bind
@@ -392,7 +429,7 @@ let main ~input_file ~output_file ~archive_uri () =
       (* filter out internal commands in blocks not along chain from target state hash *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int64.Set.mem global_slots cmd.global_slot )
+            Int.Set.mem block_ids cmd.block_id )
       in
       let sorted_internal_cmds =
         List.sort filtered_internal_cmds ~compare:(fun ic1 ic2 ->
@@ -425,7 +462,7 @@ let main ~input_file ~output_file ~archive_uri () =
       (* filter out user commands in blocks not along chain from target state hash *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int64.Set.mem global_slots cmd.global_slot )
+            Int.Set.mem block_ids cmd.block_id )
       in
       let sorted_user_cmds =
         List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
@@ -434,14 +471,37 @@ let main ~input_file ~output_file ~archive_uri () =
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      [%log info] "Applying %d user commands and %d internal commands"
+        (List.length sorted_user_cmds)
+        (List.length sorted_internal_cmds) ;
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot =
-        let log_on_slot_change curr_global_slot =
-          if Int64.( > ) curr_global_slot last_global_slot then
-            [%log info] "Applied all commands at global slot %Ld, ledger hash"
+        let log_ledger_hash_after_last_slot () =
+          let expected_ledger_hash =
+            Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
+          in
+          if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
+          then
+            [%log info]
+              "Applied all commands at global slot %Ld, got expected ledger \
+               hash"
               ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)]
               last_global_slot
+          else (
+            [%log error]
+              "Applied all commands at global slot %Ld, ledger hash differs \
+               from expected ledger hash"
+              ~metadata:
+                [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
+                ; ( "expected_ledger_hash"
+                  , Ledger_hash.to_yojson expected_ledger_hash ) ]
+              last_global_slot ;
+            Core_kernel.exit 1 )
+        in
+        let log_on_slot_change curr_global_slot =
+          if Int64.( > ) curr_global_slot last_global_slot then
+            log_ledger_hash_after_last_slot ()
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -474,6 +534,7 @@ let main ~input_file ~output_file ~archive_uri () =
         in
         match (internal_cmds, user_cmds) with
         | [], [] ->
+            log_ledger_hash_after_last_slot () ;
             Deferred.unit
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot ;
@@ -499,26 +560,11 @@ let main ~input_file ~output_file ~archive_uri () =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot:0L
       in
-      let target_ledger_json =
-        Ledger_hash.to_yojson input.target_ledger_hash
-      in
-      if Ledger_hash.equal input.target_ledger_hash (Ledger.merkle_root ledger)
-      then
-        [%log info]
-          "After applying all commands, ledger hash equals target ledger hash"
-          ~metadata:[("ledger_hash", target_ledger_json)]
-      else (
-        [%log error]
-          "After applying all commands, ledger hash differs from target \
-           ledger hash"
-          ~metadata:
-            [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-            ; ("target_ledger_hash", target_ledger_json) ] ;
-        Core_kernel.exit 1 ) ;
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =
         create_output input.target_state_hash input.target_proof ledger
+          input.genesis_ledger
         |> output_to_yojson |> Yojson.Safe.to_string
       in
       let%map writer = Async_unix.Writer.open_file output_file in

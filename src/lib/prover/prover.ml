@@ -89,9 +89,17 @@ module Worker_state = struct
          match proof_level with
          | Genesis_constants.Proof_level.Full ->
              ( module struct
-               module T = Transaction_snark.Make ()
+               module T = Transaction_snark.Make (struct
+                 let constraint_constants = constraint_constants
+               end)
 
-               module B = Blockchain_snark.Blockchain_snark_state.Make (T)
+               module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+                 let tag = T.tag
+
+                 let constraint_constants = constraint_constants
+
+                 let proof_level = proof_level
+               end)
 
                let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
 

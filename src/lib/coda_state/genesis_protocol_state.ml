@@ -23,7 +23,10 @@ let t ~genesis_ledger ~constraint_constants ~consensus_constants =
   let state =
     Protocol_state.create_value
       ~genesis_state_hash:negative_one_protocol_state_hash
-      ~previous_state_hash:negative_one_protocol_state_hash
+      ~previous_state_hash:
+        (Option.value_map constraint_constants.fork
+           ~default:negative_one_protocol_state_hash
+           ~f:(fun {previous_state_hash; _} -> previous_state_hash))
       ~blockchain_state:
         (Blockchain_state.genesis ~constraint_constants ~genesis_ledger_hash
            ~snarked_next_available_token)

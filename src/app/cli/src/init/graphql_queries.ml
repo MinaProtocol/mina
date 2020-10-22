@@ -280,3 +280,9 @@ query next_available_token {
   nextAvailableToken @bsDecoder(fn: "Decoders.token")
 }
 |}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
+}
+|}]

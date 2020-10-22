@@ -13,7 +13,11 @@ module Styles = {
         dark
           ? backgroundColor(black)
           : backgroundImage(`url("/static/img/AnnouncementBanner.png")),
-        padding2(~v=`rem(0.5), ~h=`rem(0.5)),
+        padding2(~v=`rem(0.5), ~h=`rem(1.5)),
+        media(
+          Theme.MediaQuery.tablet,
+          [padding2(~v=`rem(0.5), ~h=`rem(2.5))],
+        ),
       ]),
     ]);
 
@@ -35,7 +39,7 @@ module Styles = {
   let changeRegionSection =
     merge([flexCenter, style([paddingRight(`rem(1.))])]);
 
-  let announcementText = style([paddingLeft(`rem(2.))]);
+  let announcementText = style([]);
 
   let link =
     merge([

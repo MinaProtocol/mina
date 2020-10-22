@@ -11,19 +11,17 @@ module type Base_ledger_intf =
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
-module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) : sig
+module Make
+    (Source : Base_ledger_intf)
+    (Dest : Base_ledger_intf with type Addr.t = Source.Addr.t) : sig
   val transfer_accounts : src:Source.t -> dest:Dest.t -> Dest.t Or_error.t
 end = struct
   let transfer_accounts ~src ~dest =
-    let sorted =
+    let accounts =
       Source.foldi src ~init:[] ~f:(fun addr acc account ->
           (addr, account) :: acc )
-      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-             Source.Addr.compare addr1 addr2 )
     in
-    List.iter sorted ~f:(fun (_addr, account) ->
-        let key = Account.identifier account in
-        ignore (Dest.get_or_create_account_exn dest key account) ) ;
+    Dest.set_batch_accounts dest accounts ;
     let src_hash = Source.merkle_root src in
     let dest_hash = Dest.merkle_root dest in
     if not (Ledger_hash.equal src_hash dest_hash) then

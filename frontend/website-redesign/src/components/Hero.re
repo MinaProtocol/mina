@@ -58,12 +58,11 @@ module Styles = {
       style([
         backgroundColor(white),
         marginRight(`rem(1.)),
-        fontSize(`rem(1.5)),
         padding2(~v=`rem(1.3), ~h=`rem(1.3)),
         unsafe("width", "max-content"),
         media(
           Theme.MediaQuery.desktop,
-          [padding2(~v=`rem(1.5), ~h=`rem(1.5)), maxWidth(`rem(46.25))],
+          [padding2(~v=`rem(1.5), ~h=`rem(1.5))],
         ),
         marginTop(`rem(1.)),
         marginBottom(`rem(1.5)),
@@ -78,7 +77,7 @@ module Styles = {
         marginRight(`rem(1.)),
         marginTop(`zero),
         marginBottom(`zero),
-        maxWidth(`rem(19.)),
+        width(`percent(100.)),
         media(Theme.MediaQuery.tablet, [maxWidth(`rem(40.))]),
       ]),
     ]);
@@ -99,7 +98,7 @@ module Styles = {
 [@react.component]
 let make =
     (
-      ~title,
+      ~title=?,
       ~metadata=None,
       ~header,
       ~copy,
@@ -108,7 +107,12 @@ let make =
     ) => {
   <div className={Styles.heroContainer(background)}>
     <div className=Styles.heroContent>
-      <h4 className=Styles.headerLabel> {React.string(title)} </h4>
+      {switch (title) {
+       | Some(title) =>
+         <h4 className=Styles.headerLabel> {React.string(title)} </h4>
+
+       | None => React.null
+       }}
       {ReactExt.fromOpt(metadata, ~f=metadata =>
          <div className=Styles.categoryDateSourceContainer>
            <CategoryDateSourceText metadata />

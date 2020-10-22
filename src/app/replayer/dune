@@ -11,6 +11,7 @@
     coda_base
     coda_state
     genesis_constants
+    genesis_ledger_helper
     yojson
   )
   (preprocessor_deps ../../config.mlh)

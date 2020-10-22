@@ -4,8 +4,9 @@ module Styles = {
     style([
       display(`inlineFlex),
       alignItems(`center),
-      marginTop(`px(4)),
-      marginLeft(`rem(0.5)),
+      justifyContent(`spaceBetween),
+      margin2(~h=`rem(0.2), ~v=`rem(0.2)),
+      width(`percent(100.)),
     ]);
 
   let container = {
@@ -20,19 +21,6 @@ module Styles = {
         borderRadius(`px(4)),
         padding(`px(5)),
         cursor(`pointer),
-        after([
-          // Render triangle icon at the end of the dropdown
-          unsafe("content", ""),
-          position(`absolute),
-          width(`zero),
-          height(`zero),
-          borderLeft(`px(7), `solid, Theme.Colors.digitalBlack),
-          borderRight(`px(7), `solid, Theme.Colors.digitalBlack),
-          borderTop(`px(7), `solid, Theme.Colors.digitalBlack),
-          borderRadius(`px(1)),
-          right(`px(15)),
-          top(`percent(40.)),
-        ]),
       ]),
     ]);
   };
@@ -84,7 +72,8 @@ let make = (~items, ~currentItem, ~onItemPress) => {
 
   <div className=Styles.container onClick={_ => {toggleMenu(_ => !menuOpen)}}>
     <span className=Styles.currentItemTitle>
-      {React.string(currentItem)}
+      <span> {React.string(currentItem)} </span>
+      <Icon kind=Icon.ChevronDown />
     </span>
     <ul
       className={menuOpen ? Styles.expandedDropdown : Styles.collapsedDropdown}>

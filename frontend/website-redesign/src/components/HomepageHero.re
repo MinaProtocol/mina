@@ -7,26 +7,31 @@ module Styles = {
       position(`relative),
       important(backgroundSize(`cover)),
       backgroundImage(`url(backgroundImg)),
-      media(Theme.MediaQuery.tablet, [height(`auto)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          height(`auto),
+          after([
+            contentRule(""),
+            position(`absolute),
+            bottom(`zero),
+            left(`zero),
+            right(`zero),
+            height(`rem(20.)),
+            background(
+              linearGradient(
+                deg(0.),
+                [
+                  (`percent(0.), white),
+                  (`percent(100.), rgba(255, 255, 255, 0.)),
+                ],
+              ),
+            ),
+          ]),
+        ],
+      ),
       media(Theme.MediaQuery.desktop, [height(`rem(120.))]),
       position(`relative),
-      after([
-        contentRule(""),
-        position(`absolute),
-        bottom(`zero),
-        left(`zero),
-        right(`zero),
-        height(`rem(20.)),
-        background(
-          linearGradient(
-            deg(0.),
-            [
-              (`percent(0.), white),
-              (`percent(100.), rgba(255, 255, 255, 0.)),
-            ],
-          ),
-        ),
-      ]),
     ]);
 
   let container =
@@ -42,7 +47,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
-      alignItems(`center),
       marginBottom(`rem(12.)),
       media(Theme.MediaQuery.tablet, [marginTop(`rem(12.))]),
       media(Theme.MediaQuery.desktop, [flexDirection(`row)]),
@@ -59,6 +63,9 @@ module Styles = {
     merge([
       Theme.Type.h1jumbo,
       style([
+        fontSize(`rem(4.6)),
+        important(fontWeight(`num(100))),
+        lineHeight(`rem(5.)),
         position(`absolute),
         display(`flex),
         justifyContent(`center),
@@ -103,12 +110,7 @@ module Styles = {
 
   let heroButton = style([marginTop(`rem(2.))]);
 
-  let buttonIcon =
-    style([
-      height(`rem(1.5)),
-      marginLeft(`rem(0.5)),
-      color(Theme.Colors.orange),
-    ]);
+  let buttonIcon = style([height(`rem(1.5)), color(Theme.Colors.orange)]);
 
   let heroText =
     merge([
@@ -125,15 +127,9 @@ module Styles = {
       justifySelf(`flexStart),
       alignSelf(`flexStart),
       width(`percent(100.)),
-      height(`percent(100.)),
       media(
         Theme.MediaQuery.tablet,
-        [
-          justifySelf(`center),
-          alignSelf(`center),
-          height(`rem(12.)),
-          width(`rem(34.)),
-        ],
+        [height(`rem(12.)), width(`rem(34.))],
       ),
     ]);
 };
@@ -164,10 +160,10 @@ let make = (~backgroundImg) => {
                 href={`Internal("/tech")}
                 bgColor=Theme.Colors.white
                 paddingX=1.
-                width={`rem(13.5)}>
+                width={`rem(13.)}>
                 <span> {React.string("See Behind The Tech")} </span>
                 <span className=Styles.buttonIcon>
-                  <Icon kind=Icon.ArrowRightMedium />
+                  <Icon kind=Icon.ArrowRightSmall />
                 </span>
               </Button>
             </span>

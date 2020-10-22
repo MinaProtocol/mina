@@ -29,7 +29,9 @@ module Config = struct
     ; unsafe_no_trust_ip: bool
     ; isolate: bool
     ; trust_system: Trust_system.t
-    ; gossip_type: [`Gossipsub | `Flood | `Random]
+    ; flooding: bool
+    ; direct_peers: Coda_net2.Multiaddr.t list
+    ; peer_exchange: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -54,7 +56,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          ( Message.msg Envelope.Incoming.t
+          * (Coda_net2.validation_result -> unit) )
           Strict_pipe.Reader.t
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
@@ -142,7 +145,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
                          (Option.value_exn config.addrs_and_ports.peer)
                            .libp2p_port) ]
-                ~gossip_type:config.gossip_type
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
@@ -153,6 +155,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:config.initial_peers
+                ~direct_peers:config.direct_peers
+                ~peer_exchange:config.peer_exchange ~flooding:config.flooding
                 ~initial_gating_config:
                   Coda_net2.
                     { banned_peers=
@@ -270,7 +274,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Deferred.return true
+                      Deferred.return `Accept
                   | Remote sender ->
                       if not (Peer.Id.equal sender.peer_id my_peer_id) then
                         let valid_ivar = Ivar.create () in
@@ -278,7 +282,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           (Strict_pipe.Writer.write message_writer
                              (envelope, Ivar.fill valid_ivar))
                           ~f:(fun () -> Ivar.read valid_ivar)
-                      else Deferred.return true )
+                      else Deferred.return `Accept )
                 ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call

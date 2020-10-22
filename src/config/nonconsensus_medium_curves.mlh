@@ -29,3 +29,4 @@
 [%%define test_full_epoch false]
 
 [%%undef consensus_mechanism]
+[%%import "/src/config/fork.mlh"]

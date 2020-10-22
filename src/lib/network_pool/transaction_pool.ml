@@ -715,6 +715,10 @@ struct
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
 
+      let size = List.length
+
+      let verified_size = List.length
+
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
 
@@ -742,43 +746,68 @@ struct
         else Deferred.return ()
 
       (* Transaction verification currently happens in apply. In the future we could batch it. *)
-      let verify (t : pool) (d : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t option Deferred.t =
-        match
-          Option.try_with (fun () ->
-              let open Base_ledger in
-              let ledger = Option.value_exn t.best_tip_ledger in
-              Envelope.Incoming.map d
-                ~f:
-                  (List.map
-                     ~f:
-                       (User_command.to_verifiable_exn ~ledger ~get
-                          ~location_of_account)) )
-        with
-        | None ->
-            Deferred.return None
-        | Some v -> (
-            let open Deferred.Let_syntax in
-            match%bind Batcher.verify t.batcher v with
-            | Error e ->
-                (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                let%map () = log_and_punish ~punish:false t d e in
-                None
-            | Ok (Ok valid) ->
-                Deferred.return
-                  (Some {Envelope.Incoming.sender= d.sender; data= valid})
-            | Ok (Error ()) ->
-                let trust_record =
-                  Trust_system.record_envelope_sender t.config.trust_system
-                    t.logger d.sender
-                in
-                let%map () =
-                  (* that's an insta-ban *)
-                  trust_record
-                    ( Trust_system.Actions.Sent_invalid_signature
-                    , Some ("diff was: $diff", [("diff", to_yojson d.data)]) )
-                in
-                None )
+      let verify (t : pool) (diffs : t Envelope.Incoming.t) :
+          verified Envelope.Incoming.t Deferred.Or_error.t =
+        let open Deferred.Let_syntax in
+        let sender = Envelope.Incoming.sender diffs in
+        let diffs_are_valid =
+          List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
+              let is_valid = not (User_command.has_insufficient_fee cmd) in
+              if not is_valid then
+                [%log' debug t.logger]
+                  "Filtering user command with insufficient fee from \
+                   transaction-pool diff $cmd from $sender"
+                  ~metadata:
+                    [ ("cmd", User_command.to_yojson cmd)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
+                    ] ;
+              is_valid )
+        in
+        if not diffs_are_valid then
+          Deferred.Or_error.error_string
+            "at least one user command had an insufficient fee"
+        else
+          match t.best_tip_ledger with
+          | None ->
+              Deferred.Or_error.error_string
+                "We don't have a transition frontier at the moment, so we're \
+                 unable to verify any transactions."
+          | Some ledger -> (
+              let diffs' =
+                Envelope.Incoming.map diffs
+                  ~f:
+                    (List.map
+                       ~f:
+                         (User_command.to_verifiable_exn ~ledger
+                            ~get:Base_ledger.get
+                            ~location_of_account:
+                              Base_ledger.location_of_account))
+              in
+              match%bind Batcher.verify t.batcher diffs' with
+              | Error e ->
+                  (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                  let%map () = log_and_punish ~punish:false t diffs e in
+                  Error e
+              | Ok (Ok valid) ->
+                  Deferred.Or_error.return
+                    (Envelope.Incoming.wrap ~data:valid ~sender)
+              | Ok (Error ()) ->
+                  let trust_record =
+                    Trust_system.record_envelope_sender t.config.trust_system
+                      t.logger sender
+                  in
+                  let%map () =
+                    (* that's an insta-ban *)
+                    trust_record
+                      ( Trust_system.Actions.Sent_invalid_signature
+                      , Some
+                          ( "diff was: $diff"
+                          , [("diff", to_yojson (Envelope.Incoming.data diffs))]
+                          ) )
+                  in
+                  Or_error.error_string
+                    "at least one user command had an invalid signature" )
 
       let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in
@@ -1061,8 +1090,12 @@ struct
             in
             go txs t.pool ([], [])
 
-      let unsafe_apply t env =
-        match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
+      let unsafe_apply t diff =
+        match%map apply t diff with
+        | Ok e ->
+            Ok e
+        | Error e ->
+            Error (`Other e)
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1292,7 +1325,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys))
-              ~max_amount:100_000_000_000 ~max_fee:10_000_000_000 ()
+              ~max_amount:100_000_000_000 ~fee_range:10_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
@@ -1485,7 +1518,7 @@ let%test_module _ =
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
                  ~nonce:(Account.Nonce.of_int 1) ~max_amount:100_000_000_000
-                 ~max_fee:10_000_000_000 ())
+                 ~fee_range:10_000_000_000 ())
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool

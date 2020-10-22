@@ -29,11 +29,15 @@ module Inputs = struct
       ; cache: Cache.t
       ; proof_level: Genesis_constants.Proof_level.t }
 
-    let create ~proof_level () =
+    let create ~constraint_constants ~proof_level () =
       let m =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            Some (module Transaction_snark.Make () : S)
+            Some
+              ( module Transaction_snark.Make (struct
+                let constraint_constants = constraint_constants
+              end)
+              : S )
         | Check | None ->
             None
       in

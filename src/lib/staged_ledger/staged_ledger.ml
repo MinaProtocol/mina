@@ -484,7 +484,6 @@ module T = struct
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s txn_state_view state_and_body_hash =
-    let open Deferred.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -503,13 +502,11 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
@@ -519,6 +516,13 @@ module T = struct
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
+
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
@@ -533,18 +537,23 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       try
+        let tss = partition 10 ts in
         let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_state_view state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
+              let%map () = Async.Scheduler.yield () in
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      current_state_view state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) )
         in
         return ret
       with Exit err -> Deferred.Result.fail err
@@ -775,11 +784,20 @@ module T = struct
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
+    let update_coinbase_stack_start_time = Core.Time.now () in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
       update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
         new_ledger t.pending_coinbase_collection transactions
         current_state_view state_and_body_hash
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(
+                Span.to_ms @@ diff (now ()) update_coinbase_stack_start_time)
+          ) ]
+      "update_coinbase_stack_start_time take $time_elapsed" ;
     let slots = List.length data in
     let work_count = List.length works in
     let required_pairs =
@@ -802,6 +820,7 @@ module T = struct
       else Deferred.return (Ok ())
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let fill_work_start_time = Core.Time.now () in
     let%bind res_opt, scan_state' =
       let r =
         Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
@@ -824,6 +843,12 @@ module T = struct
               scan_state $scan_state: $error" ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_ms @@ diff (now ()) fill_work_start_time)
+          ) ]
+      "fill_work_and_enqueue_transactions take $time_elapsed" ;
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection
         ~depth:t.constraint_constants.pending_coinbase_depth
@@ -935,12 +960,20 @@ module T = struct
              (Result.map_error ~f:(fun error ->
                   Staged_ledger_error.Pre_diff error ))
     in
+    let apply_diff_start_time = Core.Time.now () in
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
       apply_diff ~constraint_constants t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
         ~log_prefix:"apply_diff" ~coinbase_receiver:witness.coinbase_receiver
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time) )
+        ]
+      "Staged_ledger.apply_diff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->

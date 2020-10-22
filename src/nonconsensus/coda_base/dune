@@ -7,6 +7,7 @@
     coda_numbers_nonconsensus
     coda_compile_config_nonconsensus
     currency_nonconsensus
+    data_hash_lib_nonconsensus
     hash_prefix_states_nonconsensus
     hex_nonconsensus
     outside_hash_image_nonconsensus

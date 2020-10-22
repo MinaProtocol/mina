@@ -103,6 +103,28 @@ let get_tokens_graphql =
          Array.iter response#accounts ~f:(fun account ->
              printf "%s " (Token_id.to_string account#token) ) ))
 
+let get_time_offset_graphql =
+  Command.async
+    ~summary:
+      "Get the time offset in seconds used by the daemon to convert real time \
+       into blockchain time"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Time_offset.make ())
+             graphql_endpoint
+         in
+         let time_offset = response#timeOffset in
+         printf
+           "Current time offset:\n\
+            %i\n\n\
+            Start other daemons with this offset by setting the \
+            CODA_TIME_OFFSET environment variable in the shell before \
+            executing them:\n\
+            export CODA_TIME_OFFSET=%i\n"
+           time_offset time_offset ))
+
 let print_trust_statuses statuses json =
   if json then
     printf "%s\n"
@@ -862,10 +884,15 @@ let dump_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         (* TODO: Allow these to be configurable. *)
+         let proof_level = Genesis_constants.Proof_level.compiled in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
          let all =
-           Transaction_snark.constraint_system_digests ()
+           Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ()
+               ~proof_level ~constraint_constants ()
          in
          let all =
            List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
@@ -1674,4 +1701,5 @@ let advanced =
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("next-available-token", next_available_token_cmd) ]
+    ; ("next-available-token", next_available_token_cmd)
+    ; ("time-offset", get_time_offset_graphql) ]

@@ -43,7 +43,7 @@ type subscription struct {
 }
 
 type validationStatus struct {
-	Completion chan bool
+	Completion chan string
 	TimedOutAt *time.Time
 }
 
@@ -198,7 +198,9 @@ type configureMsg struct {
 	ListenOn        []string           `json:"ifaces"`
 	External        string             `json:"external_maddr"`
 	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
-	GossipType      string             `json:"gossip_type"`
+	Flood           bool               `json:"flood"`
+	PeerExchange    bool               `json:"peer_exchange"`
+	DirectPeers     []string           `json:"direct_peers"`
 	SeedPeers       []string           `json:"seed_peers"`
 	GatingConfig    setGatingConfigMsg `json:"gating_config"`
 }
@@ -228,8 +230,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 
-	seeds := make([]peer.AddrInfo, len(m.SeedPeers))
-	for i, v := range m.SeedPeers {
+	seeds := make([]peer.AddrInfo, 0, len(m.SeedPeers))
+	for _, v := range m.SeedPeers {
 		addr, err := addrInfoOfString(v)
 		if err != nil {
 			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
@@ -237,7 +239,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 			// But more likely, it is an RPC error.
 			return nil, badRPC(err)
 		}
-		seeds[i] = *addr
+		seeds = append(seeds, *addr)
+	}
+
+	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
+	for _, v := range m.DirectPeers {
+		addr, err := addrInfoOfString(v)
+		if err != nil {
+			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+			// isn't supported by this version of libp2p.
+			// But more likely, it is an RPC error.
+			return nil, badRPC(err)
+		}
+		directPeers = append(directPeers, *addr)
 	}
 
 	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
@@ -259,19 +273,10 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
-	// - bigger than 16MiB block size?
-	opts := pubsub.WithMaxMessageSize(1024 * 1024 * 16)
+	// - bigger than 32MiB block size?
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
 	var ps *pubsub.PubSub
-	if m.GossipType == "gossipsub" {
-		ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "flood" {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, opts)
-	} else if m.GossipType == "random" {
-		// networks of size 100 aren't very large, but we shouldn't be using randomsub!
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, 10, opts)
-	} else {
-		return nil, badHelper(errors.New("unknown gossip type"))
-	}
+	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
 
 	if err != nil {
 		return nil, badHelper(err)
@@ -367,15 +372,15 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	app.P2p.Pubsub.Join(s.Topic)
-	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
-			return true
+			return pubsub.ValidationAccept
 		}
 
 		seqno := <-seqs
-		ch := make(chan bool, 1)
+		ch := make(chan string, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
@@ -390,7 +395,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.ValidatorMutex.Lock()
 			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
-			return false
+			return pubsub.ValidationIgnore
 		}
 
 		app.writeMsg(validateUpcall{
@@ -419,17 +424,24 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
-				return true
+				return pubsub.ValidationAccept
 			}
 			app.P2p.Logger.Info("unvalidated :(")
-			return false
+			return pubsub.ValidationReject
 		case res := <-ch:
-			if !res {
+			switch res {
+			case "reject":
 				app.P2p.Logger.Info("why u fail to validate :(")
-			} else {
+				return pubsub.ValidationReject
+			case "accept":
 				app.P2p.Logger.Info("validated!")
+				return pubsub.ValidationAccept
+			case "ignore":
+				app.P2p.Logger.Info("ignoring valid message!")
+				return pubsub.ValidationIgnore
 			}
-			return res
+			app.P2p.Logger.Info("ignoring message that falled off the end!")
+			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -505,8 +517,8 @@ type validateUpcall struct {
 }
 
 type validationCompleteMsg struct {
-	Seqno int  `json:"seqno"`
-	Valid bool `json:"is_valid"`
+	Seqno int    `json:"seqno"`
+	Valid string `json:"is_valid"`
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {

@@ -31,7 +31,7 @@ val build :
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
   -> ( t
-     , [ `Invalid_staged_ledger_diff of Error.t
+     , [> `Invalid_staged_ledger_diff of Error.t
        | `Invalid_staged_ledger_hash of Error.t
        | `Fatal_error of exn ] )
      Result.t

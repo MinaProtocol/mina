@@ -28,6 +28,7 @@ module Styles = {
 [@react.component]
 let make = () => {
   <Page title="Demo page of components">
+    <div className=Nav.Styles.spacer />
     <div className=Styles.page>
       <div>
         <SideNav currentSlug="">

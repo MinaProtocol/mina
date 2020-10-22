@@ -47,7 +47,6 @@ let%test_module "Full_frontier tests" =
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
     let create_frontier () =
-      let base_hash = Frontier_hash.empty in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
           ~genesis_ledger:Genesis_ledger.t
@@ -67,7 +66,7 @@ let%test_module "Full_frontier tests" =
       in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
-        ~base_hash ~consensus_local_state ~max_length ~precomputed_values
+        ~consensus_local_state ~max_length ~precomputed_values
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->

@@ -292,6 +292,6 @@ let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
-            ~constants:consensus_constants
+            ~constants:consensus_constants ~constraint_constants
       ; constants=
           Consensus.Constants.to_protocol_constants consensus_constants } }

@@ -63,11 +63,11 @@ clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
+	@rm -rf src/app/libp2p_helper/result
 
 # TEMP HACK (for circle-ci)
 libp2p_helper:
-	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
-
+	make -C src/app/libp2p_helper
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
@@ -237,13 +237,11 @@ deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
-	@cp _build/coda_pvkeys_* /tmp/artifacts/.
 
 deb_optimized:
 	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
-	@cp _build/coda_pvkeys_* /tmp/artifacts/.
 
 build_pv_keys:
 	$(info Building keys)

@@ -2773,6 +2773,18 @@ module Queries = struct
       ~typ:(non_null Types.genesis_constants)
       ~resolve:(fun _ () -> ())
 
+  let time_offset =
+    field "timeOffset"
+      ~doc:
+        "The time offset in seconds used to convert real times into \
+         blockchain times"
+      ~args:Arg.[]
+      ~typ:(non_null int)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Block_time.Controller.get_time_offset
+          ~logger:(Coda_lib.config coda).logger
+        |> Time.Span.to_sec |> Float.to_int )
+
   let next_available_token =
     field "nextAvailableToken"
       ~doc:
@@ -2823,6 +2835,7 @@ module Queries = struct
     ; snark_pool
     ; pending_snark_work
     ; genesis_constants
+    ; time_offset
     ; next_available_token ]
 end
 
