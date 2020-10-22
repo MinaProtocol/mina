@@ -813,7 +813,7 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", `String (Error.to_string_hum e)) ] ;
-                  return `Reject
+                  return (`Reject, None)
             in
             match%map
               do_rpc t

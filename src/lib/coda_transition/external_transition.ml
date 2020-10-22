@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = Coda_net2.validation_result * State_hash.t option -> unit
+  type t = Coda_net2.validation_result -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 

@@ -274,7 +274,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Deferred.return `Accept
+                      Deferred.return (`Accept, None)
                   | Remote sender ->
                       if not (Peer.Id.equal sender.peer_id my_peer_id) then
                         let valid_ivar = Ivar.create () in
@@ -282,7 +282,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           (Strict_pipe.Writer.write message_writer
                              (envelope, Ivar.fill valid_ivar))
                           ~f:(fun () -> Ivar.read valid_ivar)
-                      else Deferred.return `Accept )
+                      else Deferred.return (`Accept, None) )
                 ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call
