@@ -88,20 +88,25 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                 let open Trust_system.Actions in
                 (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
-                let action =
-                  match staged_ledger_error with
-                  | Invalid_proofs _ ->
-                      make_actions Sent_invalid_proof
-                  | Pre_diff (Verification_failed _) ->
-                      make_actions Sent_invalid_signature_or_proof
-                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
-                      make_actions Gossiped_invalid_transition
-                  | Unexpected _ ->
-                      failwith
-                        "build: Unexpected staged ledger error should have \
-                         been caught in another pattern"
-                in
-                Trust_system.record trust_system logger peer action
+                with_return (fun {return} ->
+                    let action =
+                      match staged_ledger_error with
+                      | Couldn't_reach_verifier _ ->
+                          return Deferred.unit
+                      | Invalid_proofs _ ->
+                          make_actions Sent_invalid_proof
+                      | Pre_diff (Verification_failed _) ->
+                          make_actions Sent_invalid_signature_or_proof
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger peer action )
           in
           Error
             (`Invalid_staged_ledger_diff
