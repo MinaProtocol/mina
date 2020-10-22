@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"codanet"
 	"context"
+	"crypto/md5"
 	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -378,9 +379,11 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
+		msgDigest := string(md5.Sum(msg.Data))
+
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
-			app.P2p.Logger.Info("would have validated but it's from us!")
+			app.P2p.Logger.Infof("would have validated but it's from us! %s %s", msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationAccept
 		}
 
@@ -391,12 +394,12 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		(*app.Validators[seqno]).Completion = ch
 		app.ValidatorMutex.Unlock()
 
-		app.P2p.Logger.Info("validating a new pubsub message ...")
+		app.P2p.Logger.Infof("validating a new pubsub message ... %s %s", msgDigest, peer.IDB58Encode(id))
 
 		sender, err := findPeerInfo(app, id)
 
 		if err != nil && !app.UnsafeNoTrustIP {
-			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
+			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it %s %s", peer.IDB58Encode(id), msgDigest)
 			app.ValidatorMutex.Lock()
 			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
@@ -418,7 +421,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// care about the timeout and will validate it anyway.
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
-			app.P2p.Logger.Error("validation timed out")
+			app.P2p.Logger.Errorf("validation timed out %s %s", msgDigest, peer.IDB58Encode(id))
 
 			app.ValidatorMutex.Lock()
 
@@ -428,10 +431,10 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.ValidatorMutex.Unlock()
 
 			if app.UnsafeNoTrustIP {
-				app.P2p.Logger.Info("validated anyway")
+				app.P2p.Logger.Infof("validated anyway %s %s", msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationAccept
 			}
-			app.P2p.Logger.Info("unvalidated")
+			app.P2p.Logger.Infof("unvalidated %s %s", msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationReject
 		case res := <-ch:
 			stateHash := "(not a block)"
@@ -440,16 +443,16 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			switch res.res {
 			case "reject":
-				app.P2p.Logger.Info("Rejected validation %s", stateHash)
+				app.P2p.Logger.Infof("Rejected validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationReject
 			case "accept":
-				app.P2p.Logger.Info("Accepted validation %s", stateHash)
+				app.P2p.Logger.Infof("Accepted validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationAccept
 			case "ignore":
-				app.P2p.Logger.Info("Ignoring validation %s", stateHash)
+				app.P2p.Logger.Infof("Ignoring validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Info("ignoring message that falled off the end! %s", stateHash)
+			app.P2p.Logger.Infof("ignoring message that falled off the end! %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
