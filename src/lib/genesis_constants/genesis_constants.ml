@@ -245,7 +245,7 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t = (int, int, Int64.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
 
       let to_latest = Fn.id
 
@@ -257,7 +257,10 @@ module Protocol = struct
           ; ("delta", `Int t.delta)
           ; ( "genesis_state_timestamp"
             , `String
-                (Time.to_string_abs t.genesis_state_timestamp
+                (Time.to_string_abs
+                   (Time.of_span_since_epoch
+                      (Time.Span.of_ms
+                         (Int64.to_float t.genesis_state_timestamp)))
                    ~zone:Time.Zone.utc) ) ]
 
       let of_yojson = function
@@ -274,7 +277,9 @@ module Protocol = struct
                 ; slots_per_epoch
                 ; slots_per_sub_window
                 ; delta
-                ; genesis_state_timestamp }
+                ; genesis_state_timestamp=
+                    genesis_state_timestamp |> Time.to_span_since_epoch
+                    |> Time.Span.to_ms |> Int64.of_float }
           | Error e ->
               Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
         | _ ->
@@ -292,8 +297,10 @@ module Protocol = struct
           ; slots_per_epoch= t.slots_per_epoch
           ; slots_per_sub_window= t.slots_per_sub_window
           ; genesis_state_timestamp=
-              Time.to_string_abs t.genesis_state_timestamp ~zone:Time.Zone.utc
-          }
+              Time.to_string_abs
+                (Time.of_span_since_epoch
+                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)))
+                ~zone:Time.Zone.utc }
         in
         T.sexp_of_t t'
     end
@@ -306,7 +313,9 @@ module Protocol = struct
           ; slots_per_sub_window= 10
           ; slots_per_epoch= 1000
           ; genesis_state_timestamp=
-              Time.of_string "2019-10-08 17:51:23.050849Z" }
+              Time.of_string "2019-10-08 17:51:23.050849Z"
+              |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
+          }
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
@@ -329,11 +338,17 @@ module T = struct
     let str =
       ( List.map
           (* TODO: *)
-          [t.protocol.k; t.protocol.delta; t.txpool_max_size]
+          [ t.protocol.k
+          ; t.protocol.slots_per_epoch
+          ; t.protocol.slots_per_sub_window
+          ; t.protocol.delta
+          ; t.txpool_max_size ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
       ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
-          t.protocol.genesis_state_timestamp
+          (Time.of_span_since_epoch
+             (Time.Span.of_ms
+                (Int64.to_float t.protocol.genesis_state_timestamp)))
     in
     Blake2.digest_string str |> Blake2.to_hex
 end
@@ -365,7 +380,8 @@ let compiled : t =
       ; slots_per_sub_window
       ; delta
       ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string }
+          genesis_timestamp_of_string genesis_state_timestamp_string
+          |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float }
   ; txpool_max_size= pool_max_size
   ; num_accounts= None }
 
