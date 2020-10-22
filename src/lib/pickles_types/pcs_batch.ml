@@ -79,7 +79,7 @@ let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
     ~mul ~add ~one ~evaluation_point ~xi
 
-open Dlog_marlin_types.Poly_comm
+open Dlog_plonk_types.Poly_comm
 
 let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
