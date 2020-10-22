@@ -418,7 +418,8 @@ module Incentives = {
               <span className=Theme.Type.link>
                 {React.string("Run a Node")}
               </span>
-              <Icon size=1.5 kind=Icon.ArrowRightLarge />
+              <Spacer width=0.5 />
+              <Icon size=1.5 kind=Icon.ArrowRightMedium />
             </a>
           </Next.Link>
         </div>
@@ -447,7 +448,7 @@ module Incentives = {
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-             "Mina is breaking down barriers to participation and unleashing a host of exciting new pathways to earn tokens.",
+              "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions."
            )}
         </p>
         <Spacer height=3. />
@@ -536,15 +537,13 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
-    /*
-     <div className=Styles.sectionContainer("")>
-       <Spacer height=6. />
-       <div className=Styles.section id="knowledge">
-         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-       </div>
-     </div>
-     <Spacer height=12. />
-     */
+    <div className={Styles.sectionContainer("")}>
+      <section className=Styles.section id="knowledge">
+        <Spacer height=6. />
+        <KnowledgeBase />
+      </section>
+    </div>
+    <Spacer height=12. />
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
