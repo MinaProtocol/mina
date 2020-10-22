@@ -42,7 +42,7 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             "BUILDKITE"
           ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./${spec.deploy_env_file}" ],
-          label = "Build Mina's archive-node debian package",
+          label = "Build Archive node debian package",
           key = "build-archive-deb-pkg",
           target = Size.XLarge,
           artifact_paths = [ S.contains "./*.deb" ]

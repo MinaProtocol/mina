@@ -36,8 +36,9 @@ module Styles = {
    */
   let quoteContainer = small =>
     style([
+      position(`relative),
       background(white),
-      padding(`rem(1.)),
+      padding(`rem(2.0)),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -57,6 +58,19 @@ module Styles = {
     merge([
       Theme.Type.quote,
       style([fontSize(`rem(1.3)), marginBottom(`rem(1.))]),
+    ]);
+  let jumpQuote =
+    merge([
+      quote,
+      style([
+        position(`absolute),
+        top(`rem(1.5)),
+        left(`rem(1.0)),
+        media(
+          Theme.MediaQuery.tablet,
+          [top(`rem(2.5)), left(`rem(2.5))],
+        ),
+      ]),
     ]);
 
   let attribute =
@@ -97,6 +111,7 @@ let make =
   <div className={Styles.container(backgroundImg)}>
     <Wrapped>
       <div className={Styles.quoteContainer(small)}>
+        <p className=Styles.jumpQuote> {React.string("\"")} </p>
         <p className=Styles.quote> {React.string(copy)} </p>
         <div className=Styles.attribute>
           <img className=Styles.headshot src=authorImg />
