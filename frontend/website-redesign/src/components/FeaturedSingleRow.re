@@ -133,6 +133,7 @@ module SingleRow = {
         display(`flex),
         flexDirection(`column),
         alignItems(`flexStart),
+        width(`percent(100.)),
         selector("h2,p", [color(textColor)]),
         selector(
           "p",
@@ -154,12 +155,14 @@ module SingleRow = {
       merge([
         Theme.Type.sectionSubhead,
         style([
+          overflow(`hidden),
           marginTop(`rem(1.)),
+          width(`percent(100.)),
           media(
             Theme.MediaQuery.desktop,
             [
               unsafe("display", "-webkit-box"),
-              unsafe("-webkit-line-clamp", "5"),
+              unsafe("-webkit-line-clamp", "10"),
               unsafe("-webkit-box-orient", "vertical"),
             ],
           ),
@@ -179,6 +182,12 @@ module SingleRow = {
           [height(`percent(110.)), width(`percent(80.))],
         ),
         media(Theme.MediaQuery.desktop, [width(`percent(100.))]),
+      ]);
+
+    let labelLink =
+      merge([
+        Theme.Type.link,
+        style([display(`flex), alignItems(`center)]),
       ]);
   };
   module ImageLeftCopyRight = {
@@ -243,7 +252,7 @@ module SingleRow = {
                <Button.Link href={label.href}>
                  <span>
                    <Spacer height=1. />
-                   <span className=Theme.Type.buttonLink>
+                   <span className=RowStyles.labelLink>
                      <span> {React.string(label.labelText)} </span>
                      <Icon kind=Icon.ArrowRightMedium />
                    </span>
@@ -317,7 +326,7 @@ module SingleRow = {
                <Button.Link href={label.href}>
                  <span>
                    <Spacer height=1. />
-                   <span className=Theme.Type.link>
+                   <span className=RowStyles.labelLink>
                      <span> {React.string(label.labelText)} </span>
                      <Icon kind=Icon.ArrowRightMedium />
                    </span>
