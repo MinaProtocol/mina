@@ -132,7 +132,7 @@ module Vrf_distribution = struct
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
     let constants = Constants.compiled in
-    let default_window_size = UInt32.to_int constants.delta in
+    let default_window_size = UInt32.to_int constants.delta + 1 in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
