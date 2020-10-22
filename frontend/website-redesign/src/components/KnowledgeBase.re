@@ -52,6 +52,7 @@ module Category = {
         {Array.map(resource => <Resource resource />, category.resources)
          |> React.array}
       </div>
+      <Spacer height=2. />
     </div>;
   };
 };

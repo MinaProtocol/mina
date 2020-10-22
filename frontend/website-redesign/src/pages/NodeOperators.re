@@ -414,7 +414,7 @@ let make = () => {
         },
       }
     />
-    // TODO: Knowledge Base
+    <KnowledgeBase />
     <section id="help-and-support">
       <ButtonBar
         kind=ButtonBar.HelpAndSupport

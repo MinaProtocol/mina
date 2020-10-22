@@ -88,6 +88,7 @@ let make = () => {
         }
       />
     </div>
+    <KnowledgeBase />
     <ButtonBar
       kind=ButtonBar.HelpAndSupport
       backgroundImg="/static/img/ButtonBarBackground.jpg"
