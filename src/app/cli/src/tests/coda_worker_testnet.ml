@@ -347,8 +347,9 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      + 2
                        * Unsigned.UInt32.to_int
                            testnet.precomputed_values.consensus_constants.k
-                     + Unsigned.UInt32.to_int
-                         testnet.precomputed_values.consensus_constants.delta
+                     + ( Unsigned.UInt32.to_int
+                           testnet.precomputed_values.consensus_constants.delta
+                       + 1 )
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -425,8 +426,9 @@ let events ~(precomputed_values : Precomputed_values.t) workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 Unsigned.UInt32.to_int
-                   precomputed_values.consensus_constants.delta
+                 ( Unsigned.UInt32.to_int
+                     precomputed_values.consensus_constants.delta
+                 + 1 )
                  * precomputed_values.constraint_constants
                      .block_window_duration_ms
                  + 6_000
@@ -475,7 +477,8 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
   let acceptable_delay =
     Time.Span.of_ms
       ( block_production_interval
-        * Unsigned.UInt32.to_int precomputed_values.consensus_constants.delta
+        * ( Unsigned.UInt32.to_int precomputed_values.consensus_constants.delta
+          + 1 )
       |> Float.of_int )
   in
   let%bind program_dir = Unix.getcwd () in
