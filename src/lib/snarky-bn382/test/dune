@@ -1,3 +1,4 @@
 (executable
  (name test)
- (libraries snarky_bn382))
+ (libraries snarky_bn382)
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))

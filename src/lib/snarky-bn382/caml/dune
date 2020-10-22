@@ -2,4 +2,4 @@
  (name snarky_bn382_bindings)
  (libraries ctypes ctypes.foreign cstubs_applicative)
  (public_name snarky_bn382.bindings)
- (preprocess (pps ppx_let)))
+ (preprocess (pps ppx_let ppx_version bisect_ppx -- --conditional)))

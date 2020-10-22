@@ -1,3 +1,4 @@
 (executable
  (name snarky_bn382_ctypes_stubs)
- (libraries snarky_bn382_bindings ctypes ctypes.stubs cstubs_applicative))
+ (libraries snarky_bn382_bindings ctypes ctypes.stubs cstubs_applicative)
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))

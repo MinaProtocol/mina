@@ -22,7 +22,8 @@
  (name snarky_bn382_stubs)
  (modules snarky_bn382_stubs)
  (public_name snarky_bn382.stubs)
- (self_build_stubs_archive (snarky_bn382_stubs)))
+ (self_build_stubs_archive (snarky_bn382_stubs))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))
 
 (library
  (name snarky_bn382)
@@ -33,4 +34,5 @@
  (c_library_flags
   :standard
   -lsnarky_bn382_stubs_stubs)
- (c_names snarky_bn382))
+ (c_names snarky_bn382)
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))
