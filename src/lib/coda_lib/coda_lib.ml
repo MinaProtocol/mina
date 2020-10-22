@@ -1093,7 +1093,7 @@ let create (config : Config.t) =
                              breadcrumb
                          in
                          External_transition.Validated.poke_validation_callback
-                           et (fun v ->
+                           et (fun (v, _) ->
                              if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation

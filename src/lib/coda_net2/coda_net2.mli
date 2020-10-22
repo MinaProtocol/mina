@@ -61,17 +61,17 @@ module Keypair : sig
     end
   end]
 
-  (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
+  (** Securely generate a new keypair. *)
 
-  (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string
+  (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
 
+  val of_string : string -> t Core.Or_error.t
   (** Undo [to_string t].
 
     Only fails if the string has the wrong format, not if the embedded
     keypair data is corrupt. *)
-  val of_string : string -> t Core.Or_error.t
 
   val to_peer_id : t -> Peer.Id.t
 end
@@ -100,38 +100,44 @@ end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
-type validation_result = [`Accept | `Reject | `Ignore]
+type validation_result = [`Accept | `Reject | `Ignore] * string option
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
     type 'a t
 
+    val publish : 'a t -> 'a -> unit Deferred.t
     (** Publish a message to this pubsub topic.
     *
     * Returned deferred is resolved once the publish is enqueued locally.
     * This function continues to work even if [unsubscribe t] has been called.
     * It is exactly [Pubsub.publish] with the topic this subscription was
     * created for, and fails in the same way. *)
-    val publish : 'a t -> 'a -> unit Deferred.t
 
+    val unsubscribe : _ t -> unit Deferred.Or_error.t
     (** Unsubscribe from this topic, closing the write pipe.
     *
     * Returned deferred is resolved once the unsubscription is complete.
     * This can fail if already unsubscribed. *)
-    val unsubscribe : _ t -> unit Deferred.Or_error.t
 
-    (** The pipe of messages received about this topic. *)
     val message_pipe : 'a t -> 'a Envelope.Incoming.t Strict_pipe.Reader.t
+    (** The pipe of messages received about this topic. *)
   end
 
+  val publish : net -> topic:string -> data:string -> unit Deferred.t
   (** Publish a message to a topic.
   *
   * Returned deferred is resolved once the publish is enqueued.
   * This can fail if signing the message failed.
   *  *)
-  val publish : net -> topic:string -> data:string -> unit Deferred.t
 
+  val subscribe :
+       net
+    -> string
+    -> should_forward_message:(   string Envelope.Incoming.t
+                               -> validation_result Deferred.t)
+    -> string Subscription.t Deferred.Or_error.t
   (** Subscribe to a pubsub topic.
     *
     * Fails if already subscribed. If it succeeds, incoming messages for that
@@ -143,13 +149,17 @@ module Pubsub : sig
     * process waits 5 seconds for the result of [should_forward_message] to be
     * reported, otherwise it will not forward it.
     *)
-  val subscribe :
+
+  val subscribe_encode :
        net
     -> string
-    -> should_forward_message:(   string Envelope.Incoming.t
+    -> should_forward_message:(   'a Envelope.Incoming.t
                                -> validation_result Deferred.t)
-    -> string Subscription.t Deferred.Or_error.t
-
+    -> bin_prot:'a Bin_prot.Type_class.t
+    -> on_decode_failure:[ `Ignore
+                         | `Call of
+                           string Envelope.Incoming.t -> Error.t -> unit ]
+    -> 'a Subscription.t Deferred.Or_error.t
   (** Like [subscribe], but knows how to stringify/destringify
     *
     * Fails if already subscribed. If it succeeds, incoming messages for that
@@ -161,29 +171,19 @@ module Pubsub : sig
     * process waits 5 seconds for the result of [should_forward_message] to be
     * reported, otherwise it will not forward it.
     *)
-  val subscribe_encode :
-       net
-    -> string
-    -> should_forward_message:(   'a Envelope.Incoming.t
-                               -> validation_result Deferred.t)
-    -> bin_prot:'a Bin_prot.Type_class.t
-    -> on_decode_failure:[ `Ignore
-                         | `Call of
-                           string Envelope.Incoming.t -> Error.t -> unit ]
-    -> 'a Subscription.t Deferred.Or_error.t
 end
 
+val create :
+     on_unexpected_termination:(unit -> unit Deferred.t)
+  -> logger:Logger.t
+  -> conf_dir:string
+  -> net Deferred.Or_error.t
 (** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
   *
   * The new [net] isn't connected to any network until [configure] is called.
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
-val create :
-     on_unexpected_termination:(unit -> unit Deferred.t)
-  -> logger:Logger.t
-  -> conf_dir:string
-  -> net Deferred.Or_error.t
 
 (** State for the connection gateway. It will disallow connections from IPs
     or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
@@ -191,19 +191,6 @@ val create :
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 
-(** Configure the network connection.
-  *
-  * Listens on each address in [maddrs].
-  *
-  * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
-  * will be called for each peer we connect to. [unsafe_no_trust_ip], if true, will not attempt to
-  * report trust actions for the IPs of observed connections.
-  *
-  * Whenever the connection list gets too small, [seed_peers] will be
-  * candidates for reconnection for peer discovery.
-  *
-  * This fails if initializing libp2p fails for any reason.
-*)
 val configure :
      net
   -> me:Keypair.t
@@ -218,18 +205,31 @@ val configure :
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> unit Deferred.Or_error.t
+(** Configure the network connection.
+  *
+  * Listens on each address in [maddrs].
+  *
+  * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
+  * will be called for each peer we connect to. [unsafe_no_trust_ip], if true, will not attempt to
+  * report trust actions for the IPs of observed connections.
+  *
+  * Whenever the connection list gets too small, [seed_peers] will be
+  * candidates for reconnection for peer discovery.
+  *
+  * This fails if initializing libp2p fails for any reason.
+*)
 
+val me : net -> Keypair.t Deferred.t
 (** The keypair the network was configured with.
   *
   * Resolved once configuration succeeds.
   *)
-val me : net -> Keypair.t Deferred.t
 
-(** List of all peers we know about. *)
 val peers : net -> Peer.t list Deferred.t
+(** List of all peers we know about. *)
 
-(** Try to connect to a peer ID, returning a [Peer.t]. *)
 val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t
+(** Try to connect to a peer ID, returning a [Peer.t]. *)
 
 (** An open stream.
 
@@ -247,16 +247,16 @@ val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t
 module Stream : sig
   type t
 
-  (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
   val pipes : t -> string Pipe.Reader.t * string Pipe.Writer.t
+  (** [pipes t] returns the reader/writer pipe for our half of the stream. *)
 
+  val reset : t -> unit Deferred.Or_error.t
   (** [reset t] informs the other peer to close the stream.
 
     The returned [Deferred.Or_error.t] is fulfilled with [Ok ()] immediately
     once the reset is performed. It does not wait for the other host to
     acknowledge.
     *)
-  val reset : t -> unit Deferred.Or_error.t
 
   val remote_peer : t -> Peer.t
 end
@@ -268,20 +268,22 @@ end
 module Protocol_handler : sig
   type t
 
-  (** Returns the protocol string being handled. *)
   val handling_protocol : t -> string
+  (** Returns the protocol string being handled. *)
 
-  (** Whether [close t] has been called. *)
   val is_closed : t -> bool
+  (** Whether [close t] has been called. *)
 
+  val close : ?reset_existing_streams:bool -> t -> unit Deferred.t
   (** Stop handling new streams on this protocol.
 
   [reset_existing_streams] controls whether open streams for this protocol
   will be reset, and defaults to [false].
   *)
-  val close : ?reset_existing_streams:bool -> t -> unit Deferred.t
 end
 
+val open_stream :
+  net -> protocol:string -> Peer.Id.t -> Stream.t Deferred.Or_error.t
 (** Opens a stream with a peer on a particular protocol.
 
   Close the write pipe when you are done. This won't close the reading end.
@@ -291,9 +293,13 @@ end
   This can fail if the peer isn't reachable, doesn't implement the requested
   protocol, and probably for other reasons.
  *)
-val open_stream :
-  net -> protocol:string -> Peer.Id.t -> Stream.t Deferred.Or_error.t
 
+val handle_protocol :
+     net
+  -> on_handler_error:[`Raise | `Ignore | `Call of Stream.t -> exn -> unit]
+  -> protocol:string
+  -> (Stream.t -> unit Deferred.t)
+  -> Protocol_handler.t Deferred.Or_error.t
 (** Handle incoming streams for a protocol.
 
   [on_handler_error] determines what happens if the handler throws an
@@ -303,13 +309,8 @@ val open_stream :
 
   The function in `Call will be passed the stream that faulted.
 *)
-val handle_protocol :
-     net
-  -> on_handler_error:[`Raise | `Ignore | `Call of Stream.t -> exn -> unit]
-  -> protocol:string
-  -> (Stream.t -> unit Deferred.t)
-  -> Protocol_handler.t Deferred.Or_error.t
 
+val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
 (** Try listening on a multiaddr.
 *
 * If successful, returns the list of all addresses this net is listening on
@@ -319,35 +320,34 @@ val handle_protocol :
 *
 * This can be called many times.
 *)
-val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
 
+val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
 (** The list of addresses this net is listening on.
 
   This returns the same thing that [listen_on] does, without listening
   on an address.
 *)
-val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
 
+val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
 (** Connect to a peer, ensuring it enters our peerbook and DHT.
 
   This can fail if the connection fails. *)
-val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
 
+val begin_advertising : net -> unit Deferred.Or_error.t
 (** Join the DHT and announce our existence.
 
   Call this after using [add_peer] to add any bootstrap peers. *)
-val begin_advertising : net -> unit Deferred.Or_error.t
 
-(** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
+(** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 
+val set_connection_gating_config :
+  net -> connection_gating -> connection_gating Deferred.t
 (** Configure the connection gateway. 
 
   This will fail if any of the trusted or banned peers are on IPv6. *)
-val set_connection_gating_config :
-  net -> connection_gating -> connection_gating Deferred.t
 
 val connection_gating_config : net -> connection_gating Deferred.t
 
-(** List of currently banned IPs. *)
 val banned_ips : net -> Unix.Inet_addr.t list Deferred.t
+(** List of currently banned IPs. *)

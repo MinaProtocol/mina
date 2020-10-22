@@ -28,21 +28,21 @@ end)
         | Local f ->
             f (Error err)
         | External f ->
-            f `Reject )
+            f (`Reject, None) )
 
     let drop accepted rejected =
       Fn.compose Deferred.return (function
         | Local f ->
             f (Ok (accepted, rejected))
         | External f ->
-            f `Ignore )
+            f (`Ignore, None) )
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
       | External f ->
-          f `Accept ;
+          f (`Accept, None) ;
           Deferred.unit
 
     let replace broadcast_pipe accepted rejected = function
@@ -50,7 +50,7 @@ end)
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
       | External f ->
-          f `Ignore ;
+          f (`Ignore, None) ;
           Linear_pipe.write broadcast_pipe accepted
   end
 

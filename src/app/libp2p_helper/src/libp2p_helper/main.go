@@ -346,6 +346,11 @@ type subscribeMsg struct {
 	Subscription int    `json:"subscription_idx"`
 }
 
+type validityResult struct {
+	Res       string `json:"res"`
+	StateHash string `json:"state_hash"`
+}
+
 type publishUpcall struct {
 	Upcall       string        `json:"upcall"`
 	Subscription int           `json:"subscription_idx"`
@@ -380,7 +385,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		}
 
 		seqno := <-seqs
-		ch := make(chan string, 1)
+		ch := make(chan validityResult, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
@@ -413,7 +418,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// care about the timeout and will validate it anyway.
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
-			app.P2p.Logger.Error("validation timed out :(")
+			app.P2p.Logger.Error("validation timed out")
 
 			app.ValidatorMutex.Lock()
 
@@ -423,24 +428,28 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.ValidatorMutex.Unlock()
 
 			if app.UnsafeNoTrustIP {
-				app.P2p.Logger.Info("validated anyway!")
+				app.P2p.Logger.Info("validated anyway")
 				return pubsub.ValidationAccept
 			}
-			app.P2p.Logger.Info("unvalidated :(")
+			app.P2p.Logger.Info("unvalidated")
 			return pubsub.ValidationReject
 		case res := <-ch:
-			switch res {
+			stateHash := "(not a block)"
+			if res.StateHash != nil {
+				stateHash := res.StateHash
+			}
+			switch res.res {
 			case "reject":
-				app.P2p.Logger.Info("why u fail to validate :(")
+				app.P2p.Logger.Info("Rejected validation %s", stateHash)
 				return pubsub.ValidationReject
 			case "accept":
-				app.P2p.Logger.Info("validated!")
+				app.P2p.Logger.Info("Accepted validation %s", stateHash)
 				return pubsub.ValidationAccept
 			case "ignore":
-				app.P2p.Logger.Info("ignoring valid message!")
+				app.P2p.Logger.Info("Ignoring validation %s", stateHash)
 				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Info("ignoring message that falled off the end!")
+			app.P2p.Logger.Info("ignoring message that falled off the end! %s", stateHash)
 			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))

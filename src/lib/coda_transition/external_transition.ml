@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = Coda_net2.validation_result -> unit
+  type t = Coda_net2.validation_result * State_hash.t option -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 
@@ -121,9 +121,11 @@ type t_ = t
 
 type external_transition = t
 
-let broadcast {validation_callback; _} = validation_callback `Accept
+let broadcast {validation_callback; protocol_state; _} =
+  validation_callback (`Accept, Some (Protocol_state.hash protocol_state))
 
-let don't_broadcast {validation_callback; _} = validation_callback `Reject
+let don't_broadcast {validation_callback; protocol_state; _} =
+  validation_callback (`Reject, Some (Protocol_state.hash protocol_state))
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
@@ -785,8 +787,8 @@ module Validated = struct
 
       module Erased = struct
         (* if this type receives a new version, that changes the serialization of
-             the type `t', so that type must also get a new version
-        *)
+               the type `t', so that type must also get a new version
+          *)
         [%%versioned
         module Stable = struct
           module V1 = struct
