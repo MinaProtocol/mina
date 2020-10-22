@@ -1,5 +1,16 @@
 module Style = {
   open Css;
+
+  let background =
+    style([
+      backgroundImage(`url("/static/img/BlogLandingHeaderBackground.jpg")),
+      backgroundSize(`cover),
+      padding2(~v=`rem(4.), ~h=`zero),
+      display(`flex),
+      flexDirection(`column),
+      media(Theme.MediaQuery.desktop, [padding2(~v=`rem(8.), ~h=`zero)]),
+    ]);
+
   let title =
     style([
       color(black),
@@ -37,7 +48,7 @@ module Style = {
       textTransform(`uppercase),
     ]);
 
-  let container = style([maxWidth(`rem(71.))]);
+  let container = style([width(`percent(100.))]);
 
   let morePostsSpacing = style([marginTop(`rem(7.1875))]);
 
@@ -75,19 +86,25 @@ module MorePosts = {
     let postList =
       style([
         listStyleType(`none),
-        flexWrap(`wrap),
-        display(`flex),
-        justifyContent(`flexStart),
-        width(`percent(110.)),
-        marginLeft(`rem(-2.)),
+        width(`percent(100.)),
+        height(`percent(100.)),
+        display(`grid),
+        gridColumnGap(`rem(2.)),
+        gridRowGap(`rem(3.)),
+        marginBottom(`rem(4.)),
+        gridTemplateColumns([
+          `repeat((`autoFit, `minmax((`minContent, `rem(23.5))))),
+        ]),
+        media(
+          Theme.MediaQuery.desktop,
+          [
+            marginBottom(`rem(8.)),
+            gridTemplateColumns([`repeat((`num(3), `fr(1.)))]),
+          ],
+        ),
       ]);
 
-    let postItem =
-      style([
-        width(`rem(25.)),
-        marginBottom(`rem(3.25)),
-        padding2(~h=`rem(2.), ~v=`zero),
-      ]);
+    let postItem = style([height(`percent(100.)), width(`percent(100.))]);
   };
 
   module Content = {
@@ -141,8 +158,9 @@ module List = {
 
 module InternalCtaSection = {
   [@react.component]
-  let make = () => {
+  let make = (~backgroundImg) => {
     <InternalCtaSection
+      backgroundImg
       leftItem=InternalCtaSection.Item.{
         title: "About the Tech",
         img: "/static/img/AboutTechCta.png",
@@ -164,26 +182,34 @@ let make = (~posts) => {
   | [featured, ...posts] =>
     <Page title="Mina Protocol Blog">
       <Next.Head> Markdown.katexStylesheet </Next.Head>
-      <div className=Nav.Styles.spacerLarge />
-      <FeaturedSingleRow
-        row=FeaturedSingleRow.Row.{
-          rowType: ImageLeftCopyRight,
-          copySize: `Large,
-          title: featured.ContentType.BlogPost.title,
-          description: featured.snippet,
-          textColor: Theme.Colors.white,
-          image: "/static/img/BlogLandingHero.jpg",
-          background: Image("/static/img/MinaSimplePattern1.jpg"),
-          contentBackground: Image("/static/img/MinaSepctrumSecondary.png"),
-          button: {
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            buttonText: "Read more",
-            dark: true,
-            href: `Internal("/blog/" ++ featured.slug),
-          },
-        }
-      />
+      <div className=Nav.Styles.spacer />
+      <div className=Style.background>
+        <FeaturedSingleRowFull
+          row=FeaturedSingleRowFull.Row.{
+            FeaturedSingleRowFull.Row.rowType: ImageLeftCopyRight,
+            header:
+              Some({
+                kind: "Blog",
+                author: featured.ContentType.BlogPost.author,
+                date: featured.ContentType.BlogPost.date,
+              }),
+            title: featured.ContentType.BlogPost.title,
+            description: featured.snippet,
+            textColor: Theme.Colors.white,
+            image: "/static/img/BlogLandingHero.jpg",
+            background: Image(""),
+            contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+            link:
+              {FeaturedSingleRowFull.Row.Button({
+                 buttonColor: Theme.Colors.orange,
+                 buttonTextColor: Theme.Colors.white,
+                 buttonText: "Read more",
+                 dark: true,
+                 href: `Internal("/blog/" ++ featured.slug),
+               })},
+          }
+        />
+      </div>
       <Wrapped>
         <div className=Style.morePostsSpacing>
           <MorePosts posts={List.take(9, posts) |> Array.of_list} />
@@ -193,7 +219,13 @@ let make = (~posts) => {
         kind=ButtonBar.CommunityLanding
         backgroundImg="/static/img/ButtonBarBackground.jpg"
       />
-      <InternalCtaSection />
+      <InternalCtaSection
+        backgroundImg={
+          Theme.desktop: "/static/img/BlogLandingHeaderBackground.jpg",
+          Theme.tablet: "/static/img/BlogLandingHeaderBackground.jpg",
+          Theme.mobile: "/static/img/BlogLandingHeaderBackground.jpg",
+        }
+      />
     </Page>
   };
 };

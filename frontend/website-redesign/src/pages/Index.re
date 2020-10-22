@@ -30,7 +30,7 @@ let make = () => {
             {
               title: "Truly Decentralized, with Full Nodes like Never Before",
               description: "With Mina, anyone who's syncing the chain is also validating transactions like a full node. Mina's design means any participant can take part in proof-of-stake consensus, have access to strong censorship-resistance and secure the blockchain.",
-              linkCopy: "Run a node",
+              linkCopy: "Run a Node",
               linkUrl: "/docs/node-operator",
               image: "/static/img/TrulyDecentralized.png",
             },
@@ -68,13 +68,14 @@ let make = () => {
           image: "/static/img/homepage-cta.jpg",
           background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
           contentBackground: Color(Theme.Colors.white),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "More on Mina",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: false,
-            href: `Internal("/about"),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "More on Mina",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: false,
+              href: `Internal("/about"),
+            }),
         }
       />
       <BlogModule source=`Press />

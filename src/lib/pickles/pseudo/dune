@@ -4,7 +4,7 @@
   (flags -warn-error -27)
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson  bisect_ppx -- --conditional))
   (libraries
-    marlin_checks
+    plonk_checks
     one_hot_vector
     pickles_types
     snarky.backendless

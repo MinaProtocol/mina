@@ -526,13 +526,14 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
         background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          href: `Internal("/docs/getting-started"),
-          buttonText: "Run a Node",
-          dark: false,
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            href: `Internal("/docs/getting-started"),
+            buttonText: "Run a Node",
+            dark: false,
+          }),
         contentBackground: Color(Css.white),
       }
     />
@@ -555,13 +556,14 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-touch.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          buttonText: "Get Started",
-          dark: false,
-          href: `Internal("/docs"),
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            buttonText: "Get Started",
+            dark: false,
+            href: `Internal("/work-with-mina"),
+          }),
         contentBackground: Color(Css.white),
       }
     />

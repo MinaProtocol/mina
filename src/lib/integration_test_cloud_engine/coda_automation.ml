@@ -45,8 +45,7 @@ module Network_config = struct
     ; agent_min_fee: string
     ; agent_max_fee: string
     ; agent_min_tx: string
-    ; agent_max_tx: string
-    ; coda_archive_image: string }
+    ; agent_max_tx: string }
   [@@deriving to_yojson]
 
   type t =
@@ -217,9 +216,7 @@ module Network_config = struct
         ; agent_min_fee= "0.06"
         ; agent_max_fee= "0.1"
         ; agent_min_tx= "0.0015"
-        ; agent_max_tx= "0.0015"
-        ; coda_archive_image=
-            "codaprotocol/coda-archive:0.0.16-beta7-develop-f79b7b0" } }
+        ; agent_max_tx= "0.0015" } }
 
   let to_terraform network_config =
     let open Terraform in
