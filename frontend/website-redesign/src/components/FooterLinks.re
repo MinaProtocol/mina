@@ -89,10 +89,8 @@ let make = () => {
           {React.string("Economics Whitepaper")}
         </a>
       </Next.Link>
-      <Next.Link href="">
-        <a className=Styles.linkStyle>
-          {React.string("Incentive Structure")}
-        </a>
+      <Next.Link href="/media">
+        <a className=Styles.linkStyle> {React.string("Media")} </a>
       </Next.Link>
     </div>
     <div
@@ -117,6 +115,10 @@ let make = () => {
       <Next.Link href="/grants">
         <a className=Styles.linkStyle> {React.string("Grant Program")} </a>
       </Next.Link>
+      <Next.Link href="/work-with-mina">
+        <a className=Styles.linkStyle> {React.string("Careers")} </a>
+      </Next.Link>
+
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader>

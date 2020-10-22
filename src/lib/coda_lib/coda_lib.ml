@@ -655,10 +655,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  Work_selection_method.remove t.snark_job_state spec ;
+  let cb _ =
+    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+    Work_selection_method.remove t.snark_job_state spec
+  in
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
 let add_transactions t (uc_inputs : User_command_input.t list) =

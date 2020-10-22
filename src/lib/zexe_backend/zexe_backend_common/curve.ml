@@ -91,34 +91,6 @@ module Make
          with module BaseField := BaseField
           and module ScalarField := ScalarField) =
 struct
-  module Affine = struct
-    module Backend = C.Affine
-
-    module Stable = struct
-      module V1 = struct
-        type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
-        [@@deriving
-          version {asserted}, eq, bin_io, sexp, compare, yojson, hash]
-      end
-
-      module Latest = V1
-    end
-
-    include Stable.Latest
-
-    let to_backend (x, y) =
-      let t = C.Affine.create x y in
-      Caml.Gc.finalise C.Affine.delete t ;
-      t
-
-    let of_backend t =
-      let x = C.Affine.x t in
-      Caml.Gc.finalise BaseField.delete x ;
-      let y = C.Affine.y t in
-      Caml.Gc.finalise BaseField.delete y ;
-      (x, y)
-  end
-
   let op1 f x =
     let r = f x in
     Caml.Gc.finalise C.delete r ;
@@ -129,28 +101,7 @@ struct
     Caml.Gc.finalise C.delete r ;
     r
 
-  let to_affine_exn t =
-    let r = C.to_affine_exn t in
-    if C.Affine.is_zero r then (
-      C.Affine.delete r ;
-      failwith "to_affine_exn: Got identity" )
-    else
-      let r' = Affine.of_backend r in
-      C.Affine.delete r ; r'
-
-  let of_affine (x, y) = op2 C.of_affine_coordinates x y
-
   type t = C.t
-
-  include Binable.Of_binable
-            (Affine)
-            (struct
-              type nonrec t = t
-
-              let to_binable = to_affine_exn
-
-              let of_binable = of_affine
-            end)
 
   open C
 
@@ -169,6 +120,67 @@ struct
   let one = one ()
 
   let zero = sub one one
+
+  module Affine = struct
+    module Backend = struct
+      include C.Affine
+
+      let zero = Memo.unit (fun () -> to_affine_exn zero)
+    end
+
+    module Stable = struct
+      module V1 = struct
+        type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
+        [@@deriving
+          version {asserted}, eq, bin_io, sexp, compare, yojson, hash]
+      end
+
+      module Latest = V1
+    end
+
+    include Stable.Latest
+
+    let to_backend = function
+      | Pickles_types.Or_infinity.Infinity ->
+          Backend.zero ()
+      | Finite (x, y) ->
+          let t = C.Affine.create x y in
+          Caml.Gc.finalise C.Affine.delete t ;
+          t
+
+    let of_backend t =
+      if C.Affine.is_zero t then Pickles_types.Or_infinity.Infinity
+      else
+        let x = C.Affine.x t in
+        Caml.Gc.finalise BaseField.delete x ;
+        let y = C.Affine.y t in
+        Caml.Gc.finalise BaseField.delete y ;
+        Finite (x, y)
+  end
+
+  let to_affine_exn t =
+    let r = C.to_affine_exn t in
+    if C.Affine.is_zero r then (
+      C.Affine.delete r ;
+      failwith "to_affine_exn: Got identity" )
+    else
+      match Affine.of_backend r with
+      | Infinity ->
+          assert false
+      | Finite r' ->
+          C.Affine.delete r ; r'
+
+  let of_affine (x, y) = op2 C.of_affine_coordinates x y
+
+  include Binable.Of_binable
+            (Affine)
+            (struct
+              type nonrec t = t
+
+              let to_binable = to_affine_exn
+
+              let of_binable = of_affine
+            end)
 
   let ( + ) = add
 
