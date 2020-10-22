@@ -43,8 +43,13 @@ type subscription struct {
 	Cancel context.CancelFunc
 }
 
+type validityResult struct {
+	Res       string `json:"res"`
+	StateHash string `json:"state_hash"`
+}
+
 type validationStatus struct {
-	Completion chan string
+	Completion chan validityResult
 	TimedOutAt *time.Time
 }
 
@@ -347,11 +352,6 @@ type subscribeMsg struct {
 	Subscription int    `json:"subscription_idx"`
 }
 
-type validityResult struct {
-	Res       string `json:"res"`
-	StateHash string `json:"state_hash"`
-}
-
 type publishUpcall struct {
 	Upcall       string        `json:"upcall"`
 	Subscription int           `json:"subscription_idx"`
@@ -379,7 +379,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
-		msgDigest := string(md5.Sum(msg.Data))
+    msgMd5Sum := md5.Sum(msg.Data)
+    msgDigest := string(msgMd5Sum[:])
 
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
@@ -438,10 +439,10 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationReject
 		case res := <-ch:
 			stateHash := "(not a block)"
-			if res.StateHash != nil {
-				stateHash := res.StateHash
+			if res.StateHash != "" {
+				stateHash = res.StateHash
 			}
-			switch res.res {
+			switch res.Res {
 			case "reject":
 				app.P2p.Logger.Infof("Rejected validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationReject
@@ -529,8 +530,8 @@ type validateUpcall struct {
 }
 
 type validationCompleteMsg struct {
-	Seqno int    `json:"seqno"`
-	Valid string `json:"is_valid"`
+	Seqno int            `json:"seqno"`
+	Valid validityResult `json:"is_valid"`
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
