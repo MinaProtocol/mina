@@ -161,6 +161,9 @@ module Tock = struct
                   include Tock0.Inner_curve
                 end)
                 (Params)
+                (struct
+                  let add = None
+                end)
 
       let add_known_unsafe t x = add_unsafe t (constant x)
     end
@@ -206,6 +209,16 @@ module Tick = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
                 (Crypto_params.Tick.Inner_curve)
                 (Params)
+                (struct
+                  let add =
+                    Some
+                      (fun p1 p2 ->
+                        let c =
+                          Run.make_checked (fun () ->
+                              Pickles.Step_main_inputs.Ops.add_fast p1 p2 )
+                        in
+                        Tick0.with_state (As_prover.return ()) c )
+                end)
 
       let add_known_unsafe t x = add_unsafe t (constant x)
     end

@@ -1,18 +1,20 @@
-type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
-[@@deriving bin_io, sexp, compare, yojson, hash, eq]
+open Core_kernel
 
-let pack {prechallenge; is_square} = is_square :: prechallenge
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'challenge t = {prechallenge: 'challenge}
+    [@@deriving sexp, compare, yojson, hash, eq]
+  end
+end]
 
-let unpack = function
-  | is_square :: prechallenge ->
-      {is_square; prechallenge}
-  | _ ->
-      failwith "Bulletproof_challenge.unpack"
+let pack {prechallenge} = prechallenge
 
-let typ chal bool =
-  let there {prechallenge; is_square} = (prechallenge, is_square) in
-  let back (prechallenge, is_square) = {prechallenge; is_square} in
+let unpack = function prechallenge -> {prechallenge}
+
+let typ chal =
+  let there {prechallenge} = prechallenge in
+  let back prechallenge = {prechallenge} in
   let open Snarky_backendless in
-  Typ.transport ~there ~back
-    (Typ.tuple2 (Pickles_types.Scalar_challenge.typ chal) bool)
+  Typ.transport ~there ~back (Pickles_types.Scalar_challenge.typ chal)
   |> Typ.transport_var ~there ~back

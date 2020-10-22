@@ -73,14 +73,14 @@ module Domains = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {h: 'a; k: 'a}
+      type 'a t = {h: 'a}
       [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
     end
   end]
 
-  let iter {h; k} ~f = f h ; f k
+  let iter {h} ~f = f h
 
-  let map {h; k} ~f = {h= f h; k= f k}
+  let map {h} ~f = {h= f h}
 end
 
 module Repr = struct
@@ -92,7 +92,7 @@ module Repr = struct
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
             Max_branches_vec.Stable.V1.t
         ; max_width: Width.Stable.V1.t
-        ; wrap_index: 'g list Abc.Stable.V1.t Matrix_evals.Stable.V1.t }
+        ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
 
       let to_latest = Fn.id
     end
@@ -108,27 +108,61 @@ module Poly = struct
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
             Max_branches_vec.T.t
         ; max_width: Width.Stable.V1.t
-        ; wrap_index: 'g list Abc.Stable.V1.t Matrix_evals.Stable.V1.t
+        ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
         ; wrap_vk: 'vk option }
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
 end
 
-let dummy_domains =
-  {Domains.h= Domain.Pow_2_roots_of_unity 0; k= Pow_2_roots_of_unity 0}
+let dummy_domains = {Domains.h= Domain.Pow_2_roots_of_unity 0}
 
 let dummy_width = Width.zero
 
 let wrap_index_to_input (type gs f) (g : gs -> f array) =
   let open Random_oracle_input in
-  let abc (t : gs Abc.t) : _ t =
-    let [a; b; c] = Abc.to_hlist t in
-    Array.concat_map [|a; b; c|] ~f:g |> field_elements
-  in
   fun t ->
-    let [x1; x2; x3; x4] = Matrix_evals.to_hlist t in
-    List.map [x1; x2; x3; x4] ~f:abc |> List.reduce_exn ~f:append
+    let [ g1
+        ; g2
+        ; g3
+        ; g4
+        ; g5
+        ; g6
+        ; g7
+        ; g8
+        ; g9
+        ; g10
+        ; g11
+        ; g12
+        ; g13
+        ; g14
+        ; g15
+        ; g16
+        ; g17
+        ; g18 ] =
+      Plonk_verification_key_evals.to_hlist t
+    in
+    List.map
+      [ g1
+      ; g2
+      ; g3
+      ; g4
+      ; g5
+      ; g6
+      ; g7
+      ; g8
+      ; g9
+      ; g10
+      ; g11
+      ; g12
+      ; g13
+      ; g14
+      ; g15
+      ; g16
+      ; g17
+      ; g18 ]
+      ~f:(Fn.compose field_elements g)
+    |> List.reduce_exn ~f:append
 
 let to_input : _ Poly.t -> _ =
   let open Random_oracle_input in
@@ -145,8 +179,8 @@ let to_input : _ Poly.t -> _ =
         |> Vector.unzip
       in
       List.reduce_exn ~f:append
-        [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h; k} ->
-              map_reduce [|h; k|] ~f:(fun (Pow_2_roots_of_unity x) ->
+        [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
+              map_reduce [|h|] ~f:(fun (Pow_2_roots_of_unity x) ->
                   bits ~len:max_log2_degree x ) )
         ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits
           |> bitstrings
