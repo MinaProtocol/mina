@@ -46,7 +46,7 @@ Pipeline.build
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
-          label = "Build Mina's daemon debian package",
+          label = "Build Mina daemon debian package",
           key = "build-deb-pkg",
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]

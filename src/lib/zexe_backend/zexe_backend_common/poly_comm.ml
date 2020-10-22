@@ -16,12 +16,14 @@ module type Inputs_intf = sig
       module Backend : sig
         include Type_with_delete
 
+        val zero : unit -> t
+
         val create : Base_field.t -> Base_field.t -> t
 
         module Vector : Vector with type elt := t
       end
 
-      val of_backend : Backend.t -> t
+      val of_backend : Backend.t -> t Or_infinity.t
     end
   end
 
@@ -38,9 +40,10 @@ module type Inputs_intf = sig
 end
 
 type 'a t =
-  [ `With_degree_bound of 'a Dlog_marlin_types.Poly_comm.With_degree_bound.t
+  [ `With_degree_bound of
+    'a Or_infinity.t Dlog_plonk_types.Poly_comm.With_degree_bound.t
   | `Without_degree_bound of
-    'a Dlog_marlin_types.Poly_comm.Without_degree_bound.t ]
+    'a Dlog_plonk_types.Poly_comm.Without_degree_bound.t ]
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
@@ -65,14 +68,25 @@ module Make (Inputs : Inputs_intf) = struct
 
   let with_degree_bound_to_backend
       (commitment :
-        (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.With_degree_bound.t) : Backend.t =
-    Backend.make (g_vec commitment.unshifted) (Some (g commitment.shifted))
+        (Base_field.t * Base_field.t) Or_infinity.t
+        Dlog_plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
+    let mk x =
+      match x with
+      | Or_infinity.Finite x ->
+          g x
+      | Infinity ->
+          Curve.Affine.Backend.zero ()
+    in
+    let unshifted = G_affine.Vector.create () in
+    Array.iter commitment.unshifted ~f:(fun c ->
+        G_affine.Vector.emplace_back unshifted (mk c) ) ;
+    Caml.Gc.finalise G_affine.Vector.delete unshifted ;
+    Backend.make unshifted (Some (mk commitment.shifted))
 
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
-        Dlog_marlin_types.Poly_comm.Without_degree_bound.t) : Backend.t =
+        Dlog_plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t =
     Backend.make (g_vec commitment) None
 
   let to_backend (t : t) : Backend.t =
@@ -86,7 +100,7 @@ module Make (Inputs : Inputs_intf) = struct
     Caml.Gc.finalise Backend.delete t ;
     t
 
-  let of_backend (t : Backend.t) =
+  let of_backend' (t : Backend.t) =
     let open Backend in
     let unshifted =
       (* TODO: Leaky? *)
@@ -96,11 +110,27 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* TODO: Leaky? *)
     let shifted = shifted t in
-    let open Dlog_marlin_types.Poly_comm in
+    (unshifted, Option.map shifted ~f:Curve.Affine.of_backend)
+
+  let of_backend_with_degree_bound t =
+    let open Dlog_plonk_types.Poly_comm in
+    let unshifted, shifted = of_backend' t in
     match shifted with
-    | Some g ->
-        `With_degree_bound
-          {With_degree_bound.unshifted; shifted= Curve.Affine.of_backend g}
     | None ->
-        `Without_degree_bound unshifted
+        assert false
+    | Some shifted ->
+        `With_degree_bound {With_degree_bound.unshifted; shifted}
+
+  let of_backend_without_degree_bound t =
+    let open Dlog_plonk_types.Poly_comm in
+    match of_backend' t with
+    | unshifted, None ->
+        `Without_degree_bound
+          (Array.map unshifted ~f:(function
+            | Infinity ->
+                assert false
+            | Finite g ->
+                g ))
+    | _ ->
+        assert false
 end

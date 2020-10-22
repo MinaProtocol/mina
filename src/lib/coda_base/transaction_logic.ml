@@ -298,6 +298,12 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
+    val validate_timing_with_min_balance :
+         account:Account.t
+      -> txn_amount:Amount.t
+      -> txn_global_slot:Global_slot.t
+      -> (Account.Timing.t * [> `Min_balance of Balance.t]) Or_error.t
+
     val validate_timing :
          account:Account.t
       -> txn_amount:Amount.t
@@ -320,13 +326,13 @@ let timing_error_to_user_command_status err =
   | _ ->
       failwith "Unexpected timed account validation error"
 
-let validate_timing ~account ~txn_amount ~txn_global_slot =
+let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
   match account.timing with
   | Untimed ->
       (* no time restrictions *)
-      Or_error.return Untimed
+      Or_error.return (Untimed, `Min_balance Balance.zero)
   | Timed
       {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
     ->
@@ -368,7 +374,16 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
             else Or_error.return curr_min_balance
       in
       (* once the calculated minimum balance becomes zero, the account becomes untimed *)
-      if Balance.(curr_min_balance > zero) then account.timing else Untimed
+      if Balance.(curr_min_balance > zero) then
+        (account.timing, `Min_balance curr_min_balance)
+      else (Untimed, `Min_balance Balance.zero)
+
+let validate_timing ~account ~txn_amount ~txn_global_slot =
+  let open Result.Let_syntax in
+  let%map timing, `Min_balance _ =
+    validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot
+  in
+  timing
 
 module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   open L
@@ -1893,6 +1908,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     (root, `Next_available_token next_available_token)
 
   module For_tests = struct
+    let validate_timing_with_min_balance = validate_timing_with_min_balance
+
     let validate_timing = validate_timing
   end
 end
