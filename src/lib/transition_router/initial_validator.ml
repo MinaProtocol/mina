@@ -223,7 +223,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  blockchain_length ;
                return ()
            | Error error ->
-               is_valid_cb `Reject ;
+               is_valid_cb (`Reject, None) ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  ~delta:genesis_constants.protocol.delta error )

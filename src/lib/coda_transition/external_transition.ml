@@ -122,10 +122,12 @@ type t_ = t
 type external_transition = t
 
 let broadcast {validation_callback; protocol_state; _} =
-  validation_callback (`Accept, Some (Protocol_state.hash protocol_state))
+  validation_callback
+    (`Accept, Some (Protocol_state.hash protocol_state |> State_hash.to_string))
 
 let don't_broadcast {validation_callback; protocol_state; _} =
-  validation_callback (`Reject, Some (Protocol_state.hash protocol_state))
+  validation_callback
+    (`Reject, Some (Protocol_state.hash protocol_state |> State_hash.to_string))
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
