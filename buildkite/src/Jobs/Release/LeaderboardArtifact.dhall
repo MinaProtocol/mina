@@ -41,7 +41,7 @@ Pipeline.build
           commands = [
               Cmd.run "echo export CODA_VERSION=$(cat frontend/leaderboard/package.json | jq '.version') > LEADERBOARD_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh LEADERBOARD_DEPLOY_ENV"
           ],
-          label = "Setup Mina's Leaderboard docker image deploy environment",
+          label = "Setup Leaderboard docker image deploy environment",
           key = "setup-deploy-env",
           target = Size.Small,
           artifact_paths = [ S.contains "frontend/leaderboard/package.json" ]
