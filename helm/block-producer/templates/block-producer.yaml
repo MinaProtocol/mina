@@ -183,7 +183,7 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
-          {{- if (ne $.Values.coda.runtimeConfig "") }}
+          {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
           {{- end -}}
@@ -221,7 +221,7 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.coda-config
-        {{- if (ne $.Values.coda.runtimeConfig "") }}
+        {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
@@ -259,7 +259,7 @@ spec:
         emptyDir: {}
       - name: config-dir
         emptyDir: {}
-      {{- if (ne $.Values.coda.runtimeConfig "") }}
+      {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
           name: block-producer-daemon-config

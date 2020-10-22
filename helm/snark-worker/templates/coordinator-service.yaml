@@ -1,16 +1,20 @@
-{{- if $.Values.coordinator.active }}
+{{- if .Values.coordinator.active }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{tpl $.Values.coordinator.fullname .}}
+  name: {{tpl .Values.coordinator.fullname .}}
   labels:
-    app: {{tpl $.Values.coordinator.fullname .}}
+    app: {{tpl .Values.coordinator.fullname .}}
 spec:
   clusterIP: None
   ports:
-    - name: rpc
-      port: {{ $.Values.coordinator.rpcPort }}
-
+    - port: {{ .Values.coordinator.rpcPort }}
+      name: rpc
   selector:
+<<<<<<< HEAD
     app: {{tpl $.Values.coordinator.fullname .}}
 {{ end }}
+=======
+    app: {{tpl .Values.coordinator.fullname .}}
+{{ end }}
+>>>>>>> 8f9439542... rebase and refactors

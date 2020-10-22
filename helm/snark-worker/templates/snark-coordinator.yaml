@@ -1,22 +1,22 @@
-{{- if $.Values.coordinator.active }}
+{{- if .Values.coordinator.active }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl $.Values.coordinator.fullname .}}
+  name: {{tpl .Values.coordinator.fullname .}}
   labels:
-    app: {{tpl $.Values.coordinator.fullname .}}
+    app: {{tpl .Values.coordinator.fullname .}}
 spec:
   replicas: {{ .Values.numReplicas }}
   selector:
     matchLabels:
-      app: {{tpl $.Values.coordinator.fullname .}}
+      app: {{tpl .Values.coordinator.fullname .}}
   template:
     metadata:
       labels:
-        app: {{tpl $.Values.coordinator.fullname .}}
-        testnet: {{ $.Values.testnetName }}
+        app: {{tpl .Values.coordinator.fullname .}}
+        testnet: {{ .Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -74,19 +74,19 @@ spec:
         ports:
         - name: p2p
           protocol: TCP 
-          containerPort: {{ $.Values.coordinator.ports.p2p }}
+          containerPort: {{ .Values.coordinator.ports.p2p }}
         - name: graphql
           protocol: TCP 
-          containerPort: {{ $.Values.coordinator.ports.graphql }}
+          containerPort: {{ .Values.coordinator.ports.graphql }}
         - name: metrics
           protocol: TCP 
-          containerPort: {{ $.Values.coordinator.ports.metrics }}
+          containerPort: {{ .Values.coordinator.ports.metrics }}
         - name: external
           protocol: TCP 
-          containerPort: {{ $.Values.coordinator.ports.external }}
-          hostPort: {{ $.Values.coordinator.ports.external }}
+          containerPort: {{ .Values.coordinator.ports.external }}
+          hostPort: {{ .Values.coordinator.ports.external }}
         imagePullPolicy: Always
-      {{- if $.Values.coda.runtimeConfig }}
+      {{- if .Values.coda.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
