@@ -563,7 +563,7 @@ let make = () => {
             buttonTextColor: Css.white,
             buttonText: "Get Started",
             dark: false,
-            href: `Internal("/docs"),
+            href: `Internal("/work-with-mina"),
           }),
         contentBackground: Color(Css.white),
       }

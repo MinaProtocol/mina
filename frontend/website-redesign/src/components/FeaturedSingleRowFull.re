@@ -1,4 +1,8 @@
 module Row = {
+  type rowType =
+    | ImageRightCopyLeft
+    | ImageLeftCopyRight;
+
   type backgroundType =
     | Image(string)
     | Color(Css.color);
@@ -28,6 +32,7 @@ module Row = {
     | Label(label);
 
   type t = {
+    rowType,
     header: option(header),
     title: string,
     description: string,
@@ -66,6 +71,7 @@ module Styles = {
 
   let contentBlock = (contentBackground: Row.backgroundType) => {
     style([
+      zIndex(100),
       width(`percent(100.)),
       maxHeight(`rem(35.)),
       overflow(`scroll),
@@ -83,13 +89,7 @@ module Styles = {
       ),
       media(
         Theme.MediaQuery.desktop,
-        [
-          position(`absolute),
-          bottom(`percent(25.)),
-          top(`inherit_),
-          right(`zero),
-          width(`rem(29.)),
-        ],
+        [position(`absolute), width(`rem(29.))],
       ),
       switch (contentBackground) {
       | Image(url) => backgroundImage(`url(url))
@@ -103,6 +103,7 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       alignItems(`flexStart),
+      width(`percent(100.)),
       selector("h2,p", [color(textColor)]),
       selector(
         "p",
@@ -126,11 +127,12 @@ module Styles = {
       style([
         overflow(`hidden),
         marginTop(`rem(1.)),
+        width(`percent(100.)),
         media(
           Theme.MediaQuery.desktop,
           [
             unsafe("display", "-webkit-box"),
-            unsafe("-webkit-line-clamp", "5"),
+            unsafe("-webkit-line-clamp", "10"),
             unsafe("-webkit-box-orient", "vertical"),
           ],
         ),
@@ -155,8 +157,6 @@ module Styles = {
           height(`percent(110.)),
           width(`percent(80.)),
           position(`absolute),
-          left(`zero),
-          bottom(`zero),
         ],
       ),
     ]);
@@ -164,13 +164,37 @@ module Styles = {
   let metadata = merge([Theme.Type.metadata, style([color(white)])]);
 };
 
-[@react.component]
-let make = (~row: Row.t, ~children=?) => {
-  <div className={Styles.singleRowBackground(row.background)}>
-    <Wrapped>
+module ImageLeftCopyRight = {
+  module ModuleStyles = {
+    open Css;
+
+    let contentBlock = backgroundImg => {
+      merge([
+        Styles.contentBlock(backgroundImg),
+        style([
+          media(
+            Theme.MediaQuery.desktop,
+            [bottom(`percent(25.)), right(`zero)],
+          ),
+        ]),
+      ]);
+    };
+
+    let image =
+      merge([
+        Styles.image,
+        style([
+          media(Theme.MediaQuery.desktop, [left(`zero), bottom(`zero)]),
+        ]),
+      ]);
+  };
+
+  [@react.component]
+  let make = (~row: Row.t, ~children=?) => {
+    <div className={Styles.singleRowBackground(row.background)}>
       <div className=Styles.container>
-        <img src={row.image} className=Styles.image />
-        <div className={Styles.contentBlock(row.contentBackground)}>
+        <img src={row.image} className=ModuleStyles.image />
+        <div className={ModuleStyles.contentBlock(row.contentBackground)}>
           <div className={Styles.copyText(row.textColor)}>
             {switch (row.header) {
              | Some(header) =>
@@ -220,6 +244,110 @@ let make = (~row: Row.t, ~children=?) => {
           </div>
         </div>
       </div>
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
+       }}
+    </div>;
+  };
+};
+
+module ImageRightCopyLeft = {
+  module ModuleStyles = {
+    open Css;
+
+    let contentBlock = backgroundImg => {
+      merge([
+        Styles.contentBlock(backgroundImg),
+        style([
+          media(
+            Theme.MediaQuery.desktop,
+            [left(`zero), top(`percent(15.))],
+          ),
+        ]),
+      ]);
+    };
+
+    let image =
+      merge([
+        Styles.image,
+        style([
+          media(Theme.MediaQuery.desktop, [right(`zero), bottom(`zero)]),
+        ]),
+      ]);
+  };
+
+  [@react.component]
+  let make = (~row: Row.t, ~children=?) => {
+    <div className={Styles.singleRowBackground(row.background)}>
+      <div className=Styles.container>
+        <div className={ModuleStyles.contentBlock(row.contentBackground)}>
+          <div className={Styles.copyText(row.textColor)}>
+            {switch (row.header) {
+             | Some(header) =>
+               <>
+                 <Rule color=Theme.Colors.white />
+                 <Spacer height=1. />
+                 <div className=Styles.metadata>
+                   <span> {React.string(header.kind)} </span>
+                   <span> {React.string(" / ")} </span>
+                   <span> {React.string(header.date)} </span>
+                   <span> {React.string(" / ")} </span>
+                   <span> {React.string(header.author)} </span>
+                 </div>
+               </>
+             | None => React.null
+             }}
+            <Spacer height=1.5 />
+            <h2 className=Theme.Type.h2> {React.string(row.title)} </h2>
+            <p className=Styles.description>
+              {React.string(row.description)}
+            </p>
+          </div>
+          <div className=Css.(style([marginTop(`rem(1.))]))>
+            {switch (row.link) {
+             | Button(button) =>
+               <Button
+                 textColor={button.buttonTextColor}
+                 bgColor={button.buttonColor}
+                 dark={button.dark}
+                 href={button.href}>
+                 <span className=Styles.buttonText>
+                   {React.string(button.buttonText)}
+                   <Icon kind=Icon.ArrowRightSmall size=1.5 />
+                 </span>
+               </Button>
+             | Label(label) =>
+               <Button.Link href={label.href}>
+                 <span>
+                   <Spacer height=1. />
+                   <span className=Theme.Type.buttonLink>
+                     <span> {React.string(label.labelText)} </span>
+                     <Icon kind=Icon.ArrowRightMedium />
+                   </span>
+                 </span>
+               </Button.Link>
+             }}
+          </div>
+        </div>
+        <img src={row.image} className=ModuleStyles.image />
+      </div>
+      {switch (children) {
+       | Some(children) => children
+       | None => <> </>
+       }}
+    </div>;
+  };
+};
+
+[@react.component]
+let make = (~row: Row.t, ~children=?) => {
+  <div className={Styles.singleRowBackground(row.background)}>
+    <Wrapped>
+      {switch (row.rowType) {
+       | ImageLeftCopyRight => <ImageLeftCopyRight row />
+       | ImageRightCopyLeft => <ImageRightCopyLeft row />
+       }}
       {switch (children) {
        | Some(children) => children
        | None => <> </>
