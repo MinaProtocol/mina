@@ -68,6 +68,8 @@ module Network_config = struct
       ~(test_config : Test_config.t) ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
+        ; slots_per_epoch
+        ; slots_per_sub_window
         ; proof_level
         ; txpool_max_size
         ; block_producers
@@ -140,12 +142,20 @@ module Network_config = struct
       ; account_creation_fee= None
       ; fork= None }
     in
+    let constraint_constants =
+      Genesis_ledger_helper.make_constraint_constants
+        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+    in
     let runtime_config =
       { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
       ; genesis=
           Some
             { k= Some k
             ; delta= Some delta
+            ; slots_per_epoch= Some slots_per_epoch
+            ; sub_windows_per_window=
+                Some constraint_constants.supercharged_coinbase_factor
+            ; slots_per_sub_window= Some slots_per_sub_window
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
       ; proof= Some proof_config (* TODO: prebake ledger and only set hash *)
@@ -157,10 +167,6 @@ module Network_config = struct
             ; balances= []
             ; hash= None
             ; name= None } }
-    in
-    let constraint_constants =
-      Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
     in
     let genesis_constants =
       Or_error.ok_exn
