@@ -44,13 +44,8 @@ type subscription struct {
 	Cancel context.CancelFunc
 }
 
-type validityResult struct {
-	Res       string `json:"res"`
-	StateHash string `json:"state_hash"`
-}
-
 type validationStatus struct {
-	Completion chan validityResult
+	Completion chan string
 	TimedOutAt *time.Time
 }
 
@@ -390,7 +385,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		}
 
 		seqno := <-seqs
-		ch := make(chan validityResult, 1)
+		ch := make(chan string, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
@@ -439,11 +434,14 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.P2p.Logger.Infof("unvalidated %s %s", msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationReject
 		case res := <-ch:
+			ress := strings.Split(res, ":")
+			trool := ress[0]
+
 			stateHash := "(not a block)"
-			if res.StateHash != "" {
-				stateHash = res.StateHash
+			if ress[1] != "" {
+				stateHash = ress[1]
 			}
-			switch res.Res {
+			switch trool {
 			case "reject":
 				app.P2p.Logger.Infof("Rejected validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationReject
@@ -454,7 +452,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 				app.P2p.Logger.Infof("Ignoring validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Infof("ignoring message that falled off the end! msg:%s %s %s %s", res.Res, stateHash, msgDigest, peer.IDB58Encode(id))
+			app.P2p.Logger.Infof("ignoring message that falled off the end! %s %s %s %s", res, stateHash, msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
@@ -531,8 +529,8 @@ type validateUpcall struct {
 }
 
 type validationCompleteMsg struct {
-	Seqno int            `json:"seqno"`
-	Valid validityResult `json:"is_valid"`
+	Seqno int    `json:"seqno"`
+	Valid string `json:"is_valid"`
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {

@@ -13,6 +13,13 @@ type validation_result = [`Accept | `Reject | `Ignore] * string option
 
 module Validity_result = struct
   type t = {res: string; state_hash: string option} [@@deriving yojson]
+
+  let to_colon {res; state_hash} =
+    match state_hash with
+    | None ->
+        Printf.sprintf "%s:" res
+    | Some hash ->
+        Printf.sprintf "%s:%s" res hash
 end
 
 type connection_gating =
@@ -822,15 +829,12 @@ module Helper = struct
                 ; action=
                     ( match action with
                     | `Accept, state_hash ->
-                        Validity_result.to_yojson
-                          {Validity_result.res= "accept"; state_hash}
+                        {Validity_result.res= "accept"; state_hash}
                     | `Reject, state_hash ->
-                        Validity_result.to_yojson
-                          {Validity_result.res= "reject"; state_hash}
+                        {Validity_result.res= "reject"; state_hash}
                     | `Ignore, state_hash ->
-                        Validity_result.to_yojson
-                          {Validity_result.res= "ignore"; state_hash} )
-                    |> Yojson.Safe.to_string }
+                        {Validity_result.res= "ignore"; state_hash} )
+                    |> Validity_result.to_colon }
             with
             | Ok "validationComplete success" ->
                 ()
