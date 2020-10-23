@@ -131,6 +131,9 @@ val revalidate :
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
+(** Get the current global slot according to the pool's time controller. *)
+val current_global_slot : t -> Coda_numbers.Global_slot.t
+
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
       there is a bug. *)
