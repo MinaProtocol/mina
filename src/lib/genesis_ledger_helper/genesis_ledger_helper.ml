@@ -1335,7 +1335,11 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
         ; genesis_state_timestamp=
             Some
               (Time.to_string_abs ~zone:Time.Zone.utc
-                 genesis_constants.protocol.genesis_state_timestamp) }
+                 (Time.of_span_since_epoch
+                    (Time.Span.of_ms
+                       (Float.of_int64
+                          genesis_constants.protocol.genesis_state_timestamp))))
+        }
   ; proof=
       Some
         { level=
