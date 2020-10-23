@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/md5"
 	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -379,8 +380,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	app.P2p.Pubsub.Join(s.Topic)
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
-    msgMd5Sum := md5.Sum(msg.Data)
-    msgDigest := string(msgMd5Sum[:])
+		msgMd5Sum := md5.Sum(msg.Data)
+		msgDigest := hex.EncodeToString(msgMd5Sum[:])
 
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
