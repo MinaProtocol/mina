@@ -454,7 +454,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 				app.P2p.Logger.Infof("Ignoring validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
 				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Infof("ignoring message that falled off the end! %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
+			app.P2p.Logger.Infof("ignoring message that falled off the end! msg:%s %s %s %s", res.Res, stateHash, msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
