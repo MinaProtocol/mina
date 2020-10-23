@@ -666,6 +666,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-shared-state-test:
@@ -683,6 +684,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-batch-payment-test:
@@ -700,6 +702,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-peers-test:
@@ -717,6 +720,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-transitive-peers-test:
@@ -734,6 +738,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-block-production-test:
@@ -751,6 +756,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-shared-prefix-test_-who-produces_0:
@@ -768,6 +774,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-shared-prefix-test_-who-produces_1:
@@ -785,6 +792,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-change-snark-worker-test:
@@ -802,6 +810,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-archive-node-test:
@@ -819,6 +828,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--dev--coda-delegation-test:
@@ -836,6 +846,7 @@ jobs:
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_catchup:

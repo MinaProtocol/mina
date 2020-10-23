@@ -627,12 +627,12 @@ module For_tests = struct
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     Core.Gc.Expert.add_finalizer_exn consensus_local_state
       (fun consensus_local_state ->
-        Ledger.Db.close
-        @@ Consensus.Data.Local_state.staking_epoch_ledger
-             consensus_local_state ;
-        Ledger.Db.close
-        @@ Consensus.Data.Local_state.next_epoch_ledger consensus_local_state
-    ) ;
+        Consensus.Data.Local_state.(
+          Snapshot.Ledger_snapshot.close
+          @@ staking_epoch_ledger consensus_local_state) ;
+        Consensus.Data.Local_state.(
+          Snapshot.Ledger_snapshot.close
+          @@ next_epoch_ledger consensus_local_state) ) ;
     frontier
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state

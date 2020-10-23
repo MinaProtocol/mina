@@ -50,7 +50,7 @@ CREATE TABLE internal_commands
 CREATE TABLE blocks
 ( id                     serial PRIMARY KEY
 , state_hash             text   NOT NULL UNIQUE
-, parent_id              int    NOT NULL        REFERENCES blocks(id) ON DELETE SET NULL
+, parent_id              int    NOT NULL        REFERENCES blocks(id)
 , creator_id             int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
