@@ -17,9 +17,9 @@ module Validity_result = struct
   let to_colon {res; state_hash} =
     match state_hash with
     | None ->
-        Printf.sprintf "%s:" res
+        Printf.sprintf "%s@" res
     | Some hash ->
-        Printf.sprintf "%s:%s" res hash
+        Printf.sprintf "%s@%s" res hash
 end
 
 type connection_gating =

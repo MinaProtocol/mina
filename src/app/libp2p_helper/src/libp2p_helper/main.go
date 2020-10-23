@@ -435,7 +435,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.P2p.Logger.Infof("unvalidated %s %s", msgDigest, peer.IDB58Encode(id))
 			return pubsub.ValidationReject
 		case res := <-ch:
-			ress := strings.Split(res, ":")
+			ress := strings.Split(res, "@")
 			trool := ress[0]
 
 			stateHash := "(not a block)"
