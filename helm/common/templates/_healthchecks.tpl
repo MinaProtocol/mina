@@ -16,8 +16,8 @@ Daemon startup probe settings
 startupProbe:
   tcpSocket:
     port: p2p-port
-  failureThreshold: {{ .Values.healthcheck.failureThreshold }}
-  periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+  failureThreshold: {{ default .Values.healthcheck.startup.failureThreshold 30 }}
+  periodSeconds: {{ default .Values.healthcheck.periodSeconds 10 }}
 {{- end }}
 
 {{/*

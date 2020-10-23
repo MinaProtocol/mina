@@ -32,7 +32,7 @@ function isChainlengthHighestReceived() {
 # Determine whether a local daemon has a peer count greater than some threshold
 #
 function peerCountGreaterThan() {
-    peerCountMinThreshold=$1
+    peerCountMinThreshold=${1:-2}
     peerCount=$(
         curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.peers | length'
@@ -40,4 +40,35 @@ function peerCountGreaterThan() {
     
     [[ $peerCount -gt $peerCountMinThreshold ]] && return 0 ||
         (echo "Peer count[${peerCount}] is not greater than mininum threshold[${peerCountMinThreshold}]." && return 1) 
+}
+
+#
+# Determine whether a local daemon owns a wallet account and has allocated funds
+#
+function ownsFunds() {
+    ownedWalletCount=$(
+        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' localhost:3085/graphql | \
+            jq '.data.ownedWallets | length'
+    )
+    balanceTotal=$(
+        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets { publicKey { balance { total } } } }" }' localhost:3085/graphql | \
+            jq '.data.ownedWallets[].balance.total'
+    )
+    
+    [[ $ownedWalletCount -gt 1 ]] && [[ $balanceTotal -gt 0 ]] && return 0 ||
+        (echo "Owned wallet count[${ownedWalletCount}] and/or balance total[${peerCountMinThreshold}] is insufficient." && return 1) 
+}
+
+#
+# Determine whether a local daemon process has sent sufficient user commands
+#
+function hasSentUserCommandsGreaterThan() {
+    userCmdMinThreshold=${1:-1}
+    userCmdSent=$(
+        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' localhost:3085/graphql | \
+            jq '.data.daemonStatus.userCommandsSent'
+    )
+    
+    [[ $userCmdSent -gt $userCmdMinThreshold ]] && return 0 ||
+        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1) 
 }
