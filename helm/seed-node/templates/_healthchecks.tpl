@@ -20,3 +20,11 @@ seed-node readiness settings
 {{- define "healthcheck.seed.readinessCheck" -}}
 {{ include "healthcheck.daemon.readinessCheck" . }}
 {{- end -}}
+
+{{/*
+ALL seed-node healthchecks
+*/}}
+{{- define "healthcheck.seed.allChecks" }}
+{{ include "healthcheck.seed.livenessCheck" . }}
+{{ include "healthcheck.seed.readinessCheck" . }}
+{{- end }}

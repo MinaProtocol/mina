@@ -34,10 +34,11 @@ spec:
         - name: METRICS_PORT
           value: {{ .Values.exporter.ports.metricsPort }}
 {{- if .Values.exporter.optionalEnv }}
-{{ toYaml .Values.exporter.optionalEnv | nindent 10 }}
+{{ toYaml .Values.exporter.optionalEnv | indent 10 }}
 {{- end }}
         ports:
         - name: metrics-port
           containerPort: {{ .Values.exporter.ports.metricsPort }}
           protocol: TCP
+{{- include "healthcheck.buildkite-exporter.healthChecks" .Values | indent 8 }}
         imagePullPolicy: Always

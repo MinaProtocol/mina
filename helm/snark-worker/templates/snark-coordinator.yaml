@@ -85,6 +85,7 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coordinator.ports.external }}
           hostPort: {{ .Values.coordinator.ports.external }}
+{{- include "healthcheck.snarkCoordinator.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
       {{- if .Values.coda.runtimeConfig }}
         volumeMounts:

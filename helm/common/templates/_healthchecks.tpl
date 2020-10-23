@@ -1,50 +1,51 @@
 {{/*
 Liveness/readiness check common settings
 */}}
-{{- define "healthcheck.common.settings" -}}
-initialDelaySeconds: {{- default 30 .Values.healthcheck.initialDelaySeconds -}}
-periodSeconds: {{- default 10 .Values.healthcheck.periodSeconds -}}
-failureThreshold: {{- default 3 .Values.healthcheck.failureThreshold -}}
-{{- end -}}
+{{- define "healthcheck.common.settings" }}
+initialDelaySeconds: {{ .healthcheck.initialDelaySeconds }}
+periodSeconds: {{ .healthcheck.periodSeconds }}
+failureThreshold: {{ .healthcheck.failureThreshold }}
+{{- end }}
 
 ### Mina daemon healthcheck TEMPLATES ###
 
 {{/*
 Daemon startup probe settings
 */}}
-{{- define "healthcheck.daemon.startupProbe" -}}
-startupProbe:
-  tcpSocket:
-    port: p2p-port
-  failureThreshold: {{- default 60 .Values.healthcheck.failureThreshold -}}
-  periodSeconds: {{- default 5 .Values.healthcheck.periodSeconds -}}
-{{- end -}}
+# {{- define "healthcheck.daemon.startupProbe" }}
+# startupProbe:
+#   tcpSocket:
+#     port: p2p-port
+#   failureThreshold: {{ .Values.healthcheck.failureThreshold }}
+#   periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+# {{- end }}
 
 {{/*
 Daemon liveness check settings
 */}}
-{{- define "healthcheck.daemon.livenessCheck" -}}
+{{- define "healthcheck.daemon.livenessCheck" }}
 livenessProbe:
   tcpSocket:
     port: p2p-port
-  {{ template "healthcheck.common.settings" . }}
-{{- end -}}
+{{- include "healthcheck.common.settings" . | indent 2 }}
+{{- end }}
 
 {{/*
 Daemon readiness check settings
 */}}
-{{- define "healthcheck.daemon.readinessCheck" -}}
+{{- define "healthcheck.daemon.readinessCheck" }}
 readinessProbe:
   exec:
-    command: "status=$(curl localhost:3085/graphql -d'{ query { daemonStatus { syncStatus } } }'); [[ status == \"synced\" ]] && return 0 || return 1"
-  {{ template "healthcheck.common.settings" . }}
-{{- end -}}
+    command: [
+      "status=$(curl localhost:3085/graphql -d'{ query { daemonStatus { syncStatus } } }'); [[ status == \"synced\" ]] && return 0 || return 1"
+    ]
+{{- include "healthcheck.common.settings" . | indent 2 }}
+{{- end }}
 
 {{/*
 ALL daemon healthchecks
 */}}
-{{- define "healthcheck.daemon.healthChecks" -}}
-{{ template "healthcheck.daemon.startupProbe" . }}
-{{ template "healthcheck.daemon.livenessCheck" . }}
-{{ template "healthcheck.daemon.readinessCheck" . }}
-{{- end -}}
+{{- define "healthcheck.daemon.allChecks" }}
+{{- include "healthcheck.daemon.livenessCheck" . }}
+{{- include "healthcheck.daemon.readinessCheck" . }}
+{{- end }}

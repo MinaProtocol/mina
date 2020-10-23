@@ -95,6 +95,7 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.external }}
           hostPort: {{ .Values.coda.ports.external }}
+{{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
@@ -116,6 +117,7 @@ spec:
         - name: archive-postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
+{{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
       volumes:
       - name: config-dir
         emptyDir: {}

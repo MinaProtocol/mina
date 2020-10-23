@@ -90,6 +90,7 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.external }}
           hostPort: {{ $.Values.coda.ports.external }}
+{{- include "healthcheck.seed.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
       {{- if .Values.coda.runtimeConfig }}
         volumeMounts:

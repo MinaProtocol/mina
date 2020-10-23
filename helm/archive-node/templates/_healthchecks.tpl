@@ -3,39 +3,37 @@
 {{/*
 archive-node startup probe settings
 */}}
-{{- define "healthcheck.archive.startupProbe" -}}
-startupProbe:
-  tcpSocket:
-    port: archive-postgres-port
-  failureThreshold: {{- default 60 .Values.healthcheck.failureThreshold -}}
-  periodSeconds: {{- default 5 .Values.healthcheck.periodSeconds -}}
-{{- end -}}
-
+# {{- define "healthcheck.archive.startupProbe" }}
+# startupProbe:
+#   tcpSocket:
+#     port: archive-postgres-port
+#   failureThreshold: {{ .Values.healthcheck.failureThreshold }}
+#   periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+# {{- end }}
 {{/*
 archive-node liveness check settings
 */}}
-{{- define "healthcheck.archive.livenessCheck" -}}
+{{- define "healthcheck.archive.livenessCheck" }}
 livenessProbe:
   tcpSocket:
     port: archive-server-port
-  {{ template "healthcheck.common.settings" . }}
-{{- end -}}
+{{- include "healthcheck.common.settings" . | indent 2 }}
+{{- end }}
 
 {{/*
 archive-node readiness check settings
 */}}
-{{- define "healthcheck.archive.readinessCheck" -}}
+{{- define "healthcheck.archive.readinessCheck" }}
 readinessProbe:
   exec:
-    command: "<postgres-query>"
-  {{ template "healthcheck.common.settings" . }}
-{{- end -}}
+    command: ["<postgres-query>"]
+{{- include "healthcheck.common.settings" . | indent 2 }}
+{{- end }}
 
 {{/*
 ALL archive-node healthchecks
 */}}
-{{- define "healthcheck.archive.healthChecks" -}}
-{{ template "healthcheck.archive.startupProbe" . }}
-{{ template "healthcheck.archive.livenessCheck" . }}
-{{ template "healthcheck.archive.readinessCheck" . }}
-{{- end -}}
+{{- define "healthcheck.archive.allChecks" }}
+{{ include "healthcheck.archive.livenessCheck" . }}
+{{ include "healthcheck.archive.readinessCheck" . }}
+{{- end }}

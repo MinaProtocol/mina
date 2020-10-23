@@ -106,6 +106,7 @@ spec:
         ports: 
         - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
+{{- include "healthcheck.userAgent.allChecks" $.Values | nindent 8 }}
         imagePullPolicy: Always
       {{- end }}
       {{ if $config.runWithBots -}}
@@ -146,6 +147,7 @@ spec:
         ports:
         - name: graphql-port
           containerPort: {{ $.Values.bots.ports.graphql }}
+{{- include "healthcheck.bots.allChecks" $.Values | nindent 8 }}
         imagePullPolicy: Always
       {{- end }}
       - name: coda
@@ -215,6 +217,7 @@ spec:
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.external }}
           hostPort: {{ $.Values.coda.ports.external }}
+{{- include "healthcheck.daemon.allChecks" $.Values | nindent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys

@@ -34,3 +34,7 @@ coordinator:
     metrics: "10001"
     external: "10909"
 
+healthcheck:
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

@@ -9,3 +9,8 @@ exporter:
 #    value: 1800
 #  - name: BUILDKITE_BRANCH
 #    value: develop
+
+healthcheck:
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

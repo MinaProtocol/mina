@@ -1,22 +1,30 @@
-### Mina SNARK-worker healthcheck TEMPLATES ###
+### Mina SNARK-coordinator/worker healthcheck TEMPLATES ###
 
 {{/*
-snark-worker startup probe settings
+snark-coordinator startup probe settings
 */}}
-{{- define "healthcheck.snarkWorker.startupProbe" -}}
-{{ include "healthcheck.daemon.startupProbe" . }}
+{{- define "healthcheck.snarkCoordinator.startupProbe" -}}
+{{- include "healthcheck.daemon.startupProbe" . }}
 {{- end -}}
 
 {{/*
-snark-worker liveness settings
+snark-coordinator liveness settings
 */}}
-{{- define "healthcheck.snarkWorker.livenessCheck" -}}
-{{ include "healthcheck.daemon.livenessCheck" . }}
+{{- define "healthcheck.snarkCoordinator.livenessCheck" -}}
+{{- include "healthcheck.daemon.livenessCheck" . }}
 {{- end -}}
 
 {{/*
-snark-worker readiness settings
+snark-coordinator readiness settings
 */}}
-{{- define "healthcheck.snarkWorker.readinessCheck" -}}
-{{ include "healthcheck.daemon.readinessCheck" . }}
+{{- define "healthcheck.snarkCoordinator.readinessCheck" -}}
+{{- include "healthcheck.daemon.readinessCheck" . }}
 {{- end -}}
+
+{{/*
+ALL snark-coordinator healthchecks
+*/}}
+{{- define "healthcheck.snarkCoordinator.allChecks" }}
+{{- include "healthcheck.snarkCoordinator.livenessCheck" . }}
+{{- include "healthcheck.snarkCoordinator.readinessCheck" . }}
+{{- end }}
