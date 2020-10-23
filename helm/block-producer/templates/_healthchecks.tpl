@@ -96,7 +96,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL bots healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
+ALL bots healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.bots.allChecks" }}
 {{- include "healthcheck.bots.livenessCheck" . }}

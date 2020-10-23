@@ -3,13 +3,14 @@
 {{/*
 archive-node startup probe settings
 */}}
-# {{- define "healthcheck.archive.startupProbe" }}
-# startupProbe:
-#   tcpSocket:
-#     port: archive-postgres-port
-#   failureThreshold: {{ .Values.healthcheck.failureThreshold }}
-#   periodSeconds: {{ .Values.healthcheck.periodSeconds }}
-# {{- end }}
+{{- define "healthcheck.archive.startupProbe" }}
+startupProbe:
+  tcpSocket:
+    port: archive-postgres-port
+  failureThreshold: {{ .Values.healthcheck.failureThreshold }}
+  periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+{{- end }}
+
 {{/*
 archive-node liveness check settings
 */}}
@@ -31,9 +32,9 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL archive-node healthchecks  - TODO: readd startupProbes once k8s clusters have been updated to 1.16
+ALL archive-node healthchecks  - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.archive.allChecks" }}
-{{ include "healthcheck.archive.livenessCheck" . }}
-{{ include "healthcheck.archive.readinessCheck" . }}
+{{- include "healthcheck.archive.livenessCheck" . }}
+{{- include "healthcheck.archive.readinessCheck" . }}
 {{- end }}

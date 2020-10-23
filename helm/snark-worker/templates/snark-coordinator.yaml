@@ -95,5 +95,5 @@ spec:
       - name: daemon-config
         configMap:
           name: snark-coordinator-daemon-config
-      {{- end -}}
+      {{- end }}
 {{- end }}

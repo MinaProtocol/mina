@@ -18,7 +18,7 @@ buildkite-exporter liveness check settings
 livenessProbe:
   tcpSocket:
     port: metrics-port
-{{ include "healthcheck.common.settings" . | indent 2 }}
+{{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 
 {{/*
@@ -35,9 +35,9 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL buildkite-exporter healthchecks - TODO: readd startupProbes once clusters have been updated to 1.16
+ALL buildkite-exporter healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.buildkite-exporter.healthChecks" }}
-{{ include "healthcheck.buildkite-exporter.livenessCheck" . }}
-{{ include "healthcheck.buildkite-exporter.readinessCheck" . }}
+{{- include "healthcheck.buildkite-exporter.livenessCheck" . }}
+{{- include "healthcheck.buildkite-exporter.readinessCheck" . }}
 {{- end }}

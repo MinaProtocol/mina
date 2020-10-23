@@ -22,7 +22,7 @@ snark-coordinator readiness settings
 {{- end }}
 
 {{/*
-ALL snark-coordinator healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
+ALL snark-coordinator healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.snarkCoordinator.allChecks" }}
 {{- include "healthcheck.snarkCoordinator.livenessCheck" . }}
