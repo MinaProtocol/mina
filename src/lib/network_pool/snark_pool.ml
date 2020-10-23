@@ -280,16 +280,15 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
               ( fee.Coda_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
           `Added )
-        else (
-          if is_local then
-            [%log' warn t.logger]
-              "Rejecting locally generated snark work $stmt, statement not \
-               referenced"
-              ~metadata:
-                [ ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work ) ] ;
-          `Statement_not_referenced )
+        else
+          let origin = if is_local then "locally generated" else "gossiped" in
+          [%log' warn t.logger]
+            "Rejecting %s snark work $stmt, statement not referenced" origin
+            ~metadata:
+              [ ( "stmt"
+                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                    work ) ] ;
+          `Statement_not_referenced
 
       let verify_and_act t ~work ~sender =
         let statements, priced_proof = work in
