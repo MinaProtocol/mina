@@ -211,6 +211,8 @@ let genesis_timestamp_of_string str =
   let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
   Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone) str
 
+let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
+
 let validate_time time_str =
   match
     Result.try_with (fun () ->
@@ -218,7 +220,7 @@ let validate_time time_str =
           time_str )
   with
   | Ok time ->
-      Ok time
+      Ok (of_time time)
   | Error _ ->
       Error
         "Invalid timestamp. Please specify timestamp in \"%Y-%m-%d \
@@ -277,9 +279,7 @@ module Protocol = struct
                 ; slots_per_epoch
                 ; slots_per_sub_window
                 ; delta
-                ; genesis_state_timestamp=
-                    genesis_state_timestamp |> Time.to_span_since_epoch
-                    |> Time.Span.to_ms |> Int64.of_float }
+                ; genesis_state_timestamp }
           | Error e ->
               Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
         | _ ->
@@ -313,9 +313,7 @@ module Protocol = struct
           ; slots_per_sub_window= 10
           ; slots_per_epoch= 1000
           ; genesis_state_timestamp=
-              Time.of_string "2019-10-08 17:51:23.050849Z"
-              |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float
-          }
+              Time.of_string "2019-10-08 17:51:23.050849Z" |> of_time }
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
@@ -380,8 +378,8 @@ let compiled : t =
       ; slots_per_sub_window
       ; delta
       ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string
-          |> Time.to_span_since_epoch |> Time.Span.to_ms |> Int64.of_float }
+          genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
+      }
   ; txpool_max_size= pool_max_size
   ; num_accounts= None }
 

@@ -131,7 +131,7 @@ module Network_config = struct
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
-      ; c= None
+      ; sub_windows_per_window= None
       ; ledger_depth= None
       ; work_delay= None
       ; block_window_duration_ms= None

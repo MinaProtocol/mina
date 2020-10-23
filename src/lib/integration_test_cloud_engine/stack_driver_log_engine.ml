@@ -811,9 +811,8 @@ let wait_for' :
         | `Slots n ->
             !n * !(t.constants.constraints.block_window_duration_ms)
         | `Epochs n ->
-            !n * 3L
-            * !(t.constants.genesis.protocol.k)
-            * !(t.constants.constraints.c)
+            !n
+            * !(t.constants.genesis.protocol.slots_per_epoch)
             * !(t.constants.constraints.block_window_duration_ms)
         | `Snarked_ledgers_generated n ->
             (* Assuming at least 1/3 rd of the max throughput otherwise this could take forever depending on the scan state size*)
