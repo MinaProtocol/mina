@@ -163,12 +163,12 @@ let to_json_for_vis
                     | `Local ip -> Hashtbl.find by_local_ip ip
                     | `External ip -> Hashtbl.find by_external_ip ip
                   in
-                    `Assoc 
-                      [ ("from", `String sender.name)
-                      ; ("to", `String node)
-                      ; ("arrows", `String "to")
-                      ; ("color", `String (color_hash state_hash) )
-                      ]
+                  `Assoc 
+                    [ ("from", `String sender.name)
+                    ; ("to", `String node)
+                    ; ("arrows", `String "to")
+                    ; ("color", `String (color_hash state_hash) )
+                    ]
               )
               events
           in
@@ -218,11 +218,11 @@ end
 open Core
 
 let () =
-  let network, _events = 
+  let network, events = 
     Sys.argv.(1), Sys.argv.(2)
   in
   let network = read_ips (In_channel.read_all network) in
-  (*
+  (* print_endline @@ Yojson.Safe.pretty_to_string @@ `List (List.map network ~f:Node_network_info.to_yojson) ; *)
   let events = 
     match Events.of_yojson (Yojson.Safe.from_file events) with
     | Ok x -> x
@@ -234,13 +234,6 @@ let () =
         List.map received ~f:(fun { time=_; podRealName; sender } ->
             ( `Node_name podRealName, { Block_received.state_hash=stateHash
                                       ; sender_ip= `External sender } ) ) ) )
-  in *)
-  to_json_for_vis [] network
+  in
+  to_json_for_vis events network
   |> Yojson.Safe.to_file "graph.json"
-
-                (*in"\nlocals:%{sexp:string list}\nexternals:%{sexp:string list}\n%!"
-                        peer_local_ip
-                        Caml.(
-                          Hashtbl.to_seq_keys by_local_ip |> List.of_seq ) 
-                        Caml.(
-                          Hashtbl.to_seq_keys by_external_ip |> List.of_seq ) ; *)
