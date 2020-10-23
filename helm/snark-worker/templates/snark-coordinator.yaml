@@ -72,16 +72,16 @@ spec:
         - name: WORK_SELECTION
           value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
         ports:
-        - name: p2p
+        - name: p2p-port
           protocol: TCP 
           containerPort: {{ .Values.coordinator.ports.p2p }}
-        - name: graphql
+        - name: graphql-port
           protocol: TCP 
           containerPort: {{ .Values.coordinator.ports.graphql }}
-        - name: metrics
+        - name: metrics-port
           protocol: TCP 
           containerPort: {{ .Values.coordinator.ports.metrics }}
-        - name: external
+        - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coordinator.ports.external }}
           hostPort: {{ .Values.coordinator.ports.external }}

@@ -31,9 +31,9 @@ spec:
         image: gcr.io/o1labs-192920/coda-network-services:latest
         command: ["bash"]
         args: ["-c", "/code/main.sh"]
-        ports:
-          - name: metrics
-            containerPort: 8000
+        ports: 
+        - name: metrics-port
+          containerPort: 8000
         imagePullPolicy: Always
       - name: seed
         resources:
@@ -64,29 +64,29 @@ spec:
           {{- end }}
         ]
         env:
-          - name: "RAYON_NUM_THREADS"
-            value: "6"
-          - name: DAEMON_REST_PORT
-            value: {{ .Values.coda.ports.graphql | quote }}
-          - name: DAEMON_CLIENT_PORT
-            value: {{ .Values.coda.ports.p2p | quote }}
-          - name: DAEMON_METRICS_PORT
-            value: {{ .Values.coda.ports.metrics | quote }}
-          - name: CODA_CLIENT_TRUSTLIST
-            value: "10.0.0.0/8"
-          - name: DAEMON_EXTERNAL_PORT
-            value: {{ .Values.coda.ports.external | quote }}
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ .Values.coda.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ .Values.coda.ports.p2p | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ .Values.coda.ports.metrics | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ .Values.coda.ports.external | quote }}
         ports:
         - name: p2p-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
-        - name: graphql
+        - name: graphql-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.graphql }}
-        - name: metrics
+        - name: metrics-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.metrics }}
-        - name: external
+        - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.external }}
           hostPort: {{ $.Values.coda.ports.external }}

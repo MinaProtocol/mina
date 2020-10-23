@@ -49,7 +49,7 @@ livenessProbe:
 {{- end }}
 
 {{/*
-block-producer readiness check settings
+user-agent readiness check settings
 */}}
 {{- define "healthcheck.userAgent.readinessCheck" }}
 readinessProbe:
