@@ -587,6 +587,16 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             }
         in
+        let%bind () =
+          if External_transition.blockchain_length t = Unsigned.UInt32.of_int 1
+          then
+            Conn.exec
+              (Caqti_request.exec Caqti_type.unit
+                 ( "ALTER SEQUENCE blocks_id_seq RESTART WITH "
+                 ^ string_of_int (block_id + 1) ))
+              ()
+          else return ()
+        in
         let transactions =
           External_transition.transactions ~constraint_constants t
         in
