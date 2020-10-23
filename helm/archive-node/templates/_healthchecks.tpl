@@ -31,7 +31,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL archive-node healthchecks
+ALL archive-node healthchecks  - TODO: readd startupProbes once k8s clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.archive.allChecks" }}
 {{ include "healthcheck.archive.livenessCheck" . }}

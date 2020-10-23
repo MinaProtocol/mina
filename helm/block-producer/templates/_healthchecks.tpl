@@ -22,7 +22,7 @@ block-producer readiness settings
 {{- end }}
 
 {{/*
-ALL block-producer healthchecks
+ALL block-producer healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.blockProducer.allChecks" }}
 {{- include "healthcheck.blockProducer.livenessCheck" . }}
@@ -59,7 +59,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL user-agent healthchecks
+ALL user-agent healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.userAgent.allChecks" }}
 {{- include "healthcheck.userAgent.livenessCheck" . }}
@@ -96,7 +96,7 @@ readinessProbe:
 {{- end }}
 
 {{/*
-ALL bots healthchecks
+ALL bots healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.bots.allChecks" }}
 {{- include "healthcheck.bots.livenessCheck" . }}

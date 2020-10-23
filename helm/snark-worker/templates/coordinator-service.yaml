@@ -11,10 +11,5 @@ spec:
     - port: {{ .Values.coordinator.rpcPort }}
       name: rpc
   selector:
-<<<<<<< HEAD
-    app: {{tpl $.Values.coordinator.fullname .}}
-{{ end }}
-=======
     app: {{tpl .Values.coordinator.fullname .}}
 {{ end }}
->>>>>>> 8f9439542... rebase and refactors

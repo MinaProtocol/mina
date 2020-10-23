@@ -22,7 +22,7 @@ seed-node readiness settings
 {{- end -}}
 
 {{/*
-ALL seed-node healthchecks
+ALL seed-node healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.seed.allChecks" }}
 {{ include "healthcheck.seed.livenessCheck" . }}

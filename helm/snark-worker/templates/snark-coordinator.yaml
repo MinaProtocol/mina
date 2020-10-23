@@ -53,8 +53,8 @@ spec:
           {{- end }}
         ]
         env:
-          - name: "RAYON_NUM_THREADS"
-            value: "7"
+        - name: "RAYON_NUM_THREADS"
+          value: "7"
         - name: DAEMON_REST_PORT
           value: {{ .Values.coordinator.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT

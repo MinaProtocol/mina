@@ -12,13 +12,13 @@ failureThreshold: {{ .healthcheck.failureThreshold }}
 {{/*
 Daemon startup probe settings
 */}}
-# {{- define "healthcheck.daemon.startupProbe" }}
-# startupProbe:
-#   tcpSocket:
-#     port: p2p-port
-#   failureThreshold: {{ .Values.healthcheck.failureThreshold }}
-#   periodSeconds: {{ .Values.healthcheck.periodSeconds }}
-# {{- end }}
+{{- define "healthcheck.daemon.startupProbe" }}
+startupProbe:
+  tcpSocket:
+    port: p2p-port
+  failureThreshold: {{ .Values.healthcheck.failureThreshold }}
+  periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+{{- end }}
 
 {{/*
 Daemon liveness check settings
