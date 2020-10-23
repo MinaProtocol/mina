@@ -37,7 +37,7 @@ Daemon readiness check settings
 readinessProbe:
   exec:
     command: [
-      "status=$(curl localhost:3085/graphql -d'{ query { daemonStatus { syncStatus } } }'); [[ status == \"synced\" ]] && return 0 || return 1"
+      "source /healthcheck/utilities.sh && isDaemonSynced"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
