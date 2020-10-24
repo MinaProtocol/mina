@@ -44,7 +44,7 @@ end]
 [%%else]
 
 let check x =
-  if T.equal x default || T.equal x (succ default) then x
+  if T.equal x default || T.equal x (next default) then x
   else failwith "Non-default tokens are disabled"
 
 [%%versioned_binable
