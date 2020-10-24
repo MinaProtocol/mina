@@ -1238,7 +1238,7 @@ module Types = struct
 
   module Payload = struct
     let peer : ('context, Network_peer.Peer.t option) typ =
-      obj "NetworkPeer" ~fields:(fun _ ->
+      obj "NetworkPeerPayload" ~fields:(fun _ ->
           [ field "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.peer_id)
