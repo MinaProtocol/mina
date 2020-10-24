@@ -138,6 +138,18 @@ module Node = struct
       }
     }
   |}]
+
+    (* TMP *)
+    module Get_node_name =
+    [%graphql
+    {|
+      query {
+        daemonStatus {
+          
+          name
+        }
+      }
+    |}]
   end
 
   let set_port_forwarding_exn ~logger t graphql_port =
