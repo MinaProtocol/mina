@@ -356,15 +356,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
-    let%bind parent_id =
-      match raw_block.parent_id with
-      | None ->
-          M.fail
-            (Errors.create ~context:"Parent block is null because genesis"
-               `Block_missing)
-      | Some id ->
-          M.return id
-    in
+    let parent_id = raw_block.parent_id in
     let%bind raw_parent_block, _parent_block_extras =
       match%bind
         Block.run_by_id (module Conn) parent_id
