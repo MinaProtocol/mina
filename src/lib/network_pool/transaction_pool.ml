@@ -112,6 +112,13 @@ module Diff_versioned = struct
   let is_empty t = List.is_empty t
 end
 
+type Structured_log_events.t +=
+  | Rejecting_command_for_reason of
+      { command: User_command.t
+      ; reason: Diff_versioned.Diff_error.t
+      ; error_extra: (string * Yojson.Safe.t) list }
+  [@@deriving register_event {msg= "Rejecting command because: $reason"}]
+
 module type S = sig
   open Intf
 
@@ -1066,19 +1073,15 @@ struct
                                     .Unwanted_fee_token )
                                   :: rejected )
                           | Error err ->
-                              let diff_err, err_extra =
+                              let diff_err, error_extra =
                                 of_indexed_pool_error err
                               in
                               if is_sender_local then
-                                [%log' error t.logger]
-                                  "rejecting $cmd because of $reason. \
-                                   ($error_extra)"
-                                  ~metadata:
-                                    [ ("cmd", User_command.to_yojson tx)
-                                    ; ( "reason"
-                                      , Diff_versioned.Diff_error.to_yojson
-                                          diff_err )
-                                    ; ("error_extra", `Assoc err_extra) ] ;
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra }) ;
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useless_gossip
@@ -1087,8 +1090,8 @@ struct
                                          ($error_extra)"
                                       , [ ("cmd", User_command.to_yojson tx)
                                         ; ("reason", yojson_fail_reason err)
-                                        ; ("error_extra", `Assoc err_extra) ]
-                                      ) )
+                                        ; ("error_extra", `Assoc error_extra)
+                                        ] ) )
                               in
                               go txs'' pool
                                 (accepted, (tx, diff_err) :: rejected) )
