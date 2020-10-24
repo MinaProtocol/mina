@@ -4,7 +4,7 @@
 [%%import "/src/config/consensus/postake_short.mlh"]
 [%%import "/src/config/scan_state/medium.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
-[%%import "/src/config/proof_level/check.mlh"]
+[%%import "/src/config/proof_level/none.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/high.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
