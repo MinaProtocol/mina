@@ -44,7 +44,8 @@ end]
 [%%else]
 
 let check x =
-  if T.equal x default then x else failwith "Non-default tokens are disabled"
+  if T.equal x default || T.equal x (succ default) then x
+  else failwith "Non-default tokens are disabled"
 
 [%%versioned_binable
 module Stable = struct
