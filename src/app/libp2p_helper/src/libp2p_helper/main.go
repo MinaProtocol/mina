@@ -438,10 +438,17 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			ress := strings.Split(res, "@")
 			trool := ress[0]
 
-			stateHash := "(not a block)"
-			if ress[1] != "" {
-				stateHash = ress[1]
-			}
+      sliceEnd := len(res)
+      if sliceEnd >= 16 {
+        sliceEnd = 16
+      }
+
+      stateHash := fmt.Sprintf("(not a block len=%d, prefix=%s)", len(res), res[:sliceEnd])
+      if len(ress) > 1 {
+        if ress[1] != "" {
+          stateHash = ress[1]
+        }
+      }
 			switch trool {
 			case "reject":
 				app.P2p.Logger.Infof("Rejected validation %s %s %s", stateHash, msgDigest, peer.IDB58Encode(id))
