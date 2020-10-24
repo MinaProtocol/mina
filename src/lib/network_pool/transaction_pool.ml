@@ -326,9 +326,9 @@ struct
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
-            (Currency.Amount.of_balance Account.min_balance_at_slot
-               ~global_slot ~cliff_time ~vesting_period ~vesting_increment
-               ~initial_minimum_balance)
+            (Currency.Balance.to_amount
+               (Account.min_balance_at_slot ~global_slot ~cliff_time
+                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
 
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
