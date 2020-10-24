@@ -24,12 +24,17 @@ module T = struct
           * Transaction_snark.Statement.t
           * Coda_base.Sok_message.t )
           list
+      | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Unexpected of Error.t
     [@@deriving sexp]
 
     let to_string = function
+      | Couldn't_reach_verifier e ->
+          Format.asprintf
+            !"The verifier could not be reached: %{sexp:Error.t}"
+            e
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
@@ -83,7 +88,7 @@ module T = struct
               ) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
-      Deferred.return false
+      Deferred.return (Or_error.error_string err_str)
     in
     if
       List.exists proofs ~f:(fun (proof, statement, _msg) ->
@@ -101,7 +106,7 @@ module T = struct
                        (Ledger_proof.statement p) )) ) ]
     else
       let start = Time.now () in
-      match%bind
+      match%map
         Verifier.verify_transaction_snarks verifier
           (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
       with
@@ -115,7 +120,7 @@ module T = struct
                          `Int (Transaction_snark.Statement.hash s) )) )
               ; ("time", `Float time_ms) ]
             "Verification in apply_diff for work $work_id took $time ms" ;
-          Deferred.return b
+          Ok b
       | Error e ->
           [%log fatal]
             ~metadata:
@@ -126,7 +131,7 @@ module T = struct
               ; ("error", `String (Error.to_string_hum e)) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
-          exit 21
+          Error e
 
   let map_opt xs ~f =
     with_return (fun {return} ->
@@ -149,10 +154,12 @@ module T = struct
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | true ->
+        | Ok true ->
             Ok ()
-        | _ ->
-            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs) )
+        | Ok false ->
+            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs)
+        | Error e ->
+            Error (Couldn't_reach_verifier e) )
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
@@ -160,7 +167,7 @@ module T = struct
               (struct
                 type t = unit
 
-                let verify ~verifier:() _proofs = Deferred.return true
+                let verify ~verifier:() _proofs = Deferred.return (Ok true)
               end)
   end
 
