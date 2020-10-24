@@ -74,6 +74,6 @@ CREATE TABLE blocks_internal_commands
 ( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
-, secondary_sequence_no int
+, secondary_sequence_no int NOT NULL
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );
