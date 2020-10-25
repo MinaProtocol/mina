@@ -13,7 +13,7 @@ while [[ "$#" -gt 0 ]]; do
         -w|--whales) whales="$2"; shift ;;
         -f|--fish) fish="$2"; shift ;;
         -n|--nodes) nodes="$2"; shift ;;
-        -t|--transactions) transactions=truee; shift ;;
+        -t|--transactions) transactions=true; shift ;;
         -r|--reset) reset=true; shift;;
         -h|--help) help=true; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
@@ -31,9 +31,12 @@ if $help; then
   exit
 fi
 
+
 if $transactions; then
-  echo "automated transactions in addition to coinbase not supported yet"
-  exit
+  if [ "$fish" -eq "0" ]; then
+    echo "transactions require at least one fish"
+    exit
+  fi
 fi
 
 # kill background process when script closes
@@ -134,7 +137,12 @@ mkdir $nodesfolder/seed
 $CODA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace &> $nodesfolder/seed/log.txt &
 seed_pid=$!
 
-sleep 5
+echo 'waiting for seed to go up...'
+
+until $CODA client status -daemon-port 3000 &> /dev/null
+do
+  sleep 1
+done
 
 # ----------
 
@@ -227,5 +235,33 @@ done
 
 # ================================================
 # Wait for nodes
+
+if $transactions; then
+  folder=$nodesfolder/fish_1
+  keyfile=$ledgerfolder/online_fish_keys/online_fish_account_1
+  pubkey=$(cat $ledgerfolder/online_fish_keys/online_fish_account_1.pub)
+  port=5006
+  transaction_frequency=5
+
+  echo "waiting for node to be up to start sending transactions..."
+
+  until $CODA client status -daemon-port 5005 &> /dev/null
+  do
+    sleep 1
+  done
+
+  echo "starting to send transactions every $transaction_frequency seconds"
+
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA account import -config-directory $folder -rest-server "http://127.0.0.1:$port/graphql" -privkey-path $keyfile &> /dev/null
+
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA account unlock -rest-server "http://127.0.0.1:$port/graphql" -public-key $pubkey  &> /dev/null
+
+  while true; do
+    sleep $transaction_frequency
+    CODA_PRIVKEY_PASS="naughty blue worm" $CODA client send-payment -rest-server "http://127.0.0.1:$port/graphql" -amount 1 -receiver $pubkey -sender $pubkey &> /dev/null
+  done
+
+
+fi
 
 wait
