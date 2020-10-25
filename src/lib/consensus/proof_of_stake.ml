@@ -860,6 +860,9 @@ module Data = struct
                                  [ Coda_base.(
                                      Account_id.create
                                        (Public_key.compress public_key)
+                                       Token_id.default)
+                                 ; Coda_base.(
+                                     Account_id.create account.public_key
                                        Token_id.default) ]
                                  epoch_snapshot.ledger }
                        ; global_slot
