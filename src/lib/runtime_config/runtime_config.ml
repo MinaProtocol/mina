@@ -332,7 +332,7 @@ end
       , "c": 8
       , "ledger_depth": 14
       , "work_delay": 2
-      , "block_window_duration_ms": 180000
+      , "block_window_duration_ms": 120000
       , "transaction_capacity": {"txns_per_second_x10": 2}
       , "coinbase_amount": "200"
       , "supercharged_coinbase_factor": 2
