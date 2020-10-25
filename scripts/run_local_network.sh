@@ -34,7 +34,7 @@ fi
 
 if $transactions; then
   if [ "$fish" -eq "0" ]; then
-    echo "transactions require at least one fish"
+    echo "sending transactions require at least one fish"
     exit
   fi
 fi
@@ -49,7 +49,7 @@ echo -e "\t1 seed"
 echo -e "\t$whales whales"
 echo -e "\t$fish fish"
 echo -e "\t$nodes non block-producing nodes"
-echo -e "\tautomated transactions: $transactions"
+echo -e "\sending transactions: $transactions"
 
 # ================================================
 # Create genesis ledger
@@ -200,7 +200,6 @@ done
 
 # ================================================
 
-
 echo "Node information:"
 
 echo -e "\tseed"
@@ -234,7 +233,7 @@ for i in $(seq 1 $nodes); do
 done
 
 # ================================================
-# Wait for nodes
+# Start sending transactions
 
 if $transactions; then
   folder=$nodesfolder/fish_1
@@ -261,7 +260,9 @@ if $transactions; then
     CODA_PRIVKEY_PASS="naughty blue worm" $CODA client send-payment -rest-server "http://127.0.0.1:$port/graphql" -amount 1 -receiver $pubkey -sender $pubkey &> /dev/null
   done
 
-
 fi
+
+# ================================================
+# Wait for nodes
 
 wait
