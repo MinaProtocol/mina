@@ -840,12 +840,12 @@ module Test_configs = struct
   { "daemon":
       { "txpool_max_size": 3000 }
   , "genesis":
-      { "k": 1
+      { "k": 4
       , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "c": 4
       , "ledger_depth": 6
       , "work_delay": 1
       , "block_window_duration_ms": 5000
