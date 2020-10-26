@@ -358,7 +358,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; action: string} [@@deriving yojson]
+      type input = {seqno: int; is_valid: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -826,7 +826,7 @@ module Helper = struct
               do_rpc t
                 (module Rpcs.Validation_complete)
                 { seqno
-                ; action=
+                ; is_valid=
                     ( match action with
                     | `Accept, state_hash ->
                         {Validity_result.res= "accept"; state_hash}
