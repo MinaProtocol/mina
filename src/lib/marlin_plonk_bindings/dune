@@ -3,5 +3,8 @@
  (name marlin_plonk_bindings)
  (libraries
    marlin_plonk_bindings_stubs
+   ;; Biginteger types backing fields
    marlin_plonk_bindings_bigint_256
-   marlin_plonk_bindings_bigint_384))
+   marlin_plonk_bindings_bigint_384
+   ;; Finite fields
+   marlin_plonk_bindings_tweedle_fp))
