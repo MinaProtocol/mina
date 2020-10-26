@@ -18,7 +18,11 @@ block-producer liveness settings
 block-producer readiness settings
 */}}
 {{- define "healthcheck.blockProducer.readinessCheck" }}
-{{- include "healthcheck.daemon.readinessCheck" . }}
+readinessProbe:
+  exec:
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasPeersGreaterThan 3 && ownsFunds"
+    ]
 {{- end }}
 
 {{/*
@@ -54,7 +58,9 @@ user-agent readiness check settings
 {{- define "healthcheck.userAgent.readinessCheck" }}
 readinessProbe:
   exec:
-    command: ["curl localhost:8000/metrics"]
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 1"
+    ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 
@@ -91,7 +97,9 @@ Mina testnet bot readiness check settings
 {{- define "healthcheck.bots.readinessCheck" }}
 readinessProbe:
   exec:
-    command: ["<verify-echo-faucet-functional>"]
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 3 && ownsFunds"
+    ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 

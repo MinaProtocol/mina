@@ -7,8 +7,6 @@ archive-node startup probe settings
 startupProbe:
   tcpSocket:
     port: archive-postgres-port
-  failureThreshold: {{ .Values.healthcheck.failureThreshold }}
-  periodSeconds: {{ .Values.healthcheck.periodSeconds }}
 {{- end }}
 
 {{/*
@@ -27,7 +25,9 @@ archive-node readiness check settings
 {{- define "healthcheck.archive.readinessCheck" }}
 readinessProbe:
   exec:
-    command: ["<postgres-query>"]
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced"
+    ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 

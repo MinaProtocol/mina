@@ -17,9 +17,13 @@ seed-node liveness settings
 {{/*
 seed-node readiness settings
 */}}
-{{- define "healthcheck.seed.readinessCheck" -}}
-{{- include "healthcheck.daemon.readinessCheck" . }}
-{{- end -}}
+{{- define "healthcheck.seed.readinessCheck" }}
+readinessProbe:
+  exec:
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 1"
+    ]
+{{- end }}
 
 {{/*
 ALL seed-node healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16

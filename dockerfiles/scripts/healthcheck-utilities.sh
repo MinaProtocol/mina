@@ -72,3 +72,43 @@ function hasSentUserCommandsGreaterThan() {
     [[ $userCmdSent -gt $userCmdMinThreshold ]] && return 0 ||
         (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1) 
 }
+
+#
+# Determine whether a SNARK coordinator has an assigned SNARK-worker
+#
+function hasSnarkWorker() {
+    snarkWorker=$(
+        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' localhost:3085/graphql | \
+            jq '.data.daemonStatus.snarkWorker'
+    )
+    rc=$?
+    
+    [[ "$rc" == 0 ]] && [[ -n "$snarkWorker" ]] && return 0 ||
+        (echo "Snark worker error: ${rc} - $snarkWorker" && return 1) 
+}
+
+#
+# Determine whether an Archive node's highest observed block is in sync with its local Mina daemon
+#
+function isArchiveSynced() {
+    echo "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>]"
+
+    while [[ "$#" -gt 0 ]]; do case $1 in
+        --db-host) host="$2"; shift;;
+        --db-port) port="$2"; shift;;
+        --db-user) user="$2"; shift;;
+        --db-password) password="$2"; shift;;
+        *) echo "Unknown parameter passed: $1"; exit 1;;
+    esac; shift; done
+
+    highestObserved=$(
+        PGPASSWORD=$password psql -qtAX -h $host -p $port -d archive -U $user \
+            -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
+    )
+    highestReceived=$(
+        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+            jq '.data.daemonStatus.highestBlockLengthReceived'
+    )
+    
+    [[ highestObserved == highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1) 
+}

@@ -18,7 +18,11 @@ snark-coordinator liveness settings
 snark-coordinator readiness settings
 */}}
 {{- define "healthcheck.snarkCoordinator.readinessCheck" }}
-{{- include "healthcheck.daemon.readinessCheck" . }}
+readinessProbe:
+  exec:
+    command: [
+      "source /healthcheck/utilities.sh && isDaemonSynced && ownsFunds && hasSnarkWorker"
+    ]
 {{- end }}
 
 {{/*

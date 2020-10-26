@@ -17,7 +17,7 @@ startupProbe:
   tcpSocket:
     port: p2p-port
   failureThreshold: {{ default .Values.healthcheck.startup.failureThreshold 30 }}
-  periodSeconds: {{ default .Values.healthcheck.periodSeconds 10 }}
+  periodSeconds: {{ default .Values.healthcheck.startup.periodSeconds 10 }}
 {{- end }}
 
 {{/*
