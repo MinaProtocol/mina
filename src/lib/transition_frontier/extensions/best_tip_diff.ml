@@ -85,8 +85,7 @@ module T = struct
               in
               ({new_commands; removed_commands; reorg_best_tip}, true)
           | E (New_node (Full _), _) -> (acc, should_broadcast)
-          | E (Root_transitioned _, _) -> (acc, should_broadcast)
-          | E (New_node (Lite _), _) -> failwith "impossible" )
+          | E (Root_transitioned _, _) -> (acc, should_broadcast) )
     in
     Option.some_if should_broadcast view
 end

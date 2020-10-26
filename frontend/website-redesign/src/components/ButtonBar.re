@@ -198,6 +198,7 @@ module HelpAndSupport = {
           Theme.Typeface.monumentGrotesk,
           color(Theme.Colors.white),
           fontSize(`rem(0.75)),
+          textAlign(`center),
           lineHeight(`rem(1.)),
           textTransform(`uppercase),
           letterSpacing(`em(0.02)),
@@ -343,36 +344,34 @@ module GetStarted = {
       </Card>;
     };
 
-    <Wrapped>
-      <div className=ButtonBarStyles.container>
-        <div className=ButtonBarStyles.grid>
-          {renderCard(
-             Icon.NodeOperators,
-             `Internal("/tech"),
-             "Run a node",
-             "Getting started is easier than you think.",
-           )}
-          {renderCard(
-             Icon.Developers,
-             `Internal("/docs"),
-             "Build on Mina",
-             "Work on the protocol  and contribute to Mina's codebase.",
-           )}
-          {renderCard(
-             Icon.Community,
-             `Internal("/community"),
-             "Join the Community",
-             "Let's keep it positive and productive.",
-           )}
-          {renderCard(
-             Icon.GrantsProgram,
-             `Internal("/docs/contributing#mina-grants"),
-             "Apply for a Grant",
-             "Roll up your sleeves and help build Mina.",
-           )}
-        </div>
+    <div className=ButtonBarStyles.container>
+      <div className=ButtonBarStyles.grid>
+        {renderCard(
+           Icon.NodeOperators,
+           `Internal("/tech"),
+           "Run a node",
+           "Getting started is easier than you think.",
+         )}
+        {renderCard(
+           Icon.Developers,
+           `Internal("/docs"),
+           "Build on Mina",
+           "Work on the protocol  and contribute to Mina's codebase.",
+         )}
+        {renderCard(
+           Icon.Community,
+           `Internal("/community"),
+           "Join the Community",
+           "Let's keep it positive and productive.",
+         )}
+        {renderCard(
+           Icon.GrantsProgram,
+           `Internal("/docs/contributing#mina-grants"),
+           "Apply for a Grant",
+           "Roll up your sleeves and help build Mina.",
+         )}
       </div>
-    </Wrapped>;
+    </div>;
   };
 };
 

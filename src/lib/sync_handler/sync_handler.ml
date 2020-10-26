@@ -142,11 +142,12 @@ module Make (Inputs : Inputs_intf) :
       best_tip_with_witness
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
-        observed_state peer_root =
+        ~precomputed_values observed_state peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants peer_root
+        Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
+          peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.select ~constants:consensus_constants

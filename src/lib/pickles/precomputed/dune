@@ -1,0 +1,16 @@
+(library
+ (name precomputed)
+ (public_name pickles.precomputed)
+ (libraries
+   core_kernel
+   zexe_backend)
+ (ppx_runtime_libraries base)
+ (preprocess
+  (pps bisect_ppx ppx_version ppx_jane ppxlib.metaquot -- --conditional)))
+
+;(rule
+; (targets precomp.ml)
+; (deps
+;  (:< gen_values/gen_values.exe))
+; (action
+;  (run %{<} %{targets})))

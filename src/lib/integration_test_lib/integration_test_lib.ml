@@ -24,7 +24,7 @@ module Test_config = struct
 
   let default =
     { k= 20
-    ; delta= 3
+    ; delta= 0
     ; proof_level= Full
     ; txpool_max_size= 3000
     ; num_snark_workers= 2
@@ -129,12 +129,15 @@ module type Engine_intf = sig
     val wait_for :
          ?blocks:int
       -> ?epoch_reached:int
+      -> ?snarked_ledgers_generated:int
       -> ?timeout:[ `Slots of int
                   | `Epochs of int
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> ([> `Blocks_produced of int] * [> `Slots_passed of int])
+      -> ( [> `Blocks_produced of int]
+         * [> `Slots_passed of int]
+         * [> `Snarked_ledgers_generated of int] )
          Malleable_error.t
 
     val wait_for_sync :

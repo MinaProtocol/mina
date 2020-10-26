@@ -7,5 +7,6 @@
     limb_vector
     zexe_backend
     pickles_types
+    pickles_base
     snarky.backendless
     core_kernel ))
