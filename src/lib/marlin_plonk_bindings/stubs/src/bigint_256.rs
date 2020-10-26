@@ -10,7 +10,8 @@ const BIGINT256_NUM_LIMBS: i32 =
     (BIGINT256_NUM_BITS + BIGINT256_LIMB_BITS - 1) / BIGINT256_LIMB_BITS;
 const BIGINT256_NUM_BYTES: usize = (BIGINT256_NUM_LIMBS as usize) * 8;
 
-pub struct CamlBigint256(BigInteger256);
+#[derive(Copy, Clone)]
+pub struct CamlBigint256(pub BigInteger256);
 
 pub type CamlBigint256Ptr = ocaml::Pointer<CamlBigint256>;
 
@@ -27,14 +28,14 @@ extern "C" fn caml_bigint_256_compare_raw(x: ocaml::Value, y: ocaml::Value) -> l
 
 impl From<&CamlBigint256> for BigUint {
     fn from(x: &CamlBigint256) -> BigUint {
-        let x_ = ((*x).0).0.as_ptr() as *const u8;
+        let x_ = (x.0).0.as_ptr() as *const u8;
         let x_ = unsafe { std::slice::from_raw_parts(x_, BIGINT256_NUM_BYTES) };
         num_bigint::BigUint::from_bytes_le(x_)
     }
 }
 
-impl From<BigUint> for CamlBigint256 {
-    fn from(x: BigUint) -> CamlBigint256 {
+impl From<&BigUint> for CamlBigint256 {
+    fn from(x: &BigUint) -> CamlBigint256 {
         let mut bytes = x.to_bytes_le();
         bytes.resize(BIGINT256_NUM_BYTES, 0);
         let limbs = bytes.as_ptr();
@@ -61,7 +62,7 @@ pub fn caml_bigint_256_of_numeral(
     base: u32,
 ) -> Result<CamlBigint256, ocaml::Error> {
     match BigUint::parse_bytes(s, base) {
-        Some(data) => Ok(data.into()),
+        Some(data) => Ok((&data).into()),
         None => Err(ocaml::Error::invalid_argument("caml_bigint_256_of_numeral")
             .err()
             .unwrap()),
@@ -71,7 +72,7 @@ pub fn caml_bigint_256_of_numeral(
 #[ocaml::func]
 pub fn caml_bigint_256_of_decimal_string(s: &[u8]) -> Result<CamlBigint256, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok(data.into()),
+        Some(data) => Ok((&data).into()),
         None => Err(
             ocaml::Error::invalid_argument("caml_bigint_256_of_decimal_string")
                 .err()
@@ -93,7 +94,7 @@ pub fn caml_bigint_256_bytes_per_limb() -> ocaml::Int {
 #[ocaml::func]
 pub fn caml_bigint_256_div(x: CamlBigint256Ptr, y: CamlBigint256Ptr) -> CamlBigint256 {
     let res: BigUint = BigUint::from(x.as_ref()) / BigUint::from(y.as_ref());
-    res.into()
+    (&res).into()
 }
 
 #[ocaml::func]
