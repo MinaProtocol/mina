@@ -7,4 +7,5 @@
    marlin_plonk_bindings_bigint_256
    marlin_plonk_bindings_bigint_384
    ;; Finite fields
-   marlin_plonk_bindings_tweedle_fp))
+   marlin_plonk_bindings_tweedle_fp
+   marlin_plonk_bindings_tweedle_fq))
