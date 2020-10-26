@@ -437,7 +437,7 @@ module Incentives = {
         slug="incentives">
         <Button
           width={`rem(15.25)}
-          href={`Internal("/static/pdf/economicsWP.pdf")}>
+          href={`Internal("/static/pdf/economicsWhitepaper.pdf")}>
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
