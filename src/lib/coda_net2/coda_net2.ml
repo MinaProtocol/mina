@@ -294,7 +294,7 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; flooding: bool
+        ; flood: bool
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
