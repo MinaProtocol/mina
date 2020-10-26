@@ -61,6 +61,7 @@ module Staged_ledger_error : sig
         * Transaction_snark.Statement.t
         * Coda_base.Sok_message.t )
         list
+    | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
     | Unexpected of Error.t
