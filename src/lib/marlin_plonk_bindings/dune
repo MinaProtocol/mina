@@ -3,4 +3,5 @@
  (name marlin_plonk_bindings)
  (libraries
    marlin_plonk_bindings_stubs
+   marlin_plonk_bindings_bigint_256
    marlin_plonk_bindings_bigint_384))
