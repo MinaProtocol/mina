@@ -23,3 +23,8 @@ module Bn_382_fq_vector = Marlin_plonk_bindings_bn_382_fq_vector
 
 module Tweedle_dee = Marlin_plonk_bindings_tweedle_dee
 module Tweedle_dum = Marlin_plonk_bindings_tweedle_dum
+
+(* URSs *)
+
+module Tweedle_fp_urs = Marlin_plonk_bindings_tweedle_fp_urs
+module Tweedle_fq_urs = Marlin_plonk_bindings_tweedle_fq_urs

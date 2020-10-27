@@ -19,4 +19,7 @@
    marlin_plonk_bindings_bn_382_fq_vector
    ;; Groups
    marlin_plonk_bindings_tweedle_dee
-   marlin_plonk_bindings_tweedle_dum))
+   marlin_plonk_bindings_tweedle_dum
+   ;; URSs
+   marlin_plonk_bindings_tweedle_fp_urs
+   marlin_plonk_bindings_tweedle_fq_urs))

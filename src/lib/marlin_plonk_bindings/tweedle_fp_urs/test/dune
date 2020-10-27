@@ -1,0 +1,3 @@
+(executable
+ (name test)
+ (libraries marlin_plonk_bindings_tweedle_fp_urs))

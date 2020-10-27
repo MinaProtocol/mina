@@ -16,3 +16,7 @@ pub mod tweedle_fq_vector;
 /* Groups */
 pub mod tweedle_dee;
 pub mod tweedle_dum;
+/* URS */
+pub mod tweedle_fp_urs;
+pub mod tweedle_fq_urs;
+pub mod urs_utils;

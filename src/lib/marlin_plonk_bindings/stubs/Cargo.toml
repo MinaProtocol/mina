@@ -36,3 +36,6 @@ marlin_protocol_pairing = { path = "../../marlin/pairing/marlin" }
 commitment_dlog = { path = "../../marlin/dlog/commitment" }
 marlin_protocol_dlog = { path = "../../marlin/dlog/marlin/" }
 plonk_protocol_dlog = { path = "../../marlin/dlog/plonk" }
+
+[profile.release]
+debug = true
