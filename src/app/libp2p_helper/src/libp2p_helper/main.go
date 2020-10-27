@@ -82,7 +82,7 @@ const (
 	removeStreamHandler
 	addStreamHandler
 	listeningAddrs
-	addPeer
+	addPeers
 	beginAdvertising
 	findPeer
 	listPeers
@@ -808,6 +808,7 @@ func (ap *addPeersMsg) run(app *app) (interface{}, error) {
 
 	for _, maddr := range ap.Multiaddrs {
 		info, err := addrInfoOfString(ap.Multiaddr)
+
 		if err != nil {
 			return nil, err
 		}
@@ -1077,7 +1078,7 @@ var msgHandlers = map[methodIdx]func() action{
 	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
 	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
 	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeer:             func() action { return &addPeerMsg{} },
+	addPeers:             func() action { return &addPeersMsg{} },
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },

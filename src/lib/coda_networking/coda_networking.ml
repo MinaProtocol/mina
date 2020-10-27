@@ -13,35 +13,35 @@ exception No_initial_peers
 
 type Structured_log_events.t +=
   | Block_received of {state_hash: State_hash.t; sender: Envelope.Sender.t}
-[@@deriving register_event {msg= "Received a block from $sender"}]
+  [@@deriving register_event {msg= "Received a block from $sender"}]
 
 type Structured_log_events.t +=
   | Snark_work_received of
       { work: Snark_pool.Resource_pool.Diff.compact
       ; sender: Envelope.Sender.t }
-[@@deriving
-  register_event {msg= "Received Snark-pool diff $work from $sender"}]
+  [@@deriving
+    register_event {msg= "Received Snark-pool diff $work from $sender"}]
 
 type Structured_log_events.t +=
   | Transactions_received of
       { txns: Transaction_pool.Resource_pool.Diff.t
       ; sender: Envelope.Sender.t }
-[@@deriving
-  register_event {msg= "Received transaction-pool diff $txns from $sender"}]
+  [@@deriving
+    register_event {msg= "Received transaction-pool diff $txns from $sender"}]
 
 type Structured_log_events.t += Gossip_new_state of {state_hash: State_hash.t}
-[@@deriving register_event {msg= "Broadcasting new state over gossip net"}]
+  [@@deriving register_event {msg= "Broadcasting new state over gossip net"}]
 
 type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
       { txns: Transaction_pool.Resource_pool.Diff.t }
-[@@deriving
-  register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
+  [@@deriving
+    register_event {msg= "Broadcasting transaction pool diff over gossip net"}]
 
 type Structured_log_events.t +=
   | Gossip_snark_pool_diff of {work: Snark_pool.Resource_pool.Diff.compact}
-[@@deriving
-  register_event {msg= "Broadcasting snark pool diff over gossip net"}]
+  [@@deriving
+    register_event {msg= "Broadcasting snark pool diff over gossip net"}]
 
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
@@ -81,9 +81,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -103,9 +103,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -122,10 +122,10 @@ module Rpcs = struct
 
         type response =
           ( Staged_ledger.Scan_state.t
-            * Ledger_hash.t
-            * Pending_coinbase.t
-            * Coda_state.Protocol_state.value list )
-            option
+          * Ledger_hash.t
+          * Pending_coinbase.t
+          * Coda_state.Protocol_state.value list )
+          option
       end
 
       module Caller = T
@@ -137,9 +137,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -147,10 +147,10 @@ module Rpcs = struct
 
         type response =
           ( Staged_ledger.Scan_state.Stable.V1.t
-            * Ledger_hash.Stable.V1.t
-            * Pending_coinbase.Stable.V1.t
-            * Coda_state.Protocol_state.Value.Stable.V1.t list )
-            option
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.Stable.V1.t
+          * Coda_state.Protocol_state.Value.Stable.V1.t list )
+          option
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -164,9 +164,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -193,9 +193,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -217,9 +217,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -246,9 +246,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -269,9 +269,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -298,9 +298,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -322,9 +322,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -343,8 +343,8 @@ module Rpcs = struct
         type response =
           ( External_transition.t
           , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
-            option
+          Proof_carrying_data.t
+          option
       end
 
       module Caller = T
@@ -356,9 +356,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -369,8 +369,8 @@ module Rpcs = struct
           ( External_transition.Stable.V1.t
           , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
           )
-            Proof_carrying_data.Stable.V1.t
-            option
+          Proof_carrying_data.Stable.V1.t
+          option
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -384,9 +384,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -414,9 +414,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -436,9 +436,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -456,8 +456,8 @@ module Rpcs = struct
         type response =
           ( External_transition.t
           , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
-            option
+          Proof_carrying_data.t
+          option
       end
 
       module Caller = T
@@ -469,9 +469,9 @@ module Rpcs = struct
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -481,8 +481,8 @@ module Rpcs = struct
           ( External_transition.Stable.V1.t
           , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
           )
-            Proof_carrying_data.Stable.V1.t
-            option
+          Proof_carrying_data.Stable.V1.t
+          option
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -496,9 +496,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -518,29 +518,29 @@ module Rpcs = struct
         `List (List.map ban_statuses ~f:yojson_of_ban_status)
 
       [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
-                    [@to_yojson
-                      fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-              ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
-                    [@to_yojson fun peer_id -> `String peer_id]
-              ; peers: Network_peer.Peer.Stable.V1.t list
-              ; block_producers:
-                  Signature_lib.Public_key.Compressed.Stable.V1.t list
-              ; protocol_state_hash: State_hash.Stable.V1.t
-              ; ban_statuses:
-                  ( Network_peer.Peer.Stable.V1.t
-                    * Trust_system.Peer_status.Stable.V1.t )
-                    list
-                    [@to_yojson yojson_of_ban_statuses]
-              ; k_block_hashes: State_hash.Stable.V1.t list }
-            [@@deriving to_yojson]
+      module Stable = struct
+        module V1 = struct
+          type t =
+            { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@to_yojson
+                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
+            ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
+                  [@to_yojson fun peer_id -> `String peer_id]
+            ; peers: Network_peer.Peer.Stable.V1.t list
+            ; block_producers:
+                Signature_lib.Public_key.Compressed.Stable.V1.t list
+            ; protocol_state_hash: State_hash.Stable.V1.t
+            ; ban_statuses:
+                ( Network_peer.Peer.Stable.V1.t
+                * Trust_system.Peer_status.Stable.V1.t )
+                list
+                  [@to_yojson yojson_of_ban_statuses]
+            ; k_block_hashes: State_hash.Stable.V1.t list }
+          [@@deriving to_yojson]
 
-            let to_latest = Fn.id
-          end
-        end]
+          let to_latest = Fn.id
+        end
+      end]
     end
 
     module Master = struct
@@ -563,14 +563,14 @@ module Rpcs = struct
     let response_to_yojson response =
       match response with
       | Ok telem ->
-        Telemetry_data.Stable.V1.to_yojson telem
+          Telemetry_data.Stable.V1.to_yojson telem
       | Error err ->
-        `Assoc [("error", `String (Error.to_string_hum err))]
+          `Assoc [("error", `String (Error.to_string_hum err))]
 
     include Perf_histograms.Rpc.Plain.Extend (struct
-        include M
-        include Master
-      end)
+      include M
+      include Master
+    end)
 
     module V1 = struct
       module T = struct
@@ -591,9 +591,9 @@ module Rpcs = struct
 
       module T' =
         Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
+            include M
+            include Master
+          end)
           (T)
 
       include T'
@@ -603,85 +603,85 @@ module Rpcs = struct
 
   type ('query, 'response) rpc =
     | Get_some_initial_peers
-      : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
+        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
-      : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
-        , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
+        : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+          , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
           rpc
     | Answer_sync_ledger_query
-      : ( Answer_sync_ledger_query.query
-        , Answer_sync_ledger_query.response )
+        : ( Answer_sync_ledger_query.query
+          , Answer_sync_ledger_query.response )
           rpc
     | Get_transition_chain
-      : (Get_transition_chain.query, Get_transition_chain.response) rpc
+        : (Get_transition_chain.query, Get_transition_chain.response) rpc
     | Get_transition_chain_proof
-      : ( Get_transition_chain_proof.query
-        , Get_transition_chain_proof.response )
+        : ( Get_transition_chain_proof.query
+          , Get_transition_chain_proof.response )
           rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
     | Get_telemetry_data
-      : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
+        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
     | Rpc_handler : ('q, 'r) rpc * ('q, 'r) Rpc_intf.rpc_fn -> rpc_handler
 
   let implementation_of_rpc : type q r.
-    (q, r) rpc -> (q, r) Rpc_intf.rpc_implementation = function
+      (q, r) rpc -> (q, r) Rpc_intf.rpc_implementation = function
     | Get_some_initial_peers ->
-      (module Get_some_initial_peers)
+        (module Get_some_initial_peers)
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
-      (module Get_staged_ledger_aux_and_pending_coinbases_at_hash)
+        (module Get_staged_ledger_aux_and_pending_coinbases_at_hash)
     | Answer_sync_ledger_query ->
-      (module Answer_sync_ledger_query)
+        (module Answer_sync_ledger_query)
     | Get_transition_chain ->
-      (module Get_transition_chain)
+        (module Get_transition_chain)
     | Get_transition_chain_proof ->
-      (module Get_transition_chain_proof)
+        (module Get_transition_chain_proof)
     | Get_ancestry ->
-      (module Get_ancestry)
+        (module Get_ancestry)
     | Ban_notify ->
-      (module Ban_notify)
+        (module Ban_notify)
     | Get_best_tip ->
-      (module Get_best_tip)
+        (module Get_best_tip)
     | Get_telemetry_data ->
-      (module Get_telemetry_data)
+        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
-      Consensus.Hooks.Rpcs.implementation_of_rpc rpc
+        Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
   let match_handler : type q r.
-    rpc_handler
-    -> (q, r) rpc
-    -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
-    -> 'a option =
-    fun handler rpc ~do_ ->
+         rpc_handler
+      -> (q, r) rpc
+      -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
+      -> 'a option =
+   fun handler rpc ~do_ ->
     match (rpc, handler) with
     | Get_some_initial_peers, Rpc_handler (Get_some_initial_peers, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
       , Rpc_handler (Get_staged_ledger_aux_and_pending_coinbases_at_hash, f) )
       ->
-      Some (do_ f)
+        Some (do_ f)
     | Answer_sync_ledger_query, Rpc_handler (Answer_sync_ledger_query, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | Get_transition_chain, Rpc_handler (Get_transition_chain, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | Get_transition_chain_proof, Rpc_handler (Get_transition_chain_proof, f)
       ->
-      Some (do_ f)
+        Some (do_ f)
     | Get_ancestry, Rpc_handler (Get_ancestry, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | Ban_notify, Rpc_handler (Ban_notify, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | Get_best_tip, Rpc_handler (Get_best_tip, f) ->
-      Some (do_ f)
+        Some (do_ f)
     | Consensus_rpc rpc_a, Rpc_handler (Consensus_rpc rpc_b, f) ->
-      Consensus.Hooks.Rpcs.match_handler (Rpc_handler (rpc_b, f)) rpc_a ~do_
+        Consensus.Hooks.Rpcs.match_handler (Rpc_handler (rpc_b, f)) rpc_a ~do_
     (* TODO: Why is there a catch-all here? *)
     | _ ->
-      None
+        None
 end
 
 module Gossip_net = Gossip_net.Make (Rpcs)
@@ -710,17 +710,17 @@ type t =
   ; gossip_net: Gossip_net.Any.t
   ; states:
       ( External_transition.t Envelope.Incoming.t
-        * Block_time.t
-        * (Coda_net2.validation_result -> unit) )
-        Strict_pipe.Reader.t
+      * Block_time.t
+      * (Coda_net2.validation_result -> unit) )
+      Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-        * (Coda_net2.validation_result -> unit) )
-        Strict_pipe.Reader.t
+      * (Coda_net2.validation_result -> unit) )
+      Strict_pipe.Reader.t
   ; snark_pool_diffs:
       ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-        * (Coda_net2.validation_result -> unit) )
-        Strict_pipe.Reader.t
+      * (Coda_net2.validation_result -> unit) )
+      Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
@@ -734,11 +734,11 @@ let offline_time
 let setup_timer ~constraint_constants time_controller sync_state_broadcaster =
   Block_time.Timeout.create time_controller (offline_time constraint_constants)
     ~f:(fun _ ->
-        Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
-        |> don't_wait_for )
+      Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
+      |> don't_wait_for )
 
 let online_broadcaster ~constraint_constants time_controller received_messages
-  =
+    =
   let online_reader, online_writer = Broadcast_pipe.create `Offline in
   let init =
     Block_time.Timeout.create time_controller
@@ -757,31 +757,31 @@ let wrap_rpc_data_in_envelope conn data =
 
 let create (config : Config.t)
     ~(get_some_initial_peers :
-        Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
-      -> Rpcs.Get_some_initial_peers.response Deferred.t)
+          Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
+       -> Rpcs.Get_some_initial_peers.response Deferred.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
-        Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+          Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           Envelope.Incoming.t
-      -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
-        Deferred.t)
+       -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
+          Deferred.t)
     ~(answer_sync_ledger_query :
-        Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
-      -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
+          Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
+       -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
     ~(get_ancestry :
-        Rpcs.Get_ancestry.query Envelope.Incoming.t
-      -> Rpcs.Get_ancestry.response Deferred.t)
+          Rpcs.Get_ancestry.query Envelope.Incoming.t
+       -> Rpcs.Get_ancestry.response Deferred.t)
     ~(get_best_tip :
-        Rpcs.Get_best_tip.query Envelope.Incoming.t
-      -> Rpcs.Get_best_tip.response Deferred.t)
+          Rpcs.Get_best_tip.query Envelope.Incoming.t
+       -> Rpcs.Get_best_tip.response Deferred.t)
     ~(get_telemetry_data :
-        Rpcs.Get_telemetry_data.query Envelope.Incoming.t
-      -> Rpcs.Get_telemetry_data.response Deferred.t)
+          Rpcs.Get_telemetry_data.query Envelope.Incoming.t
+       -> Rpcs.Get_telemetry_data.response Deferred.t)
     ~(get_transition_chain_proof :
-        Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
-      -> Rpcs.Get_transition_chain_proof.response Deferred.t)
+          Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
-        Rpcs.Get_transition_chain.query Envelope.Incoming.t
-      -> Rpcs.Get_transition_chain.response Deferred.t) =
+          Rpcs.Get_transition_chain.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain.response Deferred.t) =
   let logger = config.logger in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
@@ -883,7 +883,7 @@ let create (config : Config.t)
     record_unknown_item result sender action_msg msg_args
   in
   let answer_sync_ledger_query_rpc conn ~version:_ ((hash, query) as sync_query)
-    =
+      =
     let%bind result, sender =
       run_for_rpc_result conn sync_query ~f:answer_sync_ledger_query
         "Answer_sync_ledger_query: $query"
@@ -892,24 +892,24 @@ let create (config : Config.t)
     let%bind () =
       match result with
       | Ok _ ->
-        return ()
+          return ()
       | Error err ->
-        (* N.B.: to_string_mach double-quotes the string, don't want that *)
-        let err_msg = Error.to_string_hum err in
-        if String.is_prefix err_msg ~prefix:refused_answer_query_string then
-          Trust_system.(
-            record_envelope_sender config.trust_system config.logger sender
-              Actions.
-                ( Requested_unknown_item
-                , Some
-                    ( "Sync ledger query with hash: $hash, query: $query, \
-                       with error: $error"
-                    , [ ("hash", Ledger_hash.to_yojson hash)
-                      ; ( "query"
-                        , Syncable_ledger.Query.to_yojson
-                            Ledger.Addr.to_yojson query )
-                      ; ("error", `String err_msg) ] ) ))
-        else return ()
+          (* N.B.: to_string_mach double-quotes the string, don't want that *)
+          let err_msg = Error.to_string_hum err in
+          if String.is_prefix err_msg ~prefix:refused_answer_query_string then
+            Trust_system.(
+              record_envelope_sender config.trust_system config.logger sender
+                Actions.
+                  ( Requested_unknown_item
+                  , Some
+                      ( "Sync ledger query with hash: $hash, query: $query, \
+                         with error: $error"
+                      , [ ("hash", Ledger_hash.to_yojson hash)
+                        ; ( "query"
+                          , Syncable_ledger.Query.to_yojson
+                              Ledger.Addr.to_yojson query )
+                        ; ("error", `String err_msg) ] ) ))
+          else return ()
     in
     return result
   in
@@ -923,13 +923,12 @@ let create (config : Config.t)
     in
     match result with
     | None ->
-      record_unknown_item result sender action_msg msg_args
-    | Some peers ->
-      let%map valid_protocol_versions =
-        validate_protocol_versions ~rpc_name:"Get_some_initial_peers" sender
-          ext_trans
-      in
-      if valid_protocol_versions then result else None
+        record_unknown_item result sender action_msg msg_args
+    | Some {proof= _, ext_trans; _} ->
+        let%map valid_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_ancestry" sender ext_trans
+        in
+        if valid_protocol_versions then result else None
   in
   let get_some_initial_peers_rpc conn ~version:_ () =
     [%log debug] "Sending some initial peers to peer with IP %s"
@@ -951,19 +950,19 @@ let create (config : Config.t)
     in
     match result with
     | None ->
-      record_unknown_item result sender action_msg msg_args
+        record_unknown_item result sender action_msg msg_args
     | Some {data= data_ext_trans; proof= _, proof_ext_trans} ->
-      let%bind valid_data_protocol_versions =
-        validate_protocol_versions ~rpc_name:"Get_best_tip (data)" sender
-          data_ext_trans
-      in
-      let%map valid_proof_protocol_versions =
-        validate_protocol_versions ~rpc_name:"Get_best_tip (proof)" sender
-          proof_ext_trans
-      in
-      if valid_data_protocol_versions && valid_proof_protocol_versions then
-        result
-      else None
+        let%bind valid_data_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_best_tip (data)" sender
+            data_ext_trans
+        in
+        let%map valid_proof_protocol_versions =
+          validate_protocol_versions ~rpc_name:"Get_best_tip (proof)" sender
+            proof_ext_trans
+        in
+        if valid_data_protocol_versions && valid_proof_protocol_versions then
+          result
+        else None
   in
   let get_telemetry_data_rpc conn ~version:_ query =
     [%log debug] "Sending telemetry data to peer with IP %s"
@@ -1001,17 +1000,17 @@ let create (config : Config.t)
     in
     match result with
     | None ->
-      record_unknown_item result sender action_msg msg_args
+        record_unknown_item result sender action_msg msg_args
     | Some ext_trans ->
-      let%map valid_protocol_versions =
-        Deferred.List.map ext_trans
-          ~f:
-            (validate_protocol_versions ~rpc_name:"Get_transition_chain"
-               sender)
-      in
-      if List.for_all valid_protocol_versions ~f:(Bool.equal true) then
-        result
-      else None
+        let%map valid_protocol_versions =
+          Deferred.List.map ext_trans
+            ~f:
+              (validate_protocol_versions ~rpc_name:"Get_transition_chain"
+                 sender)
+        in
+        if List.for_all valid_protocol_versions ~f:(Bool.equal true) then
+          result
+        else None
   in
   let ban_notify_rpc conn ~version:_ ban_until =
     (* the port in `conn' is an ephemeral port, not of interest *)
@@ -1025,7 +1024,7 @@ let create (config : Config.t)
   in
   let rpc_handlers =
     let open Rpcs in
-    [ Rpc_handler (Get_some_initial_peers, get_some_initial_peers)
+    [ Rpc_handler (Get_some_initial_peers, get_some_initial_peers_rpc)
     ; Rpc_handler
         ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
         , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
@@ -1043,7 +1042,7 @@ let create (config : Config.t)
              ~genesis_ledger_hash:
                (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash))
           ~f:(fun (Rpc_handler (rpc, f)) ->
-              Rpcs.(Rpc_handler (Consensus_rpc rpc, f)) ))
+            Rpcs.(Rpc_handler (Consensus_rpc rpc, f)) ))
   in
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
@@ -1055,374 +1054,389 @@ let create (config : Config.t)
            (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers
-            ) else (
+              raise No_initial_peers )
+            else (
               [%log info] "Getting some extra initial peers to start" ;
               (* 1. Get some peers
                * 2. add them to go
               *)
-              let%map extra_initial_peers =
-                Deferred.List.filter_map initial_peers ~how:`Parallel ~f:(fun peer_id -> 
-                    match%map query_peer t (module Rpcs.Get_some_initial_peers) input with
-                    | Some peers ->
-                      Some peers
-                    | None ->  None
-                  )
+              let metadata p e =
+                [ ("error", `String (Error.to_string_hum e))
+                ; ("peer", `String (Peer.to_string p)) ]
+              in
+              let%bind extra_initial_peers =
+                Deferred.List.concat_map initial_peers ~how:`Parallel
+                  ~f:(fun peer ->
+                    match%map
+                      Gossip_net.Any.query_peer ~timeout:(Time.Span.of_sec 10.)
+                        gossip_net peer.peer_id Rpcs.Get_some_initial_peers ()
+                    with
+                    | Connected {data= Ok xs; _} ->
+                        xs
+                    | Connected {data= Error e; _} | Failed_to_connect e ->
+                        [%log warn] ~metadata:(metadata peer e)
+                          "could not get initial peers from $peer with $error" ;
+                        [] )
               in
               [%log info] "Getting some extra initial peers to start" ;
-              Gossip_net.Any.add_peers peers
-
-            ) )) ;
-     (* TODO: Think about buffering:
+              Deferred.List.iter ~how:`Sequential extra_initial_peers
+                ~f:(fun p ->
+                  match%map Gossip_net.Any.add_peer gossip_net p with
+                  | Ok () ->
+                      ()
+                  | Error e ->
+                      [%log warn] ~metadata:(metadata p e)
+                        "failed to add peer $peer with $error" ) )) )) ;
+  (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
         block announcment).
      *)
-     let received_gossips, online_notifier =
-       Strict_pipe.Reader.Fork.two
-         (Gossip_net.Any.received_message_reader gossip_net)
-     in
-     let online_status =
-       online_broadcaster ~constraint_constants:config.constraint_constants
-         config.time_controller online_notifier
-     in
-     let first_received_message_signal = Ivar.create () in
-     let states, snark_pool_diffs, transaction_pool_diffs =
-       Strict_pipe.Reader.partition_map3 received_gossips
-         ~f:(fun (envelope, valid_cb) ->
-             Ivar.fill_if_empty first_received_message_signal () ;
-             Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
-             match Envelope.Incoming.data envelope with
-             | New_state state ->
-               Perf_histograms.add_span ~name:"external_transition_latency"
-                 (Core.Time.abs_diff
-                    Block_time.(now config.time_controller |> to_time)
-                    ( External_transition.protocol_state state
-                      |> Protocol_state.blockchain_state
-                      |> Blockchain_state.timestamp |> Block_time.to_time )) ;
-               if config.log_gossip_heard.new_state then
-                 [%str_log debug]
-                   ~metadata:
-                     [("external_transition", External_transition.to_yojson state)]
-                   (Block_received
-                      { state_hash= External_transition.state_hash state
-                      ; sender= Envelope.Incoming.sender envelope }) ;
-               `Fst
-                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-                 , Block_time.now config.time_controller
-                 , valid_cb )
-             | Snark_pool_diff diff ->
-               if config.log_gossip_heard.snark_pool_diff then
-                 [%str_log debug]
-                   (Snark_work_received
-                      { work= Snark_pool.Resource_pool.Diff.to_compact diff
-                      ; sender= Envelope.Incoming.sender envelope }) ;
-               Coda_metrics.(
-                 Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
-               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
-             | Transaction_pool_diff diff ->
-               if config.log_gossip_heard.transaction_pool_diff then
-                 [%str_log debug]
-                   (Transactions_received
-                      {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
-               `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
-           )
-     in
-     { gossip_net
-     ; logger= config.logger
-     ; trust_system= config.trust_system
-     ; states
-     ; snark_pool_diffs
-     ; transaction_pool_diffs
-     ; online_status
-     ; first_received_message_signal }
+  let received_gossips, online_notifier =
+    Strict_pipe.Reader.Fork.two
+      (Gossip_net.Any.received_message_reader gossip_net)
+  in
+  let online_status =
+    online_broadcaster ~constraint_constants:config.constraint_constants
+      config.time_controller online_notifier
+  in
+  let first_received_message_signal = Ivar.create () in
+  let states, snark_pool_diffs, transaction_pool_diffs =
+    Strict_pipe.Reader.partition_map3 received_gossips
+      ~f:(fun (envelope, valid_cb) ->
+        Ivar.fill_if_empty first_received_message_signal () ;
+        Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+        match Envelope.Incoming.data envelope with
+        | New_state state ->
+            Perf_histograms.add_span ~name:"external_transition_latency"
+              (Core.Time.abs_diff
+                 Block_time.(now config.time_controller |> to_time)
+                 ( External_transition.protocol_state state
+                 |> Protocol_state.blockchain_state
+                 |> Blockchain_state.timestamp |> Block_time.to_time )) ;
+            if config.log_gossip_heard.new_state then
+              [%str_log debug]
+                ~metadata:
+                  [("external_transition", External_transition.to_yojson state)]
+                (Block_received
+                   { state_hash= External_transition.state_hash state
+                   ; sender= Envelope.Incoming.sender envelope }) ;
+            `Fst
+              ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
+              , Block_time.now config.time_controller
+              , valid_cb )
+        | Snark_pool_diff diff ->
+            if config.log_gossip_heard.snark_pool_diff then
+              [%str_log debug]
+                (Snark_work_received
+                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
+                   ; sender= Envelope.Incoming.sender envelope }) ;
+            Coda_metrics.(
+              Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
+            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
+        | Transaction_pool_diff diff ->
+            if config.log_gossip_heard.transaction_pool_diff then
+              [%str_log debug]
+                (Transactions_received
+                   {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
+    )
+  in
+  { gossip_net
+  ; logger= config.logger
+  ; trust_system= config.trust_system
+  ; states
+  ; snark_pool_diffs
+  ; transaction_pool_diffs
+  ; online_status
+  ; first_received_message_signal }
 
-     (* lift and expose select gossip net functions *)
-     include struct
-       open Gossip_net.Any
+(* lift and expose select gossip net functions *)
+include struct
+  open Gossip_net.Any
 
-       let lift f {gossip_net; _} = f gossip_net
+  let lift f {gossip_net; _} = f gossip_net
 
-       let peers = lift peers
+  let peers = lift peers
 
-       let initial_peers = lift initial_peers
+  let initial_peers = lift initial_peers
 
-       let ban_notification_reader = lift ban_notification_reader
+  let ban_notification_reader = lift ban_notification_reader
 
-       let random_peers = lift random_peers
+  let random_peers = lift random_peers
 
-       let random_peers_except = lift random_peers_except
+  let random_peers_except = lift random_peers_except
 
-       (* these cannot be directly lifted due to the value restriction *)
-       let query_peer t = lift query_peer t
+  (* these cannot be directly lifted due to the value restriction *)
+  let query_peer t = lift query_peer t
 
-       let on_first_connect t = lift on_first_connect t
+  let on_first_connect t = lift on_first_connect t
 
-       let on_first_high_connectivity t = lift on_first_high_connectivity t
+  let on_first_high_connectivity t = lift on_first_high_connectivity t
 
-       let ip_for_peer t peer_id =
-         (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
+  let ip_for_peer t peer_id =
+    (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
 
-       let connection_gating_config t = lift connection_gating t
+  let connection_gating_config t = lift connection_gating t
 
-       let set_connection_gating_config t config =
-         lift set_connection_gating t config
-     end
+  let set_connection_gating_config t config =
+    lift set_connection_gating t config
+end
 
-     let on_first_received_message {first_received_message_signal; _} ~f =
-       Ivar.read first_received_message_signal >>| f
+let on_first_received_message {first_received_message_signal; _} ~f =
+  Ivar.read first_received_message_signal >>| f
 
-     let fill_first_received_message_signal {first_received_message_signal; _} =
-       Ivar.fill_if_empty first_received_message_signal ()
+let fill_first_received_message_signal {first_received_message_signal; _} =
+  Ivar.fill_if_empty first_received_message_signal ()
 
-     (* TODO: Have better pushback behavior *)
-     let broadcast t ~log_msg msg =
-       [%str_log' trace t.logger]
-         ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
-         log_msg ;
-       Gossip_net.Any.broadcast t.gossip_net msg
+(* TODO: Have better pushback behavior *)
+let broadcast t ~log_msg msg =
+  [%str_log' trace t.logger]
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    log_msg ;
+  Gossip_net.Any.broadcast t.gossip_net msg
 
-     let broadcast_state t state =
-       broadcast t
-         (Gossip_net.Message.New_state (With_hash.data state))
-         ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
+let broadcast_state t state =
+  broadcast t
+    (Gossip_net.Message.New_state (With_hash.data state))
+    ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
 
-     let broadcast_transaction_pool_diff t diff =
-       broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
-         ~log_msg:(Gossip_transaction_pool_diff {txns= diff})
+let broadcast_transaction_pool_diff t diff =
+  broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
+    ~log_msg:(Gossip_transaction_pool_diff {txns= diff})
 
-     let broadcast_snark_pool_diff t diff =
-       broadcast t (Gossip_net.Message.Snark_pool_diff diff)
-         ~log_msg:
-           (Gossip_snark_pool_diff
-              {work= Snark_pool.Resource_pool.Diff.to_compact diff})
+let broadcast_snark_pool_diff t diff =
+  broadcast t (Gossip_net.Message.Snark_pool_diff diff)
+    ~log_msg:
+      (Gossip_snark_pool_diff
+         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
 
-     (* TODO: This is kinda inefficient *)
-     let find_map xs ~f =
-       let open Async in
-       let ds = List.map xs ~f in
-       let filter ~f =
-         Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-       in
-       let none_worked =
-         Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-             if List.for_all ds ~f:Option.is_none then return None
-             else Deferred.never () )
-       in
-       Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
+(* TODO: This is kinda inefficient *)
+let find_map xs ~f =
+  let open Async in
+  let ds = List.map xs ~f in
+  let filter ~f =
+    Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
+  in
+  let none_worked =
+    Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+        if List.for_all ds ~f:Option.is_none then return None
+        else Deferred.never () )
+  in
+  Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
 
-     (* TODO: Don't copy and paste *)
-     let find_map' xs ~f =
-       let open Async in
-       let ds = List.map xs ~f in
-       let filter ~f =
-         Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-       in
-       let none_worked =
-         Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-             (* TODO: Validation applicative here *)
-             if List.for_all ds ~f:Or_error.is_error then
-               return (Or_error.error_string "all none")
-             else Deferred.never () )
-       in
-       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
+(* TODO: Don't copy and paste *)
+let find_map' xs ~f =
+  let open Async in
+  let ds = List.map xs ~f in
+  let filter ~f =
+    Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
+  in
+  let none_worked =
+    Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+        (* TODO: Validation applicative here *)
+        if List.for_all ds ~f:Or_error.is_error then
+          return (Or_error.error_string "all none")
+        else Deferred.never () )
+  in
+  Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
-     let online_status t = t.online_status
+let online_status t = t.online_status
 
-     let make_rpc_request ~rpc ~label t peer input =
-       let open Deferred.Let_syntax in
-       match%map query_peer t peer.Peer.peer_id rpc input with
-       | Connected {data= Ok (Some response); _} ->
-         Ok response
-       | Connected {data= Ok None; _} ->
-         Or_error.errorf
-           !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
-           peer.peer_id label
-       | Connected {data= Error e; _} | Failed_to_connect e ->
-         Error e
+let make_rpc_request ~rpc ~label t peer input =
+  let open Deferred.Let_syntax in
+  match%map query_peer t peer.Peer.peer_id rpc input with
+  | Connected {data= Ok (Some response); _} ->
+      Ok response
+  | Connected {data= Ok None; _} ->
+      Or_error.errorf
+        !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
+        peer.peer_id label
+  | Connected {data= Error e; _} | Failed_to_connect e ->
+      Error e
 
-     let get_transition_chain_proof =
-       make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition"
+let get_transition_chain_proof =
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition"
 
-     let get_transition_chain =
-       make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
+let get_transition_chain =
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
 
-     let get_best_tip t peer =
-       make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
+let get_best_tip t peer =
+  make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
 
-     let ban_notify t peer banned_until =
-       query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
-       >>| Fn.const (Ok ())
+let ban_notify t peer banned_until =
+  query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
+  >>| Fn.const (Ok ())
 
-     let try_non_preferred_peers (type b) t input peers ~rpc :
-       b Envelope.Incoming.t Deferred.Or_error.t =
-       let max_current_peers = 8 in
-       let rec loop peers num_peers =
-         if num_peers > max_current_peers then
-           return
-             (Or_error.error_string
-                "None of randomly-chosen peers can handle the request")
-         else
-           let current_peers, remaining_peers = List.split_n peers num_peers in
-           find_map' current_peers ~f:(fun peer ->
-               let%bind response_or_error =
-                 query_peer t peer.Peer.peer_id rpc input
-               in
-               match response_or_error with
-               | Connected ({data= Ok (Some data); _} as envelope) ->
-                 let%bind () =
-                   Trust_system.(
-                     record t.trust_system t.logger peer
-                       Actions.
-                         ( Fulfilled_request
-                         , Some ("Nonpreferred peer returned valid response", [])
-                         ))
-                 in
-                 return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
-               | Connected {data= Ok None; _} ->
-                 loop remaining_peers (2 * num_peers)
-               | _ ->
-                 loop remaining_peers (2 * num_peers) )
-       in
-       loop peers 1
+let try_non_preferred_peers (type b) t input peers ~rpc :
+    b Envelope.Incoming.t Deferred.Or_error.t =
+  let max_current_peers = 8 in
+  let rec loop peers num_peers =
+    if num_peers > max_current_peers then
+      return
+        (Or_error.error_string
+           "None of randomly-chosen peers can handle the request")
+    else
+      let current_peers, remaining_peers = List.split_n peers num_peers in
+      find_map' current_peers ~f:(fun peer ->
+          let%bind response_or_error =
+            query_peer t peer.Peer.peer_id rpc input
+          in
+          match response_or_error with
+          | Connected ({data= Ok (Some data); _} as envelope) ->
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger peer
+                    Actions.
+                      ( Fulfilled_request
+                      , Some ("Nonpreferred peer returned valid response", [])
+                      ))
+              in
+              return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
+          | Connected {data= Ok None; _} ->
+              loop remaining_peers (2 * num_peers)
+          | _ ->
+              loop remaining_peers (2 * num_peers) )
+  in
+  loop peers 1
 
-     let rpc_peer_then_random (type b) t peer_id input ~rpc :
-       b Envelope.Incoming.t Deferred.Or_error.t =
-       let retry () =
-         let%bind peers = random_peers t 8 in
-         try_non_preferred_peers t input peers ~rpc
-       in
-       match%bind query_peer t peer_id rpc input with
-       | Connected {data= Ok (Some response); sender} ->
-         let%bind () =
-           match sender with
-           | Local ->
-             return ()
-           | Remote peer ->
-             Trust_system.(
-               record t.trust_system t.logger peer
-                 Actions.
-                   ( Fulfilled_request
-                   , Some ("Preferred peer returned valid response", []) ))
-         in
-         return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
-       | Connected {data= Ok None; sender} ->
-         let%bind () =
-           match sender with
-           | Remote peer ->
-             Trust_system.(
-               record t.trust_system t.logger peer
-                 Actions.
-                   ( Violated_protocol
-                   , Some ("When querying preferred peer, got no response", [])
-                   ))
-           | Local ->
-             return ()
-         in
-         retry ()
-       | Connected {data= Error e; sender} ->
-         (* FIXME #4094: determine if more specific actions apply here *)
-         let%bind () =
-           match sender with
-           | Remote peer ->
-             Trust_system.(
-               record t.trust_system t.logger peer
-                 Actions.
-                   ( Outgoing_connection_error
-                   , Some
-                       ( "Error while doing RPC"
-                       , [("error", `String (Error.to_string_hum e))] ) ))
-           | Local ->
-             return ()
-         in
-         retry ()
-       | Failed_to_connect _ ->
-         (* Since we couldn't connect, we have no IP to ban. *)
-         retry ()
+let rpc_peer_then_random (type b) t peer_id input ~rpc :
+    b Envelope.Incoming.t Deferred.Or_error.t =
+  let retry () =
+    let%bind peers = random_peers t 8 in
+    try_non_preferred_peers t input peers ~rpc
+  in
+  match%bind query_peer t peer_id rpc input with
+  | Connected {data= Ok (Some response); sender} ->
+      let%bind () =
+        match sender with
+        | Local ->
+            return ()
+        | Remote peer ->
+            Trust_system.(
+              record t.trust_system t.logger peer
+                Actions.
+                  ( Fulfilled_request
+                  , Some ("Preferred peer returned valid response", []) ))
+      in
+      return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
+  | Connected {data= Ok None; sender} ->
+      let%bind () =
+        match sender with
+        | Remote peer ->
+            Trust_system.(
+              record t.trust_system t.logger peer
+                Actions.
+                  ( Violated_protocol
+                  , Some ("When querying preferred peer, got no response", [])
+                  ))
+        | Local ->
+            return ()
+      in
+      retry ()
+  | Connected {data= Error e; sender} ->
+      (* FIXME #4094: determine if more specific actions apply here *)
+      let%bind () =
+        match sender with
+        | Remote peer ->
+            Trust_system.(
+              record t.trust_system t.logger peer
+                Actions.
+                  ( Outgoing_connection_error
+                  , Some
+                      ( "Error while doing RPC"
+                      , [("error", `String (Error.to_string_hum e))] ) ))
+        | Local ->
+            return ()
+      in
+      retry ()
+  | Failed_to_connect _ ->
+      (* Since we couldn't connect, we have no IP to ban. *)
+      retry ()
 
-     let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-       rpc_peer_then_random t inet_addr input
-         ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
-       >>|? Envelope.Incoming.data
+let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
+  rpc_peer_then_random t inet_addr input
+    ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
+  >>|? Envelope.Incoming.data
 
-     let get_ancestry t inet_addr input =
-       rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
+let get_ancestry t inet_addr input =
+  rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 
-     let glue_sync_ledger :
+let glue_sync_ledger :
        t
-       -> (Coda_base.Ledger_hash.t * Coda_base.Sync_ledger.Query.t)
-         Pipe_lib.Linear_pipe.Reader.t
-       -> ( Coda_base.Ledger_hash.t
-            * Coda_base.Sync_ledger.Query.t
-            * Coda_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
-         Pipe_lib.Linear_pipe.Writer.t
-       -> unit =
-       fun t query_reader response_writer ->
-       (* We attempt to query 3 random peers, retry_max times. We keep track of the
+    -> (Coda_base.Ledger_hash.t * Coda_base.Sync_ledger.Query.t)
+       Pipe_lib.Linear_pipe.Reader.t
+    -> ( Coda_base.Ledger_hash.t
+       * Coda_base.Sync_ledger.Query.t
+       * Coda_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       Pipe_lib.Linear_pipe.Writer.t
+    -> unit =
+ fun t query_reader response_writer ->
+  (* We attempt to query 3 random peers, retry_max times. We keep track of the
           peers that couldn't answer a particular query and won't try them
           again. *)
-       let retry_max = 6 in
-       let retry_interval = Core.Time.Span.of_ms 200. in
-       let rec answer_query ctr peers_tried query =
-         O1trace.trace_event "ask sync ledger query" ;
-         let%bind peers = random_peers_except t 3 ~except:peers_tried in
-         [%log' trace t.logger]
-           !"SL: Querying the following peers %{sexp: Peer.t list}"
-           peers ;
-         match%bind
-           find_map peers ~f:(fun peer ->
-               [%log' trace t.logger]
-                 !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
-                   Ledger_hash.t}"
-                 peer (fst query) ;
-               match%map
-                 query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
-               with
-               | Connected {data= Ok (Ok answer); sender} ->
-                 [%log' trace t.logger]
-                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
-                     %{sexp: Ledger_hash.t}"
-                   peer (fst query) ;
-                 (* TODO : here is a place where an envelope could contain
+  let retry_max = 6 in
+  let retry_interval = Core.Time.Span.of_ms 200. in
+  let rec answer_query ctr peers_tried query =
+    O1trace.trace_event "ask sync ledger query" ;
+    let%bind peers = random_peers_except t 3 ~except:peers_tried in
+    [%log' trace t.logger]
+      !"SL: Querying the following peers %{sexp: Peer.t list}"
+      peers ;
+    match%bind
+      find_map peers ~f:(fun peer ->
+          [%log' trace t.logger]
+            !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
+              Ledger_hash.t}"
+            peer (fst query) ;
+          match%map
+            query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
+          with
+          | Connected {data= Ok (Ok answer); sender} ->
+              [%log' trace t.logger]
+                !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
+                  %{sexp: Ledger_hash.t}"
+                peer (fst query) ;
+              (* TODO : here is a place where an envelope could contain
                     a Peer.t, and not just an IP address, if desired
                  *)
-                 Some (Envelope.Incoming.wrap ~data:answer ~sender)
-               | Connected {data= Ok (Error e); _} ->
-                 [%log' info t.logger]
-                   "Peer $peer didn't have enough information to answer \
-                    ledger_hash query. See error for more details: $error"
-                   ~metadata:
-                     [ ("error", `String (Error.to_string_hum e))
-                     ; ("peer", Peer.to_yojson peer) ] ;
-                 Hash_set.add peers_tried peer ;
-                 None
-               | Connected {data= Error e; _} ->
-                 [%log' info t.logger]
-                   "RPC error during ledger_hash query See error for more \
-                    details: $error"
-                   ~metadata:[("error", `String (Error.to_string_hum e))] ;
-                 Hash_set.add peers_tried peer ;
-                 None
-               | Failed_to_connect err ->
-                 [%log' warn t.logger] "Network error: %s"
-                   (Error.to_string_mach err) ;
-                 None )
-         with
-         | Some answer ->
-           [%log' trace t.logger]
-             !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-             (fst query) ;
-           (* TODO *)
-           Linear_pipe.write_if_open response_writer (fst query, snd query, answer)
-         | None ->
-           [%log' info t.logger]
-             !"None of the peers contacted were able to answer ledger_hash query \
-               -- trying more" ;
-           if ctr > retry_max then Deferred.unit
-           else
-             let%bind () = Clock.after retry_interval in
-             answer_query (ctr + 1) peers_tried query
-       in
-       Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
-         ~f:(answer_query 0 (Peer.Hash_set.of_list []))
-       |> don't_wait_for
+              Some (Envelope.Incoming.wrap ~data:answer ~sender)
+          | Connected {data= Ok (Error e); _} ->
+              [%log' info t.logger]
+                "Peer $peer didn't have enough information to answer \
+                 ledger_hash query. See error for more details: $error"
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ("peer", Peer.to_yojson peer) ] ;
+              Hash_set.add peers_tried peer ;
+              None
+          | Connected {data= Error e; _} ->
+              [%log' info t.logger]
+                "RPC error during ledger_hash query See error for more \
+                 details: $error"
+                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+              Hash_set.add peers_tried peer ;
+              None
+          | Failed_to_connect err ->
+              [%log' warn t.logger] "Network error: %s"
+                (Error.to_string_mach err) ;
+              None )
+    with
+    | Some answer ->
+        [%log' trace t.logger]
+          !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
+          (fst query) ;
+        (* TODO *)
+        Linear_pipe.write_if_open response_writer (fst query, snd query, answer)
+    | None ->
+        [%log' info t.logger]
+          !"None of the peers contacted were able to answer ledger_hash query \
+            -- trying more" ;
+        if ctr > retry_max then Deferred.unit
+        else
+          let%bind () = Clock.after retry_interval in
+          answer_query (ctr + 1) peers_tried query
+  in
+  Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
+    ~f:(answer_query 0 (Peer.Hash_set.of_list []))
+  |> don't_wait_for

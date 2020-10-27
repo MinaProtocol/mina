@@ -1292,7 +1292,7 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peers net maddr =
+let add_peers net maddrs =
   match%map
     Helper.(
       do_rpc net
