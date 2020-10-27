@@ -1167,9 +1167,9 @@ include struct
 
   let random_peers_except = lift random_peers_except
 
-  (* these cannot be directly lifted due to the value restriction *)
-  let query_peer t = lift query_peer t
+  let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
 
+  (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
 
   let on_first_high_connectivity t = lift on_first_high_connectivity t
@@ -1243,9 +1243,9 @@ let find_map' xs ~f =
 
 let online_status t = t.online_status
 
-let make_rpc_request ~rpc ~label t peer input =
+let make_rpc_request ?timeout ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer t peer.Peer.peer_id rpc input with
+  match%map query_peer ?timeout t peer.Peer.peer_id rpc input with
   | Connected {data= Ok (Some response); _} ->
       Ok response
   | Connected {data= Ok None; _} ->
@@ -1255,14 +1255,15 @@ let make_rpc_request ~rpc ~label t peer input =
   | Connected {data= Error e; _} | Failed_to_connect e ->
       Error e
 
-let get_transition_chain_proof =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition"
+let get_transition_chain_proof t =
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition" t
 
-let get_transition_chain =
+let get_transition_chain t =
   make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
+    t
 
-let get_best_tip t peer =
-  make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
+let get_best_tip ?timeout t peer =
+  make_rpc_request ?timeout ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
