@@ -107,9 +107,7 @@ In addition to use on any developer laptop, the docker image could be deployed d
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-Generating genesis proofs on developer laptops means downloading snark keys from s3 or large dockerfiles from docker hub, and can be difficult on a poor connection. I still believe this is worth the effort/time compared to the cost of generating the same data on each node for hundreds of nodes, and will make it very clear which genesis ledger is in use on a given network.
 
-If the templates always output the terraform files based on the templates, then we still end up with a lot of extra TF files around for old stopped networks. Could be handled with a flag to `minaform stop` and a dilligent process around when to clean up the old terraform. The alternative is to not save the post-template-execution terraform unless a flag is passed to explicitly save it for customization, which would discourage complex changes to the terraform config but would also make it harder to make complex changes when needed.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
