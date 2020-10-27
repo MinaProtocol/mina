@@ -6,7 +6,7 @@ This rfc proposes a new tool dubbed "minaform" for reliably creating and managin
 ## Motivation
 [motivation]: #motivation
 
-The goal is to standardize community-oriented and internal qa networks with a simple tool to ensure that the process for creating and deploying a new testnet is coda-reviewed, documented, and standard across all deployment scenarios. As of this RFC, additional requirements for community members themselves or external partners to make use of this tooling is out-of-scope but the goal is that this implementation will be easier to maintain and extend as needs arise.
+The goal is to standardize community-oriented and internal qa networks with a simple tool to ensure that the process for creating and deploying a new testnet is code-reviewed, documented, and standard across all deployment scenarios. As of this RFC, additional requirements for community members themselves or external partners to make use of this tooling is out-of-scope but the goal is that this implementation will be easier to maintain and extend as needs arise.
 
 The following issues with the existing system were reported by at least one person as "pain points" that consume time/debugging effort when deploying networks:
 
@@ -122,7 +122,7 @@ Why is this design the best in the space of possible designs?
 
 What other designs have been considered and what is the rationale for not choosing them?
 
-* As I see it, the most reasonable non-bash language for this tooling is go, as the rest of the tooling used here (terraform, helm, prometheus, kubernetes, docker...) is availible via go libraries, go modules can handle the versioning of all dependencies (except coda-network), and the infrastructure team is already well-versed in go and can iterate quickly with it. Why not start in go? because as of today the main dependencies of this tool include a hacky bash script and coda-network, which are not in go, and invoking go tools like terraform and kubectl are the easiest part of the process. Bash is the simplest direction to proceed from here, but when the complexity of this tool exceeds a reasonable amount for bash then a go rewrite is easy and viable. To rewrite in go from that point can rely on the bash implementation for A/B testing, and as the plan B if the more complex tool `go`es wrong.
+* As I see it, the most reasonable non-bash language for this tooling is go, as the rest of the tooling used here (terraform, helm, prometheus, kubernetes, docker...) is available via go libraries, go modules can handle the versioning of all dependencies (except coda-network), and the infrastructure team is already well-versed in go and can iterate quickly with it. Why not start in go? because as of today the main dependencies of this tool include a hacky bash script and coda-network, which are not in go, and invoking go tools like terraform and kubectl are the easiest part of the process. Bash is the simplest direction to proceed from here, but when the complexity of this tool exceeds a reasonable amount for bash then a go rewrite is easy and viable. To rewrite in go from that point can rely on the bash implementation for A/B testing, and as the plan B if the more complex tool `go`es wrong.
 
 What is the impact of not doing this?
 
