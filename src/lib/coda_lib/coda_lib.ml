@@ -70,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -655,10 +655,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  Work_selection_method.remove t.snark_job_state spec ;
+  let cb _ =
+    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+    Work_selection_method.remove t.snark_job_state spec
+  in
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
@@ -743,6 +748,18 @@ let start t =
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
+
+let start_with_precomputed_blocks t blocks =
+  let%bind () =
+    Block_producer.run_precomputed ~logger:t.config.logger
+      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~time_controller:t.config.time_controller
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~precomputed_values:t.config.precomputed_values
+      ~precomputed_blocks:blocks
+  in
+  start t
 
 let create (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1082,7 +1099,7 @@ let create (config : Config.t) =
                          in
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
-                             if v then
+                             if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
                                   .forget_validation_with_hash et ) ;

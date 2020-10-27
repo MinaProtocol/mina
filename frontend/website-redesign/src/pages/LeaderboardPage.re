@@ -149,7 +149,7 @@ module ToggleButtons = {
     };
 
     <div className=Styles.flexColumn>
-      <h3 className=Theme.Type.inputLabel> {React.string("View")} </h3>
+      <div className=Theme.Type.inputLabel> {React.string("View")} </div>
       <Spacer height=0.5 />
       <div className=Styles.buttonRow> {renderToggleButtons()} </div>
     </div>;
@@ -167,10 +167,9 @@ module FilterDropdown = {
         height(`rem(4.5)),
         width(`percent(100.)),
         marginTop(`rem(2.0)),
-        media(Theme.MediaQuery.tablet, [display(`none)]),
         media(
-          Theme.MediaQuery.notMobile,
-          [width(`percent(48.)), marginTop(`zero)],
+          Theme.MediaQuery.tablet,
+          [display(`none), width(`percent(48.)), marginTop(`zero)],
         ),
       ]);
   };

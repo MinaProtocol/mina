@@ -151,13 +151,12 @@ module TechSideNav = {
     });
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
-
-        <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
-        <SideNav.Item title="Projects & Possibilities" slug="#projects" />
-        <SideNav.Item title="Incentive Structure" slug="#incentives" />
-        <SideNav.Item title="Where We're Headed" slug="#roadmap" />
-      </SideNav>;
-      // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
+      <SideNav.Item title="How Mina Works" slug="#how-mina-works" />
+      <SideNav.Item title="Projects & Possibilities" slug="#projects" />
+      <SideNav.Item title="Incentive Structure" slug="#incentives" />
+      <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+    </SideNav>;
+    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -419,7 +418,8 @@ module Incentives = {
               <span className=Theme.Type.link>
                 {React.string("Run a Node")}
               </span>
-              <Icon size=1.5 kind=Icon.ArrowRightLarge />
+              <Spacer width=0.5 />
+              <Icon size=1.5 kind=Icon.ArrowRightMedium />
             </a>
           </Next.Link>
         </div>
@@ -448,7 +448,7 @@ module Incentives = {
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-             "Mina is breaking down barriers to participation and unleashing a host of exciting new pathways to earn tokens.",
+              "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions."
            )}
         </p>
         <Spacer height=3. />
@@ -526,25 +526,24 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-skateboard.jpg",
         background: Image("/static/img/MinaSpectrumPrimary3.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          href: `Internal("/docs/getting-started"),
-          buttonText: "Run a Node",
-          dark: false,
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            href: `Internal("/docs/getting-started"),
+            buttonText: "Run a Node",
+            dark: false,
+          }),
         contentBackground: Color(Css.white),
       }
     />
-    /*
-     <div className=Styles.sectionContainer("")>
-       <Spacer height=6. />
-       <div className=Styles.section id="knowledge">
-         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-       </div>
-     </div>
-     <Spacer height=12. />
-     */
+    <div className={Styles.sectionContainer("")}>
+      <section className=Styles.section id="knowledge">
+        <Spacer height=6. />
+        <KnowledgeBase />
+      </section>
+    </div>
+    <Spacer height=12. />
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
@@ -557,13 +556,14 @@ let make = () => {
         copySize: `Large,
         image: "/static/img/tech-touch.jpg",
         background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        button: {
-          buttonColor: Theme.Colors.orange,
-          buttonTextColor: Css.white,
-          buttonText: "Get Started",
-          dark: false,
-          href: `Internal("/docs"),
-        },
+        link:
+          FeaturedSingleRow.Row.Button({
+            buttonColor: Theme.Colors.orange,
+            buttonTextColor: Css.white,
+            buttonText: "Get Started",
+            dark: false,
+            href: `Internal("/work-with-mina"),
+          }),
         contentBackground: Color(Css.white),
       }
     />

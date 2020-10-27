@@ -653,14 +653,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
-      (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+      ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      * (Coda_net2.validation_result -> unit) )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
@@ -1034,21 +1035,7 @@ let create (config : Config.t)
               [%str_log debug]
                 (Transactions_received
                    {txns= diff; sender= Envelope.Incoming.sender envelope}) ;
-            let diff' =
-              List.filter diff ~f:(fun cmd ->
-                  if User_command.has_insufficient_fee cmd then (
-                    [%log debug]
-                      "Filtering user command with insufficient fee from \
-                       transaction-pool diff $cmd from $sender"
-                      ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
-                        ; ( "sender"
-                          , Envelope.(
-                              Sender.to_yojson (Incoming.sender envelope)) ) ] ;
-                    false )
-                  else true )
-            in
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff'), valid_cb)
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
     )
   in
   { gossip_net

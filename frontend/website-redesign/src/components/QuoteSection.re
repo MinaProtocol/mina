@@ -2,29 +2,25 @@ module Styles = {
   open Css;
 
   // TODO: Fix background sizes once wrapper is merged in
-  let container =
+  let container = (backgroundImg: Theme.backgroundImage) =>
     style([
       display(`flex),
       alignItems(`center),
       justifyContent(`center),
       position(`relative),
       important(backgroundSize(`cover)),
-      background(`url("/static/img/SectionQuoteMobile.png")),
-      padding2(~v=`rem(4.), ~h=`rem(1.5)),
+      background(`url(backgroundImg.mobile)),
+      padding2(~v=`rem(4.), ~h=`zero),
       media(
         Theme.MediaQuery.tablet,
-        [
-          background(`url("/static/img/SectionQuoteTablet.jpg")),
-          height(`rem(42.)),
-        ],
+        [background(`url(backgroundImg.tablet)), height(`percent(100.))],
       ),
       media(
         Theme.MediaQuery.desktop,
         [
           justifyContent(`flexEnd),
           alignContent(`spaceAround),
-          padding2(~v=`zero, ~h=`rem(9.5)),
-          background(`url("/static/img/SectionQuoteDesktop.jpg")),
+          background(`url(backgroundImg.desktop)),
         ],
       ),
     ]);
@@ -40,8 +36,9 @@ module Styles = {
    */
   let quoteContainer = small =>
     style([
+      position(`relative),
       background(white),
-      padding(`rem(1.)),
+      padding(`rem(2.0)),
       media(
         Theme.MediaQuery.tablet,
         [
@@ -61,6 +58,19 @@ module Styles = {
     merge([
       Theme.Type.quote,
       style([fontSize(`rem(1.3)), marginBottom(`rem(1.))]),
+    ]);
+  let jumpQuote =
+    merge([
+      quote,
+      style([
+        position(`absolute),
+        top(`rem(1.5)),
+        left(`rem(1.0)),
+        media(
+          Theme.MediaQuery.tablet,
+          [top(`rem(2.5)), left(`rem(2.5))],
+        ),
+      ]),
     ]);
 
   let attribute =
@@ -89,25 +99,30 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~small=true) => {
-  <div className=Styles.container>
-    <div className={Styles.quoteContainer(small)}>
-      <p className=Styles.quote>
-        {React.string(
-           "\"What attracted me was a small, scalable blockchain that's still independently verifiable on small nodes.\"",
-         )}
-      </p>
-      <div className=Styles.attribute>
-        <img className=Styles.headshot src="/static/img/headshots/naval.jpg" />
-        <div className=Styles.name>
-          <p className=Theme.Type.pageLabel>
-            {React.string("Naval Ravikant")}
-          </p>
-          <p className=Theme.Type.contributorLabel>
-            {React.string("AngelList Co-Founder, O(1) Labs Investor")}
-          </p>
+let make =
+    (
+      ~small=true,
+      ~copy,
+      ~author,
+      ~authorTitle,
+      ~authorImg,
+      ~backgroundImg: Theme.backgroundImage,
+    ) => {
+  <div className={Styles.container(backgroundImg)}>
+    <Wrapped>
+      <div className={Styles.quoteContainer(small)}>
+        <p className=Styles.jumpQuote> {React.string("\"")} </p>
+        <p className=Styles.quote> {React.string(copy)} </p>
+        <div className=Styles.attribute>
+          <img className=Styles.headshot src=authorImg />
+          <div className=Styles.name>
+            <p className=Theme.Type.pageLabel> {React.string(author)} </p>
+            <p className=Theme.Type.contributorLabel>
+              {React.string(authorTitle)}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </Wrapped>
   </div>;
 };

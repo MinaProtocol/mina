@@ -1,5 +1,9 @@
 open Core_kernel
 
+(* if these items change, please also change
+   Transaction_snark.Base.User_command_failure.t
+   and update the code following it
+*)
 module Failure = struct
   [%%versioned
   module Stable = struct
@@ -11,6 +15,7 @@ module Failure = struct
         | Amount_insufficient_to_create_account
         | Cannot_pay_creation_fee_in_token
         | Source_insufficient_balance
+        | Source_minimum_balance_violation
         | Receiver_already_exists
         | Not_token_owner
         | Mismatched_token_permissions
@@ -40,6 +45,8 @@ module Failure = struct
         "Cannot_pay_creation_fee_in_token"
     | Source_insufficient_balance ->
         "Source_insufficient_balance"
+    | Source_minimum_balance_violation ->
+        "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
     | Not_token_owner ->
@@ -100,6 +107,8 @@ module Failure = struct
          non-default tokens"
     | Source_insufficient_balance ->
         "The source account has an insufficient balance"
+    | Source_minimum_balance_violation ->
+        "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
     | Not_token_owner ->

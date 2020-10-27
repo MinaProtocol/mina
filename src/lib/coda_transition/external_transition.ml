@@ -4,7 +4,7 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = bool -> unit
+  type t = Coda_net2.validation_result -> unit
 
   let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
 
@@ -121,9 +121,9 @@ type t_ = t
 
 type external_transition = t
 
-let broadcast {validation_callback; _} = validation_callback true
+let broadcast {validation_callback; _} = validation_callback `Accept
 
-let don't_broadcast {validation_callback; _} = validation_callback false
+let don't_broadcast {validation_callback; _} = validation_callback `Reject
 
 let poke_validation_callback t cb = t.validation_callback <- cb
 
@@ -1053,6 +1053,7 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
@@ -1071,6 +1072,12 @@ module Staged_ledger_validation = struct
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
+        ]
+      "Staged_ledger.apply takes $time_elapsed" ;
     let target_ledger_hash =
       match proof_opt with
       | None ->

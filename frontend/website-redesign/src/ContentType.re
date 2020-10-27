@@ -17,11 +17,34 @@ module System = {
     updatedAt: string,
   };
 
+  type includes;
+
   type entry('a) = {
     sys,
     fields: 'a,
+    includes,
   };
-  type entries('a) = {items: array(entry('a))};
+  type entries('a) = {
+    items: array(entry('a)),
+    includes,
+  };
+};
+
+module Link = {
+  type t = {
+    linkType: string,
+    id: string,
+  };
+
+  type entry = {sys: t};
+};
+
+module Image = {
+  type file = {url: string};
+  type t = {file};
+
+  type entry = System.entry(t);
+  type entries = System.entries(t);
 };
 
 module BlogPost = {
@@ -41,6 +64,21 @@ module BlogPost = {
   type entries = System.entries(t);
 };
 
+module Announcement = {
+  let id = "announcement";
+  let dateKeyName = "date";
+  type t = {
+    title: string,
+    snippet: string,
+    slug: string,
+    date: string,
+    text: string,
+    image: option(Image.entry),
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
 module JobPost = {
   let id = "jobPost";
   type t = {
@@ -52,25 +90,25 @@ module JobPost = {
   type entries = System.entries(t);
 };
 
-module KnowledgeBase = {
-  let id = "knowledgeBase";
-  type link = {
+module KnowledgeBaseResource = {
+  let id = "knowledgeeBaseResource";
+  type t = {
     title: string,
     url: string,
+    image: Image.entry,
   };
-  type links = {
-    articles: array(link),
-    videos: array(link),
-  };
-  type t = {links};
   type entry = System.entry(t);
   type entries = System.entries(t);
+  [@bs.get]
+  external getImages: System.includes => array(Image.entry) = "Asset";
 };
 
-module Image = {
-  type file = {url: string};
-  type t = {file};
-
+module KnowledgeBaseCategory = {
+  let id = "knowledgeBaseCategory";
+  type t = {
+    title: string,
+    resources: array(KnowledgeBaseResource.entry),
+  };
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
@@ -111,37 +149,49 @@ module NormalizedPressBlog = {
   type t = {
     title: string,
     image: option(Image.entry),
-    link: [`Slug(string) | `Remote(string)],
+    link: [ | `Slug(string) | `Remote(string)],
     featured: bool,
     description: option(string),
-    publisher: string,
+    publisher: option(string),
     date: string,
   };
 
-  let ofBlog = (blog : BlogPost.t) => {
+  let ofBlog = (blog: BlogPost.t) => {
     {
       title: blog.title,
       image: None,
       link: `Slug(blog.slug),
       featured: true,
       description: Some(blog.snippet),
-      publisher: blog.author,
-      date: blog.date
-    }
+      publisher: Some(blog.author),
+      date: blog.date,
+    };
   };
 
-  let ofPress = (press : Press.t) => {
+  let ofAnnouncement = (announcement: Announcement.t) => {
+    {
+      title: announcement.title,
+      image: announcement.image,
+      link: `Slug(announcement.slug),
+      featured: true,
+      description: Some(announcement.snippet),
+      publisher: None,
+      date: announcement.date,
+    };
+  };
+
+  let ofPress = (press: Press.t) => {
     {
       title: press.title,
       image: Some(press.image),
       link: `Remote(press.link),
       featured: press.featured,
       description: Js.Undefined.toOption(press.description),
-      publisher: press.publisher,
+      publisher: Some(press.publisher),
       date: press.datePublished,
-    }
+    };
   };
 
   type entry = System.entry(t);
   type entries = System.entries(t);
-}
+};

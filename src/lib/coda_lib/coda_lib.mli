@@ -35,7 +35,8 @@ val replace_block_production_keypairs :
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
-val staking_ledger : t -> Sparse_ledger.t option
+val staking_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
@@ -138,6 +139,9 @@ val external_transition_database :
 val snark_pool : t -> Network_pool.Snark_pool.t
 
 val start : t -> unit Deferred.t
+
+val start_with_precomputed_blocks :
+  t -> Block_producer.Precomputed_block.t list -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 

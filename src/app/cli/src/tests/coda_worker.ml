@@ -517,8 +517,10 @@ module T = struct
               ; logger
               ; unsafe_no_trust_ip= true
               ; isolate= false
-              ; gossip_type= `Gossipsub
               ; trust_system
+              ; flooding= false
+              ; direct_peers= []
+              ; peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =

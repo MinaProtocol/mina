@@ -1,20 +1,8 @@
 module Styles = {
   open Css;
-  let text = {
-    style([
-      Theme.Typeface.ibmplexsans,
-      color(Theme.Colors.digitalBlack),
-      fontWeight(`num(600)),
-      lineHeight(`rem(2.)),
-      fontStyle(`normal),
-      fontSize(`rem(1.125)),
-      letterSpacing(`rem(-0.03)),
-    ]);
-  };
 
   let container = {
     merge([
-      text,
       style([
         display(`flex),
         flexDirection(`column),
@@ -24,7 +12,7 @@ module Styles = {
           [
             width(`percent(100.)),
             flexDirection(`row),
-            justifyContent(`spaceEvenly),
+            justifyContent(`spaceBetween),
           ],
         ),
       ]),
@@ -32,19 +20,25 @@ module Styles = {
   };
 
   let releaseTitle = {
-    style([
-      fontWeight(`num(600)),
-      fontSize(`rem(2.)),
-      letterSpacing(`rem(-0.03)),
-      display(`flex),
-      width(`percent(100.)),
-      justifyContent(`flexStart),
-      paddingTop(`rem(2.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [width(`percent(30.)), flexDirection(`row)],
-      ),
-      media(Theme.MediaQuery.tablet, [justifyContent(`center)]),
+    merge([
+      Theme.Type.h3,
+      style([
+        paddingTop(`rem(2.)),
+        marginBottom(`rem(1.5)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [width(`percent(30.)), flexDirection(`row)],
+        ),
+        media(
+          Theme.MediaQuery.tablet,
+          [
+            paddingTop(`zero),
+            paddingLeft(`rem(5.)),
+            justifyContent(`center),
+            marginRight(`rem(1.5)),
+          ],
+        ),
+      ]),
     ]);
   };
 
@@ -61,40 +55,37 @@ module Styles = {
   let gridContainer = {
     style([
       marginTop(`rem(1.)),
-      background(`hex("F5F5F5")),
+      background(`hex("F8F8F8")),
       borderTop(`px(1), `solid, Css_Colors.black),
       borderBottom(`px(1), `solid, Css_Colors.black),
-      selector(
-        "div:nth-child(even)",
-        [background(`rgba((172, 151, 96, 0.06)))],
-      ),
+      selector("div:nth-child(even)", [background(white)]),
       media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
     ]);
   };
 
   let tableRow = {
-    style([
-      padding2(~v=`zero, ~h=`rem(1.)),
-      padding(`px(8)),
-      display(`grid),
-      gridTemplateColumns([`percent(12.), `auto, `percent(30.)]),
-      gridColumnGap(`rem(1.5)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [gridTemplateColumns([`percent(10.), `auto, `percent(30.)])],
-      ),
+    merge([
+      Theme.Type.paragraph,
+      style([
+        padding2(~v=`zero, ~h=`rem(1.)),
+        padding(`px(8)),
+        display(`grid),
+        gridTemplateColumns([`percent(12.), `auto, `percent(30.)]),
+        gridColumnGap(`rem(1.5)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [gridTemplateColumns([`percent(10.), `auto, `percent(30.)])],
+        ),
+      ]),
     ]);
   };
 
   let topRow = {
     merge([
-      tableRow,
+      Theme.Type.inputLabel,
       style([
         display(`none),
-        letterSpacing(`px(2)),
-        fontSize(`rem(0.875)),
-        textTransform(`uppercase),
-        padding(`zero),
+        marginBottom(`rem(0.5)),
         media(
           Theme.MediaQuery.notMobile,
           [
@@ -109,7 +100,8 @@ module Styles = {
   let bottomRow = {
     merge([
       tableRow,
-      style([marginTop(`rem(0.5)), textTransform(`uppercase)]),
+      Theme.Type.inputLabel,
+      style([marginTop(`rem(0.5))]),
     ]);
   };
 
@@ -126,13 +118,15 @@ module Styles = {
   };
 
   let disclaimer = {
-    style([
-      display(`flex),
-      justifyContent(`flexStart),
-      fontSize(`rem(1.)),
-      marginTop(`rem(1.)),
-      marginBottom(`rem(5.)),
-      media(Theme.MediaQuery.notMobile, [justifyContent(`flexEnd)]),
+    merge([
+      Theme.Type.h6,
+      style([
+        display(`flex),
+        justifyContent(`flexStart),
+        marginTop(`rem(1.)),
+        marginBottom(`rem(5.)),
+        media(Theme.MediaQuery.notMobile, [justifyContent(`flexEnd)]),
+      ]),
     ]);
   };
 };
@@ -189,7 +183,7 @@ let make = (~releaseTitle, ~challenges) => {
   };
 
   <div className=Styles.container>
-    <div className=Styles.releaseTitle> {React.string(releaseTitle)} </div>
+    <h3 className=Styles.releaseTitle> {React.string(releaseTitle)} </h3>
     <div className=Styles.tableContainer>
       <div className=Styles.topRow>
         <span className=Css.(style([gridColumn(2, 3)]))>
