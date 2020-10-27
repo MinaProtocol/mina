@@ -8,3 +8,8 @@ pub mod bn_382_fp;
 pub mod bn_382_fq;
 pub mod tweedle_fp;
 pub mod tweedle_fq;
+/* Field vectors */
+pub mod bn_382_fp_vector;
+pub mod bn_382_fq_vector;
+pub mod tweedle_fp_vector;
+pub mod tweedle_fq_vector;

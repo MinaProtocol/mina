@@ -10,4 +10,9 @@
    marlin_plonk_bindings_tweedle_fp
    marlin_plonk_bindings_tweedle_fq
    marlin_plonk_bindings_bn_382_fp
-   marlin_plonk_bindings_bn_382_fq))
+   marlin_plonk_bindings_bn_382_fq
+   ;; Finite field vectors
+   marlin_plonk_bindings_tweedle_fp_vector
+   marlin_plonk_bindings_tweedle_fq_vector
+   marlin_plonk_bindings_bn_382_fp_vector
+   marlin_plonk_bindings_bn_382_fq_vector))
