@@ -17,6 +17,9 @@ module BlockLifetime = {
       podRealName: string,
       sender: string
     };
+
+    let toProduced = ({time, podRealName}) =>
+      {ProducedInstant.time, podRealName}
   };
 
   module Entry = {
@@ -39,14 +42,20 @@ module BlockLifetime = {
         switch (entry) {
         | This(`Produced(produced)) =>
           Some({Rendered.stateHash, produced, received: [||]})
-        | That(_) =>
+        | That(received) => {
           Js.log(
             Printf.sprintf(
-              "Couldn't find produced for one of the blocks %s, skipping",
+              "Couldn't find produced for one of the blocks %s, approximating",
               stateHash,
             ),
           );
-          None;
+
+          Some({
+            Rendered.stateHash,
+            produced: List.hd(received) |> ReceivedInstant.toProduced,
+            received: Array.of_list(received),
+          })
+        }
         | Those(`Produced(produced), received) =>
           Some({
             Rendered.stateHash,
