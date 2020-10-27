@@ -17,7 +17,7 @@ end)
 
 [%%else]
 
-[%%error
+[%%optcomp.error
 "\"genesis_ledger\" not set in config.mlh"]
 
 [%%endif]
