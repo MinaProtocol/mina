@@ -706,7 +706,7 @@ module Base = struct
                    the same. This is checked in the transaction pool.
                 *)
                 (not fee_payer_is_source)
-                && ( not source_insufficient_balance
+                && ( (not source_insufficient_balance)
                    || Or_error.is_error timing_or_error )
               in
               { predicate_failed
