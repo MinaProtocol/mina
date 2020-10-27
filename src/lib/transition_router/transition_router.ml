@@ -163,7 +163,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
   [%log debug]
     ~metadata:
       [("actual", `Int (List.length tips)); ("expected", `Int num_peers)]
-    "Finished requesting tips. Got $actual / $expected " ;
+    "Finished requesting tips. Got $actual / $expected" ;
   List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
       Option.merge acc (Option.return enveloped_candidate_best_tip)
         ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
