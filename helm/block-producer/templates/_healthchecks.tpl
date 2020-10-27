@@ -98,7 +98,7 @@ Mina testnet bot readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 3 && ownsFunds"
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 1 && ownsFunds"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}

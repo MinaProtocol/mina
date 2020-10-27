@@ -26,16 +26,9 @@ spec:
         resources:
           limits:
           requests:
-<<<<<<< HEAD
             memory: 8.0Gi
             cpu: 4.0
         image: {{ $.Values.coda.image }}
-=======
-            memory: 14.0Gi
-            cpu: 2.0
-        image: {{ .Values.coda.image }}
-        command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
->>>>>>> 5b2ca8b4b... rebase and refactors
         args: [ "daemon",
           "-log-level", {{ .Values.coda.logLevel }},
           "-log-json",

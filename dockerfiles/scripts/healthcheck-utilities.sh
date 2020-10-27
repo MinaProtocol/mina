@@ -11,7 +11,7 @@ function isDaemonSynced() {
 }
 
 #
-# Determine whether a local daemon is has processed the highest observed block
+# Determine whether a local daemon has processed the highest observed block
 #
 function isChainlengthHighestReceived() {
     chainLength=$(
@@ -91,7 +91,7 @@ function hasSnarkWorker() {
 # Determine whether an Archive node's highest observed block is in sync with its local Mina daemon
 #
 function isArchiveSynced() {
-    echo "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>]"
+    ## "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>]"
 
     while [[ "$#" -gt 0 ]]; do case $1 in
         --db-host) host="$2"; shift;;
@@ -102,7 +102,7 @@ function isArchiveSynced() {
     esac; shift; done
 
     highestObserved=$(
-        PGPASSWORD=$password psql -qtAX -h $host -p $port -d archive -U $user \
+        PGPASSWORD=${password:-foobar} psql -qtAX -h ${host:-localhost} -p ${port:-5432} -d archive -U ${user:-postgres} \
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
