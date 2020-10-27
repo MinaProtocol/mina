@@ -10,7 +10,7 @@ use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
 #[derive(Copy, Clone)]
-pub struct CamlTweedleFp(Fp);
+pub struct CamlTweedleFp(pub Fp);
 
 pub type CamlTweedleFpPtr = ocaml::Pointer<CamlTweedleFp>;
 
@@ -207,8 +207,10 @@ pub fn caml_tweedle_fp_domain_generator(
 ) -> Result<CamlTweedleFp, ocaml::Error> {
     match Domain::new(1 << log2_size) {
         Some(x) => Ok(CamlTweedleFp(x.group_gen)),
-        None => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_domain_generator")
-            .err()
-            .unwrap()),
+        None => Err(
+            ocaml::Error::invalid_argument("caml_tweedle_fp_domain_generator")
+                .err()
+                .unwrap(),
+        ),
     }
 }

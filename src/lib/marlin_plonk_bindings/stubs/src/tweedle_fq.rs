@@ -10,7 +10,7 @@ use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
 #[derive(Copy, Clone)]
-pub struct CamlTweedleFq(Fq);
+pub struct CamlTweedleFq(pub Fq);
 
 pub type CamlTweedleFqPtr = ocaml::Pointer<CamlTweedleFq>;
 
@@ -207,8 +207,10 @@ pub fn caml_tweedle_fq_domain_generator(
 ) -> Result<CamlTweedleFq, ocaml::Error> {
     match Domain::new(1 << log2_size) {
         Some(x) => Ok(CamlTweedleFq(x.group_gen)),
-        None => Err(ocaml::Error::invalid_argument("caml_tweedle_fq_domain_generator")
-            .err()
-            .unwrap()),
+        None => Err(
+            ocaml::Error::invalid_argument("caml_tweedle_fq_domain_generator")
+                .err()
+                .unwrap(),
+        ),
     }
 }

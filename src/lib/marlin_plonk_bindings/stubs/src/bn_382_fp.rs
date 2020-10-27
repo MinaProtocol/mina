@@ -1,7 +1,7 @@
 use crate::bigint_384::{CamlBigint384, CamlBigint384Ptr};
 use algebra::{
-    fields::{Field, FpParameters, PrimeField, SquareRootField},
     bn_382::fp::{Fp, FpParameters as Fp_params},
+    fields::{Field, FpParameters, PrimeField, SquareRootField},
     FftField, One, UniformRand, Zero,
 };
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -10,7 +10,7 @@ use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
 #[derive(Copy, Clone)]
-pub struct CamlBn382Fp(Fp);
+pub struct CamlBn382Fp(pub Fp);
 
 pub type CamlBn382FpPtr = ocaml::Pointer<CamlBn382Fp>;
 
@@ -202,13 +202,13 @@ pub fn caml_bn_382_fp_two_adic_root_of_unity() -> CamlBn382Fp {
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fp_domain_generator(
-    log2_size: ocaml::Int,
-) -> Result<CamlBn382Fp, ocaml::Error> {
+pub fn caml_bn_382_fp_domain_generator(log2_size: ocaml::Int) -> Result<CamlBn382Fp, ocaml::Error> {
     match Domain::new(1 << log2_size) {
         Some(x) => Ok(CamlBn382Fp(x.group_gen)),
-        None => Err(ocaml::Error::invalid_argument("caml_bn_382_fp_domain_generator")
-            .err()
-            .unwrap()),
+        None => Err(
+            ocaml::Error::invalid_argument("caml_bn_382_fp_domain_generator")
+                .err()
+                .unwrap(),
+        ),
     }
 }
