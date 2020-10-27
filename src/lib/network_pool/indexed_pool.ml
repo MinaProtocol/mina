@@ -322,15 +322,13 @@ let find_by_hash :
     -> Transaction_hash.User_command_with_valid_signature.t option =
  fun {all_by_hash; _} hash -> Map.find all_by_hash hash
 
-let current_global_slot ~time_controller consensus_constants =
-  let current_time = Block_time.now time_controller in
+let current_global_slot t =
+  let current_time = Block_time.now t.time_controller in
   Consensus.Data.Consensus_time.(
-    of_time_exn ~constants:consensus_constants current_time |> to_global_slot)
+    of_time_exn ~constants:t.consensus_constants current_time |> to_global_slot)
 
-let check_expiry ~consensus_constants ~time_controller (cmd : User_command.t) =
-  let current_global_slot =
-    current_global_slot ~time_controller consensus_constants
-  in
+let check_expiry t (cmd : User_command.t) =
+  let current_global_slot = current_global_slot t in
   let valid_until = User_command.valid_until cmd in
   if Global_slot.(valid_until < current_global_slot) then
     Error
@@ -547,10 +545,7 @@ let revalidate :
 
 let remove_expired t :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
-  let current_global_slot =
-    current_global_slot ~time_controller:t.time_controller
-      t.consensus_constants
-  in
+  let current_global_slot = current_global_slot t in
   let expired, _, _ =
     Map.split t.transactions_with_expiration current_global_slot
   in
@@ -701,7 +696,7 @@ let rec add_from_gossip_exn :
   (* Result errors indicate problems with the command, while assert failures
      indicate bugs in Coda. *)
   let open Result.Let_syntax in
-  let%bind () = check_expiry ~consensus_constants ~time_controller unchecked in
+  let%bind () = check_expiry t unchecked in
   let%bind consumed = currency_consumed' ~constraint_constants cmd in
   let%bind () =
     if User_command.check_tokens unchecked then return () else Error Bad_token
@@ -874,7 +869,7 @@ let add_from_backtrack :
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
-  let%map () = check_expiry ~consensus_constants ~time_controller unchecked in
+  let%map () = check_expiry t unchecked in
   let fee_payer = User_command.fee_payer unchecked in
   let fee = User_command.fee_exn unchecked in
   let consumed =
