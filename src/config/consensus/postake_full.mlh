@@ -1,4 +1,4 @@
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 1024]
 [%%define c 8]
-[%%define delta 3]
+[%%define delta 0]

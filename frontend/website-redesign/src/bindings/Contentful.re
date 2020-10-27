@@ -20,3 +20,8 @@ let client =
 external getEntries:
   (client, Js.t('args)) => Js.Promise.t(ContentType.System.entries('entry)) =
   "getEntries";
+
+[@bs.send]
+external getEntry:
+  (client, string, Js.t('args)) => Js.Promise.t(ContentType.System.entry('entry)) =
+  "getEntry";

@@ -2,7 +2,7 @@ apiVersion: v2
 name: o1-bot
 description: A Helm chart for Coda Protocol's O(1) role-based testnet service bots
 type: application
-version: 0.0.1
+version: 0.0.2
 appVersion: 0.0.1
 icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
 keywords:
@@ -10,6 +10,8 @@ keywords:
 - faucet
 - echo
 - community
+- mina
+- testnet
 home: https://codaprotocol.com/
 sources:
 - https://github.com/CodaProtocol

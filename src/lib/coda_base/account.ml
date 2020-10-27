@@ -138,29 +138,69 @@ type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
 
 module Timing = Account_timing
 
-[%%versioned
+module Binable_arg = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Public_key.Compressed.Stable.V1.t
+        , Token_id.Stable.V1.t
+        , Token_permissions.Stable.V1.t
+        , Balance.Stable.V1.t
+        , Nonce.Stable.V1.t
+        , Receipt.Chain_hash.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t option
+        , State_hash.Stable.V1.t
+        , Timing.Stable.V1.t
+        , Permissions.Stable.V1.t
+        , Snapp_account.Stable.V1.t option )
+        Poly.Stable.V1.t
+      [@@deriving sexp, eq, hash, compare, yojson]
+
+      let to_latest = Fn.id
+
+      let public_key (t : t) : key = t.public_key
+    end
+  end]
+end
+
+[%%if
+feature_snapps]
+
+include Binable_arg
+
+[%%else]
+
+let check (t : Binable_arg.t) =
+  match t.snapp with
+  | None ->
+      t
+  | Some _ ->
+      failwith "Snapp accounts not supported"
+
+[%%versioned_binable
 module Stable = struct
   module V1 = struct
-    type t =
-      ( Public_key.Compressed.Stable.V1.t
-      , Token_id.Stable.V1.t
-      , Token_permissions.Stable.V1.t
-      , Balance.Stable.V1.t
-      , Nonce.Stable.V1.t
-      , Receipt.Chain_hash.Stable.V1.t
-      , Public_key.Compressed.Stable.V1.t option
-      , State_hash.Stable.V1.t
-      , Timing.Stable.V1.t
-      , Permissions.Stable.V1.t
-      , Snapp_account.Stable.V1.t option )
-      Poly.Stable.V1.t
+    type t = Binable_arg.Stable.V1.t
     [@@deriving sexp, eq, hash, compare, yojson]
+
+    include Binable.Of_binable
+              (Binable_arg.Stable.V1)
+              (struct
+                type nonrec t = t
+
+                let to_binable = check
+
+                let of_binable = check
+              end)
 
     let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
   end
 end]
+
+[%%endif]
 
 [%%define_locally
 Stable.Latest.(public_key)]

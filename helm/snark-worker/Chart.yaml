@@ -9,6 +9,8 @@ icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/
 keywords:
 - snarks
 - zero-knowledge
+- mina
+- testnet
 home: https://codaprotocol.com/
 sources:
 - https://github.com/CodaProtocol/coda/tree/develop/src/lib/snark_worker

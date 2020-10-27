@@ -6,6 +6,7 @@ module Styles = {
       cursor(`pointer),
       color(Theme.Colors.orange),
       display(`flex),
+      hover([textDecoration(`underline)]),
     ]);
 
   let text = style([marginRight(`rem(0.2)), cursor(`pointer)]);
