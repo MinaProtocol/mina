@@ -354,12 +354,12 @@ module Helper = struct
       let name = "validationComplete"
     end
 
-    module Add_peer = struct
-      type input = {multiaddr: string} [@@deriving yojson]
+    module Add_peers = struct
+      type input = {multiaddrs: string list} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
-      let name = "addPeer"
+      let name = "addPeers"
     end
 
     module Begin_advertising = struct
@@ -1292,17 +1292,21 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peer net maddr =
+let add_peers net maddr =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+      do_rpc net
+        (module Rpcs.Add_peers)
+        {Rpcs.Add_peers.multiaddrs= List.map maddrs ~f:Multiaddr.to_string})
   with
-  | Ok "addPeer success" ->
+  | Ok "addPeers success" ->
       Ok ()
   | Ok v ->
-      failwithf "helper broke RPC protocol: addPeer got %s" v ()
+      failwithf "helper broke RPC protocol: addPeers got %s" v ()
   | Error e ->
       Error e
+
+let add_peer net maddr = add_peers net [maddr]
 
 let begin_advertising net =
   match%map Helper.(do_rpc net (module Rpcs.Begin_advertising) ()) with

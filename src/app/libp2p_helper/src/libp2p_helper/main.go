@@ -784,8 +784,8 @@ func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
 	return "removeStreamHandler success", nil
 }
 
-type addPeerMsg struct {
-	Multiaddr string `json:"multiaddr"`
+type addPeersMsg struct {
+	Multiaddrs string `json:"multiaddrs"`
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -801,16 +801,20 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	return info, nil
 }
 
-func (ap *addPeerMsg) run(app *app) (interface{}, error) {
+func (ap *addPeersMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-	info, err := addrInfoOfString(ap.Multiaddr)
-	if err != nil {
-		return nil, err
+
+	for _, maddr := range ap.Multiaddrs {
+		info, err := addrInfoOfString(ap.Multiaddr)
+		if err != nil {
+			return nil, err
+		}
+
+		app.AddedPeers = append(app.AddedPeers, *info)
 	}
 
-	app.AddedPeers = append(app.AddedPeers, *info)
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
@@ -820,7 +824,7 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
-	return "addPeer success", nil
+	return "addPeers success", nil
 }
 
 type beginAdvertisingMsg struct {
