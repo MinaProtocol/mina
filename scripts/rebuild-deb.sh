@@ -76,6 +76,11 @@ mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
+
+# TODO: Find a way to package keys properly without blocking/locking in CI
+# For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
+rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
+
 # Keys
 # Identify actual keys used in build
 #NOTE: Moving the keys from /tmp because of storage constraints. This is OK
@@ -114,6 +119,7 @@ do
     done
 done
 
+# Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
 # Genesis Ledger/proof Copy
 for f in /tmp/coda_cache_dir/genesis*; do
     if [ -e "$f" ]; then
@@ -127,7 +133,6 @@ for f in /tmp/s3_cache_dir/genesis*; do
         mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
     fi
 done
-
 
 #copy config.json
 cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"

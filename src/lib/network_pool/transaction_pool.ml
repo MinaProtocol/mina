@@ -112,6 +112,13 @@ module Diff_versioned = struct
   let is_empty t = List.is_empty t
 end
 
+type Structured_log_events.t +=
+  | Rejecting_command_for_reason of
+      { command: User_command.t
+      ; reason: Diff_versioned.Diff_error.t
+      ; error_extra: (string * Yojson.Safe.t) list }
+  [@@deriving register_event {msg= "Rejecting command because: $reason"}]
+
 module type S = sig
   open Intf
 
@@ -309,6 +316,21 @@ struct
             ; ( "current_global_slot"
               , Coda_numbers.Global_slot.to_yojson current_global_slot ) ] )
 
+    let balance_of_account ~global_slot (account : Account.t) =
+      match account.timing with
+      | Untimed ->
+          account.balance
+      | Timed
+          { initial_minimum_balance
+          ; cliff_time
+          ; vesting_period
+          ; vesting_increment } ->
+          Currency.Balance.sub_amount account.balance
+            (Currency.Balance.to_amount
+               (Account.min_balance_at_slot ~global_slot ~cliff_time
+                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+          |> Option.value ~default:Currency.Balance.zero
+
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
             Transition_frontier.best_tip_diff)
@@ -327,6 +349,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
+      let global_slot = Indexed_pool.current_global_slot t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
@@ -413,7 +436,7 @@ struct
                       ~message:"public key has location but no account"
                       (Base_ledger.get best_tip_ledger loc)
                   in
-                  acc.balance
+                  balance_of_account ~global_slot acc
             in
             let fee_payer = User_command.(fee_payer (forget_check cmd.data)) in
             let fee_payer_balance =
@@ -527,7 +550,8 @@ struct
               | Some acct -> (
                 match
                   Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
-                    (Currency.Balance.to_amount acct.balance)
+                    ( balance_of_account ~global_slot acct
+                    |> Currency.Balance.to_amount )
                 with
                 | Error e ->
                     let error_str, metadata = of_indexed_pool_error e in
@@ -614,6 +638,7 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
+                 let global_slot = Indexed_pool.current_global_slot t.pool in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -630,8 +655,9 @@ struct
                                   account"
                                (Base_ledger.get validation_ledger loc)
                            in
-                           (acc.nonce, Currency.Balance.to_amount acc.balance)
-                   )
+                           ( acc.nonce
+                           , balance_of_account ~global_slot acc
+                             |> Currency.Balance.to_amount ) )
                  in
                  let dropped_locally_generated =
                    Sequence.filter dropped ~f:(fun cmd ->
@@ -814,6 +840,7 @@ struct
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
         let pool_max_size = t.config.pool_max_size in
+        let global_slot = Indexed_pool.current_global_slot t.pool in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -871,7 +898,7 @@ struct
                             Indexed_pool.add_from_gossip_exn pool tx'
                               sender_account.nonce
                             @@ Currency.Balance.to_amount
-                                 sender_account.balance
+                            @@ balance_of_account ~global_slot sender_account
                           in
                           let of_indexed_pool_error = function
                             | Indexed_pool.Command_error.Invalid_nonce
@@ -1047,19 +1074,15 @@ struct
                                     .Unwanted_fee_token )
                                   :: rejected )
                           | Error err ->
-                              let diff_err, err_extra =
+                              let diff_err, error_extra =
                                 of_indexed_pool_error err
                               in
                               if is_sender_local then
-                                [%log' error t.logger]
-                                  "rejecting $cmd because of $reason. \
-                                   ($error_extra)"
-                                  ~metadata:
-                                    [ ("cmd", User_command.to_yojson tx)
-                                    ; ( "reason"
-                                      , Diff_versioned.Diff_error.to_yojson
-                                          diff_err )
-                                    ; ("error_extra", `Assoc err_extra) ] ;
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra }) ;
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useless_gossip
@@ -1068,8 +1091,8 @@ struct
                                          ($error_extra)"
                                       , [ ("cmd", User_command.to_yojson tx)
                                         ; ("reason", yojson_fail_reason err)
-                                        ; ("error_extra", `Assoc err_extra) ]
-                                      ) )
+                                        ; ("error_extra", `Assoc error_extra)
+                                        ] ) )
                               in
                               go txs'' pool
                                 (accepted, (tx, diff_err) :: rejected) )
