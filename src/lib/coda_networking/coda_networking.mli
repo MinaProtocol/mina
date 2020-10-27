@@ -106,7 +106,15 @@ module Rpcs : sig
     type response = Telemetry_data.t Or_error.t [@@deriving to_yojson]
   end
 
+  module Get_some_initial_peers : sig
+    type query = unit [@@deriving sexp, to_yojson]
+
+    type response = Network_peer.Peer.t list [@@deriving to_yojson]
+  end
+
   type ('query, 'response) rpc =
+    | Get_some_initial_peers
+        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
@@ -267,6 +275,9 @@ val ban_notification_reader :
 
 val create :
      Config.t
+  -> get_some_initial_peers:(   Rpcs.Get_some_initial_peers.query
+                                Envelope.Incoming.t
+                             -> Rpcs.Get_some_initial_peers.response Deferred.t)
   -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   Rpcs
                                                              .Get_staged_ledger_aux_and_pending_coinbases_at_hash
                                                              .query

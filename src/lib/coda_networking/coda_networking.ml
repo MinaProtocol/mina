@@ -67,9 +67,9 @@ module Rpcs = struct
       let name = "get_some_initial_peers"
 
       module T = struct
-        type query = unit
+        type query = unit [@@deriving sexp, yojson]
 
-        type response = Network_peer.Peer.t list
+        type response = Network_peer.Peer.t list [@@deriving sexp, yojson]
       end
 
       module Caller = T

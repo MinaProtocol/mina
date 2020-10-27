@@ -333,8 +333,6 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
   This can fail if the connection fails. *)
 val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
 
-val add_peers : net -> Multiaddr.t list -> unit Deferred.Or_error.t
-
 (** Join the DHT and announce our existence.
 
   Call this after using [add_peer] to add any bootstrap peers. *)
