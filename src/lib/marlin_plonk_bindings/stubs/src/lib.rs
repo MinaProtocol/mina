@@ -15,3 +15,4 @@ pub mod tweedle_fp_vector;
 pub mod tweedle_fq_vector;
 /* Groups */
 pub mod tweedle_dee;
+pub mod tweedle_dum;

@@ -18,4 +18,5 @@
    marlin_plonk_bindings_bn_382_fp_vector
    marlin_plonk_bindings_bn_382_fq_vector
    ;; Groups
-   marlin_plonk_bindings_tweedle_dee))
+   marlin_plonk_bindings_tweedle_dee
+   marlin_plonk_bindings_tweedle_dum))

@@ -22,3 +22,4 @@ module Bn_382_fq_vector = Marlin_plonk_bindings_bn_382_fq_vector
 (* Groups *)
 
 module Tweedle_dee = Marlin_plonk_bindings_tweedle_dee
+module Tweedle_dum = Marlin_plonk_bindings_tweedle_dum
