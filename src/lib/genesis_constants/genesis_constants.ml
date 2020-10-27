@@ -316,7 +316,7 @@ module Protocol = struct
               Time.of_string "2019-10-08 17:51:23.050849Z" |> of_time }
         in
         (*from the print statement in Serialization.check_serialization*)
-        let known_good_digest = "2b1a964e0fea8c31fdf76e7f5bebcdd6" in
+        let known_good_digest = "28b7c3bb5f94351f0afa6ebd83078730" in
         Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           t known_good_digest
