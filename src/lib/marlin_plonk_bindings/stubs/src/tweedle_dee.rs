@@ -10,6 +10,8 @@ use algebra::{
 };
 use rand::rngs::StdRng;
 
+use commitment_dlog::commitment::PolyComm;
+
 /* Projective representation is raw bytes on the OCaml heap. */
 
 pub struct CamlTweedleDee(pub GProjective);
@@ -104,7 +106,7 @@ impl From<CamlTweedleDeeAffine<CamlTweedleFqPtr>> for GAffine {
     }
 }
 
-/* This is heinous, but we have newtypes to deal with, so :shrug: */
+/* This is heinous, but we have type conversions to deal with, so :shrug: */
 
 pub struct CamlTweedleDeeAffineVector(pub Vec<GAffine>);
 
@@ -131,17 +133,86 @@ unsafe impl ocaml::ToValue for CamlTweedleDeeAffineVector {
         let len = self.0.len();
         // Manually allocate an OCaml array of the right size
         let mut array = ocaml::Array::alloc(len);
-        for i in 0..len {
-            // Construct the OCaml value for each element, then place it in the correct position in
-            // the array.
-            // Bounds checks are skipped because we know statically that the indices are in range.
+        let mut i = 0;
+        for c in self.0.into_iter() {
             unsafe {
+                // Construct the OCaml value for each element, then place it in the correct position in
+                // the array.
+                // Bounds checks are skipped because we know statically that the indices are in range.
                 array.set_unchecked(
                     i,
-                    Into::<CamlTweedleDeeAffine<CamlTweedleFq>>::into(*self.0.get_unchecked(i))
-                        .to_value(),
+                    Into::<CamlTweedleDeeAffine<CamlTweedleFq>>::into(c).to_value(),
                 );
             }
+            i = i + 1;
+        }
+        array.to_value()
+    }
+}
+
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+pub struct CamlTweedleDeePolyComm<T> {
+    shifted: Option<CamlTweedleDeeAffine<T>>,
+    unshifted: CamlTweedleDeeAffineVector,
+}
+
+impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<CamlTweedleFq> {
+    fn from(c: PolyComm<GAffine>) -> Self {
+        CamlTweedleDeePolyComm {
+            shifted: Option::map(c.shifted, Into::into),
+            unshifted: CamlTweedleDeeAffineVector(c.unshifted),
+        }
+    }
+}
+
+impl From<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> for PolyComm<GAffine> {
+    fn from(c: CamlTweedleDeePolyComm<CamlTweedleFqPtr>) -> Self {
+        PolyComm {
+            shifted: Option::map(c.shifted, Into::into),
+            unshifted: c.unshifted.0,
+        }
+    }
+}
+
+/* This is also heinous, but we still have type conversions to deal with, so :shrug: */
+
+pub struct CamlTweedleDeePolyCommVector(pub Vec<PolyComm<GAffine>>);
+
+unsafe impl ocaml::FromValue for CamlTweedleDeePolyCommVector {
+    fn from_value(value: ocaml::Value) -> Self {
+        // Intepret as an array. This is free.
+        let array: ocaml::Array<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> =
+            ocaml::FromValue::from_value(value);
+        let len = array.len();
+        let mut vec: Vec<PolyComm<GAffine>> = Vec::with_capacity(len);
+        for i in 0..len {
+            // get_unchecked does the conversion to the caml representation, and then into brings
+            // us back to a raw GAffine.
+            unsafe {
+                vec.push(array.get_unchecked(i).into());
+            }
+        }
+        CamlTweedleDeePolyCommVector(vec)
+    }
+}
+
+unsafe impl ocaml::ToValue for CamlTweedleDeePolyCommVector {
+    fn to_value(self: Self) -> ocaml::Value {
+        let len = self.0.len();
+        // Manually allocate an OCaml array of the right size
+        let mut array = ocaml::Array::alloc(len);
+        let mut i = 0;
+        for c in self.0.into_iter() {
+            unsafe {
+                // Construct the OCaml value for each element, then place it in the correct position in
+                // the array.
+                // Bounds checks are skipped because we know statically that the indices are in range.
+                array.set_unchecked(
+                    i,
+                    Into::<CamlTweedleDeePolyComm<CamlTweedleFq>>::into(c).to_value(),
+                );
+            }
+            i = i + 1;
         }
         array.to_value()
     }
