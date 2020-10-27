@@ -1,3 +1,5 @@
+module Types = Marlin_plonk_bindings_types
+
 (** Biginteger types *)
 
 module Bigint_256 = Marlin_plonk_bindings_bigint_256
@@ -16,3 +18,7 @@ module Tweedle_fp_vector = Marlin_plonk_bindings_tweedle_fp_vector
 module Tweedle_fq_vector = Marlin_plonk_bindings_tweedle_fq_vector
 module Bn_382_fp_vector = Marlin_plonk_bindings_bn_382_fp_vector
 module Bn_382_fq_vector = Marlin_plonk_bindings_bn_382_fq_vector
+
+(* Groups *)
+
+module Tweedle_dee = Marlin_plonk_bindings_tweedle_dee

@@ -13,3 +13,5 @@ pub mod bn_382_fp_vector;
 pub mod bn_382_fq_vector;
 pub mod tweedle_fp_vector;
 pub mod tweedle_fq_vector;
+/* Groups */
+pub mod tweedle_dee;
