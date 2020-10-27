@@ -14,14 +14,20 @@ module Style = {
 
   let page =
     style([
-      display(`block),
+      display(`flex),
       justifyContent(`center),
       margin(`auto),
       marginTop(`rem(2.)),
-      marginBottom(`rem(6.)),
-      padding2(~v=`zero, ~h=`rem(2.)),
-      media(Theme.MediaQuery.desktop, [display(`flex)]),
-      media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
+      paddingBottom(`rem(6.)),
+      media(Theme.MediaQuery.desktop, [justifyContent(`spaceBetween)]),
+    ]);
+
+  let blogBackground =
+    style([
+      height(`percent(100.)),
+      width(`percent(100.)),
+      important(backgroundSize(`cover)),
+      backgroundImage(`url("/static/img/backgrounds/BlogBackground.jpg")),
     ]);
 
   let eyebrow = style([marginBottom(`rem(1.))]);
@@ -33,8 +39,11 @@ module Style = {
       alignItems(`center),
       marginTop(`rem(1.5)),
       marginBottom(`rem(0.5)),
-      hover([color(Theme.Colors.black)]),
+      textDecoration(`none),
+      color(Theme.Colors.orange),
     ]);
+
+  let link = merge([Theme.Type.link, style([])]);
 };
 
 module EditLink = {
@@ -49,19 +58,8 @@ module EditLink = {
         ++ ".mdx"
       }
       className=Style.editLink>
-      <svg
-        fill="currentColor"
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24">
-        <path
-          d="M7.127 22.562l-7.127 1.438 1.438-7.128 5.689 5.69zm1.414-1.414l11.228-11.225-5.69-5.692-11.227 11.227 5.689 5.69zm9.768-21.148l-2.816 2.817 5.691 5.691 2.816-2.819-5.691-5.689z"
-        />
-      </svg>
-      <span className=Css.(style([marginLeft(`rem(0.25))]))>
-        {React.string("Edit")}
-      </span>
+      <span className=Style.link> {React.string("Edit")} </span>
+      <Icon kind=Icon.ArrowRightMedium />
     </a>;
   };
 };
@@ -85,18 +83,22 @@ let make = (~metadata, ~children) => {
     <Next.Head>
       <link rel="stylesheet" href="/static/css/a11y-light.css" />
     </Next.Head>
-    <div className=Nav.Styles.spacer />
-    <div className=Style.page>
-      <DocsSideNav currentSlug />
-      <div className=Style.content>
-        <div className=Style.eyebrow>
-          <LabelEyebrow copy="Documentation" />
+    <div className=Style.blogBackground>
+      <Wrapped>
+        <div className=Nav.Styles.spacer />
+        <div className=Style.page>
+          <DocsSideNav currentSlug />
+          <div className=Style.content>
+            <div className=Style.eyebrow>
+              <LabelEyebrow copy="Documentation" />
+            </div>
+            <EditLink route={router.route} />
+            <Next.MDXProvider components={DocsComponents.allComponents()}>
+              children
+            </Next.MDXProvider>
+          </div>
         </div>
-        <EditLink route={router.route} />
-        <Next.MDXProvider components={DocsComponents.allComponents()}>
-          children
-        </Next.MDXProvider>
-      </div>
+      </Wrapped>
     </div>
   </Page>;
 };

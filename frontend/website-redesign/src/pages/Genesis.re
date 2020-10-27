@@ -8,9 +8,10 @@ module Styles = {
   let background =
     style([
       backgroundImage(
-        `url("/static/img/BecomeAGenesisMemberBackground.jpg"),
+        `url("/static/img/backgrounds/SectionGenesisBackground.png"),
       ),
       backgroundSize(`cover),
+      paddingTop(`rem(12.)),
     ]);
   // leaderboard css
   let disclaimer =
@@ -26,7 +27,7 @@ module Styles = {
 
   let leaderboardContainer =
     style([
-      height(`rem(66.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -35,7 +36,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
-      media(Theme.MediaQuery.tablet, [height(`rem(41.))]),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 
   let leaderboardTextContainer =
@@ -74,6 +75,7 @@ module HowItWorksGrid = {
     let container =
       style([
         display(`flex),
+        width(`percent(100.)),
         flexDirection(`column),
         media(
           Theme.MediaQuery.desktop,
@@ -119,47 +121,45 @@ module HowItWorksGrid = {
 
   [@react.component]
   let make = () => {
-    <Wrapped>
-      <div className=Styles.container>
-        <h2 className=Styles.h2> {React.string("How It Works")} </h2>
-        <div className=Styles.grid>
-          <GridItem label="What Members Do: Pre-Mainnet">
-            <p className=Theme.Type.paragraph>
-              {React.string(
-                 "Get hands-on experience developing applications with zero knowledge proofs, plus an overview of different types of constructions.",
-               )}
-            </p>
-          </GridItem>
-          <GridItem label="What Members Do: Post-Mainnet">
-            <p className=Theme.Type.paragraph>
-              {React.string(
-                 {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
-               )}
-            </p>
-          </GridItem>
-          <GridItem label="Who is Selected">
-            <p className=Theme.Type.paragraph>
-              {React.string(
-                 "Highly engaged node operators and community leaders, with new Genesis Members being announced on a rolling basis until we reach a thousand.",
-               )}
-            </p>
-          </GridItem>
-          <GridItem label="What They Get">
-            <p className=Theme.Type.paragraph>
-              {React.string(
-                 "To ensure decentralization, Mina has allocated 6.6% of the protocol (or 66,000 Mina tokens) to Genesis Founding Members.",
-               )}
-            </p>
-            // TODO: Add link here to terms and conditions
-            <Next.Link href="/tcGenesis">
-              <a className=Styles.link>
-                {React.string("Read Terms and Conditions.")}
-              </a>
-            </Next.Link>
-          </GridItem>
-        </div>
+    <div className=Styles.container>
+      <h2 className=Styles.h2> {React.string("How It Works")} </h2>
+      <div className=Styles.grid>
+        <GridItem label="What Members Do: Pre-Mainnet">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "Get hands-on experience developing applications with zero knowledge proofs, plus an overview of different types of constructions.",
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="What Members Do: Post-Mainnet">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               {j|Participate as block producers by continuously staking or delegating their Mina tokens — plus everything they were doing pre-mainnet. |j},
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="Who is Selected">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "Highly engaged node operators and community leaders, with new Genesis Members being announced on a rolling basis until we reach a thousand.",
+             )}
+          </p>
+        </GridItem>
+        <GridItem label="What They Get">
+          <p className=Theme.Type.paragraph>
+            {React.string(
+               "To ensure decentralization, Mina has allocated 6.6% of the protocol (or 66,000 Mina tokens) to Genesis Founding Members.",
+             )}
+          </p>
+          // TODO: Add link here to terms and conditions
+          <Next.Link href="/tcGenesis">
+            <a className=Styles.link>
+              {React.string("Read Terms and Conditions.")}
+            </a>
+          </Next.Link>
+        </GridItem>
       </div>
-    </Wrapped>;
+    </div>;
   };
 };
 
@@ -171,8 +171,7 @@ module FoundingMembersSection = {
         backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
         backgroundSize(`cover),
       ]);
-    let h2 =
-      merge([Theme.Type.h2, style([paddingTop(`rem(4.)), color(white)])]);
+    let h2 = merge([Theme.Type.h2, style([color(white)])]);
     let sectionSubhead =
       merge([
         Theme.Type.paragraphMono,
@@ -355,14 +354,10 @@ let make = (~profiles) => {
       }>
       <Spacer height=2. />
       <Button
-        href={
-               `External(
-                 "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
-               )
-             }
-        bgColor=Theme.Colors.black>
+        href={`External(Constants.genesisGrantApplication)}
+        bgColor=Theme.Colors.digitalBlack>
         {React.string("Apply Now")}
-        <Icon kind=Icon.ArrowRightMedium />
+        <Icon kind=Icon.ArrowRightSmall />
       </Button>
     </Hero>
     <div className=Styles.background>
@@ -374,29 +369,26 @@ let make = (~profiles) => {
           description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
-          background:
-            Image("/static/img/backgrounds/SectionGenesisBackground.png"),
+          background: Image(""),
           contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "Apply Now",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: false,
-            href:
-              `External(
-                "https://docs.google.com/forms/d/e/1FAIpQLSebjJSGobXHIOPlnjnGtp0InsNFU3Z7Sig_xoqCfeaKebJ0XQ/viewform",
-              ),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "Apply Now",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: true,
+              href: `External(Constants.genesisGrantApplication),
+            }),
         }>
         <Spacer height=4. />
         <Rule color=Theme.Colors.white />
         <Spacer height=4. />
         <HowItWorksGrid />
         <Rule color=Theme.Colors.white />
-        <Spacer height=7. />
       </FeaturedSingleRow>
     </div>
     <div className=Styles.genesisSection>
+      <Spacer height=2. />
       <FoundingMembersSection profiles>
         <WorldMapSection />
         <Spacer height=7.25 />
@@ -430,7 +422,6 @@ let make = (~profiles) => {
              )}
           </p>
         </Wrapped>
-        <Spacer height=4. />
         <CultureFooter />
         <Spacer height=4. />
       </div>

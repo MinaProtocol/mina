@@ -47,7 +47,7 @@ module Styles = {
   let description =
     style([
       width(`percent(80.)),
-      media(Theme.MediaQuery.notMobile, [width(`percent(50.))]),
+      media(Theme.MediaQuery.notMobile, [width(`percent(80.))]),
     ]);
 
   let gridItemCopy =

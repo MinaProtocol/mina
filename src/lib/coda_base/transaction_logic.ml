@@ -298,6 +298,12 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
+    val validate_timing_with_min_balance :
+         account:Account.t
+      -> txn_amount:Amount.t
+      -> txn_global_slot:Global_slot.t
+      -> (Account.Timing.t * [> `Min_balance of Balance.t]) Or_error.t
+
     val validate_timing :
          account:Account.t
       -> txn_amount:Amount.t
@@ -306,13 +312,27 @@ module type S = sig
   end
 end
 
-let validate_timing ~account ~txn_amount ~txn_global_slot =
+(* tags for timing validation errors *)
+let nsf_tag = "nsf"
+
+let min_balance_tag = "minbal"
+
+let timing_error_to_user_command_status err =
+  match Error.Internal_repr.of_info err with
+  | Tag_t (tag, _) when String.equal tag nsf_tag ->
+      User_command_status.Failure.Source_insufficient_balance
+  | Tag_t (tag, _) when String.equal tag min_balance_tag ->
+      User_command_status.Failure.Source_minimum_balance_violation
+  | _ ->
+      failwith "Unexpected timed account validation error"
+
+let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let open Account.Poly in
   let open Account.Timing.Poly in
   match account.timing with
   | Untimed ->
       (* no time restrictions *)
-      Or_error.return Untimed
+      Or_error.return (Untimed, `Min_balance Balance.zero)
   | Timed
       {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
     ->
@@ -325,6 +345,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
               Amount.t} at global slot %{sexp: Global_slot.t}, the balance \
               %{sexp: Balance.t} is insufficient"
             txn_amount txn_global_slot account_balance
+          |> Or_error.tag ~tag:nsf_tag
         in
         let min_balance_error min_balance =
           Or_error.errorf
@@ -333,6 +354,7 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
               transaction would put the balance below the calculated minimum \
               balance of %{sexp: Balance.t}"
             txn_amount txn_global_slot min_balance
+          |> Or_error.tag ~tag:min_balance_tag
         in
         match Balance.(account_balance - txn_amount) with
         | None ->
@@ -352,7 +374,16 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
             else Or_error.return curr_min_balance
       in
       (* once the calculated minimum balance becomes zero, the account becomes untimed *)
-      if Balance.(curr_min_balance > zero) then account.timing else Untimed
+      if Balance.(curr_min_balance > zero) then
+        (account.timing, `Min_balance curr_min_balance)
+      else (Untimed, `Min_balance Balance.zero)
+
+let validate_timing ~account ~txn_amount ~txn_global_slot =
+  let open Result.Let_syntax in
+  let%map timing, `Min_balance _ =
+    validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot
+  in
+  timing
 
 module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   open L
@@ -679,8 +710,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let%map timing =
             validate_timing ~txn_amount:Amount.zero
               ~txn_global_slot:current_global_slot ~account:source_account
-            |> Result.map_error ~f:(fun _ ->
-                   User_command_status.Failure.Source_insufficient_balance )
+            |> Result.map_error ~f:timing_error_to_user_command_status
           in
           let source_account =
             { source_account with
@@ -739,9 +769,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%bind timing =
                 validate_timing ~txn_amount:amount
                   ~txn_global_slot:current_global_slot ~account
-                |> Result.map_error ~f:(fun _ ->
-                       User_command_status.Failure.Source_insufficient_balance
-                   )
+                |> Result.map_error ~f:timing_error_to_user_command_status
               in
               let%map balance =
                 Result.map_error (sub_amount account.balance amount)
@@ -874,8 +902,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%map timing =
               validate_timing ~txn_amount:Amount.zero
                 ~txn_global_slot:current_global_slot ~account:source_account
-              |> Result.map_error ~f:(fun _ ->
-                     User_command_status.Failure.Source_insufficient_balance )
+              |> Result.map_error ~f:timing_error_to_user_command_status
             in
             {source_account with timing}
           in
@@ -937,8 +964,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%map timing =
               validate_timing ~txn_amount:Amount.zero
                 ~txn_global_slot:current_global_slot ~account
-              |> Result.map_error ~f:(fun _ ->
-                     User_command_status.Failure.Source_insufficient_balance )
+              |> Result.map_error ~f:timing_error_to_user_command_status
             in
             (location, source_timing, {account with timing})
           in
@@ -1033,7 +1059,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Neg ->
           validate_timing ~txn_amount:delta.magnitude
             ~txn_global_slot:state_view.curr_global_slot ~account:a
-          |> with_err Source_insufficient_balance
+          |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
       match a.snapp with None -> Snapp_account.default | Some a -> a
@@ -1882,6 +1908,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     (root, `Next_available_token next_available_token)
 
   module For_tests = struct
+    let validate_timing_with_min_balance = validate_timing_with_min_balance
+
     let validate_timing = validate_timing
   end
 end

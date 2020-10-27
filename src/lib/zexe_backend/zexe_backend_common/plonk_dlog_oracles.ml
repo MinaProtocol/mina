@@ -48,6 +48,8 @@ module type Inputs_intf = sig
     val p_eval_1 : t -> Field.t
 
     val p_eval_2 : t -> Field.t
+
+    val digest_before_evaluations : t -> Field.t
   end
 end
 
@@ -67,17 +69,21 @@ module Make (Inputs : Inputs_intf) = struct
 
   open Backend
 
-  let alpha = field alpha
+  let scalar_challenge f t = Pickles_types.Scalar_challenge.create (field f t)
+
+  let alpha = scalar_challenge alpha
 
   let beta = field beta
 
   let gamma = field gamma
 
-  let zeta = field zeta
+  let zeta = scalar_challenge zeta
 
-  let v = field v
+  let digest_before_evaluations = field digest_before_evaluations
 
-  let u = field u
+  let v = scalar_challenge v
+
+  let u = scalar_challenge u
 
   let p_eval_1 = field p_eval_1
 

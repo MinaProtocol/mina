@@ -52,7 +52,11 @@ module Make (N : Vector.Nat_intf) = struct
     let bits =
       List.groupi ~break:(fun i _ _ -> i mod 64 = 0) bits |> List.map ~f:pack
     in
-    Vector.take_from_list bits N.n
+    let n = List.length bits in
+    let n_expected = Nat.to_int N.n in
+    assert (n <= n_expected) ;
+    let bits = bits @ List.init (n_expected - n) ~f:(fun _ -> Int64.zero) in
+    Vector.of_list_and_length_exn bits N.n
 
   let of_tick_field x =
     of_bits (List.take (Backend.Tick.Field.to_bits x) length)

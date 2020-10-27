@@ -58,6 +58,9 @@ let%test_module "vrf-test" =
                     let scale = scale_field
                   end)
                   (Snarky.Libsnark.Mnt6.G1.Coefficients)
+                  (struct
+                    let add = None
+                  end)
 
         let add_known_unsafe t x = add_unsafe t (constant x)
       end

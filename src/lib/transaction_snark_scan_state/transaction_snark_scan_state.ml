@@ -285,7 +285,7 @@ module Make_statement_scanner
     (M : Monad_with_Or_error_intf) (Verifier : sig
         type t
 
-        val verify : verifier:t -> P.t list -> sexp_bool M.t
+        val verify : verifier:t -> P.t list -> sexp_bool M.Or_error.t
     end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
@@ -378,10 +378,15 @@ struct
     match res with
     | Ok None ->
         M.return (Error `Empty)
-    | Ok (Some (res, proofs)) ->
+    | Ok (Some (res, proofs)) -> (
         let open M.Let_syntax in
-        if%map Verifier.verify ~verifier proofs then Ok res
-        else Error (`Error (Error.of_string "Bad proofs"))
+        match%map Verifier.verify ~verifier proofs with
+        | Ok true ->
+            Ok res
+        | Ok false ->
+            Error (`Error (Error.of_string "Bad proofs"))
+        | Error e ->
+            Error (`Error e) )
     | Error e ->
         M.return (Error (`Error e))
 

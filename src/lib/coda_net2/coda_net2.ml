@@ -347,7 +347,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; action: string} [@@deriving yojson]
+      type input = {seqno: int; is_valid: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -815,7 +815,7 @@ module Helper = struct
               do_rpc t
                 (module Rpcs.Validation_complete)
                 { seqno
-                ; action=
+                ; is_valid=
                     ( match action with
                     | `Accept ->
                         "accept"
@@ -1424,7 +1424,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
@@ -1447,7 +1447,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
           | Ok (Ok ()) ->
               ()
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
