@@ -68,6 +68,8 @@ The get-network command is meant to be used alongside create-network to easily a
 
 The `bake-image <testnet_name> --git-sha <git-commit-sha>` command is a simple entrypoint for building a new image based on the provided one, but with the genesis ledger, proofs, and proving keys baked-in to reduce network startup time at the expense of this one-time step (Pain Point #4). This can be run on any existing network, and will replace the docker image, debian package, and google cloud storage urls in `terraform.env` to match the new image. Using a pre-baked images allows for all deployments to skip the generate-proof stage and avoids duplicate work of downloading and unpacking keys from s3, but `bake-image` should still make it easy to iterate on a network deployment when images have bugs and need to be updated.
 
+This command can be outsourced to google cloud for expediency, and because these files including the image itself never really need to be on the same machine that operates the deployment. To this end, google cloud build (https://cloud.google.com/cloud-build/docs/quickstart-build#build_using_dockerfile) a serverless product that can be sent a dockerfile at any time to have google build it. There is some value in trying to handle other CI builds with google cloud build but its especially perfect for this scenario when the majority of the build time is spent on network transfers to/from google cloud, so that GCB can build much quicker than any other environment (and we pay per build minute over 120/day). For nearly 0 additional development effort we get to bake docker images in google cloud.
+
 ### Minaform Start
 
 The start command handles deploying the network and starting all containers / gcloud resources. `minaform start <testnet_name>` will start the given testnet on the default cluster, and provide a output to display the deployment progress. Keys will be uploaded to the cluster when the namespace is created, and then terraform resources will be deployed. If `--wait` is specified, the script will run `minaform watch <testnet_name>` once terraform is complete to watch for all of the nodes to become ready.
@@ -84,7 +86,9 @@ The restart command runs a `minaform stop` followed by `minaform start` and acce
 
 The upgrade command runs a terraform apply, to update the existing deployment with new changes. Ideally this should also provide more debugging flags to terraform and other tooling, and require user input to proceed so that the engineer deploying can understand what state will be lost (if any) in the process. Accepts the same flags as start/stop/restart.
 
-### Minaform 
+### Minaform connect
+
+To facilitate easy local testing, `minaform connect <testnet_name>` will use the terraform.env to locally start a docker container node that connects to the deployed testnet. With some additional flags to specify keypairs to mount `--key <key folder path>` and where to persist the .coda-config dir (default nowhere) `--local-config-dir <path>`. This is another area where many developers know some process for assembling the correct docker image, daemon.json, and peers for a given network but with the terraform.env and kubectl its very possible to script and lower the barrier to entry even more.
 
 ### Minaform Watch
 
