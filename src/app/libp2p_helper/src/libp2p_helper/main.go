@@ -82,7 +82,7 @@ const (
 	removeStreamHandler
 	addStreamHandler
 	listeningAddrs
-	addPeers
+	addPeer
 	beginAdvertising
 	findPeer
 	listPeers
@@ -784,8 +784,8 @@ func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
 	return "removeStreamHandler success", nil
 }
 
-type addPeersMsg struct {
-	Multiaddrs string `json:"multiaddrs"`
+type addPeerMsg struct {
+	Multiaddr string `json:"multiaddr"`
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -801,21 +801,16 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	return info, nil
 }
 
-func (ap *addPeersMsg) run(app *app) (interface{}, error) {
+func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-
-	for _, maddr := range ap.Multiaddrs {
-		info, err := addrInfoOfString(ap.Multiaddr)
-
-		if err != nil {
-			return nil, err
-		}
-
-		app.AddedPeers = append(app.AddedPeers, *info)
+	info, err := addrInfoOfString(ap.Multiaddr)
+	if err != nil {
+		return nil, err
 	}
 
+	app.AddedPeers = append(app.AddedPeers, *info)
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
@@ -825,7 +820,7 @@ func (ap *addPeersMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
-	return "addPeers success", nil
+	return "addPeer success", nil
 }
 
 type beginAdvertisingMsg struct {
@@ -1078,7 +1073,7 @@ var msgHandlers = map[methodIdx]func() action{
 	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
 	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
 	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeers:             func() action { return &addPeersMsg{} },
+	addPeer:             func() action { return &addPeerMsg{} },
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
