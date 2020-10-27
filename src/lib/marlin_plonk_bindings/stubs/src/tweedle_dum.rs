@@ -69,22 +69,12 @@ pub enum CamlTweedleDumAffine<T> {
 
 #[ocaml::func]
 pub fn caml_tweedle_dum_to_affine(x: CamlTweedleDumPtr) -> CamlTweedleDumAffine<CamlTweedleFp> {
-    let p = x.as_ref().0.into_affine();
-    if p.is_zero() {
-        CamlTweedleDumAffine::Infinity
-    } else {
-        CamlTweedleDumAffine::Finite((CamlTweedleFp(p.x), CamlTweedleFp(p.y)))
-    }
+    x.as_ref().0.into_affine().into()
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<CamlTweedleFpPtr>) -> CamlTweedleDum {
-    match x {
-        CamlTweedleDumAffine::Infinity => CamlTweedleDum(GAffine::zero().into_projective()),
-        CamlTweedleDumAffine::Finite((x, y)) => {
-            CamlTweedleDum(GAffine::new(x.as_ref().0, y.as_ref().0, false).into_projective())
-        }
-    }
+    CamlTweedleDum(Into::<GAffine>::into(x).into_projective())
 }
 
 #[ocaml::func]
@@ -93,4 +83,66 @@ pub fn caml_tweedle_dum_of_affine_coordinates(
     y: CamlTweedleFpPtr,
 ) -> CamlTweedleDum {
     CamlTweedleDum(GProjective::new(x.as_ref().0, y.as_ref().0, Fp::one()))
+}
+
+impl From<GAffine> for CamlTweedleDumAffine<CamlTweedleFp> {
+    fn from(p: GAffine) -> Self {
+        if p.is_zero() {
+            CamlTweedleDumAffine::Infinity
+        } else {
+            CamlTweedleDumAffine::Finite((CamlTweedleFp(p.x), CamlTweedleFp(p.y)))
+        }
+    }
+}
+
+impl From<CamlTweedleDumAffine<CamlTweedleFpPtr>> for GAffine {
+    fn from(p: CamlTweedleDumAffine<CamlTweedleFpPtr>) -> Self {
+        match p {
+            CamlTweedleDumAffine::Infinity => GAffine::zero(),
+            CamlTweedleDumAffine::Finite((x, y)) => GAffine::new(x.as_ref().0, y.as_ref().0, false),
+        }
+    }
+}
+
+/* This is heinous, but we have newtypes to deal with, so :shrug: */
+
+pub struct CamlTweedleDumAffineVector(pub Vec<GAffine>);
+
+unsafe impl ocaml::FromValue for CamlTweedleDumAffineVector {
+    fn from_value(value: ocaml::Value) -> Self {
+        // Intepret as an array. This is free.
+        let array: ocaml::Array<CamlTweedleDumAffine<CamlTweedleFpPtr>> =
+            ocaml::FromValue::from_value(value);
+        let len = array.len();
+        let mut vec: Vec<GAffine> = Vec::with_capacity(len);
+        for i in 0..len {
+            // get_unchecked does the conversion to the caml representation, and then into brings
+            // us back to a raw GAffine.
+            unsafe {
+                vec.push(array.get_unchecked(i).into());
+            }
+        }
+        CamlTweedleDumAffineVector(vec)
+    }
+}
+
+unsafe impl ocaml::ToValue for CamlTweedleDumAffineVector {
+    fn to_value(self: Self) -> ocaml::Value {
+        let len = self.0.len();
+        // Manually allocate an OCaml array of the right size
+        let mut array = ocaml::Array::alloc(len);
+        for i in 0..len {
+            // Construct the OCaml value for each element, then place it in the correct position in
+            // the array.
+            // Bounds checks are skipped because we know statically that the indices are in range.
+            unsafe {
+                array.set_unchecked(
+                    i,
+                    Into::<CamlTweedleDumAffine<CamlTweedleFp>>::into(*self.0.get_unchecked(i))
+                        .to_value(),
+                );
+            }
+        }
+        array.to_value()
+    }
 }
