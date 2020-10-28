@@ -14,7 +14,7 @@
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 20]
 [%%define c 8]
-[%%define delta 3]
+[%%define delta 0]
 
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
@@ -25,7 +25,7 @@
 [%%define genesis_ledger "testnet_postake"]
 
 [%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
-[%%define block_window_duration 180000]
+[%%define block_window_duration 120000]
 
 [%%define integration_tests false]
 [%%define force_updates false]
@@ -39,3 +39,4 @@
 [%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
+[%%import "/src/config/features/mainnet.mlh"]

@@ -294,7 +294,7 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; flooding: bool
+        ; flood: bool
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
@@ -347,7 +347,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; action: string} [@@deriving yojson]
+      type input = {seqno: int; is_valid: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -815,7 +815,7 @@ module Helper = struct
               do_rpc t
                 (module Rpcs.Validation_complete)
                 { seqno
-                ; action=
+                ; is_valid=
                     ( match action with
                     | `Accept ->
                         "accept"
@@ -1154,7 +1154,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
-      ; flooding
+      ; flood= flooding
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
@@ -1424,7 +1424,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
@@ -1447,7 +1447,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
           | Ok (Ok ()) ->
               ()
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]

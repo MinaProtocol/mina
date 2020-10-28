@@ -101,7 +101,7 @@ end
  *)
 module Cache = struct
   module type S = sig
-    module Cached : Cached.S
+    type ('t, 'cache_t) cached
 
     type 'elt t
 
@@ -120,7 +120,7 @@ module Cache = struct
      *  Otherwise, [Ok] is returned with a [Cached]
      *  representation of [elt].
      *)
-    val register_exn : 'elt t -> 'elt -> ('elt, 'elt) Cached.t
+    val register_exn : 'elt t -> 'elt -> ('elt, 'elt) cached
 
     val mem : 'elt t -> 'elt -> bool
 
@@ -155,7 +155,8 @@ module Transmuter_cache = struct
   module type S = sig
     module Cached : Cached.S
 
-    module Cache : Cache.S with module Cached := Cached
+    module Cache :
+      Cache.S with type ('t, 'cache_t) cached := ('t, 'cache_t) Cached.t
 
     type target
 
@@ -175,7 +176,8 @@ module Transmuter_cache = struct
   module type F = sig
     module Cached : Cached.S
 
-    module Cache : Cache.S with module Cached := Cached
+    module Cache :
+      Cache.S with type ('t, 'cache_t) cached := ('t, 'cache_t) Cached.t
 
     module Make
         (Transmuter : Transmuter.S)
@@ -194,7 +196,8 @@ module Main = struct
   module type S = sig
     module Cached : Cached.S
 
-    module Cache : Cache.S with module Cached := Cached
+    module Cache :
+      Cache.S with type ('t, 'cache_t) cached := ('t, 'cache_t) Cached.t
 
     module Transmuter_cache :
       Transmuter_cache.F with module Cached := Cached and module Cache := Cache

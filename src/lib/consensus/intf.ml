@@ -295,6 +295,18 @@ module type S = sig
 
   module Data : sig
     module Local_state : sig
+      module Snapshot : sig
+        module Ledger_snapshot : sig
+          type t =
+            | Genesis_ledger of Coda_base.Ledger.t
+            | Ledger_db of Coda_base.Ledger.Db.t
+
+          val close : t -> unit
+
+          val merkle_root : t -> Coda_base.Ledger_hash.t
+        end
+      end
+
       type t [@@deriving to_yojson]
 
       val create :
@@ -318,9 +330,9 @@ module type S = sig
            Public_key.Compressed.Table.t
            option
 
-      val next_epoch_ledger : t -> Coda_base.Ledger.Db.t
+      val next_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
 
-      val staking_epoch_ledger : t -> Coda_base.Ledger.Db.t
+      val staking_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
 
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
@@ -587,7 +599,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> Coda_base.Sparse_ledger.t
+      -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]

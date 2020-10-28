@@ -40,8 +40,7 @@ let create_output target_state_hash target_proof ledger
   {target_state_hash; target_proof; target_ledger}
 
 (* map from global slots to expected ledger hashes *)
-
-let global_slot_ledger_hash_tbl : (int64, Ledger_hash.t) Hashtbl.t =
+let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
 (* cache of account keys *)
@@ -345,27 +344,38 @@ let main ~input_file ~output_file ~archive_uri () =
         State_hash.to_yojson input.target_state_hash
         |> unquoted_string_of_yojson
       in
-      [%log info] "Loading global slots and ledger hashes" ;
-      let%bind global_slots =
+      [%log info] "Loading block information" ;
+      let%bind block_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.Global_slots_and_ledger_hashes.run db state_hash)
+            (fun db -> Sql.Block_info.run db state_hash)
             pool
         with
-        | Ok slots_and_hashes ->
-            let slots =
-              List.map slots_and_hashes ~f:(fun (slot, _hash) -> slot)
+        | Ok block_info ->
+            let ids =
+              List.map block_info ~f:(fun (id, _global_slot, _hash) -> id)
             in
             (* build mapping from global slots to ledger hashes *)
-            List.iter slots_and_hashes ~f:(fun (slot, hash) ->
-                Hashtbl.add_exn global_slot_ledger_hash_tbl ~key:slot
+            List.iter block_info ~f:(fun (_id, global_slot, hash) ->
+                Hashtbl.add_exn global_slot_ledger_hash_tbl ~key:global_slot
                   ~data:(Ledger_hash.of_string hash) ) ;
-            return (Int64.Set.of_list slots)
+            return (Int.Set.of_list ids)
         | Error msg ->
-            [%log error] "Error getting global slots and ledger hashes"
+            [%log error] "Error getting block information"
               ~metadata:[("error", `String (Caqti_error.show msg))] ;
             exit 1
       in
+      (* check that genesis block is in chain to target hash
+         assumption: genesis block occupies global slot 0
+      *)
+      if Int64.Table.mem global_slot_ledger_hash_tbl Int64.zero then
+        [%log info]
+          "Block chain leading to target state hash includes genesis block"
+      else (
+        [%log fatal]
+          "Block chain leading to target state hash does not include genesis \
+           block" ;
+        Core_kernel.exit 1 ) ;
       [%log info] "Loading user command ids" ;
       let%bind user_cmd_ids =
         match%bind
@@ -419,7 +429,7 @@ let main ~input_file ~output_file ~archive_uri () =
       (* filter out internal commands in blocks not along chain from target state hash *)
       let filtered_internal_cmds =
         List.filter unsorted_internal_cmds ~f:(fun cmd ->
-            Int64.Set.mem global_slots cmd.global_slot )
+            Int.Set.mem block_ids cmd.block_id )
       in
       let sorted_internal_cmds =
         List.sort filtered_internal_cmds ~compare:(fun ic1 ic2 ->
@@ -452,7 +462,7 @@ let main ~input_file ~output_file ~archive_uri () =
       (* filter out user commands in blocks not along chain from target state hash *)
       let filtered_user_cmds =
         List.filter unsorted_user_cmds ~f:(fun cmd ->
-            Int64.Set.mem global_slots cmd.global_slot )
+            Int.Set.mem block_ids cmd.block_id )
       in
       let sorted_user_cmds =
         List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
@@ -461,6 +471,9 @@ let main ~input_file ~output_file ~archive_uri () =
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      [%log info] "Applying %d user commands and %d internal commands"
+        (List.length sorted_user_cmds)
+        (List.length sorted_internal_cmds) ;
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot =

@@ -30,6 +30,7 @@ module Network_config = struct
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; coda_faucet_amount: string
+    ; deploy_archive: bool
     ; coda_faucet_fee: string
     ; seed_zone: string
     ; seed_region: string
@@ -45,8 +46,7 @@ module Network_config = struct
     ; agent_min_fee: string
     ; agent_max_fee: string
     ; agent_min_tx: string
-    ; agent_max_tx: string
-    ; coda_archive_image: string }
+    ; agent_max_tx: string }
   [@@deriving to_yojson]
 
   type t =
@@ -197,6 +197,7 @@ module Network_config = struct
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
+        ; deploy_archive= false
         ; coda_points_image= images.points
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"
@@ -217,9 +218,7 @@ module Network_config = struct
         ; agent_min_fee= "0.06"
         ; agent_max_fee= "0.1"
         ; agent_min_tx= "0.0015"
-        ; agent_max_tx= "0.0015"
-        ; coda_archive_image=
-            "codaprotocol/coda-archive:0.0.16-beta7-develop-f79b7b0" } }
+        ; agent_max_tx= "0.0015" } }
 
   let to_terraform network_config =
     let open Terraform in

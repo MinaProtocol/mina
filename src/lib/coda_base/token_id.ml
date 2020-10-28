@@ -12,15 +12,7 @@ open Import
 
 module T = Coda_numbers.Nat.Make64 ()
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t = Unsigned_extended.UInt64.Stable.V1.t
-    [@@deriving sexp, eq, compare, hash, yojson]
-
-    let to_latest = Fn.id
-  end
-end]
+let default = T.of_uint64 Unsigned.UInt64.one
 
 let to_input = T.to_input
 
@@ -36,7 +28,44 @@ let next = T.succ
 
 let invalid = T.of_uint64 Unsigned.UInt64.zero
 
-let default = T.of_uint64 Unsigned.UInt64.one
+[%%if
+feature_tokens]
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = T.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+end]
+
+[%%else]
+
+let check x =
+  if T.equal x default || T.equal x (next default) then x
+  else failwith "Non-default tokens are disabled"
+
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t = T.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+
+    include Binable.Of_binable
+              (T.Stable.V1)
+              (struct
+                type nonrec t = t
+
+                let to_binable = check
+
+                let of_binable = check
+              end)
+
+    let to_latest = Fn.id
+  end
+end]
+
+[%%endif]
 
 let gen_ge minimum =
   Quickcheck.Generator.map

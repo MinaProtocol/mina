@@ -118,12 +118,11 @@ module Instance = struct
 
   let start_sync ~constraint_constants t =
     let open Result.Let_syntax in
-    let%bind () = assert_no_sync t in
-    let%map base_hash = Database.get_frontier_hash t.db in
+    let%map () = assert_no_sync t in
     t.sync
     <- Some
          (Sync.create ~constraint_constants ~logger:t.factory.logger
-            ~time_controller:t.factory.time_controller ~base_hash ~db:t.db)
+            ~time_controller:t.factory.time_controller ~db:t.db)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -132,10 +131,9 @@ module Instance = struct
         t.sync <- None ;
         Ok () )
 
-  let notify_sync t ~diffs ~hash_transition =
+  let notify_sync t ~diffs =
     assert_sync t ~f:(fun sync ->
-        Sync.notify sync ~diffs ~hash_transition ;
-        Deferred.Result.return () )
+        Sync.notify sync ~diffs ; Deferred.Result.return () )
 
   let destroy t =
     let open Deferred.Let_syntax in
@@ -161,8 +159,6 @@ module Instance = struct
     >>= Database.get_transition t.db
     |> Result.map_error ~f:Database.Error.message
 
-  let set_frontier_hash t = Database.set_frontier_hash t.db
-
   let fast_forward t target_root :
       (unit, [> `Failure of string | `Bootstrap_required]) Result.t =
     let open Root_identifier.Stable.Latest in
@@ -175,14 +171,7 @@ module Instance = struct
     let root_hash = Root_data.Minimal.hash root in
     if State_hash.equal root_hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
-      let%bind frontier_hash =
-        lift_error
-          (Database.get_frontier_hash t.db)
-          "failed to get frontier hash"
-      in
-      Result.ok_if_true
-        (Frontier_hash.equal frontier_hash target_root.frontier_hash)
-        ~error:`Frontier_hash_does_not_match
+      Ok ()
     else (
       [%log' warn t.factory.logger]
         ~metadata:
@@ -219,22 +208,16 @@ module Instance = struct
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind ( root
-             , root_transition
-             , best_tip
-             , base_hash
-             , protocol_states
-             , root_hash ) =
+    let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
       let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
-      let%bind protocol_states =
+      let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
       in
-      let%map base_hash = Database.get_frontier_hash t.db in
-      (root, root_transition, best_tip, base_hash, protocol_states, root_hash))
+      (root, root_transition, best_tip, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
@@ -257,7 +240,7 @@ module Instance = struct
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
-      Full_frontier.create ~logger:t.factory.logger ~base_hash
+      Full_frontier.create ~logger:t.factory.logger
         ~root_data:
           { transition= root_transition
           ; staged_ledger= root_staged_ledger
@@ -325,10 +308,6 @@ module Instance = struct
                 `Failure (Database.Error.not_found_message err) ))
     in
     let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
-    (* reset the frontier hash at the end so it matches the persistent frontier hash (for future sanity checks) *)
-    [%log' trace t.factory.logger] "Pinning frontier hash at %s"
-      (Frontier_hash.to_string base_hash) ;
-    Full_frontier.set_hash_unsafe frontier (`I_promise_this_is_safe base_hash) ;
     (frontier, extensions)
 end
 
@@ -365,7 +344,7 @@ let reset_database_exn t ~root_data =
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->
-      Database.initialize instance.db ~root_data ~base_hash:Frontier_hash.empty ;
+      Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
       Debug_assert.debug_assert (fun () ->
           Database.check instance.db

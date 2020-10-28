@@ -16,20 +16,31 @@ spec:
         app: {{tpl $.Values.seed.fullname .}}
         testnet: {{ $.Values.testnetName }}
         role: seed
-        version: {{ (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
         prometheus.io/path: '/metrics'
     spec:
       containers:
+      - name: coda-network-services
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: gcr.io/o1labs-192920/coda-network-services:latest
+        command: ["bash"]
+        args: ["-c", "/code/main.sh"]
+        ports: 
+          - name: metrics
+            containerPort: 8000
+        imagePullPolicy: Always
       - name: seed
         resources:
           limits:
-            memory: 6.0Gi
           requests:
-            memory: 2.0Gi
-            cpu: 1000m
+            memory: 14.0Gi
+            cpu: 8.0
         image: {{ $.Values.coda.image }}
         command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
         args: [ "daemon",
@@ -42,16 +53,8 @@ spec:
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-enable-peer-exchange", "true",
           "-seed",
-          {{- if $.Values.coda.enableFlooding }}
-          "-enable-flooding true"
-          {{- end -}}
-          {{- if $.Values.coda.peerExchange }}
-          "-peer-exchange true"
-          {{- end -}}
-          {{- range $.Values.coda.directPeers }}
-          "-direct-peers", {{ . | quote }},
-          {{- end -}}
           "-discovery-keypair", "{{ $.Values.seed.discoveryKeypair }}",
           {{- if (ne $.Values.coda.runtimeConfig "") }}
           "-config-file", "/config/daemon.json",
@@ -62,6 +65,8 @@ spec:
           {{- end }}
         ]
         env:
+          - name: "RAYON_NUM_THREADS"
+            value: "6"
           - name: DAEMON_REST_PORT
             value: "3085"
           - name: DAEMON_CLIENT_PORT
