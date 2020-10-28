@@ -3,6 +3,7 @@ module Item = {
     title: string,
     img: string,
     snippet: string,
+    url: string,
   };
 
   module Styles = {
@@ -42,10 +43,12 @@ module Item = {
       </h2>
       <img className=Styles.image src={item.img} />
       <p className=Theme.Type.paragraph> {React.string(item.snippet)} </p>
-      <div className=ListModule.Listing.ListingStyles.link>
-        <span> {React.string("Read more")} </span>
-        <Icon kind=Icon.ArrowRightMedium />
-      </div>
+      <Next.Link href={item.url}>
+        <div className=ListModule.Listing.ListingStyles.link>
+          <span> {React.string("Read more")} </span>
+          <Icon kind=Icon.ArrowRightMedium />
+        </div>
+      </Next.Link>
     </div>;
   };
 };
