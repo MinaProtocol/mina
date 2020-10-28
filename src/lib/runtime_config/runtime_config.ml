@@ -770,7 +770,7 @@ module Test_configs = struct
   , "proof":
       { "level": "none"
       , "c": 8
-      , "ledger_depth": 6
+      , "ledger_depth": 10
       , "work_delay": 2
       , "block_window_duration_ms": 1500
       , "transaction_capacity": {"2_to_the": 3}
@@ -794,7 +794,7 @@ module Test_configs = struct
   , "proof":
       { "level": "check"
       , "c": 8
-      , "ledger_depth": 6
+      , "ledger_depth": 10
       , "work_delay": 2
       , "block_window_duration_ms": 15000
       , "transaction_capacity": {"2_to_the": 3}
@@ -820,7 +820,7 @@ module Test_configs = struct
   , "proof":
       { "level": "check"
       , "c": 8
-      , "ledger_depth": 30
+      , "ledger_depth": 10
       , "work_delay": 1
       , "block_window_duration_ms": 10000
       , "transaction_capacity": {"2_to_the": 2}
@@ -846,7 +846,7 @@ module Test_configs = struct
   , "proof":
       { "level": "check"
       , "c": 4
-      , "ledger_depth": 6
+      , "ledger_depth": 10
       , "work_delay": 1
       , "block_window_duration_ms": 5000
       , "transaction_capacity": {"2_to_the": 2}
