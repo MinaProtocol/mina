@@ -67,21 +67,24 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       node.interface <- Some interface
 
     let get_interface peer =
-      Option.value_exn peer.interface
-        ~error:
-          (Error.of_string "cannot call rpc on peer which was never registered")
+      match peer.interface with
+      | Some x ->
+          Ok x
+      | None ->
+          Or_error.error_string
+            "cannot call rpc on peer which was never registered"
 
     let broadcast t ~sender msg =
       Hashtbl.iter t.nodes ~f:(fun nodes ->
           List.iter nodes ~f:(fun node ->
               if not (Peer.equal node.peer sender) then
-                let intf = get_interface node in
-                let msg =
-                  Envelope.(
-                    Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
-                in
-                Strict_pipe.Writer.write intf.broadcast_message_writer
-                  (msg, Fn.const ()) ) )
+                Or_error.iter (get_interface node) ~f:(fun intf ->
+                    let msg =
+                      Envelope.(
+                        Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
+                    in
+                    Strict_pipe.Writer.write intf.broadcast_message_writer
+                      (msg, Fn.const ()) ) ) )
 
     let call_rpc : type q r.
            t
@@ -98,8 +101,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           ~error:
             (Error.createf "failed to find peer %s in peer_table" responder_id)
       in
-      let intf = get_interface (lookup_node t responder) in
-      intf.rpc_hook.hook sender_id rpc query
+      match get_interface (lookup_node t responder) with
+      | Ok intf ->
+          intf.rpc_hook.hook sender_id rpc query
+      | Error e ->
+          Deferred.return (Coda_base.Rpc_intf.Failed_to_connect e)
   end
 
   module Instance = struct
@@ -186,9 +192,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
-    let add_peer {peer_table; _} (p : Peer.t) =
-      Hashtbl.add peer_table ~key:p.peer_id ~data:p |> ignore ;
-      Deferred.return (Ok ())
+    let add_peer _ (_p : Peer.t) = Deferred.return (Ok ())
 
     let initial_peers t =
       Hashtbl.data t.peer_table
