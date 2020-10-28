@@ -986,7 +986,7 @@ struct
     in
     let%bind () =
       (* need pervasive (=) in scope for comparing polymorphic variant *)
-      let ( = ) = Pervasives.( = ) in
+      let ( = ) = Stdlib.( = ) in
       Result.ok_if_true
         ( `Take
         = Consensus.Hooks.select ~constants:consensus_constants
