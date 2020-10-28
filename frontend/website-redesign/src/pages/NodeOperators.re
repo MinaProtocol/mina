@@ -422,9 +422,11 @@ let make = () => {
       }
     />
     <div className=Styles.knowledgebaseBackground>
-      <Section title="" subhead="" slug="knowledge-base">
-        <KnowledgeBase />
-      </Section>
+      <Wrapped>
+        <Section title="" subhead="" slug="knowledge-base">
+          <KnowledgeBase />
+        </Section>
+      </Wrapped>
     </div>
     <section id="help-and-support">
       <ButtonBar
