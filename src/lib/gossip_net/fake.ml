@@ -186,6 +186,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
+    let add_peer {peer_table; _} (p : Peer.t) =
+      Hashtbl.add peer_table ~key:p.peer_id ~data:p |> ignore ;
+      Deferred.return (Ok ())
+
     let initial_peers t =
       Hashtbl.data t.peer_table
       |> List.map
@@ -213,7 +217,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader {ban_notification_reader; _} =
       ban_notification_reader
 
-    let query_peer t peer rpc query =
+    let query_peer ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
 

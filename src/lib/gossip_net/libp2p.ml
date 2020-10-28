@@ -445,6 +445,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let initial_peers t = t.config.initial_peers
 
+    let add_peer t p =
+      let open Coda_net2 in
+      !(t.net2)
+      >>= Fn.flip add_peer (Multiaddr.of_string (Peer.to_multiaddr_string p))
+
     (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
     let random_sublist xs n = List.take (List.permute xs) n
 
@@ -459,13 +464,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         n
 
     let try_call_rpc_with_dispatch : type r q.
-           t
+           ?timeout:Time.Span.t
+        -> t
         -> Peer.t
         -> Async.Rpc.Transport.t
         -> (r, q) dispatch
         -> r
         -> q Deferred.Or_error.t =
-     fun t peer transport dispatch query ->
+     fun ?timeout t peer transport dispatch query ->
       let call () =
         Monitor.try_with (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -473,7 +479,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
-                >>=? fun conn' -> dispatch conn' query )
+                >>=? fun conn' ->
+                let d = dispatch conn' query in
+                match timeout with
+                | None ->
+                    d
+                | Some timeout ->
+                    Deferred.any
+                      [ d
+                      ; ( after timeout
+                        >>| fun () -> Or_error.error_string "rpc timed out" )
+                      ] )
               transport
               ~on_handshake_error:
                 (`Call
@@ -544,12 +560,19 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       call ()
 
     let try_call_rpc : type q r.
-        t -> Peer.t -> _ -> (q, r) rpc -> q -> r Deferred.Or_error.t =
-     fun t peer transport rpc query ->
+           ?timeout:Time.Span.t
+        -> t
+        -> Peer.t
+        -> _
+        -> (q, r) rpc
+        -> q
+        -> r Deferred.Or_error.t =
+     fun ?timeout t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
-      try_call_rpc_with_dispatch t peer transport Impl.dispatch_multi query
+      try_call_rpc_with_dispatch ?timeout t peer transport Impl.dispatch_multi
+        query
 
-    let query_peer t (peer_id : Peer.Id.t) rpc rpc_input =
+    let query_peer ?timeout t (peer_id : Peer.Id.t) rpc rpc_input =
       let%bind net2 = !(t.net2) in
       match%bind
         Coda_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
@@ -557,7 +580,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       | Ok stream ->
           let peer = Coda_net2.Stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
-          try_call_rpc t peer transport rpc rpc_input
+          try_call_rpc ?timeout t peer transport rpc rpc_input
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
