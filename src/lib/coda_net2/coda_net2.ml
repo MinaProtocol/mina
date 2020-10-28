@@ -294,7 +294,7 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; flooding: bool
+        ; flood: bool
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
@@ -1154,7 +1154,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
-      ; flooding
+      ; flood= flooding
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange

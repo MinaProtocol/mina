@@ -302,7 +302,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ( (testnet.precomputed_values.constraint_constants.c - 1)
+                     ( (8 - 1)
                      * testnet.precomputed_values.constraint_constants
                          .block_window_duration_ms )
                    /. 1000. )

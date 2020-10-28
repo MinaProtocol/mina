@@ -706,8 +706,8 @@ module Base = struct
                    the same. This is checked in the transaction pool.
                 *)
                 (not fee_payer_is_source)
-                && ( source_insufficient_balance
-                   || Or_error.is_error timing_or_error )
+                && (not source_insufficient_balance)
+                && Or_error.is_error timing_or_error
               in
               { predicate_failed
               ; source_not_present
@@ -2645,15 +2645,15 @@ module Base = struct
                   let timed_balance_check ok =
                     [%with_label
                       "Check source timed balance failure matches predicted"]
-                      (let%bind ok =
+                      (let%bind not_ok =
                          Boolean.(
-                           ok
+                           (not ok)
                            &&& not
                                  user_command_failure
                                    .source_insufficient_balance)
                        in
-                       Boolean.Assert.( = ) ok
-                         (Boolean.not user_command_failure.source_bad_timing))
+                       Boolean.Assert.( = ) not_ok
+                         user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
                     ~txn_amount:amount ~txn_global_slot)
