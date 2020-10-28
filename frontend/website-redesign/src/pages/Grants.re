@@ -84,11 +84,32 @@ module Styles = {
     ]);
 
   let grantDescriptionInnerContainer =
-    style([display(`flex), justifyContent(`spaceBetween)]);
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+    ]);
 
-  let grantTwoColumnContent = style([width(`percent(48.))]);
+  let grantTwoColumnContent =
+    style([
+      marginTop(`rem(1.5)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(48.)), marginTop(`zero)],
+      ),
+    ]);
 
-  let grantThreeColumnContent = style([width(`percent(30.))]);
+  let grantThreeColumnContent =
+    style([
+      marginTop(`rem(2.)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(30.)), marginTop(`zero)],
+      ),
+    ]);
 };
 
 module GrantsSideNav = {
