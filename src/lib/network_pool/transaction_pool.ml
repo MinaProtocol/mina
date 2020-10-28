@@ -507,6 +507,13 @@ struct
           %i commands during backtracking to maintain max size."
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
         (Sequence.length dropped_backtrack) ;
+      let pool_reachable_words = Obj.reachable_words @@ Obj.repr pool'' in
+      [%log' debug t.logger]
+        "OCaml reachable words for the current transaction pool"
+        ~metadata:
+          [ ("reachable_words", `Int pool_reachable_words)
+          ; ( "words_per_transaction"
+            , `Int (pool_reachable_words / Indexed_pool.size pool'') ) ] ;
       t.pool <- pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
           (* If the dropped transaction was included in the winning chain, it'll
