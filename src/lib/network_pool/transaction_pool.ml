@@ -511,9 +511,12 @@ struct
       [%log' debug t.logger]
         "OCaml reachable words for the current transaction pool"
         ~metadata:
-          [ ("reachable_words", `Int pool_reachable_words)
-          ; ( "words_per_transaction"
-            , `Int (pool_reachable_words / Indexed_pool.size pool'') ) ] ;
+          (let size = Indexed_pool.size pool'' in
+           if Int.equal size 0 then
+             [("reachable_words_no_txns", `Int pool_reachable_words)]
+           else
+             [ ("reachable_words", `Int pool_reachable_words)
+             ; ("words_per_transaction", `Int (pool_reachable_words / size)) ]) ;
       t.pool <- pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
           (* If the dropped transaction was included in the winning chain, it'll
