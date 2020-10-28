@@ -276,8 +276,6 @@ module type S = sig
         type t =
           { delta: int
           ; k: int
-          ; c: int
-          ; c_times_k: int
           ; slots_per_epoch: int
           ; slot_duration: int
           ; epoch_duration: int
