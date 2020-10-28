@@ -10,7 +10,6 @@ module Poly = struct
     module V1 = struct
       type ('length, 'time, 'timespan) t =
         { k: 'length
-        ; c: 'length
         ; delta: 'length
         ; slots_per_sub_window: 'length
         ; slots_per_window: 'length
@@ -181,7 +180,6 @@ let create' (type a b c)
     ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
     (a, b, c) Poly.t =
   let open M in
-  let c = constant constraint_constants.c in
   let block_window_duration_ms =
     constant constraint_constants.block_window_duration_ms
   in
@@ -189,11 +187,14 @@ let create' (type a b c)
   let delta = of_length protocol_constants.delta in
   (*TODO: sub_windows_per_window, slots_per_sub_window are currently dummy
   values and need to be updated before mainnet*)
-  let sub_windows_per_window = c in
-  let slots_per_sub_window = k in
-  let slots_per_window = sub_windows_per_window * slots_per_sub_window in
-  (* Number of slots =24k in ouroboros praos *)
-  let slots_per_epoch = constant 3 * c * k in
+  let slots_per_sub_window =
+    of_length protocol_constants.slots_per_sub_window
+  in
+  let sub_windows_per_window =
+    constant constraint_constants.sub_windows_per_window
+  in
+  let slots_per_window = slots_per_sub_window * sub_windows_per_window in
+  let slots_per_epoch = of_length protocol_constants.slots_per_epoch in
   let module Slot = struct
     let duration_ms = block_window_duration_ms
   end in
@@ -206,7 +207,6 @@ let create' (type a b c)
   let delta_duration = Slot.duration_ms * (delta + M.one) in
   let res : (a, b, c) Poly.t =
     { Poly.k= to_length k
-    ; c= to_length c
     ; delta= to_length delta
     ; block_window_duration_ms= to_timespan block_window_duration_ms
     ; slots_per_sub_window= to_length slots_per_sub_window
@@ -255,13 +255,23 @@ let for_unit_tests =
          Genesis_constants.Constraint_constants.for_unit_tests
        ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
 
-let to_protocol_constants ({k; delta; genesis_state_timestamp; _} : _ Poly.t) =
-  {Coda_base.Protocol_constants_checked.Poly.k; delta; genesis_state_timestamp}
+let to_protocol_constants
+    ({ k
+     ; delta
+     ; genesis_state_timestamp
+     ; slots_per_sub_window
+     ; slots_per_epoch
+     ; sub_windows_per_window= _ } :
+      _ Poly.t) =
+  { Coda_base.Protocol_constants_checked.Poly.k
+  ; delta
+  ; genesis_state_timestamp
+  ; slots_per_sub_window
+  ; slots_per_epoch }
 
 let data_spec =
   Data_spec.
     [ Length.Checked.typ
-    ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
@@ -288,7 +298,6 @@ let to_input (t : t) =
     (Array.concat
        [ Array.map ~f:u
            [| t.k
-            ; t.c
             ; t.delta
             ; t.slots_per_sub_window
             ; t.slots_per_window
@@ -325,7 +334,6 @@ module Checked = struct
     let u = Length.Checked.to_bits in
     let s = Block_time.Span.Unpacked.var_to_bits in
     let%map k = u var.k
-    and c = u var.c
     and delta = u var.delta
     and slots_per_sub_window = u var.slots_per_sub_window
     and slots_per_window = u var.slots_per_window
@@ -347,7 +355,6 @@ module Checked = struct
     Random_oracle.Input.bitstrings
       (Array.map ~f:l
          [| k
-          ; c
           ; delta
           ; slots_per_sub_window
           ; slots_per_window
