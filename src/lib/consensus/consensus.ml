@@ -13,7 +13,7 @@ include Proof_of_stake
 [%%show
 consesus_mechanism]
 
-[%%error
+[%%optcomp.error
 "invalid value for \"consensus_mechanism\""]
 
 [%%endif]

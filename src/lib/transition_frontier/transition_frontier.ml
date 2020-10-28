@@ -73,6 +73,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
             persistent_frontier_instance root_identifier
         with
       | Ok () ->
+          [%log info] "Fast forward successful" ;
           Ok ()
       | Error `Sync_cannot_be_running ->
           Error (`Failure "sync job is already running on persistent frontier")
@@ -100,6 +101,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           | `Failure _ as err ->
               err ))
   in
+  [%log info] "Loaded full frontier and extensions" ;
   let%map () =
     Deferred.return
       ( Persistent_frontier.Instance.start_sync

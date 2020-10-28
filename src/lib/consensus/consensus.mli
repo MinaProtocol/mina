@@ -15,7 +15,7 @@ include
 
 [%%show consesus_mechanism]
 
-[%%error "invalid value for \"consensus_mechanism\""]
+[%%optcomp.error "invalid value for \"consensus_mechanism\""]
 
 [%%endif]
 
