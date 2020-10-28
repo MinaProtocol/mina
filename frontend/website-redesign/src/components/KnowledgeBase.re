@@ -96,7 +96,7 @@ let fetchCategories = () => {
 };
 
 [@react.component]
-let make = () => {
+let make = (~backgroundImg="/static/img/KnowledgeBase.jpg") => {
   let (categories, setCategories) = React.useState(() => [||]);
 
   let _ =
