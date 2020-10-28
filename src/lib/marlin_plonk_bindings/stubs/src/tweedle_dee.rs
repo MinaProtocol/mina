@@ -1,3 +1,4 @@
+use crate::caml_vector;
 use crate::tweedle_fp::CamlTweedleFpPtr;
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
@@ -106,47 +107,20 @@ impl From<CamlTweedleDeeAffine<CamlTweedleFqPtr>> for GAffine {
     }
 }
 
-/* This is heinous, but we have type conversions to deal with, so :shrug: */
-
 pub struct CamlTweedleDeeAffineVector(pub Vec<GAffine>);
 
 unsafe impl ocaml::FromValue for CamlTweedleDeeAffineVector {
     fn from_value(value: ocaml::Value) -> Self {
-        // Intepret as an array. This is free.
-        let array: ocaml::Array<CamlTweedleDeeAffine<CamlTweedleFqPtr>> =
-            ocaml::FromValue::from_value(value);
-        let len = array.len();
-        let mut vec: Vec<GAffine> = Vec::with_capacity(len);
-        for i in 0..len {
-            // get_unchecked does the conversion to the caml representation, and then into brings
-            // us back to a raw GAffine.
-            unsafe {
-                vec.push(array.get_unchecked(i).into());
-            }
-        }
+        let vec = caml_vector::from_value_array::<CamlTweedleDeeAffine<CamlTweedleFqPtr>, _>(
+            ocaml::FromValue::from_value(value),
+        );
         CamlTweedleDeeAffineVector(vec)
     }
 }
 
 unsafe impl ocaml::ToValue for CamlTweedleDeeAffineVector {
     fn to_value(self: Self) -> ocaml::Value {
-        let len = self.0.len();
-        // Manually allocate an OCaml array of the right size
-        let mut array = ocaml::Array::alloc(len);
-        let mut i = 0;
-        for c in self.0.into_iter() {
-            unsafe {
-                // Construct the OCaml value for each element, then place it in the correct position in
-                // the array.
-                // Bounds checks are skipped because we know statically that the indices are in range.
-                array.set_unchecked(
-                    i,
-                    Into::<CamlTweedleDeeAffine<CamlTweedleFq>>::into(c).to_value(),
-                );
-            }
-            i = i + 1;
-        }
-        array.to_value()
+        caml_vector::to_array::<CamlTweedleDeeAffine<CamlTweedleFq>, _>(self.0).to_value()
     }
 }
 
@@ -174,46 +148,19 @@ impl From<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> for PolyComm<GAffine> {
     }
 }
 
-/* This is also heinous, but we still have type conversions to deal with, so :shrug: */
-
 pub struct CamlTweedleDeePolyCommVector(pub Vec<PolyComm<GAffine>>);
 
 unsafe impl ocaml::FromValue for CamlTweedleDeePolyCommVector {
     fn from_value(value: ocaml::Value) -> Self {
-        // Intepret as an array. This is free.
-        let array: ocaml::Array<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> =
-            ocaml::FromValue::from_value(value);
-        let len = array.len();
-        let mut vec: Vec<PolyComm<GAffine>> = Vec::with_capacity(len);
-        for i in 0..len {
-            // get_unchecked does the conversion to the caml representation, and then into brings
-            // us back to a raw GAffine.
-            unsafe {
-                vec.push(array.get_unchecked(i).into());
-            }
-        }
+        let vec = caml_vector::from_value_array::<CamlTweedleDeePolyComm<CamlTweedleFqPtr>, _>(
+            ocaml::FromValue::from_value(value),
+        );
         CamlTweedleDeePolyCommVector(vec)
     }
 }
 
 unsafe impl ocaml::ToValue for CamlTweedleDeePolyCommVector {
     fn to_value(self: Self) -> ocaml::Value {
-        let len = self.0.len();
-        // Manually allocate an OCaml array of the right size
-        let mut array = ocaml::Array::alloc(len);
-        let mut i = 0;
-        for c in self.0.into_iter() {
-            unsafe {
-                // Construct the OCaml value for each element, then place it in the correct position in
-                // the array.
-                // Bounds checks are skipped because we know statically that the indices are in range.
-                array.set_unchecked(
-                    i,
-                    Into::<CamlTweedleDeePolyComm<CamlTweedleFq>>::into(c).to_value(),
-                );
-            }
-            i = i + 1;
-        }
-        array.to_value()
+        caml_vector::to_array::<CamlTweedleDeePolyComm<CamlTweedleFq>, _>(self.0).to_value()
     }
 }
