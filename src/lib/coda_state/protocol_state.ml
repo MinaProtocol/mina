@@ -17,7 +17,7 @@ module Poly = struct
     module V1 = struct
       type ('state_hash, 'body) t =
         {previous_state_hash: 'state_hash; body: 'body}
-      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
+      [@@deriving eq, ord, hash, sexp, yojson, hlist]
     end
   end]
 end
@@ -39,7 +39,7 @@ module Body = struct
           ; blockchain_state: 'blockchain_state
           ; consensus_state: 'consensus_state
           ; constants: 'constants }
-        [@@deriving sexp, eq, compare, to_yojson, hash, version, hlist]
+        [@@deriving sexp, eq, compare, yojson, hash, version, hlist]
       end
     end]
   end
@@ -54,7 +54,7 @@ module Body = struct
           , Consensus.Data.Consensus_state.Value.Stable.V1.t
           , Protocol_constants_checked.Value.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
+        [@@deriving eq, ord, bin_io, hash, sexp, yojson, version]
 
         let to_latest = Fn.id
       end
@@ -64,7 +64,7 @@ module Body = struct
   type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
     ('state_hash, 'blockchain_state, 'consensus_state, 'constants) Poly.t
 
-  type value = Value.t [@@deriving sexp, to_yojson]
+  type value = Value.t [@@deriving sexp, yojson]
 
   [%%ifdef
   consensus_mechanism]
@@ -168,7 +168,7 @@ module Value = struct
     module V1 = struct
       type t =
         (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, hash, compare, eq, to_yojson]
+      [@@deriving sexp, hash, compare, eq, yojson]
 
       let to_latest = Fn.id
     end
@@ -177,7 +177,7 @@ module Value = struct
   include Hashable.Make (Stable.Latest)
 end
 
-type value = Value.t [@@deriving sexp, to_yojson]
+type value = Value.t [@@deriving sexp, yojson]
 
 [%%ifdef
 consensus_mechanism]

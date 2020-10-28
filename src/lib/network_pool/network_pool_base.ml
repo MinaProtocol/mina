@@ -106,6 +106,7 @@ end)
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered (`Capacity 1024, `Overflow Drop_head))
     in
+    (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
         [%log' debug t.logger] "Verifying $diff"
