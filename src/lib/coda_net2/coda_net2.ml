@@ -73,7 +73,7 @@ module Go_log = struct
         (* this is intentionally debug, because the go info logs are too verbose for our info *)
         Debug
     | "debug" ->
-        Debug
+        Spam
     | _ ->
         Spam
 
