@@ -28,3 +28,10 @@ module Tweedle_dum = Marlin_plonk_bindings_tweedle_dum
 
 module Tweedle_fp_urs = Marlin_plonk_bindings_tweedle_fp_urs
 module Tweedle_fq_urs = Marlin_plonk_bindings_tweedle_fq_urs
+
+(* Verification Indices *)
+
+module Tweedle_fp_verifier_index =
+  Marlin_plonk_bindings_tweedle_fp_verifier_index
+module Tweedle_fq_verifier_index =
+  Marlin_plonk_bindings_tweedle_fq_verifier_index

@@ -1,0 +1,6 @@
+(library
+ (name marlin_plonk_bindings_tweedle_fp_verifier_index)
+ (public_name marlin_plonk_bindings.tweedle_fp_verifier_index)
+ (libraries
+   marlin_plonk_bindings_stubs
+   marlin_plonk_bindings_tweedle_fp_urs))
