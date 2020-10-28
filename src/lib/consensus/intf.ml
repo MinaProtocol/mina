@@ -276,8 +276,6 @@ module type S = sig
         type t =
           { delta: int
           ; k: int
-          ; c: int
-          ; c_times_k: int
           ; slots_per_epoch: int
           ; slot_duration: int
           ; epoch_duration: int
@@ -420,7 +418,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, sexp, to_yojson]
+            type t [@@deriving hash, eq, compare, sexp, yojson]
           end
         end]
 

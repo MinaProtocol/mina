@@ -235,9 +235,8 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
-               ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
-               ~slot_duration:nn_int ~epoch_duration:nn_int
-               ~acceptable_network_delay:nn_int
+               ~k:nn_int ~slots_per_epoch:nn_int ~slot_duration:nn_int
+               ~epoch_duration:nn_int ~acceptable_network_delay:nn_int
                ~genesis_state_timestamp:nn_time )
 
     let peer : (_, Network_peer.Peer.Display.t option) typ =

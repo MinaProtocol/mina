@@ -264,7 +264,7 @@ module Json_layout = struct
 
     type t =
       { level: (string option[@default None])
-      ; c: (int option[@default None])
+      ; sub_windows_per_window: (int option[@default None])
       ; ledger_depth: (int option[@default None])
       ; work_delay: (int option[@default None])
       ; block_window_duration_ms: (int option[@default None])
@@ -277,7 +277,7 @@ module Json_layout = struct
 
     let fields =
       [| "level"
-       ; "c"
+       ; "sub_windows_per_window"
        ; "ledger_depth"
        ; "work_delay"
        ; "block_window_duration_ms"
@@ -293,10 +293,19 @@ module Json_layout = struct
     type t =
       { k: (int option[@default None])
       ; delta: (int option[@default None])
+      ; slots_per_epoch: (int option[@default None])
+      ; slots_per_sub_window: (int option[@default None])
+      ; sub_windows_per_window: (int option[@default None])
       ; genesis_state_timestamp: (string option[@default None]) }
     [@@deriving yojson, dhall_type]
 
-    let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
+    let fields =
+      [| "k"
+       ; "delta"
+       ; "slots_per_epoch"
+       ; "slots_per_sub_window"
+       ; "sub_window_per_window"
+       ; "genesis_state_timestamp" |]
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -329,7 +338,7 @@ end
   , "genesis": { "k": 1, "delta": 1 }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 14
       , "work_delay": 2
       , "block_window_duration_ms": 120000
@@ -584,7 +593,7 @@ module Proof_keys = struct
 
   type t =
     { level: Level.t option
-    ; c: int option
+    ; sub_windows_per_window: int option
     ; ledger_depth: int option
     ; work_delay: int option
     ; block_window_duration_ms: int option
@@ -597,7 +606,7 @@ module Proof_keys = struct
 
   let to_json_layout
       { level
-      ; c
+      ; sub_windows_per_window
       ; ledger_depth
       ; work_delay
       ; block_window_duration_ms
@@ -607,7 +616,7 @@ module Proof_keys = struct
       ; account_creation_fee
       ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
-    ; c
+    ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
@@ -620,7 +629,7 @@ module Proof_keys = struct
 
   let of_json_layout
       { Json_layout.Proof_keys.level
-      ; c
+      ; sub_windows_per_window
       ; ledger_depth
       ; work_delay
       ; block_window_duration_ms
@@ -635,7 +644,7 @@ module Proof_keys = struct
       result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
     in
     { level
-    ; c
+    ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
@@ -652,7 +661,9 @@ module Proof_keys = struct
 
   let combine t1 t2 =
     { level= opt_fallthrough ~default:t1.level t2.level
-    ; c= opt_fallthrough ~default:t1.c t2.c
+    ; sub_windows_per_window=
+        opt_fallthrough ~default:t1.sub_windows_per_window
+          t2.sub_windows_per_window
     ; ledger_depth= opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
     ; work_delay= opt_fallthrough ~default:t1.work_delay t2.work_delay
     ; block_window_duration_ms=
@@ -674,7 +685,12 @@ end
 
 module Genesis = struct
   type t = Json_layout.Genesis.t =
-    {k: int option; delta: int option; genesis_state_timestamp: string option}
+    { k: int option
+    ; delta: int option
+    ; slots_per_epoch: int option
+    ; slots_per_sub_window: int option
+    ; sub_windows_per_window: int option
+    ; genesis_state_timestamp: string option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
@@ -690,6 +706,14 @@ module Genesis = struct
   let combine t1 t2 =
     { k= opt_fallthrough ~default:t1.k t2.k
     ; delta= opt_fallthrough ~default:t1.delta t2.delta
+    ; sub_windows_per_window=
+        opt_fallthrough ~default:t1.sub_windows_per_window
+          t2.sub_windows_per_window
+    ; slots_per_epoch=
+        opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
+    ; slots_per_sub_window=
+        opt_fallthrough ~default:t1.slots_per_sub_window
+          t2.slots_per_sub_window
     ; genesis_state_timestamp=
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp }
@@ -769,8 +793,8 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "none"
-      , "c": 8
-      , "ledger_depth": 10
+      , "sub_windows_per_window": 8
+      , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 1500
       , "transaction_capacity": {"2_to_the": 3}
@@ -793,8 +817,8 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
-      , "ledger_depth": 10
+      , "sub_windows_per_window": 8
+      , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 15000
       , "transaction_capacity": {"2_to_the": 3}
@@ -819,8 +843,8 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
-      , "ledger_depth": 10
+      , "sub_windows_per_window": 8
+      , "ledger_depth": 30
       , "work_delay": 1
       , "block_window_duration_ms": 10000
       , "transaction_capacity": {"2_to_the": 2}
@@ -845,8 +869,8 @@ module Test_configs = struct
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 4
-      , "ledger_depth": 10
+      , "sub_windows_per_window": 4
+      , "ledger_depth": 6
       , "work_delay": 1
       , "block_window_duration_ms": 5000
       , "transaction_capacity": {"2_to_the": 2}
