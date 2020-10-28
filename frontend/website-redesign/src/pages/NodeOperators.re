@@ -132,7 +132,7 @@ module NodeOperatorsSideNav = {
       <SideNav.Item title="Node Overview" slug="#how-mina-works" />
       <SideNav.Item title="Testnet" slug="#testnet" />
       <SideNav.Item title="Genesis Program" slug="#genesis" />
-      <SideNav.Item title="Knowledge Base" slug="#knowledge-base" />
+      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
       <SideNav.Item title="Help And Support" slug="#help-and-support" />
     </SideNav>;
     // <SideNav.Item
@@ -429,7 +429,7 @@ let make = () => {
     </section>
     <div className=Styles.knowledgebaseBackground>
       <Wrapped>
-        <Section title="" subhead="" slug="knowledge-base">
+        <Section title="" subhead="" slug="knowledge">
           <KnowledgeBase />
         </Section>
       </Wrapped>

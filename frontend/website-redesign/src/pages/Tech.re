@@ -155,8 +155,8 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
-    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -448,7 +448,7 @@ module Incentives = {
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-              "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions."
+             "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions.",
            )}
         </p>
         <Spacer height=3. />
