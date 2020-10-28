@@ -26,10 +26,8 @@ let main n waiting_time () =
       Block_time.Span.to_ms consensus_constants.block_window_duration_ms
       |> Int64.to_int_exn
     in
-    Unsigned.UInt32.(
-      block_window_duration_ms * 3
-      * to_int consensus_constants.c
-      * to_int consensus_constants.k)
+    block_window_duration_ms
+    * Unsigned.UInt32.to_int consensus_constants.slots_per_epoch
   in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1

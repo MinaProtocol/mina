@@ -108,19 +108,25 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
   let num_peers = 8 in
   let%bind peers = Coda_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
-  let open Deferred.Option.Let_syntax in
-  let%map best_tip =
-    Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
+  let%map tips =
+    Deferred.List.filter_map ~how:`Parallel peers ~f:(fun peer ->
         let open Deferred.Let_syntax in
-        match%bind Coda_networking.get_best_tip network peer with
+        match%bind
+          Coda_networking.get_best_tip ~timeout:(Time.Span.of_min 1.) network
+            peer
+        with
         | Error e ->
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String (Error.to_string_hum e)) ]
               "Couldn't get best tip from peer: $error" ;
-            return acc
+            return None
         | Ok peer_best_tip -> (
+            [%log debug]
+              ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+              "Successfully downloaded best tip from $peer" ;
+            (* TODO: Use batch verification instead *)
             match%bind
               Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
                 ~precomputed_values
@@ -139,45 +145,47 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                         , Some ("Peer sent us bad proof for their best tip", [])
                         ))
                 in
-                acc
+                None
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
-                let enveloped_candidate_best_tip =
-                  Envelope.Incoming.wrap_peer ~data:candidate_best_tip
-                    ~sender:peer
-                in
+                [%log debug]
+                  ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+                  "Successfully verified best tip from $peer" ;
                 return
-                @@ Option.merge acc
-                     (Option.return enveloped_candidate_best_tip)
-                     ~f:(fun enveloped_existing_best_tip
-                        enveloped_candidate_best_tip
-                        ->
-                       let candidate_best_tip =
-                         Envelope.Incoming.data enveloped_candidate_best_tip
-                       in
-                       let existing_best_tip =
-                         Envelope.Incoming.data enveloped_existing_best_tip
-                       in
-                       Coda_networking.fill_first_received_message_signal
-                         network ;
-                       if
-                         External_transition.Initial_validated.compare
-                           candidate_best_tip existing_best_tip
-                         > 0
-                       then (
-                         let best_tip_length =
-                           External_transition.Initial_validated
-                           .blockchain_length candidate_best_tip
-                           |> Coda_numbers.Length.to_int
-                         in
-                         Coda_metrics.Transition_frontier
-                         .update_max_blocklength_observed best_tip_length ;
-                         don't_wait_for
-                         @@ Broadcast_pipe.Writer.write
-                              most_recent_valid_block_writer candidate_best_tip ;
-                         enveloped_candidate_best_tip )
-                       else enveloped_existing_best_tip ) ) )
+                  (Some
+                     (Envelope.Incoming.wrap_peer ~data:candidate_best_tip
+                        ~sender:peer)) ) )
   in
-  best_tip
+  [%log debug]
+    ~metadata:
+      [("actual", `Int (List.length tips)); ("expected", `Int num_peers)]
+    "Finished requesting tips. Got $actual / $expected" ;
+  List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
+      Option.merge acc (Option.return enveloped_candidate_best_tip)
+        ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
+          let candidate_best_tip =
+            Envelope.Incoming.data enveloped_candidate_best_tip
+          in
+          let existing_best_tip =
+            Envelope.Incoming.data enveloped_existing_best_tip
+          in
+          Coda_networking.fill_first_received_message_signal network ;
+          if
+            External_transition.Initial_validated.compare candidate_best_tip
+              existing_best_tip
+            > 0
+          then (
+            let best_tip_length =
+              External_transition.Initial_validated.blockchain_length
+                candidate_best_tip
+              |> Coda_numbers.Length.to_int
+            in
+            Coda_metrics.Transition_frontier.update_max_blocklength_observed
+              best_tip_length ;
+            don't_wait_for
+            @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                 candidate_best_tip ;
+            enveloped_candidate_best_tip )
+          else enveloped_existing_best_tip ) )
 
 let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
     ~consensus_local_state ~precomputed_values =
@@ -186,6 +194,7 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
       ~persistent_root ~persistent_frontier ~precomputed_values ()
   with
   | Ok frontier ->
+      [%log info] "Successfully loaded frontier" ;
       Some frontier
   | Error `Persistent_frontier_malformed ->
       failwith
