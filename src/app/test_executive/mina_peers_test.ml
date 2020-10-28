@@ -45,16 +45,17 @@ module Make (Engine : Engine_intf) = struct
       ~metadata:
       [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ; *)
     let get_peer_id_partial = Node.get_peer_id ~logger in
-    let%bind query_results =
+    (* each element in query_results represents the data of a single node relevant to this test. ( peer_id of node * [list of peer_ids of node's peers] ) *)
+    let%bind (query_results : (string * string list) list) =
       Malleable_error.List.map peer_list ~f:get_peer_id_partial
     in
     [%log info] "mina_peers_test: successfully made graphql query" ;
-    (* query_results is of type (string * string sexp_list) sexp_list *)
-    (* each element represents the data of a single node relevant to this test. ( peer_id of node * [list of peer_ids of node's peers] ) *)
     let expected_peers, _ = List.unzip query_results in
     let test_compare_func (node_peer_id, visible_peers_of_node) =
       let expected_peers_of_node : string list =
-        List.filter ~f:(String.equal node_peer_id) expected_peers
+        List.filter
+          ~f:(fun p -> not (String.equal p node_peer_id))
+          expected_peers
         (* expected_peers_of_node is just expected_peers but with the peer_id of the given node removed from the list *)
       in
       List.iter visible_peers_of_node ~f:(fun p ->
