@@ -58,7 +58,7 @@ module Value = struct
         , State_hash.Stable.V1.t
         , Length.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, to_yojson]
+      [@@deriving sexp, compare, eq, hash, yojson]
 
       let to_latest = Fn.id
     end
