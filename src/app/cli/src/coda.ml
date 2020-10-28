@@ -733,6 +733,7 @@ let setup_daemon logger =
                 let open Keypair in
                 Public_key.compress keypair.public_key )
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
+          ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
       let initial_peers =

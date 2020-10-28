@@ -309,6 +309,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                           Coda_networking.(
                             query_peer network peer.peer_id
                               (Rpcs.Consensus_rpc rpc) query) ) }
+                  ~ledger_depth:
+                    precomputed_values.constraint_constants.ledger_depth
                   sync_jobs
               with
               | Error e ->

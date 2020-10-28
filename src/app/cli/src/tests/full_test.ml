@@ -84,7 +84,7 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants = precomputed_values.constraint_constants in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants = precomputed_values.consensus_constants in
@@ -143,6 +143,7 @@ let run_test () : unit Deferred.t =
           ~epoch_ledger_location
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
+          ~ledger_depth:constraint_constants.ledger_depth
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in

@@ -580,7 +580,8 @@ module For_tests = struct
           (Consensus.Data.Local_state.create
              ~genesis_ledger:
                (Precomputed_values.genesis_ledger precomputed_values)
-             ~epoch_ledger_location Public_key.Compressed.Set.empty)
+             ~epoch_ledger_location Public_key.Compressed.Set.empty
+             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)

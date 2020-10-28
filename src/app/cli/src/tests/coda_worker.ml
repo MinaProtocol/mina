@@ -506,6 +506,7 @@ module T = struct
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
               ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
+              ~ledger_depth:constraint_constants.ledger_depth
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.

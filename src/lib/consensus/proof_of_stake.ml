@@ -272,26 +272,24 @@ module Data = struct
         { staking= json |> member "staking" |> to_string |> Uuid.of_string
         ; next= json |> member "next" |> to_string |> Uuid.of_string }
 
-    let create_epoch_ledger ~location ~genesis_ledger =
+    let create_epoch_ledger ~location ~genesis_ledger ~ledger_depth =
       let open Coda_base in
       let module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db) in
-      let depth =
-        Genesis_constants.Constraint_constants.compiled.ledger_depth
-      in
       if Sys.file_exists location then (
         let logger = Logger.create () in
         [%log info]
           ~metadata:[("location", `String location)]
           "Loading epoch ledger from disk: $location" ;
-        Ledger.Db.create ~directory_name:location ~depth () )
+        Ledger.Db.create ~directory_name:location ~depth:ledger_depth () )
       else
         let epoch_ledger =
-          Ledger.Db.create ~directory_name:location () ~depth
+          Ledger.Db.create ~directory_name:location () ~depth:ledger_depth
         in
         ignore @@ Ledger_transfer.transfer_accounts genesis_ledger epoch_ledger ;
         epoch_ledger
 
-    let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location =
+    let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location
+        ~ledger_depth =
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_ledger = Lazy.force genesis_ledger in
@@ -312,14 +310,14 @@ module Data = struct
       in
       let staking_epoch_ledger =
         create_epoch_ledger ~location:staking_epoch_ledger_location
-          ~genesis_ledger
+          ~genesis_ledger ~ledger_depth
       in
       let next_epoch_ledger_location =
         epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.next
       in
       let next_epoch_ledger =
         create_epoch_ledger ~location:next_epoch_ledger_location
-          ~genesis_ledger
+          ~genesis_ledger ~ledger_depth
       in
       ref
         { Data.staking_epoch_snapshot=
@@ -386,7 +384,7 @@ module Data = struct
       | Next_epoch_snapshot ->
           !t.next_epoch_snapshot <- v
 
-    let reset_snapshot (t : t) id ~sparse_ledger =
+    let reset_snapshot (t : t) id ~sparse_ledger ~ledger_depth =
       let open Coda_base in
       let module Ledger_transfer =
         Ledger_transfer.From_sparse_ledger (Ledger.Db) in
@@ -396,16 +394,15 @@ module Data = struct
           sparse_ledger
       in
       let merkle_root = Sparse_ledger.merkle_root sparse_ledger in
-      let depth =
-        Genesis_constants.Constraint_constants.compiled.ledger_depth
-      in
       match id with
       | Staking_epoch_snapshot ->
           let old_ledger = !t.staking_epoch_snapshot.ledger in
           Ledger.Db.close old_ledger ;
           let location = staking_epoch_ledger_location t in
           File_system.rmrf location ;
-          let ledger = Ledger.Db.create ~directory_name:location ~depth () in
+          let ledger =
+            Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
+          in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
           !t.staking_epoch_snapshot <- {delegatee_table; ledger; merkle_root}
@@ -414,7 +411,9 @@ module Data = struct
           Ledger.Db.close old_ledger ;
           let location = next_epoch_ledger_location t in
           File_system.rmrf location ;
-          let ledger = Ledger.Db.create ~directory_name:location ~depth () in
+          let ledger =
+            Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
+          in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
           !t.next_epoch_snapshot <- {delegatee_table; ledger; merkle_root}
@@ -2566,7 +2565,7 @@ module Hooks = struct
           Non_empty_list.of_list_opt ls )
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
-      ~(query_peer : Rpcs.query) requested_syncs =
+      ~(query_peer : Rpcs.query) ~ledger_depth requested_syncs =
     let open Local_state in
     let open Snapshot in
     let open Deferred.Let_syntax in
@@ -2614,7 +2613,8 @@ module Hooks = struct
                     record trust_system logger peer
                       Actions.(Epoch_ledger_provided, None))
                 in
-                reset_snapshot local_state snapshot_id ~sparse_ledger ;
+                reset_snapshot local_state snapshot_id ~sparse_ledger
+                  ~ledger_depth ;
                 return true
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)

@@ -301,6 +301,7 @@ module type S = sig
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> epoch_ledger_location:string
+        -> ledger_depth:int
         -> t
 
       val current_block_production_keys :
@@ -609,6 +610,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
+      -> ledger_depth:int
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 
