@@ -509,7 +509,17 @@ let make = () => {
           generation of participants.
         |js}
         slug="roadmap">
-        <img src="/static/img/tech-roadmap.svg" width="100%" />
+        <picture>
+          <source
+            media=Theme.MediaQuery.mobile
+            srcSet="/static/img/tech-roadmap-mobile.svg"
+          />
+          <source
+            media=Theme.MediaQuery.notMobile
+            srcSet="/static/img/tech-roadmap-desktop.svg"
+          />
+          <img src="/static/img/tech-roadmap-desktop.svg" width="100%" />
+        </picture>
       </Section>
       <Spacer height=7. />
     </div>
