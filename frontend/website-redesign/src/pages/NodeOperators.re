@@ -130,6 +130,8 @@ module NodeOperatorsSideNav = {
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
       <SideNav.Item title="Node Overview" slug="#how-mina-works" />
+      <SideNav.Item title="Testnet" slug="#testnet" />
+      <SideNav.Item title="Genesis Program" slug="#genesis" />
       <SideNav.Item title="Knowledge Base" slug="#knowledge-base" />
       <SideNav.Item title="Help And Support" slug="#help-and-support" />
     </SideNav>;
@@ -378,49 +380,53 @@ let make = () => {
     </Hero>
     <NodeOperatorsSideNav />
     <NodeOverview />
-    <FeaturedSingleRow
-      row={
-        FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
-        title: "Testnet",
-        copySize: `Small,
-        description: {js|Check out what’s in beta, take on Testnet challenges and earn Testnet points.|js},
-        textColor: Theme.Colors.white,
-        image: "/static/img/NodeOperators_large.jpg",
-        background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        link:
-          FeaturedSingleRow.Row.Button({
-            FeaturedSingleRow.Row.buttonText: "Go to Testnet",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: true,
-            href: `Internal("/testnet"),
-          }),
-      }
-    />
+    <section id="testnet">
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          title: "Testnet",
+          copySize: `Small,
+          description: {js|Check out what’s in beta, take on Testnet challenges and earn Testnet points.|js},
+          textColor: Theme.Colors.white,
+          image: "/static/img/NodeOperators_large.jpg",
+          background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "Go to Testnet",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: true,
+              href: `Internal("/testnet"),
+            }),
+        }
+      />
+    </section>
     // TODO: Not currently ready to ship. Update component with proper info when available.
     //<BlockExplorersAndTools />
-    <FeaturedSingleRow
-      row=FeaturedSingleRow.Row.{
-        rowType: ImageRightCopyLeft,
-        copySize: `Large,
-        title: "Genesis Program",
-        description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
-        textColor: Theme.Colors.white,
-        image: "/static/img/BlogLandingHero.jpg",
-        background:
-          Image("/static/img/community-page/CommunityBackground.jpg"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        link:
-          {FeaturedSingleRow.Row.Button({
-             buttonColor: Theme.Colors.mint,
-             buttonTextColor: Theme.Colors.digitalBlack,
-             buttonText: "Learn More",
-             dark: true,
-             href: `Internal("/genesis"),
-           })},
-      }
-    />
+    <section id="genesis">
+      <FeaturedSingleRow
+        row=FeaturedSingleRow.Row.{
+          rowType: ImageRightCopyLeft,
+          copySize: `Large,
+          title: "Genesis Program",
+          description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
+          textColor: Theme.Colors.white,
+          image: "/static/img/BlogLandingHero.jpg",
+          background:
+            Image("/static/img/community-page/CommunityBackground.jpg"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            {FeaturedSingleRow.Row.Button({
+               buttonColor: Theme.Colors.mint,
+               buttonTextColor: Theme.Colors.digitalBlack,
+               buttonText: "Learn More",
+               dark: true,
+               href: `Internal("/genesis"),
+             })},
+        }
+      />
+    </section>
     <div className=Styles.knowledgebaseBackground>
       <Wrapped>
         <Section title="" subhead="" slug="knowledge-base">
