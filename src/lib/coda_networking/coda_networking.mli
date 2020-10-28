@@ -193,7 +193,8 @@ val get_ancestry :
      Deferred.Or_error.t
 
 val get_best_tip :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
@@ -254,7 +255,8 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
