@@ -495,7 +495,24 @@ module Data = struct
         [%%versioned
         module Stable = struct
           module V1 = struct
-            type t = string [@@deriving sexp, eq, compare, hash, yojson]
+            type t = string [@@deriving sexp, eq, compare, hash]
+
+            let to_yojson t =
+              `String (Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet t)
+
+            let of_yojson = function
+              | `String s ->
+                  Result.map_error
+                      (Base64.decode ~alphabet:Base64.uri_safe_alphabet s)
+                      ~f:(function `Msg err ->
+                      sprintf
+                        "Error decoding vrf output in \
+                         Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
+                        err )
+              | _ ->
+                  Error
+                    "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a \
+                     string"
 
             let to_latest = Fn.id
           end
@@ -1030,7 +1047,7 @@ module Data = struct
               , Lock_checkpoint.Stable.V1.t
               , Length.Stable.V1.t )
               Poly.Stable.V1.t
-            [@@deriving sexp, compare, eq, hash, to_yojson]
+            [@@deriving sexp, compare, eq, hash, yojson]
 
             let to_latest = Fn.id
           end
@@ -1054,7 +1071,7 @@ module Data = struct
               , Lock_checkpoint.Stable.V1.t
               , Length.Stable.V1.t )
               Poly.Stable.V1.t
-            [@@deriving sexp, compare, eq, hash, to_yojson]
+            [@@deriving sexp, compare, eq, hash, yojson]
 
             let to_latest = Fn.id
           end
@@ -1600,7 +1617,7 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving sexp, eq, compare, hash, to_yojson, fields, hlist]
+          [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
         end
       end]
     end
@@ -1618,31 +1635,11 @@ module Data = struct
             , Epoch_data.Next_value_versioned.Value.Stable.V1.t
             , bool )
             Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash]
+          [@@deriving sexp, eq, compare, hash, yojson]
 
           let to_latest = Fn.id
-
-          let to_yojson t =
-            `Assoc
-              [ ("blockchain_length", Length.to_yojson t.Poly.blockchain_length)
-              ; ("epoch_count", Length.to_yojson t.epoch_count)
-              ; ("min_window_density", Length.to_yojson t.min_window_density)
-              ; ( "sub_window_densities"
-                , `List (List.map ~f:Length.to_yojson t.sub_window_densities)
-                )
-              ; ("last_vrf_output", `String "<opaque>")
-              ; ("total_currency", Amount.to_yojson t.total_currency)
-              ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
-              ; ( "staking_epoch_data"
-                , Epoch_data.Staking.Value.to_yojson t.staking_epoch_data )
-              ; ( "next_epoch_data"
-                , Epoch_data.Next.Value.to_yojson t.next_epoch_data )
-              ; ( "has_ancestor_in_same_checkpoint_window"
-                , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
-
-      let to_yojson = Stable.Latest.to_yojson
 
       module For_tests = struct
         let with_curr_global_slot (state : t) slot_number =

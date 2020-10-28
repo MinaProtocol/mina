@@ -13,8 +13,8 @@ while [[ "$#" -gt 0 ]]; do
         -w|--whales) whales="$2"; shift ;;
         -f|--fish) fish="$2"; shift ;;
         -n|--nodes) nodes="$2"; shift ;;
-        -t|--transactions) transactions=true; shift ;;
-        -r|--reset) reset=true; shift;;
+        -t|--transactions) transactions=true ;;
+        -r|--reset) reset=true ;;
         -h|--help) help=true; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
@@ -49,7 +49,7 @@ echo -e "\t1 seed"
 echo -e "\t$whales whales"
 echo -e "\t$fish fish"
 echo -e "\t$nodes non block-producing nodes"
-echo -e "\sending transactions: $transactions"
+echo -e "\tsending transactions: $transactions"
 
 # ================================================
 # Create genesis ledger
@@ -77,7 +77,19 @@ if [ ! -d "$ledgerfolder" ]; then
   python3 $S/testnet-keys.py keys generate-online-fish-keys --count $fish --output-dir $ledgerfolder/online_fish_keys
   python3 $S/testnet-keys.py keys generate-offline-whale-keys --count $whales --output-dir $ledgerfolder/offline_whale_keys
   python3 $S/testnet-keys.py keys generate-online-whale-keys --count $whales --output-dir $ledgerfolder/online_whale_keys
-  
+
+  if [ "$(uname)" != "Darwin" ]; then
+    file=$(ls $ledgerfolder/offline_fish_keys/ | head -n 1)
+    owner=$(stat -c "%U" $ledgerfolder/offline_fish_keys/$file)
+
+    if [ "$file" != "$USER" ]; then
+      sudo chown -R $USER $ledgerfolder/offline_fish_keys
+      sudo chown -R $USER $ledgerfolder/online_fish_keys
+      sudo chown -R $USER $ledgerfolder/offline_whale_keys
+      sudo chown -R $USER $ledgerfolder/online_whale_keys
+    fi
+  fi
+
   chmod -R 0700 $ledgerfolder/offline_fish_keys
   chmod -R 0700 $ledgerfolder/online_fish_keys
   chmod -R 0700 $ledgerfolder/offline_whale_keys
