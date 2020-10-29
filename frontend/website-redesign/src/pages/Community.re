@@ -154,7 +154,7 @@ let make = (~profiles) => {
                buttonTextColor: Theme.Colors.digitalBlack,
                buttonText: "Apply now",
                dark: true,
-               href: `Internal("/genesis"),
+               href: `External(Constants.genesisGrantApplication),
              })},
         }>
         <Spacer height=4. />
