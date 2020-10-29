@@ -1073,7 +1073,10 @@ let create (config : Config.t)
                           "could not get initial peers from $peer with $error" ;
                         [] )
               in
-              [%log info] "Getting some extra initial peers to start" ;
+              [%log info]
+                ~metadata:
+                  [("peers", [%to_yojson: Peer.t list] extra_initial_peers)]
+                "Got extra $peers" ;
               Deferred.List.iter ~how:`Sequential extra_initial_peers
                 ~f:(fun p ->
                   match%map Gossip_net.Any.add_peer gossip_net p with
