@@ -1142,9 +1142,9 @@ let list_peers net =
   | Error _ ->
       []
 
-let configure net ~logger ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange ~seed_peers
-    ~initial_gating_config =
+let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
+    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
+    ~seed_peers ~initial_gating_config =
   net.Helper.new_peer_callback
   <- Some
        (fun peer_id peer_addrs ->
