@@ -70,7 +70,7 @@ pub extern "C" fn caml_tweedle_dee_endo_base() -> CamlTweedleFq {
     CamlTweedleFq(endo_q)
 }
 
-#[no_mangle]
+#[ocaml::func]
 pub extern "C" fn caml_tweedle_dee_endo_scalar() -> CamlTweedleFp {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
     CamlTweedleFp(endo_r)
