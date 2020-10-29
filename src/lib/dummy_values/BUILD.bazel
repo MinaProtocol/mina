@@ -1,0 +1,52 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load("@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module"
+)
+
+load("//:BUILD.bzl",
+    "GLOBAL_MODULE_OPTS",
+)
+load("//mina:BUILD.bzl",
+    "REPO_MODULE_OPTS"
+)
+
+################################################################
+#### Package CLI Options
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+bool_flag( name = "debug", build_setting_default = True)
+config_setting( name = "enable_debug", flag_values = {":debug": str(True)})
+PKG_DEBUG_OPT = select({":enable_debug": ["-g"], "//conditions:default": []})
+
+bool_flag( name = "verbose", build_setting_default = False)
+config_setting( name = "enable_verbose", flag_values = {":verbose": str(True)})
+PKG_VERBOSE_OPT = select({":enable_verbose": ["-verbose"], "//conditions:default": []})
+
+DUMMY_VALUES_MODULE_OPTS = GLOBAL_MODULE_OPTS + REPO_MODULE_OPTS + PKG_DEBUG_OPT + PKG_VERBOSE_OPT
+
+ocaml_module(
+    name = "Dummy_values",
+    src = ":dummy_values.ml",
+    opts = DUMMY_VALUES_MODULE_OPTS,
+    ppx = "@//bzl/ppx:ppx[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]",
+    ppx_args = ["--conditional"],
+    deps = [
+        # do not sort (buildifier)
+          "@mina//src/lib/crypto_params",
+        "@snarky//src/base:snarky_backendless",
+    ]
+)
+
+################################################################
+GENTOOL = "//src/lib/dummy_values/gen_values:gen_values.exe"
+genrule(
+    name = "gen_srcs",
+    outs = ["dummy_values.ml"],
+    tools = [GENTOOL],
+    cmd = "\n".join([
+        "$(location {gentool})".format(gentool=GENTOOL),
+        "cp dummy_values.ml \"$@\""
+    ]),
+)
+

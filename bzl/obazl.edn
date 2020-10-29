@@ -1,0 +1,68 @@
+;; Obazl tool configuration map
+;; FIXME: one config map per workspace
+{
+
+ ;; TODO
+ :overrides {
+             "digestif" "digestif.c"
+             }
+ :workspace "mina"
+ :exclusions #{
+               ;; list of dune files to NOT convert automatically
+
+               ;; hand-edited OCaml-only buildfiles
+               ;; edits in the BUILD.bazel files marked by # obazl:retain
+               "src/lib/logger/dune" ;; .mli search path FIXME
+               "src/lib/coda_base/gen/dune" ;; digestif.c
+               "src/lib/dummy_values/dune" ;; hand-tuned
+               "src/lib/dummy_values/gen/dune" ;; hand-tuned
+               "src/lib/crypto_params/dune" ;; rule impl
+               "src/lib/pickles/limb_vector/dune" ;; -inline-test-lib
+               "src/lib/pickles_base/dune" ;; missing dep FIXME
+               "src/lib/pickles_types/dune" ;; ppx-added dep FIXME
+               "src/lib/snarky_curves/dune" ;; singleton
+               "src/lib/structured_log_events/dune" ;; singleton
+
+               "src/lib/zexe_backend/dune" ;; hand-optimized
+               "src/lib/zexe_backend/tweedle/dune" ;; hand-optimized
+               "src/lib/zexe_backend/zexe_backend_common/dune" ;; hand-optimized
+
+               ;; Polyglot buildfiles, hand-edited to add cc rules
+               ;; FIXME: scope by repo
+               "src/lib/snarky/src/camlsnark_c/groth16_gpu_prover/dune"      ; cc
+               "src/lib/snarky/src/camlsnark_c/groth16_gpu_prover/test/dune" ; cc
+               "src/lib/snarky/src/camlsnark_c/cpp_vector/dune" ; cc rule
+               "src/lib/snarky/src/camlsnark_c/libsnark_bindings/dune" ; cc rule
+               "src/lib/snarky/src/camlsnark_c/snark_caml_bn128/dune"  ; unused cc
+               "src/lib/snarky/src/camlsnark_c/snark_caml_common/dune" ; unused cc
+               "src/lib/snarky/src/camlsnark_c/snark_caml_mnt298/dune" ; unused cc
+               "src/lib/snarky/src/camlsnark_c/snark_caml_mnt753/dune" ; unused cc
+               }
+ :ns-sep "__"
+ :opam {
+        :pins {
+               ;; will be omitted from local deps list
+               async_kernel "src/external/async_kernel",
+               base58 "src/external/coda_base58",
+               graphql_ppx "src/external/graphql_ppx"
+               rpc_parallel "src/external/rpc_parallel",
+               ocaml-extlib "src/external/ocaml-extlib",
+               sodium "src/external/ocaml-sodium",
+               }
+        }
+ :ppx {:shared-pkg "//bzl/ppx"}
+ :profiles {
+            :all {:flags [:standard "-short-paths" "-cclib" "-ljemalloc"
+                          "-w" "e@a-4-29-40-41-42-44-45-48-58-59-60"]
+                  :src "src/dune.flags.inc"}
+            ;; src/dune.flags.inc contents:
+            ;; (env
+            ;;  (_
+            ;;   (flags (:standard -short-paths -cclib -ljemalloc -w @a-4-29-40-41-42-44-45-48-58-59-60))))
+            ;; "The default value for (flags ...) is taken from the environment,..."
+       }
+ ;; :fixes {
+ ;;         "register_event.ml" "@opam//pkg:ppx_tools",
+ ;;         "@opam//pkg:ppx_deriving.eq" "@opam//pkg:ppx_deriving.runtime"
+ ;;         }
+ }

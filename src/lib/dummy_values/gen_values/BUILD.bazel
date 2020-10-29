@@ -1,0 +1,57 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "GLOBAL_EXECUTABLE_OPTS",
+    "GLOBAL_MODULE_OPTS",
+)
+load(
+    "//mina:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+
+################################################################
+#### Package CLI Options
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+bool_flag(name = "debug", build_setting_default = True)
+config_setting(name = "enable_debug", flag_values = {":debug": str(True)})
+PKG_DEBUG_OPT = select({":enable_debug": ["-g"], "//conditions:default": []})
+
+bool_flag(name = "verbose", build_setting_default = False)
+config_setting(name = "enable_verbose", flag_values = {":verbose": str(True)})
+PKG_VERBOSE_OPT = select({":enable_verbose": ["-verbose"], "//conditions:default": []})
+
+################################################################
+ocaml_executable(
+    name = "gen_values.exe",
+    opts = GLOBAL_EXECUTABLE_OPTS + REPO_EXECUTABLE_OPTS + PKG_DEBUG_OPT + PKG_VERBOSE_OPT,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:digestif.c",
+        ":Gen_values",
+    ],
+    visibility = ["//src/lib/dummy_values:__pkg__"]
+)
+
+ocaml_module(
+    name = "Gen_values",
+    src = "gen_values.ml",
+    opts = GLOBAL_MODULE_OPTS + REPO_MODULE_OPTS + PKG_DEBUG_OPT + PKG_VERBOSE_OPT,
+    ppx = "//bzl/ppx:ppx[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]",
+    ppx_args = ["--conditional"],
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:async",
+        "@opam//pkg:core",
+        "@opam//pkg:ppxlib",
+        "@mina//src/lib/crypto_params",
+        "@mina//src/lib/pickles",
+    ]
+)
