@@ -696,7 +696,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Grants Program"
+      header={Some("Grants Program")}
       copy={
         Some(
           "The Project Grant program is designed to encourage community members to work on projects related to developing the Mina protocol and community.",

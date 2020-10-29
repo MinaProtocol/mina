@@ -3,7 +3,7 @@ let make = (~statusCode="404") => {
   <Page title="Mina Cryptocurrency Protocol" footerColor=Theme.Colors.orange>
     <div className=Nav.Styles.spacer />
     <Hero
-      header={statusCode ++ " error"}
+      header={Some(statusCode ++ " error")}
       copy={
         Some(
           "This page is so decentralized, it doesn't exist. Let's bring you back to the world's lightest blockchain.",

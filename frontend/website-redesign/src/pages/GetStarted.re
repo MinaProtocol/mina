@@ -29,7 +29,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Get Started"
-      header="Mina makes it simple."
+      header={Some("Mina makes it simple.")}
       copy={
         Some(
           "Interested and ready to take the next step? You're in the right place.",

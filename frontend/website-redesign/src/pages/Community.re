@@ -121,7 +121,7 @@ let make = (~profiles) => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
-      header="Welcome"
+      header={Some("Welcome")}
       copy={
         Some(
           "We're an inclusive community uniting people around the world with a passion for decentralized blockchain.",

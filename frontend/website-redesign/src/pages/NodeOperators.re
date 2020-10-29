@@ -361,7 +361,7 @@ let make = () => {
         Theme.mobile: "/static/img/backgrounds/NodeOperatorHeroMobile.jpg",
       }
       title="Get Started For Node Operators"
-      header="Run a Node"
+      header=Some("Run a Node")
       copy={
         Some(
           {js|With the world’s lightest blockchain, running a node is easier than ever. Here you’ll find everything you need to get up and running.|js},

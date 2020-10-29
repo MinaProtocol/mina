@@ -487,7 +487,7 @@ let make = () => {
         Theme.mobile: "/static/img/tech-hero-mobile.jpg",
       }
       title="Tech"
-      header="An Elegant Solution"
+      header=Some("An Elegant Solution")
       copy={
         Some(
           "Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",

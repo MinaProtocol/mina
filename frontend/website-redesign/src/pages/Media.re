@@ -4,7 +4,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Press & Media"
+      header={Some("Press & Media")}
       copy={
         Some(
           "Light. Accessible. Decentralized. SNARKy. Mina is a whole new kind of blockchain.",
@@ -33,6 +33,7 @@ let make = () => {
       source=`Announcement
       title="Mina Announcements"
       itemKind=ListModule.Announcement
+      buttonHref={`Internal("/announcements")}
     />
   </Page>;
 };

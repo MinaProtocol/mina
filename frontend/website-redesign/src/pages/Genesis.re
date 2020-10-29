@@ -341,7 +341,7 @@ let make = (~profiles) => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
-      header="Genesis Program"
+      header={Some("Genesis Program")}
       copy={
         Some(
           "We're looking for community members to join the Genesis Token Grant Program and form the backbone of Mina's robust decentralized network.",

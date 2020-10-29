@@ -81,7 +81,7 @@ let make = () => {
       <div className=Nav.Styles.spacer />
       <Hero
         title="Testnet"
-        header="Secure the Network"
+        header=Some("Secure the Network")
         copy={
           Some(
             {j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j},
