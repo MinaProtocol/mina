@@ -37,6 +37,18 @@ impl From<&CamlBigint256> for CamlTweedleFq {
     }
 }
 
+impl From<Fq> for CamlTweedleFq {
+    fn from(x: Fq) -> Self {
+        CamlTweedleFq(x)
+    }
+}
+
+impl From<CamlTweedleFq> for Fq {
+    fn from(x: CamlTweedleFq) -> Self {
+        x.0
+    }
+}
+
 impl std::fmt::Display for CamlTweedleFq {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         CamlBigint256::from(self).fmt(f)
@@ -46,6 +58,12 @@ impl std::fmt::Display for CamlTweedleFq {
 ocaml::custom!(CamlTweedleFq {
     compare: caml_tweedle_fq_compare_raw,
 });
+
+unsafe impl ocaml::FromValue for CamlTweedleFq {
+    fn from_value(value: ocaml::Value) -> Self {
+        CamlTweedleFqPtr::from_value(value).as_ref().clone()
+    }
+}
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_size_in_bits() -> ocaml::Int {

@@ -59,6 +59,12 @@ ocaml::custom!(CamlTweedleFp {
     compare: caml_tweedle_fp_compare_raw,
 });
 
+unsafe impl ocaml::FromValue for CamlTweedleFp {
+    fn from_value(value: ocaml::Value) -> Self {
+        CamlTweedleFpPtr::from_value(value).as_ref().clone()
+    }
+}
+
 #[ocaml::func]
 pub fn caml_tweedle_fp_size_in_bits() -> ocaml::Int {
     Fp_params::MODULUS_BITS as isize

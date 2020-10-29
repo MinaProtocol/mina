@@ -40,3 +40,7 @@ module Tweedle_fp_verifier_index =
   Marlin_plonk_bindings_tweedle_fp_verifier_index
 module Tweedle_fq_verifier_index =
   Marlin_plonk_bindings_tweedle_fq_verifier_index
+
+(* Proofs *)
+module Tweedle_fp_proof = Marlin_plonk_bindings_tweedle_fp_proof
+module Tweedle_fq_proof = Marlin_plonk_bindings_tweedle_fq_proof

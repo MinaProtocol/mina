@@ -67,3 +67,38 @@ module Plonk_gate = struct
 
   type 'a t = {kind: Kind.t; wires: Wires.t; c: 'a array}
 end
+
+module Plonk_proof = struct
+  module Evaluations = struct
+    type 'field t =
+      { l: 'field array
+      ; r: 'field array
+      ; o: 'field array
+      ; z: 'field array
+      ; t: 'field array
+      ; f: 'field array
+      ; sigma1: 'field array
+      ; sigma2: 'field array }
+  end
+
+  module Opening_proof = struct
+    type ('field, 'g) t =
+      {lr: ('g * 'g) array; delta: 'g; z1: 'field; z2: 'field; sg: 'g}
+  end
+
+  module Messages = struct
+    type 'poly_comm t =
+      { l_comm: 'poly_comm
+      ; r_comm: 'poly_comm
+      ; o_comm: 'poly_comm
+      ; z_comm: 'poly_comm
+      ; t_comm: 'poly_comm }
+  end
+
+  type ('field, 'g, 'poly_comm) t =
+    { messages: 'poly_comm Messages.t
+    ; proof: ('field, 'g) Opening_proof.t
+    ; evals: 'field Evaluations.t * 'field Evaluations.t
+    ; public: 'field array
+    ; prev_challenges: ('field array * 'poly_comm) array }
+end

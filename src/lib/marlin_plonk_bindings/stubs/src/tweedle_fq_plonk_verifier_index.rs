@@ -180,6 +180,24 @@ pub fn of_ocaml<'a>(
     CamlTweedleFqPlonkVerifierIndexRaw(index, urs_copy_outer)
 }
 
+impl From<CamlTweedleFqPlonkVerifierIndexPtr> for CamlTweedleFqPlonkVerifierIndexRaw<'_> {
+    fn from(index: CamlTweedleFqPlonkVerifierIndexPtr) -> Self {
+        of_ocaml(
+            index.max_poly_size,
+            index.max_quot_size,
+            index.urs,
+            index.evals,
+            index.shifts,
+        )
+    }
+}
+
+impl From<CamlTweedleFqPlonkVerifierIndexPtr> for DlogVerifierIndex<'_, GAffine> {
+    fn from(index: CamlTweedleFqPlonkVerifierIndexPtr) -> Self {
+        CamlTweedleFqPlonkVerifierIndexRaw::from(index).0
+    }
+}
+
 pub fn read_raw<'a>(
     urs: CamlTweedleFqUrs,
     path: String,
@@ -253,14 +271,7 @@ pub fn caml_tweedle_fq_plonk_verifier_index_write(
     index: CamlTweedleFqPlonkVerifierIndexPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let index = of_ocaml(
-        index.max_poly_size,
-        index.max_quot_size,
-        index.urs,
-        index.evals,
-        index.shifts,
-    );
-    write_raw(&index.0, path)
+    write_raw(&CamlTweedleFqPlonkVerifierIndexRaw::from(index).0, path)
 }
 
 #[ocaml::func]
@@ -278,13 +289,7 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_ocaml(
     index: CamlTweedleFqPlonkVerifierIndexPtr,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(
-        index.max_poly_size,
-        index.max_quot_size,
-        index.urs,
-        index.evals,
-        index.shifts,
-    )
+    index.into()
 }
 
 #[ocaml::func]
@@ -316,7 +321,6 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_create(
 pub fn caml_tweedle_fq_plonk_verifier_index_create(
     index: CamlTweedleFqPlonkIndexPtr<'static>,
 ) -> CamlTweedleFqPlonkVerifierIndex {
-    let verifier_index = index.as_ref().0.verifier_index();
-    let urs = Rc::clone(&index.as_ref().1);
-    to_ocaml(&urs, verifier_index)
+    let index = index.as_ref();
+    to_ocaml(&index.1, index.0.verifier_index())
 }

@@ -98,6 +98,15 @@ impl From<GAffine> for CamlTweedleDeeAffine<CamlTweedleFq> {
     }
 }
 
+impl From<CamlTweedleDeeAffine<CamlTweedleFq>> for GAffine {
+    fn from(p: CamlTweedleDeeAffine<CamlTweedleFq>) -> Self {
+        match p {
+            CamlTweedleDeeAffine::Infinity => GAffine::zero(),
+            CamlTweedleDeeAffine::Finite((x, y)) => GAffine::new(x.0, y.0, false),
+        }
+    }
+}
+
 impl From<CamlTweedleDeeAffine<CamlTweedleFqPtr>> for GAffine {
     fn from(p: CamlTweedleDeeAffine<CamlTweedleFqPtr>) -> Self {
         match p {
@@ -124,6 +133,33 @@ unsafe impl ocaml::ToValue for CamlTweedleDeeAffineVector {
     }
 }
 
+pub struct CamlTweedleDeeAffinePairVector(pub Vec<(GAffine, GAffine)>);
+
+unsafe impl ocaml::FromValue for CamlTweedleDeeAffinePairVector {
+    fn from_value(value: ocaml::Value) -> Self {
+        let vec = caml_vector::from_array_(ocaml::FromValue::from_value(value), |value| {
+            let (x1, x2): (
+                CamlTweedleDeeAffine<CamlTweedleFqPtr>,
+                CamlTweedleDeeAffine<CamlTweedleFqPtr>,
+            ) = ocaml::FromValue::from_value(value);
+            (x1.into(), x2.into())
+        });
+        CamlTweedleDeeAffinePairVector(vec)
+    }
+}
+
+unsafe impl ocaml::ToValue for CamlTweedleDeeAffinePairVector {
+    fn to_value(self: Self) -> ocaml::Value {
+        caml_vector::to_array_(self.0, |x| {
+            let (x1, x2) = x;
+            let x1: CamlTweedleDeeAffine<CamlTweedleFq> = x1.into();
+            let x2: CamlTweedleDeeAffine<CamlTweedleFq> = x2.into();
+            ocaml::ToValue::to_value((x1, x2))
+        })
+        .to_value()
+    }
+}
+
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDeePolyComm<T> {
     shifted: Option<CamlTweedleDeeAffine<T>>,
@@ -135,6 +171,15 @@ impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<CamlTweedleFq> {
         CamlTweedleDeePolyComm {
             shifted: Option::map(c.shifted, Into::into),
             unshifted: CamlTweedleDeeAffineVector(c.unshifted),
+        }
+    }
+}
+
+impl From<CamlTweedleDeePolyComm<CamlTweedleFq>> for PolyComm<GAffine> {
+    fn from(c: CamlTweedleDeePolyComm<CamlTweedleFq>) -> Self {
+        PolyComm {
+            shifted: Option::map(c.shifted, Into::into),
+            unshifted: c.unshifted.0,
         }
     }
 }

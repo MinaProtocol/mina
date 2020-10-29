@@ -180,6 +180,24 @@ pub fn of_ocaml<'a>(
     CamlTweedleFpPlonkVerifierIndexRaw(index, urs_copy_outer)
 }
 
+impl From<CamlTweedleFpPlonkVerifierIndexPtr> for CamlTweedleFpPlonkVerifierIndexRaw<'_> {
+    fn from(index: CamlTweedleFpPlonkVerifierIndexPtr) -> Self {
+        of_ocaml(
+            index.max_poly_size,
+            index.max_quot_size,
+            index.urs,
+            index.evals,
+            index.shifts,
+        )
+    }
+}
+
+impl From<CamlTweedleFpPlonkVerifierIndexPtr> for DlogVerifierIndex<'_, GAffine> {
+    fn from(index: CamlTweedleFpPlonkVerifierIndexPtr) -> Self {
+        CamlTweedleFpPlonkVerifierIndexRaw::from(index).0
+    }
+}
+
 pub fn read_raw<'a>(
     urs: CamlTweedleFpUrs,
     path: String,
@@ -253,14 +271,7 @@ pub fn caml_tweedle_fp_plonk_verifier_index_write(
     index: CamlTweedleFpPlonkVerifierIndexPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let index = of_ocaml(
-        index.max_poly_size,
-        index.max_quot_size,
-        index.urs,
-        index.evals,
-        index.shifts,
-    );
-    write_raw(&index.0, path)
+    write_raw(&CamlTweedleFpPlonkVerifierIndexRaw::from(index).0, path)
 }
 
 #[ocaml::func]
@@ -278,13 +289,7 @@ pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_parts(
 pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_ocaml(
     index: CamlTweedleFpPlonkVerifierIndexPtr,
 ) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
-    of_ocaml(
-        index.max_poly_size,
-        index.max_quot_size,
-        index.urs,
-        index.evals,
-        index.shifts,
-    )
+    index.into()
 }
 
 #[ocaml::func]
