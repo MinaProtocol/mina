@@ -126,7 +126,7 @@ let main inputs =
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
-  let dispatch_cleanup_PARTIAL =
+  let f_dispatch_cleanup =
     dispatch_cleanup ~logger ~cleanup_func:Engine.Network_manager.cleanup
       ~destroy_func:Engine.Log_engine.destroy ~net_manager_ref ~log_engine_ref
       ~cleanup_deferred_ref
@@ -139,7 +139,7 @@ let main inputs =
         @@ Printf.sprintf "received signal %s" (Signal.to_string signal)
       in
       don't_wait_for
-        (dispatch_cleanup_PARTIAL "signal received"
+        (f_dispatch_cleanup "signal received"
            (Malleable_error.of_error_hard error)) ) ;
   let%bind monitor_test_result =
     Monitor.try_with ~extract_exn:true (fun () ->
@@ -158,7 +158,7 @@ let main inputs =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->
               don't_wait_for
-                (dispatch_cleanup_PARTIAL
+                (f_dispatch_cleanup
                    (sprintf
                       !"log engine fatal error: %s"
                       (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
@@ -174,7 +174,7 @@ let main inputs =
     | Error exn ->
         Malleable_error.of_error_hard (Error.of_exn exn)
   in
-  let%bind () = dispatch_cleanup_PARTIAL "test completed" test_result in
+  let%bind () = f_dispatch_cleanup "test completed" test_result in
   exit 0
 
 let start inputs =
