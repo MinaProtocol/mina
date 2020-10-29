@@ -137,9 +137,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
           in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
+            [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me
+              configure net2 ~me ~logger:config.logger
                 ~maddrs:
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
@@ -172,6 +173,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           config.initial_peers
                     ; isolate= config.isolate }
                 ~on_new_peer:(fun _ ->
+                  [%log' trace config.logger] "Fired on_new_peer callback" ;
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
