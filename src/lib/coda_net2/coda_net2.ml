@@ -1142,9 +1142,15 @@ let list_peers net =
   | Error _ ->
       []
 
-let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
+let configure net ~logger ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
     ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange ~seed_peers
     ~initial_gating_config =
+  net.Helper.new_peer_callback
+  <- Some
+       (fun peer_id peer_addrs ->
+         on_new_peer
+           { id= Peer.Id.unsafe_of_string peer_id
+           ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1163,12 +1169,6 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
-      net.new_peer_callback
-      <- Some
-           (fun peer_id peer_addrs ->
-             on_new_peer
-               { id= Peer.Id.unsafe_of_string peer_id
-               ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1492,16 +1492,18 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
-          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
+        configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
+          ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       and () =
-        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
-          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
+        configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
+          ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
