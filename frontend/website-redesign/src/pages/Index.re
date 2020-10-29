@@ -78,7 +78,7 @@ let make = () => {
             }),
         }
       />
-      <BlogModule source=`Press />
+      <BlogModule source=`Press itemKind=ListModule.Press />
     </div>
   </Page>;
 };
