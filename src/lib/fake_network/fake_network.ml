@@ -155,12 +155,17 @@ module Generator = struct
     -> peer_state Generator.t
 
   let fresh_peer ~precomputed_values ~max_frontier_length =
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger
+        ~genesis_ledger ~epoch_ledger_location
+        ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values
@@ -170,12 +175,17 @@ module Generator = struct
 
   let peer_with_branch ~frontier_branch_size ~precomputed_values
       ~max_frontier_length =
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger
+        ~genesis_ledger ~epoch_ledger_location
+        ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

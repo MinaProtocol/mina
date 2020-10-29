@@ -308,7 +308,7 @@ let calculate_root_transition_diff t heir =
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
-    ~ignore_consensus_local_state =
+    ~enable_epoch_ledger_sync =
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -351,13 +351,18 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
   (* STEP 0 *)
-  if not ignore_consensus_local_state then
-    O1trace.measure "calling consensus hook frontier_root_transition"
-      (fun () ->
-        Consensus.Hooks.frontier_root_transition
-          (Breadcrumb.consensus_state old_root_node.breadcrumb)
-          (Breadcrumb.consensus_state new_root_node.breadcrumb)
-          ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ) ;
+  let () =
+    match enable_epoch_ledger_sync with
+    | `Enabled snarked_ledger ->
+        O1trace.measure "calling consensus hook frontier_root_transition"
+          (fun () ->
+            Consensus.Hooks.frontier_root_transition
+              (Breadcrumb.consensus_state old_root_node.breadcrumb)
+              (Breadcrumb.consensus_state new_root_node.breadcrumb)
+              ~local_state:t.consensus_local_state ~snarked_ledger )
+    | `Disabled ->
+        ()
+  in
   let new_staged_ledger =
     let m0 = Breadcrumb.mask old_root_node.breadcrumb in
     let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -486,7 +491,7 @@ let calculate_diffs t breadcrumb =
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
-    ~ignore_consensus_local_state : mutant * State_hash.t option =
+    ~enable_epoch_ledger_sync : mutant * State_hash.t option =
   match diff with
   | New_node (Full breadcrumb) ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -511,7 +516,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         Root_data.Limited.protocol_states new_root
       in
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
-        ~ignore_consensus_local_state ;
+        ~enable_epoch_ledger_sync ;
       (old_root_hash, Some new_root_hash)
 
 let update_metrics_with_diff (type mutant) t
@@ -577,7 +582,7 @@ let update_metrics_with_diff (type mutant) t
   | _ ->
       ()
 
-let apply_diffs t diffs ~ignore_consensus_local_state =
+let apply_diffs t diffs ~enable_epoch_ledger_sync =
   let open Root_identifier.Stable.Latest in
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
@@ -591,9 +596,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   let new_root, diffs_with_mutants =
     List.fold diffs ~init:(None, [])
       ~f:(fun (prev_root, diffs_with_mutants) (Diff.Full.E.E diff) ->
-        let mutant, new_root =
-          apply_diff t diff ~ignore_consensus_local_state
-        in
+        let mutant, new_root = apply_diff t diff ~enable_epoch_ledger_sync in
         update_metrics_with_diff t diff ;
         let new_root =
           match new_root with
@@ -606,7 +609,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
     )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
-  if not ignore_consensus_local_state then
+  if not (enable_epoch_ledger_sync = `Disabled) then
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync
