@@ -6,6 +6,7 @@ use crate::plonk_verifier_index::{
 use crate::tweedle_dum::CamlTweedleDumPolyComm;
 use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
+use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_urs::CamlTweedleFqUrs;
 use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fq::Fq};
 
@@ -295,18 +296,27 @@ pub fn caml_tweedle_fq_plonk_verifier_index_ocaml_of_raw(
     to_ocaml_copy(&index.1, &index.0)
 }
 
-/*
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_create(
-    index: CamlTweedleFqPlonkIndexPtr) -> CamlTweedleFqPlonkVerifierIndexRaw {
-    let index = index.as_ref();
-    CamlTweedleFqPlonkVerifierIndexRaw(index.0.verifier_index(), Rc::clone(&index.1))
+    mut index: CamlTweedleFqPlonkIndexPtr<'static>,
+) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
+    let urs = Rc::clone(&index.as_ref().1);
+    let verifier_index: DlogVerifierIndex<'static, GAffine> =
+        // The underlying urs reference forces a lifetime borrow of `index`, but really
+        // * we only need to borrow the urs
+        // * we know statically that the urs will be live for the whole duration because of the
+        //   refcounted references.
+        // We prefer this to a pointer round-trip because we don't want to allocate memory when the
+        // optimizer will otherwise see to place this straight in the OCaml heap.
+        unsafe { std::mem::transmute(index.as_ref().0.verifier_index()) };
+    CamlTweedleFqPlonkVerifierIndexRaw(verifier_index, urs)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_create(
-    index: CamlTweedleFqPlonkIndexPtr) -> CamlTweedleFqPlonkVerifierIndex {
-    let index = index.as_ref();
-    to_ocaml(&index.1, index.0.verifier_index())
+    index: CamlTweedleFqPlonkIndexPtr<'static>,
+) -> CamlTweedleFqPlonkVerifierIndex {
+    let verifier_index = index.as_ref().0.verifier_index();
+    let urs = Rc::clone(&index.as_ref().1);
+    to_ocaml(&urs, verifier_index)
 }
-*/

@@ -116,13 +116,12 @@ pub fn read_plonk_evaluations<F: ToBytes + PrimeField, R: Read>(
 }
 
 pub fn write_plonk_index<'a, G: CommitmentCurve, W: Write>(
-    k: *const PlonkIndex<'a, G>,
+    k: &PlonkIndex<'a, G>,
     mut w: W,
 ) -> IoResult<()>
 where
     G::ScalarField: CommitmentField + ToBytes,
 {
-    let k = unsafe { &(*k) };
     write_plonk_constraint_system::<G, &mut W>(&k.cs, &mut w)?;
     (k.max_poly_size as u64).write(&mut w)?;
     (k.max_quot_size as u64).write(&mut w)?;

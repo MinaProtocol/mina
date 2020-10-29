@@ -5,6 +5,7 @@ use crate::plonk_verifier_index::{
 };
 use crate::tweedle_dee::CamlTweedleDeePolyComm;
 use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
+use crate::tweedle_fp_plonk_index::CamlTweedleFpPlonkIndexPtr;
 use crate::tweedle_fp_urs::CamlTweedleFpUrs;
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::tweedle::{dee::Affine as GAffine, dum::Affine as GAffineOther, fp::Fp};
@@ -295,18 +296,26 @@ pub fn caml_tweedle_fp_plonk_verifier_index_ocaml_of_raw(
     to_ocaml_copy(&index.1, &index.0)
 }
 
-/*
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_raw_create(
-    index: CamlTweedleFpPlonkIndexPtr) -> CamlTweedleFpPlonkVerifierIndexRaw {
-    let index = index.as_ref();
-    CamlTweedleFpPlonkVerifierIndexRaw(index.0.verifier_index(), Rc::clone(&index.1))
+    index: CamlTweedleFpPlonkIndexPtr<'static>,
+) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
+    let urs = Rc::clone(&index.as_ref().1);
+    let verifier_index: DlogVerifierIndex<'static, GAffine> =
+        // The underlying urs reference forces a lifetime borrow of `index`, but really
+        // * we only need to borrow the urs
+        // * we know statically that the urs will be live for the whole duration because of the
+        //   refcounted references.
+        // We prefer this to a pointer round-trip because we don't want to allocate memory when the
+        // optimizer will otherwise see to place this straight in the OCaml heap.
+        unsafe { std::mem::transmute(index.as_ref().0.verifier_index()) };
+    CamlTweedleFpPlonkVerifierIndexRaw(verifier_index, urs)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_create(
-    index: CamlTweedleFpPlonkIndexPtr) -> CamlTweedleFpPlonkVerifierIndex {
+    index: CamlTweedleFpPlonkIndexPtr,
+) -> CamlTweedleFpPlonkVerifierIndex {
     let index = index.as_ref();
     to_ocaml(&index.1, index.0.verifier_index())
 }
-*/

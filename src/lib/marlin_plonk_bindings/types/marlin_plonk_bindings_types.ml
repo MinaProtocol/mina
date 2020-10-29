@@ -35,3 +35,35 @@ end
 module Plonk_verification_shifts = struct
   type 'field t = {r: 'field; o: 'field}
 end
+
+module Plonk_gate = struct
+  module Kind = struct
+    type t =
+      | Zero
+      | Generic
+      | Poseidon
+      | Add1
+      | Add2
+      | Vbmul1
+      | Vbmul2
+      | Vbmul3
+      | Endomul1
+      | Endomul2
+      | Endomul3
+      | Endomul4
+  end
+
+  module Col = struct
+    type t = L | R | O
+  end
+
+  module Wire = struct
+    type t = {row: int; col: Col.t}
+  end
+
+  module Wires = struct
+    type t = {row: int; l: Wire.t; r: Wire.t; o: Wire.t}
+  end
+
+  type 'a t = {kind: Kind.t; wires: Wires.t; c: 'a array}
+end

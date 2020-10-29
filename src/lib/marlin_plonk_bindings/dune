@@ -23,6 +23,9 @@
    ;; URSs
    marlin_plonk_bindings_tweedle_fp_urs
    marlin_plonk_bindings_tweedle_fq_urs
+   ;; Indices
+   marlin_plonk_bindings_tweedle_fp_index
+   marlin_plonk_bindings_tweedle_fq_index
    ;; Verification indices
    marlin_plonk_bindings_tweedle_fp_verifier_index
    marlin_plonk_bindings_tweedle_fq_verifier_index))

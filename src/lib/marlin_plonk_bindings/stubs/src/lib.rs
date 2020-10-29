@@ -23,8 +23,12 @@ pub mod tweedle_dum;
 pub mod tweedle_fp_urs;
 pub mod tweedle_fq_urs;
 pub mod urs_utils;
+/* Gates */
+pub mod plonk_gate;
 /* Indices */
 pub mod index_serialization;
 pub mod plonk_verifier_index;
+pub mod tweedle_fp_plonk_index;
 pub mod tweedle_fp_plonk_verifier_index;
+pub mod tweedle_fq_plonk_index;
 pub mod tweedle_fq_plonk_verifier_index;

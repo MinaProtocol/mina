@@ -37,6 +37,18 @@ impl From<&CamlBigint256> for CamlTweedleFp {
     }
 }
 
+impl From<Fp> for CamlTweedleFp {
+    fn from(x: Fp) -> Self {
+        CamlTweedleFp(x)
+    }
+}
+
+impl From<CamlTweedleFp> for Fp {
+    fn from(x: CamlTweedleFp) -> Self {
+        x.0
+    }
+}
+
 impl std::fmt::Display for CamlTweedleFp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         CamlBigint256::from(self).fmt(f)

@@ -13,6 +13,10 @@ type t =
 module Raw = struct
   type t
 
+  external create :
+    Marlin_plonk_bindings_tweedle_fp_index.t -> t
+    = "caml_tweedle_fp_plonk_verifier_index_raw_create"
+
   external read :
     Marlin_plonk_bindings_tweedle_fp_urs.t -> string -> t
     = "caml_tweedle_fp_plonk_verifier_index_raw_read"
@@ -30,6 +34,10 @@ module Raw = struct
     -> Marlin_plonk_bindings_tweedle_fp.t Plonk_verification_shifts.t
     = "caml_tweedle_fp_plonk_verifier_index_raw_of_parts"
 end
+
+external create :
+  Marlin_plonk_bindings_tweedle_fp_index.t -> t
+  = "caml_tweedle_fp_plonk_verifier_index_create"
 
 external read :
   Marlin_plonk_bindings_tweedle_fp_urs.t -> string -> t
