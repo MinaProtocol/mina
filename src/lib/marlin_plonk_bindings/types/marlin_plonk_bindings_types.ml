@@ -1,5 +1,5 @@
-module Or_infinite = struct
-  type 'a t = Infinite | Finite of 'a
+module Or_infinity = struct
+  type 'a t = Infinity | Finite of 'a
 end
 
 module Poly_comm = struct

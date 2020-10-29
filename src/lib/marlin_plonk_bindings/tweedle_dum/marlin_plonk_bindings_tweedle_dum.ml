@@ -3,7 +3,7 @@ type t
 module Affine = struct
   type t =
     (Marlin_plonk_bindings_tweedle_fp.t * Marlin_plonk_bindings_tweedle_fp.t)
-    Marlin_plonk_bindings_types.Or_infinite.t
+    Marlin_plonk_bindings_types.Or_infinity.t
 end
 
 external one : unit -> t = "caml_tweedle_dum_one"
@@ -32,6 +32,10 @@ external of_affine_coordinates :
   Marlin_plonk_bindings_tweedle_fp.t -> Marlin_plonk_bindings_tweedle_fp.t -> t
   = "caml_tweedle_dum_of_affine_coordinates"
 
-external endo_base : unit -> Marlin_plonk_bindings_tweedle_fp.t = "caml_tweedle_dum_endo_base"
+external endo_base :
+  unit -> Marlin_plonk_bindings_tweedle_fp.t
+  = "caml_tweedle_dum_endo_base"
 
-external endo_scalar : unit -> Marlin_plonk_bindings_tweedle_fq.t = "caml_tweedle_dum_endo_scalar"
+external endo_scalar :
+  unit -> Marlin_plonk_bindings_tweedle_fq.t
+  = "caml_tweedle_dum_endo_scalar"
