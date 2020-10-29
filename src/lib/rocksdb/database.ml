@@ -84,7 +84,7 @@ let to_bigstring = Bigstring.of_string
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  Async.Quickcheck.async_test ~trials:50
+  Async.Quickcheck.async_test ~trials:20
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
@@ -112,7 +112,7 @@ let%test_unit "checkpoint read" =
   let open Async in
   Thread_safe.block_on_async_exn
   @@ fun () ->
-  Quickcheck.async_test ~trials:50
+  Quickcheck.async_test ~trials:20
     Quickcheck.Generator.(
       list @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
     ~f:(fun kvs ->
