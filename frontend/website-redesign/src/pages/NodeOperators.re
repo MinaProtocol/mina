@@ -356,9 +356,9 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/NodeOperatorHero.jpg",
-        Theme.tablet: "/static/img/NodeOperatorHero.jpg",
-        Theme.mobile: "/static/img/NodeOperatorHero.jpg",
+        Theme.desktop: "/static/img/backgrounds/NodeOperatorHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/NodeOperatorHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/NodeOperatorHeroMobile.jpg",
       }
       title="Get Started For Node Operators"
       header="Run a Node"
