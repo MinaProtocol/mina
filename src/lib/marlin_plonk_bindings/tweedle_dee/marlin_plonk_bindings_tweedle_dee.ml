@@ -31,3 +31,7 @@ external of_affine : Affine.t -> t = "caml_tweedle_dee_of_affine"
 external of_affine_coordinates :
   Marlin_plonk_bindings_tweedle_fq.t -> Marlin_plonk_bindings_tweedle_fq.t -> t
   = "caml_tweedle_dee_of_affine_coordinates"
+
+external endo_base : unit -> Marlin_plonk_bindings_tweedle_fq.t = "caml_tweedle_dee_endo_base"
+
+external endo_scalar : unit -> Marlin_plonk_bindings_tweedle_fp.t = "caml_tweedle_dee_endo_scalar"

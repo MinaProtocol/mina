@@ -1,5 +1,5 @@
 use crate::caml_vector;
-use crate::tweedle_fp::CamlTweedleFpPtr;
+use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
@@ -62,6 +62,18 @@ pub fn caml_tweedle_dee_rng(i: ocaml::Int) -> CamlTweedleDee {
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
     CamlTweedleDee(UniformRand::rand(&mut rng))
+}
+
+#[ocaml::func]
+pub extern "C" fn caml_tweedle_dee_endo_base() -> CamlTweedleFq {
+    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    CamlTweedleFq(endo_q)
+}
+
+#[no_mangle]
+pub extern "C" fn caml_tweedle_dee_endo_scalar() -> CamlTweedleFp {
+    let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    CamlTweedleFp(endo_r)
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
