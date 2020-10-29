@@ -106,6 +106,7 @@ let setup (type n) ?(logger = Logger.null ())
                     , expected_merkle_root
                     , pending_coinbases
                     , protocol_states )) )
+                ~get_some_initial_peers:(fun _ -> Deferred.return [])
                 ~answer_sync_ledger_query:(fun query_env ->
                   let ledger_hash, _ = Envelope.Incoming.data query_env in
                   Sync_handler.answer_query ~frontier ledger_hash

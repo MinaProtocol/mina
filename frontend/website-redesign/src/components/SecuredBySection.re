@@ -201,7 +201,7 @@ let make = () => {
             <img src="/static/img/AboutSnarkProducers.svg" />
             <h3 className=Theme.Type.h3> {React.string("100s")} </h3>
             <p className=Theme.Type.label>
-              {React.string("Snark Workers")}
+              {React.string("Snark Producers")}
             </p>
           </span>
         </div>
