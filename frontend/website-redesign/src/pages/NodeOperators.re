@@ -193,14 +193,14 @@ module Roles = {
           title="Block Producers"
           copy={js|Similar to miners or stakers in other protocols, block producers can be selected to produce a block and earn block rewards, coinbase, transaction fees and network fees. Block producers can also be SNARK producers and generate their own proofs.|js}
           linkCopy="Block Producer Documentation"
-          linkUrl="/docs/node-operator"
+          linkUrl="/docs/node-operator/#participating-in-consensus"
         />
         <Role
           img="/static/img/SnarkProducers_2x.svg"
           title="Snark Producers"
           copy={js|SNARK producers help compress data in the network by generating SNARK proofs of transactions. They then sell those SNARK proofs to block producers on the Snarketplace in return for a portion of the block rewards|js}
           linkCopy="SNARK Producer Documentation"
-          linkUrl="/docs/node-operator"
+          linkUrl="/docs/node-operator/#compressing-data-in-the-mina-network"
         />
       </div>
     </div>;
