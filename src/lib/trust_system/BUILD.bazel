@@ -1,0 +1,208 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns_module",
+)
+load(
+    "//:BUILD.bzl",
+    "GLOBAL_ARCHIVE_OPTS",
+    "GLOBAL_INTERFACE_OPTS",
+    "GLOBAL_MODULE_OPTS",
+    "GLOBAL_NS_MODULE_OPTS",
+)
+load(
+    "//mina:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+#### Package CLI Options
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+################################################################
+## STANZA 1: LIBRARY TRUST_SYSTEM
+################################################################
+TRUST_SYSTEM_ARCHIVE_OPTS = GLOBAL_ARCHIVE_OPTS + REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+TRUST_SYSTEM_INTERFACE_OPTS = []
+
+TRUST_SYSTEM_MODULE_OPTS = GLOBAL_MODULE_OPTS + REPO_MODULE_OPTS + PKG_MODULE_OPTS + []
+
+TRUST_SYSTEM_NS_MODULE_OPTS = []
+
+TRUST_SYSTEM_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@mina//src/lib/network_peer",
+    "@mina//src/lib/key_value_database",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/rocksdb",
+    "@mina//src/lib/coda_metrics",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+]
+
+TRUST_SYSTEM_PPX = "@//bzl/ppx:ppx[bisect_ppx][ppx_assert][ppx_base][ppx_bin_prot][ppx_coda][ppx_custom_printf][ppx_deriving.std][ppx_deriving_yojson][ppx_fields_conv][ppx_inline_test][ppx_let][ppx_optcomp][ppx_register_event][ppx_sexp_conv][ppx_snarky][ppx_version]"
+
+TRUST_SYSTEM_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "trust_system",
+    "--conditional",
+]
+
+ocaml_archive(
+    name = "trust_system",
+    doc = "Track how much we trust peers",
+    opts = TRUST_SYSTEM_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Banned_status",
+        ":Peer_status",
+        ":Peer_trust",
+        ":Record",
+        ":Trust_system",
+    ],
+)
+
+ocaml_ns_module(
+    name = "Trust_system_ns",
+    ns = "trust_system",
+    opts = TRUST_SYSTEM_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "banned_status.ml",
+        "peer_status.ml",
+        "peer_trust.ml",
+        "record.ml",
+        "trust_system.ml",
+    ],
+)
+
+ocaml_module(
+    name = "Banned_status",
+    src = "banned_status.ml",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS,
+)
+
+ocaml_module(
+    name = "Peer_status",
+    src = "peer_status.ml",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        ":Banned_status"
+    ],
+)
+
+ocaml_module(
+    name = "Peer_trust",
+    src = "peer_trust.ml",
+    intf = ":_Peer_trust",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Record",
+    ],
+)
+
+ocaml_interface(
+    name = "_Peer_trust",
+    src = "peer_trust.mli",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_INTERFACE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Peer_status",
+    ],
+)
+
+ocaml_module(
+    name = "Record",
+    src = "record.ml",
+    intf = ":_Record",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Banned_status",
+        ":Peer_status",
+    ],
+)
+
+ocaml_interface(
+    name = "_Record",
+    src = "record.mli",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_INTERFACE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Peer_status",
+    ],
+)
+
+ocaml_module(
+    name = "Trust_system",
+    src = "trust_system.ml",
+    ns_module = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = TRUST_SYSTEM_PPX,
+    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":Banned_status",
+        ":Peer_status",
+        ":Peer_trust",
+    ],
+)
