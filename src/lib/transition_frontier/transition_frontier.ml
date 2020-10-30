@@ -176,6 +176,7 @@ let rec load_with_max_length :
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
         ~root_data:(genesis_root_data ~precomputed_values)
+        ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
@@ -185,7 +186,9 @@ let rec load_with_max_length :
       ~ignore_consensus_local_state:false
   in
   match
-    Persistent_frontier.Instance.check_database persistent_frontier_instance
+    Persistent_frontier.Instance.check_database
+      ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
+      persistent_frontier_instance
   with
   | Error `Not_initialized ->
       (* TODO: this case can be optimized to not create the
@@ -195,6 +198,17 @@ let rec load_with_max_length :
       reset_and_continue ()
   | Error `Invalid_version ->
       [%log info] "persistent frontier database out of date" ;
+      reset_and_continue ()
+  | Error (`Genesis_state_mismatch persisted_genesis_state_hash) ->
+      [%log info]
+        "Genesis state in persisted frontier $persisted_state_hash differs \
+         from the current genesis state $precomputed_state_hash"
+        ~metadata:
+          [ ( "persisted_state_hash"
+            , State_hash.to_yojson persisted_genesis_state_hash )
+          ; ( "precomputed_state_hash"
+            , State_hash.to_yojson
+                precomputed_values.protocol_state_with_hash.hash ) ] ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
       [%log error] "Persistent frontier database is corrupt: %s"
@@ -599,6 +613,7 @@ module For_tests = struct
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
+          ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
