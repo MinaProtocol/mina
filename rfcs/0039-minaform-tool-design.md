@@ -1,108 +1,87 @@
 ## Summary
 [summary]: #summary
 
-This rfc proposes a new tool dubbed "minaform" for reliably creating and managing QA nets and production deployments. Our existing setup is very hacky and requires knowledge of many tools to use effectively. The intention with minaform is to build a flexible enough tool that resolves major pain points with the existing setup, and standardizes a single tool for folks to learn/understand.
+This rfc proposes a variety of changes to our existing testnet terraform modules and main.tf files to more reliably create and manage both QA nets and production deployments. Our existing setup is very hacky and requires knowledge of many tools to use effectively. The intention with this refactor/these changes is to leverage terraform's `.tfvars` files to configure networks but allow sharing a "qa.tf" file for qa nets and a "prod.tf" file for production networks. This, along with other tweaks to the terraform listed below, resolves major pain points with the existing setup, and standardizes a simpler process for folks to learn/understand.
 
 ## Motivation
 [motivation]: #motivation
 
-The goal is to standardize community-oriented and internal qa networks with a simple tool to ensure that the process for creating and deploying a new testnet is code-reviewed, documented, and standard across all deployment scenarios. As of this RFC, additional requirements for community members themselves or external partners to make use of this tooling is out-of-scope but the goal is that this implementation will be easier to maintain and extend as needs arise.
+The goal is to standardize community-oriented and internal qa networks with a more structured terraform module/network to ensure that the process for creating and deploying a new testnet is code-reviewed, documented, and standard across all deployment scenarios. As of this RFC, additional requirements for community members themselves or external partners to make use of this tooling is out-of-scope but the goal is that this implementation will be easier to maintain and extend as needs arise.
 
 The following issues with the existing system were reported by at least one person as "pain points" that consume time/debugging effort when deploying networks:
 
 1) Production Networks vs. QA Nets
     - The process for deploying production testnets vs. qa nets has diverged in a few places and this means our day-to-day testing does not cover all of the services we need to deploy for public networks.
+    - Resolved by creating standard terraform network configurations, so that each network when possible can be defined exclusively in a `.tfvars` file overriding common variables like docker image.
 2) Determining network health is difficult/unclear/inconsistent
-    - Some of this is addressed with more health checks in k8s and more metrics / better dashboards in grafana, but integrating the deployment tooling with all of those checks can help make it more foolproof.
-3) No "uninstall" command / cleanup afterwards
-    - Both the testnet terraform files and resources in the cluster end up hanging around more than neccessary. Needs additional tooling to clean up after itself.
+    - This is addressed with more health checks in k8s and more metrics / better dashboards in grafana, but integrating the deployment tooling with all of those checks can help make it more foolproof.
+    - Resolved with Helm NOTES and/or Terraform outputs to provide links for grafana and stackdriver to provide more visibility to the monitoring we have.
+3) No cleanup after networks have run their course, especially cleaning up coda-automation.
+    - Resolved by more dilligently cleaning up after old networks. May also be worth investigating a lifespan for the network in terraform for automated cluster cleanup.
+    - This issue should be less of a problem when networks are simply `.tfvars` files.
 4) Generating Genesis Proofs is slow/resource intensive/hard to predict
-    - See proposal for how to pre-generate proofs in docker images
+    - Resolved by `scripts/bake-image.sh` which takes in the daemon image to start with and outputs a "baked" one w/ a genesis ledger, proof, and snark keys. `--cloud` flag uses google cloud build to execute the Dockerfile instead of running locally.
 5) Hard to determine the correct docker tag from a given git SHA
     - Can be scripted to allow for a git tag or git SHA input, in addition to / in place of the docker tag.
+    - Resolved by `scripts/docker-tag-from-git.sh`, simple script to take in a git commit sha and output the correct docker tag to use. `--wait` flag will wait for the docker image to be pushed.
 6) Keys and other private info for deployment are not committed/shared with other team members
-    - Addressed by https://github.com/MinaProtocol/coda-automation/issues/472
+    - Resolved by https://github.com/MinaProtocol/mina/issues/6550 , simple feature of coda-network tool to download the genesis ledger and all associated keys from google cloud storage.
 7) Incompatible helm/terraform versions
     - Can be addressed by 1) checking versioning before trying to use these tools and 2) bundling a canonical set of tools into a docker image
+    - Resolved by building a docker image in the mina repo / coda-automation submodule with the source of coda-automation, helm, kubectl, terraform, etc.
 8) Incompatible helm/terraform changes
     - Addressed by moving the charts to the mina repo and explicitly releasing them. Terraform specifies an individual version of each chart to depend on and will fetch the released chart before deploys.
+    - Resolved with released helm chart version in mina buildkite pipeline, already working and in use
 9) Helm string processing is inconsistent/hard
     - Now all charts are passing `helm lint` in the mina repo, and we can add `helm test` in the future as well. Charts in the mina repo also allow for us to build dhall types and tooling around our charts, but that is out-of-scope for this RFC.
+    - Resolved with helm linting and rendering in buildkite to ensure the charts are usable. Should add `helm test` to that pipeline eventually as well.
 10) Passing flags to the daemon process directly is difficult to debug/handle/manage
-    -  Expose command line flags genericly as a list of command line arguments in helm, allowing deployments to replace the default flags as needed and clearly specify them. These helm changes are just best-practices, and are also out-of-scope for this RFC.
+    -  Expose command line flags genericly as a list of command line arguments in helm, allowing deployments to replace the default flags as needed and clearly specify them.
+    - Resolved by having the helm accept a list of arguments to the daemon, provide this functionality through `.tfvars`.
 
 ## Detailed design
 [detailed-design]: #detailed-design
 
-One of the major design goals is to introduce a set of default terraform network configurations for qa and production that will be the starting point for all networks we deploy, and will be maintained with PR's and strict code review, while still allowing any further modification to fit the needs of any individual deployment, testing, or debugging effort. The design revolves around a new bash script, `minaform`, as well improvements to the existing coda-network tool, that can be bundled in a container alongside its dependencies for easy cross-platform use as soon as possible.  Why bash? See #rationale-and-alternatives
+One of the major design goals is to introduce a set of default terraform network configurations for qa and production that will be the starting point for all networks we deploy, and will be maintained with PR's and strict code review, while still allowing any further modification to fit the needs of any individual deployment, testing, or debugging effort. The design revolves around a improvements to the existing coda-network tool and a few new bash scripts to address specific needs expressed by nathan, brandon, and andrew.  The entirety of mina-automation can then be bundled in a container alongside its dependencies for easy cross-platform use as soon as possible.
 
-### Minaform create-network
+None of these scripts are used to actually deploy or manage cluster resources. 
 
-The first entrypoint to deploying a new network with minaform is the `create-network <testnet_name>` command which will create a new testnet folder based on the provided example terraform testnet folder (with standard, well-commented, `qa` and `prod` example networks to start), and then generate or download a set of keys + ledger to use with this new network. This system of standardizing qa and prod networks, and building all future networks from this shared starting point  addresses Pain Point #1, but still needs cleanup when networks are no longer required. See `minaform delete-network <testnet_name>` for more on how to handle that.
+### New coda-network features
 
-With the example terraform, minaform can now use the `coda-network` tool (aka carey's key service), to look for a set of keys and genesis block in google cloud for this testnet name, and if they do not exist then it will generate all of the neccessary keys for you, as well as the ledger itself. In the initial implementation, this will be handled by the already ready to use but fairly hacky scripts `generate-keys-and-ledger.sh`, but as the coda-network tool becomes more fully featured then the sed+jq steps can be removed and minaform can interract directly with coda-network. The vision for coda-network includes commands for extending existing keysets or regenerating a genesis ledger with minor changes, so that once a network is created with minaform, any future edits to the keypairs or keysets or genesis ledger can be performed directly with coda-network.
+- `keyset deploy` command for uploading keys as secrets to kubernetes to deprecate scripts/testnet-keys.py.
+    - If we go this direction permanently, it could be integrated as a local-exec in terraform. See the below keypair download initContainer for another approach.
+- Keyset, keypair, and genesis download to allow easy retrieval of the keys required for a given genesis ledger, or to retrieve any specific key from google cloud storage.
+    - Tracking issue: https://github.com/MinaProtocol/mina/issues/6550
+    - The mina-automation docker image w/ `coda-network keypair download` would allow for an initContainer in kubernetes to grab a key for a specific container, removing the need for `keyset deploy` entirely.
+- Using ocaml generate-keypair binary or docker image to generate keys instead of relying on js library.
+    - Tracking issue: https://github.com/MinaProtocol/mina/issues/6548
+- More complete genesis-create command with support for vesting schedules and a yaml-based config file for defining genesis ledger requirements. 
+    - Tracking Issue: https://github.com/MinaProtocol/mina/issues/6551
+    - Doing this properly is worthwhile, but a combination of bash + jq + the existing `coda-network genesis` command have unblocked deployments and will be used until a complete design + implementation is ready. 
 
-Flags to the `create-network` command for `--generate-keys`, `--upload-keys`, and `--download-keys` allow you to force regeneration/re-upload of keys for easier testing and quick iteration on the key generation tooling. The default value of `true` for each of these makes it easy to share keys across O(1)  Labs employees who are collaborating on the same network (Pain Point #6).
+### ./scripts/create-network.sh
 
-The flag `--bake-image=true` will cause the tool to also run `minaform bake-image` to build a new docker image with all of the require network configuration and s3-cached files baked-in.
+The first entrypoint to deploying a new network is a new script, `./scripts/create-network.sh <testnet_name>`, which will create a new testnet `.tfvars` file based on the new and improved terraform testnet examples, `qa` and `prod`, and then generate or download a set of keys + ledger to use with this new network. This system of standardizing qa and prod networks, and building all future networks from this shared starting point addresses Pain Point #1.
 
-Two flags are availible to specify which version of the daemon to run, `--daemon-image` and `--daemon-git-sha` where daemon-git-sha calculates the image tag based on the given git tag (Pain Point #5). 
+With the example terraform, `create-network.sh` can now use the `coda-network` tool (aka carey's key service, or the "Testnet SDK") to generate all of the neccessary keypairs for you, as well as the genesis ledger itself. In the initial implementation, this will be handled by the already ready to use but fairly hacky scripts `generate-keys-and-ledger.sh`, but as the coda-network tool becomes more fully featured then the sed+jq steps will be removed and this script will interract directly with coda-network.
+
+The flag `--bake-image=true` will cause the tool to also run `./scripts/bake-image.sh` to build a new docker image with all of the required network configuration and s3-cached files baked-in.
 
 Additional flags can be provided to the create-network command for changing the quantities of fish, whales, seeds, bots, etc. These quantaties are provided at this stage so that the genesis ledger can be populated with proper accounts for these services.
 
-Once the network has been defined and set up, you can always make manual changes to the terraform files to customize the new network, or just proceed to `minaform start <testnet_name>`. 
+Once the network has been defined and set up, you can always make manual changes to the `.tfvars` to customize the deployment. Additionally, `./scripts/bake-image.sh` can be run at any time to re-package a new daemon image with the required genesis ledger, proof, and configuration.  Any future edits to the keypairs, keysets, or the genesis ledger can be performed directly with coda-network.
 
-#### terraform.env
+### ./scripts/bake-image.sh
 
-The configured docker image, git tag, deb package tag and the image generated by create-network (with deb package + keys + genesis proof) are stored alongside the default network configuration (prod or qa) in a `terraform.env` file and in `export TF_BLAH=blah` format so that those variables can be easily validated by the deploying engineer, and updated for each iteration of a testnet.  Google cloud storage paths to the keyfiles and ledger are also provided in this file for ease of use and visibility for anyone working with this network, and for use in `minaform get-network`.
+The `./scripts/bake-image.sh <testnet_name> --docker-image <image>` script is a simple entrypoint for building a new image based on the provided one, but with the genesis ledger, proofs, and proving keys baked-in to reduce network startup time at the expense of this one-time step (Pain Point #4). If no --docker-image flag is specified, the script will use the docker_image variable in `<testnet_name>.tfvars`. This can be run on any existing network, and will produce a docker image with the tag `gcr.io/o1labs-192920/mina-daemon:<image>-baked-<sha256>` where sha256 is the hash of the genesis_ledger for `<testnet_name>`. The script will also insert the above image tag into the `baked_docker_image` field in `<testnet_name>.tfvars`. This `baked_docker_image` parameterr will allow the terraform to assume the genesis ledger is already included in the image and will not use a runtimeConfig to read the genesis_ledger. Using pre-baked images allows for all deployments to skip the generate-proof stage and avoids duplicate work of downloading and unpacking keys from s3, but this script should still make it easy to iterate on a network deployment when images have bugs and need to be updated.
 
-Any additional common configuration parameters like log-level can also be added to the terraform environment in this way and exported as terraform environment variables so that those settings can even more easily be changed without touching the terraform. At any time as the default terraform testnets evolve we can use environment variables in more places identified to be commonly variable across networks.
+This command can be outsourced to google cloud with the `--cloud` flag because these files including the image itself never really need to be on the same machine that operates the deployment. To this end, google cloud build (https://cloud.google.com/cloud-build/docs/quickstart-build#build_using_dockerfile) a serverless product that can be sent a dockerfile at any time to have google build it. There is some value in trying to handle other CI builds with google cloud build but its especially perfect for this scenario when the majority of the build time is spent on network transfers to/from google cloud, so that GCB can build much quicker than any other environment (and we pay per build minute over 120/day). For nearly 0 additional development effort we get to bake docker images in google cloud.
 
-Potentially this environment can be stored in GCP alonside keys and other things, while the coda-automation repo only houses the default network configs but I expect that providing a terraform file for each network even when the tf does not need to be updated will ensure that this solution remains compatible with the good parts of old workflows (terraform's flexibility) without the bad parts (hard to standardize when everything is flexible). If at some point in the future the vast majority of minaform networks have been deployed without edits to the tf then the defaults can be changed to only output a tf file for each network when an explicit flag is provided.
+### mina-automation Docker image
 
-### Minaform get-network
+To address pain points #7 and #8, and to some extent the larger problem of how to make it easy for anyone, from anywhere, to deploy networks, we need a mina-automation docker image that can be bundled alongside all of its dependencies (nodejs for coda-network, some of our deb packages like generate-keypair, terraform, helm, the mina-automation repo). These dependencies can then be handled by updates to the docker image, and anyone having trouble with version mismatches can mount their credentials into a docker container and get moving quickly.
 
-The get-network command is meant to be used alongside create-network to easily allow engineers to collaborate on deployments of a testnet. `minaform get-network <testnet_name>` will use the terraform folder and `terraform.env` to download the keysets and genesis ledger for the given testnet so that you can start, stop, restart, or upgrade a network that you did not create.
-
-### Minaform bake-image
-
-The `bake-image <testnet_name> --git-sha <git-commit-sha>` command is a simple entrypoint for building a new image based on the provided one, but with the genesis ledger, proofs, and proving keys baked-in to reduce network startup time at the expense of this one-time step (Pain Point #4). This can be run on any existing network, and will replace the docker image, debian package, and google cloud storage urls in `terraform.env` to match the new image. Using a pre-baked images allows for all deployments to skip the generate-proof stage and avoids duplicate work of downloading and unpacking keys from s3, but `bake-image` should still make it easy to iterate on a network deployment when images have bugs and need to be updated.
-
-This command can be outsourced to google cloud for expediency, and because these files including the image itself never really need to be on the same machine that operates the deployment. To this end, google cloud build (https://cloud.google.com/cloud-build/docs/quickstart-build#build_using_dockerfile) a serverless product that can be sent a dockerfile at any time to have google build it. There is some value in trying to handle other CI builds with google cloud build but its especially perfect for this scenario when the majority of the build time is spent on network transfers to/from google cloud, so that GCB can build much quicker than any other environment (and we pay per build minute over 120/day). For nearly 0 additional development effort we get to bake docker images in google cloud.
-
-### Minaform Start
-
-The start command handles deploying the network and starting all containers / gcloud resources. `minaform start <testnet_name>` will start the given testnet on the default cluster, and provide a output to display the deployment progress. Keys will be uploaded to the cluster when the namespace is created, and then terraform resources will be deployed. If `--wait` is specified, the script will run `minaform watch <testnet_name>` once terraform is complete to watch for all of the nodes to become ready.
-
-### Minaform Stop
-
-The stop command handles destroying all resources for the given testnet, ideally using the existing terraform state and all of the same pararemeters so destroys can always happen smoothly. Will provide a `--force` flag to force terraform and other tooling to delete everything and clean up. This command closely matching the process for start/restart/etc. addresses pain point #3 and should make it easier to keep the cluster clean and easy.
-
-### Minaform Restart
-
-The restart command runs a `minaform stop` followed by `minaform start` and accepts the same flags as both start + stop.
-
-### Minaform Upgrade
-
-The upgrade command runs a terraform apply, to update the existing deployment with new changes. Ideally this should also provide more debugging flags to terraform and other tooling, and require user input to proceed so that the engineer deploying can understand what state will be lost (if any) in the process. Accepts the same flags as start/stop/restart.
-
-### Minaform connect
-
-To facilitate easy local testing, `minaform connect <testnet_name>` will use the terraform.env to locally start a docker container node that connects to the deployed testnet. With some additional flags to specify keypairs to mount `--key <key folder path>` and where to persist the .coda-config dir (default nowhere) `--local-config-dir <path>`. This is another area where many developers know some process for assembling the correct docker image, daemon.json, and peers for a given network but with the terraform.env and kubectl its very possible to script and lower the barrier to entry even more.
-
-### Minaform Watch
-
-Addressing Pain Point #2 is the `minaform watch` command that will integrate with any scripts or tools we have right now (and write going forward) for monitoring network health. For grafana and google cloud it will just print links to their web dashboards. For kubernetes startup/liveness/readiness probes and tracking pod health there will be live statistics printed to the console. When new tooling is created for monitoring network health it should be added at least as a flag / subcommand of watch to allow for easy visibility.
-
-An issue has been raised that the logic for monitoring/validating the health of a network is orthogonal to deployment, which is understandable. The longer term plan of eventually transitioning to go makes the possible value of this sort of command much higher, and as such a bash implementation is less worthwhile. The grafana dashboard + gcp UI url for a given testnet can just as easily be returned by the start/restart/upgrade commands.
-
-## Beyond the minaform tool
-
-### Minaform Docker image
-
-To address pain points #7 and #8, and to some extent the larger problem of how to make it easy for anyone, from anywhere, to deploy networks, we need a minaform docker image that can be bundled alongside all of its dependencies (nodejs for coda-network, some of our deb packages like generate-keypair, terraform, helm, most of mina-automation repo, and the helm charts themselves). These dependencies can then be handled by updates to the docker image, and anyone having trouble with version mismatches can mount their credentials into a docker container and get moving quickly.
-
-In addition to use on any developer laptop, the docker image could be deployed directly into the cluster, google cloud shell, or a google cloud VM to allow for low-latency deployment to gcloud even from a high-latency network (hope that helps @bkase @mrmr1993 !).
+In addition to use on any developer laptop, the docker image could be deployed directly into the cluster, google cloud shell, or a google cloud VM to allow for low-latency deployment to gcloud even from a high-latency network. This will allow us to move in the direction of this container running as a pod in the cluster and all deployments can be conducted from this pod.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
@@ -112,21 +91,19 @@ In addition to use on any developer laptop, the docker image could be deployed d
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-Why Bash?
-
-* Key generation and upload are handled by bash scripts as of now so this will allow for quick iteration as hacky internals are removed, without changing the command line interface or the user experience. This design is intended to not introduce any additional tools to the process that we were not already committed to, so that after the minimum viable verison is in place we can re-evaluate if the system needs new tools.
-
 Why is this design the best in the space of possible designs?
 
-* To a point mentioned in the comments, bash has plenty of built-in support for properly parsing command-line arguments (see scripts/release-docker.sh in the mina repo for an example of handling that more properly), and very little needs to be done to glue terraform + coda-network together besides standardizing file paths and manipulating strings so the outputs of one tool properly match the inputs of another. A carefully written and commented bash script is the shortest path to a usable solution, and when the requirements for a solution exceed the plan outlined in this RFC we can just as easily continue from this point while rewriting in a compiled and typechecked language.
+* Terraform is the agreed upon base for all of our deployment operations and management of a cluster, and a lot of time has already been invested in generating terraform from the integration test framework and other tools. This design allows us to lower the minimum terraform customization required to deploy a network, and does not introduce additional tooling beyond terraform, docker, and the coda-network tool. The proposed scripts could even be a readme with individual commands for starting a network as we have in coda-automation/README.md now, but the scripts allow for a more graceful transition behind the scenes as coda-network and the terraform mature with individual patches and improvements. 
 
 What other designs have been considered and what is the rationale for not choosing them?
 
-* As I see it, the most reasonable non-bash language for this tooling is go, as the rest of the tooling used here (terraform, helm, prometheus, kubernetes, docker...) is available via go libraries, go modules can handle the versioning of all dependencies (except coda-network), and the infrastructure team is already well-versed in go and can iterate quickly with it. Why not start in go? because as of today the main dependencies of this tool include a hacky bash script and coda-network, which are not in go, and invoking go tools like terraform and kubectl are the easiest part of the process. Bash is the simplest direction to proceed from here, but when the complexity of this tool exceeds a reasonable amount for bash then a go rewrite is easy and viable. To rewrite in go from that point can rely on the bash implementation for A/B testing, and as the plan B if the more complex tool `go`es wrong.
+* As I see it, the most ambitious but useful direction to go from here is a golang tool that incorporates native go libraries for terraform, helm, google cloud, prometheus, kubernetes, and docker with go modules to version of all dependencies (except coda-network). Our use of these tools would not change much from calling them on the command line, except that it can easily be type-checked, versioned, compiled, and optimized for our use case. As mentioned this approach is more ambitious, and when terraform itself can solve the majority of our issues the energy should first be spent there.
+
+* An argument can be made as well for adding bake-image.sh and create-network.sh to the coda-network tool, but the reasonml tool would still be shelling out to terraform and docker.  One of my design goals with this plan has been to limit use of @figitaki's time, and if we are just scripting around cli tools anyway the solutions should be equivalent. When the developer cycles are there, we can always port the scripts from bash into coda-network subcommands. In the meantime, time and energy can be focused on improving the terraform as it is now to meet the needs of all networks we deploy.
 
 What is the impact of not doing this?
 
-* Continuing with `auto-deploy.sh` means continued confusion over how to start when creating a new network, how to generate keys and a ledger, and how to customize terraform files. This will remain hard to maintain until we standardize the process and expectations around deploying testnets.
+* Continuing with `auto-deploy.sh` means continued confusion over how to start when creating a new network, how to generate keys and a ledger, and how to customize terraform files. This will remain hard to maintain until we standardize the process and expectations around deploying testnets. 
 
 ## Prior art
 [prior-art]: #prior-art
