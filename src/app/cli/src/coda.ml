@@ -164,7 +164,7 @@ let setup_daemon logger =
            "WAIT-TIME in ms before a snark-work is reassigned (default: %dms)"
            Cli_lib.Default.work_reassignment_wait)
   and enable_tracing =
-    flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+    flag "tracing" no_arg ~doc:"Trace into $config-directory/trace/$pid.trace"
   and insecure_rest_server =
     flag "insecure-rest-server" no_arg
       ~doc:
@@ -345,15 +345,11 @@ let setup_daemon logger =
             Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
             |> Deferred.map ~f:Option.some )
     in
-    (* Check if the config files are for the current version.
-        * WARNING: Deleting ALL the files in the config directory if there is
-        * a version mismatch *)
-    (* When persistence is added back, this needs to be revisited
-        * to handle persistence related files properly *)
     let%bind () =
-      let make_version ~wipe_dir =
+      let make_version () =
         let%bind () =
-          if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
+          (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
+          File_system.remove_dir (conf_dir ^/ "trace")
         in
         let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
         Writer.write_line wr Coda_version.commit_id ;
@@ -375,7 +371,7 @@ let setup_daemon logger =
               "Different version of Coda detected in config directory \
                $config_directory, removing existing configuration"
               ~metadata:[("config_directory", `String conf_dir)] ;
-            make_version ~wipe_dir:true )
+            make_version () )
       | Error e ->
           [%log trace]
             ~metadata:[("error", `String (Error.to_string_mach e))]
@@ -384,7 +380,7 @@ let setup_daemon logger =
             "Failed to read coda.version, cleaning up the config directory \
              $config_directory"
             ~metadata:[("config_directory", `String conf_dir)] ;
-          make_version ~wipe_dir:false
+          make_version ()
     in
     Memory_stats.log_memory_stats logger ~process:"daemon" ;
     Parallel.init_master () ;
@@ -477,7 +473,9 @@ let setup_daemon logger =
         | _ ->
             Runtime_config.default
       in
-      let genesis_dir = Option.value ~default:conf_dir genesis_dir in
+      let genesis_dir =
+        Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+      in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
