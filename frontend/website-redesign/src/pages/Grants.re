@@ -110,6 +110,17 @@ module Styles = {
         [width(`percent(30.)), marginTop(`zero)],
       ),
     ]);
+
+  let link =
+    merge([
+      Theme.Type.link,
+      style([
+        media(
+          Theme.MediaQuery.tablet,
+          [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],
+        ),
+      ]),
+    ]);
 };
 
 module GrantsSideNav = {
@@ -187,7 +198,7 @@ module FAQ = {
             <span className=Theme.Type.paragraph>
               <span> {React.string("Visit ")} </span>
               <Next.Link href="/docs">
-                <span className=Theme.Type.link>
+                <span className=Styles.link>
                   {React.string("the Mina Docs.")}
                 </span>
               </Next.Link>
@@ -209,7 +220,7 @@ module FAQ = {
             <span className=Theme.Type.paragraph>
               <span> {React.string("See the ")} </span>
               <Next.Link href=Constants.projectGrantApplication>
-                <span className=Theme.Type.link>
+                <span className=Styles.link>
                   {React.string("Application Process ")}
                 </span>
               </Next.Link>
@@ -219,8 +230,8 @@ module FAQ = {
                  )}
               </span>
               <Next.Link href=Constants.githubUrl>
-                <span className=Theme.Type.link>
-                  {React.string("Contributing code to Mina ")}
+                <span className=Styles.link>
+                  {React.string("contributing code to Mina ")}
                 </span>
               </Next.Link>
               <span>
@@ -658,7 +669,7 @@ module HowToApply = {
                      )}
                   </span>
                   <Next.Link href="/privacy">
-                    <span className=Theme.Type.link>
+                    <span className=Styles.link>
                       {React.string("Privacy Policy")}
                     </span>
                   </Next.Link>
