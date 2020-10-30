@@ -75,6 +75,11 @@ module Make (Inputs : Inputs_intf) :
     let kvdb = Kvdb.create directory in
     {uuid; kvdb; depth; directory}
 
+  let create_checkpoint t ~directory_name () =
+    let uuid = Uuid_unix.create () in
+    let kvdb = Kvdb.create_checkpoint t.kvdb directory_name in
+    {uuid; kvdb; depth= t.depth; directory= directory_name}
+
   let close {kvdb; uuid= _; depth= _; directory= _} = Kvdb.close kvdb
 
   let with_ledger ~depth ~f =

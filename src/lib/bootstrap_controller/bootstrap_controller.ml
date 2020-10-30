@@ -430,6 +430,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                             Coda_networking.(
                               query_peer t.network peer.peer_id
                                 (Rpcs.Consensus_rpc rpc) query) ) }
+                    ~ledger_depth:
+                      precomputed_values.constraint_constants.ledger_depth
                     sync_jobs
                 in
                 (true, result) )

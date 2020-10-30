@@ -37,10 +37,38 @@ module Make (Inputs : Inputs_intf) :
       Ledger.Any_ledger.cast (module Ledger.Db)
       @@ Transition_frontier.root_snarked_ledger frontier
     in
+    let staking_epoch_ledger =
+      Transition_frontier.consensus_local_state frontier
+      |> Consensus.Data.Local_state.staking_epoch_ledger
+    in
+    let next_epoch_ledger =
+      Transition_frontier.consensus_local_state frontier
+      |> Consensus.Data.Local_state.next_epoch_ledger
+    in
     if
       Ledger_hash.equal ledger_hash
         (Ledger.Any_ledger.M.merkle_root root_ledger)
     then Some root_ledger
+    else if
+      Ledger_hash.equal ledger_hash
+        (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+           staking_epoch_ledger)
+    then
+      match staking_epoch_ledger with
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+          None
+      | Ledger_db ledger ->
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+    else if
+      Ledger_hash.equal ledger_hash
+        (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+           next_epoch_ledger)
+    then
+      match next_epoch_ledger with
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+          None
+      | Ledger_db ledger ->
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
     else None
 
   let answer_query :

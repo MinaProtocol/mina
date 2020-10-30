@@ -295,6 +295,12 @@ let setup_daemon logger =
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+    let best_tip_diff_log_size = 1024 * 1024 * 5 in
+    Logger.Consumer_registry.register ~id:"best_tip_diff"
+      ~processor:(Logger.Processor.raw ())
+      ~transport:
+        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
@@ -723,14 +729,17 @@ let setup_daemon logger =
       let initial_block_production_keypairs =
         block_production_keypair |> Option.to_list |> Keypair.Set.of_list
       in
+      let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           ~genesis_ledger:
             (Precomputed_values.genesis_ledger precomputed_values)
+          ~epoch_ledger_location
           ( Option.map block_production_keypair ~f:(fun keypair ->
                 let open Keypair in
                 Public_key.compress keypair.public_key )
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
+          ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
       let initial_peers =
@@ -890,12 +899,13 @@ let setup_daemon logger =
              ~wallets_disk_location:(conf_dir ^/ "wallets")
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
-             ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-             ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
+             ~receipt_chain_database ~time_controller
+             ~initial_block_production_keypairs ~monitor ~consensus_local_state
+             ~transaction_database ~external_transition_database
+             ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
