@@ -235,9 +235,8 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
-               ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
-               ~slot_duration:nn_int ~epoch_duration:nn_int
-               ~acceptable_network_delay:nn_int
+               ~k:nn_int ~slots_per_epoch:nn_int ~slot_duration:nn_int
+               ~epoch_duration:nn_int ~acceptable_network_delay:nn_int
                ~genesis_state_timestamp:nn_time )
 
     let peer : (_, Network_peer.Peer.Display.t option) typ =
@@ -703,13 +702,15 @@ module Types = struct
                             genesis ledger. The account was not present in \
                             the ledger." ;
                          None )
-                   | Sparse_ledger staking_ledger -> (
+                   | Ledger_db staking_ledger -> (
                      try
                        let index =
-                         Sparse_ledger.find_index_exn staking_ledger account_id
+                         Coda_base.Ledger.Db.index_of_account_exn
+                           staking_ledger account_id
                        in
                        let delegate_account =
-                         Sparse_ledger.get_exn staking_ledger index
+                         Coda_base.Ledger.Db.get_at_index_exn staking_ledger
+                           index
                        in
                        let delegate_key = delegate_account.public_key in
                        Some (get_best_ledger_account_pk coda delegate_key)
