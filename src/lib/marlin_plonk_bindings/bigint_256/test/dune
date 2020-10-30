@@ -1,4 +1,5 @@
 (executable
  (name test)
  (libraries marlin_plonk_bindings_bigint_256)
- (foreign_archives ../../stubs/marlin_plonk_stubs))
+ (foreign_archives ../../stubs/marlin_plonk_stubs)
+ (preprocess (pps ppx_version bisect_ppx)))
