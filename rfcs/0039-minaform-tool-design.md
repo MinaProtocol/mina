@@ -44,7 +44,7 @@ The following issues with the existing system were reported by at least one pers
 
 One of the major design goals is to introduce a set of default terraform network configurations for qa and production that will be the starting point for all networks we deploy, and will be maintained with PR's and strict code review, while still allowing any further modification to fit the needs of any individual deployment, testing, or debugging effort. The design revolves around a improvements to the existing coda-network tool and a few new bash scripts to address specific needs expressed by nathan, brandon, and andrew.  The entirety of mina-automation can then be bundled in a container alongside its dependencies for easy cross-platform use as soon as possible.
 
-None of these scripts are used to actually deploy or manage cluster resources. 
+None of these scripts are used to actually deploy or manage cluster resources.
 
 ### New coda-network features
 
@@ -55,9 +55,9 @@ None of these scripts are used to actually deploy or manage cluster resources.
     - The mina-automation docker image w/ `coda-network keypair download` would allow for an initContainer in kubernetes to grab a key for a specific container, removing the need for `keyset deploy` entirely.
 - Using ocaml generate-keypair binary or docker image to generate keys instead of relying on js library.
     - Tracking issue: https://github.com/MinaProtocol/mina/issues/6548
-- More complete genesis-create command with support for vesting schedules and a yaml-based config file for defining genesis ledger requirements. 
+- More complete genesis-create command with support for vesting schedules and a yaml-based config file for defining genesis ledger requirements.
     - Tracking Issue: https://github.com/MinaProtocol/mina/issues/6551
-    - Doing this properly is worthwhile, but a combination of bash + jq + the existing `coda-network genesis` command have unblocked deployments and will be used until a complete design + implementation is ready. 
+    - Doing this properly is worthwhile, but a combination of bash + jq + the existing `coda-network genesis` command have unblocked deployments and will be used until a complete design + implementation is ready.
 
 ### ./scripts/create-network.sh
 
@@ -93,7 +93,7 @@ In addition to use on any developer laptop, the docker image could be deployed d
 
 Why is this design the best in the space of possible designs?
 
-* Terraform is the agreed upon base for all of our deployment operations and management of a cluster, and a lot of time has already been invested in generating terraform from the integration test framework and other tools. This design allows us to lower the minimum terraform customization required to deploy a network, and does not introduce additional tooling beyond terraform, docker, and the coda-network tool. The proposed scripts could even be a readme with individual commands for starting a network as we have in coda-automation/README.md now, but the scripts allow for a more graceful transition behind the scenes as coda-network and the terraform mature with individual patches and improvements. 
+* Terraform is the agreed upon base for all of our deployment operations and management of a cluster, and a lot of time has already been invested in generating terraform from the integration test framework and other tools. This design allows us to lower the minimum terraform customization required to deploy a network, and does not introduce additional tooling beyond terraform, docker, and the coda-network tool. The proposed scripts could even be a readme with individual commands for starting a network as we have in coda-automation/README.md now, but the scripts allow for a more graceful transition behind the scenes as coda-network and the terraform mature with individual patches and improvements.
 
 What other designs have been considered and what is the rationale for not choosing them?
 
@@ -103,7 +103,7 @@ What other designs have been considered and what is the rationale for not choosi
 
 What is the impact of not doing this?
 
-* Continuing with `auto-deploy.sh` means continued confusion over how to start when creating a new network, how to generate keys and a ledger, and how to customize terraform files. This will remain hard to maintain until we standardize the process and expectations around deploying testnets. 
+* Continuing with `auto-deploy.sh` means continued confusion over how to start when creating a new network, how to generate keys and a ledger, and how to customize terraform files. This will remain hard to maintain until we standardize the process and expectations around deploying testnets.
 
 ## Prior art
 [prior-art]: #prior-art
@@ -111,7 +111,7 @@ What is the impact of not doing this?
 Many proposals from the Conner era have tackled this design space, and a variety of python scripts used in the existing setup came out of those designs, and to some extent coda-network is a result as well. See https://github.com/MinaProtocol/mina/issues/4723 for an outline of the work achieved and what was left to be accomplished.
 
 To that end, this concept was inspired by https://github.com/MinaProtocol/mina/issues/5768 and intends to achieve some of the listed design goals. The interface defined in this RFC can be extended to be community-friendly (by allowing easy configuration of google cloud and kubernetes credentials) but those features are out-of-scope for the initial implementation. Easier to iterate quickly on is a high priority, as is modularity (by still allowing direct use of terraform and direct interraction with coda-network).
- 
+
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
