@@ -76,16 +76,29 @@ let make = (~posts) => {
         header=None
         copy=None
         background={
-          Theme.desktop: "/static/img/MinaSpectrumBackground.jpg",
-          Theme.tablet: "/static/img/MinaSpectrumBackground.jpg",
-          Theme.mobile: "/static/img/MinaSpectrumBackground.jpg",
+          Theme.desktop: "/static/img/MinaSpectrumPrimary3.jpg",
+          Theme.tablet: "/static/img/MinaSpectrumPrimary3.jpg",
+          Theme.mobile: "/static/img/MinaSpectrumPrimary3.jpg",
         }>
-        <Spacer height=1.5 />
-        <h5> {React.string("Announcements")} </h5>
-        <Rule />
-        <h5> {React.string(featured.ContentType.Announcement.title)} </h5>
-        <p> {React.string(featured.ContentType.Announcement.snippet)} </p>
-        <div />
+        <div className=Css.(style([marginTop(`rem(-12.))]))>
+          <h5 className=Hero.Styles.headerLabel>
+            {React.string("Announcements")}
+          </h5>
+          <Rule />
+          <div className=Theme.Type.metadata>
+            <span> {React.string("Announcement")} </span>
+            <span> {React.string(" / ")} </span>
+            <span>
+              {React.string(featured.ContentType.Announcement.date)}
+            </span>
+          </div>
+          <h1 className=Hero.Styles.header>
+            {React.string(featured.ContentType.Announcement.title)}
+          </h1>
+          <p className=Hero.Styles.headerCopy>
+            {React.string(featured.ContentType.Announcement.snippet)}
+          </p>
+        </div>
       </Hero>
       <Wrapped>
         <div className=Blog.Style.morePostsSpacing>
