@@ -62,7 +62,8 @@ module type Engine_intf = sig
     val stop : t -> unit Malleable_error.t
 
     val send_payment :
-         logger:Logger.t
+         ?retry_on_graphql_error:bool
+      -> logger:Logger.t
       -> t
       -> sender:Signature_lib.Public_key.Compressed.t
       -> receiver:Signature_lib.Public_key.Compressed.t
@@ -173,6 +174,8 @@ module type Test_intf = sig
   type log_engine
 
   val config : Test_config.t
+
+  val expected_error_event_reprs : Structured_log_events.repr list
 
   val run : network -> log_engine -> unit Malleable_error.t
 end
