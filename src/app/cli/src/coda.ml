@@ -295,6 +295,12 @@ let setup_daemon logger =
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+    let best_tip_diff_log_size = 1024 * 1024 * 5 in
+    Logger.Consumer_registry.register ~id:"best_tip_diff"
+      ~processor:(Logger.Processor.raw ())
+      ~transport:
+        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
