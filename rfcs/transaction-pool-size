@@ -22,13 +22,13 @@ TX size: 0.5KB
 Mempool Size: 4MB
 Queue in hours: 4MB / (15 TPS x 0.5KB) = 530 seconds ~ 10 minutes  
 
-Given there is no evidence of block producers demanding more than 5 hours of transactions in their queue and Mina is not prioritizing high TPS at this time, it is recommended to stick to the 10MB transaction pool size. This translates to about 8 hours of queue.  
+Given there is no evidence of block producers demanding more than 5 hours of transactions in their queue and Mina is not prioritizing high TPS at this time, it is recommended to stick to the 10MB transaction pool size. This translates to about 14 hours of queue.  
 
 Zaki (Comos) & Luke (Tezos) also think that 8 hours of queue time is sufficient for us as a start. 
 
 ## Mina Protocol mainnet 
 
 TPS: 0.2 
-TX size: 1.5KB 
+TX size: 1KB 
 Transaction Pool Size: 10MB 
-Queue in hours: 10MB / (0.2 TPS x 1.5KB) = 30K seconds ~ 8 hours  
+Queue in hours: 10MB / (0.2 TPS x 1KB) = 50K seconds ~ 14 hours  
