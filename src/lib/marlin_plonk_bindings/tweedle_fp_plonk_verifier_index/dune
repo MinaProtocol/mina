@@ -3,4 +3,5 @@
  (public_name marlin_plonk_bindings.tweedle_fp_verifier_index)
  (libraries
    marlin_plonk_bindings_stubs
-   marlin_plonk_bindings_tweedle_fp_index))
+   marlin_plonk_bindings_tweedle_fp_index)
+ (preprocess (pps ppx_version bisect_ppx)))
