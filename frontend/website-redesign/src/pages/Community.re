@@ -128,9 +128,9 @@ let make = (~profiles) => {
         )
       }
       background={
-        Theme.desktop: "/static/img/community-page/09_Community_1_2880x1504.jpg",
-        Theme.tablet: "/static/img/community-page/09_Community_1_1536x1504_tablet.jpg",
-        Theme.mobile: "/static/img/community-page/09_Community_1_750x1056_mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/CommunityHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/CommunityHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/CommunityHeroMobile.jpg",
       }
     />
     <ButtonBar
