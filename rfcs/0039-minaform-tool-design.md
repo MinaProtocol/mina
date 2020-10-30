@@ -1,7 +1,7 @@
 ## Summary
 [summary]: #summary
 
-This rfc proposes a variety of changes to our existing testnet terraform modules and main.tf files to more reliably create and manage both QA nets and production deployments. Our existing setup is very hacky and requires knowledge of many tools to use effectively. The intention with this refactor/these changes is to leverage terraform's `.tfvars` files to configure networks but allow sharing a "qa.tf" file for qa nets and a "prod.tf" file for production networks. This, along with other tweaks to the terraform listed below, resolves major pain points with the existing setup, and standardizes a simpler process for folks to learn/understand.
+This rfc proposes a variety of changes to our existing testnet terraform modules and main.tf files to more reliably create and manage both QA nets and production deployments. Our existing setup is very hacky and requires knowledge of many tools to use effectively. The intention with this refactor/these changes is to leverage terraform's `.tfvars` files to configure networks but allow sharing a "qa.tf" file for qa nets and a "prod.tf" file for production networks. This approach, along with other tweaks to the terraform listed below, resolves major pain points with the existing setup, and standardizes a simpler process for folks to learn/understand.
 
 ## Motivation
 [motivation]: #motivation
@@ -44,7 +44,7 @@ The following issues with the existing system were reported by at least one pers
 
 One of the major design goals is to introduce a set of default terraform network configurations for qa and production that will be the starting point for all networks we deploy, and will be maintained with PR's and strict code review, while still allowing any further modification to fit the needs of any individual deployment, testing, or debugging effort. The design revolves around a improvements to the existing coda-network tool and a few new bash scripts to address specific needs expressed by nathan, brandon, and andrew.  The entirety of mina-automation can then be bundled in a container alongside its dependencies for easy cross-platform use as soon as possible.
 
-None of these scripts are used to actually deploy or manage cluster resources.
+**Unlike in the original `minaform` design, none of these scripts are used to actually deploy or manage cluster resources. Terraform will be the only tool for starting or stopping networks, coda-network and these helper scripts just help get to that stage faster.**
 
 ### New coda-network features
 
