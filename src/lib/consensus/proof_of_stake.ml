@@ -2661,25 +2661,24 @@ module Hooks = struct
                 (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
             with
             | Connected {data= Ok (Ok sparse_ledger); _} -> (
-                let%bind () =
-                  Trust_system.(
-                    record trust_system logger peer
-                      Actions.(Epoch_ledger_provided, None))
-                in
-                match
-                  reset_snapshot local_state snapshot_id ~sparse_ledger
-                    ~ledger_depth
-                with
-                | Ok () ->
-                    return true
-                | Error e ->
-                    [%log faulty_peer_without_punishment]
-                      ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
-                        ; ("error", `String (Error.to_string_hum e)) ]
-                      "Peer $peer failed to serve requested epoch ledger: \
-                       $error" ;
-                    return false )
+              match
+                reset_snapshot local_state snapshot_id ~sparse_ledger
+                  ~ledger_depth
+              with
+              | Ok () ->
+                  let%bind () =
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Epoch_ledger_provided, None))
+                  in
+                  return true
+              | Error e ->
+                  [%log faulty_peer_without_punishment]
+                    ~metadata:
+                      [ ("peer", Network_peer.Peer.to_yojson peer)
+                      ; ("error", `String (Error.to_string_hum e)) ]
+                    "Peer $peer failed to serve requested epoch ledger: $error" ;
+                  return false )
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)
                 [%log faulty_peer_without_punishment]
