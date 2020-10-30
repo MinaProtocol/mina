@@ -55,6 +55,52 @@ let report_test_errors error_set =
     exit 1 )
   else Deferred.unit
 
+let dispatch_cleanup ~logger ~cleanup_func ~destroy_func ~net_manager_ref
+    ~log_engine_ref ~cleanup_deferred_ref reason
+    (test_result : unit Malleable_error.t) : unit Deferred.t =
+  let cleanup () : unit Deferred.t =
+    let%bind () =
+      Option.value_map !net_manager_ref ~default:Deferred.unit ~f:cleanup_func
+    in
+    let log_engine_cleanup_result =
+      Option.value_map !log_engine_ref
+        ~default:(Malleable_error.return Test_error.Set.empty)
+        ~f:destroy_func
+    in
+    let%bind log_engine_error_set =
+      match%map Malleable_error.lift_error_set log_engine_cleanup_result with
+      | Ok (remote_error_set, internal_error_set) ->
+          Test_error.Set.combine [remote_error_set; internal_error_set]
+      | Error internal_error_set ->
+          internal_error_set
+    in
+    let%bind test_error_set =
+      match%map Malleable_error.lift_error_set test_result with
+      | Ok ((), error_set) ->
+          error_set
+      | Error error_set ->
+          error_set
+    in
+    report_test_errors
+      (Test_error.Set.combine [test_error_set; log_engine_error_set])
+  in
+  let%bind test_error_str = Malleable_error.hard_error_to_string test_result in
+  match !cleanup_deferred_ref with
+  | Some deferred ->
+      [%log error]
+        "additional call to cleanup testnet while already cleaning up \
+         ($reason, $error)"
+        ~metadata:
+          [("reason", `String reason); ("error", `String test_error_str)] ;
+      deferred
+  | None ->
+      [%log info] "cleaning up testnet ($reason, $error)"
+        ~metadata:
+          [("reason", `String reason); ("error", `String test_error_str)] ;
+      let deferred = cleanup () in
+      cleanup_deferred_ref := Some deferred ;
+      deferred
+
 let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
   let (Engine_with_cli_inputs ((module Engine), cli_inputs)) = inputs.engine in
@@ -80,53 +126,10 @@ let main inputs =
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
-  let dispatch_cleanup reason (test_result : unit Malleable_error.t) :
-      unit Deferred.t =
-    let cleanup () : unit Deferred.t =
-      let%bind () =
-        Option.value_map !net_manager_ref ~default:Deferred.unit
-          ~f:Engine.Network_manager.cleanup
-      in
-      let log_engine_cleanup_result =
-        Option.value_map !log_engine_ref
-          ~default:(Malleable_error.return Test_error.Set.empty)
-          ~f:Engine.Log_engine.destroy
-      in
-      let%bind log_engine_error_set =
-        match%map Malleable_error.lift_error_set log_engine_cleanup_result with
-        | Ok (remote_error_set, internal_error_set) ->
-            Test_error.Set.combine [remote_error_set; internal_error_set]
-        | Error internal_error_set ->
-            internal_error_set
-      in
-      let%bind test_error_set =
-        match%map Malleable_error.lift_error_set test_result with
-        | Ok ((), error_set) ->
-            error_set
-        | Error error_set ->
-            error_set
-      in
-      report_test_errors
-        (Test_error.Set.combine [test_error_set; log_engine_error_set])
-    in
-    let%bind test_error_str =
-      Malleable_error.hard_error_to_string test_result
-    in
-    match !cleanup_deferred_ref with
-    | Some deferred ->
-        [%log error]
-          "additional call to cleanup testnet while already cleaning up \
-           ($reason, $error)"
-          ~metadata:
-            [("reason", `String reason); ("error", `String test_error_str)] ;
-        deferred
-    | None ->
-        [%log info] "cleaning up testnet ($reason, $error)"
-          ~metadata:
-            [("reason", `String reason); ("error", `String test_error_str)] ;
-        let deferred = cleanup () in
-        cleanup_deferred_ref := Some deferred ;
-        deferred
+  let f_dispatch_cleanup =
+    dispatch_cleanup ~logger ~cleanup_func:Engine.Network_manager.cleanup
+      ~destroy_func:Engine.Log_engine.destroy ~net_manager_ref ~log_engine_ref
+      ~cleanup_deferred_ref
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
   Signal.handle Signal.terminating ~f:(fun signal ->
@@ -136,7 +139,7 @@ let main inputs =
         @@ Printf.sprintf "received signal %s" (Signal.to_string signal)
       in
       don't_wait_for
-        (dispatch_cleanup "signal received"
+        (f_dispatch_cleanup "signal received"
            (Malleable_error.of_error_hard error)) ) ;
   let%bind monitor_test_result =
     Monitor.try_with ~extract_exn:true (fun () ->
@@ -155,7 +158,7 @@ let main inputs =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->
               don't_wait_for
-                (dispatch_cleanup
+                (f_dispatch_cleanup
                    (sprintf
                       !"log engine fatal error: %s"
                       (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
@@ -171,7 +174,7 @@ let main inputs =
     | Error exn ->
         Malleable_error.of_error_hard (Error.of_exn exn)
   in
-  let%bind () = dispatch_cleanup "test completed" test_result in
+  let%bind () = f_dispatch_cleanup "test completed" test_result in
   exit 0
 
 let start inputs =

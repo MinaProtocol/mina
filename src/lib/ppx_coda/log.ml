@@ -41,9 +41,10 @@ module Make (Info : Ppxinfo) = struct
       Info.logger_module ^ "." ^ level_name |> Longident.parse
     in
     let log_level_expr = pexp_ident (Located.mk log_level_id) in
-    (* spam logs don't contain module, location *)
-    if String.equal level_name "spam" then
-      [%expr [%e log_level_expr] [%e logger]]
+    (* spam and best_tip_diff logs don't contain module, location *)
+    if
+      String.equal level_name "spam" || String.equal level_name "best_tip_diff"
+    then [%expr [%e log_level_expr] [%e logger]]
     else
       [%expr
         [%e log_level_expr] [%e logger] ~module_:__MODULE__ ~location:__LOC__]
