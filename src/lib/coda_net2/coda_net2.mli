@@ -206,6 +206,7 @@ type connection_gating =
 *)
 val configure :
      net
+  -> logger:Logger.t
   -> me:Keypair.t
   -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list

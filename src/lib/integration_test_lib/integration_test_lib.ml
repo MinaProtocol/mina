@@ -15,6 +15,8 @@ module Test_config = struct
   type t =
     { k: int
     ; delta: int
+    ; slots_per_epoch: int
+    ; slots_per_sub_window: int
     ; proof_level: Runtime_config.Proof_keys.Level.t
     ; txpool_max_size: int
     ; block_producers: Block_producer.t list
@@ -24,6 +26,8 @@ module Test_config = struct
 
   let default =
     { k= 20
+    ; slots_per_epoch= 3 * 8 * 20
+    ; slots_per_sub_window= 2
     ; delta= 0
     ; proof_level= Full
     ; txpool_max_size= 3000
@@ -71,6 +75,9 @@ module type Engine_intf = sig
       -> t
       -> account_id:Coda_base.Account_id.t
       -> Currency.Balance.t Malleable_error.t
+
+    val get_peer_id :
+      logger:Logger.t -> t -> (string * string list) Malleable_error.t
   end
 
   module Network : sig

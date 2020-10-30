@@ -175,6 +175,13 @@ module Structured : sig
   val fatal : log_function
 
   val faulty_peer_without_punishment : log_function
+
+  val best_tip_diff :
+       t
+    -> ?tags:Tags.t list
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
 end
 
 (** Short alias for Structured. *)
