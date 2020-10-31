@@ -419,6 +419,7 @@ module Data = struct
 
     let reset_snapshot (t : t) id ~sparse_ledger ~ledger_depth =
       let open Coda_base in
+      let open Or_error.Let_syntax in
       let module Ledger_transfer =
         Coda_base.Ledger_transfer.From_sparse_ledger (Ledger.Db) in
       let delegatee_table =
@@ -434,8 +435,9 @@ module Data = struct
           let ledger =
             Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
           in
-          ignore
-          @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
+          let%map (_ : Ledger.Db.t) =
+            Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
+          in
           !t.staking_epoch_snapshot
           <- { delegatee_table
              ; ledger= Snapshot.Ledger_snapshot.Ledger_db ledger }
@@ -446,8 +448,9 @@ module Data = struct
           let ledger =
             Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
           in
-          ignore
-          @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
+          let%map (_ : Ledger.Db.t) =
+            Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
+          in
           !t.next_epoch_snapshot
           <- { delegatee_table
              ; ledger= Snapshot.Ledger_snapshot.Ledger_db ledger }
@@ -2657,15 +2660,25 @@ module Hooks = struct
               query_peer.query peer Rpcs.Get_epoch_ledger
                 (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
             with
-            | Connected {data= Ok (Ok sparse_ledger); _} ->
-                let%bind () =
-                  Trust_system.(
-                    record trust_system logger peer
-                      Actions.(Epoch_ledger_provided, None))
-                in
+            | Connected {data= Ok (Ok sparse_ledger); _} -> (
+              match
                 reset_snapshot local_state snapshot_id ~sparse_ledger
-                  ~ledger_depth ;
-                return true
+                  ~ledger_depth
+              with
+              | Ok () ->
+                  let%bind () =
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Epoch_ledger_provided, None))
+                  in
+                  return true
+              | Error e ->
+                  [%log faulty_peer_without_punishment]
+                    ~metadata:
+                      [ ("peer", Network_peer.Peer.to_yojson peer)
+                      ; ("error", `String (Error.to_string_hum e)) ]
+                    "Peer $peer failed to serve requested epoch ledger: $error" ;
+                  return false )
             | Connected {data= Ok (Error err); _} ->
                 (* TODO figure out punishments here. *)
                 [%log faulty_peer_without_punishment]
