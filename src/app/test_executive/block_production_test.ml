@@ -16,6 +16,8 @@ module Make (Engine : Engine_intf) = struct
       block_producers= [{balance= "1000"; timing= Untimed}]
     ; num_snark_workers= 0 }
 
+  let expected_error_event_reprs = []
+
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in

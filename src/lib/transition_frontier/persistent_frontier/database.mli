@@ -44,9 +44,11 @@ val close : t -> unit
 
 val check :
      t
+  -> genesis_state_hash:State_hash.t
   -> ( unit
      , [> `Not_initialized
        | `Invalid_version
+       | `Genesis_state_mismatch of State_hash.t
        | `Corrupt of
          [> `Not_found of
             [> `Best_tip

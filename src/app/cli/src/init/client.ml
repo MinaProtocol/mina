@@ -1014,7 +1014,8 @@ let pending_snark_work =
 let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
+  Command.async
+    ~summary:"Start async tracing to $config-directory/trace/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
@@ -1511,7 +1512,6 @@ let compile_time_constants =
                      .block_window_duration_ms )
              ; ( "delta"
                , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
-             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
              ; ( "sub_windows_per_window"
                , `Int
                    (Unsigned.UInt32.to_int

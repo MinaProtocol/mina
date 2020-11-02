@@ -15,6 +15,8 @@ module Test_config = struct
   type t =
     { k: int
     ; delta: int
+    ; slots_per_epoch: int
+    ; slots_per_sub_window: int
     ; proof_level: Runtime_config.Proof_keys.Level.t
     ; txpool_max_size: int
     ; block_producers: Block_producer.t list
@@ -24,6 +26,8 @@ module Test_config = struct
 
   let default =
     { k= 20
+    ; slots_per_epoch= 3 * 8 * 20
+    ; slots_per_sub_window= 2
     ; delta= 0
     ; proof_level= Full
     ; txpool_max_size= 3000
@@ -57,8 +61,13 @@ module type Engine_intf = sig
 
     val stop : t -> unit Malleable_error.t
 
+    (* does not return if it succeeds, use don't_wait_for *)
+    val set_port_forwarding_exn :
+      logger:Logger.t -> t -> int -> unit Deferred.t
+
     val send_payment :
-         logger:Logger.t
+         ?retry_on_graphql_error:bool
+      -> logger:Logger.t
       -> t
       -> sender:Signature_lib.Public_key.Compressed.t
       -> receiver:Signature_lib.Public_key.Compressed.t
@@ -169,6 +178,8 @@ module type Test_intf = sig
   type log_engine
 
   val config : Test_config.t
+
+  val expected_error_event_reprs : Structured_log_events.repr list
 
   val run : network -> log_engine -> unit Malleable_error.t
 end

@@ -218,7 +218,7 @@ let get db ~key ~error =
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
-let check t =
+let check t ~genesis_state_hash =
   let check_version () =
     match get_if_exists t.db ~key:Db_version ~default:0 with
     | 0 ->
@@ -235,7 +235,7 @@ let check t =
     let%bind best_tip =
       get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
     in
-    let%bind _ =
+    let%bind root_transition =
       get t.db ~key:(Transition root_hash)
         ~error:(`Corrupt (`Not_found `Root_transition))
     in
@@ -247,7 +247,7 @@ let check t =
       get t.db ~key:(Transition best_tip)
         ~error:(`Corrupt (`Not_found `Best_tip_transition))
     in
-    root_hash
+    (root_hash, root_transition)
   in
   let rec check_arcs pred_hash =
     let%bind successors =
@@ -263,7 +263,16 @@ let check t =
         check_arcs succ_hash )
   in
   let%bind () = check_version () in
-  let%bind root_hash = check_base () in
+  let%bind root_hash, root_transition = check_base () in
+  let%bind () =
+    let persisted_genesis_state_hash =
+      External_transition.protocol_state root_transition
+      |> Coda_state.Protocol_state.genesis_state_hash
+    in
+    if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
+      Ok ()
+    else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
+  in
   check_arcs root_hash
 
 let initialize t ~root_data =

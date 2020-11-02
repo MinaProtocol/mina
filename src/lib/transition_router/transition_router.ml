@@ -106,19 +106,14 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
   let num_peers = 8 in
-  let with_timeout d =
-    Deferred.any
-      [ d
-      ; ( after (Time_ns.Span.of_sec 60.)
-        >>| fun _ -> Or_error.error_string "timed out" ) ]
-  in
   let%bind peers = Coda_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
   let%map tips =
     Deferred.List.filter_map ~how:`Parallel peers ~f:(fun peer ->
         let open Deferred.Let_syntax in
         match%bind
-          with_timeout (Coda_networking.get_best_tip network peer)
+          Coda_networking.get_best_tip ~timeout:(Time.Span.of_min 1.) network
+            peer
         with
         | Error e ->
             [%log debug]
@@ -340,6 +335,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                           Coda_networking.(
                             query_peer network peer.peer_id
                               (Rpcs.Consensus_rpc rpc) query) ) }
+                  ~ledger_depth:
+                    precomputed_values.constraint_constants.ledger_depth
                   sync_jobs
               with
               | Error e ->

@@ -13,11 +13,16 @@ module Styles = {
       justifyContent(`center),
       alignItems(`center),
       padding2(~v=`zero, ~h=`rem(1.)),
-      selector(
-        "svg",
+      media(
+        Theme.MediaQuery.tablet,
         [
-          marginLeft(`rem(0.5)),
-          SVG.fill(Theme.Colors.digitalBlackA(0.5)),
+          selector(
+            "svg",
+            [
+              marginLeft(`rem(0.5)),
+              SVG.fill(Theme.Colors.digitalBlackA(0.5)),
+            ],
+          ),
         ],
       ),
       hover([

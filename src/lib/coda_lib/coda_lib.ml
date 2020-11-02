@@ -917,8 +917,18 @@ let create (config : Config.t) =
                         ; ban_statuses
                         ; k_block_hashes } )
           in
+          let get_some_initial_peers _ =
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                [%log' error config.logger]
+                  "Network not instantiated when initial peers requested" ;
+                Deferred.return []
+            | Some net ->
+                Coda_networking.peers net
+          in
           let%bind net =
-            Coda_networking.create config.net_config
+            Coda_networking.create config.net_config ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring

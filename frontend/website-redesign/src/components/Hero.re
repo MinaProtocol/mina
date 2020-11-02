@@ -3,15 +3,20 @@ open Css;
 module Styles = {
   let heroContainer = (backgroundImg: Theme.backgroundImage) =>
     style([
+      height(`rem(33.)),
       display(`flex),
       flexDirection(`column),
-      justifyContent(`flexStart),
+      justifyContent(`flexEnd),
       alignContent(`spaceBetween),
       backgroundImage(`url(backgroundImg.mobile)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(`url(backgroundImg.tablet))],
+        [
+          justifyContent(`flexStart),
+          height(`percent(100.)),
+          backgroundImage(`url(backgroundImg.tablet)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
