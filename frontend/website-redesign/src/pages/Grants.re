@@ -115,6 +115,8 @@ module Styles = {
     merge([
       Theme.Type.link,
       style([
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
         media(
           Theme.MediaQuery.tablet,
           [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],

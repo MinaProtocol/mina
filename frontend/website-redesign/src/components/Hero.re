@@ -62,7 +62,7 @@ module Styles = {
         unsafe("width", "max-content"),
         media(
           Theme.MediaQuery.desktop,
-          [width(`percent(50.)), padding2(~v=`rem(1.5), ~h=`rem(1.5))],
+          [padding2(~v=`rem(1.5), ~h=`rem(1.5))],
         ),
         marginTop(`rem(1.)),
         marginBottom(`rem(1.5)),
