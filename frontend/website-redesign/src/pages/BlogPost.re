@@ -117,7 +117,7 @@ let make = (~post: option(ContentType.BlogPost.t)) => {
           )
         }
         title="Blog"
-        header=title
+        header={Some(title)}
         copy={Js.Undefined.toOption(subtitle)}
         background=Theme.{
           desktop: "/static/img/BlogDetailImage.jpg",

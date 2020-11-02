@@ -69,17 +69,17 @@ let make = () => {
     <div className=Styles.typesOfGrantsInnerContainer>
       <h3 className=Theme.Type.h3> {React.string("Types of Grants")} </h3>
       <TypeOfGrant
-        img="static/img/TechinalGrants.png"
+        img="static/img/TechinalGrants.svg"
         title="Technical Grants"
         copy="Contribute to engineering projects like web interfaces or to protocol enhancements like stablecoins."
       />
       <TypeOfGrant
-        img="static/img/CommunityGrants.png"
+        img="static/img/CommunityGrants.svg"
         title="Community Grants"
         copy="Help with community organizing or create much-needed content to better serve our members."
       />
       <TypeOfGrant
-        img="static/img/SubmitYourOwnGrant.png"
+        img="static/img/SubmitYourOwnGrant.svg"
         title="Submit Your Own"
         copy="Share an idea for how to improve the Mina network or build the Mina community."
       />
