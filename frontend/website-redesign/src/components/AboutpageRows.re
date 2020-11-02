@@ -221,7 +221,7 @@ let make = () => {
         </p>
         <img
           className=Styles.secondImage
-          src="/static/img/triangle_desktop.png"
+          src="/static/img/triangle_desktop.jpg"
         />
       </div>
     </div>
