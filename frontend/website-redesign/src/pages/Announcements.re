@@ -1,6 +1,21 @@
 module Styles = {
   open Css;
   let titleSpacing = style([marginBottom(`rem(3.1875))]);
+
+  let header =
+    merge([
+      Hero.Styles.header,
+      style([
+        width(`percent(100.)),
+        media(Theme.MediaQuery.tablet, [maxWidth(`rem(40.))]),
+      ]),
+    ]);
+
+  let heroContentContainer =
+    style([
+      marginTop(`zero),
+      media(Theme.MediaQuery.desktop, [marginTop(`rem(-12.))]),
+    ]);
 };
 
 module MorePosts = {
@@ -80,7 +95,7 @@ let make = (~posts) => {
           Theme.tablet: "/static/img/MinaSpectrumPrimary3.jpg",
           Theme.mobile: "/static/img/MinaSpectrumPrimary3.jpg",
         }>
-        <div className=Css.(style([marginTop(`rem(-12.))]))>
+        <div className=Styles.heroContentContainer>
           <h5 className=Hero.Styles.headerLabel>
             {React.string("Announcements")}
           </h5>
@@ -92,7 +107,7 @@ let make = (~posts) => {
               {React.string(featured.ContentType.Announcement.date)}
             </span>
           </div>
-          <h1 className=Hero.Styles.header>
+          <h1 className=Styles.header>
             {React.string(featured.ContentType.Announcement.title)}
           </h1>
           <p className=Hero.Styles.headerCopy>
