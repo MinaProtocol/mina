@@ -10,9 +10,9 @@ let make = (~statusCode="404") => {
         )
       }
       background={
-        Theme.desktop: "/static/img/backgrounds/404page.png",
-        Theme.tablet: "/static/img/backgrounds/404page.png",
-        Theme.mobile: "/static/img/backgrounds/404page.png",
+        Theme.desktop: "/static/img/backgrounds/404page.jpg",
+        Theme.tablet: "/static/img/backgrounds/404page.jpg",
+        Theme.mobile: "/static/img/backgrounds/404page.jpg",
       }>
       <Spacer height=1. />
       <Button

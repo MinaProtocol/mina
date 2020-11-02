@@ -95,18 +95,18 @@ module Styles = {
     merge([
       heroRowImage,
       style([
-        backgroundImage(`url("/static/img/triangle_mobile.png")),
+        backgroundImage(`url("/static/img/triangle_mobile.jpg")),
         media(
           Theme.MediaQuery.tablet,
           [
             position(`absolute),
             left(`zero),
-            backgroundImage(`url("/static/img/triangle_tablet.png")),
+            backgroundImage(`url("/static/img/triangle_tablet.jpg")),
           ],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [backgroundImage(`url("/static/img/triangle_desktop.png"))],
+          [backgroundImage(`url("/static/img/triangle_desktop.jpg"))],
         ),
       ]),
     ]);

@@ -716,9 +716,9 @@ let make = () => {
         )
       }
       background={
-        Theme.desktop: "/static/img/GrantsHero.jpg",
-        Theme.tablet: "/static/img/GrantsHero.jpg",
-        Theme.mobile: "/static/img/GrantsHero.jpg",
+        Theme.desktop: "/static/img/backgrounds/GrantsHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/GrantsHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/GrantsHeroMobile.jpg",
       }
     />
     <div className=Styles.typesOfGrantsImage>

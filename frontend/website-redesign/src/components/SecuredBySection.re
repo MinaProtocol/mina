@@ -3,10 +3,10 @@ module Styles = {
   let backgroundImage =
     style([
       backgroundSize(`cover),
-      backgroundImage(url("/static/img/SecuredBySmall.png")),
+      backgroundImage(url("/static/img/SecuredBySmall.jpg")),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(url("/static/img/SecuredByMedium.png"))],
+        [backgroundImage(url("/static/img/SecuredByMedium.jpg"))],
       ),
       media(
         Theme.MediaQuery.desktop,

@@ -482,12 +482,12 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/tech-hero-desktop.jpg",
-        Theme.tablet: "/static/img/tech-hero-tablet.jpg",
-        Theme.mobile: "/static/img/tech-hero-mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/tech-hero-desktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/tech-hero-tablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/tech-hero-mobile.jpg",
       }
       title="Tech"
-      header=Some("An Elegant Solution")
+      header={Some("An Elegant Solution")}
       copy={
         Some(
           "Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",

@@ -8,7 +8,7 @@ module Styles = {
   let background =
     style([
       backgroundImage(
-        `url("/static/img/backgrounds/SectionGenesisBackground.png"),
+        `url("/static/img/backgrounds/SectionGenesisBackground.jpg"),
       ),
       backgroundSize(`cover),
       paddingTop(`rem(12.)),
@@ -348,9 +348,9 @@ let make = (~profiles) => {
         )
       }
       background=Theme.{
-        mobile: "/static/img/GenesisSmall.jpg",
-        tablet: "/static/img/GenesisMedium.jpg",
-        desktop: "/static/img/GenesisLarge.jpg",
+        mobile: "/static/img/backgrounds/GenesisHeroMobile.jpg",
+        tablet: "/static/img/backgrounds/GenesisHeroTablet.jpg",
+        desktop: "/static/img/backgrounds/GenesisHeroDesktop.jpg",
       }>
       <Spacer height=2. />
       <Button
