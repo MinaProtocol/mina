@@ -125,3 +125,23 @@ pub fn caml_bigint_256_test_bit(x: CamlBigint256Ptr, i: ocaml::Int) -> Result<bo
             .unwrap()),
     }
 }
+
+#[ocaml::func]
+pub fn caml_bigint_256_to_bytes(x: CamlBigint256Ptr) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlBigint256>();
+    let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    unsafe {
+        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+    }
+    ocaml::Value(str)
+}
+
+#[ocaml::func]
+pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigint256, ocaml::Error> {
+    let len = std::mem::size_of::<CamlBigint256>();
+    if x.len() != len {
+      ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
+    };
+    let x = unsafe {*(x.as_ptr() as *const CamlBigint256)};
+    Ok(x)
+}

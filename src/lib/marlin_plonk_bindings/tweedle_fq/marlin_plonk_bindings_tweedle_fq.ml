@@ -65,3 +65,5 @@ external two_adic_root_of_unity :
 external domain_generator : int -> t = "caml_tweedle_fq_domain_generator"
 
 external to_bytes : t -> Bytes.t = "caml_tweedle_fq_to_bytes"
+
+external of_bytes : Bytes.t -> t = "caml_tweedle_fq_of_bytes"
