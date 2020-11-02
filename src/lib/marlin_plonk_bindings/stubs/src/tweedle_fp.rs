@@ -232,3 +232,13 @@ pub fn caml_tweedle_fp_domain_generator(
         ),
     }
 }
+
+#[ocaml::func]
+pub fn caml_tweedle_fp_to_bytes(x: CamlTweedleFpPtr) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlTweedleFp>();
+    let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    unsafe {
+        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+    }
+    ocaml::Value(str)
+}

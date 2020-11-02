@@ -212,3 +212,13 @@ pub fn caml_bn_382_fq_domain_generator(log2_size: ocaml::Int) -> Result<CamlBn38
         ),
     }
 }
+
+#[ocaml::func]
+pub fn caml_bn_382_fq_to_bytes(x: CamlBn382FqPtr) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlBn382Fq>();
+    let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    unsafe {
+        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+    }
+    ocaml::Value(str)
+}
