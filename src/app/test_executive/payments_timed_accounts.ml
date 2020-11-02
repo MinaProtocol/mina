@@ -28,7 +28,7 @@ module Make (Engine : Engine_intf) = struct
         ~vesting_increment:50_000_000_000
     in
     let timing2 =
-      make_timing ~min_balance:500_000_000_000 ~cliff_time:2000
+      make_timing ~min_balance:650_000_000_000 ~cliff_time:2000
         ~vesting_period:1 ~vesting_increment:500_000_000_000
     in
     { default with
@@ -58,6 +58,9 @@ module Make (Engine : Engine_intf) = struct
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
     let%bind () = Log_engine.wait_for_init block_producer2 log_engine in
     [%log info] "Block producer 2 (of 2) initialized" ;
+    let graphql_port = 3085 in
+    Async_kernel.Deferred.don't_wait_for
+      (Node.set_port_forwarding_exn ~logger block_producer2 graphql_port) ;
     let sender = pk_of_keypair network.keypairs 1 in
     let receiver = pk_of_keypair network.keypairs 0 in
     let fee = Currency.Fee.of_int 10_000_000 in
@@ -87,10 +90,10 @@ module Make (Engine : Engine_intf) = struct
     [%log info] "Got breadcrumb with desired payment" ;
     [%log info]
       "Sending payment, should fail because of minimum balance violation" ;
-    (* second payment of same amount would dip balance beneath minimum *)
+    let amount' = Currency.Amount.of_int 600_000_000_000 in
     let payment_or_error =
       Node.send_payment ~retry_on_graphql_error:false ~logger block_producer2
-        ~sender ~receiver ~amount ~fee
+        ~sender ~receiver ~amount:amount' ~fee
     in
     let%map () =
       match%bind.Async_kernel.Deferred.Let_syntax payment_or_error with

@@ -61,6 +61,10 @@ module type Engine_intf = sig
 
     val stop : t -> unit Malleable_error.t
 
+    (* does not return if it succeeds, use don't_wait_for *)
+    val set_port_forwarding_exn :
+      logger:Logger.t -> t -> int -> unit Deferred.t
+
     val send_payment :
          ?retry_on_graphql_error:bool
       -> logger:Logger.t

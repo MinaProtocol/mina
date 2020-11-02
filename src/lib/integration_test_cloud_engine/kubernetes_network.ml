@@ -71,7 +71,7 @@ module Node = struct
           ; Malleable_error.Hard_fail.soft_errors= _ } ->
           Malleable_error.of_error_hard e.error
 
-    (* default port is 3085, may need to be explicit if multiple daemons are running *)
+    (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
     let set_port_forwarding ~logger t port =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
@@ -279,10 +279,9 @@ module Node = struct
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let graphql_port = 3085 in
     let open Malleable_error.Let_syntax in
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    let graphql_port = 3085 in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
