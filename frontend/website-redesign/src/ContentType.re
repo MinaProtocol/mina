@@ -171,7 +171,7 @@ module NormalizedPressBlog = {
   let ofAnnouncement = (announcement: Announcement.t) => {
     {
       title: announcement.title,
-      image: announcement.image,
+      image: None,
       link: `Slug(announcement.slug),
       featured: true,
       description: Some(announcement.snippet),

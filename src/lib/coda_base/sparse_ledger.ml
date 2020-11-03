@@ -617,6 +617,8 @@ let has_locked_tokens_exn ~global_slot ~account_id t =
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
+let depth t = M.depth t
+
 let handler t =
   let ledger = ref t in
   let path_exn idx =

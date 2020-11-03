@@ -155,8 +155,8 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
-    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -448,7 +448,7 @@ module Incentives = {
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-              "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions."
+             "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions.",
            )}
         </p>
         <Spacer height=3. />
@@ -482,12 +482,12 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/tech-hero-desktop.jpg",
-        Theme.tablet: "/static/img/tech-hero-tablet.jpg",
-        Theme.mobile: "/static/img/tech-hero-mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/tech-hero-desktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/tech-hero-tablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/tech-hero-mobile.jpg",
       }
       title="Tech"
-      header="An Elegant Solution"
+      header={Some("An Elegant Solution")}
       copy={
         Some(
           "Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
@@ -509,7 +509,17 @@ let make = () => {
           generation of participants.
         |js}
         slug="roadmap">
-        <img src="/static/img/tech-roadmap.svg" width="100%" />
+        <picture>
+          <source
+            media=Theme.MediaQuery.mobile
+            srcSet="/static/img/tech-roadmap-mobile.svg"
+          />
+          <source
+            media=Theme.MediaQuery.notMobile
+            srcSet="/static/img/tech-roadmap-desktop.svg"
+          />
+          <img src="/static/img/tech-roadmap-desktop.svg" width="100%" />
+        </picture>
       </Section>
       <Spacer height=7. />
     </div>
