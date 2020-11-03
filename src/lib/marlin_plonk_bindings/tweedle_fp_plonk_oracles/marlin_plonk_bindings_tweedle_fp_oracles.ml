@@ -1,15 +1,17 @@
 open Marlin_plonk_bindings_types
 
+type t = Marlin_plonk_bindings_tweedle_fp.t Oracles.t
+
 external create_raw :
      Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array
   -> Marlin_plonk_bindings_tweedle_fp_verifier_index.Raw.t
   -> Marlin_plonk_bindings_tweedle_fp_proof.t
-  -> Marlin_plonk_bindings_tweedle_fp.t Oracles.t
+  -> t
   = "caml_tweedle_fp_plonk_oracles_create_raw"
 
 external create :
      Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array
   -> Marlin_plonk_bindings_tweedle_fp_verifier_index.t
   -> Marlin_plonk_bindings_tweedle_fp_proof.t
-  -> Marlin_plonk_bindings_tweedle_fp.t Oracles.t
+  -> t
   = "caml_tweedle_fp_plonk_oracles_create"
