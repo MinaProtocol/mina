@@ -21,7 +21,14 @@ module Styles = {
       ]),
     ]);
 
-  let flexCenter = style([display(`flex), alignItems(`center)]);
+  let flexCenter =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [justifyContent(`flexStart)]),
+    ]);
 
   let hideIfMobileElseShow =
     style([

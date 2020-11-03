@@ -55,10 +55,10 @@ module Section = {
     let image =
       style([
         width(`percent(100.)),
-        maxWidth(`rem(23.)),
+        maxWidth(`rem(11.5)),
         height(`auto),
         marginTop(`rem(2.)),
-        media(Theme.MediaQuery.desktop, [maxWidth(`rem(35.))]),
+        media(Theme.MediaQuery.desktop, [maxWidth(`rem(17.5))]),
       ]);
   };
   module SimpleRow = {
@@ -91,12 +91,7 @@ module Section = {
       |> Array.mapi((idx, row) => {
            <div
              key={row.title}
-             className={Styles.rowContainer(
-               ~reverse={
-                 idx mod 2 != 0;
-               },
-               (),
-             )}>
+             className={Styles.rowContainer(~reverse={idx mod 2 != 0}, ())}>
              <div className=SectionStyles.textContainer>
                <h2 className=SectionStyles.title>
                  {React.string(row.title)}
@@ -155,9 +150,7 @@ module Section = {
            <div
              key={row.title}
              className={SectionStyles.rowContainer(
-               ~reverse={
-                 idx mod 2 != 0;
-               },
+               ~reverse={idx mod 2 != 0},
                (),
              )}>
              <div className=SectionStyles.textContainer>
