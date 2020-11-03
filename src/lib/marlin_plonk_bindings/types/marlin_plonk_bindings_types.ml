@@ -120,7 +120,7 @@ module Oracles = struct
 
   type 'field t =
     { o: 'field Random_oracles.t
-    ; p_eval: 'field array * 'field array
+    ; p_eval: 'field * 'field
     ; opening_prechallenges: 'field array
     ; digest_before_evaluations: 'field }
 end

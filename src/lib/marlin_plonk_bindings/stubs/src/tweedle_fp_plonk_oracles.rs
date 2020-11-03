@@ -15,7 +15,7 @@ use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 use crate::caml_vector;
 use crate::tweedle_dee::CamlTweedleDeePolyCommVector;
 use crate::tweedle_fp::CamlTweedleFp;
-use crate::tweedle_fp_plonk_proof::{CamlTweedleFpPlonkProof, CamlTweedleFpVec};
+use crate::tweedle_fp_plonk_proof::CamlTweedleFpPlonkProof;
 use crate::tweedle_fp_plonk_verifier_index::{
     CamlTweedleFpPlonkVerifierIndexPtr, CamlTweedleFpPlonkVerifierIndexRaw,
     CamlTweedleFpPlonkVerifierIndexRawPtr,
@@ -93,7 +93,7 @@ unsafe impl ocaml::ToValue for CamlTweedleFpScalarChallengeVec {
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFpPlonkOracles {
     pub o: CamlTweedleFpPlonkRandomOracles,
-    pub p_eval: (CamlTweedleFpVec, CamlTweedleFpVec),
+    pub p_eval: (CamlTweedleFp, CamlTweedleFp),
     pub opening_prechallenges: CamlTweedleFpScalarChallengeVec,
     pub digest_before_evaluations: CamlTweedleFp,
 }
@@ -121,11 +121,7 @@ pub fn caml_tweedle_fp_plonk_oracles_create_raw(
 
     CamlTweedleFpPlonkOracles {
         o: o.into(),
-        /* The clones below would normally be bad, but these are length=1 vectors.. */
-        p_eval: (
-            CamlTweedleFpVec(p_eval[0].clone()),
-            CamlTweedleFpVec(p_eval[1].clone()),
-        ),
+        p_eval: (CamlTweedleFp(p_eval[0][0]), CamlTweedleFp(p_eval[1][0])),
         opening_prechallenges: CamlTweedleFpScalarChallengeVec(
             proof.proof.prechallenges(&mut sponge),
         ),
@@ -156,11 +152,7 @@ pub fn caml_tweedle_fp_plonk_oracles_create(
 
     CamlTweedleFpPlonkOracles {
         o: o.into(),
-        /* The clones below would normally be bad, but these are length=1 vectors.. */
-        p_eval: (
-            CamlTweedleFpVec(p_eval[0].clone()),
-            CamlTweedleFpVec(p_eval[1].clone()),
-        ),
+        p_eval: (CamlTweedleFp(p_eval[0][0]), CamlTweedleFp(p_eval[1][0])),
         opening_prechallenges: CamlTweedleFpScalarChallengeVec(
             proof.proof.prechallenges(&mut sponge),
         ),
