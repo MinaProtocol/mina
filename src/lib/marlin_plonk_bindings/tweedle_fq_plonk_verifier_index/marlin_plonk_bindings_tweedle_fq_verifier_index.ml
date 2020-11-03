@@ -54,3 +54,8 @@ external to_raw :
 external of_raw_copy :
   Raw.t -> t
   = "caml_tweedle_fq_plonk_verifier_index_ocaml_of_raw"
+
+external shifts :
+     log2_size:int
+  -> Marlin_plonk_bindings_tweedle_fq.t Plonk_verification_shifts.t
+  = "caml_tweedle_fq_plonk_verifier_index_shifts"
