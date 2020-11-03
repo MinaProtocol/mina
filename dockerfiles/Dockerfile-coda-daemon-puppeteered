@@ -12,11 +12,11 @@ pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\
 > find_puppeteer.sh
 
 RUN echo '#!/bin/bash\n\
-kill -s SIGUSR2 $(./find_puppeteer.sh)'\
+kill -s SIGUSR2 $(./find_puppeteer.sh) || true'\
 > start.sh
 
 RUN echo '#!/bin/bash\n\
-kill -s SIGUSR1 $(./find_puppeteer.sh)'\
+kill -s SIGUSR1 $(./find_puppeteer.sh) || true'\
 > stop.sh
 
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
