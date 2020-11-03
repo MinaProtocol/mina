@@ -140,8 +140,8 @@ pub fn caml_bigint_256_to_bytes(x: CamlBigint256Ptr) -> ocaml::Value {
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigint256, ocaml::Error> {
     let len = std::mem::size_of::<CamlBigint256>();
     if x.len() != len {
-      ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
+        ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    let x = unsafe {*(x.as_ptr() as *const CamlBigint256)};
+    let x = unsafe { *(x.as_ptr() as *const CamlBigint256) };
     Ok(x)
 }

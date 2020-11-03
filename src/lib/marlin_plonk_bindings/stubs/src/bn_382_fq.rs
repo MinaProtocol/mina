@@ -227,8 +227,8 @@ pub fn caml_bn_382_fq_to_bytes(x: CamlBn382FqPtr) -> ocaml::Value {
 pub fn caml_bn_382_fq_of_bytes(x: &[u8]) -> Result<CamlBn382Fq, ocaml::Error> {
     let len = std::mem::size_of::<CamlBn382Fq>();
     if x.len() != len {
-      ocaml::Error::failwith("caml_bn_382_fq_of_bytes")?;
+        ocaml::Error::failwith("caml_bn_382_fq_of_bytes")?;
     };
-    let x = unsafe {*(x.as_ptr() as *const CamlBn382Fq)};
+    let x = unsafe { *(x.as_ptr() as *const CamlBn382Fq) };
     Ok(x)
 }

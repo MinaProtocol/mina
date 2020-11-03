@@ -247,8 +247,8 @@ pub fn caml_tweedle_fq_to_bytes(x: CamlTweedleFqPtr) -> ocaml::Value {
 pub fn caml_tweedle_fq_of_bytes(x: &[u8]) -> Result<CamlTweedleFq, ocaml::Error> {
     let len = std::mem::size_of::<CamlTweedleFq>();
     if x.len() != len {
-      ocaml::Error::failwith("caml_tweedle_fq_of_bytes")?;
+        ocaml::Error::failwith("caml_tweedle_fq_of_bytes")?;
     };
-    let x = unsafe {*(x.as_ptr() as *const CamlTweedleFq)};
+    let x = unsafe { *(x.as_ptr() as *const CamlTweedleFq) };
     Ok(x)
 }
