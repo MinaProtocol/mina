@@ -226,27 +226,27 @@ pub fn caml_tweedle_fp_plonk_proof_create(
     index: CamlTweedleFpPlonkIndexPtr<'static>,
     primary_input: CamlTweedleFpVectorPtr,
     auxiliary_input: CamlTweedleFpVectorPtr,
-    prev_challenges: CamlTweedleFpVectorPtr,
+    prev_challenges: Vec<CamlTweedleFp>,
     prev_sgs: CamlTweedleDeeAffineVector,
 ) -> CamlTweedleFpPlonkProof {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
     let prev: Vec<(Vec<Fp>, PolyComm<GAffine>)> = {
-        if prev_challenges.as_ref().0.len() == 0 {
+        if prev_challenges.len() == 0 {
             Vec::new()
         } else {
-            let challenges_per_sg = prev_challenges.as_ref().0.len() / prev_sgs.0.len();
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.0.len();
             prev_sgs
                 .0
                 .iter()
                 .enumerate()
                 .map(|(i, sg)| {
                     (
-                        prev_challenges.as_ref().0
+                        prev_challenges
                             [(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
-                            .map(|x| *x)
+                            .map(|x| x.0)
                             .collect(),
                         PolyComm::<GAffine> {
                             unshifted: vec![sg.clone()],
