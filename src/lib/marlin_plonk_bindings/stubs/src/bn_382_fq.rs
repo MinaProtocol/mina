@@ -135,8 +135,8 @@ pub fn caml_bn_382_fq_print(x: CamlBn382FqPtr) {
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fq_copy(x: CamlBn382FqPtr) -> CamlBn382Fq {
-    *x.as_ref()
+pub fn caml_bn_382_fq_copy(mut x: CamlBn382FqPtr, y: CamlBn382FqPtr) {
+    *x.as_mut() = *y.as_ref()
 }
 
 #[ocaml::func]
@@ -211,4 +211,24 @@ pub fn caml_bn_382_fq_domain_generator(log2_size: ocaml::Int) -> Result<CamlBn38
                 .unwrap(),
         ),
     }
+}
+
+#[ocaml::func]
+pub fn caml_bn_382_fq_to_bytes(x: CamlBn382FqPtr) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlBn382Fq>();
+    let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    unsafe {
+        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+    }
+    ocaml::Value(str)
+}
+
+#[ocaml::func]
+pub fn caml_bn_382_fq_of_bytes(x: &[u8]) -> Result<CamlBn382Fq, ocaml::Error> {
+    let len = std::mem::size_of::<CamlBn382Fq>();
+    if x.len() != len {
+        ocaml::Error::failwith("caml_bn_382_fq_of_bytes")?;
+    };
+    let x = unsafe { *(x.as_ptr() as *const CamlBn382Fq) };
+    Ok(x)
 }

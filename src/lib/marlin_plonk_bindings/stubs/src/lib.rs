@@ -35,3 +35,6 @@ pub mod tweedle_fq_plonk_verifier_index;
 /* Proofs */
 pub mod tweedle_fp_plonk_proof;
 pub mod tweedle_fq_plonk_proof;
+/* Oracles */
+pub mod tweedle_fp_plonk_oracles;
+pub mod tweedle_fq_plonk_oracles;
