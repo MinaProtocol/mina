@@ -4,7 +4,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="About"
-      header="We're on a mission."
+      header={Some("We're on a mission.")}
       copy={
         Some(
           "To create a vibrant decentralized network and open programmable currency - so we can all participate, build, exchange and thrive.",
@@ -25,7 +25,7 @@ let make = () => {
       backgroundImg={
         Theme.desktop: "/static/img/SectionQuoteDesktop.jpg",
         Theme.tablet: "/static/img/SectionQuoteTablet.jpg",
-        Theme.mobile: "/static/img/SectionQuoteMobile.png",
+        Theme.mobile: "/static/img/SectionQuoteMobile.jpg",
       }
     />
     <SecuredBySection />

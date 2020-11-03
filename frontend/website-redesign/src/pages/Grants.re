@@ -84,11 +84,45 @@ module Styles = {
     ]);
 
   let grantDescriptionInnerContainer =
-    style([display(`flex), justifyContent(`spaceBetween)]);
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+    ]);
 
-  let grantTwoColumnContent = style([width(`percent(48.))]);
+  let grantTwoColumnContent =
+    style([
+      marginTop(`rem(1.5)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(48.)), marginTop(`zero)],
+      ),
+    ]);
 
-  let grantThreeColumnContent = style([width(`percent(30.))]);
+  let grantThreeColumnContent =
+    style([
+      marginTop(`rem(2.)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(30.)), marginTop(`zero)],
+      ),
+    ]);
+
+  let link =
+    merge([
+      Theme.Type.link,
+      style([
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+        media(
+          Theme.MediaQuery.tablet,
+          [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],
+        ),
+      ]),
+    ]);
 };
 
 module GrantsSideNav = {
@@ -166,7 +200,7 @@ module FAQ = {
             <span className=Theme.Type.paragraph>
               <span> {React.string("Visit ")} </span>
               <Next.Link href="/docs">
-                <span className=Theme.Type.link>
+                <span className=Styles.link>
                   {React.string("the Mina Docs.")}
                 </span>
               </Next.Link>
@@ -188,7 +222,7 @@ module FAQ = {
             <span className=Theme.Type.paragraph>
               <span> {React.string("See the ")} </span>
               <Next.Link href=Constants.projectGrantApplication>
-                <span className=Theme.Type.link>
+                <span className=Styles.link>
                   {React.string("Application Process ")}
                 </span>
               </Next.Link>
@@ -198,8 +232,8 @@ module FAQ = {
                  )}
               </span>
               <Next.Link href=Constants.githubUrl>
-                <span className=Theme.Type.link>
-                  {React.string("Contributing code to Mina ")}
+                <span className=Styles.link>
+                  {React.string("contributing code to Mina ")}
                 </span>
               </Next.Link>
               <span>
@@ -637,7 +671,7 @@ module HowToApply = {
                      )}
                   </span>
                   <Next.Link href="/privacy">
-                    <span className=Theme.Type.link>
+                    <span className=Styles.link>
                       {React.string("Privacy Policy")}
                     </span>
                   </Next.Link>
@@ -675,16 +709,16 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Grants Program"
+      header={Some("Grants Program")}
       copy={
         Some(
           "The Project Grant program is designed to encourage community members to work on projects related to developing the Mina protocol and community.",
         )
       }
       background={
-        Theme.desktop: "/static/img/GrantsHeroMobile.jpg",
-        Theme.tablet: "/static/img/GrantsHeroTablet.jpg",
-        Theme.mobile: "/static/img/GrantsHeroDesktop.jpg",
+        Theme.desktop: "/static/img/backgrounds/GrantsHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/GrantsHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/GrantsHeroMobile.jpg",
       }
     />
     <div className=Styles.typesOfGrantsImage>

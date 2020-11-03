@@ -38,12 +38,7 @@ module Styles = {
       backgroundColor(`currentColor),
       marginRight(`rem(0.5)),
     ]);
-  let link =
-    style([
-      textDecoration(`none),
-      display(`inline),
-      margin2(~v=`zero, ~h=`rem(0.5)),
-    ]);
+  let link = style([textDecoration(`none), display(`inline)]);
 
   let icon = style([display(`inlineFlex), alignItems(`center)]);
 };
