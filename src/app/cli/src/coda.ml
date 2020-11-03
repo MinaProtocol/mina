@@ -238,6 +238,12 @@ let setup_daemon logger =
         "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
          discovery"
       (listed string)
+  and libp2p_peer_list_file =
+    flag "peer-list-file"
+      ~doc:
+        "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
+         discovery inside a file delimited by new-lines (\\n)"
+      (optional string)
   and curr_protocol_version =
     flag "current-protocol-version" (optional string)
       ~doc:
@@ -740,9 +746,31 @@ let setup_daemon logger =
           ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      let%bind peer_list_file_contents_or_empty =
+        match libp2p_peer_list_file with
+        | None ->
+            return []
+        | Some file -> (
+            match%bind
+              Monitor.try_with_or_error (fun () -> Reader.file_contents file)
+            with
+            | Ok contents ->
+                String.split ~on:'\n' contents
+                |> List.filter ~f:(fun s -> not (String.is_empty s))
+                |> List.map ~f:Coda_net2.Multiaddr.of_string
+                |> return
+            | Error e ->
+                [%log fatal]
+                  ~metadata:[("error", `String (Error.to_string_mach e))]
+                  "Unable to read peer-list file properly. It must be a \
+                   newline separated series of libp2p multiaddrs (ex: \
+                   /ip4/IPADDR/tcp/PORT/p2p/PEERID)" ;
+                exit 15 )
+      in
       let initial_peers =
         List.concat
           [ List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+          ; peer_list_file_contents_or_empty
           ; List.map ~f:Coda_net2.Multiaddr.of_string
             @@ or_from_config
                  (Fn.compose Option.some
