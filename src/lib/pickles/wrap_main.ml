@@ -123,7 +123,7 @@ let pack_statement max_branching =
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size
-  |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
+  |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant

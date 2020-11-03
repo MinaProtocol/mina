@@ -1,5 +1,5 @@
 open Core_kernel
-open Snarky_bn382
+open Marlin_plonk_bindings
 open Zexe_backend_common
 
 module Rounds = struct
@@ -12,19 +12,43 @@ end
 
 module Bigint256 =
   Zexe_backend_common.Bigint.Make
-    (Bigint256)
+    (Bigint_256)
     (struct
       let length_in_bytes = 32
     end)
 
 module Fp = Field.Make (struct
   module Bigint = Bigint256
-  include Snarky_bn382.Tweedle.Fp
+  include Tweedle_fp
+
+  module Vector = struct
+    include Tweedle_fp_vector
+
+    (* TODO: Update snarky interface so that we don't need to do this.. *)
+    let get v i =
+      match get v i with
+      | Some x ->
+          x
+      | None ->
+          failwith "Tweedle.Fp.Vector.get: Index out of range"
+  end
 end)
 
 module Fq = Field.Make (struct
   module Bigint = Bigint256
-  include Snarky_bn382.Tweedle.Fq
+  include Tweedle_fq
+
+  module Vector = struct
+    include Tweedle_fq_vector
+
+    (* TODO: Update snarky interface so that we don't need to do this.. *)
+    let get v i =
+      match get v i with
+      | Some x ->
+          x
+      | None ->
+          failwith "Tweedle.Fq.Vector.get: Index out of range"
+  end
 end)
 
 module Dee = struct
@@ -36,7 +60,7 @@ module Dee = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fq) (Fp) (Params) (Snarky_bn382.Tweedle.Dee.Curve)
+  include Curve.Make (Fq) (Fp) (Params) (Tweedle_dee)
 end
 
 module Dum = struct
@@ -48,17 +72,35 @@ module Dum = struct
     let b = of_int 5
   end
 
-  include Curve.Make (Fp) (Fq) (Params) (Snarky_bn382.Tweedle.Dum.Curve)
+  include Curve.Make (Fp) (Fq) (Params) (Tweedle_dum)
 end
 
 module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dum
   module Base_field = Fp
-  module Backend = Snarky_bn382.Tweedle.Dum.Field_poly_comm
+
+  module Backend = struct
+    include Tweedle_fq_urs.Poly_comm
+
+    let shifted ({shifted; _} : t) = shifted
+
+    let unshifted ({unshifted; _} : t) = unshifted
+
+    let make unshifted shifted : t = {shifted; unshifted}
+  end
 end)
 
 module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Curve = Dee
   module Base_field = Fq
-  module Backend = Snarky_bn382.Tweedle.Dee.Field_poly_comm
+
+  module Backend = struct
+    include Tweedle_fp_urs.Poly_comm
+
+    let shifted ({shifted; _} : t) = shifted
+
+    let unshifted ({unshifted; _} : t) = unshifted
+
+    let make unshifted shifted : t = {shifted; unshifted}
+  end
 end)
