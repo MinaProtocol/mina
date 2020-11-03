@@ -36,6 +36,16 @@ module Plonk_verification_shifts = struct
   type 'field t = {r: 'field; o: 'field}
 end
 
+module Plonk_verifier_index = struct
+  type ('field, 'urs, 'poly_comm) t =
+    { domain: 'field Plonk_domain.t
+    ; max_poly_size: int
+    ; max_quot_size: int
+    ; urs: 'urs
+    ; evals: 'poly_comm Plonk_verification_evals.t
+    ; shifts: 'field Plonk_verification_shifts.t }
+end
+
 module Plonk_gate = struct
   module Kind = struct
     type t =

@@ -1,14 +1,10 @@
 open Marlin_plonk_bindings_types
 
 type t =
-  { domain: Marlin_plonk_bindings_tweedle_fq.t Plonk_domain.t
-  ; max_poly_size: int
-  ; max_quot_size: int
-  ; urs: Marlin_plonk_bindings_tweedle_fq_urs.t
-  ; evals:
-      Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t
-      Plonk_verification_evals.t
-  ; shifts: Marlin_plonk_bindings_tweedle_fq.t Plonk_verification_shifts.t }
+  ( Marlin_plonk_bindings_tweedle_fq.t
+  , Marlin_plonk_bindings_tweedle_fq_urs.t
+  , Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t )
+  Plonk_verifier_index.t
 
 module Raw = struct
   type t
