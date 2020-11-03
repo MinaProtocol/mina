@@ -1,0 +1,21 @@
+(executable
+  (package history_accumulator)
+  (name history_accumulator)
+  (public_name history_accumulator)
+  (modes native)
+  (libraries
+    async
+    core_kernel
+    logger
+    ppx_deriving_yojson.runtime
+    lib
+    yojson
+    )
+  (preprocess (pps
+    ppx_coda
+    ppx_deriving.show
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_version
+     bisect_ppx -- --conditional))
+  )
