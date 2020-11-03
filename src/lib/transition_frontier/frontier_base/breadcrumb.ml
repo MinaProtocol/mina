@@ -21,14 +21,16 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
+let build ?skip_staged_ledger_verification ~logger ~precomputed_values
+    ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender =
+                  External_transition.Almost_validated.t) ~sender () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
+        .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+          ~precomputed_values ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -380,7 +382,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None
+          ~sender:None ~skip_staged_ledger_verification:true ()
       with
       | Ok new_breadcrumb ->
           [%log info]
