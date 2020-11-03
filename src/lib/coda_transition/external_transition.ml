@@ -1014,7 +1014,8 @@ module Staged_ledger_validation = struct
     Fn.compose statement_target statement
 
   let validate_staged_ledger_diff :
-         ( 'time_received
+         ?skip_staged_ledger_verification:bool
+      -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain
@@ -1045,8 +1046,9 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~precomputed_values ~verifier
-       ~parent_staged_ledger ~parent_protocol_state ->
+   fun ?skip_staged_ledger_verification (t, validation) ~logger
+       ~precomputed_values ~verifier ~parent_staged_ledger
+       ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -1058,7 +1060,7 @@ module Staged_ledger_validation = struct
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_update _ ) =
-      Staged_ledger.apply
+      Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
         ~current_state_view:

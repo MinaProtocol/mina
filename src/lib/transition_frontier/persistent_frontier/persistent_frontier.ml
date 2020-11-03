@@ -282,10 +282,11 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger ~precomputed_values
+               Breadcrumb.build ~skip_staged_ledger_verification:true
+                 ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None
+                 ~sender:None ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
