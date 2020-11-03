@@ -36,6 +36,16 @@ module Plonk_verification_shifts = struct
   type 'field t = {r: 'field; o: 'field}
 end
 
+module Plonk_verifier_index = struct
+  type ('field, 'urs, 'poly_comm) t =
+    { domain: 'field Plonk_domain.t
+    ; max_poly_size: int
+    ; max_quot_size: int
+    ; urs: 'urs
+    ; evals: 'poly_comm Plonk_verification_evals.t
+    ; shifts: 'field Plonk_verification_shifts.t }
+end
+
 module Plonk_gate = struct
   module Kind = struct
     type t =
@@ -101,4 +111,26 @@ module Plonk_proof = struct
     ; evals: 'field Evaluations.t * 'field Evaluations.t
     ; public: 'field array
     ; prev_challenges: ('field array * 'poly_comm) array }
+end
+
+module Oracles = struct
+  module Random_oracles = struct
+    type 'field t =
+      { beta: 'field
+      ; gamma: 'field
+      ; alpha_chal: 'field
+      ; alpha: 'field
+      ; zeta: 'field
+      ; v: 'field
+      ; u: 'field
+      ; zeta_chal: 'field
+      ; v_chal: 'field
+      ; u_chal: 'field }
+  end
+
+  type 'field t =
+    { o: 'field Random_oracles.t
+    ; p_eval: 'field * 'field
+    ; opening_prechallenges: 'field array
+    ; digest_before_evaluations: 'field }
 end

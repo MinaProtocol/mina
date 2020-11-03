@@ -31,5 +31,8 @@
    marlin_plonk_bindings_tweedle_fq_verifier_index
    ;; Proofs
    marlin_plonk_bindings_tweedle_fp_proof
-   marlin_plonk_bindings_tweedle_fq_proof)
+   marlin_plonk_bindings_tweedle_fq_proof
+   ;; Oracles
+   marlin_plonk_bindings_tweedle_fp_oracles
+   marlin_plonk_bindings_tweedle_fq_oracles)
  (preprocess (pps ppx_version bisect_ppx)))
