@@ -2,16 +2,6 @@ open Intf
 open Core
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-(*
-open Snarky_bn382
-
-module Det_sqrt_witness = struct
-  type 'a t = {c: 'a; d: Unsigned.UInt64.t; sqrt: 'a}
-end
-
-module D = Det_sqrt_witness
-*)
-
 module type Input_intf = sig
   type t
 
@@ -44,24 +34,6 @@ module type Input_intf = sig
   val square : t -> t
 
   val sqrt : t -> t option
-
-  (*
-  val det_sqrt : t -> t
-
-  module rec Det_sqrt_witness : sig
-    val c : Det_sqrt_witness.t -> t
-
-    val d : Det_sqrt_witness.t -> Unsigned.UInt64.t
-
-    val success : Det_sqrt_witness.t -> bool
-
-    val sqrt : Det_sqrt_witness.t -> t
-
-    val create : t -> Det_sqrt_witness.t
-
-    type t
-  end
-*)
 
   val is_square : t -> bool
 
@@ -114,10 +86,6 @@ module type S = sig
   val inv : t -> t
 
   val sqrt : t -> t
-
-  (*val det_sqrt : t -> t
-
-  val det_sqrt_witness : t -> t Det_sqrt_witness.t option*)
 
   val size_in_bits : int
 
