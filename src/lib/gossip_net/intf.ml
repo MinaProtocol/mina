@@ -18,8 +18,6 @@ module type Gossip_net_intf = sig
 
   val initial_peers : t -> Coda_net2.Multiaddr.t list
 
-  val add_peer : t -> Peer.t -> unit Deferred.Or_error.t
-
   val connection_gating : t -> Coda_net2.connection_gating Deferred.t
 
   val set_connection_gating :
@@ -31,12 +29,7 @@ module type Gossip_net_intf = sig
     t -> int -> except:Peer.Hash_set.t -> Peer.t list Deferred.t
 
   val query_peer :
-       ?timeout:Time.Span.t
-    -> t
-    -> Peer.Id.t
-    -> ('q, 'r) Rpc_intf.rpc
-    -> 'q
-    -> 'r rpc_response Deferred.t
+    t -> Peer.Id.t -> ('q, 'r) Rpc_intf.rpc -> 'q -> 'r rpc_response Deferred.t
 
   val query_random_peers :
        t
