@@ -146,13 +146,23 @@ module Output = struct
         :: acc_trees )
 end
 
-module type Display_intf = sig
-  type t [@@deriving yojson]
+module type Graph_node_intf = sig
+  type t
 
-  val of_output : Output.t -> t
+  type display [@@deriving yojson]
+
+  val display : t -> display
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
+  val compare : t -> t -> int
+
+  val name : t -> string
 end
 
-module Display : Display_intf = struct
+module Display = struct
   type node =
     { state: Transition_frontier.Extensions.Best_tip_diff.Log_event.t
     ; peers: int }
@@ -167,7 +177,7 @@ module Display : Display_intf = struct
             {state= t.state; peers= Set.length t.peer_ids} ) )
 end
 
-module Compact_display : Display_intf = struct
+module Compact_display = struct
   type state =
     { current: State_hash.t
     ; parent: State_hash.t
@@ -197,7 +207,55 @@ module Compact_display : Display_intf = struct
             {state; peers= Set.length t.peer_ids} ) )
 end
 
-let main ~input_dir ~output_file ~log_dir ~output_format () =
+module Graph_node = struct
+  type state =
+    { current: State_hash.t
+    ; length: Coda_numbers.Length.t
+    ; slot: Coda_numbers.Global_slot.t }
+  [@@deriving yojson, eq, hash]
+
+  type t = {state: state; peers: int} [@@deriving yojson, eq, hash]
+
+  type display = t [@@deriving yojson]
+
+  let display = Fn.id
+
+  let name t = State_hash.to_string t.state.current
+
+  let compare t t' = State_hash.compare t.state.current t'.state.current
+end
+
+module Visualization = struct
+  include Visualization.Make_ocamlgraph (Graph_node)
+
+  let to_graph (t : Compact_display.node Rose_tree.t) =
+    let to_graph_node (node : Compact_display.node) =
+      let state =
+        { Graph_node.current= node.state.current
+        ; length= node.state.blockchain_length
+        ; slot= node.state.global_slot }
+      in
+      {Graph_node.state; peers= node.peers}
+    in
+    let rec go (Rose_tree.T (node, subtrees)) graph =
+      let node = to_graph_node node in
+      let graph_with_node = add_vertex graph node in
+      List.fold ~init:graph_with_node subtrees
+        ~f:(fun gr (T (child_node, _) as child_tree) ->
+          let gr' = add_edge gr node (to_graph_node child_node) in
+          go child_tree gr' )
+    in
+    go t empty
+
+  let visualize (t : Compact_display.t) ~output_dir =
+    List.iteri t ~f:(fun i tree ->
+        let filename = output_dir ^/ "tree_" ^ Int.to_string i ^ ".dot" in
+        Out_channel.with_file filename ~f:(fun output_channel ->
+            let graph = to_graph tree in
+            output_graph output_channel graph ) )
+end
+
+let main ~input_dir ~output_dir ~output_format () =
   let%map files =
     Sys.ls_dir input_dir
     >>| List.filter_map ~f:(fun n ->
@@ -214,7 +272,7 @@ let main ~input_dir ~output_file ~log_dir ~output_format () =
   Logger.Consumer_registry.register ~id:"default"
     ~processor:(Logger.Processor.raw ())
     ~transport:
-      (Logger.Transport.File_system.dumb_logrotate ~directory:log_dir
+      (Logger.Transport.File_system.dumb_logrotate ~directory:output_dir
          ~log_filename:"mina-history-accumulator.log"
          ~max_size:logrotate_max_size) ;
   let logger = Logger.create () in
@@ -225,17 +283,21 @@ let main ~input_dir ~output_file ~log_dir ~output_format () =
   [%log info] "Accumulating the history.." ;
   let output = Output.of_input t' in
   [%log info] "Generated the resulting rose tree" ;
-  let (module D : Display_intf) =
+  let output_json =
     match output_format with
     | Some "Full" ->
-        (module Display)
+        Display.(to_yojson @@ of_output output)
     | Some "Compact" | _ ->
-        (module Compact_display)
+        Compact_display.(to_yojson @@ of_output output)
   in
+  let result_file = output_dir ^/ "Result.txt" in
   [%log info] "Writing the result (format: %s) to %s"
     (Option.value ~default:"Compact" output_format)
-    output_file ;
-  Yojson.Safe.to_file output_file D.(to_yojson @@ of_output output) ;
+    result_file ;
+  Yojson.Safe.to_file result_file output_json ;
+  (*Visualization*)
+  [%log info] "Writing visualization files" ;
+  Visualization.visualize (Compact_display.of_output output) ~output_dir ;
   ()
 
 let () =
@@ -243,22 +305,16 @@ let () =
     run
       (let open Let_syntax in
       Command.async
-        ~summary:"Accumulates best tip history from multiple log files"
+        ~summary:
+          "Accumulates best tip history from multiple log files in a rose \
+           tree representation"
         (let%map input_dir =
            Param.flag "--input-dir"
              ~doc:
                "PATH Directory containing one or more mina-best-tip.log files"
              Param.(required string)
-         and output_file =
-           Param.flag "--output-file"
-             ~doc:
-               "File File containing the accumulated history in a rose tree \
-                representation"
-             Param.(required string)
-         and log_dir =
-           Param.flag "--log-dir"
-             ~doc:
-               "Path Directory where the accumulator's log file can be saved"
+         and output_dir =
+           Param.flag "--output-dir" ~doc:"PATH Directory to save the output"
              Param.(required string)
          and output_format =
            Param.flag "--output-format"
@@ -268,4 +324,4 @@ let () =
                 blockchain length, and global slot. Default: Compact"
              Param.(optional string)
          in
-         main ~input_dir ~output_file ~log_dir ~output_format)))
+         main ~input_dir ~output_dir ~output_format)))
