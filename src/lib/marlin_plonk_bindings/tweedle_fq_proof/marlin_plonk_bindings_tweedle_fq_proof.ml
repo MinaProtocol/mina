@@ -9,8 +9,8 @@ type t =
 (* TODO-someday: [prev_challenges] should be an array of arrays, not a flat array. *)
 external create :
      Marlin_plonk_bindings_tweedle_fq_index.t
-  -> primary_input:Marlin_plonk_bindings_tweedle_fq.t array
-  -> auxiliary_input:Marlin_plonk_bindings_tweedle_fq.t array
+  -> primary_input:Marlin_plonk_bindings_tweedle_fq_vector.t
+  -> auxiliary_input:Marlin_plonk_bindings_tweedle_fq_vector.t
   -> prev_challenges:Marlin_plonk_bindings_tweedle_fq.t array
   -> prev_sgs:Marlin_plonk_bindings_tweedle_dum.Affine.t array
   -> t
