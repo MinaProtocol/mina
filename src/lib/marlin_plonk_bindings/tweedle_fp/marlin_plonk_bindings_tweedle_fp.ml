@@ -32,7 +32,7 @@ external of_string : string -> t = "caml_tweedle_fp_of_string"
 
 external print : t -> unit = "caml_tweedle_fp_print"
 
-external copy : t -> t = "caml_tweedle_fp_copy"
+external copy : over:t -> t -> unit = "caml_tweedle_fp_copy"
 
 external mut_add : t -> other:t -> unit = "caml_tweedle_fp_mut_add"
 

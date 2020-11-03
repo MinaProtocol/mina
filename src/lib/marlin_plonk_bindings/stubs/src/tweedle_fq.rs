@@ -153,8 +153,8 @@ pub fn caml_tweedle_fq_print(x: CamlTweedleFqPtr) {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_copy(x: CamlTweedleFqPtr) -> CamlTweedleFq {
-    *x.as_ref()
+pub fn caml_tweedle_fq_copy(mut x: CamlTweedleFqPtr, y: CamlTweedleFqPtr) {
+    *x.as_mut() = *y.as_ref()
 }
 
 #[ocaml::func]

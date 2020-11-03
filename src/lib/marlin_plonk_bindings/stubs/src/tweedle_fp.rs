@@ -153,8 +153,8 @@ pub fn caml_tweedle_fp_print(x: CamlTweedleFpPtr) {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_copy(x: CamlTweedleFpPtr) -> CamlTweedleFp {
-    *x.as_ref()
+pub fn caml_tweedle_fp_copy(mut x: CamlTweedleFpPtr, y: CamlTweedleFpPtr) {
+    *x.as_mut() = *y.as_ref()
 }
 
 #[ocaml::func]

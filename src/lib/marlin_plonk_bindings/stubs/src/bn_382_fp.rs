@@ -135,8 +135,8 @@ pub fn caml_bn_382_fp_print(x: CamlBn382FpPtr) {
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fp_copy(x: CamlBn382FpPtr) -> CamlBn382Fp {
-    *x.as_ref()
+pub fn caml_bn_382_fp_copy(mut x: CamlBn382FpPtr, y: CamlBn382FpPtr) {
+    *x.as_mut() = *y.as_ref();
 }
 
 #[ocaml::func]
