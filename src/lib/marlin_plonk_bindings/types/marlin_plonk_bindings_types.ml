@@ -102,3 +102,25 @@ module Plonk_proof = struct
     ; public: 'field array
     ; prev_challenges: ('field array * 'poly_comm) array }
 end
+
+module Oracles = struct
+  module Random_oracles = struct
+    type 'field t =
+      { beta: 'field
+      ; gamma: 'field
+      ; alpha_chal: 'field
+      ; alpha: 'field
+      ; zeta: 'field
+      ; v: 'field
+      ; u: 'field
+      ; zeta_chal: 'field
+      ; v_chal: 'field
+      ; u_chal: 'field }
+  end
+
+  type 'field t =
+    { o: 'field Random_oracles.t
+    ; p_eval: 'field array * 'field array
+    ; opening_prechallenges: 'field array
+    ; digest_before_evaluations: 'field }
+end
