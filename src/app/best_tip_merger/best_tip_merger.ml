@@ -135,7 +135,7 @@ module Output = struct
 
   type t = node Rose_tree.t list
 
-  let of_input (input : Input.t) : t =
+  let of_input (input : Input.t) ~min_peers : t =
     let roots =
       List.fold (Hashtbl.data input.init_states) ~init:State_hash.Map.empty
         ~f:(fun map root_state ->
@@ -155,7 +155,13 @@ module Output = struct
               (Hashtbl.find input.all_states parent_hash)
             |> Map.data
           in
-          List.map successors ~f:(fun s ->
+          let successors_with_min_peers =
+            if min_peers > 1 then
+              List.filter successors ~f:(fun s ->
+                  Set.length s.peer_ids >= min_peers )
+            else successors
+          in
+          List.map successors_with_min_peers ~f:(fun s ->
               Rose_tree.T
                 ( Node {state= s.state; peer_ids= s.peer_ids}
                 , go s.state.state_hash ) )
@@ -311,7 +317,7 @@ module Visualization = struct
             output_graph output_channel graph ) )
 end
 
-let main ~input_dir ~output_dir ~output_format () =
+let main ~input_dir ~output_dir ~output_format ~min_peers () =
   let%map files =
     Sys.ls_dir input_dir
     >>| List.filter_map ~f:(fun n ->
@@ -335,8 +341,8 @@ let main ~input_dir ~output_dir ~output_format () =
     List.fold ~init:t files ~f:(fun t log_file ->
         Input.of_logs ~logger ~log_file t )
   in
-  [%log info] "Consolidating the history.." ;
-  let output = Output.of_input t' in
+  [%log info] "Consolidating best-tip history.." ;
+  let output = Output.of_input t' ~min_peers in
   [%log info] "Generated the resulting rose tree" ;
   let output_json, fmt_str =
     match output_format with
@@ -377,7 +383,14 @@ let () =
                 blockchain length, and global slot. Default: Compact"
              Param.(optional string)
          and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level in
+         and log_level = Cli_lib.Flag.Log.level
+         and min_peers =
+           Param.flag "-min-peers"
+             ~doc:
+               "Int(>0) Keep blocks that were accepted by at least min-peers \
+                number of peers and prune the rest (Default=1)"
+             Param.(optional int)
+         in
          let output_format =
            match output_format with
            | Some "Full" | Some "full" ->
@@ -391,5 +404,14 @@ let () =
                      formats are Full or Compact"
                     x)
          in
+         let min_peers =
+           match min_peers with
+           | Some x when x > 0 ->
+               x
+           | None ->
+               1
+           | _ ->
+               failwith "Invalid value for min-peers"
+         in
          Cli_lib.Stdout_log.setup log_json log_level ;
-         main ~input_dir ~output_dir ~output_format)))
+         main ~input_dir ~output_dir ~output_format ~min_peers)))
