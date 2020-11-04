@@ -216,8 +216,26 @@ module NavGroupLink = {
   };
 };
 
+[@bs.val] [@bs.scope "window"] external innerWidth: int = "innerWidth";
+[@bs.val] [@bs.scope "window"]
+external addEventListener: (string, unit => unit) => unit = "addEventListener";
+
 [@react.component]
 let make = (~dark=false) => {
+  let (width, setWidth) = React.useState(() => 0);
+
+  React.useEffect0(() => {
+    let handleSize = () => {
+      switch ([%external innerWidth]) {
+      | Some(_) => setWidth(_ => innerWidth)
+      | None => ()
+      };
+    };
+    addEventListener("resize", handleSize);
+    handleSize();
+    None;
+  });
+
   <header className=Styles.container>
     <Next.Link href="/">
       {dark
@@ -258,7 +276,10 @@ let make = (~dark=false) => {
       <Spacer width=1.5 />
       <div className=Styles.ctaContainer>
         <Button
-          href={`Internal("/genesis")} width={`rem(13.)} paddingX=1. dark>
+          href={`Internal("/genesis")}
+          width={`rem(13.)}
+          paddingX=1.
+          dark={width < Constants.desktopBreakpoint ? true : false}>
           <img src="/static/img/promo-logo.svg" height="40" />
           <Spacer width=0.5 />
           <span> {React.string("Join Genesis Token Program")} </span>
