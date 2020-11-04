@@ -1,5 +1,5 @@
-import Page from '@reason/pages/Docs';
-export default Page({title: "SNARK Constructions"});
+import Page from "@reason/pages/Docs";
+export default Page({ title: "SNARK Constructions" });
 
 # Which SNARK construction should I use?
 
@@ -8,16 +8,17 @@ This page gives an overview of some of the important criteria to have in mind wh
 
 ## Non-malleability
 
-For many applications, it is important for SNARKs to be *non-malleable*. 
-Intuitively, a SNARK is *non-malleable* if seeing proofs doesn't help you produce proofs on new statements.
+For many applications, it is important for SNARKs to be _non-malleable_.
+Intuitively, a SNARK is _non-malleable_ if seeing proofs doesn't help you produce proofs on new statements.
 
-A bit more in detail, a SNARK construction is *non-malleable* if
+A bit more in detail, a SNARK construction is _non-malleable_ if
 it is impossible to modify a proof **p** which verifies against input **x** into a proof **p'** which verifies
-against an input **x'**, unless you could have done so without seeing **(p, x)**. 
+against an input **x'**, unless you could have done so without seeing **(p, x)**.
 
-The technical phrase for this kind of non-malleability is *simulation extractable*.
+The technical phrase for this kind of non-malleability is _simulation extractable_.
 
 ### When do I need non-malleability?
+
 In applications where the witness or part of the witness should remain secret, you probably need
 non-malleability. There are techniques for achieving the same security while still using a
 malleable SNARK, but they are best left to the experts.
@@ -53,7 +54,7 @@ The following efficiency characteristics are important to keep in mind when sele
 There are other performance criteria that are of interest if one intends to use recursive SNARKs, but
 that is outside the scope of this document.
 
-# Overview of the landscape
+## Overview of the landscape
 
 Let's evaluate some of the existing SNARK constructions according to our criteria.
 Performance descriptions for some of the parameters will remain subjective until someone gets
@@ -62,7 +63,7 @@ make a PR if you are so moved :)
 
 ![Overview](/static/img/SNARKSOverview.jpg)
 
-# Footnotes
+## Footnotes
 
 In this document, by "no setup", I mean a transparent setup, which in practice amounts to a choice of a hash function
 like SHA256, blake2s, etc.
