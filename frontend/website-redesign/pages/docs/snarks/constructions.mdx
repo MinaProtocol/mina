@@ -57,17 +57,10 @@ that is outside the scope of this document.
 
 Let's evaluate some of the existing SNARK constructions according to our criteria.
 Performance descriptions for some of the parameters will remain subjective until someone gets
-around to running a proper, fair benchmark. There are many holes  in the below table, so please
+around to running a proper, fair benchmark. There are many holes in the below table, so please
 make a PR if you are so moved :)
 
-| Construction | Setup | Non-malleable | Prover time | Proof size | Verifier time |
-| --- | --- | --- | --- | --- | --- |
-| Groth16 | Per-program | No | Excellent | 100-300 bytes | 1-10ms |
-| Bowe--Gabizon18 | Per-program | Yes | Excellent | 100-300 bytes | 1-10ms |
-| Marlin | Universal | ? | Good | 1-2kB | 8-20ms |
-| PLONK | Universal | ? | ? | ? | ? |
-| Sonic | Universal | ? | Fair | 1-2kB | ? |
-| Fractal | None | ? | Good | 80-250kB | ? |
+![Overview](/static/img/SNARKSOverview.jpg)
 
 # Footnotes
 
