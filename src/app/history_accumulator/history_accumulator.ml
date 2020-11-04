@@ -17,7 +17,7 @@ module Node = struct
 end
 
 module Input = struct
-  (*all_states: hash table of a parent block and a map of it's successors
+  (*all_states: hash table of a parent block and a map of its successors
    * init_states: blocks for which there are no previous blocks in the log
    * peers: set of peers whose logs were processed
    * seen_state_hashes: map of states that were obtained from the logs. Used to keep the roots updated*)
@@ -109,11 +109,13 @@ module Input = struct
                         state.state.protocol_state.previous_state_hash
                       in
                       if State_hash.Set.mem acc'.seen_state_hashes parent then
-                        (* no longer a root because a node for it's parent was seen*)
+                        (* no longer a root because a node for its parent was seen*)
                         Hashtbl.remove acc'.init_states root ) ;
                   {acc' with peers}
               | None | Some false ->
-                  [%log error] "Could not process log line $line"
+                  [%log error]
+                    "Skipping log line $line because it is not a \
+                     best-tip-change log"
                     ~metadata:[("line", `String line)] ;
                   (*skipping any other logs*) acc )
           | Error err ->
@@ -337,17 +339,15 @@ let main ~input_dir ~output_dir ~output_format () =
   [%log info] "Accumulating the history.." ;
   let output = Output.of_input t' in
   [%log info] "Generated the resulting rose tree" ;
-  let output_json =
+  let output_json, fmt_str =
     match output_format with
-    | Some "Full" ->
-        Display.(to_yojson @@ of_output output)
-    | Some "Compact" | _ ->
-        Compact_display.(to_yojson @@ of_output output)
+    | `Full ->
+        (Display.(to_yojson @@ of_output output), "Full")
+    | `Compact ->
+        (Compact_display.(to_yojson @@ of_output output), "Compact")
   in
   let result_file = output_dir ^/ "Result.txt" in
-  [%log info] "Writing the result (format: %s) to %s"
-    (Option.value ~default:"Compact" output_format)
-    result_file ;
+  [%log info] "Writing the result (format: %s) to %s" fmt_str result_file ;
   Yojson.Safe.to_file result_file output_json ;
   (*Visualization*)
   [%log info] "Writing visualization files" ;
@@ -363,19 +363,34 @@ let () =
           "Accumulates best tip history from multiple log files in a rose \
            tree representation"
         (let%map input_dir =
-           Param.flag "--input-dir"
+           Param.flag "-input-dir"
              ~doc:
                "PATH Directory containing one or more mina-best-tip.log files"
              Param.(required string)
          and output_dir =
-           Param.flag "--output-dir" ~doc:"PATH Directory to save the output"
+           Param.flag "-output-dir" ~doc:"PATH Directory to save the output"
              Param.(required string)
          and output_format =
-           Param.flag "--output-format"
+           Param.flag "-output-format"
              ~doc:
                "Full|Compact Information shown for each block. Full= Protocol \
                 state and Compact= Current state hash, previous state hash, \
                 blockchain length, and global slot. Default: Compact"
              Param.(optional string)
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level in
+         let output_format =
+           match output_format with
+           | Some "Full" | Some "full" ->
+               `Full
+           | Some "Compact" | Some "compact" | None ->
+               `Compact
+           | Some x ->
+               failwith
+                 (sprintf
+                    "Invalid value %s for output-format. Currently supported \
+                     formats are Full or Compact"
+                    x)
          in
+         Cli_lib.Stdout_log.setup log_json log_level ;
          main ~input_dir ~output_dir ~output_format)))

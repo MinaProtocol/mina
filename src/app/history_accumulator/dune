@@ -9,6 +9,7 @@
     logger
     ppx_deriving_yojson.runtime
     lib
+    cli_lib
     yojson
     )
   (preprocess (pps
