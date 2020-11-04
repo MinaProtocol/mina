@@ -21,34 +21,14 @@ module Fp = Field.Make (struct
   module Bigint = Bigint256
   include Tweedle_fp
 
-  module Vector = struct
-    include Tweedle_fp_vector
-
-    (* TODO: Update snarky interface so that we don't need to do this.. *)
-    let get v i =
-      match get v i with
-      | Some x ->
-          x
-      | None ->
-          failwith "Tweedle.Fp.Vector.get: Index out of range"
-  end
+  module Vector = Tweedle_fp_vector
 end)
 
 module Fq = Field.Make (struct
   module Bigint = Bigint256
   include Tweedle_fq
 
-  module Vector = struct
-    include Tweedle_fq_vector
-
-    (* TODO: Update snarky interface so that we don't need to do this.. *)
-    let get v i =
-      match get v i with
-      | Some x ->
-          x
-      | None ->
-          failwith "Tweedle.Fq.Vector.get: Index out of range"
-  end
+  module Vector = Tweedle_fq_vector
 end)
 
 module Dee = struct

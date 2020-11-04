@@ -243,8 +243,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
                 .enumerate()
                 .map(|(i, sg)| {
                     (
-                        prev_challenges
-                            [(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
                             .map(|x| x.0)
                             .collect(),
