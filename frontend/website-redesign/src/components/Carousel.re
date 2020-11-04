@@ -3,7 +3,7 @@ module Styles = {
   let container =
     style([
       position(`relative),
-      height(`px(1138)),
+      height(`rem(70.)),
       width(`percent(100.)),
       paddingTop(`rem(6.)),
     ]);
