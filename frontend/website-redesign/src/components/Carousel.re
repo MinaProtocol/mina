@@ -29,7 +29,7 @@ module Styles = {
       alignItems(`center),
       overflowX(`hidden),
       width(`percent(110.)),
-      selector(" > :not(:first-child)", [marginLeft(`rem(1.))]),
+      selector(" > :not(:first-child)", [marginLeft(`rem(1.5))]),
     ]);
 
   let headerContainer =
@@ -73,7 +73,7 @@ module Styles = {
         Theme.Colors.digitalBlack,
         Theme.Colors.white,
         Some(Theme.Colors.white),
-        true,
+        false,
         `rem(2.5),
         Some(`rem(2.5)),
         0.5,
@@ -92,9 +92,9 @@ module Arrow = {
 
 module Slide = {
   [@react.component]
-  let make = (~profiles: array(ContentType.GenesisProfile.t)) => {
+  let make = (~items: array(ContentType.GenesisProfile.t)) => {
     <div className=Styles.contentContainer>
-      {profiles
+      {items
        |> Array.map((p: ContentType.GenesisProfile.t) => {
             <GenesisMemberProfile
               key={p.name}
@@ -114,30 +114,25 @@ module Slide = {
 
 [@react.component]
 let make =
-    (
-      ~title,
-      ~copy,
-      ~textColor,
-      ~profiles: array(ContentType.GenesisProfile.t),
-    ) => {
-  let (currentProfiles, setCurrentProfiles) = React.useState(_ => profiles);
+    (~title, ~copy, ~textColor, ~items: array(ContentType.GenesisProfile.t)) => {
+  let (items, setItems) = React.useState(_ => items);
 
-  let prevSlide = _ => {
-    let copy = Belt.Array.copy(currentProfiles);
+  let nextSlide = _ => {
+    let copy = Belt.Array.copy(items);
     switch (Js.Array.shift(copy)) {
     | Some(last) =>
       Js.Array.push(last, copy) |> ignore;
-      setCurrentProfiles(_ => copy);
+      setItems(_ => copy);
     | None => ()
     };
   };
 
-  let nextSlide = _ => {
-    let copy = Belt.Array.copy(currentProfiles);
+  let prevSlide = _ => {
+    let copy = Belt.Array.copy(items);
     switch (Js.Array.pop(copy)) {
     | Some(last) =>
       Js.Array.unshift(last, copy) |> ignore;
-      setCurrentProfiles(_ => copy);
+      setItems(_ => copy);
     | None => ()
     };
   };
@@ -154,6 +149,6 @@ let make =
         <Arrow icon=Icon.ArrowRightLarge onClick=nextSlide />
       </span>
     </div>
-    <Slide profiles=currentProfiles />
+    <Slide items />
   </div>;
 };

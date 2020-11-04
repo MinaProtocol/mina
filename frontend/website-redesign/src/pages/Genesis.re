@@ -302,7 +302,7 @@ let make = (~profiles) => {
         <Carousel
           title="Genesis Founding Members"
           copy="Get to know some of the Founding Members working to strengthen the protocol and build our community."
-          profiles
+          items=profiles
           textColor=Theme.Colors.white
         />
       </FeaturedSingleRow>
