@@ -27,6 +27,12 @@ module Styles = {
     style([media(Theme.MediaQuery.desktop, [width(`rem(42.))])]);
   let genesisRule =
     style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
+
+  let modal = modalShowing =>
+    style([
+      modalShowing ? opacity(1.) : opacity(0.),
+      pointerEvents(`none),
+    ]);
 };
 
 module GenesisMembersGrid = {
@@ -106,6 +112,12 @@ module GenesisMembersGrid = {
 
 [@react.component]
 let make = () => {
+  let (modalOpen, setModalOpen) = React.useState(_ => false);
+
+  let switchModalState = () => {
+    setModalOpen(_ => !modalOpen);
+  };
+
   <div className=Styles.container>
     <div className=Styles.headerCopy>
       <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
@@ -116,7 +128,10 @@ let make = () => {
       </p>
     </div>
     <Rule color=Theme.Colors.black />
-    <TeamGrid />
+    <div className={Styles.modal(modalOpen)}>
+      {React.string("showing modal")}
+    </div>
+    <TeamGrid switchModalState />
     <div className=Styles.genesisRule> <Rule color=Theme.Colors.black /> </div>
     <GenesisMembersGrid />
   </div>;

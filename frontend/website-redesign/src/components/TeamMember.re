@@ -38,12 +38,12 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~fullName="", ~title="", ~src="") => {
+let make = (~fullName="", ~title="", ~src="", ~switchModalState=_ => ()) => {
   <div className=Styles.memberContainer>
     <img className=Styles.image src />
     <div className=Styles.flexRow>
       <h5 className=Styles.name> {React.string(fullName)} </h5>
-      <Icon kind=Icon.Plus />
+      <span onClick={_ => switchModalState()}> <Icon kind=Icon.Plus /> </span>
     </div>
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
