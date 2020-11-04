@@ -153,8 +153,8 @@ pub fn caml_tweedle_fp_print(x: CamlTweedleFpPtr) {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_copy(x: CamlTweedleFpPtr) -> CamlTweedleFp {
-    *x.as_ref()
+pub fn caml_tweedle_fp_copy(mut x: CamlTweedleFpPtr, y: CamlTweedleFpPtr) {
+    *x.as_mut() = *y.as_ref()
 }
 
 #[ocaml::func]
@@ -231,4 +231,24 @@ pub fn caml_tweedle_fp_domain_generator(
                 .unwrap(),
         ),
     }
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fp_to_bytes(x: CamlTweedleFpPtr) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlTweedleFp>();
+    let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    unsafe {
+        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+    }
+    ocaml::Value(str)
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fp_of_bytes(x: &[u8]) -> Result<CamlTweedleFp, ocaml::Error> {
+    let len = std::mem::size_of::<CamlTweedleFp>();
+    if x.len() != len {
+        ocaml::Error::failwith("caml_tweedle_fp_of_bytes")?;
+    };
+    let x = unsafe { *(x.as_ptr() as *const CamlTweedleFp) };
+    Ok(x)
 }
