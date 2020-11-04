@@ -32,7 +32,7 @@ external of_string : string -> t = "caml_bn_382_fq_of_string"
 
 external print : t -> unit = "caml_bn_382_fq_print"
 
-external copy : t -> t = "caml_bn_382_fq_copy"
+external copy : over:t -> t -> unit = "caml_bn_382_fq_copy"
 
 external mut_add : t -> other:t -> unit = "caml_bn_382_fq_mut_add"
 
@@ -63,3 +63,7 @@ external two_adic_root_of_unity :
   = "caml_bn_382_fq_two_adic_root_of_unity"
 
 external domain_generator : int -> t = "caml_bn_382_fq_domain_generator"
+
+external to_bytes : t -> Bytes.t = "caml_bn_382_fq_to_bytes"
+
+external of_bytes : Bytes.t -> t = "caml_bn_382_fq_of_bytes"

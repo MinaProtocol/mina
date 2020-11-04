@@ -14,7 +14,7 @@ module Gate_vector = struct
     = "caml_tweedle_fp_plonk_gate_vector_get"
 
   external wrap :
-    t -> Plonk_gate.Wire.t -> unit
+    t -> Plonk_gate.Wire.t -> Plonk_gate.Wire.t -> unit
     = "caml_tweedle_fp_plonk_gate_vector_wrap"
 end
 

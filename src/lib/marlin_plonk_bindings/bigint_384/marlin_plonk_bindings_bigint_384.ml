@@ -17,3 +17,7 @@ external to_string : t -> string = "caml_bigint_384_to_string"
 external of_numeral : string -> int -> int -> t = "caml_bigint_384_of_numeral"
 
 external of_decimal_string : string -> t = "caml_bigint_384_of_decimal_string"
+
+external to_bytes : t -> Bytes.t = "caml_bigint_384_to_bytes"
+
+external of_bytes : Bytes.t -> t = "caml_bigint_384_of_bytes"

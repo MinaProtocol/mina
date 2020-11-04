@@ -121,16 +121,16 @@ let make = (~profiles) => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
-      header="Welcome"
+      header={Some("Welcome")}
       copy={
         Some(
           "We're an inclusive community uniting people around the world with a passion for decentralized blockchain.",
         )
       }
       background={
-        Theme.desktop: "/static/img/community-page/09_Community_1_2880x1504.jpg",
-        Theme.tablet: "/static/img/community-page/09_Community_1_1536x1504_tablet.jpg",
-        Theme.mobile: "/static/img/community-page/09_Community_1_750x1056_mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/CommunityHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/CommunityHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/CommunityHeroMobile.jpg",
       }
     />
     <ButtonBar
@@ -154,7 +154,7 @@ let make = (~profiles) => {
                buttonTextColor: Theme.Colors.digitalBlack,
                buttonText: "Apply now",
                dark: true,
-               href: `Internal("/genesis"),
+               href: `External(Constants.genesisGrantApplication),
              })},
         }>
         <Spacer height=4. />

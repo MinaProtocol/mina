@@ -45,6 +45,7 @@ module Styles = {
     style([
       width(`percent(100.)),
       marginBottom(`rem(2.)),
+      height(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
     ]);
 };
