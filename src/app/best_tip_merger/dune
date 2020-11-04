@@ -1,7 +1,7 @@
 (executable
-  (package history_accumulator)
-  (name history_accumulator)
-  (public_name history_accumulator)
+  (package best_tip_merger)
+  (name best_tip_merger)
+  (public_name best_tip_merger)
   (modes native)
   (libraries
     async

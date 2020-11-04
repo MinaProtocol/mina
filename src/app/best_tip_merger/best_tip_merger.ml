@@ -1,4 +1,4 @@
-(* Accumulates the best tip history from mina-best-tip.log files. It gets all the states from the log files passed and generates a rose tree *)
+(* Accumulates the best tip history from mina-best-tip.log files and consolidates it into a rose tree representation*)
 
 open Core
 open Async
@@ -329,14 +329,13 @@ let main ~input_dir ~output_dir ~output_format () =
     ~processor:(Logger.Processor.raw ())
     ~transport:
       (Logger.Transport.File_system.dumb_logrotate ~directory:output_dir
-         ~log_filename:"mina-history-accumulator.log"
-         ~max_size:logrotate_max_size) ;
+         ~log_filename:"mina-best-tip-merger.log" ~max_size:logrotate_max_size) ;
   let logger = Logger.create () in
   let t' =
     List.fold ~init:t files ~f:(fun t log_file ->
         Input.of_logs ~logger ~log_file t )
   in
-  [%log info] "Accumulating the history.." ;
+  [%log info] "Consolidating the history.." ;
   let output = Output.of_input t' in
   [%log info] "Generated the resulting rose tree" ;
   let output_json, fmt_str =
@@ -360,7 +359,7 @@ let () =
       (let open Let_syntax in
       Command.async
         ~summary:
-          "Accumulates best tip history from multiple log files in a rose \
+          "Consolidates best tip history from multiple log files into a rose \
            tree representation"
         (let%map input_dir =
            Param.flag "-input-dir"
