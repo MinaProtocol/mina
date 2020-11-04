@@ -282,10 +282,11 @@ module Instance = struct
                    |> Deferred.return
              in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger ~precomputed_values
+               Breadcrumb.build ~skip_staged_ledger_verification:true
+                 ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None
+                 ~sender:None ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
@@ -332,7 +333,7 @@ let with_instance_exn t ~f =
   let%map () = Instance.destroy instance in
   x
 
-let reset_database_exn t ~root_data =
+let reset_database_exn t ~root_data ~genesis_state_hash =
   let open Root_data.Limited in
   let open Deferred.Let_syntax in
   [%log' info t.logger]
@@ -347,12 +348,14 @@ let reset_database_exn t ~root_data =
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
       Debug_assert.debug_assert (fun () ->
-          Database.check instance.db
+          Database.check instance.db ~genesis_state_hash
           |> Result.map_error ~f:(function
                | `Invalid_version ->
                    "invalid version"
                | `Not_initialized ->
                    "not initialized"
+               | `Genesis_state_mismatch _ ->
+                   "genesis state mismatch"
                | `Corrupt err ->
                    Database.Error.message err )
           |> Result.ok_or_failwith ) )

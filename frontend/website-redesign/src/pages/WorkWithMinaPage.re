@@ -19,7 +19,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Work with Mina"
+      header={Some("Work with Mina")}
       copy={
         Some(
           {js|Interested in growing the world’s lightest, most accessible blockchain?|js},
@@ -46,7 +46,7 @@ let make = () => {
       backgroundImg={
         Theme.desktop: "/static/img/SectionQuoteDesktop.jpg",
         Theme.tablet: "/static/img/SectionQuoteTablet.jpg",
-        Theme.mobile: "/static/img/SectionQuoteMobile.png",
+        Theme.mobile: "/static/img/SectionQuoteMobile.jpg",
       }
     />
     <SimpleRow

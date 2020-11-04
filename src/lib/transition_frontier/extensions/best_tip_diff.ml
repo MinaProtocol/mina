@@ -3,7 +3,7 @@ open Coda_base
 open Frontier_base
 
 module T = struct
-  type t = {logger: Logger.t}
+  type t = {logger: Logger.t; best_tip_diff_logger: Logger.t}
 
   type view =
     { new_commands: User_command.Valid.t With_status.t list
@@ -13,6 +13,7 @@ module T = struct
   module Log_event = struct
     type t =
       { protocol_state: Coda_state.Protocol_state.Value.t
+      ; state_hash: State_hash.t
       ; just_emitted_a_proof: bool }
     [@@deriving yojson]
 
@@ -25,7 +26,8 @@ module T = struct
   end
 
   let create ~logger frontier =
-    ( {logger}
+    let best_tip_diff_logger = Logger.create ~id:"best_tip_diff" () in
+    ( {logger; best_tip_diff_logger}
     , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
       ; removed_commands= []
       ; reorg_best_tip= false } )
@@ -83,34 +85,36 @@ module T = struct
               let reorg_best_tip =
                 not (List.is_empty removed_from_best_tip_path)
               in
+              let added_transitions =
+                List.map
+                  ~f:(fun b ->
+                    { Log_event.protocol_state= Breadcrumb.protocol_state b
+                    ; state_hash= Breadcrumb.state_hash b
+                    ; just_emitted_a_proof= Breadcrumb.just_emitted_a_proof b
+                    } )
+                  added_to_best_tip_path
+              in
+              let removed_transitions =
+                List.map
+                  ~f:(fun b ->
+                    { Log_event.protocol_state= Breadcrumb.protocol_state b
+                    ; state_hash= Breadcrumb.state_hash b
+                    ; just_emitted_a_proof= Breadcrumb.just_emitted_a_proof b
+                    } )
+                  removed_from_best_tip_path
+              in
+              let event =
+                Log_event.New_best_tip_event
+                  {added_transitions; removed_transitions; reorg_best_tip}
+              in
               [%str_log' debug t.logger]
                 ~metadata:
                   [ ( "no_of_added_breadcrumbs"
                     , `Int (List.length added_to_best_tip_path) )
                   ; ( "no_of_removed_breadcrumbs"
                     , `Int (List.length removed_from_best_tip_path) ) ]
-                (Log_event.New_best_tip_event
-                   { added_transitions=
-                       List.map
-                         ~f:(fun b ->
-                           { Log_event.protocol_state=
-                               Breadcrumb.validated_transition b
-                               |> Coda_transition.External_transition.Validated
-                                  .protocol_state
-                           ; just_emitted_a_proof=
-                               Breadcrumb.just_emitted_a_proof b } )
-                         added_to_best_tip_path
-                   ; removed_transitions=
-                       List.map
-                         ~f:(fun b ->
-                           { Log_event.protocol_state=
-                               Breadcrumb.validated_transition b
-                               |> Coda_transition.External_transition.Validated
-                                  .protocol_state
-                           ; just_emitted_a_proof=
-                               Breadcrumb.just_emitted_a_proof b } )
-                         removed_from_best_tip_path
-                   ; reorg_best_tip }) ;
+                event ;
+              [%str_log' best_tip_diff t.best_tip_diff_logger] event ;
               ({new_commands; removed_commands; reorg_best_tip}, true)
           | E (New_node (Full _), _) -> (acc, should_broadcast)
           | E (Root_transitioned _, _) -> (acc, should_broadcast) )

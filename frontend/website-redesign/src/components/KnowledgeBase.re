@@ -49,7 +49,11 @@ module Category = {
       <h3 className=Theme.Type.h3> {React.string(category.title)} </h3>
       <Spacer height=2. />
       <div className=Styles.resourceGrid>
-        {Array.map(resource => <Resource resource />, category.resources)
+        {Array.map(
+           (resource: ContentType.KnowledgeBaseResource.t) =>
+             <div key={resource.title}> <Resource resource /> </div>,
+           category.resources,
+         )
          |> React.array}
       </div>
       <Spacer height=2. />
@@ -96,7 +100,7 @@ let fetchCategories = () => {
 };
 
 [@react.component]
-let make = () => {
+let make = (~backgroundImg="/static/img/KnowledgeBase.jpg") => {
   let (categories, setCategories) = React.useState(() => [||]);
 
   let _ =
@@ -119,6 +123,12 @@ let make = () => {
        )}
     </p>
     <Spacer height=4. />
-    {Array.map(category => {<Category category />}, categories) |> React.array}
+    {Array.map(
+       (category: Category.t) => {
+         <div key={category.title}> <Category category /> </div>
+       },
+       categories,
+     )
+     |> React.array}
   </div>;
 };

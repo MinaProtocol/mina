@@ -615,7 +615,8 @@ module type S = sig
 
   module Staged_ledger_validation : sig
     val validate_staged_ledger_diff :
-         ( 'time_received
+         ?skip_staged_ledger_verification:bool
+      -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain
