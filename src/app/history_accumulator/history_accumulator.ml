@@ -18,12 +18,12 @@ end
 
 module Input = struct
   (*all_states: hash table of a parent block and a map of it's successors
-   * roots: all the nodes for which there is no block for the parent node
+   * init_states: blocks for which there are no previous blocks in the log
    * peers: set of peers whose logs were processed
    * seen_state_hashes: map of states that were obtained from the logs. Used to keep the roots updated*)
   type t =
     { all_states: (State_hash.t, Node.t State_hash.Map.t) Hashtbl.t
-    ; roots: (State_hash.t, Node.t) Hashtbl.t
+    ; init_states: (State_hash.t, Node.t) Hashtbl.t
           (*generate from seen state hashes later on*)
     ; peers: String.Set.t
     ; seen_state_hashes: State_hash.Set.t }
@@ -78,7 +78,8 @@ module Input = struct
                           if Set.mem acc''.seen_state_hashes parent_hash |> not
                           then
                             (*Assuming the logs are in order, if the parent hash was not already seen then it is the root*)
-                            Hashtbl.update t.roots new_state_hash ~f:(function
+                            Hashtbl.update t.init_states new_state_hash
+                              ~f:(function
                               | None ->
                                   new_node
                               | Some node ->
@@ -102,14 +103,14 @@ module Input = struct
                         {acc'' with seen_state_hashes} )
                   in
                   (* remove any previous roots for which there are ancestors now*)
-                  List.iter (Hashtbl.keys acc'.roots) ~f:(fun root ->
-                      let state = Hashtbl.find_exn acc'.roots root in
+                  List.iter (Hashtbl.keys acc'.init_states) ~f:(fun root ->
+                      let state = Hashtbl.find_exn acc'.init_states root in
                       let parent =
                         state.state.protocol_state.previous_state_hash
                       in
                       if State_hash.Set.mem acc'.seen_state_hashes parent then
                         (* no longer a root because a node for it's parent was seen*)
-                        Hashtbl.remove acc'.roots root ) ;
+                        Hashtbl.remove acc'.init_states root ) ;
                   {acc' with peers}
               | None | Some false ->
                   [%log error] "Could not process log line $line"
@@ -124,26 +125,41 @@ module Input = struct
     res
 end
 
+(*Output is a rose tree and consists of all the forks seen from an initial state; Multiple rose trees is there are logs with different initial states*)
 module Output = struct
-  type t = Node.t Rose_tree.t list
+  type node =
+    | Root of {state: State_hash.t; peer_ids: String.Set.t}
+    | Node of Node.t
+
+  type t = node Rose_tree.t list
 
   let of_input (input : Input.t) : t =
-    List.fold ~init:[] (Hashtbl.data input.roots)
-      ~f:(fun acc_trees root_state ->
-        let rec go (node : Node.t) =
+    let roots =
+      List.fold (Hashtbl.data input.init_states) ~init:State_hash.Map.empty
+        ~f:(fun map root_state ->
+          Map.update map
+            (Coda_state.Protocol_state.previous_state_hash
+               root_state.state.protocol_state) ~f:(function
+            | Some peer_ids ->
+                Set.union peer_ids root_state.peer_ids
+            | None ->
+                root_state.peer_ids ) )
+    in
+    List.fold ~init:[] (Map.to_alist roots)
+      ~f:(fun acc_trees (root, peer_ids) ->
+        let rec go parent_hash =
           let successors =
             Option.value ~default:State_hash.Map.empty
-              (Hashtbl.find input.all_states node.state.state_hash)
+              (Hashtbl.find input.all_states parent_hash)
             |> Map.data
           in
           List.map successors ~f:(fun s ->
-              Rose_tree.T ({Node.state= s.state; peer_ids= s.peer_ids}, go s)
-          )
+              Rose_tree.T
+                ( Node {state= s.state; peer_ids= s.peer_ids}
+                , go s.state.state_hash ) )
         in
-        Rose_tree.T
-          ( {Node.state= root_state.state; peer_ids= root_state.peer_ids}
-          , go root_state )
-        :: acc_trees )
+        let root_node = Rose_tree.T (Root {state= root; peer_ids}, go root) in
+        root_node :: acc_trees )
 end
 
 module type Graph_node_intf = sig
@@ -163,26 +179,34 @@ module type Graph_node_intf = sig
 end
 
 module Display = struct
-  type node =
-    { state: Transition_frontier.Extensions.Best_tip_diff.Log_event.t
-    ; peers: int }
+  type state =
+    | Root of State_hash.t
+    | Node of Transition_frontier.Extensions.Best_tip_diff.Log_event.t
   [@@deriving yojson]
+
+  type node = {state: state; peers: int} [@@deriving yojson]
 
   type t = node Rose_tree.t list [@@deriving yojson]
 
   let of_output : Output.t -> t =
    fun t ->
     List.map t ~f:(fun tree ->
-        Rose_tree.map tree ~f:(fun (t : Node.t) ->
-            {state= t.state; peers= Set.length t.peer_ids} ) )
+        Rose_tree.map tree ~f:(fun (t : Output.node) ->
+            match t with
+            | Root s ->
+                {state= Root s.state; peers= Set.length s.peer_ids}
+            | Node s ->
+                {state= Node s.state; peers= Set.length s.peer_ids} ) )
 end
 
 module Compact_display = struct
   type state =
-    { current: State_hash.t
-    ; parent: State_hash.t
-    ; blockchain_length: Coda_numbers.Length.t
-    ; global_slot: Coda_numbers.Global_slot.t }
+    | Root of State_hash.t
+    | Node of
+        { current: State_hash.t
+        ; parent: State_hash.t
+        ; blockchain_length: Coda_numbers.Length.t
+        ; global_slot: Coda_numbers.Global_slot.t }
   [@@deriving yojson]
 
   type node = {state: state; peers: int} [@@deriving yojson]
@@ -191,27 +215,34 @@ module Compact_display = struct
 
   let of_output t =
     List.map t ~f:(fun tree ->
-        Rose_tree.map tree ~f:(fun (t : Node.t) ->
-            let state : state =
-              { current= t.state.state_hash
-              ; parent= t.state.protocol_state.previous_state_hash
-              ; blockchain_length=
-                  Coda_state.Protocol_state.consensus_state
-                    t.state.protocol_state
-                  |> Consensus.Data.Consensus_state.blockchain_length
-              ; global_slot=
-                  Coda_state.Protocol_state.consensus_state
-                    t.state.protocol_state
-                  |> Consensus.Data.Consensus_state.curr_global_slot }
-            in
-            {state; peers= Set.length t.peer_ids} ) )
+        Rose_tree.map tree ~f:(fun (t : Output.node) ->
+            match t with
+            | Root s ->
+                {state= Root s.state; peers= Set.length s.peer_ids}
+            | Node t ->
+                let state : state =
+                  Node
+                    { current= t.state.state_hash
+                    ; parent= t.state.protocol_state.previous_state_hash
+                    ; blockchain_length=
+                        Coda_state.Protocol_state.consensus_state
+                          t.state.protocol_state
+                        |> Consensus.Data.Consensus_state.blockchain_length
+                    ; global_slot=
+                        Coda_state.Protocol_state.consensus_state
+                          t.state.protocol_state
+                        |> Consensus.Data.Consensus_state.curr_global_slot }
+                in
+                {state; peers= Set.length t.peer_ids} ) )
 end
 
 module Graph_node = struct
   type state =
-    { current: State_hash.t
-    ; length: Coda_numbers.Length.t
-    ; slot: Coda_numbers.Global_slot.t }
+    | Root of State_hash.t
+    | Node of
+        { current: State_hash.t
+        ; length: Coda_numbers.Length.t
+        ; slot: Coda_numbers.Global_slot.t }
   [@@deriving yojson, eq, hash]
 
   type t = {state: state; peers: int} [@@deriving yojson, eq, hash]
@@ -220,9 +251,16 @@ module Graph_node = struct
 
   let display = Fn.id
 
-  let name t = State_hash.to_string t.state.current
+  let name t =
+    match t.state with
+    | Root s ->
+        State_hash.to_string s
+    | Node s ->
+        State_hash.to_string s.current
 
-  let compare t t' = State_hash.compare t.state.current t'.state.current
+  let compare t t' =
+    let state_hash = function Root s -> s | Node s -> s.current in
+    State_hash.compare (state_hash t.state) (state_hash t'.state)
 end
 
 module Visualization = struct
@@ -231,9 +269,14 @@ module Visualization = struct
   let to_graph (t : Compact_display.node Rose_tree.t) =
     let to_graph_node (node : Compact_display.node) =
       let state =
-        { Graph_node.current= node.state.current
-        ; length= node.state.blockchain_length
-        ; slot= node.state.global_slot }
+        match node.state with
+        | Root s ->
+            Graph_node.Root s
+        | Node s ->
+            Node
+              { current= s.current
+              ; length= s.blockchain_length
+              ; slot= s.global_slot }
       in
       {Graph_node.state; peers= node.peers}
     in
@@ -265,7 +308,7 @@ let main ~input_dir ~output_dir ~output_format () =
   let t : Input.t =
     { Input.all_states= Hashtbl.create (module State_hash)
     ; peers= String.Set.empty
-    ; roots= Hashtbl.create (module State_hash)
+    ; init_states= Hashtbl.create (module State_hash)
     ; seen_state_hashes= State_hash.Set.empty }
   in
   let logrotate_max_size = 1024 * 1024 * 1 in
