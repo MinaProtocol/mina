@@ -1,11 +1,13 @@
 module Styles = {
   open Css;
-  let container =
+  let container = dark =>
     style([
       height(`px(1138)),
       width(`percent(100.)),
       paddingTop(`rem(6.)),
-      backgroundColor(Theme.Colors.digitalBlack),
+      dark
+        ? backgroundColor(Theme.Colors.digitalBlack)
+        : backgroundColor(`transparent),
     ]);
 
   let leftWrapped =
@@ -51,9 +53,17 @@ module Styles = {
 
   let rule = style([marginTop(`rem(6.))]);
 
-  let h2 = merge([Theme.Type.h2, style([color(white)])]);
+  let h2 = dark =>
+    merge([
+      Theme.Type.h2,
+      style([dark ? color(white) : color(Theme.Colors.digitalBlack)]),
+    ]);
 
-  let paragraph = merge([Theme.Type.paragraph, style([color(white)])]);
+  let paragraph = dark =>
+    merge([
+      Theme.Type.paragraph,
+      style([dark ? color(white) : color(Theme.Colors.digitalBlack)]),
+    ]);
 
   let buttons =
     style([
@@ -65,13 +75,13 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
     ]);
 
-  let button =
+  let button = dark =>
     merge([
       Button.Styles.button(
         Theme.Colors.digitalBlack,
         Theme.Colors.white,
         Some(Theme.Colors.white),
-        false,
+        !dark,
         `rem(2.5),
         Some(`rem(2.5)),
         0.5,
@@ -83,8 +93,8 @@ module Styles = {
 
 module Arrow = {
   [@react.component]
-  let make = (~icon, ~onClick) => {
-    <div className=Styles.button onClick> <Icon kind=icon /> </div>;
+  let make = (~icon, ~onClick, ~dark) => {
+    <div className={Styles.button(dark)} onClick> <Icon kind=icon /> </div>;
   };
 };
 
@@ -111,7 +121,13 @@ module Slide = {
 };
 
 [@react.component]
-let make = (~profiles: array(ContentType.GenesisProfile.t)) => {
+let make =
+    (
+      ~title,
+      ~copy,
+      ~dark=false,
+      ~profiles: array(ContentType.GenesisProfile.t),
+    ) => {
   let (currentProfiles, setCurrentProfiles) = React.useState(_ => profiles);
 
   let prevSlide = _ => {
@@ -134,24 +150,18 @@ let make = (~profiles: array(ContentType.GenesisProfile.t)) => {
     };
   };
 
-  <div className=Styles.container>
+  <div className={Styles.container(dark)}>
     <Wrapped>
       <Rule color=Theme.Colors.white />
       <div className=Styles.headerContainer>
         <span className=Styles.headerCopy>
-          <h2 className=Styles.h2>
-            {React.string("Genesis Founding Members")}
-          </h2>
+          <h2 className={Styles.h2(dark)}> {React.string(title)} </h2>
           <Spacer height=1. />
-          <p className=Styles.paragraph>
-            {React.string(
-               "Get to know some of the Founding Members working to strengthen the protocol and build our community.",
-             )}
-          </p>
+          <p className={Styles.paragraph(dark)}> {React.string(copy)} </p>
         </span>
         <span className=Styles.buttons>
-          <Arrow icon=Icon.ArrowLeftLarge onClick=prevSlide />
-          <Arrow icon=Icon.ArrowRightLarge onClick=nextSlide />
+          <Arrow icon=Icon.ArrowLeftLarge onClick=prevSlide dark />
+          <Arrow icon=Icon.ArrowRightLarge onClick=nextSlide dark />
         </span>
       </div>
     </Wrapped>
