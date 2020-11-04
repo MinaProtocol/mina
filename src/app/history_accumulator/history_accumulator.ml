@@ -247,18 +247,29 @@ module Graph_node = struct
 
   type t = {state: state; peers: int} [@@deriving yojson, eq, hash]
 
-  type display = t [@@deriving yojson]
+  type display = {state: string; length: string; slot: string; peers: int}
+  [@@deriving yojson]
 
-  let display = Fn.id
-
-  let name t =
+  let name (t : t) =
     match t.state with
     | Root s ->
-        State_hash.to_string s
+        State_hash.to_string s |> Fn.flip String.suffix 7
     | Node s ->
-        State_hash.to_string s.current
+        State_hash.to_string s.current |> Fn.flip String.suffix 7
 
-  let compare t t' =
+  let display (t : t) =
+    let state = name t in
+    let length, slot =
+      match t.state with
+      | Root _ ->
+          ("NA", "NA")
+      | Node s ->
+          ( Coda_numbers.Length.to_string s.length
+          , Coda_numbers.Global_slot.to_string s.slot )
+    in
+    {state; slot; length; peers= t.peers}
+
+  let compare (t : t) (t' : t) =
     let state_hash = function Root s -> s | Node s -> s.current in
     State_hash.compare (state_hash t.state) (state_hash t'.state)
 end
