@@ -24,11 +24,14 @@ let name = "proof_of_stake"
 let genesis_ledger_total_currency ~ledger =
   Coda_base.Ledger.to_list (Lazy.force ledger)
   |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
-         Balance.add_amount sum
-           (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
-         |> Option.value_exn ?here:None ?error:None
-              ~message:"failed to calculate total currency in genesis ledger"
-     )
+         let open Coda_base in
+         let open Account.Poly in
+         (* only default token matters for total currency used to determine stake *)
+         if Token_id.equal account.token_id Token_id.default then
+           Balance.add_amount sum (Balance.to_amount @@ account.balance)
+           |> Option.value_exn ?here:None ?error:None
+                ~message:"Failed to calculate total currency in genesis ledger"
+         else sum )
   |> Balance.to_amount
 
 let genesis_ledger_hash ~ledger =
@@ -1910,7 +1913,7 @@ module Data = struct
         Amount.add previous_consensus_state.total_currency supply_increase
         |> Option.map ~f:Or_error.return
         |> Option.value
-             ~default:(Or_error.error_string "failed to add total_currency")
+             ~default:(Or_error.error_string "Failed to add total_currency")
       and () =
         if
           Consensus_transition.(
