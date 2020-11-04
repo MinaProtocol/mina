@@ -350,6 +350,16 @@ let handle_block_production_errors ~logger ~previous_protocol_state
           staged ledger diff: $error" ;
       return ()
 
+let time ~logger ~time_controller label f =
+  let open Deferred.Result.Let_syntax in
+  let t0 = Time.now time_controller in
+  let%map x = f () in
+  let span = Time.diff (Time.now time_controller) t0 in
+  [%log info]
+    ~metadata:[("time", `Int (Time.Span.to_ms span |> Int64.to_int_exn))]
+    !"%s%!" label ;
+  x
+
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
@@ -442,28 +452,22 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   (let open Deferred.Let_syntax in
                   let emit_breadcrumb () =
                     let open Deferred.Result.Let_syntax in
-                    let t0 = Time.now time_controller in
                     let%bind protocol_state_proof =
-                      measure "proving state transition valid" (fun () ->
-                          Prover.prove prover
-                            ~prev_state:previous_protocol_state
-                            ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition
-                            pending_coinbase_witness )
-                      |> Deferred.Result.map_error ~f:(fun err ->
-                             `Prover_error
-                               ( err
-                               , ( previous_protocol_state_proof
-                                 , internal_transition
-                                 , pending_coinbase_witness ) ) )
+                      time ~logger ~time_controller
+                        "Protocol_state_proof proving time(ms)" (fun () ->
+                          measure "proving state transition valid" (fun () ->
+                              Prover.prove prover
+                                ~prev_state:previous_protocol_state
+                                ~prev_state_proof:previous_protocol_state_proof
+                                ~next_state:protocol_state internal_transition
+                                pending_coinbase_witness )
+                          |> Deferred.Result.map_error ~f:(fun err ->
+                                 `Prover_error
+                                   ( err
+                                   , ( previous_protocol_state_proof
+                                     , internal_transition
+                                     , pending_coinbase_witness ) ) ) )
                     in
-                    let span = Time.diff (Time.now time_controller) t0 in
-                    [%log info]
-                      ~metadata:
-                        [ ( "proving_time"
-                          , `Int (Time.Span.to_ms span |> Int64.to_int_exn) )
-                        ]
-                      !"Protocol_state_proof proving time(ms): $proving_time%!" ;
                     let staged_ledger_diff =
                       Internal_transition.staged_ledger_diff
                         internal_transition
@@ -508,8 +512,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       |> Deferred.return
                     in
                     let%bind breadcrumb =
-                      Breadcrumb.build ~logger ~precomputed_values ~verifier
-                        ~trust_system ~parent:crumb ~transition ~sender:None
+                      time ~logger ~time_controller
+                        "Build breadcrumb on produced block" (fun () ->
+                          Breadcrumb.build ~logger ~precomputed_values
+                            ~verifier ~trust_system ~parent:crumb ~transition
+                            ~sender:None (* Consider skipping here *)
+                            ~skip_staged_ledger_verification:false () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
                                `Invalid_staged_ledger_diff
@@ -775,17 +783,20 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             |> Deferred.return
           in
           let%bind breadcrumb =
-            Breadcrumb.build ~logger ~precomputed_values ~verifier
-              ~trust_system ~parent:crumb ~transition ~sender:None
-            |> Deferred.Result.map_error ~f:(function
-                 | `Invalid_staged_ledger_diff e ->
-                     `Invalid_staged_ledger_diff (e, staged_ledger_diff)
-                 | ( `Fatal_error _
-                   | `Invalid_genesis_protocol_state
-                   | `Invalid_staged_ledger_hash _
-                   | `Not_selected_over_frontier_root
-                   | `Parent_missing_from_frontier ) as err ->
-                     err )
+            time ~logger ~time_controller
+              "Build breadcrumb on produced block (precomputed)" (fun () ->
+                Breadcrumb.build ~logger ~precomputed_values ~verifier
+                  ~trust_system ~parent:crumb ~transition ~sender:None
+                  ~skip_staged_ledger_verification:false ()
+                |> Deferred.Result.map_error ~f:(function
+                     | `Invalid_staged_ledger_diff e ->
+                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                     | ( `Fatal_error _
+                       | `Invalid_genesis_protocol_state
+                       | `Invalid_staged_ledger_hash _
+                       | `Not_selected_over_frontier_root
+                       | `Parent_missing_from_frontier ) as err ->
+                         err ) )
           in
           [%str_log trace]
             ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]

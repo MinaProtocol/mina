@@ -13,6 +13,7 @@ use algebra::tweedle::{dee::Affine as GAffine, dum::Affine as GAffineOther, fp::
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use commitment_dlog::srs::SRS;
+use plonk_circuits::constraints::ConstraintSystem;
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
@@ -323,4 +324,15 @@ pub fn caml_tweedle_fp_plonk_verifier_index_create(
 ) -> CamlTweedleFpPlonkVerifierIndex {
     let index = index.as_ref();
     to_ocaml(&index.1, index.0.verifier_index())
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fp_plonk_verifier_index_shifts(
+    log2_size: ocaml::Int,
+) -> CamlPlonkVerificationShifts<CamlTweedleFp> {
+    let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
+    CamlPlonkVerificationShifts {
+        r: CamlTweedleFp(a),
+        o: CamlTweedleFp(b),
+    }
 }
