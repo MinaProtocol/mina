@@ -1,33 +1,39 @@
 module Styles = {
   open Css;
   let memberContainer =
-    style([height(`rem(17.)), width(`rem(11.)), color(orange)]);
-  let image = style([width(`rem(10.)), marginBottom(`rem(1.))]);
+    style([
+      height(`rem(17.)),
+      width(`rem(11.)),
+      color(orange),
+      hover([
+        display(`flex),
+        flexDirection(`column),
+        alignItems(`center),
+        justifyContent(`center),
+        transform(`scale((1.3, 1.3))),
+        padding(`rem(1.)),
+        backgroundColor(Theme.Colors.digitalBlack),
+        selector("> div > h5", [color(white)]),
+        selector("> p", [color(white)]),
+      ]),
+    ]);
+  let image = style([width(`percent(100.)), marginBottom(`rem(1.))]);
   let name =
     merge([
       Theme.Type.h5,
-      style([
-        lineHeight(`rem(1.37)),
-        color(black),
-        important(fontSize(`px(18))),
-      ]),
+      style([color(black), important(fontSize(`px(18)))]),
     ]);
   let title =
     merge([
       Theme.Type.contributorLabel,
-      style([
-        lineHeight(`rem(1.37)),
-        color(black),
-        fontSize(`px(12)),
-        maxWidth(`rem(10.)),
-      ]),
+      style([color(black), fontSize(`px(12)), maxWidth(`rem(10.))]),
     ]);
   let flexRow =
     style([
       display(`flex),
       flexDirection(`row),
       justifyContent(`spaceBetween),
-      width(`rem(10.)),
+      width(`percent(100.)),
     ]);
 };
 
@@ -37,8 +43,8 @@ let make = (~fullName="", ~title="", ~src="") => {
     <img className=Styles.image src />
     <div className=Styles.flexRow>
       <h5 className=Styles.name> {React.string(fullName)} </h5>
+      <Icon kind=Icon.Plus />
     </div>
-    //<Icon kind=Icon.Plus />
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
 };
