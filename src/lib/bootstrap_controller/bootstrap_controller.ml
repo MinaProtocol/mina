@@ -430,6 +430,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                             Coda_networking.(
                               query_peer t.network peer.peer_id
                                 (Rpcs.Consensus_rpc rpc) query) ) }
+                    ~ledger_depth:
+                      precomputed_values.constraint_constants.ledger_depth
                     sync_jobs
                 in
                 (true, result) )
@@ -458,6 +460,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn
                 persistent_frontier ~root_data:new_root_data
+                ~genesis_state_hash:
+                  precomputed_values.protocol_state_with_hash.hash
             in
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(

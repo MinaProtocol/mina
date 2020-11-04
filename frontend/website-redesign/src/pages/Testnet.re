@@ -11,10 +11,26 @@ module Styles = {
       selector("h4", [important(color(Theme.Colors.white))]),
     ]);
 
-  let statusBadge =
+  let statusBadgeContainer =
     merge([
       Theme.Type.label,
-      style([color(Theme.Colors.white), marginTop(`rem(4.5))]),
+      style([
+        color(Theme.Colors.white),
+        marginTop(`rem(4.5)),
+        display(`flex),
+        alignItems(`flexStart),
+        flexDirection(`column),
+        media(
+          Theme.MediaQuery.tablet,
+          [alignItems(`center), flexDirection(`row)],
+        ),
+      ]),
+    ]);
+
+  let statusBadge =
+    style([
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.tablet, [marginLeft(`rem(1.))]),
     ]);
 
   let leaderboardLink =
@@ -81,7 +97,7 @@ let make = () => {
       <div className=Nav.Styles.spacer />
       <Hero
         title="Testnet"
-        header="Secure the Network"
+        header={Some("Secure the Network")}
         copy={
           Some(
             {j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j},
@@ -92,10 +108,12 @@ let make = () => {
           tablet: "/static/img/TestnetBackground.jpg",
           mobile: "/static/img/TestnetBackground.jpg",
         }>
-        <p className=Styles.statusBadge>
-          {React.string("Testnet Status: ")}
-          <StatusBadge service=`Network />
-        </p>
+        <div className=Styles.statusBadgeContainer>
+          <span> {React.string("Testnet Status: ")} </span>
+          <span className=Styles.statusBadge>
+            <StatusBadge service=`Network />
+          </span>
+        </div>
       </Hero>
       <Wrapped>
         <div className=Styles.leaderboardTextContainer>

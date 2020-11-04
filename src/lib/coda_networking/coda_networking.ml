@@ -49,7 +49,7 @@ type Structured_log_events.t +=
  *   - add the new constructor for Rpcs.rpc to Rpcs.all_of_type_erased_rpc
  *   - add a pattern matching case to Rpcs.implementation_of_rpc mapping the
  *     new constructor to the new module for your RPC
- *)
+*)
 module Rpcs = struct
   (* for versioning of the types here, see
 
@@ -60,7 +60,58 @@ module Rpcs = struct
      The "master" types are the ones used internally in the code base. Each
      version has coercions between their query and response types and the master
      types.
-   *)
+  *)
+
+  module Get_some_initial_peers = struct
+    module Master = struct
+      let name = "get_some_initial_peers"
+
+      module T = struct
+        type query = unit [@@deriving sexp, yojson]
+
+        type response = Network_peer.Peer.t list [@@deriving sexp, yojson]
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, version {rpc}]
+
+        type response = Network_peer.Peer.Stable.V1.t list
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
 
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     module Master = struct
@@ -551,6 +602,8 @@ module Rpcs = struct
   end
 
   type ('query, 'response) rpc =
+    | Get_some_initial_peers
+        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
@@ -577,6 +630,8 @@ module Rpcs = struct
 
   let implementation_of_rpc : type q r.
       (q, r) rpc -> (q, r) Rpc_intf.rpc_implementation = function
+    | Get_some_initial_peers ->
+        (module Get_some_initial_peers)
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash ->
         (module Get_staged_ledger_aux_and_pending_coinbases_at_hash)
     | Answer_sync_ledger_query ->
@@ -603,6 +658,8 @@ module Rpcs = struct
       -> 'a option =
    fun handler rpc ~do_ ->
     match (rpc, handler) with
+    | Get_some_initial_peers, Rpc_handler (Get_some_initial_peers, f) ->
+        Some (do_ f)
     | ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
       , Rpc_handler (Get_staged_ledger_aux_and_pending_coinbases_at_hash, f) )
       ->
@@ -622,6 +679,7 @@ module Rpcs = struct
         Some (do_ f)
     | Consensus_rpc rpc_a, Rpc_handler (Consensus_rpc rpc_b, f) ->
         Consensus.Hooks.Rpcs.match_handler (Rpc_handler (rpc_b, f)) rpc_a ~do_
+    (* TODO: Why is there a catch-all here? *)
     | _ ->
         None
 end
@@ -698,6 +756,9 @@ let wrap_rpc_data_in_envelope conn data =
   Envelope.Incoming.wrap_peer ~data ~sender:conn
 
 let create (config : Config.t)
+    ~(get_some_initial_peers :
+          Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
+       -> Rpcs.Get_some_initial_peers.response Deferred.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
           Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           Envelope.Incoming.t
@@ -852,9 +913,9 @@ let create (config : Config.t)
     in
     return result
   in
+  let md p = [("peer", Peer.to_yojson p)] in
   let get_ancestry_rpc conn ~version:_ query =
-    [%log debug] "Sending root proof to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending root proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_ancestry query: $query" in
     let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
     let%bind result, sender =
@@ -869,9 +930,17 @@ let create (config : Config.t)
         in
         if valid_protocol_versions then result else None
   in
+  let get_some_initial_peers_rpc (conn : Peer.t) ~version:_ () =
+    [%log trace] "Sending some initial peers to $peer" ~metadata:(md conn) ;
+    let action_msg = "Get_some_initial_peers query: $query" in
+    let msg_args = [("query", `Assoc [])] in
+    let%map result, _sender =
+      run_for_rpc_result conn () ~f:get_some_initial_peers action_msg msg_args
+    in
+    result
+  in
   let get_best_tip_rpc conn ~version:_ query =
-    [%log debug] "Sending best_tip to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
     let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
     let%bind result, sender =
@@ -894,8 +963,7 @@ let create (config : Config.t)
         else None
   in
   let get_telemetry_data_rpc conn ~version:_ query =
-    [%log debug] "Sending telemetry data to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending telemetry data to $peer" ~metadata:(md conn) ;
     let action_msg = "Telemetry_data" in
     let msg_args = [] in
     (* if peer doesn't return telemetry data, don't change trust score *)
@@ -905,8 +973,7 @@ let create (config : Config.t)
     result
   in
   let get_transition_chain_proof_rpc conn ~version:_ query =
-    [%log info] "Sending transition_chain_proof to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log info] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
@@ -918,8 +985,7 @@ let create (config : Config.t)
     record_unknown_item result sender action_msg msg_args
   in
   let get_transition_chain_rpc conn ~version:_ query =
-    [%log info] "Sending transition_chain to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain.query_to_yojson query)]
@@ -945,7 +1011,7 @@ let create (config : Config.t)
     (* the port in `conn' is an ephemeral port, not of interest *)
     [%log warn] "Node banned by peer $peer until $ban_until"
       ~metadata:
-        [ ("peer", `String (Unix.Inet_addr.to_string conn.Peer.host))
+        [ ("peer", Peer.to_yojson conn)
         ; ( "ban_until"
           , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) ) ] ;
     (* no computation to do; we're just getting notification *)
@@ -953,7 +1019,8 @@ let create (config : Config.t)
   in
   let rpc_handlers =
     let open Rpcs in
-    [ Rpc_handler
+    [ Rpc_handler (Get_some_initial_peers, get_some_initial_peers_rpc)
+    ; Rpc_handler
         ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
         , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
     ; Rpc_handler (Answer_sync_ledger_query, answer_sync_ledger_query_rpc)
@@ -979,15 +1046,50 @@ let create (config : Config.t)
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
-           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
+           (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers )) )) ;
+              raise No_initial_peers )
+            else (
+              [%log info] "Getting some extra initial peers to start" ;
+              (* 1. Get some peers
+               * 2. add them to go
+              *)
+              let metadata p e =
+                [ ("error", `String (Error.to_string_hum e))
+                ; ("peer", `String (Peer.to_string p)) ]
+              in
+              let%bind extra_initial_peers =
+                Deferred.List.concat_map initial_peers ~how:`Parallel
+                  ~f:(fun peer ->
+                    match%map
+                      Gossip_net.Any.query_peer ~timeout:(Time.Span.of_sec 10.)
+                        gossip_net peer.peer_id Rpcs.Get_some_initial_peers ()
+                    with
+                    | Connected {data= Ok xs; _} ->
+                        xs
+                    | Connected {data= Error e; _} | Failed_to_connect e ->
+                        [%log warn] ~metadata:(metadata peer e)
+                          "could not get initial peers from $peer with $error" ;
+                        [] )
+              in
+              [%log info]
+                ~metadata:
+                  [("peers", [%to_yojson: Peer.t list] extra_initial_peers)]
+                "Got extra $peers" ;
+              Deferred.List.iter ~how:`Sequential extra_initial_peers
+                ~f:(fun p ->
+                  match%map Gossip_net.Any.add_peer gossip_net p with
+                  | Ok () ->
+                      ()
+                  | Error e ->
+                      [%log warn] ~metadata:(metadata p e)
+                        "failed to add peer $peer with $error" ) )) )) ;
   (* TODO: Think about buffering:
-     I.e., what do we do when too many messages are coming in, or going out.
-     For example, some things you really want to not drop (like your outgoing
-     block announcment).
-  *)
+        I.e., what do we do when too many messages are coming in, or going out.
+        For example, some things you really want to not drop (like your outgoing
+        block announcment).
+     *)
   let received_gossips, online_notifier =
     Strict_pipe.Reader.Fork.two
       (Gossip_net.Any.received_message_reader gossip_net)
@@ -1063,9 +1165,9 @@ include struct
 
   let random_peers_except = lift random_peers_except
 
-  (* these cannot be directly lifted due to the value restriction *)
-  let query_peer t = lift query_peer t
+  let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
 
+  (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
 
   let on_first_high_connectivity t = lift on_first_high_connectivity t
@@ -1139,9 +1241,9 @@ let find_map' xs ~f =
 
 let online_status t = t.online_status
 
-let make_rpc_request ~rpc ~label t peer input =
+let make_rpc_request ?timeout ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer t peer.Peer.peer_id rpc input with
+  match%map query_peer ?timeout t peer.Peer.peer_id rpc input with
   | Connected {data= Ok (Some response); _} ->
       Ok response
   | Connected {data= Ok None; _} ->
@@ -1151,14 +1253,15 @@ let make_rpc_request ~rpc ~label t peer input =
   | Connected {data= Error e; _} | Failed_to_connect e ->
       Error e
 
-let get_transition_chain_proof =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition"
+let get_transition_chain_proof t =
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition" t
 
-let get_transition_chain =
+let get_transition_chain t =
   make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
+    t
 
-let get_best_tip t peer =
-  make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
+let get_best_tip ?timeout t peer =
+  make_rpc_request ?timeout ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
@@ -1269,8 +1372,8 @@ let glue_sync_ledger :
     -> unit =
  fun t query_reader response_writer ->
   (* We attempt to query 3 random peers, retry_max times. We keep track of the
-     peers that couldn't answer a particular query and won't try them
-     again. *)
+          peers that couldn't answer a particular query and won't try them
+          again. *)
   let retry_max = 6 in
   let retry_interval = Core.Time.Span.of_ms 200. in
   let rec answer_query ctr peers_tried query =
@@ -1294,8 +1397,8 @@ let glue_sync_ledger :
                   %{sexp: Ledger_hash.t}"
                 peer (fst query) ;
               (* TODO : here is a place where an envelope could contain
-                 a Peer.t, and not just an IP address, if desired
-              *)
+                    a Peer.t, and not just an IP address, if desired
+                 *)
               Some (Envelope.Incoming.wrap ~data:answer ~sender)
           | Connected {data= Ok (Error e); _} ->
               [%log' info t.logger]

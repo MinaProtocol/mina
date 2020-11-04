@@ -8,6 +8,19 @@ module Styles = {
       ),
       backgroundSize(`cover),
     ]);
+
+  let knowledgebaseBackground =
+    style([
+      backgroundImage(`url("/static/img/backgrounds/KnowledgeBase.jpg")),
+      backgroundSize(`cover),
+      padding2(~v=`rem(12.), ~h=`zero),
+    ]);
+
+  let knowledgebaseContainer =
+    style([
+      marginLeft(`zero),
+      media(Theme.MediaQuery.tablet, [paddingLeft(`rem(16.))]),
+    ]);
 };
 
 [@react.component]
@@ -16,7 +29,7 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Get Started"
-      header="Mina makes it simple."
+      header={Some("Mina makes it simple.")}
       copy={
         Some(
           "Interested and ready to take the next step? You're in the right place.",
@@ -71,10 +84,10 @@ let make = () => {
     <div className=Styles.background>
       <FeaturedSingleRow
         row={
-          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
           title: "Become a Genesis Member",
           copySize: `Small,
-          description: "Up to 1,000 community participants will be selected to help us harden Mina's protocol, strengthen the network and receive a distribution of 66,000 tokens.",
+          description: {js|Calling all block producers, SNARK producers and community leaders. We’re looking for 1,000 participants to join the Genesis token grant program and form the backbone of Mina’s decentralized network."|js},
           textColor: Theme.Colors.white,
           image: "/static/img/GenesisCopy.jpg",
           background: Image("/static/img/BecomeAGenesisMemberBackground.jpg"),
@@ -82,15 +95,19 @@ let make = () => {
           link:
             FeaturedSingleRow.Row.Button({
               FeaturedSingleRow.Row.buttonText: "Learn More",
-              buttonColor: Theme.Colors.orange,
-              buttonTextColor: Theme.Colors.white,
+              buttonColor: Theme.Colors.mint,
+              buttonTextColor: Theme.Colors.digitalBlack,
               dark: true,
               href: `Internal("/genesis"),
             }),
         }
       />
     </div>
-    <KnowledgeBase />
+    <div className=Styles.knowledgebaseBackground>
+      <Wrapped>
+        <div className=Styles.knowledgebaseContainer> <KnowledgeBase /> </div>
+      </Wrapped>
+    </div>
     <ButtonBar
       kind=ButtonBar.HelpAndSupport
       backgroundImg="/static/img/ButtonBarBackground.jpg"

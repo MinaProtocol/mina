@@ -164,7 +164,7 @@ let setup_daemon logger =
            "WAIT-TIME in ms before a snark-work is reassigned (default: %dms)"
            Cli_lib.Default.work_reassignment_wait)
   and enable_tracing =
-    flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+    flag "tracing" no_arg ~doc:"Trace into $config-directory/trace/$pid.trace"
   and insecure_rest_server =
     flag "insecure-rest-server" no_arg
       ~doc:
@@ -295,6 +295,12 @@ let setup_daemon logger =
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+    let best_tip_diff_log_size = 1024 * 1024 * 5 in
+    Logger.Consumer_registry.register ~id:"best_tip_diff"
+      ~processor:(Logger.Processor.raw ())
+      ~transport:
+        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
@@ -339,15 +345,11 @@ let setup_daemon logger =
             Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
             |> Deferred.map ~f:Option.some )
     in
-    (* Check if the config files are for the current version.
-        * WARNING: Deleting ALL the files in the config directory if there is
-        * a version mismatch *)
-    (* When persistence is added back, this needs to be revisited
-        * to handle persistence related files properly *)
     let%bind () =
-      let make_version ~wipe_dir =
+      let make_version () =
         let%bind () =
-          if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
+          (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
+          File_system.remove_dir (conf_dir ^/ "trace")
         in
         let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
         Writer.write_line wr Coda_version.commit_id ;
@@ -369,7 +371,7 @@ let setup_daemon logger =
               "Different version of Coda detected in config directory \
                $config_directory, removing existing configuration"
               ~metadata:[("config_directory", `String conf_dir)] ;
-            make_version ~wipe_dir:true )
+            make_version () )
       | Error e ->
           [%log trace]
             ~metadata:[("error", `String (Error.to_string_mach e))]
@@ -378,7 +380,7 @@ let setup_daemon logger =
             "Failed to read coda.version, cleaning up the config directory \
              $config_directory"
             ~metadata:[("config_directory", `String conf_dir)] ;
-          make_version ~wipe_dir:false
+          make_version ()
     in
     Memory_stats.log_memory_stats logger ~process:"daemon" ;
     Parallel.init_master () ;
@@ -471,7 +473,9 @@ let setup_daemon logger =
         | _ ->
             Runtime_config.default
       in
-      let genesis_dir = Option.value ~default:conf_dir genesis_dir in
+      let genesis_dir =
+        Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+      in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
@@ -723,14 +727,17 @@ let setup_daemon logger =
       let initial_block_production_keypairs =
         block_production_keypair |> Option.to_list |> Keypair.Set.of_list
       in
+      let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           ~genesis_ledger:
             (Precomputed_values.genesis_ledger precomputed_values)
+          ~epoch_ledger_location
           ( Option.map block_production_keypair ~f:(fun keypair ->
                 let open Keypair in
                 Public_key.compress keypair.public_key )
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
+          ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
       let initial_peers =
@@ -890,12 +897,13 @@ let setup_daemon logger =
              ~wallets_disk_location:(conf_dir ^/ "wallets")
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
-             ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-             ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
+             ~receipt_chain_database ~time_controller
+             ~initial_block_production_keypairs ~monitor ~consensus_local_state
+             ~transaction_database ~external_transition_database
+             ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in

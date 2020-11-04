@@ -272,8 +272,6 @@ module Status = struct
         Consensus.Configuration.Fields.to_list
           ~delta:(fmt_field "Delta" string_of_int)
           ~k:(fmt_field "k" string_of_int)
-          ~c:(fmt_field "c" string_of_int)
-          ~c_times_k:(fmt_field "c * k" string_of_int)
           ~slots_per_epoch:(fmt_field "Slots per epoch" string_of_int)
           ~slot_duration:(fmt_field "Slot duration" ms_to_string)
           ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)

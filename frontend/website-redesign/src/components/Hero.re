@@ -3,15 +3,20 @@ open Css;
 module Styles = {
   let heroContainer = (backgroundImg: Theme.backgroundImage) =>
     style([
+      height(`rem(33.)),
       display(`flex),
       flexDirection(`column),
-      justifyContent(`flexStart),
+      justifyContent(`flexEnd),
       alignContent(`spaceBetween),
       backgroundImage(`url(backgroundImg.mobile)),
       backgroundSize(`cover),
       media(
         Theme.MediaQuery.tablet,
-        [backgroundImage(`url(backgroundImg.tablet))],
+        [
+          justifyContent(`flexStart),
+          height(`percent(100.)),
+          backgroundImage(`url(backgroundImg.tablet)),
+        ],
       ),
       media(
         Theme.MediaQuery.desktop,
@@ -100,25 +105,24 @@ let make =
     (
       ~title=?,
       ~metadata=None,
-      ~header,
+      ~header: option(string),
       ~copy,
       ~background: Theme.backgroundImage,
       ~children=?,
     ) => {
   <div className={Styles.heroContainer(background)}>
     <div className=Styles.heroContent>
-      {switch (title) {
-       | Some(title) =>
-         <h4 className=Styles.headerLabel> {React.string(title)} </h4>
-
-       | None => React.null
-       }}
+      {ReactExt.fromOpt(title, ~f=s =>
+         <h4 className=Styles.headerLabel> {React.string(s)} </h4>
+       )}
       {ReactExt.fromOpt(metadata, ~f=metadata =>
          <div className=Styles.categoryDateSourceContainer>
            <CategoryDateSourceText metadata />
          </div>
        )}
-      <h1 className=Styles.header> {React.string(header)} </h1>
+      {ReactExt.fromOpt(header, ~f=s =>
+         <h1 className=Styles.header> {React.string(s)} </h1>
+       )}
       {ReactExt.fromOpt(copy, ~f=s =>
          <p className=Styles.headerCopy> {React.string(s)} </p>
        )}

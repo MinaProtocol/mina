@@ -56,7 +56,13 @@ module FetchBlogs = Fetch(ContentType.BlogPost);
 module FetchPress = Fetch(ContentType.Press);
 
 [@react.component]
-let make = (~source, ~title="In the News", ~itemKind=ListModule.Blog) => {
+let make =
+    (
+      ~source,
+      ~title="In the News",
+      ~itemKind=ListModule.Blog,
+      ~buttonHref=`Internal("/blog"),
+    ) => {
   let (content, setContent) = React.useState(_ => [||]);
 
   React.useEffect0(() => {
@@ -100,7 +106,7 @@ let make = (~source, ~title="In the News", ~itemKind=ListModule.Blog) => {
           | ListModule.TestnetRetro => "See all posts"
           }
         }
-        buttonHref={`Internal("/blog")}
+        buttonHref
       />
     </Wrapped>
     <ListModule items=content itemKind />
