@@ -479,7 +479,11 @@ module type S = sig
 
       val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
 
+      val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+
       val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+
+      val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
