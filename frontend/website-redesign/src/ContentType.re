@@ -129,6 +129,22 @@ module GenesisProfile = {
   type entries = System.entries(t);
 };
 
+module TeamProfile = {
+  let id = "teamMembers";
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+    bio: string,
+    quote: string,
+    twitter: option(string),
+    github: option(string),
+    linkedIn: option(string),
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
 module Press = {
   let id = "press";
   let dateKeyName = "datePublished";

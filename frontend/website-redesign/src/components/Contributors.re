@@ -1,6 +1,6 @@
 module Styles = {
   open Css;
-  let container = style([padding2(~v=`rem(4.), ~h=`rem(1.25))]);
+  let container = style([margin2(~v=`rem(4.), ~h=`zero)]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let sectionSubhead =
     merge([
@@ -23,13 +23,15 @@ module Styles = {
       pointerEvents(`none),
       transition("opacity", ~duration=400, ~timingFunction=`easeIn),
       position(`absolute),
-      height(`percent(100.)),
+      height(`rem(286.8)),
       width(`vw(100.)),
       backgroundColor(`rgba((0, 0, 0, 0.3))),
       display(`flex),
+      media(Theme.MediaQuery.tablet, [height(`rem(158.8))]),
+      media(Theme.MediaQuery.desktop, [height(`rem(124.))]),
     ]);
 
-  let modal = style([margin(`auto)]);
+  let modal = style([zIndex(100), margin(`auto)]);
 };
 
 module GenesisMembersGrid = {
@@ -126,30 +128,26 @@ module Modal = {
 };
 
 [@react.component]
-let make = () => {
-  let (modalOpen, setModalOpen) = React.useState(_ => false);
-
-  let switchModalState = () => {
-    setModalOpen(_ => !modalOpen);
-  };
-
-  <div className=Styles.container>
+let make = (~profiles, ~modalOpen, ~switchModalState) => {
+  <>
     <div className={Styles.modalContainer(modalOpen)}> <Modal /> </div>
-    <Wrapped>
-      <div className=Styles.headerCopy>
-        <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
-           )}
-        </p>
-      </div>
-      <Rule color=Theme.Colors.black />
-      <TeamGrid switchModalState />
-      <div className=Styles.genesisRule>
+    <div className=Styles.container>
+      <Wrapped>
+        <div className=Styles.headerCopy>
+          <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
+          <p className=Styles.sectionSubhead>
+            {React.string(
+               "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
+             )}
+          </p>
+        </div>
         <Rule color=Theme.Colors.black />
-      </div>
-      <GenesisMembersGrid />
-    </Wrapped>
-  </div>;
+        <TeamGrid profiles switchModalState />
+        <div className=Styles.genesisRule>
+          <Rule color=Theme.Colors.black />
+        </div>
+        <GenesisMembersGrid />
+      </Wrapped>
+    </div>
+  </>;
 };
