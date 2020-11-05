@@ -1,17 +1,6 @@
 module Styles = {
   open Css;
-  let container =
-    style([
-      padding2(~v=`rem(4.), ~h=`rem(1.25)),
-      media(
-        Theme.MediaQuery.desktop,
-        [
-          padding2(~v=`rem(8.), ~h=`rem(9.5)),
-          maxWidth(`rem(89.)),
-          margin2(~v=`zero, ~h=`auto),
-        ],
-      ),
-    ]);
+  let container = style([padding2(~v=`rem(4.), ~h=`rem(1.25))]);
   let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
   let sectionSubhead =
     merge([
@@ -28,11 +17,19 @@ module Styles = {
   let genesisRule =
     style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
 
-  let modal = modalShowing =>
+  let modalContainer = modalShowing =>
     style([
       modalShowing ? opacity(1.) : opacity(0.),
       pointerEvents(`none),
+      transition("opacity", ~duration=400, ~timingFunction=`easeIn),
+      position(`absolute),
+      height(`percent(100.)),
+      width(`vw(100.)),
+      backgroundColor(`rgba((0, 0, 0, 0.3))),
+      display(`flex),
     ]);
+
+  let modal = style([margin(`auto)]);
 };
 
 module GenesisMembersGrid = {
@@ -110,6 +107,24 @@ module GenesisMembersGrid = {
   };
 };
 
+module Modal = {
+  [@react.component]
+  let make = () => {
+    <div className=Styles.modal>
+      <GenesisMemberProfile
+        key="Test Name"
+        name="Test Name"
+        photo="/static/img/headshots/IzaakMeckler.jpg"
+        quote={"\"" ++ "This is a quote" ++ "\""}
+        location="This is a location"
+        twitter="twitter"
+        github=None
+        blogPost=None
+      />
+    </div>;
+  };
+};
+
 [@react.component]
 let make = () => {
   let (modalOpen, setModalOpen) = React.useState(_ => false);
@@ -119,20 +134,22 @@ let make = () => {
   };
 
   <div className=Styles.container>
-    <div className=Styles.headerCopy>
-      <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
-      <p className=Styles.sectionSubhead>
-        {React.string(
-           "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
-         )}
-      </p>
-    </div>
-    <Rule color=Theme.Colors.black />
-    <div className={Styles.modal(modalOpen)}>
-      {React.string("showing modal")}
-    </div>
-    <TeamGrid switchModalState />
-    <div className=Styles.genesisRule> <Rule color=Theme.Colors.black /> </div>
-    <GenesisMembersGrid />
+    <div className={Styles.modalContainer(modalOpen)}> <Modal /> </div>
+    <Wrapped>
+      <div className=Styles.headerCopy>
+        <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
+        <p className=Styles.sectionSubhead>
+          {React.string(
+             "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
+           )}
+        </p>
+      </div>
+      <Rule color=Theme.Colors.black />
+      <TeamGrid switchModalState />
+      <div className=Styles.genesisRule>
+        <Rule color=Theme.Colors.black />
+      </div>
+      <GenesisMembersGrid />
+    </Wrapped>
   </div>;
 };

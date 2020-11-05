@@ -35,6 +35,8 @@ module Styles = {
       justifyContent(`spaceBetween),
       width(`percent(100.)),
     ]);
+
+  let icon = style([cursor(`pointer)]);
 };
 
 [@react.component]
@@ -43,7 +45,9 @@ let make = (~fullName="", ~title="", ~src="", ~switchModalState=_ => ()) => {
     <img className=Styles.image src />
     <div className=Styles.flexRow>
       <h5 className=Styles.name> {React.string(fullName)} </h5>
-      <span onClick={_ => switchModalState()}> <Icon kind=Icon.Plus /> </span>
+      <span className=Styles.icon onClick={_ => switchModalState()}>
+        <Icon kind=Icon.Plus />
+      </span>
     </div>
     <p className=Styles.title> {React.string(title)} </p>
   </div>;
