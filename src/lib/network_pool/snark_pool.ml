@@ -303,7 +303,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
             ; ("fee", Currency.Fee.to_yojson fee)
-            ; ("error", `String (Error.to_string_hum e))
+            ; ("error", Error_json.error_to_yojson e)
             ; ("sender", Envelope.Sender.to_yojson sender) ]
           in
           [%log' error t.logger] ~metadata
@@ -364,7 +364,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             verify pairs
         | Error e ->
             [%log' error t.logger]
-              ~metadata:[("error", `String (Error.to_string_hum e))]
+              ~metadata:[("error", Error_json.error_to_yojson e)]
               "One_or_two length mismatch: $error" ;
             Deferred.return false
     end

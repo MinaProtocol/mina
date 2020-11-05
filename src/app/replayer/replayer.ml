@@ -411,13 +411,17 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
+  let valid_until =
+    Option.map cmd.valid_until ~f:(fun slot ->
+        Coda_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+  in
   let payload =
     Signed_command_payload.create
       ~fee:(Currency.Fee.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee)
       ~fee_token:(Token_id.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee_token)
       ~fee_payer_pk
       ~nonce:(Unsigned.UInt32.of_int64 cmd.nonce)
-      ~valid_until:None ~memo ~body
+      ~valid_until ~memo ~body
   in
   (* when applying the transaction, there's a check that the fee payer and
      signer keys are the same; since this transaction was accepted, we know
@@ -528,13 +532,11 @@ let main ~input_file ~output_file ~archive_uri () =
       let staking_epoch_ledger_hash =
         Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let staking_seed = Snark_params.Tick.Field.of_string staking_seed_str in
+      let staking_seed = Epoch_seed.of_string staking_seed_str in
       let next_epoch_ledger_hash =
         Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let next_seed = Snark_params.Tick.Field.of_string next_seed_str in
+      let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_info_of_state_hash ~logger pool fork_state_hash
