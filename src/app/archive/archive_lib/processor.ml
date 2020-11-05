@@ -88,6 +88,14 @@ module Public_key = struct
 end
 
 module Snarked_ledger_hash = struct
+  let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let hash = Frozen_ledger_hash.to_string t in
+    Conn.find
+      (Caqti_request.find Caqti_type.string Caqti_type.int
+         "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
+      hash
+
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
@@ -122,9 +130,7 @@ module Epoch_data = struct
     let Coda_base.Epoch_ledger.Poly.{hash; _} =
       Coda_base.Epoch_data.Poly.ledger t
     in
-    let%bind ledger_hash_id =
-      Snarked_ledger_hash.add_if_doesn't_exist (module Conn) hash
-    in
+    let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
     let seed =
       Coda_base.Epoch_data.Poly.Stable.V1.seed t
       |> Snark_params.Tick.Field.to_string
@@ -132,7 +138,7 @@ module Epoch_data = struct
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
-           "SELECT id FROM epoch_ledgers WHERE ledger_hash_id = ? AND seed = ?")
+           "SELECT id FROM epoch_data WHERE ledger_hash_id = ? AND seed = ?")
         {seed; ledger_hash_id}
     with
     | Some id ->
