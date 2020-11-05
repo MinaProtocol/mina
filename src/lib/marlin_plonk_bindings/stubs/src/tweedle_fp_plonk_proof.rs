@@ -106,10 +106,13 @@ unsafe impl ocaml::FromValue for CamlTweedleFpPrevChallenges {
 unsafe impl ocaml::ToValue for CamlTweedleFpPrevChallenges {
     fn to_value(self: Self) -> ocaml::Value {
         let array = caml_vector::to_array_(self.0, |(vec, polycomm)| {
-            let polycomm: CamlTweedleDeePolyComm<CamlTweedleFq> = polycomm.into();
-            let array_value =
-                caml_vector::to_array_(vec, |x| ocaml::ToValue::to_value(CamlTweedleFp(x)));
-            ocaml::ToValue::to_value((array_value, polycomm))
+            ocaml::frame!((array_value) {
+                let polycomm: CamlTweedleDeePolyComm<CamlTweedleFq> = polycomm.into();
+                let array_inner =
+                    caml_vector::to_array_(vec, |x| ocaml::ToValue::to_value(CamlTweedleFp(x)));
+                array_value = array_inner.to_value().clone();
+                ocaml::ToValue::to_value((array_inner, polycomm))
+            })
         });
         array.to_value()
     }
