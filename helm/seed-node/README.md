@@ -1,3 +1,5 @@
+Trigger auto-deploy [REMOVE]
+
 ## Introduction
 
 This chart bootstraps a Coda protocol Testnet seed node.
