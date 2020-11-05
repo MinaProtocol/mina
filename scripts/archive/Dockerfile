@@ -29,3 +29,5 @@ RUN apt-get -y update && \
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
   && apt-get -y update \
   && apt-get install -y "coda-archive=$coda_deb_version"
+
+ENTRYPOINT ["bash", "-c"]
