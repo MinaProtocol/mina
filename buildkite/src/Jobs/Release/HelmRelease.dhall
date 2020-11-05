@@ -32,7 +32,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "HELM_RELEASE=true buildkite/scripts/helm-ci.sh" ]
+          commands = [ Cmd.run "AUTO_DEPLOY=true HELM_RELEASE=true buildkite/scripts/helm-ci.sh" ]
           , label = "Helm chart release"
           , key = "release-helm-chart"
           , target = Size.Medium

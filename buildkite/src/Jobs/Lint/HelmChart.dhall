@@ -1,3 +1,5 @@
+--- Trigger to lint -> auto-deploy
+
 let Prelude = ../../External/Prelude.dhall
 let B = ../../External/Buildkite.dhall
 
