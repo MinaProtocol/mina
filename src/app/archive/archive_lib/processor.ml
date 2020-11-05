@@ -89,7 +89,6 @@ end
 
 module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
-    let open Deferred.Result.Let_syntax in
     let hash = Frozen_ledger_hash.to_string t in
     Conn.find
       (Caqti_request.find Caqti_type.string Caqti_type.int
