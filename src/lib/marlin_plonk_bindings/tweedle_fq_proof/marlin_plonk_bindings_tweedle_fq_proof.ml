@@ -42,4 +42,4 @@ external batch_verify :
   -> Marlin_plonk_bindings_tweedle_fq_verifier_index.t array
   -> t array
   -> bool
-  = "caml_tweedle_fq_plonk_proof_verify"
+  = "caml_tweedle_fq_plonk_proof_batch_verify"
