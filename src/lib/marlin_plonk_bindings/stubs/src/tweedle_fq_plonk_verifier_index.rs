@@ -133,6 +133,7 @@ pub fn to_ocaml_copy<'a>(
 pub fn of_ocaml<'a>(
     max_poly_size: ocaml::Int,
     max_quot_size: ocaml::Int,
+    log_size_of_group: ocaml::Int,
     urs: CamlTweedleFqUrs,
     evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<CamlTweedleFpPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFqPtr>,
@@ -146,7 +147,7 @@ pub fn of_ocaml<'a>(
     };
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
     let index = DlogVerifierIndex::<GAffine> {
-        domain: Domain::<Fq>::new(max_poly_size as usize).unwrap(),
+        domain: Domain::<Fq>::new(1 << log_size_of_group).unwrap(),
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
@@ -186,6 +187,7 @@ impl From<CamlTweedleFqPlonkVerifierIndexPtr> for CamlTweedleFqPlonkVerifierInde
         of_ocaml(
             index.max_poly_size,
             index.max_quot_size,
+            index.domain.log_size_of_group,
             index.urs,
             index.evals,
             index.shifts,
@@ -279,11 +281,12 @@ pub fn caml_tweedle_fq_plonk_verifier_index_write(
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
     max_poly_size: ocaml::Int,
     max_quot_size: ocaml::Int,
+    log_size_of_group: ocaml::Int,
     urs: CamlTweedleFqUrs,
     evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<CamlTweedleFpPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFqPtr>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(max_poly_size, max_quot_size, urs, evals, shifts)
+    of_ocaml(max_poly_size, max_quot_size, log_size_of_group, urs, evals, shifts)
 }
 
 #[ocaml::func]
