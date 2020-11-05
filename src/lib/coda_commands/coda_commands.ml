@@ -316,7 +316,7 @@ let get_status ~flag t =
           `Active `Offline
       | `Synced | `Catchup ->
           if abs (highest_block_length_received - blockchain_length) < 5 then
-            `Active `Sync
+            `Active `Synced
           else `Active `Catchup
     in
     let consensus_time_best_tip =
