@@ -500,33 +500,37 @@ module Ledger = struct
       | None ->
           return None
     in
+    let search_local_and_s3 name =
+      let named_filename =
+        named_filename ~constraint_constants ~num_accounts:config.num_accounts
+          ~balances:config.balances name
+      in
+      match%bind
+        Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+      with
+      | Some path ->
+          return (Some path)
+      | None ->
+          load_from_s3 named_filename
+    in
     match hash_filename with
     | Some filename ->
         return (Some filename)
     | None -> (
-      match config.base with
-      | Hash hash ->
-          assert (Some hash = config.hash) ;
-          return None
-      | Accounts accounts -> (
-          let named_filename =
-            named_filename ~constraint_constants
-              ~num_accounts:config.num_accounts ~balances:config.balances
-              (accounts_name accounts)
-          in
-          match%bind
-            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
-          with
-          | Some path ->
-              return (Some path)
-          | None ->
-              load_from_s3 named_filename )
-      | Named name ->
+      match (config.base, config.name) with
+      | Named name, _ ->
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts ~balances:config.balances name
           in
-          Deferred.List.find_map ~f:(file_exists named_filename) search_paths )
+          Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+      | Accounts accounts, _ ->
+          search_local_and_s3 (accounts_name accounts)
+      | Hash hash, None ->
+          assert (Some hash = config.hash) ;
+          return None
+      | _, Some name ->
+          search_local_and_s3 name )
 
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -719,12 +723,12 @@ module Ledger = struct
                 match (config.base, config.name) with
                 | Named name, _ ->
                     Some name
-                | _, Some name ->
-                    Some name
-                | Accounts accounts, None ->
+                | Accounts accounts, _ ->
                     Some (accounts_name accounts)
                 | Hash _, None ->
                     None
+                | _, Some name ->
+                    Some name
               in
               match (tar_path, name) with
               | Ok tar_path, Some name ->
