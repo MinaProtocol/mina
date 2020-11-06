@@ -316,24 +316,26 @@ module Data = struct
           , `String
               (Coda_base.Frozen_ledger_hash.to_string genesis_ledger_hash) ) ]
 
-    let epoch_ledger_uuids_from_file ~genesis_ledger_hash location =
+    let epoch_ledger_uuids_from_file ~genesis_ledger_hash epoch_ledger_location
+        =
       let open Yojson.Basic.Util in
-      let json = Yojson.Basic.from_file location in
+      let json = Yojson.Basic.from_file (epoch_ledger_location ^ ".json") in
       let stored_genesis_ledger_hash =
         json
         |> member "genesis_ledger_hash"
         |> to_string |> Coda_base.Frozen_ledger_hash.of_string
       in
+      let staking = json |> member "staking" |> to_string |> Uuid.of_string in
+      let next = json |> member "next" |> to_string |> Uuid.of_string in
       if
         Coda_base.Frozen_ledger_hash.equal genesis_ledger_hash
           stored_genesis_ledger_hash
-      then
-        Some
-          Data.
-            { staking= json |> member "staking" |> to_string |> Uuid.of_string
-            ; next= json |> member "next" |> to_string |> Uuid.of_string
-            ; genesis_ledger_hash }
-      else None
+      then Some Data.{staking; next; genesis_ledger_hash}
+      else (
+        Sys.remove epoch_ledger_location ;
+        File_system.rmrf @@ epoch_ledger_location ^ Uuid.to_string staking ;
+        File_system.rmrf @@ epoch_ledger_location ^ Uuid.to_string next ;
+        None )
 
     let create_epoch_ledger ~location ~genesis_ledger ~ledger_depth =
       let open Coda_base in
@@ -366,16 +368,17 @@ module Data = struct
       let genesis_ledger_hash = Ledger.merkle_root genesis_ledger in
       let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
       let epoch_ledger_uuids =
-        if Sys.file_exists epoch_ledger_uuids_location then
+        if Sys.file_exists epoch_ledger_uuids_location then (
           match
             epoch_ledger_uuids_from_file ~genesis_ledger_hash
-              epoch_ledger_uuids_location
+              epoch_ledger_location
           with
           | Some epoch_ledger_uuids ->
               epoch_ledger_uuids
           | None ->
+              Sys.remove epoch_ledger_uuids_location ;
               initialize_epoch_ledger_uuids ~genesis_ledger_hash
-                ~epoch_ledger_uuids_location
+                ~epoch_ledger_uuids_location )
         else
           initialize_epoch_ledger_uuids ~genesis_ledger_hash
             ~epoch_ledger_uuids_location
