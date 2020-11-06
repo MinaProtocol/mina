@@ -36,20 +36,19 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~profiles, ~switchModalState) => {
+let make = (~profiles, ~switchModalState, ~setCurrentMember) => {
   <div className=Styles.grid>
     {React.array(
        Array.map(
          (p: ContentType.TeamProfile.t) => {
-           Js.log(p);
-           <div key={p.name}>
+           <div key={p.name} onClick={_ => setCurrentMember(p)}>
              <TeamMember
                fullName={p.name}
                title={p.title}
-               switchModalState
                src={p.image.fields.file.url}
+               switchModalState
              />
-           </div>;
+           </div>
          },
          profiles,
        ),

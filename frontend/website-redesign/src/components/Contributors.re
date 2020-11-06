@@ -22,11 +22,15 @@ module Styles = {
       modalShowing ? opacity(1.) : opacity(0.),
       pointerEvents(`none),
       transition("opacity", ~duration=400, ~timingFunction=`easeIn),
-      position(`absolute),
+      position(`fixed),
       height(`rem(286.8)),
       width(`vw(100.)),
       backgroundColor(`rgba((0, 0, 0, 0.3))),
       display(`flex),
+      top(`percent(50.)),
+      left(`percent(50.)),
+      zIndex(100),
+      transform(`translate((`percent(-50.), `percent(-50.)))),
       media(Theme.MediaQuery.tablet, [height(`rem(158.8))]),
       media(Theme.MediaQuery.desktop, [height(`rem(124.))]),
     ]);
@@ -111,26 +115,27 @@ module GenesisMembersGrid = {
 
 module Modal = {
   [@react.component]
-  let make = () => {
-    <div className=Styles.modal>
-      <GenesisMemberProfile
-        key="Test Name"
-        name="Test Name"
-        photo="/static/img/headshots/IzaakMeckler.jpg"
-        quote={"\"" ++ "This is a quote" ++ "\""}
-        location="This is a location"
-        twitter="twitter"
-        github=None
-        blogPost=None
-      />
-    </div>;
+  let make = (~currentMember: option(ContentType.TeamProfile.t)) => {
+    Belt.Option.mapWithDefault(currentMember, React.null, currentMember => {
+      <div className=Styles.modal>
+        <TeamMemberProfile member=currentMember />
+      </div>
+    });
   };
 };
 
 [@react.component]
 let make = (~profiles, ~modalOpen, ~switchModalState) => {
+  let (currentMember, setCurrentMember) = React.useState(_ => None);
+
+  let setMember = member => {
+    setCurrentMember(_ => Some(member));
+  };
+
   <>
-    <div className={Styles.modalContainer(modalOpen)}> <Modal /> </div>
+    <div className={Styles.modalContainer(modalOpen)}>
+      <Modal currentMember />
+    </div>
     <div className=Styles.container>
       <Wrapped>
         <div className=Styles.headerCopy>
@@ -142,7 +147,7 @@ let make = (~profiles, ~modalOpen, ~switchModalState) => {
           </p>
         </div>
         <Rule color=Theme.Colors.black />
-        <TeamGrid profiles switchModalState />
+        <TeamGrid profiles switchModalState setCurrentMember=setMember />
         <div className=Styles.genesisRule>
           <Rule color=Theme.Colors.black />
         </div>

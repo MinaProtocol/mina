@@ -140,6 +140,7 @@ module TeamProfile = {
     twitter: option(string),
     github: option(string),
     linkedIn: option(string),
+    location: string,
   };
   type entry = System.entry(t);
   type entries = System.entries(t);
