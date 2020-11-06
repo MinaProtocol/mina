@@ -482,11 +482,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 | None ->
                     d
                 | Some timeout ->
-                    Deferred.any
-                      [ d
-                      ; ( after timeout
-                        >>| fun () -> Or_error.error_string "rpc timed out" )
-                      ] )
+                    Deferred.choose
+                      [ choice d Fn.id
+                      ; choice (after timeout) (fun () ->
+                            Or_error.error_string "rpc timed out" ) ] )
               transport
               ~on_handshake_error:
                 (`Call
