@@ -109,6 +109,7 @@ module Make_real () = struct
       ; proof_level= Full
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
+      ; genesis_epoch_data= None
       ; consensus_constants
       ; protocol_state_with_hash
       ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
@@ -200,6 +201,7 @@ let main () =
            ; proof_level= Genesis_constants.Proof_level.for_unit_tests
            ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
+           ; genesis_epoch_data= Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
            ; genesis_proof= Coda_base.Proof.blockchain_dummy })
@@ -230,6 +232,7 @@ let main () =
            ; proof_level= Genesis_constants.Proof_level.compiled
            ; genesis_constants
            ; genesis_ledger= (module Test_genesis_ledger)
+           ; genesis_epoch_data= Genesis_epoch_data.compiled
            ; consensus_constants
            ; protocol_state_with_hash
            ; genesis_proof= compiled_base_proof })]

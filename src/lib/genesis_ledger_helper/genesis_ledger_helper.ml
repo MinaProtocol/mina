@@ -433,7 +433,7 @@ module Ledger = struct
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~num_accounts ~balances name =
+      ~num_accounts ~balances ~ledger_name_prefix name =
     let str =
       String.concat
         [ Int.to_string constraint_constants.ledger_depth
@@ -447,7 +447,7 @@ module Ledger = struct
             Coda_base.Account.Stable.Latest.bin_writer_t
             Coda_base.Account.empty ]
     in
-    "genesis_ledger_" ^ name ^ "_"
+    ledger_name_prefix ^ "_" ^ name ^ "_"
     ^ Blake2.(to_hex (digest_string str))
     ^ ".tar.gz"
 
@@ -458,7 +458,7 @@ module Ledger = struct
     in
     "accounts_" ^ Blake2.to_hex hash
 
-  let find_tar ~logger ~genesis_dir ~constraint_constants
+  let find_tar ~logger ~genesis_dir ~constraint_constants ~ledger_name_prefix
       (config : Runtime_config.Ledger.t) =
     let search_paths = Cache_dir.possible_paths "" @ [genesis_dir] in
     let file_exists filename path =
@@ -512,7 +512,7 @@ module Ledger = struct
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts ~balances:config.balances
-              (accounts_name accounts)
+              ~ledger_name_prefix (accounts_name accounts)
           in
           match%bind
             Deferred.List.find_map ~f:(file_exists named_filename) search_paths
@@ -524,7 +524,8 @@ module Ledger = struct
       | Named name ->
           let named_filename =
             named_filename ~constraint_constants
-              ~num_accounts:config.num_accounts ~balances:config.balances name
+              ~num_accounts:config.num_accounts ~balances:config.balances
+              ~ledger_name_prefix name
           in
           Deferred.List.find_map ~f:(file_exists named_filename) search_paths )
 
@@ -652,6 +653,7 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?(ledger_name_prefix = "genesis_ledger")
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let padded_accounts_opt =
@@ -659,7 +661,8 @@ module Ledger = struct
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
-          find_tar ~logger ~genesis_dir ~constraint_constants config
+          find_tar ~logger ~genesis_dir ~constraint_constants
+            ~ledger_name_prefix config
         in
         match tar_path with
         | Some tar_path -> (
@@ -691,7 +694,7 @@ module Ledger = struct
                 let ledger_filename =
                   named_filename ~constraint_constants
                     ~num_accounts:config.num_accounts ~balances:config.balances
-                    ledger_name
+                    ~ledger_name_prefix ledger_name
                 in
                 [%log error]
                   "Bad config $config: genesis ledger named $ledger_name is \
@@ -732,7 +735,7 @@ module Ledger = struct
                     genesis_dir
                     ^/ named_filename ~constraint_constants
                          ~num_accounts:config.num_accounts
-                         ~balances:config.balances name
+                         ~balances:config.balances ~ledger_name_prefix name
                   in
                   (* Delete the file if it already exists. *)
                   let%bind () =
@@ -760,6 +763,50 @@ module Ledger = struct
                       [ ("path", `String tar_path)
                       ; ("error", `String (Error.to_string_hum err)) ] ;
                   return (Error err) ) ) )
+end
+
+module Epoch_data = struct
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      (config : Runtime_config.Epoch_data.t option) =
+    let open Deferred.Or_error.Let_syntax in
+    match config with
+    | None ->
+        Deferred.Or_error.return (None, None)
+    | Some config ->
+        let ledger_name_prefix = "epoch_ledger" in
+        let load_ledger ledger =
+          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+            ~ledger_name_prefix ledger
+        in
+        let%bind staking, config' =
+          let%map staking_ledger, config', ledger_file =
+            load_ledger config.staking.ledger
+          in
+          [%log info] "Loaded staking epoch ledger from $ledger_file"
+            ~metadata:[("ledger_file", `String ledger_file)] ;
+          ( { Genesis_epoch_data.Data.ledger= staking_ledger
+            ; seed= Epoch_seed.of_string config.staking.seed }
+          , {config.staking with ledger= config'} )
+        in
+        let%map next, config'' =
+          match config.next with
+          | None ->
+              [%log info]
+                "Configured next epoch ledger same as the staking epoch ledger" ;
+              Deferred.Or_error.return (None, None)
+          | Some {ledger; seed} ->
+              let%map next_ledger, config'', ledger_file =
+                load_ledger ledger
+              in
+              [%log info] "Loaded next epoch ledger from $ledger_file"
+                ~metadata:[("ledger_file", `String ledger_file)] ;
+              ( Some
+                  { Genesis_epoch_data.Data.ledger= next_ledger
+                  ; seed= Epoch_seed.of_string seed }
+              , Some {Runtime_config.Epoch_data.Data.ledger= config''; seed} )
+        in
+        ( Some {Genesis_epoch_data.staking; next}
+        , Some {Runtime_config.Epoch_data.staking= config'; next= config''} )
 end
 
 (* This hash encodes the data that determines a genesis proof:
@@ -822,7 +869,7 @@ module Genesis_proof = struct
                 ; ("error", `String (Error.to_string_hum e)) ] ;
             return None )
 
-  let generate_inputs ~runtime_config ~proof_level ~ledger
+  let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id
       ~(genesis_constants : Genesis_constants.t) =
     let consensus_constants =
@@ -839,6 +886,7 @@ module Genesis_proof = struct
     ; proof_level
     ; blockchain_proof_system_id
     ; genesis_ledger= ledger
+    ; genesis_epoch_data
     ; consensus_constants
     ; protocol_state_with_hash
     ; genesis_constants }
@@ -866,6 +914,7 @@ module Genesis_proof = struct
           Genesis_proof.create_values
             (module B)
             { genesis_ledger= inputs.genesis_ledger
+            ; genesis_epoch_data= inputs.genesis_epoch_data
             ; runtime_config= inputs.runtime_config
             ; proof_level= inputs.proof_level
             ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id)
@@ -881,6 +930,7 @@ module Genesis_proof = struct
         ; proof_level= inputs.proof_level
         ; genesis_constants= inputs.genesis_constants
         ; genesis_ledger= inputs.genesis_ledger
+        ; genesis_epoch_data= inputs.genesis_epoch_data
         ; consensus_constants= inputs.consensus_constants
         ; protocol_state_with_hash= inputs.protocol_state_with_hash
         ; genesis_proof= Coda_base.Proof.blockchain_dummy }
@@ -935,6 +985,7 @@ module Genesis_proof = struct
                 ; proof_level= inputs.proof_level
                 ; genesis_constants= inputs.genesis_constants
                 ; genesis_ledger= inputs.genesis_ledger
+                ; genesis_epoch_data= inputs.genesis_epoch_data
                 ; consensus_constants= inputs.consensus_constants
                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
                 ; genesis_proof }
@@ -961,6 +1012,7 @@ module Genesis_proof = struct
           ; proof_level= inputs.proof_level
           ; genesis_constants= inputs.genesis_constants
           ; genesis_ledger= inputs.genesis_ledger
+          ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; genesis_proof= compiled.genesis_proof }
@@ -1233,8 +1285,14 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            ; name= None
            ; add_genesis_winner= None })
   in
+  let%bind genesis_epoch_data, genesis_epoch_data_config =
+    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      config.epoch_data
+  in
   let config =
-    {config with ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)}
+    { config with
+      ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)
+    ; epoch_data= genesis_epoch_data_config }
   in
   let%bind genesis_constants =
     Deferred.return
@@ -1243,7 +1301,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   let proof_inputs =
     Genesis_proof.generate_inputs ~runtime_config:config ~proof_level
       ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
-      ~blockchain_proof_system_id
+      ~blockchain_proof_system_id ~genesis_epoch_data
   in
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
@@ -1318,7 +1376,7 @@ let upgrade_old_config ~logger filename json =
       (* This error will get handled properly elsewhere, do nothing here. *)
       return json
 
-let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
+(*let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
     Runtime_config.t =
   let genesis_constants = precomputed_values.genesis_constants in
   let constraint_constants = precomputed_values.constraint_constants in
@@ -1393,7 +1451,7 @@ let inferred_runtime_config (precomputed_values : Precomputed_values.t) :
               |> Option.value ~default:Public_key.Compressed.empty
               |> Public_key.Compressed.equal
                    (fst Coda_state.Consensus_state_hooks.genesis_winner) ) } }
-
+*)
 let%test_module "Account config test" =
   ( module struct
     let%test_unit "Runtime config <=> Account" =
