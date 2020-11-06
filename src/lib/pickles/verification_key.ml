@@ -53,7 +53,7 @@ module Stable = struct
         let {Snarky_bn382_bindings.Shifts.r; o} =
           Common.tock_shifts ~log2_size
         in
-        let max_quot_size = (5 * (Domain.size d + 2)) - 5 in
+        let max_quot_size = Common.max_quot_size_int (Domain.size d) in
         Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
           ~max_poly_size:(u (1 lsl Nat.to_int Rounds.Wrap.n))
           ~max_quot_size:(u max_quot_size) ~urs ~sigma_comm0:(g c.sigma_comm_0)

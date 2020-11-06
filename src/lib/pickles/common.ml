@@ -226,3 +226,8 @@ let index_commitment_length k ~max_degree =
   1
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
+
+let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
+  of_int 5 * (domain_size - of_int 1)
+
+let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )

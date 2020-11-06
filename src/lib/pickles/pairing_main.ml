@@ -383,14 +383,14 @@ struct
             + m.qc_comm
           in
           let poseidon =
-            (* alpha^3 rcm_comm[0] + alpha^4 rcm_comm[1] + alpha^5 rcm_comm[2]
+            (* alpha^2 rcm_comm[0] + alpha^3 rcm_comm[1] + alpha^4 rcm_comm[2]
                  =
-                 alpha^3 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
+                 alpha^2 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
               *)
             let a = alpha in
             let ( * ) = Fn.flip Scalar_challenge.endo in
             m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
-            |> ( * ) a |> ( * ) a |> ( * ) a
+            |> ( * ) a |> ( * ) a
           in
           let g =
             List.reduce_exn ~f:( + )
@@ -436,7 +436,8 @@ struct
               check_bulletproof
                 ~pcs_batch:
                   (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
-                     ~max_quot_size:((5 * (Domain.size domain + 2)) - 5))
+                     ~max_quot_size:
+                       (Common.max_quot_size_int (Domain.size domain)))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
                 ~advice ~openings_proof
                 ~polynomials:(without_degree_bound, [t_comm]) )
@@ -772,7 +773,7 @@ struct
               Side_loaded_verification_key.(Domain.log2_size max_domains.h)
         ; x= Pow_2_roots_of_unity 0 }
     in
-    Commitment_lengths.generic' ~h ~add:Field.add ~mul:Field.mul
+    Commitment_lengths.generic' ~h ~add:Field.add ~mul:Field.mul ~sub:Field.sub
       ~of_int:Field.of_int
       ~ceil_div_max_degree:
         (let k = Nat.to_int Backend.Tick.Rounds.n in
@@ -912,10 +913,13 @@ struct
               `Known
                 ( which_branch
                 , Vector.map step_domains ~f:(fun x ->
-                      (5 * (Domain.size x.Domains.h + 2)) - 5 ) )
+                      Common.max_quot_size_int (Domain.size x.Domains.h) ) )
           | `Side_loaded domains ->
               let conv domain =
-                let deg = (of_int 5 * domain#size) + of_int 5 in
+                let deg =
+                  Common.max_quot_size ~of_int ~mul:( * ) ~sub:( - )
+                    domain#size
+                in
                 let d = Split_evaluations.mod_max_degree deg in
                 Number.(
                   to_bits (constant (Field.Constant.of_int Max_degree.step) - d))

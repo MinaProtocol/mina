@@ -42,7 +42,8 @@ let combined_inner_product (type actual_branching)
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations
       (Common.dlog_pcs_batch (AB.add Nat.N8.n)
-         ~max_quot_size:Int.((5 * (Domain.size step_branch_domains.h + 2)) - 5))
+         ~max_quot_size:
+           (Common.max_quot_size_int (Domain.size step_branch_domains.h)))
       ~xi ~init:Fn.id ~mul
       ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
       ~last:Array.last ~evaluation_point:pt

@@ -299,7 +299,7 @@ let wrap_main
                     h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
-                          (5 * (Domain.size d.h + 2)) - 5 ) ) ) )
+                          Common.max_quot_size_int (Domain.size d.h) ) ) ) )
               |> Vector.unzip
             in
             let actual_branchings =
@@ -422,10 +422,7 @@ let wrap_main
             (module Max_branching)
             ~step_widths ~step_domains ~verification_key:pairing_plonk_index
             ~xi ~sponge
-            ~public_input:
-              (Array.append [||]
-                 (* [|[Boolean.true_]|]*)
-                 (pack_statement Max_branching.n prev_statement))
+            ~public_input:(pack_statement Max_branching.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
             ~messages ~which_branch ~openings_proof
             ~plonk:
