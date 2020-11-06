@@ -157,38 +157,39 @@ let make = () => {
       <p className=Styles.advisorsSubhead>
         {React.string("Supporting O(1) Labs")}
       </p>
-      <div className=Styles.advisorGrid>
-        <TeamMember
-          fullName="Jill Carlson"
-          title="Co-founder, Open Money Initiative"
-          src="/static/img/headshots/carlson.jpg"
-        />
-        <TeamMember
-          fullName="Paul Davidson"
-          title="Co-founder & CEO, Alpha Exploration Co."
-          src="/static/img/headshots/davidson.jpg"
-        />
-        <TeamMember
-          fullName="Joseph Bonneau"
-          title="Advisor"
-          src="/static/img/headshots/bonneau.jpg"
-        />
-        <TeamMember
-          fullName="Akis Kattis"
-          title="Advisor"
-          src="/static/img/headshots/kattis.jpg"
-        />
-        <TeamMember
-          fullName="Benedikt Bunz"
-          title="Advisor"
-          src="/static/img/headshots/bunz.jpg"
-        />
-        <TeamMember
-          fullName="Amit Sahai"
-          title="Director, Center for Encrypted Functionalities"
-          src="/static/img/headshots/sahai.jpg"
-        />
-      </div>
+      <div
+        className=Styles.advisorGrid
+        // <TeamMember
+        //   fullName="Jill Carlson"
+        //   title="Co-founder, Open Money Initiative"
+        //   src="/static/img/headshots/carlson.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Paul Davidson"
+        //   title="Co-founder & CEO, Alpha Exploration Co."
+        //   src="/static/img/headshots/davidson.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Joseph Bonneau"
+        //   title="Advisor"
+        //   src="/static/img/headshots/bonneau.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Akis Kattis"
+        //   title="Advisor"
+        //   src="/static/img/headshots/kattis.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Benedikt Bunz"
+        //   title="Advisor"
+        //   src="/static/img/headshots/bunz.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Amit Sahai"
+        //   title="Director, Center for Encrypted Functionalities"
+        //   src="/static/img/headshots/sahai.jpg"
+        // />
+      />
     </Wrapped>
   </div>;
 };

@@ -14,28 +14,27 @@ module Styles = {
     ]);
   let headerCopy =
     style([media(Theme.MediaQuery.desktop, [width(`rem(42.))])]);
+
   let genesisRule =
     style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
 
   let modalContainer = modalShowing =>
     style([
       modalShowing ? opacity(1.) : opacity(0.),
-      pointerEvents(`none),
+      modalShowing ? pointerEvents(`auto) : pointerEvents(`none),
       transition("opacity", ~duration=400, ~timingFunction=`easeIn),
       position(`fixed),
-      height(`rem(286.8)),
+      height(`vh(100.)),
       width(`vw(100.)),
       backgroundColor(`rgba((0, 0, 0, 0.3))),
       display(`flex),
       top(`percent(50.)),
       left(`percent(50.)),
-      zIndex(100),
       transform(`translate((`percent(-50.), `percent(-50.)))),
-      media(Theme.MediaQuery.tablet, [height(`rem(158.8))]),
-      media(Theme.MediaQuery.desktop, [height(`rem(124.))]),
+      zIndex(10),
     ]);
 
-  let modal = style([zIndex(100), margin(`auto)]);
+  let modal = style([margin(`auto)]);
 };
 
 module GenesisMembersGrid = {
@@ -92,49 +91,70 @@ module GenesisMembersGrid = {
            )}
         </p>
       </div>
-      <div className=Styles.grid>
-        <TeamMember
-          fullName="Greg | DeFidog"
-          title="Genesis Founding Member"
-          src="/static/img/headshots/Greg.jpg"
-        />
-        <TeamMember
-          fullName="Alexander#4542"
-          title="Genesis Founding Member"
-          src="/static/img/headshots/Alexander.jpg"
-        />
-        <TeamMember
-          fullName="GarethDavies"
-          title="Genesis Founding Member"
-          src="/static/img/headshots/GarethDavies.jpg"
-        />
-      </div>
+      <div
+        className=Styles.grid
+        // <TeamMember
+        //   fullName="Greg | DeFidog"
+        //   title="Genesis Founding Member"
+        //   src="/static/img/headshots/Greg.jpg"
+        // />
+        // <TeamMember
+        //   fullName="Alexander#4542"
+        //   title="Genesis Founding Member"
+        //   src="/static/img/headshots/Alexander.jpg"
+        // />
+        // <TeamMember
+        //   fullName="GarethDavies"
+        //   title="Genesis Founding Member"
+        //   src="/static/img/headshots/GarethDavies.jpg"
+        // />
+      />
     </>;
   };
 };
 
 module Modal = {
   [@react.component]
-  let make = (~currentMember: option(ContentType.TeamProfile.t)) => {
-    Belt.Option.mapWithDefault(currentMember, React.null, currentMember => {
-      <div className=Styles.modal>
-        <TeamMemberProfile member=currentMember />
-      </div>
-    });
+  let make =
+      (
+        ~currentMember: ContentType.TeamProfile.t,
+        ~switchModalState,
+        ~onNextMemberPress,
+        ~onPrevMemberPress,
+      ) => {
+    <div className=Styles.modal>
+      <TeamMemberProfile
+        member=currentMember
+        switchModalState
+        onNextMemberPress
+        onPrevMemberPress
+      />
+    </div>;
   };
 };
 
 [@react.component]
 let make = (~profiles, ~modalOpen, ~switchModalState) => {
-  let (currentMember, setCurrentMember) = React.useState(_ => None);
+  let (currentMemberIndex, setCurrentMemberIndex) = React.useState(_ => 0);
 
-  let setMember = member => {
-    setCurrentMember(_ => Some(member));
+  let onPrevMemberPress = () => {
+    currentMemberIndex <= 0
+      ? () : setCurrentMemberIndex(_ => currentMemberIndex - 1);
+  };
+
+  let onNextMemberPress = () => {
+    currentMemberIndex >= Array.length(profiles)
+      ? () : setCurrentMemberIndex(_ => currentMemberIndex + 1);
   };
 
   <>
     <div className={Styles.modalContainer(modalOpen)}>
-      <Modal currentMember />
+      <Modal
+        currentMember={Array.get(profiles, currentMemberIndex)}
+        switchModalState
+        onPrevMemberPress
+        onNextMemberPress
+      />
     </div>
     <div className=Styles.container>
       <Wrapped>
@@ -147,7 +167,7 @@ let make = (~profiles, ~modalOpen, ~switchModalState) => {
           </p>
         </div>
         <Rule color=Theme.Colors.black />
-        <TeamGrid profiles switchModalState setCurrentMember=setMember />
+        <TeamGrid profiles switchModalState setCurrentMemberIndex />
         <div className=Styles.genesisRule>
           <Rule color=Theme.Colors.black />
         </div>

@@ -36,18 +36,14 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~profiles, ~switchModalState, ~setCurrentMember) => {
+let make =
+    (~profiles, ~switchModalState,  ~setCurrentMemberIndex) => {
   <div className=Styles.grid>
     {React.array(
-       Array.map(
-         (p: ContentType.TeamProfile.t) => {
-           <div key={p.name} onClick={_ => setCurrentMember(p)}>
-             <TeamMember
-               fullName={p.name}
-               title={p.title}
-               src={p.image.fields.file.url}
-               switchModalState
-             />
+       Array.mapi(
+         (index, member: ContentType.TeamProfile.t) => {
+           <div key={member.name}>
+             <TeamMember index member switchModalState setCurrentMemberIndex />
            </div>
          },
          profiles,

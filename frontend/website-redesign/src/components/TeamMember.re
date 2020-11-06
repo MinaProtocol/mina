@@ -40,15 +40,26 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~fullName="", ~title="", ~src="", ~switchModalState=_ => ()) => {
+let make =
+    (
+      ~member: ContentType.TeamProfile.t,
+      ~switchModalState=_ => (),
+      ~setCurrentMemberIndex,
+      ~index,
+    ) => {
   <div className=Styles.memberContainer>
-    <img className=Styles.image src />
+    <img className=Styles.image src={member.image.fields.file.url} />
     <div className=Styles.flexRow>
-      <h5 className=Styles.name> {React.string(fullName)} </h5>
-      <span className=Styles.icon onClick={_ => switchModalState()}>
+      <h5 className=Styles.name> {React.string(member.name)} </h5>
+      <span
+        className=Styles.icon
+        onClick={_ => {
+          switchModalState();
+          setCurrentMemberIndex(_ => index);
+        }}>
         <Icon kind=Icon.Plus />
       </span>
     </div>
-    <p className=Styles.title> {React.string(title)} </p>
+    <p className=Styles.title> {React.string(member.title)} </p>
   </div>;
 };
