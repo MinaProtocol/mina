@@ -152,7 +152,6 @@ spec:
             memory: 14.0Gi
             cpu: 8.0
         image: {{ $.Values.coda.image }}
-        command: ["/usr/bin/dumb-init", "/root/init_coda.sh"]
         args: [ "daemon",
           "-log-level", {{ $.Values.coda.logLevel }},
           "-log-json",

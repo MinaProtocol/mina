@@ -149,22 +149,23 @@ struct
               zeta * domain_generator ~log2_size:(Domain.log2_size domain))
           in
           time "plonk_checks" (fun () ->
-          Plonk_checks.derive_plonk
-            (module Tick.Field)
-            ~endo:Endo.Dee.base ~shift:Shifts.tick
-            ~mds:Tick_field_sponge.params.mds
-            ~domain:
-              (Plonk_checks.domain
-                 (module Tick.Field)
-                 domain ~shifts:Common.tick_shifts
-                 ~domain_generator:Backend.Tick.Field.domain_generator)
-            { zeta
-            ; alpha
-            ; beta= Challenge.Constant.to_tick_field plonk0.beta
-            ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
-            (Plonk_checks.evals_of_split_evals
-               (module Tick.Field)
-               t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw) )
+              Plonk_checks.derive_plonk
+                (module Tick.Field)
+                ~endo:Endo.Dee.base ~shift:Shifts.tick
+                ~mds:Tick_field_sponge.params.mds
+                ~domain:
+                  (Plonk_checks.domain
+                     (module Tick.Field)
+                     domain ~shifts:Common.tick_shifts
+                     ~domain_generator:Backend.Tick.Field.domain_generator)
+                { zeta
+                ; alpha
+                ; beta= Challenge.Constant.to_tick_field plonk0.beta
+                ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
+                (Plonk_checks.evals_of_split_evals
+                   (module Tick.Field)
+                   t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+          )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in

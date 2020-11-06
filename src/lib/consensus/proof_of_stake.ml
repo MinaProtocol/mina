@@ -245,7 +245,10 @@ module Data = struct
     end
 
     module Data = struct
-      type epoch_ledger_uuids = {staking: Uuid.t; next: Uuid.t}
+      type epoch_ledger_uuids =
+        { staking: Uuid.t
+        ; next: Uuid.t
+        ; genesis_state_hash: Coda_base.State_hash.t }
 
       (* Invariant: Snapshot's delegators are taken from accounts in block_production_pubkeys *)
       type t =
@@ -304,22 +307,33 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let epoch_ledger_uuids_to_yojson Data.{staking; next} =
+    let epoch_ledger_uuids_to_yojson Data.{staking; next; genesis_state_hash} =
       `Assoc
         [ ("staking", `String (Uuid.to_string staking))
-        ; ("next", `String (Uuid.to_string next)) ]
+        ; ("next", `String (Uuid.to_string next))
+        ; ( "genesis_state_hash"
+          , Coda_base.State_hash.to_yojson genesis_state_hash ) ]
 
     let epoch_ledger_uuids_from_file location =
-      let open Yojson.Basic.Util in
-      let json = Yojson.Basic.from_file location in
-      Data.
-        { staking= json |> member "staking" |> to_string |> Uuid.of_string
-        ; next= json |> member "next" |> to_string |> Uuid.of_string }
+      let open Yojson.Safe.Util in
+      let open Result.Let_syntax in
+      let json = Yojson.Safe.from_file location in
+      let uuid str =
+        Result.(
+          map_error
+            (try_with (fun () -> Uuid.of_string str))
+            ~f:(fun ex -> Exn.to_string ex))
+      in
+      let%bind staking = json |> member "staking" |> to_string |> uuid in
+      let%bind next = json |> member "next" |> to_string |> uuid in
+      let%map genesis_state_hash =
+        json |> member "genesis_state_hash" |> Coda_base.State_hash.of_yojson
+      in
+      Data.{staking; next; genesis_state_hash}
 
-    let create_epoch_ledger ~location ~genesis_ledger ~ledger_depth =
+    let create_epoch_ledger ~location ~logger ~genesis_ledger ~ledger_depth =
       let open Coda_base in
       if Sys.file_exists location then (
-        let logger = Logger.create () in
         [%log info]
           ~metadata:[("location", `String location)]
           "Loading epoch ledger from disk: $location" ;
@@ -328,34 +342,76 @@ module Data = struct
       else Snapshot.Ledger_snapshot.Genesis_ledger genesis_ledger
 
     let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location
-        ~ledger_depth =
+        ~ledger_depth ~genesis_state_hash =
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_ledger = Lazy.force genesis_ledger in
       let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
+      let logger = Logger.create () in
+      let create_new_uuids () =
+        let epoch_ledger_uuids =
+          Data.
+            { staking= Uuid_unix.create ()
+            ; next= Uuid_unix.create ()
+            ; genesis_state_hash }
+        in
+        Yojson.Safe.to_file epoch_ledger_uuids_location
+          (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+        epoch_ledger_uuids
+      in
+      let ledger_location uuid = epoch_ledger_location ^ Uuid.to_string uuid in
       let epoch_ledger_uuids =
-        if Sys.file_exists epoch_ledger_uuids_location then
-          epoch_ledger_uuids_from_file epoch_ledger_uuids_location
-        else
+        if Sys.file_exists epoch_ledger_uuids_location then (
           let epoch_ledger_uuids =
-            Data.{staking= Uuid_unix.create (); next= Uuid_unix.create ()}
+            match epoch_ledger_uuids_from_file epoch_ledger_uuids_location with
+            | Ok res ->
+                res
+            | Error str ->
+                [%log error]
+                  "Failed to read epoch ledger uuids from file $path: $error"
+                  ~metadata:
+                    [ ("path", `String epoch_ledger_uuids_location)
+                    ; ("error", `String str) ] ;
+                failwith "Failed to load epoch ledger uuids from file"
           in
-          Yojson.Basic.to_file epoch_ledger_uuids_location
-            (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
-          epoch_ledger_uuids
+          if
+            Coda_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
+              genesis_state_hash
+          then epoch_ledger_uuids
+          else
+            (*Clean-up outdated epoch ledgers*)
+            let staking_ledger_location =
+              ledger_location epoch_ledger_uuids.staking
+            in
+            let next_ledger_location =
+              ledger_location epoch_ledger_uuids.next
+            in
+            [%log info]
+              "Cleaning up old epoch ledgers with genesis state $state_hash \
+               at locations $staking and $next"
+              ~metadata:
+                [ ( "state_hash"
+                  , Coda_base.State_hash.to_yojson
+                      epoch_ledger_uuids.genesis_state_hash )
+                ; ("staking", `String staking_ledger_location)
+                ; ("next", `String next_ledger_location) ] ;
+            File_system.rmrf staking_ledger_location ;
+            File_system.rmrf next_ledger_location ;
+            create_new_uuids () )
+        else create_new_uuids ()
       in
       let staking_epoch_ledger_location =
-        epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.staking
+        ledger_location epoch_ledger_uuids.staking
       in
       let staking_epoch_ledger =
-        create_epoch_ledger ~location:staking_epoch_ledger_location
+        create_epoch_ledger ~location:staking_epoch_ledger_location ~logger
           ~genesis_ledger ~ledger_depth
       in
       let next_epoch_ledger_location =
-        epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.next
+        ledger_location epoch_ledger_uuids.next
       in
       let next_epoch_ledger =
-        create_epoch_ledger ~location:next_epoch_ledger_location
+        create_epoch_ledger ~location:next_epoch_ledger_location ~logger
           ~genesis_ledger ~ledger_depth
       in
       ref
@@ -2221,7 +2277,11 @@ module Data = struct
     let staking_epoch_data_var (t : var) : Epoch_data.var =
       t.staking_epoch_data
 
+    let staking_epoch_data (t : Value.t) = t.staking_epoch_data
+
     let next_epoch_data_var (t : var) : Epoch_data.var = t.next_epoch_data
+
+    let next_epoch_data (t : Value.t) = t.next_epoch_data
 
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
@@ -2967,10 +3027,12 @@ module Hooks = struct
       let epoch_ledger_uuids =
         Local_state.Data.
           { staking= !local_state.epoch_ledger_uuids.next
-          ; next= Uuid_unix.create () }
+          ; next= Uuid_unix.create ()
+          ; genesis_state_hash=
+              !local_state.epoch_ledger_uuids.genesis_state_hash }
       in
       !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
-      Yojson.Basic.to_file
+      Yojson.Safe.to_file
         (!local_state.epoch_ledger_location ^ ".json")
         (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
       !local_state.next_epoch_snapshot

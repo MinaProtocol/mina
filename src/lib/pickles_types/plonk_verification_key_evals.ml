@@ -5,6 +5,7 @@ module H_list = Snarky_backendless.H_list
 module Stable = struct
   module V1 = struct
     type 'comm t =
+          'comm Marlin_plonk_bindings_types.Plonk_verification_evals.t =
       { sigma_comm_0: 'comm
       ; sigma_comm_1: 'comm
       ; sigma_comm_2: 'comm

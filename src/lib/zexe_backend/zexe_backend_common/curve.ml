@@ -1,3 +1,4 @@
+open Marlin_plonk_bindings.Types
 open Intf
 open Core_kernel
 
@@ -11,34 +12,12 @@ module type Input_intf = sig
   end
 
   module Affine : sig
-    type t
-
-    val x : t -> BaseField.t
-
-    val y : t -> BaseField.t
-
-    val is_zero : t -> bool
-
-    val create : BaseField.t -> BaseField.t -> t
-
-    val delete : t -> unit
-
-    module Vector : sig
-      include Snarky_intf.Vector.S with type elt = t
-
-      val typ : t Ctypes.typ
-
-      val delete : t -> unit
-    end
-
-    module Pair : Intf.Pair with type elt := t
+    type t = (BaseField.t * BaseField.t) Or_infinity.t
   end
 
   type t
 
-  val delete : t -> unit
-
-  val to_affine_exn : t -> Affine.t
+  val to_affine : t -> Affine.t
 
   val of_affine_coordinates : BaseField.t -> BaseField.t -> t
 
@@ -64,7 +43,7 @@ module type Field_intf = sig
     end
   end
 
-  include Type_with_delete with type t = Stable.Latest.t
+  type t = Stable.Latest.t
 
   val ( + ) : t -> t -> t
 
@@ -91,31 +70,8 @@ module Make
          with module BaseField := BaseField
           and module ScalarField := ScalarField) =
 struct
-  let op1 f x =
-    let r = f x in
-    Caml.Gc.finalise C.delete r ;
-    r
-
-  let op2 f x y =
-    let r = f x y in
-    Caml.Gc.finalise C.delete r ;
-    r
-
-  type t = C.t
-
-  open C
-
-  let add = op2 add
-
-  let scale = op2 scale
-
-  let sub = op2 sub
-
-  let double = op1 double
-
-  let negate = op1 negate
-
-  let random = op1 random
+  include (
+    C : module type of C with type t = C.t with module Affine := C.Affine )
 
   let one = one ()
 
@@ -125,7 +81,9 @@ struct
     module Backend = struct
       include C.Affine
 
-      let zero = Memo.unit (fun () -> to_affine_exn zero)
+      let zero () = Or_infinity.Infinity
+
+      let create x y = Or_infinity.Finite (x, y)
     end
 
     module Stable = struct
@@ -140,37 +98,21 @@ struct
 
     include Stable.Latest
 
-    let to_backend = function
-      | Pickles_types.Or_infinity.Infinity ->
-          Backend.zero ()
-      | Finite (x, y) ->
-          let t = C.Affine.create x y in
-          Caml.Gc.finalise C.Affine.delete t ;
-          t
+    let to_backend = Fn.id
 
-    let of_backend t =
-      if C.Affine.is_zero t then Pickles_types.Or_infinity.Infinity
-      else
-        let x = C.Affine.x t in
-        Caml.Gc.finalise BaseField.delete x ;
-        let y = C.Affine.y t in
-        Caml.Gc.finalise BaseField.delete y ;
-        Finite (x, y)
+    let of_backend = Fn.id
   end
 
-  let to_affine_exn t =
-    let r = C.to_affine_exn t in
-    if C.Affine.is_zero r then (
-      C.Affine.delete r ;
-      failwith "to_affine_exn: Got identity" )
-    else
-      match Affine.of_backend r with
-      | Infinity ->
-          assert false
-      | Finite r' ->
-          C.Affine.delete r ; r'
+  let to_affine_or_infinity = C.to_affine
 
-  let of_affine (x, y) = op2 C.of_affine_coordinates x y
+  let to_affine_exn t =
+    match C.to_affine t with
+    | Infinity ->
+        failwith "to_affine_exn: Got identity"
+    | Finite c ->
+        c
+
+  let of_affine (x, y) = C.of_affine_coordinates x y
 
   include Binable.Of_binable
             (Affine)

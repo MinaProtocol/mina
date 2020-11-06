@@ -9,7 +9,7 @@ type 'field vanishing_polynomial_domain =
 
 type 'field plonk_domain =
   < vanishing_polynomial: 'field -> 'field
-  ; shifts: 'field Snarky_bn382.Shifts.t
+  ; shifts: 'field Marlin_plonk_bindings.Types.Plonk_verification_shifts.t
   ; generator: 'field
   ; size: 'field >
 
@@ -107,7 +107,9 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     (* x^5 *)
     square (square x) * x
   in
-  let {Snarky_bn382.Shifts.r; o} = domain#shifts in
+  let {Marlin_plonk_bindings.Types.Plonk_verification_shifts.r; o} =
+    domain#shifts
+  in
   fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
     let alphas =

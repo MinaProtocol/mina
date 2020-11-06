@@ -43,28 +43,22 @@ module Stable = struct
     let to_latest = Fn.id
 
     let of_repr urs {Repr.commitments= c; step_domains; data= d} =
-      let u = Unsigned.Size_t.of_int in
-      let g =
-        Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend
-      in
-      let t =
+      let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let d = Domain.Pow_2_roots_of_unity log2_size in
-        let {Snarky_bn382_bindings.Shifts.r; o} =
-          Common.tock_shifts ~log2_size
-        in
         let max_quot_size = Common.max_quot_size_int (Domain.size d) in
-        Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
-          ~max_poly_size:(u (1 lsl Nat.to_int Rounds.Wrap.n))
-          ~max_quot_size:(u max_quot_size) ~urs ~sigma_comm0:(g c.sigma_comm_0)
-          ~sigma_comm1:(g c.sigma_comm_1) ~sigma_comm2:(g c.sigma_comm_2)
-          ~ql_comm:(g c.ql_comm) ~qr_comm:(g c.qr_comm) ~qo_comm:(g c.qo_comm)
-          ~qm_comm:(g c.qm_comm) ~qc_comm:(g c.qc_comm)
-          ~rcm_comm0:(g c.rcm_comm_0) ~rcm_comm1:(g c.rcm_comm_1)
-          ~rcm_comm2:(g c.rcm_comm_2) ~psm_comm:(g c.psm_comm)
-          ~add_comm:(g c.add_comm) ~mul1_comm:(g c.mul1_comm)
-          ~mul2_comm:(g c.mul2_comm) ~emul1_comm:(g c.emul1_comm)
-          ~emul2_comm:(g c.emul2_comm) ~emul3_comm:(g c.emul3_comm) ~r ~o
+        { domain=
+            { log_size_of_group= log2_size
+            ; group_gen= Backend.Tock.Field.domain_generator log2_size }
+        ; max_poly_size= 1 lsl Nat.to_int Rounds.Wrap.n
+        ; max_quot_size
+        ; urs
+        ; evals=
+            Plonk_verification_key_evals.map c ~f:(fun unshifted ->
+                { Marlin_plonk_bindings.Types.Poly_comm.shifted= None
+                ; unshifted=
+                    Array.map unshifted ~f:(fun x -> Or_infinity.Finite x) } )
+        ; shifts= Common.tock_shifts ~log2_size }
       in
       {commitments= c; step_domains; data= d; index= t}
 
@@ -114,5 +108,4 @@ let dummy =
      { Repr.commitments= dummy_commitments g
      ; step_domains= [||]
      ; data= {constraints= rows} }
-     |> Stable.Latest.of_repr
-          (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one))
+     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Tweedle_fp_urs.create 1))

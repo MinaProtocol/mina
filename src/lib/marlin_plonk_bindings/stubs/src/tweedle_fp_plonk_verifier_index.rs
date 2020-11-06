@@ -13,7 +13,7 @@ use algebra::tweedle::{dee::Affine as GAffine, dum::Affine as GAffineOther, fp::
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use commitment_dlog::srs::SRS;
-use plonk_circuits::constraints::ConstraintSystem;
+use plonk_circuits::constraints::{zk_w, zk_polynomial, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
@@ -133,6 +133,7 @@ pub fn to_ocaml_copy<'a>(
 pub fn of_ocaml<'a>(
     max_poly_size: ocaml::Int,
     max_quot_size: ocaml::Int,
+    log_size_of_group: ocaml::Int,
     urs: CamlTweedleFpUrs,
     evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<CamlTweedleFqPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFpPtr>,
@@ -145,8 +146,11 @@ pub fn of_ocaml<'a>(
         SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
     };
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let domain = Domain::<Fp>::new(1 << log_size_of_group).unwrap();
     let index = DlogVerifierIndex::<GAffine> {
-        domain: Domain::<Fp>::new(max_poly_size as usize).unwrap(),
+        domain,
+        w: zk_w(domain),
+        zkpm: zk_polynomial(domain),
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
@@ -186,6 +190,7 @@ impl From<CamlTweedleFpPlonkVerifierIndexPtr> for CamlTweedleFpPlonkVerifierInde
         of_ocaml(
             index.max_poly_size,
             index.max_quot_size,
+            index.domain.log_size_of_group,
             index.urs,
             index.evals,
             index.shifts,
@@ -279,11 +284,12 @@ pub fn caml_tweedle_fp_plonk_verifier_index_write(
 pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_parts(
     max_poly_size: ocaml::Int,
     max_quot_size: ocaml::Int,
+    log_size_of_group: ocaml::Int,
     urs: CamlTweedleFpUrs,
     evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<CamlTweedleFqPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFpPtr>,
 ) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
-    of_ocaml(max_poly_size, max_quot_size, urs, evals, shifts)
+    of_ocaml(max_poly_size, max_quot_size, log_size_of_group, urs, evals, shifts)
 }
 
 #[ocaml::func]

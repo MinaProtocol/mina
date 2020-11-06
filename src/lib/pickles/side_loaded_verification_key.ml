@@ -142,39 +142,26 @@ include Make
           (struct
             include Vk
 
-            let of_repr {Repr.Stable.V1.step_data; max_width; wrap_index= c} =
-              let u = Unsigned.Size_t.of_int in
-              let g =
-                Fn.compose
-                  Zexe_backend.Tweedle.Fp_poly_comm
-                  .without_degree_bound_to_backend Array.of_list
+            let of_repr {Repr.Stable.V1.step_data; max_width; wrap_index= c} :
+                Impls.Wrap.Verification_key.t =
+              let d = Common.wrap_domains.h in
+              let log2_size = Import.Domain.log2_size d in
+              let max_quot_size =
+                Common.max_quot_size_int (Import.Domain.size d)
               in
-              let t =
-                let d = Common.wrap_domains.h in
-                let max_quot_size =
-                  Common.max_quot_size_int (Import.Domain.size d)
-                in
-                let {Snarky_bn382_bindings.Shifts.r; o} =
-                  Common.tock_shifts
-                    ~log2_size:(Pickles_base.Domain.log2_size d)
-                in
-                Snarky_bn382.Tweedle.Dee.Plonk.Field_verifier_index.make
-                  ~max_poly_size:(u (1 lsl Nat.to_int Backend.Tock.Rounds.n))
-                  ~max_quot_size:(u max_quot_size)
-                  ~urs:(Backend.Tock.Keypair.load_urs ())
-                  ~sigma_comm0:(g c.sigma_comm_0)
-                  ~sigma_comm1:(g c.sigma_comm_1)
-                  ~sigma_comm2:(g c.sigma_comm_2) ~ql_comm:(g c.ql_comm)
-                  ~qr_comm:(g c.qr_comm) ~qo_comm:(g c.qo_comm)
-                  ~qm_comm:(g c.qm_comm) ~qc_comm:(g c.qc_comm)
-                  ~rcm_comm0:(g c.rcm_comm_0) ~rcm_comm1:(g c.rcm_comm_1)
-                  ~rcm_comm2:(g c.rcm_comm_2) ~psm_comm:(g c.psm_comm)
-                  ~add_comm:(g c.add_comm) ~mul1_comm:(g c.mul1_comm)
-                  ~mul2_comm:(g c.mul2_comm) ~emul1_comm:(g c.emul1_comm)
-                  ~emul2_comm:(g c.emul2_comm) ~emul3_comm:(g c.emul3_comm) ~r
-                  ~o
-              in
-              t
+              { domain=
+                  { log_size_of_group= log2_size
+                  ; group_gen= Backend.Tock.Field.domain_generator log2_size }
+              ; max_poly_size= 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; max_quot_size
+              ; urs= Backend.Tock.Keypair.load_urs ()
+              ; evals=
+                  Plonk_verification_key_evals.map c ~f:(fun unshifted ->
+                      { Marlin_plonk_bindings.Types.Poly_comm.shifted= None
+                      ; unshifted=
+                          Array.of_list_map unshifted ~f:(fun x ->
+                              Or_infinity.Finite x ) } )
+              ; shifts= Common.tock_shifts ~log2_size }
           end)
 
 let dummy : t =

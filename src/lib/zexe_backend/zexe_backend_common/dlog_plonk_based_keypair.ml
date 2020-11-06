@@ -1,3 +1,5 @@
+module Poly_comm0 = Poly_comm
+open Marlin_plonk_bindings.Types
 open Unsigned.Size_t
 
 module type Stable_v1 = sig
@@ -24,29 +26,23 @@ module type Inputs_intf = sig
 
     type t
 
-    val wrap_gate : t -> size_t -> int -> size_t -> int -> unit
+    val wrap : t -> Plonk_gate.Wire.t -> Plonk_gate.Wire.t -> unit
   end
 
   module Urs : sig
     type t
 
-    val read : string -> t
+    val read : string -> t option
 
     val write : t -> string -> unit
 
-    val create : Unsigned.Size_t.t -> t
+    val create : int -> t
   end
 
   module Scalar_field : sig
     include Stable_v1
 
-    include Type_with_delete with type t := t
-
     val one : t
-
-    module Vector : sig
-      include Vector with type elt = t
-    end
   end
 
   module Constraint_system : sig
@@ -58,9 +54,7 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
-    val delete : t -> unit
-
-    val create : Gate_vector.t -> Unsigned.size_t -> Urs.t -> t
+    val create : Gate_vector.t -> int -> Urs.t -> t
   end
 
   module Curve : sig
@@ -70,53 +64,20 @@ module type Inputs_intf = sig
   end
 
   module Poly_comm : sig
-    module Backend : T0
+    module Backend : sig
+      type t
+    end
 
-    type t = Curve.Affine.t Poly_comm.t
+    type t = Curve.Affine.t Poly_comm0.t
 
     val of_backend_without_degree_bound : Backend.t -> t
   end
 
   module Verifier_index : sig
-    type t
+    type t =
+      (Scalar_field.t, Urs.t, Poly_comm.Backend.t) Plonk_verifier_index.t
 
     val create : Index.t -> t
-
-    val sigma_comm_0 : t -> Poly_comm.Backend.t
-
-    val sigma_comm_1 : t -> Poly_comm.Backend.t
-
-    val sigma_comm_2 : t -> Poly_comm.Backend.t
-
-    val ql_comm : t -> Poly_comm.Backend.t
-
-    val qr_comm : t -> Poly_comm.Backend.t
-
-    val qo_comm : t -> Poly_comm.Backend.t
-
-    val qm_comm : t -> Poly_comm.Backend.t
-
-    val qc_comm : t -> Poly_comm.Backend.t
-
-    val rcm_comm_0 : t -> Poly_comm.Backend.t
-
-    val rcm_comm_1 : t -> Poly_comm.Backend.t
-
-    val rcm_comm_2 : t -> Poly_comm.Backend.t
-
-    val psm_comm : t -> Poly_comm.Backend.t
-
-    val add_comm : t -> Poly_comm.Backend.t
-
-    val mul1_comm : t -> Poly_comm.Backend.t
-
-    val mul2_comm : t -> Poly_comm.Backend.t
-
-    val emul1_comm : t -> Poly_comm.Backend.t
-
-    val emul2_comm : t -> Poly_comm.Backend.t
-
-    val emul3_comm : t -> Poly_comm.Backend.t
   end
 end
 
@@ -152,7 +113,15 @@ module Make (Inputs : Inputs_intf) = struct
           let store =
             Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
-              (fun () ~path -> Urs.read path)
+              (fun () ~path ->
+                match Urs.read path with
+                | Some urs ->
+                    urs
+                | None ->
+                    (* TODO: Handle this properly. *)
+                    failwith
+                      "Could not read the URS from disk; its format did not \
+                       match the expected format" )
               Urs.write
           in
           let u =
@@ -160,7 +129,7 @@ module Make (Inputs : Inputs_intf) = struct
             | Ok (u, _) ->
                 u
             | Error _e ->
-                let urs = Urs.create (Unsigned.Size_t.of_int degree) in
+                let urs = Urs.create degree in
                 let _ =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function
@@ -187,13 +156,14 @@ module Make (Inputs : Inputs_intf) = struct
         if List.length x > 1 then
           let h = List.hd_exn x in
           let t = List.last_exn x in
-          Gate_vector.wrap_gate gates (conv t.row) t.col (conv h.row) h.col ) ;
+          Gate_vector.wrap gates
+            {row= conv t.row; col= t.col}
+            {row= conv h.row; col= h.col} ) ;
     let index =
       Index.create gates
-        (Unsigned.Size_t.of_int (Set_once.get_exn cs.public_input_size [%here]))
+        (Set_once.get_exn cs.public_input_size [%here])
         (load_urs ())
     in
-    Caml.Gc.finalise Index.delete index ;
     {index; cs}
 
   let vk t = Verifier_index.create t.index
@@ -202,7 +172,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   open Pickles_types
 
-  let vk_commitments t :
+  let vk_commitments (t : Verifier_index.t) :
       Curve.Affine.t Dlog_plonk_types.Poly_comm.Without_degree_bound.t
       Plonk_verification_key_evals.t =
     let f (t : Poly_comm.Backend.t) =
@@ -212,23 +182,5 @@ module Make (Inputs : Inputs_intf) = struct
       | _ ->
           assert false
     in
-    let open Verifier_index in
-    { sigma_comm_0= f (sigma_comm_0 t)
-    ; sigma_comm_1= f (sigma_comm_1 t)
-    ; sigma_comm_2= f (sigma_comm_2 t)
-    ; ql_comm= f (ql_comm t)
-    ; qr_comm= f (qr_comm t)
-    ; qo_comm= f (qo_comm t)
-    ; qm_comm= f (qm_comm t)
-    ; qc_comm= f (qc_comm t)
-    ; rcm_comm_0= f (rcm_comm_0 t)
-    ; rcm_comm_1= f (rcm_comm_1 t)
-    ; rcm_comm_2= f (rcm_comm_2 t)
-    ; psm_comm= f (psm_comm t)
-    ; add_comm= f (add_comm t)
-    ; mul1_comm= f (mul1_comm t)
-    ; mul2_comm= f (mul2_comm t)
-    ; emul1_comm= f (emul1_comm t)
-    ; emul2_comm= f (emul2_comm t)
-    ; emul3_comm= f (emul3_comm t) }
+    Plonk_verification_key_evals.map ~f t.evals
 end

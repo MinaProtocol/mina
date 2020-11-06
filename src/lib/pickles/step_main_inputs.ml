@@ -85,19 +85,16 @@ module Input_domain = struct
   let lagrange_commitments =
     lazy
       (let domain_size = Domain.size domain in
-       let u = Unsigned.Size_t.of_int in
        time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
-                 Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
-                   (Backend.Tock.Keypair.load_urs ())
-                   (u domain_size) (u i)
-                 |> Snarky_bn382.Tweedle.Dee.Field_poly_comm.unshifted
+                 (Marlin_plonk_bindings.Tweedle_fp_urs.lagrange_commitment
+                    (Backend.Tock.Keypair.load_urs ())
+                    domain_size i)
+                   .unshifted
                in
-               assert (Tick.Inner_curve.Affine.Backend.Vector.length v = 1) ;
-               Tick.Inner_curve.Affine.Backend.Vector.get v 0
-               |> Tick.Inner_curve.Affine.of_backend |> Or_infinity.finite_exn
-           ) ))
+               assert (Array.length v = 1) ;
+               v.(0) |> Or_infinity.finite_exn ) ))
 end
 
 module Inner_curve = struct
@@ -215,8 +212,7 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Tweedle.Dee.Plonk.Field_urs.h
+      ( Marlin_plonk_bindings_tweedle_fp_urs.h
           (Backend.Tock.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dee.Affine.of_backend |> Or_infinity.finite_exn
-      )
+      |> Or_infinity.finite_exn )
 end
