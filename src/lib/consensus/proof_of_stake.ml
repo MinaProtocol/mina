@@ -2221,7 +2221,11 @@ module Data = struct
     let staking_epoch_data_var (t : var) : Epoch_data.var =
       t.staking_epoch_data
 
+    let staking_epoch_data (t : Value.t) = t.staking_epoch_data
+
     let next_epoch_data_var (t : var) : Epoch_data.var = t.next_epoch_data
+
+    let next_epoch_data (t : Value.t) = t.next_epoch_data
 
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
