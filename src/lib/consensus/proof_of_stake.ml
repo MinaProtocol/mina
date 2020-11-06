@@ -245,7 +245,10 @@ module Data = struct
     end
 
     module Data = struct
-      type epoch_ledger_uuids = {staking: Uuid.t; next: Uuid.t}
+      type epoch_ledger_uuids =
+        { staking: Uuid.t
+        ; next: Uuid.t
+        ; genesis_ledger_hash: Coda_base.Frozen_ledger_hash.t }
 
       (* Invariant: Snapshot's delegators are taken from accounts in block_production_pubkeys *)
       type t =
@@ -304,17 +307,33 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let epoch_ledger_uuids_to_yojson Data.{staking; next} =
+    let epoch_ledger_uuids_to_yojson Data.{staking; next; genesis_ledger_hash}
+        =
       `Assoc
         [ ("staking", `String (Uuid.to_string staking))
-        ; ("next", `String (Uuid.to_string next)) ]
+        ; ("next", `String (Uuid.to_string next))
+        ; ( "genesis_ledger_hash"
+          , `String
+              (Coda_base.Frozen_ledger_hash.to_string genesis_ledger_hash) ) ]
 
-    let epoch_ledger_uuids_from_file location =
+    let epoch_ledger_uuids_from_file ~genesis_ledger_hash location =
       let open Yojson.Basic.Util in
       let json = Yojson.Basic.from_file location in
-      Data.
-        { staking= json |> member "staking" |> to_string |> Uuid.of_string
-        ; next= json |> member "next" |> to_string |> Uuid.of_string }
+      let stored_genesis_ledger_hash =
+        json
+        |> member "genesis_ledger_hash"
+        |> to_string |> Coda_base.Frozen_ledger_hash.of_string
+      in
+      if
+        Coda_base.Frozen_ledger_hash.equal genesis_ledger_hash
+          stored_genesis_ledger_hash
+      then
+        Some
+          Data.
+            { staking= json |> member "staking" |> to_string |> Uuid.of_string
+            ; next= json |> member "next" |> to_string |> Uuid.of_string
+            ; genesis_ledger_hash }
+      else None
 
     let create_epoch_ledger ~location ~genesis_ledger ~ledger_depth =
       let open Coda_base in
@@ -327,22 +346,39 @@ module Data = struct
           (Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()) )
       else Snapshot.Ledger_snapshot.Genesis_ledger genesis_ledger
 
+    let initialize_epoch_ledger_uuids ~genesis_ledger_hash
+        ~epoch_ledger_uuids_location =
+      let epoch_ledger_uuids =
+        Data.
+          { staking= Uuid_unix.create ()
+          ; next= Uuid_unix.create ()
+          ; genesis_ledger_hash }
+      in
+      Yojson.Basic.to_file epoch_ledger_uuids_location
+        (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+      epoch_ledger_uuids
+
     let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location
         ~ledger_depth =
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_ledger = Lazy.force genesis_ledger in
+      let genesis_ledger_hash = Ledger.merkle_root genesis_ledger in
       let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
       let epoch_ledger_uuids =
         if Sys.file_exists epoch_ledger_uuids_location then
-          epoch_ledger_uuids_from_file epoch_ledger_uuids_location
+          match
+            epoch_ledger_uuids_from_file ~genesis_ledger_hash
+              epoch_ledger_uuids_location
+          with
+          | Some epoch_ledger_uuids ->
+              epoch_ledger_uuids
+          | None ->
+              initialize_epoch_ledger_uuids ~genesis_ledger_hash
+                ~epoch_ledger_uuids_location
         else
-          let epoch_ledger_uuids =
-            Data.{staking= Uuid_unix.create (); next= Uuid_unix.create ()}
-          in
-          Yojson.Basic.to_file epoch_ledger_uuids_location
-            (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
-          epoch_ledger_uuids
+          initialize_epoch_ledger_uuids ~genesis_ledger_hash
+            ~epoch_ledger_uuids_location
       in
       let staking_epoch_ledger_location =
         epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.staking
