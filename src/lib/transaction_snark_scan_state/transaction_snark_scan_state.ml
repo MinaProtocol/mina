@@ -421,7 +421,6 @@ struct
                        %{sexp:Transaction_snark.Statement.t}"
                      transaction.statement expected_statement) )
     in
-    Timer.log "scan_statement" timer ;
     let res =
       Fold.fold_chronological_until tree ~init:None
         ~f_merge:(fun acc (_weight, job) ->
@@ -440,6 +439,7 @@ struct
               Stop e )
         ~finish:Result.return
     in
+    Timer.log "scan_statement" timer ;
     match res with
     | Ok None ->
         M.return (Error `Empty)
