@@ -388,7 +388,7 @@ module Data = struct
             in
             [%log info]
               "Cleaning up old epoch ledgers with genesis state $state_hash \
-               at location $staking and $next"
+               at locations $staking and $next"
               ~metadata:
                 [ ( "state_hash"
                   , Coda_base.State_hash.to_yojson
