@@ -47,6 +47,12 @@ CREATE TABLE internal_commands
 , hash        text                  NOT NULL UNIQUE
 );
 
+CREATE TABLE epoch_data
+( id             serial PRIMARY KEY
+, seed           text   NOT NULL
+, ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+);
+
 CREATE TABLE blocks
 ( id                      serial PRIMARY KEY
 , state_hash              text   NOT NULL UNIQUE
@@ -59,12 +65,6 @@ CREATE TABLE blocks
 , height                  bigint NOT NULL
 , global_slot             bigint NOT NULL
 , timestamp               bigint NOT NULL
-);
-
-CREATE TABLE epoch_data
-( id             serial PRIMARY KEY
-, seed           string NOT NULL
-, ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
