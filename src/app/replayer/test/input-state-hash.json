@@ -1,0 +1,22 @@
+{
+    "genesis_ledger": {
+        "accounts": [
+            {
+                "pk": "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g",
+                "balance": "66000",
+                "sk": null,
+                "delegate": null
+            },
+            {
+                "pk": "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf",
+                "balance": "0.000000001",
+                "sk": null,
+                "delegate": null
+            }
+        ],
+        "add_genesis_winner": false
+    },
+    "target": [
+        "State_hash_target","3NKArwTBxom3RWyRYrLXCMMmKTgWidcmxs5U9MTHe3Q5s4mLSrX3"
+    ]
+}

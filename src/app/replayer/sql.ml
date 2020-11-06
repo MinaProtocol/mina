@@ -18,7 +18,7 @@ module Block_info = struct
 
            INNER JOIN chain
 
-           ON b.id = chain.parent_id
+           ON b.id = chain.parent_id AND chain.id <> chain.parent_id
         )
 
         SELECT id,global_slot,ledger_hash FROM chain c
@@ -45,7 +45,7 @@ let find_command_ids_query s =
 
         INNER JOIN chain
 
-        ON b.id = chain.parent_id
+        ON b.id = chain.parent_id AND chain.id <> chain.parent_id
       )
 
       SELECT DISTINCT %s_command_id FROM chain c
@@ -235,4 +235,36 @@ module Public_key = struct
 
   let run (module Conn : Caqti_async.CONNECTION) pk_id =
     Conn.find_opt query pk_id
+end
+
+module Epoch_ledger_hash = struct
+  (* given an epoch ledger hash, what are the state hashes in blocks
+     with a next epoch data id that refers to that epoch ledger hash
+
+     returned in descending order of the global slot in those blocks
+
+     the state hashes may or may not refer to blocks with a chain back
+     to the genesis block
+   *)
+
+  let query =
+    Caqti_request.collect Caqti_type.string Caqti_type.string
+      {|
+         SELECT state_hash FROM blocks
+
+         INNER JOIN epoch_data
+
+         ON blocks.next_epoch_data_id = epoch_data.id
+
+         INNER JOIN snarked_ledger_hashes
+
+         ON epoch_data.ledger_hash_id = snarked_ledger_hashes.id
+
+         WHERE snarked_ledger_hashes.value = ?
+
+         ORDER BY global_slot DESC
+       |}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION) epoch_ledger_hash =
+    Conn.collect_list query epoch_ledger_hash
 end

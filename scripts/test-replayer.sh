@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # test replayer on known archive db
 
@@ -12,11 +12,34 @@ PG_PORT=5432
 PG_PASSWORD=somepassword
 PG_CONN=postgres://postgres:$PG_PASSWORD@localhost:$PG_PORT/$DB
 
+function cleanup () {
+    CONTAINER=`cat $CONTAINER_FILE`
+
+    if [[ ! -z $CONTAINER ]] ; then
+	echo "Killing, removing docker container"
+	for action in kill rm; do
+	    docker container $action $CONTAINER
+	done
+    fi
+
+    rm -f $CONTAINER_FILE
+}
+
+function report () {
+ if [[ $1 == 0 ]]; then
+     echo SUCCEEDED
+ else
+     echo FAILED
+ fi
+}
+
 # -v mounts dir with Unix socket on host
 echo "Starting docker with Postgresql"
 docker run \
        --name replayer-postgres -d -v /var/run/postgresql:/var/run/postgresql -p $PG_PORT:$PG_PORT \
        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=$PG_PASSWORD -e POSTGRES_DB=$DB postgres:$DOCKER_IMAGE > $CONTAINER_FILE
+
+trap "cleanup; exit 1" SIGINT
 
 # wait for Postgresql to become available
 sleep 5
@@ -30,23 +53,26 @@ psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
 echo "Building replayer"
 dune b $REPLAYER_DIR/replayer.exe --profile=dev
 
-echo "Running replayer"
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
+echo "Running replayer with state hash target"
+./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input-state-hash.json --output-file /dev/null
 
-RESULT=$?
+STATE_HASH_RESULT=$?
 
-echo "Killing, removing docker container"
-CONTAINER=`cat docker.container`
-for action in kill rm; do
-    docker container $action $CONTAINER
-done
+report $STATE_HASH_RESULT
 
-rm -f $CONTAINER_FILE
+echo "Running replayer with epoch ledger hash target"
+./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input-epoch-ledger-hash.json --output-file /dev/null
 
-if [ $RESULT = 0 ]; then
-    echo SUCCEEDED
+EPOCH_LEDGER_RESULT=$?
+
+report $EPOCH_LEDGER_RESULT
+
+cleanup
+
+if [[ $STATE_HASH_RESULT == 0 && $EPOCH_LEDGER_RESULT = 0 ]]; then
+    RESULT=0
 else
-    echo FAILED
+    RESULT=1
 fi
 
 exit $RESULT
