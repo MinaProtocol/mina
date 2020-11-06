@@ -29,7 +29,12 @@ module type Gossip_net_intf = sig
     t -> int -> except:Peer.Hash_set.t -> Peer.t list Deferred.t
 
   val query_peer :
-    t -> Peer.Id.t -> ('q, 'r) Rpc_intf.rpc -> 'q -> 'r rpc_response Deferred.t
+       ?timeout:Time.Span.t
+    -> t
+    -> Peer.Id.t
+    -> ('q, 'r) Rpc_intf.rpc
+    -> 'q
+    -> 'r rpc_response Deferred.t
 
   val query_random_peers :
        t
