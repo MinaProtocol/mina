@@ -137,7 +137,7 @@ module Epoch_data = struct
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
-           "SELECT id FROM epoch_data WHERE ledger_hash_id = ? AND seed = ?")
+           "SELECT id FROM epoch_data WHERE seed = ? AND ledger_hash_id = ?")
         {seed; ledger_hash_id}
     with
     | Some id ->
