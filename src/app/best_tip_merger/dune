@@ -1,0 +1,23 @@
+(executable
+  (package best_tip_merger)
+  (name best_tip_merger)
+  (public_name best_tip_merger)
+  (modes native)
+  (libraries
+    async
+    core_kernel
+    logger
+    ppx_deriving_yojson.runtime
+    lib
+    cli_lib
+    yojson
+    )
+  (preprocess (pps
+    ppx_coda
+    ppx_deriving.show
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_version
+    ppx_deriving.eq
+     bisect_ppx -- --conditional))
+  )

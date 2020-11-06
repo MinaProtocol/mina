@@ -744,6 +744,8 @@ let setup_daemon logger =
                 Public_key.compress keypair.public_key )
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
           ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
       let%bind peer_list_file_contents_or_empty =
