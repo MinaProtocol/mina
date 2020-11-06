@@ -20,14 +20,12 @@ module Bigint256 =
 module Fp = Field.Make (struct
   module Bigint = Bigint256
   include Tweedle_fp
-
   module Vector = Tweedle_fp_vector
 end)
 
 module Fq = Field.Make (struct
   module Bigint = Bigint256
   include Tweedle_fq
-
   module Vector = Tweedle_fq_vector
 end)
 
