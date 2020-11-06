@@ -577,7 +577,8 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.int typ
          "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
-          ledger_hash, height, global_slot, timestamp FROM blocks WHERE id = ?")
+          staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, \
+          global_slot, timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
