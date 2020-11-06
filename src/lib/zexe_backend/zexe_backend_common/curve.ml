@@ -77,6 +77,10 @@ struct
 
   let zero = sub one one
 
+  let y_squared x =
+    let open BaseField in
+    Params.b + (x * (Params.a + square x))
+
   module Affine = struct
     module Backend = struct
       include C.Affine
@@ -88,9 +92,29 @@ struct
 
     module Stable = struct
       module V1 = struct
-        type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
-        [@@deriving
-          version {asserted}, eq, bin_io, sexp, compare, yojson, hash]
+        module T = struct
+          type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
+          [@@deriving
+            version {asserted}, eq, bin_io, sexp, compare, yojson, hash]
+        end
+
+        include T
+
+        include Binable.Of_binable
+                  (T)
+                  (struct
+                    let on_curve (x, y) =
+                      BaseField.Stable.Latest.equal (y_squared x)
+                        (BaseField.square y)
+
+                    type t = T.t
+
+                    let to_binable = Fn.id
+
+                    let of_binable t =
+                      if not (on_curve t) then failwith "Invalid curve point" ;
+                      t
+                  end)
       end
 
       module Latest = V1
@@ -130,7 +154,7 @@ struct
 
   let find_y x =
     let open BaseField in
-    let y2 = (x * square x) + (Params.a * x) + Params.b in
+    let y2 = y_squared x in
     if is_square y2 then Some (sqrt y2) else None
 
   let point_near_x (x : BaseField.t) =
