@@ -38,7 +38,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Domain = struct
     let shifts (type n) ((which, log2s) : (int, n) t) ~shifts =
       let shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
-      let open Snarky_bn382.Shifts in
+      let open Marlin_plonk_bindings.Types.Plonk_verification_shifts in
       let mk f = mask which (Vector.map shifts ~f) in
       {r= mk (fun {r; _} -> r); o= mk (fun {o; _} -> o)}
 
