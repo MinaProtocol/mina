@@ -1,5 +1,10 @@
 [@react.component]
-let make = (~profiles) => {
+let make =
+    (
+      ~profiles: array(ContentType.GenericMember.t),
+      ~genesisMembers: array(ContentType.GenericMember.t),
+      ~advisors: array(ContentType.GenericMember.t),
+    ) => {
   let (modalOpen, setModalOpen) = React.useState(_ => false);
 
   let switchModalState = () => {
@@ -35,26 +40,56 @@ let make = (~profiles) => {
       }
     />
     <SecuredBySection />
-    <Contributors profiles modalOpen switchModalState />
-    <Investors />
+    <Contributors
+      profiles
+      genesisMembers
+      advisors
+      modalOpen
+      switchModalState
+    />
   </Page>;
 };
 
 Next.injectGetInitialProps(make, _ => {
-  Contentful.getEntries(
-    Lazy.force(Contentful.client),
-    {
-      "include": 1,
-      "content_type": ContentType.TeamProfile.id,
-      "order": "-fields.name",
-    },
-  )
-  |> Promise.map((entries: ContentType.TeamProfile.entries) => {
+  [|
+    Contentful.getEntries(
+      Lazy.force(Contentful.client),
+      {
+        "include": 1,
+        "content_type": ContentType.TeamProfile.id,
+        "order": "-fields.name",
+      },
+    ),
+    Contentful.getEntries(
+      Lazy.force(Contentful.client),
+      {
+        "include": 1,
+        "content_type": ContentType.GenesisProfile.id,
+        "order": "-fields.publishDate",
+      },
+    ),
+    Contentful.getEntries(
+      Lazy.force(Contentful.client),
+      {
+        "include": 1,
+        "content_type": ContentType.Advisor.id,
+        "order": "-fields.name",
+      },
+    ),
+  |]
+  |> Js.Promise.all
+  |> Js.Promise.then_((results: array(ContentType.GenericMember.entries)) => {
        let profiles =
-         Array.map(
-           (e: ContentType.TeamProfile.entry) => e.fields,
-           entries.items,
-         );
-       {"profiles": profiles};
+         results
+         |> Array.map((e: ContentType.GenericMember.entries) => {
+              e.items
+              |> Array.map((e: ContentType.GenericMember.entry) => {e.fields})
+            });
+
+       Js.Promise.resolve({
+         "profiles": profiles[0],
+         "genesisMembers": profiles[1],
+         "advisors": profiles[2],
+       });
      })
 });

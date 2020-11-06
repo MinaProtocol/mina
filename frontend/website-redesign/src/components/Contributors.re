@@ -1,19 +1,6 @@
 module Styles = {
   open Css;
   let container = style([margin2(~v=`rem(4.), ~h=`zero)]);
-  let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
-  let sectionSubhead =
-    merge([
-      Theme.Type.sectionSubhead,
-      style([
-        fontSize(`px(19)),
-        lineHeight(`rem(1.75)),
-        marginBottom(`rem(2.93)),
-        letterSpacing(`pxFloat(-0.4)),
-      ]),
-    ]);
-  let headerCopy =
-    style([media(Theme.MediaQuery.desktop, [width(`rem(42.))])]);
 
   let genesisRule =
     style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
@@ -31,99 +18,23 @@ module Styles = {
       top(`percent(50.)),
       left(`percent(50.)),
       transform(`translate((`percent(-50.), `percent(-50.)))),
-      zIndex(10),
+      zIndex(2),
     ]);
 
   let modal = style([margin(`auto)]);
 };
 
-module GenesisMembersGrid = {
-  module Styles = {
-    open Css;
-
-    let genesisHeader = merge([Theme.Type.h2, style([])]);
-    let genesisCopy =
-      style([
-        unsafe("grid-area", "1 /1 / span 1 / span 2"),
-        media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
-      ]);
-    let sectionSubhead =
-      merge([
-        Theme.Type.sectionSubhead,
-        style([
-          fontSize(`px(19)),
-          lineHeight(`rem(1.75)),
-          marginTop(`rem(0.5)),
-          marginBottom(`rem(2.)),
-          letterSpacing(`pxFloat(-0.4)),
-        ]),
-      ]);
-    let grid =
-      style([
-        marginTop(`rem(1.)),
-        display(`grid),
-        paddingTop(`rem(1.)),
-        gridTemplateColumns([`rem(10.), `rem(10.)]),
-        gridAutoRows(`rem(17.3)),
-        gridColumnGap(`rem(1.)),
-        gridRowGap(`rem(1.)),
-        media(
-          Theme.MediaQuery.tablet,
-          [gridTemplateColumns([`repeat((`num(3), `rem(10.)))])],
-        ),
-        media(
-          Theme.MediaQuery.desktop,
-          [gridTemplateColumns([`repeat((`num(5), `rem(11.)))])],
-        ),
-      ]);
-  };
-  [@react.component]
-  let make = () => {
-    <>
-      <Spacer height=3. />
-      <div className=Styles.genesisCopy>
-        <h2 className=Styles.genesisHeader>
-          {React.string("Genesis Members")}
-        </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Meet the node operators, developers, and community builders making Mina happen.",
-           )}
-        </p>
-      </div>
-      <div
-        className=Styles.grid
-        // <TeamMember
-        //   fullName="Greg | DeFidog"
-        //   title="Genesis Founding Member"
-        //   src="/static/img/headshots/Greg.jpg"
-        // />
-        // <TeamMember
-        //   fullName="Alexander#4542"
-        //   title="Genesis Founding Member"
-        //   src="/static/img/headshots/Alexander.jpg"
-        // />
-        // <TeamMember
-        //   fullName="GarethDavies"
-        //   title="Genesis Founding Member"
-        //   src="/static/img/headshots/GarethDavies.jpg"
-        // />
-      />
-    </>;
-  };
-};
-
-module Modal = {
+module MemberModal = {
   [@react.component]
   let make =
       (
-        ~currentMember: ContentType.TeamProfile.t,
+        ~currentMember: ContentType.GenericMember.t,
         ~switchModalState,
         ~onNextMemberPress,
         ~onPrevMemberPress,
       ) => {
     <div className=Styles.modal>
-      <TeamMemberProfile
+      <ProfileCard
         member=currentMember
         switchModalState
         onNextMemberPress
@@ -134,8 +45,12 @@ module Modal = {
 };
 
 [@react.component]
-let make = (~profiles, ~modalOpen, ~switchModalState) => {
+let make =
+    (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
   let (currentMemberIndex, setCurrentMemberIndex) = React.useState(_ => 0);
+  let allProfiles =
+    Belt.Array.concat(profiles, genesisMembers)
+    |> Belt.Array.concat(advisors);
 
   let onPrevMemberPress = () => {
     currentMemberIndex <= 0
@@ -143,14 +58,24 @@ let make = (~profiles, ~modalOpen, ~switchModalState) => {
   };
 
   let onNextMemberPress = () => {
-    currentMemberIndex >= Array.length(profiles)
+    currentMemberIndex >= Array.length(allProfiles) - 1
       ? () : setCurrentMemberIndex(_ => currentMemberIndex + 1);
+  };
+
+  let setMember = (member: ContentType.GenericMember.t) => {
+    let memberIndex =
+      Belt.Array.getIndexBy(allProfiles, (m: ContentType.GenericMember.t) => {
+        m.name == member.name
+      });
+    Belt.Option.mapWithDefault(memberIndex, (), index =>
+      setCurrentMemberIndex(_ => index)
+    );
   };
 
   <>
     <div className={Styles.modalContainer(modalOpen)}>
-      <Modal
-        currentMember={Array.get(profiles, currentMemberIndex)}
+      <MemberModal
+        currentMember={Array.get(allProfiles, currentMemberIndex)}
         switchModalState
         onPrevMemberPress
         onNextMemberPress
@@ -158,21 +83,18 @@ let make = (~profiles, ~modalOpen, ~switchModalState) => {
     </div>
     <div className=Styles.container>
       <Wrapped>
-        <div className=Styles.headerCopy>
-          <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
-          <p className=Styles.sectionSubhead>
-            {React.string(
-               "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
-             )}
-          </p>
-        </div>
         <Rule color=Theme.Colors.black />
-        <TeamGrid profiles switchModalState setCurrentMemberIndex />
+        <TeamGrid profiles switchModalState setCurrentMember=setMember />
         <div className=Styles.genesisRule>
           <Rule color=Theme.Colors.black />
         </div>
-        <GenesisMembersGrid />
+        <GenesisMembersGrid
+          genesisMembers
+          switchModalState
+          setCurrentMember=setMember
+        />
       </Wrapped>
     </div>
+    <Investors advisors switchModalState setCurrentMember=setMember />
   </>;
 };

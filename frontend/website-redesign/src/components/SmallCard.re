@@ -42,10 +42,9 @@ module Styles = {
 [@react.component]
 let make =
     (
-      ~member: ContentType.TeamProfile.t,
+      ~member: ContentType.GenericMember.t,
       ~switchModalState=_ => (),
-      ~setCurrentMemberIndex,
-      ~index,
+      ~setCurrentMember=_ => (),
     ) => {
   <div className=Styles.memberContainer>
     <img className=Styles.image src={member.image.fields.file.url} />
@@ -55,7 +54,7 @@ let make =
         className=Styles.icon
         onClick={_ => {
           switchModalState();
-          setCurrentMemberIndex(_ => index);
+          setCurrentMember(member);
         }}>
         <Icon kind=Icon.Plus />
       </span>

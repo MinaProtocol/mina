@@ -228,7 +228,7 @@ module FoundingMembersSection = {
                    <GenesisMemberProfile
                      key={p.name}
                      name={p.name}
-                     photo={p.profilePhoto.fields.file.url}
+                     photo={p.image.fields.file.url}
                      quote={"\"" ++ p.quote ++ "\""}
                      location={p.memberLocation}
                      twitter={p.twitter}

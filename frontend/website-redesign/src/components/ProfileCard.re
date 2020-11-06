@@ -12,7 +12,11 @@ module Styles = {
       padding2(~h=`rem(2.), ~v=`rem(1.5)),
     ]);
 
-  let memberName = merge([Theme.Type.h3, style([fontWeight(`light)])]);
+  let memberName =
+    merge([
+      Theme.Type.h3,
+      style([marginTop(`rem(1.)), fontWeight(`light)]),
+    ]);
 
   let profilePicture =
     style([
@@ -116,10 +120,10 @@ module Styles = {
 [@react.component]
 let make =
     (
-      ~member: ContentType.TeamProfile.t,
-      ~switchModalState,
-      ~onNextMemberPress,
-      ~onPrevMemberPress,
+      ~member: ContentType.GenericMember.t,
+      ~switchModalState=_ => (),
+      ~onNextMemberPress=_ => (),
+      ~onPrevMemberPress=_ => (),
     ) => {
   <div className=Styles.outerBox>
     <div className=Styles.container>
@@ -135,11 +139,21 @@ let make =
       </div>
       <h4 className=Styles.memberName> {React.string(member.name)} </h4>
       <p className=Styles.memberTitle> {React.string(member.title)} </p>
-      <div className=Styles.quoteSection>
-        <Rule />
-        <p className=Styles.quote> {React.string(member.bio)} </p>
-        <Rule />
-      </div>
+      {switch (member.bio, member.quote) {
+       | (Some(bio), _) =>
+         <div className=Styles.quoteSection>
+           <Rule />
+           <p className=Styles.quote> {React.string(bio)} </p>
+           <Rule />
+         </div>
+       | (None, Some(quote)) =>
+         <div className=Styles.quoteSection>
+           <Rule />
+           <p className=Styles.quote> {React.string(quote)} </p>
+           <Rule />
+         </div>
+       | (None, None) => React.null
+       }}
       <div className=Styles.socials>
         <div className=Styles.socialTags>
           {switch (member.twitter) {
@@ -154,10 +168,7 @@ let make =
            }}
           {switch (member.github) {
            | Some(github) =>
-             <a
-               target="_blank"
-               href={"https://github.com/" ++ github}
-               className=Styles.iconLink>
+             <a target="_blank" href=github className=Styles.iconLink>
                <Icon kind=Icon.Github />
              </a>
            | _ => React.null

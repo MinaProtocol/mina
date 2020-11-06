@@ -117,10 +117,10 @@ module GenesisProfile = {
   let id = "genesisProfile";
   type t = {
     name: string,
-    profilePhoto: Image.entry,
+    image: Image.entry,
     quote: string,
     memberLocation: string,
-    twitter: string,
+    twitter: option(string),
     github: option(string),
     publishDate: string,
     blogPost: BlogPost.entry,
@@ -141,6 +141,36 @@ module TeamProfile = {
     github: option(string),
     linkedIn: option(string),
   };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module Advisor = {
+  let id = "advisors";
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module GenericMember = {
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+    quote: option(string),
+    bio: option(string),
+    twitter: option(string),
+    github: option(string),
+    linkedIn: option(string),
+    blogPost: BlogPost.entry,
+    memberLocation: string,
+    publishDate: string,
+  };
+
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
