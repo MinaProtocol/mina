@@ -131,8 +131,7 @@ module Epoch_data = struct
     in
     let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
     let seed =
-      Coda_base.Epoch_data.Poly.Stable.V1.seed t
-      |> Snark_params.Tick.Field.to_string
+      Coda_base.Epoch_data.Poly.seed t |> Snark_params.Tick.Field.to_string
     in
     match%bind
       Conn.find_opt
