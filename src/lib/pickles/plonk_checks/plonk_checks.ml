@@ -89,6 +89,17 @@ open Composition_types.Dlog_based.Proof_state.Deferred_values.Plonk
 let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     (module F : Field_intf with type t = t) ~shift ~endo ~mds
     ~(domain : t plonk_domain) =
+  let module Range = struct
+    let psdn = (0, 3)
+
+    let perm = (3, 5)
+
+    let add = (5, 7)
+
+    let endml = (7, 13)
+
+    let mul = (13, 17)
+  end in
   let open F in
   let square x = x * x in
   let double x = of_int 2 * x in
@@ -99,36 +110,65 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
   let {Snarky_bn382.Shifts.r; o} = domain#shifts in
   fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
       ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
-    let bz = beta * zeta in
-    let perm0 =
-      with_label __LOC__ (fun () ->
-          (e0.l + bz + gamma)
-          * (e0.r + (bz * r) + gamma)
-          * (e0.o + (bz * o) + gamma)
-          * alpha
-          + (alpha * alpha * domain#vanishing_polynomial zeta / (zeta - one))
-      )
+    let alphas =
+      let arr =
+        let a2 = alpha * alpha in
+        let a = Array.init 17 ~f:(fun _ -> a2) in
+        for i = 1 to Int.(Array.length a - 1) do
+          a.(i) <- with_label __LOC__ (fun () -> a.(Int.(i - 1)) * alpha)
+        done ;
+        a
+      in
+      fun (i, j) k ->
+        assert (k < j) ;
+        arr.(Int.(i + k))
     in
-    let perm1 =
-      let beta_sigma1 = with_label __LOC__ (fun () -> beta * e0.sigma1) in
-      let beta_sigma2 = with_label __LOC__ (fun () -> beta * e0.sigma2) in
-      let beta_alpha = with_label __LOC__ (fun () -> beta * alpha) in
-      with_label __LOC__ (fun () ->
-          negate (e0.l + beta_sigma1 + gamma)
-          * (e0.r + beta_sigma2 + gamma)
-          * (e1.z * beta_alpha) )
+    let bz = beta * zeta in
+    let perm0, perm1 =
+      let w3, w2, w1 =
+        (* generator^{n - 3} *)
+        let gen = domain#generator in
+        let gen_inv = one / gen in
+        let w3 = square gen_inv * gen_inv in
+        let w2 = gen * w3 in
+        (w3, w2, gen * w2)
+      in
+      let zkp =
+        (* x^3 - x^2(w1+w2+w3) + x(w1w2+w1w3+w2w3) - w1w2w3
+           evaluated at x = zeta
+        *)
+        let w23 = w2 * w3 in
+        List.fold ~init:(of_int 0)
+          ~f:(fun acc coeff -> (zeta * acc) + coeff)
+          [ one
+          ; negate (w1 + w2 + w3)
+          ; (w1 * (w2 + w3)) + w23
+          ; negate (w1 * w23) ]
+      in
+      let perm0 =
+        with_label __LOC__ (fun () ->
+            let vp_zeta = domain#vanishing_polynomial zeta in
+            (e0.l + bz + gamma)
+            * (e0.r + (bz * r) + gamma)
+            * (e0.o + (bz * o) + gamma)
+            * alpha * zkp
+            + (alphas Range.perm 0 * vp_zeta / (zeta - one))
+            + (alphas Range.perm 1 * vp_zeta / (zeta - w3)) )
+      in
+      let perm1 =
+        let beta_sigma1 = with_label __LOC__ (fun () -> beta * e0.sigma1) in
+        let beta_sigma2 = with_label __LOC__ (fun () -> beta * e0.sigma2) in
+        let beta_alpha = with_label __LOC__ (fun () -> beta * alpha) in
+        with_label __LOC__ (fun () ->
+            negate (e0.l + beta_sigma1 + gamma)
+            * (e0.r + beta_sigma2 + gamma)
+            * (e1.z * beta_alpha * zkp) )
+      in
+      (perm0, perm1)
     in
     let gnrc_l = e0.l in
     let gnrc_r = e0.r in
     let gnrc_o = e0.o in
-    let alphas =
-      let a2 = alpha * alpha in
-      let a = Array.init 4 ~f:(fun _ -> a2) in
-      for i = 1 to Int.(Array.length a - 1) do
-        a.(i) <- with_label __LOC__ (fun () -> a.(Int.(i - 1)) * alpha)
-      done ;
-      a
-    in
     let psdn0 =
       let lro =
         let s = [|sbox e0.l; sbox e0.r; sbox e0.o|] in
@@ -136,45 +176,49 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             Array.reduce_exn ~f:F.( + ) (Array.map2_exn s m ~f:F.( * )) )
       in
       with_label __LOC__ (fun () ->
-          ((lro.(0) - e1.l) * alphas.(1))
-          + ((lro.(1) - e1.r) * alphas.(2))
-          + ((lro.(2) - e1.o) * alphas.(3)) )
+          Array.mapi [|e1.l; e1.r; e1.o|] ~f:(fun i e ->
+              (lro.(i) - e) * alphas Range.psdn i )
+          |> Array.reduce_exn ~f:( + ) )
     in
     let ecad0 =
       with_label __LOC__ (fun () ->
           (((e1.r - e1.l) * (e0.o + e0.l)) - ((e1.l - e1.o) * (e0.r - e0.l)))
-          * alphas.(1)
+          * alphas Range.add 0
           + ( ((e1.l + e1.r + e1.o) * (e1.l - e1.o) * (e1.l - e1.o))
             - ((e0.o + e0.l) * (e0.o + e0.l)) )
-            * alphas.(2) )
+            * alphas Range.add 1 )
     in
     let vbmul0, vbmul1 =
       let tmp = double e0.l - square e0.r + e1.r in
       ( with_label __LOC__ (fun () ->
-            ((square e0.r - e0.r) * alphas.(1))
+            ((square e0.r - e0.r) * alphas Range.mul 0)
             + (((e1.l - e0.l) * e1.r) - e1.o + (e0.o * (double e0.r - one)))
-              * alphas.(2) )
+              * alphas Range.mul 1 )
       , with_label __LOC__ (fun () ->
             ( square (double e0.o - (tmp * e0.r))
             - ((square e0.r - e1.r + e1.l) * square tmp) )
-            * alphas.(1)
+            * alphas Range.mul 2
             + ( ((e0.l - e1.l) * (double e0.o - (tmp * e0.r)))
               - ((e1.o + e0.o) * tmp) )
-              * alphas.(2) ) )
+              * alphas Range.mul 3 ) )
     in
     let endomul0, endomul1, endomul2 =
       let xr = square e0.r - e0.l - e1.r in
       let t = e0.l - xr in
       let u = double e0.o - (t * e0.r) in
       ( with_label __LOC__ (fun () ->
-            ((square e0.l - e0.l) * alphas.(1))
-            + ((square e1.l - e1.l) * alphas.(2))
-            + ((e1.r - ((one + (e0.l * (endo - one))) * e0.r)) * alphas.(3)) )
+            ((square e0.l - e0.l) * alphas Range.endml 0)
+            + ((square e1.l - e1.l) * alphas Range.endml 1)
+            + (e1.r - ((one + (e0.l * (endo - one))) * e0.r))
+              * alphas Range.endml 2 )
       , with_label __LOC__ (fun () ->
-            ((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one)) )
+            (((e1.l - e0.r) * e1.r) - e1.o + (e0.o * (double e0.l - one)))
+            * alphas Range.endml 3 )
       , with_label __LOC__ (fun () ->
-            ((square u - (square t * (xr + e0.l + e1.l))) * alphas.(1))
-            + ((((e0.l - e1.l) * u) - (t * (e0.o + e1.o))) * alphas.(2)) ) )
+            (square u - (square t * (xr + e0.l + e1.l)))
+            * alphas Range.endml 4
+            + (((e0.l - e1.l) * u) - (t * (e0.o + e1.o)))
+              * alphas Range.endml 5 ) )
     in
     In_circuit.map_fields
       ~f:(Shifted_value.of_field (module F) ~shift)
