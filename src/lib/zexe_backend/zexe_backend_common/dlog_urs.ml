@@ -22,7 +22,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   let name =
-    sprintf "%s_%d_%s_v2" name
+    sprintf "%s_%d_%s_v3" name
       (Pickles_types.Nat.to_int Rounds.n)
       Version.marlin_repo_sha
 

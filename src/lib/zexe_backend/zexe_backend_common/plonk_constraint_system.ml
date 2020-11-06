@@ -58,7 +58,7 @@ module Hash_state = struct
 
   let digest t = Md5.digest_string H.(to_raw_string (get t))
 
-  let empty = H.feed_string H.empty "plonk_constraint_system"
+  let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
 module Plonk_constraint = struct
