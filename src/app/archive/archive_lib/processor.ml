@@ -145,7 +145,7 @@ module Epoch_data = struct
     | None ->
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO epoch_data (seed, ledger_hash) VALUES (?, ?) \
+             "INSERT INTO epoch_data (seed, ledger_hash_id) VALUES (?, ?) \
               RETURNING id")
           {seed; ledger_hash_id}
 end
