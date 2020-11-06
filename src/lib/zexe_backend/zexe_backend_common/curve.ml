@@ -56,6 +56,8 @@ module type Field_intf = sig
   val is_square : t -> bool
 
   val sqrt : t -> t
+
+  val random : unit -> t
 end
 
 module Make
@@ -100,6 +102,8 @@ struct
 
         include T
 
+        exception Invalid_curve_point of t
+
         include Binable.Of_binable
                   (T)
                   (struct
@@ -112,13 +116,40 @@ struct
                     let to_binable = Fn.id
 
                     let of_binable t =
-                      if not (on_curve t) then failwith "Invalid curve point" ;
+                      if not (on_curve t) then raise (Invalid_curve_point t) ;
                       t
                   end)
       end
 
       module Latest = V1
     end
+
+    let%test "cannot deserialize invalid points" =
+      (* y^2 = x^3 + a x + b
+
+        pick c at random
+        let (x, y) = (c^2, c^3)
+
+        Then the above equation becomes
+        c^6 = c^6 + (a c^2 + b)
+
+        a c^3 + b is almost certainly nonzero (and for our curves, with a = 0, it always is)
+        so this point is almost certainly (and for our curves, always) invalid
+    *)
+      let invalid =
+        let open BaseField in
+        let c = random () in
+        let c2 = square c in
+        (c2, c2 * c)
+      in
+      match
+        Binable.to_string (module Stable.Latest) invalid
+        |> Binable.of_string (module Stable.Latest)
+      with
+      | exception Stable.V1.Invalid_curve_point _ ->
+          true
+      | _ ->
+          false
 
     include Stable.Latest
 
