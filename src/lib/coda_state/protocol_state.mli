@@ -124,6 +124,7 @@ val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
      genesis_ledger:Coda_base.Ledger.t Lazy.t
+  -> genesis_epoch_data:Genesis_epoch_data.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> Value.t

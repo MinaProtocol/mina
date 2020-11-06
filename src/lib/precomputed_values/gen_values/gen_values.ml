@@ -93,13 +93,15 @@ module Make_real () = struct
 
   let genesis_constants = Genesis_constants.compiled
 
+  let genesis_epoch_data = Genesis_epoch_data.compiled
+
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol
 
   let protocol_state_with_hash =
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-      ~constraint_constants ~consensus_constants
+      ~genesis_epoch_data ~constraint_constants ~consensus_constants
 
   let compiled_values =
     Genesis_proof.create_values
@@ -109,7 +111,7 @@ module Make_real () = struct
       ; proof_level= Full
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
-      ; genesis_epoch_data= None
+      ; genesis_epoch_data
       ; consensus_constants
       ; protocol_state_with_hash
       ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
@@ -190,6 +192,7 @@ let main () =
           (let protocol_state_with_hash =
              Coda_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+               ~genesis_epoch_data:Genesis_epoch_data.for_unit_tests
                ~constraint_constants:
                  Genesis_constants.Constraint_constants.for_unit_tests
                ~consensus_constants:
@@ -218,21 +221,22 @@ let main () =
              Genesis_constants.Constraint_constants.compiled
            in
            let genesis_constants = Genesis_constants.compiled in
+           let genesis_epoch_data = Genesis_epoch_data.compiled in
            let consensus_constants =
              Consensus.Constants.create ~constraint_constants
                ~protocol_constants:genesis_constants.protocol
            in
            let protocol_state_with_hash =
              Coda_state.Genesis_protocol_state.t
-               ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-               ~consensus_constants
+               ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
+               ~constraint_constants ~consensus_constants
            in
            { runtime_config= Runtime_config.default
            ; constraint_constants
            ; proof_level= Genesis_constants.Proof_level.compiled
            ; genesis_constants
            ; genesis_ledger= (module Test_genesis_ledger)
-           ; genesis_epoch_data= Genesis_epoch_data.compiled
+           ; genesis_epoch_data
            ; consensus_constants
            ; protocol_state_with_hash
            ; genesis_proof= compiled_base_proof })]

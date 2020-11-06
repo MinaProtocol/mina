@@ -686,7 +686,7 @@ module Types = struct
                    let open Option.Let_syntax in
                    let account_id = account_id account in
                    match%bind Coda_lib.staking_ledger coda with
-                   | Genesis_ledger staking_ledger -> (
+                   | Genesis_epoch_ledger staking_ledger -> (
                      match
                        let open Option.Let_syntax in
                        account_id
@@ -2695,13 +2695,14 @@ module Queries = struct
             ; constraint_constants
             ; consensus_constants
             ; genesis_proof
+            ; genesis_epoch_data
             ; _ } =
           (Coda_lib.config coda).precomputed_values
         in
         let {With_hash.data= genesis_state; hash} =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-            ~constraint_constants ~consensus_constants
+            ~genesis_epoch_data ~constraint_constants ~consensus_constants
         in
         { With_hash.data=
             { Auxiliary_database.Filtered_external_transition.creator=

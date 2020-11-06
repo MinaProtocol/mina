@@ -92,7 +92,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   let constraint_constants = t.constraint_constants in
   let consensus_constants = t.consensus_constants in
   let prev_state =
-    Protocol_state.negative_one ~genesis_ledger ~constraint_constants
+    Protocol_state.negative_one ~genesis_ledger
+      ~genesis_epoch_data:t.genesis_epoch_data ~constraint_constants
       ~consensus_constants
   in
   let curr = t.protocol_state_with_hash.data in

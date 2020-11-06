@@ -416,7 +416,7 @@ module Accounts = struct
 end
 
 module Ledger = struct
-  let hash_filename hash =
+  let hash_filename hash ~ledger_name_prefix =
     let str =
       (* Consider the serialization of accounts as well as the hash. In
          particular, adding fields that are
@@ -429,7 +429,9 @@ module Ledger = struct
       ^ Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
           Coda_base.Account.empty
     in
-    "genesis_ledger_" ^ Blake2.to_hex (Blake2.digest_string str) ^ ".tar.gz"
+    ledger_name_prefix ^ "_"
+    ^ Blake2.to_hex (Blake2.digest_string str)
+    ^ ".tar.gz"
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -464,8 +466,9 @@ module Ledger = struct
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
-        [%log info] "Found ledger file at $path"
-          ~metadata:[("path", `String filename)] ;
+        [%log info] "Found $ledger file at $path"
+          ~metadata:
+            [("ledger", `String ledger_name_prefix); ("path", `String filename)] ;
         Some filename )
       else (
         [%log info] "Ledger file $path does not exist"
@@ -479,16 +482,17 @@ module Ledger = struct
       | Ok () ->
           file_exists filename Cache_dir.s3_install_path
       | Error e ->
-          [%log info] "Could not download genesis ledger from $uri: $error"
+          [%log info] "Could not download $ledger from $uri: $error"
             ~metadata:
-              [ ("uri", `String s3_path)
+              [ ("ledger", `String ledger_name_prefix)
+              ; ("uri", `String s3_path)
               ; ("error", `String (Error.to_string_hum e)) ] ;
           return None
     in
     let%bind hash_filename =
       match config.hash with
       | Some hash -> (
-          let hash_filename = hash_filename hash in
+          let hash_filename = hash_filename hash ~ledger_name_prefix in
           let%bind tar_path =
             Deferred.List.find_map ~f:(file_exists hash_filename) search_paths
           in
@@ -531,9 +535,10 @@ module Ledger = struct
 
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ?accounts filename =
-    [%log info] "Loading genesis ledger from $path"
-      ~metadata:[("path", `String filename)] ;
+      ?accounts ~ledger_name_prefix filename =
+    [%log info] "Loading $ledger from $path"
+      ~metadata:
+        [("ledger", `String ledger_name_prefix); ("path", `String filename)] ;
     let dirname = Uuid.to_string (Uuid_unix.create ()) in
     (* Unpack the ledger in the autogen directory, since we know that we have
        write permissions there.
@@ -564,17 +569,19 @@ module Ledger = struct
     in
     packed
 
-  let generate_tar ~genesis_dir ~logger ledger =
+  let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
     Ledger.commit ledger ;
     let dirname = Option.value_exn (Ledger.get_directory ledger) in
     let root_hash = State_hash.to_string @@ Ledger.merkle_root ledger in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
-    let tar_path = genesis_dir ^/ hash_filename root_hash in
+    let tar_path =
+      genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
+    in
     [%log info]
-      "Creating genesis ledger tar file for $root_hash at $path from database \
-       at $dir"
+      "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:
-        [ ("root_hash", `String root_hash)
+        [ ("ledger", `String ledger_name_prefix)
+        ; ("root_hash", `String root_hash)
         ; ("path", `String tar_path)
         ; ("dir", `String dirname) ] ;
     let open Deferred.Or_error.Let_syntax in
@@ -582,7 +589,7 @@ module Ledger = struct
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      (config : Runtime_config.Ledger.t) =
+      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -622,13 +629,16 @@ module Ledger = struct
       | Named name -> (
         match Genesis_ledger.fetch_ledger name with
         | Some (module M) ->
-            [%log info] "Found genesis ledger with name $ledger_name"
-              ~metadata:[("ledger_name", `String name)] ;
+            [%log info] "Found $ledger with name $ledger_name"
+              ~metadata:
+                [ ("ledger", `String ledger_name_prefix)
+                ; ("ledger_name", `String name) ] ;
             Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
         | None ->
-            [%log warn]
-              "Could not find a built-in genesis ledger named $ledger_name"
-              ~metadata:[("ledger_name", `String name)] ;
+            [%log warn] "Could not find a built-in $ledger named $ledger_name"
+              ~metadata:
+                [ ("ledger", `String ledger_name_prefix)
+                ; ("ledger_name", `String name) ] ;
             None )
     in
     let padded_accounts_with_balances_opt =
@@ -657,7 +667,8 @@ module Ledger = struct
       (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error (fun () ->
         let padded_accounts_opt =
-          padded_accounts_from_runtime_config_opt ~logger ~proof_level config
+          padded_accounts_from_runtime_config_opt ~logger ~proof_level
+            ~ledger_name_prefix config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -668,7 +679,7 @@ module Ledger = struct
         | Some tar_path -> (
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
-                ?accounts:padded_accounts_opt tar_path
+                ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
                 Ok (ledger, config, tar_path)
@@ -686,8 +697,10 @@ module Ledger = struct
                 assert false
             | Hash hash ->
                 [%log error]
-                  "Could not find or generate a ledger for $root_hash"
-                  ~metadata:[("root_hash", `String hash)] ;
+                  "Could not find or generate a $ledger for $root_hash"
+                  ~metadata:
+                    [ ("ledger", `String ledger_name_prefix)
+                    ; ("root_hash", `String hash) ] ;
                 Deferred.Or_error.errorf
                   "Could not find a ledger tar file for hash '%s'" hash
             | Named ledger_name ->
@@ -697,22 +710,23 @@ module Ledger = struct
                     ~ledger_name_prefix ledger_name
                 in
                 [%log error]
-                  "Bad config $config: genesis ledger named $ledger_name is \
-                   not built in, and no ledger file was found at \
-                   $ledger_filename"
+                  "Bad config $config: $ledger named $ledger_name is not \
+                   built in, and no ledger file was found at $ledger_filename"
                   ~metadata:
-                    [ ("config", Runtime_config.Ledger.to_yojson config)
+                    [ ("ledger", `String ledger_name_prefix)
+                    ; ("config", Runtime_config.Ledger.to_yojson config)
                     ; ("ledger_name", `String ledger_name)
                     ; ("ledger_filename", `String ledger_filename) ] ;
-                Deferred.Or_error.errorf "Genesis ledger '%s' not found"
-                  ledger_name )
+                Deferred.Or_error.errorf "ledger '%s' not found" ledger_name )
           | Some accounts -> (
               let packed =
                 packed_genesis_ledger_of_accounts
                   ~depth:constraint_constants.ledger_depth accounts
               in
               let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
-              let%bind tar_path = generate_tar ~genesis_dir ~logger ledger in
+              let%bind tar_path =
+                generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+              in
               let config =
                 { config with
                   hash= Some (State_hash.to_string @@ Ledger.merkle_root ledger)
@@ -756,11 +770,14 @@ module Ledger = struct
                   let root_hash =
                     State_hash.to_string @@ Ledger.merkle_root ledger
                   in
-                  let tar_path = genesis_dir ^/ hash_filename root_hash in
+                  let tar_path =
+                    genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
+                  in
                   [%log error]
-                    "Could not generate a ledger file at $path: $error"
+                    "Could not generate a $ledger file at $path: $error"
                     ~metadata:
-                      [ ("path", `String tar_path)
+                      [ ("ledger", `String ledger_name_prefix)
+                      ; ("path", `String tar_path)
                       ; ("error", `String (Error.to_string_hum err)) ] ;
                   return (Error err) ) ) )
 end
@@ -784,7 +801,8 @@ module Epoch_data = struct
           in
           [%log info] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[("ledger_file", `String ledger_file)] ;
-          ( { Genesis_epoch_data.Data.ledger= staking_ledger
+          ( { Genesis_epoch_data.Data.ledger=
+                Genesis_ledger.Packed.t staking_ledger
             ; seed= Epoch_seed.of_string config.staking.seed }
           , {config.staking with ledger= config'} )
         in
@@ -801,7 +819,8 @@ module Epoch_data = struct
               [%log info] "Loaded next epoch ledger from $ledger_file"
                 ~metadata:[("ledger_file", `String ledger_file)] ;
               ( Some
-                  { Genesis_epoch_data.Data.ledger= next_ledger
+                  { Genesis_epoch_data.Data.ledger=
+                      Genesis_ledger.Packed.t next_ledger
                   ; seed= Epoch_seed.of_string seed }
               , Some {Runtime_config.Epoch_data.Data.ledger= config''; seed} )
         in
@@ -879,7 +898,7 @@ module Genesis_proof = struct
     let protocol_state_with_hash =
       Coda_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-        ~constraint_constants ~consensus_constants
+        ~genesis_epoch_data ~constraint_constants ~consensus_constants
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants

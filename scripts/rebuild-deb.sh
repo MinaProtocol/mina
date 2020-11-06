@@ -120,14 +120,14 @@ do
 done
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
-# Genesis Ledger/proof Copy
+# Genesis Ledger/proof/epoch ledger Copy
 for f in /tmp/coda_cache_dir/genesis*; do
     if [ -e "$f" ]; then
         mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
     fi
 done
 
-# Copy genesis Ledger/proof if they were downloaded from s3
+# Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
 for f in /tmp/s3_cache_dir/genesis*; do
     if [ -e "$f" ]; then
         mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."

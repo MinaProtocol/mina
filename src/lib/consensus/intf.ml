@@ -296,7 +296,7 @@ module type S = sig
       module Snapshot : sig
         module Ledger_snapshot : sig
           type t =
-            | Genesis_ledger of Coda_base.Ledger.t
+            | Genesis_epoch_ledger of Coda_base.Ledger.t
             | Ledger_db of Coda_base.Ledger.Db.t
 
           val close : t -> unit
@@ -310,6 +310,7 @@ module type S = sig
       val create :
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> ledger_depth:int
         -> t
@@ -437,6 +438,7 @@ module type S = sig
 
       val negative_one :
            genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Value.t
@@ -445,6 +447,7 @@ module type S = sig
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
@@ -452,6 +455,7 @@ module type S = sig
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t

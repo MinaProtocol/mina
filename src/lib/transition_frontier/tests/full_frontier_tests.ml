@@ -54,7 +54,9 @@ let%test_module "Full_frontier tests" =
       in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-          ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
+          ~genesis_ledger:Genesis_ledger.t
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+          ~epoch_ledger_location
           ~ledger_depth:constraint_constants.ledger_depth
       in
       let root_ledger =

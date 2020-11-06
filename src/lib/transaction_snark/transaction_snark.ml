@@ -3576,6 +3576,7 @@ let%test_module "transaction_snark" =
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
         Coda_state.Genesis_protocol_state.t
           ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
@@ -4283,6 +4284,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
@@ -4304,6 +4306,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in

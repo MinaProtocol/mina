@@ -330,7 +330,8 @@ module Json_layout = struct
     end
 
     type t =
-      {staking: Data.t; next: Data.t option (*If None then next = staking*)}
+      { staking: Data.t
+      ; next: (Data.t option[@default None]) (*If None then next = staking*) }
     [@@deriving yojson, dhall_type]
 
     let fields = [|"staking"; "next"|]
@@ -346,7 +347,7 @@ module Json_layout = struct
     ; epoch_data: (Epoch_data.t option[@default None]) }
   [@@deriving yojson, dhall_type]
 
-  let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
+  let fields = [|"daemon"; "ledger"; "genesis"; "proof"; "epoch_data"|]
 
   let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
