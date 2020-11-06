@@ -312,6 +312,7 @@ module type S = sig
         -> genesis_ledger:Ledger.t Lazy.t
         -> epoch_ledger_location:string
         -> ledger_depth:int
+        -> genesis_state_hash:State_hash.t
         -> t
 
       val current_block_production_keys :
