@@ -153,7 +153,7 @@ find "${BUILDDIR}"
 # Build the package
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 
 # second deb without the proving keys -- FIXME: DRY
@@ -181,7 +181,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 #remove build dir
 rm -rf "${BUILDDIR}"
