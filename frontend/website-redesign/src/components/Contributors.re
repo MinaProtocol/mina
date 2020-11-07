@@ -24,26 +24,6 @@ module Styles = {
   let modal = style([margin(`auto)]);
 };
 
-module MemberModal = {
-  [@react.component]
-  let make =
-      (
-        ~currentMember: ContentType.GenericMember.t,
-        ~switchModalState,
-        ~onNextMemberPress,
-        ~onPrevMemberPress,
-      ) => {
-    <div className=Styles.modal>
-      <ProfileCard
-        member=currentMember
-        switchModalState
-        onNextMemberPress
-        onPrevMemberPress
-      />
-    </div>;
-  };
-};
-
 [@react.component]
 let make =
     (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
@@ -74,12 +54,14 @@ let make =
 
   <>
     <div className={Styles.modalContainer(modalOpen)}>
-      <MemberModal
-        currentMember={Array.get(allProfiles, currentMemberIndex)}
-        switchModalState
-        onPrevMemberPress
-        onNextMemberPress
-      />
+      <div className=Styles.modal>
+        <ProfileCard
+          member={Array.get(allProfiles, currentMemberIndex)}
+          switchModalState
+          onPrevMemberPress
+          onNextMemberPress
+        />
+      </div>
     </div>
     <div className=Styles.container>
       <Wrapped>
