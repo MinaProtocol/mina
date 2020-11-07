@@ -16,7 +16,7 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 set +u
 PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
-PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
+PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}

@@ -14,7 +14,7 @@ set +u
 
 # export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
-export PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
+export PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 export BUILD_NUM=${BUILDKITE_BUILD_NUM}
 export BUILD_URL=${BUILDKITE_BUILD_URL}
