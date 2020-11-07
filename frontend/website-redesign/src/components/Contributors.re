@@ -2,9 +2,6 @@ module Styles = {
   open Css;
   let container = style([margin2(~v=`rem(4.), ~h=`zero)]);
 
-  let genesisRule =
-    style([media(Theme.MediaQuery.desktop, [width(`percent(100.))])]);
-
   let modalContainer = modalShowing =>
     style([
       modalShowing ? opacity(1.) : opacity(0.),
@@ -42,7 +39,7 @@ let make =
       ? () : setCurrentMemberIndex(_ => currentMemberIndex + 1);
   };
 
-  let setMember = (member: ContentType.GenericMember.t) => {
+  let setCurrentMember = (member: ContentType.GenericMember.t) => {
     let memberIndex =
       Belt.Array.getIndexBy(allProfiles, (m: ContentType.GenericMember.t) => {
         m.name == member.name
@@ -66,17 +63,11 @@ let make =
     <div className=Styles.container>
       <Wrapped>
         <Rule color=Theme.Colors.black />
-        <TeamGrid profiles switchModalState setCurrentMember=setMember />
-        <div className=Styles.genesisRule>
-          <Rule color=Theme.Colors.black />
-        </div>
-        <GenesisMembersGrid
-          genesisMembers
-          switchModalState
-          setCurrentMember=setMember
-        />
+        <TeamGrid profiles switchModalState setCurrentMember />
+        <Rule color=Theme.Colors.black />
+        <GenesisMembersGrid genesisMembers switchModalState setCurrentMember />
       </Wrapped>
     </div>
-    <Investors advisors switchModalState setCurrentMember=setMember />
+    <Investors advisors switchModalState setCurrentMember />
   </>;
 };
