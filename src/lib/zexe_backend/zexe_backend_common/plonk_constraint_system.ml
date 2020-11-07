@@ -165,6 +165,8 @@ module Hash = Core.Md5
 
 let digest (t : _ t) = Hash_state.digest t.hash
 
+let zk_rows = 2
+
 module Make
     (Fp : Field.S)
     (Gates : Gate_vector_intf with type field := Fp.t) (Params : sig
@@ -246,7 +248,7 @@ struct
       Internal_var.Table.create ()
     in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
-    let num_rows = public_input_size + sys.next_row in
+    let num_rows = zk_rows + public_input_size + sys.next_row in
     let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
     for i = 0 to public_input_size - 1 do
       res.(i).(0) <- external_values (i + 1)
@@ -283,6 +285,11 @@ struct
                 let value = compute lc in
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
+    for r = 0 to zk_rows - 1 do
+      for c = 0 to 2 do
+        res.(num_rows - 1 - r).(c) <- Fp.random ()
+      done
+    done ;
     res
 
   let create_internal ?constant sys lc : V.t =
@@ -358,8 +365,27 @@ struct
         done ;
         let offset_row = Row.to_absolute ~public_input_size:n in
         let all_gates =
+          let rev_map_append xs tl ~f =
+            List.fold xs ~init:tl ~f:(fun acc x -> f x :: acc)
+          in
+          let offset = Gate_spec.map_rows ~f:offset_row in
+          let random_rows =
+            let zeroes = Array.init 5 ~f:(fun _ -> Fp.zero) in
+            List.init zk_rows ~f:(fun i ->
+                let row = Row.After_public_input (n + sys.next_row + i) in
+                offset
+                  { kind= Generic
+                  ; row
+                  ; lrow= row
+                  ; lcol= L
+                  ; rrow= row
+                  ; rcol= R
+                  ; orow= row
+                  ; ocol= O
+                  ; coeffs= zeroes } )
+          in
           List.rev_append !pub_input_gate_specs_rev
-            (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
+            (rev_map_append gates random_rows ~f:offset)
         in
         List.iter all_gates
           ~f:(fun {kind; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->

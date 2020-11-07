@@ -115,9 +115,8 @@ let max_domains_with_x =
   let x =
     Plonk_checks.Domain.Pow_2_roots_of_unity
       (Int.ceil_log2
-         ( 1
-         + input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-             (Nat.to_int Width.Max.n) ))
+         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
+            (Nat.to_int Width.Max.n)))
   in
   {Ds.h= conv max_domains.h; x}
 

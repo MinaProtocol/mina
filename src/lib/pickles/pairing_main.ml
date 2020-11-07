@@ -499,10 +499,10 @@ struct
     let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
     let max_width = Width.Max.n in
     let domain_log2s =
-      Vector.init (S max_width) ~f:(fun w -> Int.ceil_log2 (1 + input_size w))
+      Vector.init (S max_width) ~f:(fun w -> Int.ceil_log2 (input_size w))
     in
     let (T max_log2_size) =
-      let n = Int.ceil_log2 (1 + input_size (Nat.to_int max_width)) in
+      let n = Int.ceil_log2 (input_size (Nat.to_int max_width)) in
       assert (List.last_exn (Vector.to_list domain_log2s) = n) ;
       Nat.of_int n
     in
@@ -585,8 +585,7 @@ struct
         let open Side_loaded_verification_key in
         let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
         let possibilities =
-          Vector.init (S Width.Max.n) ~f:(fun w ->
-              Int.ceil_log2 (1 + input_size w) )
+          Vector.init (S Width.Max.n) ~f:(fun w -> Int.ceil_log2 (input_size w))
         in
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list possibilities) ~f:(fun i d ->
