@@ -7,7 +7,6 @@ open Coda_base
 (* identify a target block B to replay to, either with
 
    1)  target state hash  = protocol state hash in B
-       target proof       = blockchain SNARK proof of the protocol state in B
 
    or
 
