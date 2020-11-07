@@ -16,7 +16,7 @@ DEBS3='deb-s3 upload '\
 '--cache-control=max-age=120 '\
 '--component main'
 
-DEBS='_build/coda-*.deb'
+DEBS='_build/mina-*.deb'
 
 usage() {
     echo "Usage: $0 [-f] [-r REPONAME] [-d DEBNAME]" 1>&2;
