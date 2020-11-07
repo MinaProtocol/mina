@@ -6,4 +6,4 @@
    marlin_plonk_bindings_types
    marlin_plonk_bindings_tweedle_fp
    marlin_plonk_bindings_tweedle_fq)
- (preprocess (pps ppx_version bisect_ppx)))
+ (preprocess (pps ppx_version bisect_ppx -- --conditional)))
