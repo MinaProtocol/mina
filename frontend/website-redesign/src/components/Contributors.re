@@ -48,9 +48,9 @@ module MemberModal = {
 let make =
     (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
   let (currentMemberIndex, setCurrentMemberIndex) = React.useState(_ => 0);
+
   let allProfiles =
-    Belt.Array.concat(profiles, genesisMembers)
-    |> Belt.Array.concat(advisors);
+    profiles->Belt.Array.concat(genesisMembers)->Belt.Array.concat(advisors);
 
   let onPrevMemberPress = () => {
     currentMemberIndex <= 0
