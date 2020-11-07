@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -eou pipefail
-AUTO_DEPLOY=true
 
 
 diff=$(
