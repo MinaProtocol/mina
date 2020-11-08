@@ -57,7 +57,7 @@ Next.injectGetInitialProps(make, _ => {
       {
         "include": 1,
         "content_type": ContentType.TeamProfile.id,
-        "order": "-fields.name",
+        "order": "fields.order",
       },
     ),
     Contentful.getEntries(
