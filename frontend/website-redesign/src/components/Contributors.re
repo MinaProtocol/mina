@@ -21,10 +21,12 @@ module Styles = {
   let modal = style([margin(`auto)]);
 };
 
+external asDomElement: 'a => Dom.element = "%identity";
 [@react.component]
 let make =
     (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
   let (currentMemberIndex, setCurrentMemberIndex) = React.useState(_ => 0);
+  let modalBackgroundRef = React.useRef(Js.Nullable.null);
 
   let allProfiles =
     profiles->Belt.Array.concat(genesisMembers)->Belt.Array.concat(advisors);
@@ -39,6 +41,18 @@ let make =
       ? () : setCurrentMemberIndex(_ => currentMemberIndex + 1);
   };
 
+  let closeModal = e => {
+    modalBackgroundRef
+    |> React.Ref.current
+    |> Js.Nullable.toOption
+    |> Option.iter(modalRef =>
+         if (modalRef === asDomElement(ReactEvent.Mouse.target(e))
+             && modalOpen) {
+           switchModalState();
+         }
+       );
+  };
+
   let setCurrentMember = (member: ContentType.GenericMember.t) => {
     let memberIndex =
       Belt.Array.getIndexBy(allProfiles, (m: ContentType.GenericMember.t) => {
@@ -50,7 +64,10 @@ let make =
   };
 
   <>
-    <div className={Styles.modalContainer(modalOpen)}>
+    <div
+      className={Styles.modalContainer(modalOpen)}
+      ref={modalBackgroundRef->ReactDOMRe.Ref.domRef}
+      onClick={e => closeModal(e)}>
       <div className=Styles.modal>
         <ProfileCard
           member={Array.get(allProfiles, currentMemberIndex)}
