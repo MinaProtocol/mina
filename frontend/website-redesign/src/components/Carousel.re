@@ -122,22 +122,26 @@ module Slider = {
 
 [@react.component]
 let make =
-    (~title, ~copy, ~textColor, ~items: array(ContentType.GenesisProfile.t)) => {
+    (
+      ~title,
+      ~copy,
+      ~textColor,
+      ~items: array(ContentType.GenesisProfile.t),
+      ~slideWidthRem,
+    ) => {
   let (itemIndex, setItemIndex) = React.useState(_ => 0);
   let (translate, setTranslate) = React.useState(_ => 0.);
 
   let nextSlide = _ =>
     if (itemIndex < Array.length(items) - 1) {
       setItemIndex(_ => itemIndex + 1);
-      // 24.5 is the value in rem that each slide item is in width.
-      setTranslate(_ => translate -. 24.5);
+      setTranslate(_ => translate -. slideWidthRem);
     };
 
   let prevSlide = _ =>
     if (itemIndex > 0) {
       setItemIndex(_ => itemIndex - 1);
-      // 24.5 is the value in rem that each slide item is in width.
-      setTranslate(_ => translate +. 24.5);
+      setTranslate(_ => translate +. slideWidthRem);
     };
 
   <div className=Styles.container>
