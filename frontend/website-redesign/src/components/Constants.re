@@ -10,16 +10,16 @@ let linkedInUrl = "https://linkedin.com/in/";
 
 let minaStatus = "https://status.minaprotocol.com";
 
-let minaDiscord = "https://bit.ly/MinaDiscord";
-let minaDiscordRulesAndGuidelines = "https://discord.com/invite/Vexf4ED";
 let minaDiscordSocial = "https://bit.ly/MinaDiscord";
-let minaNewsletter = "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul";
-let minaPressKit = "https://drive.google.com/file/d/177Xzj6Rqd9UnYwzRzMRLPKoyows-iwKx/view?usp=sharing";
-let minaDocsEditLink = "https://github.com/MinaProtocol/mina/edit/develop/frontend/website/pages";
+let minaDiscordRulesAndGuidelines = "https://discord.com/invite/Vexf4ED";
 
 let minaGithub = "https://github.com/MinaProtocol/mina";
 let minaGithubIssues = "https://github.com/MinaProtocol/mina/issues";
 let minaCodeOfConduct = "https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md";
+
+let minaNewsletter = "https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul";
+let minaPressKit = "https://drive.google.com/file/d/177Xzj6Rqd9UnYwzRzMRLPKoyows-iwKx/view?usp=sharing";
+let minaDocsEditLink = "https://github.com/MinaProtocol/mina/edit/develop/frontend/website/pages";
 
 let minaWiki = "https://minawiki.com";
 let minaWikiMainPage = "https://minawiki.com/Main_Page";
