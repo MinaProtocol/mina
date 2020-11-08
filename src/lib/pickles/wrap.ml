@@ -217,11 +217,10 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
 
       let alpha = to_field plonk0.alpha
     end in
-    let domain, w =
-      Tweedle.Dum_based_plonk.B.Field_verifier_index.
-        (domain_log2 pairing_vk, domain_group_gen pairing_vk)
+    let domain =
+      Domain.Pow_2_roots_of_unity pairing_vk.domain.log_size_of_group
     in
-    let domain = Domain.Pow_2_roots_of_unity (Unsigned.UInt32.to_int domain) in
+    let w = pairing_vk.domain.group_gen in
     (* Debug *)
     [%test_eq: Tick.Field.t] w
       (Tick.Field.domain_generator ~log2_size:(Domain.log2_size domain)) ;

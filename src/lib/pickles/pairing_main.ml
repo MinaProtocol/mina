@@ -486,7 +486,7 @@ struct
 
   let shifts ~log2_size =
     Common.tick_shifts ~log2_size
-    |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
+    |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
 
   let domain_generator ~log2_size =
     Backend.Tick.Field.domain_generator ~log2_size |> Impl.Field.constant

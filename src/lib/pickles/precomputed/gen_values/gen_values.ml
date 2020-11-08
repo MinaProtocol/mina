@@ -34,7 +34,7 @@ let dee =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "dee %d" i (fun () ->
-              Snarky_bn382.Tweedle.Dee.Field_urs.lagrange_commitment
+              Marlin_plonk_bindings.Tweedle_fp_urs.lagrange_commitment
                 (Dee_based_plonk.Keypair.load_urs ())
                 (Unsigned.Size_t.of_int domain_size)
                 (Unsigned.Size_t.of_int i) )
@@ -50,7 +50,7 @@ let dum =
       let n = Int.min max_public_input_size domain_size in
       List.init n ~f:(fun i ->
           ksprintf time "dum %d" i (fun () ->
-              Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
+              Marlin_plonk_bindings.Tweedle_fq_urs.lagrange_commitment
                 (Dum_based_plonk.Keypair.load_urs ())
                 (Unsigned.Size_t.of_int domain_size)
                 (Unsigned.Size_t.of_int i) )

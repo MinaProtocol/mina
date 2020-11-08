@@ -507,6 +507,8 @@ module T = struct
             Consensus.Data.Local_state.create initial_block_production_keys
               ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
+              ~genesis_state_hash:
+                (With_hash.hash precomputed_values.protocol_state_with_hash)
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
