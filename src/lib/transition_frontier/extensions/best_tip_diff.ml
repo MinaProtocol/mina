@@ -15,7 +15,9 @@ module T = struct
       { protocol_state: Coda_state.Protocol_state.Value.t
       ; state_hash: State_hash.t
       ; just_emitted_a_proof: bool }
-    [@@deriving yojson]
+    [@@deriving yojson, sexp]
+
+    let compare t t' = State_hash.compare t.state_hash t'.state_hash
 
     type Structured_log_events.t +=
       | New_best_tip_event of

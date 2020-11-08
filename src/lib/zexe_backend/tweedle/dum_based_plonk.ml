@@ -1,13 +1,14 @@
+open Core_kernel
 open Zexe_backend_common
 open Basic
-module T = Snarky_bn382.Tweedle
 module Field = Fq
-module B = T.Dum.Plonk
 module Curve = Dum
 
 module Bigint = struct
   module R = struct
     include Field.Bigint
+
+    let of_data _ = failwith __LOC__
 
     let to_field = Field.of_bigint
 
@@ -18,15 +19,19 @@ end
 let field_size : Bigint.R.t = Field.size
 
 module Verification_key = struct
-  type t = B.Field_verifier_index.t
+  type t = Marlin_plonk_bindings.Tweedle_fq_verifier_index.t
 
   let to_string _ = failwith __LOC__
 
   let of_string _ = failwith __LOC__
+
+  let shifts = Marlin_plonk_bindings.Tweedle_fq_verifier_index.shifts
 end
 
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make (Field) (B.Gate_vector)
+  Plonk_constraint_system.Make
+    (Field)
+    (Marlin_plonk_bindings.Tweedle_fq_index.Gate_vector)
     (struct
       let params =
         Sponge.Params.(
@@ -36,54 +41,51 @@ module R1CS_constraint_system =
 
 module Var = Var
 
-let lagrange =
-  let open Core_kernel in
-  let f =
-    Memo.general ~hashable:Int.hashable (fun domain_log2 ->
-        let open B.Field_poly_comm in
-        let v = Vector.create () in
-        Array.iter
-          Precomputed.Lagrange_precomputations.(
-            dum.(index_of_domain_log2 domain_log2))
-          ~f:(fun g ->
-            Vector.emplace_back v
-              (Fq_poly_comm.to_backend (`Without_degree_bound g)) ) ;
-        v )
+let lagrange : int -> Marlin_plonk_bindings.Tweedle_fq_urs.Poly_comm.t array =
+  let open Marlin_plonk_bindings.Types in
+  Memo.general ~hashable:Int.hashable (fun domain_log2 ->
+      Array.map
+        Precomputed.Lagrange_precomputations.(
+          dum.(index_of_domain_log2 domain_log2))
+        ~f:(fun unshifted ->
+          { Poly_comm.unshifted=
+              Array.map unshifted ~f:(fun c -> Or_infinity.Finite c)
+          ; shifted= None } ) )
+
+let with_lagrange f (vk : Verification_key.t) =
+  f (lagrange vk.domain.log_size_of_group) vk
+
+let with_lagranges f (vks : Verification_key.t array) =
+  let lgrs =
+    Array.map vks ~f:(fun vk -> lagrange vk.domain.log_size_of_group)
   in
-  fun x -> f (Unsigned.UInt32.to_int x)
-
-let with_lagrange f vk =
-  f (lagrange (B.Field_verifier_index.domain_log2 vk)) vk
-
-let with_lagranges f vks =
-  let lgrs = B.Field_poly_comm.Vector.Vector.create () in
-  for i = 0 to B.Field_verifier_index.Vector.length vks - 1 do
-    B.Field_poly_comm.Vector.Vector.emplace_back lgrs
-      (lagrange B.Field_verifier_index.(domain_log2 (Vector.get vks i)))
-  done ;
   f lgrs vks
 
 module Rounds = Rounds.Step
 
 module Keypair = Dlog_plonk_based_keypair.Make (struct
+  open Marlin_plonk_bindings
+
   let name = "tweedledum"
 
   module Rounds = Rounds
-  module Urs = B.Field_urs
-  module Index = B.Field_index
+  module Urs = Tweedle_fq_urs
+  module Index = Tweedle_fq_index
   module Curve = Curve
   module Poly_comm = Fq_poly_comm
   module Scalar_field = Field
-  module Verifier_index = B.Field_verifier_index
-  module Gate_vector = B.Gate_vector
+  module Verifier_index = Tweedle_fq_verifier_index
+  module Gate_vector = Tweedle_fq_index.Gate_vector
   module Constraint_system = R1CS_constraint_system
 end)
 
 module Proof = Plonk_dlog_proof.Make (struct
+  open Marlin_plonk_bindings
   module Scalar_field = Field
+  module Base_field = Fp
 
   module Backend = struct
-    include B.Field_proof
+    include Tweedle_fq_proof
 
     let verify = with_lagrange verify
 
@@ -97,7 +99,7 @@ module Proof = Plonk_dlog_proof.Make (struct
         else get auxiliary (i - 1 - length primary)
       in
       let w = R1CS_constraint_system.compute_witness pk.cs external_values in
-      let n = Unsigned.Size_t.to_int (B.Field_index.domain_d1_size pk.index) in
+      let n = Tweedle_fq_index.domain_d1_size pk.index in
       let witness = Field.Vector.create () in
       for i = 0 to Array.length w.(0) - 1 do
         for j = 0 to n - 1 do
@@ -108,10 +110,21 @@ module Proof = Plonk_dlog_proof.Make (struct
       create pk.index (Field.Vector.create ()) witness prev_chals prev_comms
   end
 
-  module Verifier_index = B.Field_verifier_index
+  module Verifier_index = Tweedle_fq_verifier_index
   module Index = Keypair
-  module Evaluations_backend = B.Field_proof.Evaluations
-  module Opening_proof_backend = B.Field_opening_proof
+
+  module Evaluations_backend = struct
+    type t =
+      Scalar_field.t Marlin_plonk_bindings.Types.Plonk_proof.Evaluations.t
+  end
+
+  module Opening_proof_backend = struct
+    type t =
+      ( Scalar_field.t
+      , Curve.Affine.Backend.t )
+      Marlin_plonk_bindings.Types.Plonk_proof.Opening_proof.t
+  end
+
   module Poly_comm = Fq_poly_comm
   module Curve = Curve
 end)
@@ -144,8 +157,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    open Core_kernel
-    include B.Field_oracles
+    include Marlin_plonk_bindings.Tweedle_fq_oracles
 
     let create = with_lagrange create
   end

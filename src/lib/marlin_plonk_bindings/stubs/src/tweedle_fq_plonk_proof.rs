@@ -106,10 +106,13 @@ unsafe impl ocaml::FromValue for CamlTweedleFqPrevChallenges {
 unsafe impl ocaml::ToValue for CamlTweedleFqPrevChallenges {
     fn to_value(self: Self) -> ocaml::Value {
         let array = caml_vector::to_array_(self.0, |(vec, polycomm)| {
-            let polycomm: CamlTweedleDumPolyComm<CamlTweedleFp> = polycomm.into();
-            let array_value =
-                caml_vector::to_array_(vec, |x| ocaml::ToValue::to_value(CamlTweedleFq(x)));
-            ocaml::ToValue::to_value((array_value, polycomm))
+            ocaml::frame!((array_value) {
+                let polycomm: CamlTweedleDumPolyComm<CamlTweedleFp> = polycomm.into();
+                let array_inner =
+                    caml_vector::to_array_(vec, |x| ocaml::ToValue::to_value(CamlTweedleFq(x)));
+                array_value = array_inner.to_value().clone();
+                ocaml::ToValue::to_value((array_inner, polycomm))
+            })
         });
         array.to_value()
     }
@@ -226,27 +229,26 @@ pub fn caml_tweedle_fq_plonk_proof_create(
     index: CamlTweedleFqPlonkIndexPtr<'static>,
     primary_input: CamlTweedleFqVectorPtr,
     auxiliary_input: CamlTweedleFqVectorPtr,
-    prev_challenges: CamlTweedleFqVectorPtr,
+    prev_challenges: Vec<CamlTweedleFq>,
     prev_sgs: CamlTweedleDumAffineVector,
 ) -> CamlTweedleFqPlonkProof {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
     let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
-        if prev_challenges.as_ref().0.len() == 0 {
+        if prev_challenges.len() == 0 {
             Vec::new()
         } else {
-            let challenges_per_sg = prev_challenges.as_ref().0.len() / prev_sgs.0.len();
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.0.len();
             prev_sgs
                 .0
                 .iter()
                 .enumerate()
                 .map(|(i, sg)| {
                     (
-                        prev_challenges.as_ref().0
-                            [(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
-                            .map(|x| *x)
+                            .map(|x| x.0)
                             .collect(),
                         PolyComm::<GAffine> {
                             unshifted: vec![sg.clone()],
