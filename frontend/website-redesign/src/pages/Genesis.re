@@ -322,9 +322,7 @@ module CultureFooter = {
            )}
         </p>
         <div className=Styles.link>
-          <a
-            className=Styles.anchor
-            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
+          <a className=Styles.anchor href=Constants.minaCodeOfConduct>
             {React.string("Read our Code of Conduct")}
             <Icon kind=Icon.ArrowRightMedium />
           </a>

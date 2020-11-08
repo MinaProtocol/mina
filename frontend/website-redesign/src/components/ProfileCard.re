@@ -149,7 +149,7 @@ let make =
        | (None, Some(quote)) =>
          <div className=Styles.quoteSection>
            <Rule />
-           <p className=Styles.quote> {React.string(quote)} </p>
+           <p className=Styles.quote> {React.string({j|"$(quote)"|j})} </p>
            <Rule />
          </div>
        | (None, None) => React.null
@@ -160,7 +160,7 @@ let make =
            | Some(twitter) =>
              <a
                target="_blank"
-               href={"https://twitter.com/" ++ twitter}
+               href={Constants.twitterUrl ++ twitter}
                className=Styles.iconLink>
                <Icon kind=Icon.Twitter />
              </a>
@@ -168,7 +168,10 @@ let make =
            }}
           {switch (member.github) {
            | Some(github) =>
-             <a target="_blank" href=github className=Styles.iconLink>
+             <a
+               target="_blank"
+               href={Constants.githubUrl ++ github}
+               className=Styles.iconLink>
                <Icon kind=Icon.Github />
              </a>
            | _ => React.null
@@ -177,7 +180,7 @@ let make =
            | Some(linkedIn) =>
              <a
                target="_blank"
-               href={"https://linkedin.com/in/" ++ linkedIn}
+               href={Constants.linkedInUrl ++ linkedIn}
                className=Styles.iconLink>
                <Icon kind=Icon.Twitter />
              </a>

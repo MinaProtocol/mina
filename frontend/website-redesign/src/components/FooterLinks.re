@@ -118,28 +118,24 @@ let make = () => {
       <Next.Link href="/work-with-mina">
         <a className=Styles.linkStyle> {React.string("Careers")} </a>
       </Next.Link>
-
     </div>
     <div className=Styles.linksGroup>
       <h4 className=Styles.linksHeader>
         {React.string("Help and Support")}
       </h4>
-      <a className=Styles.linkStyle href="https://discord.com/invite/RDQc43H">
+      <a className=Styles.linkStyle href=Constants.minaDiscordSocial>
         {React.string("Discord")}
       </a>
-      <a className=Styles.linkStyle href="https://forums.minaprotocol.com/">
+      <a className=Styles.linkStyle href=Constants.minaForums>
         {React.string("Forums")}
       </a>
-      <a
-        className=Styles.linkStyle href="https://github.com/MinaProtocol/mina">
+      <a className=Styles.linkStyle href=Constants.minaGithub>
         {React.string("Github")}
       </a>
-      <a className=Styles.linkStyle href="https://minawiki.com/Main_Page">
+      <a className=Styles.linkStyle href=Constants.minaWikiMainPage>
         {React.string("Wiki")}
       </a>
-      <a
-        className=Styles.linkStyle
-        href="https://github.com/MinaProtocol/mina/issues">
+      <a className=Styles.linkStyle href=Constants.minaGithubIssues>
         {React.string("Report a Bug")}
       </a>
     </div>

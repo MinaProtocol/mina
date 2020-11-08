@@ -116,7 +116,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
            | Some(twitter) =>
              <a
                target="_blank"
-               href={"https://twitter.com/" ++ twitter}
+               href={Constants.twitterUrl ++ twitter}
                className=Styles.iconLink>
                <Icon kind=Icon.Twitter />
              </a>
@@ -126,7 +126,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
            | Some(github) =>
              <a
                target="_blank"
-               href={"https://github.com/" ++ github}
+               href={Constants.githubUrl ++ github}
                className=Styles.iconLink>
                <Icon kind=Icon.Github />
              </a>
