@@ -32,6 +32,12 @@ module Styles = {
       selector(" > :not(:first-child)", [marginLeft(`rem(1.5))]),
     ]);
 
+  let slide = translate =>
+    style([
+      transform(`translateX(`rem(translate))),
+      transition("transform", ~duration=400, ~timingFunction=`easeOut),
+    ]);
+
   let headerContainer =
     style([
       display(`flex),
@@ -90,22 +96,24 @@ module Arrow = {
   };
 };
 
-module Slide = {
+module Slider = {
   [@react.component]
-  let make = (~items: array(ContentType.GenesisProfile.t)) => {
+  let make = (~items: array(ContentType.GenesisProfile.t), ~translate) => {
     <div className=Styles.contentContainer>
       {items
        |> Array.map((p: ContentType.GenesisProfile.t) => {
-            <GenesisMemberProfile
-              key={p.name}
-              name={p.name}
-              photo={p.profilePhoto.fields.file.url}
-              quote={"\"" ++ p.quote ++ "\""}
-              location={p.memberLocation}
-              twitter={p.twitter}
-              github={p.github}
-              blogPost={p.blogPost.fields.slug}
-            />
+            <div key={p.name} className={Styles.slide(translate)}>
+              <GenesisMemberProfile
+                key={p.name}
+                name={p.name}
+                photo={p.profilePhoto.fields.file.url}
+                quote={"\"" ++ p.quote ++ "\""}
+                location={p.memberLocation}
+                twitter={p.twitter}
+                github={p.github}
+                blogPost={p.blogPost.fields.slug}
+              />
+            </div>
           })
        |> React.array}
     </div>;
@@ -115,27 +123,22 @@ module Slide = {
 [@react.component]
 let make =
     (~title, ~copy, ~textColor, ~items: array(ContentType.GenesisProfile.t)) => {
-  let (items, setItems) = React.useState(_ => items);
+  let (itemIndex, setItemIndex) = React.useState(_ => 0);
+  let (translate, setTranslate) = React.useState(_ => 0.);
 
-  let nextSlide = _ => {
-    let copy = Belt.Array.copy(items);
-    switch (Js.Array.shift(copy)) {
-    | Some(last) =>
-      Js.Array.push(last, copy) |> ignore;
-      setItems(_ => copy);
-    | None => ()
+  let nextSlide = _ =>
+    if (itemIndex < Array.length(items) - 1) {
+      setItemIndex(_ => itemIndex + 1);
+      // 24.5 is the value in rem that each slide item is in width.
+      setTranslate(_ => translate -. 24.5);
     };
-  };
 
-  let prevSlide = _ => {
-    let copy = Belt.Array.copy(items);
-    switch (Js.Array.pop(copy)) {
-    | Some(last) =>
-      Js.Array.unshift(last, copy) |> ignore;
-      setItems(_ => copy);
-    | None => ()
+  let prevSlide = _ =>
+    if (itemIndex > 0) {
+      setItemIndex(_ => itemIndex - 1);
+      // 24.5 is the value in rem that each slide item is in width.
+      setTranslate(_ => translate +. 24.5);
     };
-  };
 
   <div className=Styles.container>
     <div className=Styles.headerContainer>
@@ -149,6 +152,6 @@ let make =
         <Arrow icon=Icon.ArrowRightLarge onClick=nextSlide />
       </span>
     </div>
-    <Slide items />
+    <Slider translate items />
   </div>;
 };
