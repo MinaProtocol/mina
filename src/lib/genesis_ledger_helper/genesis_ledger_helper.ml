@@ -810,7 +810,8 @@ module Epoch_data = struct
           match config.next with
           | None ->
               [%log info]
-                "Configured next epoch ledger same as the staking epoch ledger" ;
+                "Configured next epoch ledger to be the same as the staking \
+                 epoch ledger" ;
               Deferred.Or_error.return (None, None)
           | Some {ledger; seed} ->
               let%map next_ledger, config'', ledger_file =

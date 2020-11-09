@@ -113,13 +113,20 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         { source= Coda_base.Pending_coinbase.Stack.empty
         ; target= Coda_base.Pending_coinbase.Stack.empty } }
   in
+  let genesis_epoch_ledger =
+    match t.genesis_epoch_data with
+    | None ->
+        genesis_ledger
+    | Some data ->
+        data.staking.ledger
+  in
   let open Pickles_types in
   let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
   let txn_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n in
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
-         ~genesis_ledger)
+         ~genesis_epoch_ledger)
     { transition= Snark_transition.genesis ~constraint_constants ~genesis_ledger
     ; prev_state }
     [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]

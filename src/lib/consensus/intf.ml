@@ -60,6 +60,7 @@ module type Blockchain_state = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
     -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Frozen_ledger_hash.t
     -> snarked_next_available_token:Token_id.t
     -> timestamp:Block_time.t
     -> Value.t
@@ -68,6 +69,9 @@ module type Blockchain_state = sig
     ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+
+  val genesis_ledger_hash :
     (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
   val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
@@ -220,6 +224,7 @@ module type State_hooks = sig
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -357,7 +362,7 @@ module type S = sig
 
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> genesis_epoch_ledger:Coda_base.Ledger.t Lazy.t
         -> Snark_params.Tick.Handler.t
 
       val handler :

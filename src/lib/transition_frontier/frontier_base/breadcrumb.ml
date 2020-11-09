@@ -341,11 +341,15 @@ module For_tests = struct
             previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.snarked_next_available_token
       in
+      let genesis_ledger_hash =
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.genesis_ledger_hash
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
-          ~staged_ledger_hash:next_staged_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =

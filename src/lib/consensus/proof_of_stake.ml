@@ -316,8 +316,7 @@ module Data = struct
         { staking= json |> member "staking" |> to_string |> Uuid.of_string
         ; next= json |> member "next" |> to_string |> Uuid.of_string }
 
-    let create_epoch_ledger ~location ~genesis_ledger ~genesis_epoch_ledger
-        ~ledger_depth =
+    let create_epoch_ledger ~location ~genesis_epoch_ledger ~ledger_depth =
       let open Coda_base in
       if Sys.file_exists location then (
         let logger = Logger.create () in
@@ -326,24 +325,19 @@ module Data = struct
           "Loading epoch ledger from disk: $location" ;
         Snapshot.Ledger_snapshot.Ledger_db
           (Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()) )
-      else
-        match genesis_epoch_ledger with
-        | None ->
-            Genesis_epoch_ledger (Lazy.force genesis_ledger)
-        | Some ledger ->
-            Genesis_epoch_ledger (Lazy.force ledger)
+      else Genesis_epoch_ledger (Lazy.force genesis_epoch_ledger)
 
     let create block_producer_pubkeys ~genesis_ledger ~genesis_epoch_data
         ~epoch_ledger_location ~ledger_depth =
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
-        Option.value_map genesis_epoch_data ~default:(None, None)
+        Option.value_map genesis_epoch_data
+          ~default:(genesis_ledger, genesis_ledger)
           ~f:(fun {Genesis_epoch_data.staking; next} ->
-            ( Some staking.ledger
-            , Some
-                (Option.value_map next ~default:staking.ledger ~f:(fun next ->
-                     next.ledger )) ) )
+            ( staking.ledger
+            , Option.value_map next ~default:staking.ledger ~f:(fun next ->
+                  next.ledger ) ) )
       in
       let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
       let epoch_ledger_uuids =
@@ -362,16 +356,14 @@ module Data = struct
       in
       let staking_epoch_ledger =
         create_epoch_ledger ~location:staking_epoch_ledger_location
-          ~genesis_ledger ~genesis_epoch_ledger:genesis_epoch_ledger_staking
-          ~ledger_depth
+          ~genesis_epoch_ledger:genesis_epoch_ledger_staking ~ledger_depth
       in
       let next_epoch_ledger_location =
         epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.next
       in
       let next_epoch_ledger =
         create_epoch_ledger ~location:next_epoch_ledger_location
-          ~genesis_ledger ~genesis_epoch_ledger:genesis_epoch_ledger_next
-          ~ledger_depth
+          ~genesis_epoch_ledger:genesis_epoch_ledger_next ~ledger_depth
       in
       ref
         { Data.staking_epoch_snapshot=
@@ -917,14 +909,13 @@ module Data = struct
 
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
-          -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+          -> genesis_epoch_ledger:Coda_base.Ledger.t Lazy.t
           -> Snark_params.Tick.Handler.t =
-       fun ~constraint_constants ~genesis_ledger ->
+       fun ~constraint_constants ~genesis_epoch_ledger ->
         let pk, sk = genesis_winner in
-        (*Deepthi: add genesis epoch ledger*)
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn
-            (Lazy.force genesis_ledger)
+            (Lazy.force genesis_epoch_ledger)
             [Coda_base.(Account_id.create pk Token_id.default)]
         in
         let empty_pending_coinbase =
@@ -1136,17 +1127,11 @@ module Data = struct
           ; Epoch_ledger.var_to_input ledger
           ; field (Coda_base.State_hash.var_to_hash_packed lock_checkpoint) ]
 
-      let genesis ~genesis_ledger
-          ~(genesis_epoch_data : Genesis_epoch_data.Data.t option) =
-        let ledger, seed =
-          Option.value_map genesis_epoch_data
-            ~default:(genesis_ledger, Epoch_seed.initial) ~f:(fun epoch_data ->
-              (epoch_data.ledger, epoch_data.seed) )
-        in
+      let genesis ~(genesis_epoch_data : Genesis_epoch_data.Data.t) =
         { Poly.ledger=
-            Epoch_ledger.genesis ~ledger
+            Epoch_ledger.genesis ~ledger:genesis_epoch_data.ledger
             (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
-        ; seed
+        ; seed= genesis_epoch_data.seed
         ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
         ; lock_checkpoint= Lock_checkpoint.null
         ; epoch_length= Length.of_int 1 }
@@ -1230,13 +1215,20 @@ module Data = struct
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
         epoch_count ~prev_epoch ~next_epoch ~next_slot
         ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
-        ~total_currency ~(constants : Constants.t) =
+        ~genesis_ledger_hash ~total_currency ~(constants : Constants.t) =
+      let next_staking_ledger =
+        (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
+        if
+          Coda_base.Frozen_ledger_hash.equal snarked_ledger_hash
+            genesis_ledger_hash
+        then next_data.ledger
+        else {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
+      in
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
           , { Poly.seed= next_data.seed
-            ; ledger=
-                {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
+            ; ledger= next_staking_ledger
             ; start_checkpoint=
                 prev_protocol_state_hash
                 (* TODO: We need to make sure issue #2328 is properly addressed. *)
@@ -1920,6 +1912,7 @@ module Data = struct
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
+        ~(genesis_ledger_hash : Coda_base.Frozen_ledger_hash.t)
         ~(producer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
@@ -1955,7 +1948,8 @@ module Data = struct
           , previous_consensus_state.next_epoch_data )
           previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
           ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
-          ~producer_vrf_result ~snarked_ledger_hash ~total_currency
+          ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
+          ~total_currency
       in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density ~constants
@@ -2018,9 +2012,14 @@ module Data = struct
         | Some {previous_length; _} ->
             previous_length
       in
+      let default_epoch_data =
+        Genesis_epoch_data.Data.
+          {ledger= genesis_ledger; seed= Epoch_seed.initial}
+      in
       let genesis_epoch_data_staking, genesis_epoch_data_next =
-        Option.value_map genesis_epoch_data ~default:(None, None)
-          ~f:(fun data -> (Some data.staking, data.next))
+        Option.value_map genesis_epoch_data
+          ~default:(default_epoch_data, default_epoch_data) ~f:(fun data ->
+            (data.staking, Option.value ~default:data.staking data.next) )
       in
       { Poly.blockchain_length
       ; epoch_count= Length.zero
@@ -2034,11 +2033,10 @@ module Data = struct
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger
       ; curr_global_slot= Global_slot.zero ~constants
       ; staking_epoch_data=
-          Epoch_data.Staking.genesis ~genesis_ledger
+          Epoch_data.Staking.genesis
             ~genesis_epoch_data:genesis_epoch_data_staking
       ; next_epoch_data=
-          Epoch_data.Next.genesis ~genesis_ledger
-            ~genesis_epoch_data:genesis_epoch_data_next
+          Epoch_data.Next.genesis ~genesis_epoch_data:genesis_epoch_data_next
       ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
@@ -2067,7 +2065,7 @@ module Data = struct
                 ~constraint_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash)
+           ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
         ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
@@ -2101,7 +2099,8 @@ module Data = struct
         (previous_protocol_state_hash : Coda_base.State_hash.var)
         ~(supply_increase : Currency.Amount.var)
         ~(previous_blockchain_state_ledger_hash :
-           Coda_base.Frozen_ledger_hash.var) ~constraint_constants
+           Coda_base.Frozen_ledger_hash.var) ~genesis_ledger_hash
+        ~constraint_constants
         ~(protocol_constants : Coda_base.Protocol_constants_checked.var) =
       let open Snark_params.Tick in
       let%bind constants =
@@ -2153,6 +2152,14 @@ module Data = struct
       let%bind in_seed_update_range =
         Slot.Checked.in_seed_update_range next_slot ~constants
       in
+      let%bind update_next_epoch_ledger =
+        (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
+        let%bind snarked_ledger_is_still_genesis =
+          Coda_base.Frozen_ledger_hash.equal_var genesis_ledger_hash
+            previous_blockchain_state_ledger_hash
+        in
+        Boolean.(epoch_increased &&& not snarked_ledger_is_still_genesis)
+      in
       let%bind next_epoch_data =
         let%map seed =
           let base = previous_state.next_epoch_data.seed in
@@ -2166,7 +2173,7 @@ module Data = struct
           in
           succ base
         and ledger =
-          Epoch_ledger.if_ epoch_increased
+          Epoch_ledger.if_ update_next_epoch_ledger
             ~then_:
               { total_currency= new_total_currency
               ; hash= previous_blockchain_state_ledger_hash }
@@ -2839,7 +2846,7 @@ module Hooks = struct
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , Length.(existing.min_window_density < candidate.min_window_density)
+        , Length.(existing.min_window_density <= candidate.min_window_density)
         )
     in
     let choice = if should_take then `Take else `Keep in
@@ -3155,7 +3162,8 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~snarked_ledger_hash ~supply_increase ~logger ~constraint_constants =
+        ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
+        ~constraint_constants =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -3181,7 +3189,7 @@ module Hooks = struct
              ~consensus_transition
              ~producer_vrf_result:block_data.Block_data.vrf_result
              ~previous_protocol_state_hash ~supply_increase
-             ~snarked_ledger_hash)
+             ~snarked_ledger_hash ~genesis_ledger_hash)
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
@@ -3208,6 +3216,9 @@ module Hooks = struct
           ~previous_blockchain_state_ledger_hash:
             ( Protocol_state.blockchain_state prev_state
             |> Blockchain_state.snarked_ledger_hash )
+          ~genesis_ledger_hash:
+            ( Protocol_state.blockchain_state prev_state
+            |> Blockchain_state.genesis_ledger_hash )
           ~protocol_constants:(Protocol_state.constants prev_state)
     end
 
@@ -3222,6 +3233,11 @@ module Hooks = struct
            -> Consensus_state.Value.t)
           Quickcheck.Generator.t =
         let open Consensus_state in
+        let genesis_ledger_hash =
+          let (module L) = Genesis_ledger.for_unit_tests in
+          Lazy.force L.t |> Coda_base.Ledger.merkle_root
+          |> Coda_base.Frozen_ledger_hash.of_ledger_hash
+        in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
         let%map producer_vrf_result = Vrf.Output.gen in
@@ -3254,7 +3270,8 @@ module Hooks = struct
               ~next_slot:curr_slot
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
-              ~producer_vrf_result ~snarked_ledger_hash ~total_currency
+              ~producer_vrf_result ~snarked_ledger_hash ~genesis_ledger_hash
+              ~total_currency
           in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density ~constants
@@ -3363,7 +3380,7 @@ let%test_module "Proof of stake tests" =
       let next_consensus_state =
         update ~constants ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
-          ~producer_vrf_result
+          ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
         |> Or_error.ok_exn
       in
       (* build pieces needed to apply "update_var" *)
@@ -3390,6 +3407,7 @@ let%test_module "Proof of stake tests" =
           exists Coda_base.Frozen_ledger_hash.typ
             ~compute:(As_prover.return snarked_ledger_hash)
         in
+        let genesis_ledger_hash = previous_blockchain_state_ledger_hash in
         let%bind constants_checked =
           exists Coda_base.Protocol_constants_checked.typ
             ~compute:
@@ -3400,8 +3418,8 @@ let%test_module "Proof of stake tests" =
         let result =
           update_var previous_state transition_data
             previous_protocol_state_hash ~supply_increase
-            ~previous_blockchain_state_ledger_hash ~constraint_constants
-            ~protocol_constants:constants_checked
+            ~previous_blockchain_state_ledger_hash ~genesis_ledger_hash
+            ~constraint_constants ~protocol_constants:constants_checked
         in
         (* setup handler *)
         let indices =
