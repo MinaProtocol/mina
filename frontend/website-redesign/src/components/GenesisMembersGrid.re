@@ -39,7 +39,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~genesisMembers, ~switchModalState, ~setCurrentMember) => {
+let make = (~genesisMembers, ~switchModalState, ~setCurrentIndexAndMembers) => {
   <>
     <Spacer height=3. />
     <div className=Styles.genesisCopy>
@@ -56,8 +56,13 @@ let make = (~genesisMembers, ~switchModalState, ~setCurrentMember) => {
       {React.array(
          genesisMembers
          |> Array.map((member: ContentType.GenericMember.t) => {
-              <div key={member.name}>
-                <SmallCard member switchModalState setCurrentMember />
+              <div
+                key={member.name}
+                onClick={_ => {
+                  switchModalState();
+                  setCurrentIndexAndMembers(member, genesisMembers);
+                }}>
+                <SmallCard member />
               </div>
             }),
        )}

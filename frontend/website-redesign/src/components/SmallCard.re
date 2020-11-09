@@ -30,18 +30,8 @@ module Styles = {
 };
 
 [@react.component]
-let make =
-    (
-      ~member: ContentType.GenericMember.t,
-      ~switchModalState=_ => (),
-      ~setCurrentMember=_ => (),
-    ) => {
-  <div
-    className=Styles.memberContainer
-    onClick={_ => {
-      switchModalState();
-      setCurrentMember(member);
-    }}>
+let make = (~member: ContentType.GenericMember.t) => {
+  <div className=Styles.memberContainer>
     <img className=Styles.image src={member.image.fields.file.url} />
     <div className=Styles.flexRow>
       <h5 className=Styles.name> {React.string(member.name)} </h5>

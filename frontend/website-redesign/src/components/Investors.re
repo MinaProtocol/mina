@@ -87,7 +87,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~advisors, ~switchModalState, ~setCurrentMember) => {
+let make = (~advisors, ~switchModalState, ~setCurrentIndexAndMembers) => {
   <div className=Styles.backgroundImage>
     <Wrapped>
       <Spacer height=7. />
@@ -161,8 +161,13 @@ let make = (~advisors, ~switchModalState, ~setCurrentMember) => {
         {React.array(
            advisors
            |> Array.map((member: ContentType.GenericMember.t) => {
-                <div key={member.name}>
-                  <SmallCard member switchModalState setCurrentMember />
+                <div
+                  key={member.name}
+                  onClick={_ => {
+                    switchModalState();
+                    setCurrentIndexAndMembers(member, advisors);
+                  }}>
+                  <SmallCard member />
                 </div>
               }),
          )}

@@ -52,7 +52,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~profiles, ~switchModalState, ~setCurrentMember) => {
+let make = (~profiles, ~switchModalState, ~setCurrentIndexAndMembers) => {
   <>
     <div className=Styles.headerCopy>
       <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
@@ -66,8 +66,13 @@ let make = (~profiles, ~switchModalState, ~setCurrentMember) => {
       {React.array(
          profiles
          |> Array.map((member: ContentType.GenericMember.t) => {
-              <div key={member.name}>
-                <SmallCard member switchModalState setCurrentMember />
+              <div
+                key={member.name}
+                onClick={_ => {
+                  switchModalState();
+                  setCurrentIndexAndMembers(member, profiles);
+                }}>
+                <SmallCard member />
               </div>
             }),
        )}

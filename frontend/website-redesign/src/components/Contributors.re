@@ -21,24 +21,62 @@ module Styles = {
   let modal = style([margin(`auto)]);
 };
 
+type state = {
+  memberIndex: int,
+  currentMembers: array(ContentType.GenericMember.t),
+};
+
+type actions =
+  | UpdateIndexAndCurrentMembers(
+      ContentType.GenericMember.t,
+      array(ContentType.GenericMember.t),
+    )
+  | UpdateMemberIndex(int)
+  | OnPrevMemberPress
+  | OnNextMemberPress;
+
+let reducer = (prevState, action) => {
+  switch (action) {
+  | UpdateIndexAndCurrentMembers(member, members) =>
+    let memberIndex =
+      Belt.Array.getIndexBy(members, (m: ContentType.GenericMember.t) => {
+        m.name == member.name
+      });
+    switch (memberIndex) {
+    | Some(index) => {memberIndex: index, currentMembers: members}
+    | None => prevState
+    };
+
+  | UpdateMemberIndex(index) => {...prevState, memberIndex: index}
+
+  | OnPrevMemberPress =>
+    prevState.memberIndex <= 0
+      ? prevState : {...prevState, memberIndex: prevState.memberIndex - 1}
+
+  | OnNextMemberPress =>
+    prevState.memberIndex >= Array.length(prevState.currentMembers) - 1
+      ? prevState : {...prevState, memberIndex: prevState.memberIndex + 1}
+  };
+};
+
 external asDomElement: 'a => Dom.element = "%identity";
 [@react.component]
 let make =
     (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
-  let (currentMemberIndex, setCurrentMemberIndex) = React.useState(_ => 0);
+  let (state, dispatch) =
+    React.useReducer(reducer, {memberIndex: 0, currentMembers: profiles});
   let modalBackgroundRef = React.useRef(Js.Nullable.null);
 
-  let allProfiles =
-    profiles->Belt.Array.concat(genesisMembers)->Belt.Array.concat(advisors);
-
   let onPrevMemberPress = () => {
-    currentMemberIndex <= 0
-      ? () : setCurrentMemberIndex(_ => currentMemberIndex - 1);
+    dispatch(OnPrevMemberPress);
   };
 
   let onNextMemberPress = () => {
-    currentMemberIndex >= Array.length(allProfiles) - 1
-      ? () : setCurrentMemberIndex(_ => currentMemberIndex + 1);
+    dispatch(OnNextMemberPress);
+  };
+
+  let setCurrentIndexAndMembers = (member, members) => {
+    dispatch(UpdateIndexAndCurrentMembers(member, members));
   };
 
   let closeModal = e => {
@@ -53,38 +91,34 @@ let make =
        );
   };
 
-  let setCurrentMember = (member: ContentType.GenericMember.t) => {
-    let memberIndex =
-      Belt.Array.getIndexBy(allProfiles, (m: ContentType.GenericMember.t) => {
-        m.name == member.name
-      });
-    Belt.Option.mapWithDefault(memberIndex, (), index =>
-      setCurrentMemberIndex(_ => index)
-    );
-  };
-
   <>
-    <div
-      className={Styles.modalContainer(modalOpen)}
-      ref={modalBackgroundRef->ReactDOMRe.Ref.domRef}
-      onClick={e => closeModal(e)}>
-      <div className=Styles.modal>
-        <ProfileCard
-          member={Array.get(allProfiles, currentMemberIndex)}
-          switchModalState
-          onPrevMemberPress
-          onNextMemberPress
-        />
-      </div>
-    </div>
+    {Array.length(state.currentMembers) === 0
+       ? React.null
+       : <div
+           className={Styles.modalContainer(modalOpen)}
+           ref={modalBackgroundRef->ReactDOMRe.Ref.domRef}
+           onClick={e => closeModal(e)}>
+           <div className=Styles.modal>
+             <ProfileCard
+               member={Array.get(state.currentMembers, state.memberIndex)}
+               switchModalState
+               onPrevMemberPress
+               onNextMemberPress
+             />
+           </div>
+         </div>}
     <div className=Styles.container>
       <Wrapped>
         <Rule color=Theme.Colors.black />
-        <TeamGrid profiles switchModalState setCurrentMember />
+        <TeamGrid profiles switchModalState setCurrentIndexAndMembers />
         <Rule color=Theme.Colors.black />
-        <GenesisMembersGrid genesisMembers switchModalState setCurrentMember />
+        <GenesisMembersGrid
+          genesisMembers
+          switchModalState
+          setCurrentIndexAndMembers
+        />
       </Wrapped>
     </div>
-    <Investors advisors switchModalState setCurrentMember />
+    <Investors advisors switchModalState setCurrentIndexAndMembers />
   </>;
 };
