@@ -19,27 +19,21 @@ module type Inputs_intf = sig
   module Scalar_field : sig
     include Stable_v1
 
-    include Type_with_delete with type t := t
-
     val one : t
 
-    module Vector : sig
-      include Vector with type elt = t
+    module Vector : Snarky_intf.Vector.S with type elt = t
+  end
 
-      module Triple : Triple with type elt := t
-    end
+  module Base_field : sig
+    type t
   end
 
   module Curve : sig
     module Affine : sig
-      include Stable_v1
+      include Stable_v1 with type Stable.V1.t = Base_field.t * Base_field.t
 
       module Backend : sig
-        include Type_with_delete
-
-        module Vector : Vector with type elt = t
-
-        module Pair : Intf.Pair with type elt := t
+        type t = (Base_field.t * Base_field.t) Or_infinity.t
       end
 
       val of_backend : Backend.t -> t Or_infinity.t
@@ -51,7 +45,9 @@ module type Inputs_intf = sig
   module Poly_comm : sig
     type t = Curve.Affine.t Poly_comm.t
 
-    module Backend : Type_with_delete
+    module Backend : sig
+      type t = Curve.Affine.Backend.t Marlin_plonk_bindings.Types.Poly_comm.t
+    end
 
     val of_backend_with_degree_bound : Backend.t -> t
 
@@ -61,52 +57,15 @@ module type Inputs_intf = sig
   end
 
   module Opening_proof_backend : sig
-    type t
-
-    val lr : t -> Curve.Affine.Backend.Pair.Vector.t
-
-    val z1 : t -> Scalar_field.t
-
-    val z2 : t -> Scalar_field.t
-
-    val delta : t -> Curve.Affine.Backend.t
-
-    val sg : t -> Curve.Affine.Backend.t
-
-    val delete : t -> unit
+    type t =
+      ( Scalar_field.t
+      , Curve.Affine.Backend.t )
+      Marlin_plonk_bindings.Types.Plonk_proof.Opening_proof.t
   end
 
   module Evaluations_backend : sig
-    type t
-
-    val make :
-         l:Scalar_field.Vector.t
-      -> r:Scalar_field.Vector.t
-      -> o:Scalar_field.Vector.t
-      -> z:Scalar_field.Vector.t
-      -> t:Scalar_field.Vector.t
-      -> f:Scalar_field.Vector.t
-      -> sigma1:Scalar_field.Vector.t
-      -> sigma2:Scalar_field.Vector.t
-      -> t
-
-    val l_eval : t -> Scalar_field.Vector.t
-
-    val r_eval : t -> Scalar_field.Vector.t
-
-    val o_eval : t -> Scalar_field.Vector.t
-
-    val z_eval : t -> Scalar_field.Vector.t
-
-    val t_eval : t -> Scalar_field.Vector.t
-
-    val f_eval : t -> Scalar_field.Vector.t
-
-    val sigma1_eval : t -> Scalar_field.Vector.t
-
-    val sigma2_eval : t -> Scalar_field.Vector.t
-
-    module Pair : Intf.Pair_basic with type elt := t
+    type t =
+      Scalar_field.t Marlin_plonk_bindings.Types.Plonk_proof.Evaluations.t
   end
 
   module Index : sig
@@ -115,56 +74,24 @@ module type Inputs_intf = sig
 
   module Verifier_index : sig
     type t
-
-    module Vector : Vector with type elt := t
   end
 
   module Backend : sig
-    include Type_with_delete
-
-    module Vector : Vector with type elt := t
-
-    val make :
-         primary_input:Scalar_field.Vector.t
-      -> l_comm:Poly_comm.Backend.t
-      -> r_comm:Poly_comm.Backend.t
-      -> o_comm:Poly_comm.Backend.t
-      -> z_comm:Poly_comm.Backend.t
-      -> t_comm:Poly_comm.Backend.t
-      -> lr:Curve.Affine.Backend.Pair.Vector.t
-      -> z1:Scalar_field.t
-      -> z2:Scalar_field.t
-      -> delta:Curve.Affine.Backend.t
-      -> sg:Curve.Affine.Backend.t
-      -> evals0:Evaluations_backend.t
-      -> evals1:Evaluations_backend.t
-      -> prev_challenges:Scalar_field.Vector.t
-      -> prev_sgs:Curve.Affine.Backend.Vector.t
-      -> t
+    type t =
+      ( Scalar_field.t
+      , Curve.Affine.Backend.t
+      , Poly_comm.Backend.t )
+      Marlin_plonk_bindings_types.Plonk_proof.t
 
     val create :
          Index.t
       -> Scalar_field.Vector.t
       -> Scalar_field.Vector.t
-      -> Scalar_field.Vector.t
-      -> Curve.Affine.Backend.Vector.t
+      -> Scalar_field.t array
+      -> Curve.Affine.Backend.t array
       -> t
 
-    val batch_verify : Verifier_index.Vector.t -> Vector.t -> bool
-
-    val proof : t -> Opening_proof_backend.t
-
-    val evals_nocopy : t -> Evaluations_backend.Pair.t
-
-    val l_comm : t -> Poly_comm.Backend.t
-
-    val r_comm : t -> Poly_comm.Backend.t
-
-    val o_comm : t -> Poly_comm.Backend.t
-
-    val z_comm : t -> Poly_comm.Backend.t
-
-    val t_comm : t -> Poly_comm.Backend.t
+    val batch_verify : Verifier_index.t array -> t array -> bool
   end
 end
 
@@ -227,113 +154,68 @@ module Make (Inputs : Inputs_intf) = struct
 
   let g t f = G.Affine.of_backend (f t)
 
-  let fq t f =
-    let t = f t in
-    Caml.Gc.finalise Fq.delete t ;
-    t
-
-  let fqv t f =
-    let t = f t in
-    Caml.Gc.finalise Fq.Vector.delete t ;
-    Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
-
   let fq_array_to_vec arr =
-    let vec = Fq.Vector.create () in
-    Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
-    Caml.Gc.finalise Fq.Vector.delete vec ;
-    vec
-
-  let g_array_to_vec arr =
-    let module V = G.Affine.Backend.Vector in
-    let vec = V.create () in
-    Array.iter arr ~f:(fun fe -> V.emplace_back vec fe) ;
-    Caml.Gc.finalise V.delete vec ;
-    vec
-
-  let evalvec arr =
     let vec = Fq.Vector.create () in
     Array.iter arr ~f:(fun fe -> Fq.Vector.emplace_back vec fe) ;
     vec
 
   let opening_proof_of_backend (t : Opening_proof_backend.t) =
-    let gpair (type a) (t : a) (f : a -> G.Affine.Backend.Pair.t) :
+    let g x = G.Affine.of_backend x |> Or_infinity.finite_exn in
+    let gpair (type a) (t : G.Affine.Backend.t * G.Affine.Backend.t) :
         G.Affine.t * G.Affine.t =
-      let t = f t in
-      let g x = G.Affine.of_backend x |> Or_infinity.finite_exn in
-      G.Affine.Backend.Pair.(g (f0 t), g (f1 t))
+      (g (fst t), g (snd t))
     in
-    let fq = fq t in
-    let g = g t in
-    let open Opening_proof_backend in
-    let lr =
-      let v = lr t in
-      Array.init (G.Affine.Backend.Pair.Vector.length v) (fun i ->
-          gpair v (fun v -> G.Affine.Backend.Pair.Vector.get v i) )
-    in
-    { Dlog_plonk_types.Openings.Bulletproof.lr
-    ; z_1= fq z1
-    ; z_2= fq z2
-    ; delta= g delta |> Or_infinity.finite_exn
-    ; sg= g sg |> Or_infinity.finite_exn }
+    { Dlog_plonk_types.Openings.Bulletproof.lr= Array.map ~f:gpair t.lr
+    ; z_1= t.z1
+    ; z_2= t.z2
+    ; delta= g t.delta
+    ; sg= g t.sg }
 
   let of_backend (t : Backend.t) : t =
     let open Backend in
-    let proof =
-      let t = proof t in
-      let ret = opening_proof_of_backend t in
-      Opening_proof_backend.delete t ;
-      ret
-    in
+    let proof = opening_proof_of_backend t.proof in
     let evals =
-      let t = evals_nocopy t in
-      Evaluations_backend.Pair.(f0 t, f1 t)
+      (fst t.evals, snd t.evals)
       |> Tuple_lib.Double.map ~f:(fun e ->
              let open Evaluations_backend in
-             let fqv = fqv e in
-             { Dlog_plonk_types.Evals.l= fqv l_eval
-             ; r= fqv r_eval
-             ; o= fqv o_eval
-             ; z= fqv z_eval
-             ; t= fqv t_eval
-             ; f= fqv f_eval
-             ; sigma1= fqv sigma1_eval
-             ; sigma2= fqv sigma2_eval } )
+             { Dlog_plonk_types.Evals.l= e.l
+             ; r= e.r
+             ; o= e.o
+             ; z= e.z
+             ; t= e.t
+             ; f= e.f
+             ; sigma1= e.sigma1
+             ; sigma2= e.sigma2 } )
     in
     let wo x =
-      match Poly_comm.of_backend_without_degree_bound (x t) with
+      match Poly_comm.of_backend_without_degree_bound x with
       | `Without_degree_bound gs ->
           gs
       | _ ->
           assert false
     in
     let w x =
-      match Poly_comm.of_backend_with_degree_bound (x t) with
+      match Poly_comm.of_backend_with_degree_bound x with
       | `With_degree_bound t ->
           t
       | _ ->
           assert false
     in
     { messages=
-        { l_comm= wo l_comm
-        ; r_comm= wo r_comm
-        ; o_comm= wo o_comm
-        ; z_comm= wo z_comm
-        ; t_comm= w t_comm }
+        { l_comm= wo t.messages.l_comm
+        ; r_comm= wo t.messages.r_comm
+        ; o_comm= wo t.messages.o_comm
+        ; z_comm= wo t.messages.z_comm
+        ; t_comm= w t.messages.t_comm }
     ; openings= {proof; evals} }
 
   let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2}
-      =
-    Evaluations_backend.make ~l:(evalvec l) ~r:(evalvec r) ~o:(evalvec o)
-      ~z:(evalvec z) ~t:(evalvec t) ~f:(evalvec f) ~sigma1:(evalvec sigma1)
-      ~sigma2:(evalvec sigma2)
-
-  let field_vector_of_list xs =
-    let v = Fq.Vector.create () in
-    List.iter ~f:(Fq.Vector.emplace_back v) xs ;
-    v
+      : Evaluations_backend.t =
+    {l; r; o; z; t; f; sigma1; sigma2}
 
   let vec_to_array (type t elt)
-      (module V : Intf.Vector with type t = t and type elt = elt) (v : t) =
+      (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
+      (v : t) =
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
@@ -343,32 +225,25 @@ module Make (Inputs : Inputs_intf) = struct
     let g x = G.Affine.to_backend (Or_infinity.Finite x) in
     let pcw t = Poly_comm.to_backend (`With_degree_bound t) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
-    let lr =
-      let v = G.Affine.Backend.Pair.Vector.create () in
-      Array.iter lr ~f:(fun (l, r) ->
-          G.Affine.Backend.Pair.Vector.emplace_back v
-            (G.Affine.Backend.Pair.make (g l) (g r)) ) ;
-      v
-    in
-    let challenges =
-      List.map chal_polys
-        ~f:(fun {Challenge_polynomial.challenges; commitment= _} -> challenges)
-      |> Array.concat |> fq_array_to_vec
-    in
-    let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun {Challenge_polynomial.commitment; challenges= _} ->
-          G.Affine.to_backend (Finite commitment) )
-      |> g_array_to_vec
-    in
-    Backend.make ~primary_input ~l_comm:(pcwo l_comm) ~r_comm:(pcwo r_comm)
-      ~o_comm:(pcwo o_comm) ~z_comm:(pcwo z_comm) ~t_comm:(pcw t_comm) ~lr
-      ~z1:z_1 ~z2:z_2 ~delta:(g delta) ~sg:(g sg)
-      ~evals0:(eval_to_backend evals0) ~evals1:(eval_to_backend evals1)
-      ~prev_challenges:challenges ~prev_sgs:commitments
+    let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
+    { messages=
+        { l_comm= pcwo l_comm
+        ; r_comm= pcwo r_comm
+        ; o_comm= pcwo o_comm
+        ; z_comm= pcwo z_comm
+        ; t_comm= pcw t_comm }
+    ; proof= {lr; delta= g delta; z1= z_1; z2= z_2; sg= g sg}
+    ; evals= (eval_to_backend evals0, eval_to_backend evals1)
+    ; public= primary_input
+    ; prev_challenges=
+        Array.of_list_map chal_polys
+          ~f:(fun {Challenge_polynomial.commitment; challenges} ->
+            ( challenges
+            , { Marlin_plonk_bindings.Types.Poly_comm.shifted= None
+              ; unshifted= [|Or_infinity.Finite commitment|] } ) ) }
 
   let to_backend chal_polys primary_input t =
-    to_backend' chal_polys (field_vector_of_list primary_input) t
+    to_backend' chal_polys (List.to_array primary_input) t
 
   let create ?message pk ~primary ~auxiliary =
     let chal_polys =
@@ -377,39 +252,31 @@ module Make (Inputs : Inputs_intf) = struct
     let challenges =
       List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
           challenges )
-      |> Array.concat |> fq_array_to_vec
+      |> Array.concat
     in
     let commitments =
       Array.of_list_map chal_polys
         ~f:(fun {Challenge_polynomial.commitment; _} ->
           G.Affine.to_backend (Finite commitment) )
-      |> g_array_to_vec
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
-    let t = of_backend res in
-    Backend.delete res ; t
+    of_backend res
 
-  let batch_verify' (conv : 'a -> Fq.Vector.t)
+  let batch_verify' (conv : 'a -> Fq.t array)
       (ts : (Verifier_index.t * t * 'a * message option) list) =
-    let vks = Verifier_index.Vector.create () in
-    let v = Backend.Vector.create () in
-    List.iter ts ~f:(fun (vk, t, xs, m) ->
-        let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
-        Verifier_index.Vector.emplace_back vks vk ;
-        Backend.Vector.emplace_back v p ;
-        Backend.delete p ) ;
-    let res = Backend.batch_verify vks v in
-    Backend.Vector.delete v ; res
+    let vks_and_v =
+      Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
+          let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+          (vk, p) )
+    in
+    Backend.batch_verify
+      (Array.map ~f:fst vks_and_v)
+      (Array.map ~f:snd vks_and_v)
 
-  let batch_verify = batch_verify' (fun xs -> field_vector_of_list xs)
+  let batch_verify = batch_verify' (fun xs -> List.to_array xs)
 
-  let verify ?message t vk (xs : Fq.Vector.t) : bool =
+  let verify ?message t vk xs : bool =
     batch_verify'
-      (fun xs ->
-        let v = Fq.Vector.create () in
-        for i = 0 to Fq.Vector.length xs - 1 do
-          Fq.Vector.emplace_back v (Fq.Vector.get xs i)
-        done ;
-        v )
+      (vec_to_array (module Scalar_field.Vector))
       [(vk, t, xs, message)]
 end

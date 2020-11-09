@@ -24,6 +24,7 @@ module Raw = struct
   external of_parts :
        max_poly_size:int
     -> max_quot_size:int
+    -> log_size_of_group:int
     -> Marlin_plonk_bindings_tweedle_fp_urs.t
     -> Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t
        Plonk_verification_evals.t

@@ -1,6 +1,5 @@
 use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use algebra::tweedle::fp::Fp;
-use std::convert::TryInto;
 
 pub struct CamlTweedleFpVector(pub Vec<Fp>);
 pub type CamlTweedleFpVectorPtr = ocaml::Pointer<CamlTweedleFpVector>;
@@ -39,13 +38,10 @@ pub fn caml_tweedle_fp_vector_emplace_back(mut v: CamlTweedleFpVectorPtr, x: Cam
 pub fn caml_tweedle_fp_vector_get(
     v: CamlTweedleFpVectorPtr,
     i: ocaml::Int,
-) -> Result<Option<CamlTweedleFp>, ocaml::Error> {
-    match TryInto::<usize>::try_into(i) {
-        Ok(i) => match v.as_ref().0.get(i) {
-            Some(x) => Ok(Some(CamlTweedleFp(*x))),
-            None => Ok(None),
-        },
-        Err(_) => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_vector_get")
+) -> Result<CamlTweedleFp, ocaml::Error> {
+    match v.as_ref().0.get(i as usize) {
+        Some(x) => Ok(CamlTweedleFp(*x)),
+        None => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_vector_get")
             .err()
             .unwrap()),
     }
