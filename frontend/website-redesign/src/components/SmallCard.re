@@ -8,7 +8,12 @@ module Styles = {
       cursor(`pointer),
       hover([selector("> div > span", [color(Theme.Colors.orange)])]),
     ]);
-  let image = style([width(`percent(100.)), marginBottom(`rem(1.))]);
+  let image =
+    style([
+      width(`rem(11.)),
+      height(`rem(11.)),
+      marginBottom(`rem(1.)),
+    ]);
   let name =
     merge([
       Theme.Type.h5,
