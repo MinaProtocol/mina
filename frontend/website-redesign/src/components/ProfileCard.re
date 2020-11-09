@@ -41,6 +41,8 @@ module Styles = {
       Theme.Type.label,
       style([
         fontSize(`rem(0.875)),
+        width(`percent(100.)),
+        maxWidth(`rem(18.)),
         marginBottom(`rem(1.)),
         media(
           Theme.MediaQuery.tablet,
