@@ -507,7 +507,7 @@ module Ledger = struct
     let search_local_and_s3 name =
       let named_filename =
         named_filename ~constraint_constants ~num_accounts:config.num_accounts
-          ~balances:config.balances name
+          ~balances:config.balances ~ledger_name_prefix name
       in
       match%bind
         Deferred.List.find_map ~f:(file_exists named_filename) search_paths

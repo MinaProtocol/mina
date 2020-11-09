@@ -2979,10 +2979,17 @@ module Hooks = struct
             select_epoch_snapshot ~constants ~consensus_state:state
               ~local_state ~epoch
           in
+          let snapshot_ledger_hash =
+            Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger
+          in
           [%log debug]
             !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             (epoch_snapshot_name source)
-            (Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger) ;
+            snapshot_ledger_hash ;
+          (*These are computed separately*)
+          assert (
+            Coda_base.Frozen_ledger_hash.equal snapshot_ledger_hash
+              epoch_data.ledger.hash ) ;
           snapshot
         in
         let block_data unseen_pks slot =
