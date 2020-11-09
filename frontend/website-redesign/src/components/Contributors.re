@@ -64,7 +64,7 @@ external asDomElement: 'a => Dom.element = "%identity";
 let make =
     (~profiles, ~genesisMembers, ~advisors, ~modalOpen, ~switchModalState) => {
   let (state, dispatch) =
-    React.useReducer(reducer, {memberIndex: 0, currentMembers: profiles});
+    React.useReducer(reducer, {memberIndex: 0, currentMembers: [||]});
   let modalBackgroundRef = React.useRef(Js.Nullable.null);
 
   let onPrevMemberPress = () => {

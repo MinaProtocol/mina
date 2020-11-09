@@ -96,6 +96,7 @@ module Styles = {
       alignItems(`center),
       justifyContent(`spaceBetween),
       marginTop(`rem(1.)),
+      color(white),
       selector(">:first-child", [marginRight(`rem(1.))]),
       media(Theme.MediaQuery.notMobile, [marginTop(`zero)]),
     ]);
@@ -188,12 +189,24 @@ let make =
            }}
         </div>
         <div className=Styles.buttons>
-          <div className=Styles.button onClick={_ => onPrevMemberPress()}>
+          <ModalButton
+            bgColor=Theme.Colors.digitalBlack
+            borderColor=Theme.Colors.white
+            dark=true
+            width={`rem(2.5)}
+            paddingX=0.5
+            onClick={_ => onPrevMemberPress()}>
             <Icon kind=Icon.ArrowLeftLarge />
-          </div>
-          <div className=Styles.button onClick={_ => onNextMemberPress()}>
+          </ModalButton>
+          <ModalButton
+            bgColor=Theme.Colors.digitalBlack
+            borderColor=Theme.Colors.white
+            dark=true
+            width={`rem(2.5)}
+            paddingX=0.5
+            onClick={_ => onNextMemberPress()}>
             <Icon kind=Icon.ArrowRightLarge />
-          </div>
+          </ModalButton>
         </div>
       </div>
     </div>
