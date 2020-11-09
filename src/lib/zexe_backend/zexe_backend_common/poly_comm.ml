@@ -2,8 +2,6 @@ open Intf
 open Core_kernel
 open Pickles_types
 
-(* module B = Snarky_bn382 *)
-
 module type Inputs_intf = sig
   module Base_field : sig
     type t
@@ -11,16 +9,14 @@ module type Inputs_intf = sig
 
   module Curve : sig
     module Affine : sig
-      type t
+      type t = Base_field.t * Base_field.t
 
       module Backend : sig
-        include Type_with_delete
+        type t = (Base_field.t * Base_field.t) Or_infinity.t
 
         val zero : unit -> t
 
         val create : Base_field.t -> Base_field.t -> t
-
-        module Vector : Vector with type elt := t
       end
 
       val of_backend : Backend.t -> t Or_infinity.t
@@ -28,14 +24,14 @@ module type Inputs_intf = sig
   end
 
   module Backend : sig
-    include Type_with_delete
+    type t = Curve.Affine.Backend.t Marlin_plonk_bindings.Types.Poly_comm.t
 
     val make :
-      Curve.Affine.Backend.Vector.t -> Curve.Affine.Backend.t option -> t
+      Curve.Affine.Backend.t array -> Curve.Affine.Backend.t option -> t
 
     val shifted : t -> Curve.Affine.Backend.t option
 
-    val unshifted : t -> Curve.Affine.Backend.Vector.t
+    val unshifted : t -> Curve.Affine.Backend.t array
   end
 end
 
@@ -53,41 +49,22 @@ module Make (Inputs : Inputs_intf) = struct
 
   module G_affine = Curve.Affine.Backend
 
-  let g (a, b) =
-    let open G_affine in
-    let t = create a b in
-    Caml.Gc.finalise delete t ; t
+  let g (a, b) = G_affine.create a b
 
-  let g_vec arr =
-    let v = G_affine.Vector.create () in
-    Array.iter arr ~f:(fun c ->
-        (* Very leaky *)
-        G_affine.Vector.emplace_back v (g c) ) ;
-    Caml.Gc.finalise G_affine.Vector.delete v ;
-    v
+  let g_vec arr = Array.map ~f:g arr
 
   let with_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t) Or_infinity.t
         Dlog_plonk_types.Poly_comm.With_degree_bound.t) : Backend.t =
-    let mk x =
-      match x with
-      | Or_infinity.Finite x ->
-          g x
-      | Infinity ->
-          Curve.Affine.Backend.zero ()
-    in
-    let unshifted = G_affine.Vector.create () in
-    Array.iter commitment.unshifted ~f:(fun c ->
-        G_affine.Vector.emplace_back unshifted (mk c) ) ;
-    Caml.Gc.finalise G_affine.Vector.delete unshifted ;
-    Backend.make unshifted (Some (mk commitment.shifted))
+    {shifted= Some commitment.shifted; unshifted= commitment.unshifted}
 
   let without_degree_bound_to_backend
       (commitment :
         (Base_field.t * Base_field.t)
         Dlog_plonk_types.Poly_comm.Without_degree_bound.t) : Backend.t =
-    Backend.make (g_vec commitment) None
+    { shifted= None
+    ; unshifted= Array.map ~f:(fun x -> Or_infinity.Finite x) commitment }
 
   let to_backend (t : t) : Backend.t =
     let t =
@@ -97,34 +74,23 @@ module Make (Inputs : Inputs_intf) = struct
       | `Without_degree_bound t ->
           without_degree_bound_to_backend t
     in
-    Caml.Gc.finalise Backend.delete t ;
     t
 
   let of_backend' (t : Backend.t) =
-    let open Backend in
-    let unshifted =
-      (* TODO: Leaky? *)
-      let v = unshifted t in
-      Array.init (G_affine.Vector.length v) (fun i ->
-          Curve.Affine.of_backend (G_affine.Vector.get v i) )
-    in
-    (* TODO: Leaky? *)
-    let shifted = shifted t in
-    (unshifted, Option.map shifted ~f:Curve.Affine.of_backend)
+    (t.unshifted, Option.map t.shifted ~f:Curve.Affine.of_backend)
 
-  let of_backend_with_degree_bound t =
+  let of_backend_with_degree_bound (t : Backend.t) =
     let open Dlog_plonk_types.Poly_comm in
-    let unshifted, shifted = of_backend' t in
-    match shifted with
+    match t.shifted with
     | None ->
         assert false
     | Some shifted ->
-        `With_degree_bound {With_degree_bound.unshifted; shifted}
+        `With_degree_bound {With_degree_bound.unshifted= t.unshifted; shifted}
 
-  let of_backend_without_degree_bound t =
+  let of_backend_without_degree_bound (t : Backend.t) =
     let open Dlog_plonk_types.Poly_comm in
-    match of_backend' t with
-    | unshifted, None ->
+    match t with
+    | {unshifted; shifted= None} ->
         `Without_degree_bound
           (Array.map unshifted ~f:(function
             | Infinity ->

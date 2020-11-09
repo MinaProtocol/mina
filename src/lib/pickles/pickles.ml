@@ -315,8 +315,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.t * Dirty.t)
-        Lazy.t
+      * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
   end

@@ -77,14 +77,12 @@ let%test_unit "sponge" =
 module Input_domain = struct
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
     let domain_size = Domain.size domain in
-    let u = Unsigned.Size_t.of_int in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
-              (Tick.Keypair.load_urs ()) (u domain_size) (u i)
-            |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
-            |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
-            |> Me.Inner_curve.Affine.of_backend |> Or_infinity.finite_exn ) )
+            (Marlin_plonk_bindings.Tweedle_fq_urs.lagrange_commitment
+               (Tick.Keypair.load_urs ()) domain_size i)
+              .unshifted.(0)
+            |> Or_infinity.finite_exn ) )
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
@@ -203,8 +201,7 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.h
+      ( Marlin_plonk_bindings.Tweedle_fq_urs.h
           (Backend.Tick.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dum.Affine.of_backend |> Or_infinity.finite_exn
-      )
+      |> Or_infinity.finite_exn )
 end

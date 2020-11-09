@@ -238,3 +238,17 @@ module Proof = struct
     end
   end]
 end
+
+module Shifts = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'field t =
+            'field Marlin_plonk_bindings_types.Plonk_verification_shifts.t =
+        {r: 'field; o: 'field}
+      [@@deriving sexp, compare, yojson, hash, eq]
+    end
+  end]
+
+  let map ~f {r; o} = {r= f r; o= f o}
+end
