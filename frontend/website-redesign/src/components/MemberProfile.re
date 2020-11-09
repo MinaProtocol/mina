@@ -117,8 +117,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github) => {
             <div className=Styles.socialTag>
               <img src="/static/img/Icon.Twitter.svg" />
               <Spacer width=0.34 />
-              <a
-                href={Constants.twitterUrl ++ twitter} className=Styles.link>
+              <a href={Constants.twitterUrl ++ twitter} className=Styles.link>
                 {React.string(twitter)}
               </a>
             </div>
@@ -127,9 +126,7 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github) => {
                <div className=Styles.socialTag>
                  <img src="/static/img/Icon.Git.svg" />
                  <Spacer width=0.34 />
-                 <a
-                   href={Constants.githubUrl ++ github}
-                   className=Styles.link>
+                 <a href={Constants.githubUrl ++ github} className=Styles.link>
                    {React.string(github)}
                  </a>
                </div>
