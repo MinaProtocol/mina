@@ -4,8 +4,9 @@ module Styles = {
     style([
       height(`rem(17.)),
       width(`rem(11.)),
-      color(orange),
+      color(black),
       cursor(`pointer),
+      hover([selector("> div > span", [color(Theme.Colors.orange)])]),
     ]);
   let image = style([width(`percent(100.)), marginBottom(`rem(1.))]);
   let name =
