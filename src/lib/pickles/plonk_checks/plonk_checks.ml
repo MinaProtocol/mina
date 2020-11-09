@@ -136,16 +136,10 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
         (w3, w2, gen * w2)
       in
       let zkp =
-        (* x^3 - x^2(w1+w2+w3) + x(w1w2+w1w3+w2w3) - w1w2w3
+        (* Vanishing polynomial of [w1, w2, w3]
            evaluated at x = zeta
         *)
-        let w23 = w2 * w3 in
-        List.fold ~init:(of_int 0)
-          ~f:(fun acc coeff -> (zeta * acc) + coeff)
-          [ one
-          ; negate (w1 + w2 + w3)
-          ; (w1 * (w2 + w3)) + w23
-          ; negate (w1 * w23) ]
+        (zeta - w1) * (zeta - w2) * (zeta - w3)
       in
       let perm0 =
         with_label __LOC__ (fun () ->
