@@ -47,16 +47,24 @@ CREATE TABLE internal_commands
 , hash        text                  NOT NULL UNIQUE
 );
 
+CREATE TABLE epoch_data
+( id             serial PRIMARY KEY
+, seed           text   NOT NULL
+, ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+);
+
 CREATE TABLE blocks
-( id                     serial PRIMARY KEY
-, state_hash             text   NOT NULL UNIQUE
-, parent_id              int    NOT NULL        REFERENCES blocks(id)
-, creator_id             int    NOT NULL        REFERENCES public_keys(id)
-, snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
-, ledger_hash            text   NOT NULL
-, height                 bigint NOT NULL
-, global_slot            bigint NOT NULL
-, timestamp              bigint NOT NULL
+( id                      serial PRIMARY KEY
+, state_hash              text   NOT NULL UNIQUE
+, parent_id               int    NOT NULL        REFERENCES blocks(id)
+, creator_id              int    NOT NULL        REFERENCES public_keys(id)
+, snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
+, staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
+, next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
+, ledger_hash             text   NOT NULL
+, height                  bigint NOT NULL
+, global_slot             bigint NOT NULL
+, timestamp               bigint NOT NULL
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);

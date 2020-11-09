@@ -1,25 +1,45 @@
+use ocaml::ToValue;
+
 pub fn to_array_<T, F: Fn(T) -> ocaml::Value>(v: Vec<T>, f: F) -> ocaml::Array<ocaml::Value> {
-    let len = v.len();
-    // Manually allocate an OCaml array of the right size
-    let mut array = ocaml::Array::alloc(len);
-    for (i, x) in v.into_iter().enumerate() {
-        unsafe {
-            array.set_unchecked(i, f(x));
+    ocaml::frame!((array_value) {
+        let len = v.len();
+        // Manually allocate an OCaml array of the right size
+        let mut array = ocaml::Array::alloc(len);
+        // This is safe because we know that Array::alloc doesn't allocate.
+        // TODO: Discuss with upstream about better handling arrays so they don't get GC'd out from
+        //       under us.
+        array_value = array.to_value().clone();
+        for (i, x) in v.into_iter().enumerate() {
+            ocaml::frame!((value) {
+                value = f(x);
+                unsafe {
+                    array.set_unchecked(i, value);
+                }
+            })
         }
-    }
-    array
+        array
+    })
 }
 
 pub fn ref_to_array<T, F: Fn(&T) -> ocaml::Value>(v: &Vec<T>, f: F) -> ocaml::Array<ocaml::Value> {
-    let len = v.len();
-    // Manually allocate an OCaml array of the right size
-    let mut array = ocaml::Array::alloc(len);
-    for (i, x) in v.into_iter().enumerate() {
-        unsafe {
-            array.set_unchecked(i, f(x));
+    ocaml::frame!((array_value) {
+        let len = v.len();
+        // Manually allocate an OCaml array of the right size
+        let mut array = ocaml::Array::alloc(len);
+        // This is safe because we know that Array::alloc doesn't allocate.
+        // TODO: Discuss with upstream about better handling arrays so they don't get GC'd out from
+        //       under us.
+        array_value = array.to_value().clone();
+        for (i, x) in v.into_iter().enumerate() {
+            ocaml::frame!((value) {
+                value = f(x);
+                unsafe {
+                    array.set_unchecked(i, value);
+                }
+            })
         }
-    }
-    array
+        array
+    })
 }
 
 pub fn to_array<Caml: ocaml::ToValue, T: Into<Caml>>(v: Vec<T>) -> ocaml::Array<ocaml::Value> {

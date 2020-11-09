@@ -61,12 +61,16 @@ pub fn caml_tweedle_fq_plonk_gate_vector_get(
     v: CamlTweedleFqPlonkGateVectorPtr,
     i: ocaml::Int,
 ) -> CamlPlonkGate {
-    let gate = &(v.as_ref().0)[i as usize];
-    CamlPlonkGate {
-        typ: (&gate.typ).into(),
-        wires: (&gate.wires).into(),
-        c: caml_vector::ref_to_array(&gate.c, |x| CamlTweedleFq(*x).to_value()),
-    }
+    ocaml::frame!((array_value) {
+        let gate = &(v.as_ref().0)[i as usize];
+        let c = caml_vector::ref_to_array(&gate.c, |x| CamlTweedleFq(*x).to_value());
+        array_value = c.to_value().clone();
+        CamlPlonkGate {
+            typ: (&gate.typ).into(),
+            wires: (&gate.wires).into(),
+            c,
+        }
+    })
 }
 
 #[ocaml::func]

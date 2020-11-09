@@ -318,6 +318,7 @@ module type S = sig
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> ledger_depth:int
+        -> genesis_state_hash:State_hash.t
         -> t
 
       val current_block_production_keys :
@@ -488,7 +489,11 @@ module type S = sig
 
       val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
 
+      val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+
       val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+
+      val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ

@@ -509,6 +509,8 @@ module T = struct
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
+              ~genesis_state_hash:
+                (With_hash.hash precomputed_values.protocol_state_with_hash)
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
