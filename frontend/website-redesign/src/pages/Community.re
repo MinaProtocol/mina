@@ -298,7 +298,6 @@ Next.injectGetInitialProps(make, _ => {
       "include": 1,
       "content_type": ContentType.GenesisProfile.id,
       "order": "-fields.publishDate",
-      "limit": 3,
     },
   )
   |> Promise.map((entries: ContentType.GenesisProfile.entries) => {
