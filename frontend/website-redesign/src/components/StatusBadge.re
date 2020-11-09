@@ -43,7 +43,7 @@ module Styles = {
   let icon = style([display(`inlineFlex), alignItems(`center)]);
 };
 
-let url = "https://status.minaprotocol.com";
+let url = Constants.minaStatus;
 let apiPath = "/api/v2/summary.json";
 
 type component = {
