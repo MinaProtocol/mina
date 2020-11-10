@@ -1101,6 +1101,48 @@ func main() {
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
 
+	helperLog.Infof("libp2p_helper has the following logging subsystems active: %v", logging.GetSubsystems())
+
+	// === Set subsystem log levels ===
+	// All subsystems that have been considered are explicitly listed. Any that
+	// are added when modifying this code should be considered and added to
+	// this list.
+	logging.SetLogLevel("mplex", "debug")
+	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
+	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
+	logging.SetLogLevel("ping", "info")         // Logs every ping timeout at debug
+	logging.SetLogLevel("basichost", "info")    // Spammy at debug
+	logging.SetLogLevel("test-logger", "debug")
+	logging.SetLogLevel("blankhost", "debug")
+	logging.SetLogLevel("connmgr", "debug")
+	logging.SetLogLevel("eventlog", "debug")
+	logging.SetLogLevel("p2p-config", "debug")
+	logging.SetLogLevel("ipns", "debug")
+	logging.SetLogLevel("nat", "debug")
+	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
+	logging.SetLogLevel("providers", "debug")
+	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
+	logging.SetLogLevel("dht", "info") // Logs every operation to debug
+	logging.SetLogLevel("peerstore", "debug")
+	logging.SetLogLevel("diversityFilter", "debug")
+	logging.SetLogLevel("table", "debug")
+	logging.SetLogLevel("stream-upgrader", "debug")
+	logging.SetLogLevel("helper top-level JSON handling", "debug")
+	logging.SetLogLevel("dht.pb", "debug")
+	logging.SetLogLevel("tcp-tpt", "debug")
+	logging.SetLogLevel("autonat", "debug")
+	logging.SetLogLevel("discovery", "debug")
+	logging.SetLogLevel("routing/record", "debug")
+	logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
+	logging.SetLogLevel("badger", "debug")
+	logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
+	logging.SetLogLevel("routedhost", "debug")
+	logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
+	logging.SetLogLevel("peerstore/ds", "debug")
+	logging.SetLogLevel("mdns", "info") // Logs each mdns call
+	logging.SetLogLevel("bootstrap", "debug")
+	logging.SetLogLevel("reuseport-transport", "debug")
+
 	go func() {
 		i := 0
 		for {
