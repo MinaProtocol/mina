@@ -26,7 +26,7 @@ RUN apt-get -y update && \
   rm -rf /var/lib/apt/lists/*
 
 # archive-node package
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/coda.list \
+RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
   && apt-get install -y "mina-archive=$coda_deb_version"
 
