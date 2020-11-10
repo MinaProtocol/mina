@@ -1,11 +1,12 @@
 (library
-  (name snarky_blake2)
-  (public_name snarky_blake2)
-  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq bisect_ppx -- --conditional))
-  (inline_tests)
-  (libraries
-    snarky.backendless
-    blake2
-    digestif
-    core_kernel
-    integers ))
+ (name snarky_blake2)
+ (public_name snarky_blake2)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
+ (inline_tests)
+ (libraries
+   snarky.backendless
+   blake2
+   digestif
+   core_kernel
+   integers))

@@ -1,19 +1,19 @@
 (library
-    (name rocks)
-    (public_name rocks)
-    (no_dynlink)
-    (modes native)
-    (libraries ctypes ctypes.foreign)
-    (modules (:standard \ rocks_linker_flags_gen rocks_test))
-    (c_library_flags (:standard (:include flags.sexp)))
-    (self_build_stubs_archive (rocksdb))
-    )
+ (name rocks)
+ (public_name rocks)
+ (no_dynlink)
+ (modes native)
+ (libraries ctypes ctypes.foreign)
+ (modules (:standard \ rocks_linker_flags_gen rocks_test))
+ (c_library_flags (:standard (:include flags.sexp)))
+ (self_build_stubs_archive (rocksdb))
+)
 
 (executable
  (name rocks_linker_flags_gen)
  (modules rocks_linker_flags_gen)
  (libraries dune.configurator)
- )
+)
 
 (rule
  (targets flags.sexp)
