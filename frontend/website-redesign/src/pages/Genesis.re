@@ -8,10 +8,11 @@ module Styles = {
   let background =
     style([
       backgroundImage(
-        `url("/static/img/backgrounds/SectionGenesisBackground.png"),
+        `url("/static/img/backgrounds/SectionGenesisBackground.jpg"),
       ),
       backgroundSize(`cover),
       paddingTop(`rem(12.)),
+      overflowX(`hidden),
     ]);
   // leaderboard css
   let disclaimer =
@@ -163,93 +164,6 @@ module HowItWorksGrid = {
   };
 };
 
-module FoundingMembersSection = {
-  module Styles = {
-    open Css;
-    let container =
-      style([
-        backgroundImage(`url("/static/img/GenesisMiddleBackground.jpg")),
-        backgroundSize(`cover),
-      ]);
-    let h2 = merge([Theme.Type.h2, style([color(white)])]);
-    let sectionSubhead =
-      merge([
-        Theme.Type.paragraphMono,
-        style([
-          color(white),
-          letterSpacing(`pxFloat(-0.4)),
-          marginTop(`rem(1.)),
-          fontSize(`rem(1.18)),
-          media(Theme.MediaQuery.tablet, [width(`rem(41.))]),
-        ]),
-      ]);
-    //member profile css
-    let profileRow =
-      style([
-        display(`flex),
-        flexDirection(`column),
-        justifyContent(`center),
-        margin(`auto),
-        selector(
-          "> :last-child",
-          [marginBottom(`zero), marginRight(`zero)],
-        ),
-        media(
-          Theme.MediaQuery.tablet,
-          [justifyContent(`flexStart), flexDirection(`row)],
-        ),
-      ]);
-
-    let profile =
-      style([
-        marginRight(`rem(2.)),
-        marginBottom(`rem(5.)),
-        media(Theme.MediaQuery.tablet, [marginBottom(`zero)]),
-      ]);
-  };
-  [@react.component]
-  let make = (~profiles, ~children=?) => {
-    <div className=Styles.container>
-      <Wrapped>
-        <h2 className=Styles.h2>
-          {React.string("Genesis Founding Members")}
-        </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Get to know some of the founding members working to strengthen the protocol and build our community.",
-           )}
-        </p>
-        <Spacer height=6. />
-        <div className=Styles.profileRow>
-          {React.array(
-             Array.map(
-               (p: ContentType.GenesisProfile.t) => {
-                 <div className=Styles.profile>
-                   <GenesisMemberProfile
-                     key={p.name}
-                     name={p.name}
-                     photo={p.profilePhoto.fields.file.url}
-                     quote={"\"" ++ p.quote ++ "\""}
-                     location={p.memberLocation}
-                     twitter={p.twitter}
-                     github={p.github}
-                     blogPost={p.blogPost.fields.slug}
-                   />
-                 </div>
-               },
-               profiles,
-             ),
-           )}
-        </div>
-        {switch (children) {
-         | Some(children) => children
-         | None => React.null
-         }}
-      </Wrapped>
-    </div>;
-  };
-};
-
 module CultureFooter = {
   module Styles = {
     open Css;
@@ -322,9 +236,7 @@ module CultureFooter = {
            )}
         </p>
         <div className=Styles.link>
-          <a
-            className=Styles.anchor
-            href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md">
+          <a className=Styles.anchor href=Constants.minaCodeOfConduct>
             {React.string("Read our Code of Conduct")}
             <Icon kind=Icon.ArrowRightMedium />
           </a>
@@ -341,16 +253,16 @@ let make = (~profiles) => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
-      header="Genesis Program"
+      header={Some("Genesis Program")}
       copy={
         Some(
           "We're looking for community members to join the Genesis Token Grant Program and form the backbone of Mina's robust decentralized network.",
         )
       }
       background=Theme.{
-        mobile: "/static/img/GenesisSmall.jpg",
-        tablet: "/static/img/GenesisMedium.jpg",
-        desktop: "/static/img/GenesisLarge.jpg",
+        mobile: "/static/img/backgrounds/GenesisHeroMobile.jpg",
+        tablet: "/static/img/backgrounds/GenesisHeroTablet.jpg",
+        desktop: "/static/img/backgrounds/GenesisHeroDesktop.jpg",
       }>
       <Spacer height=2. />
       <Button
@@ -385,14 +297,19 @@ let make = (~profiles) => {
         <Spacer height=4. />
         <HowItWorksGrid />
         <Rule color=Theme.Colors.white />
+        <Carousel
+          title="Genesis Founding Members"
+          copy="Get to know some of the Founding Members working to strengthen the protocol and build our community."
+          items=profiles
+          textColor=Theme.Colors.white
+          slideWidthRem=24.5
+        />
       </FeaturedSingleRow>
     </div>
     <div className=Styles.genesisSection>
       <Spacer height=2. />
-      <FoundingMembersSection profiles>
-        <WorldMapSection />
-        <Spacer height=7.25 />
-      </FoundingMembersSection>
+      <Wrapped> <WorldMapSection /> </Wrapped>
+      <Spacer height=7.25 />
       <div className=Styles.leaderboardBackground>
         <Wrapped>
           <div className=Styles.leaderboardTextContainer>
@@ -436,7 +353,6 @@ Next.injectGetInitialProps(make, _ => {
       "include": 1,
       "content_type": ContentType.GenesisProfile.id,
       "order": "-fields.publishDate",
-      "limit": 3,
     },
   )
   |> Promise.map((entries: ContentType.GenesisProfile.entries) => {

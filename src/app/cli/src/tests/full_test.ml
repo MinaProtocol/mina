@@ -84,7 +84,7 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants = precomputed_values.constraint_constants in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants = precomputed_values.consensus_constants in
@@ -137,10 +137,15 @@ let run_test () : unit Deferred.t =
           external_transition_database_dir
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
+      let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
+          ~epoch_ledger_location
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
+          ~ledger_depth:constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
@@ -218,8 +223,8 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
-             ~time_controller ~receipt_chain_database ~snark_work_fee
-             ~consensus_local_state ~transaction_database
+             ~epoch_ledger_location ~time_controller ~receipt_chain_database
+             ~snark_work_fee ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~precomputed_values ())
       in
@@ -478,9 +483,7 @@ let run_test () : unit Deferred.t =
                 blockchain_length t
                 > Length.add blockchain_length' wait_till_length )
               ~timeout_min:
-                ( ( Length.to_int consensus_constants.delta
-                  + 1
-                  + Length.to_int consensus_constants.c )
+                ( (Length.to_int consensus_constants.delta + 1 + 8)
                   * ( ( Block_time.Span.to_ms
                           consensus_constants.block_window_duration_ms
                       |> Int64.to_int_exn )

@@ -706,8 +706,8 @@ module Base = struct
                    the same. This is checked in the transaction pool.
                 *)
                 (not fee_payer_is_source)
-                && ( source_insufficient_balance
-                   || Or_error.is_error timing_or_error )
+                && (not source_insufficient_balance)
+                && Or_error.is_error timing_or_error
               in
               { predicate_failed
               ; source_not_present
@@ -950,6 +950,22 @@ module Base = struct
               ~creating_new_token ~fee_payer_account ~source_account
               ~receiver_account txn)
   end
+
+  (* Currently, a circuit must have at least 1 of every type of constraint. *)
+  let dummy_constraints () =
+    make_checked
+      Impl.(
+        fun () ->
+          let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+          let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
+          let _ =
+            Pickles.Step_main_inputs.Ops.scale_fast g
+              (`Plus_two_to_len [|b; b|])
+          in
+          let _ =
+            Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+          in
+          ())
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
@@ -2629,15 +2645,15 @@ module Base = struct
                   let timed_balance_check ok =
                     [%with_label
                       "Check source timed balance failure matches predicted"]
-                      (let%bind ok =
+                      (let%bind not_ok =
                          Boolean.(
-                           ok
+                           (not ok)
                            &&& not
                                  user_command_failure
                                    .source_insufficient_balance)
                        in
-                       Boolean.Assert.( = ) ok
-                         (Boolean.not user_command_failure.source_bad_timing))
+                       Boolean.Assert.( = ) not_ok
+                         user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
                     ~txn_amount:amount ~txn_global_slot)
@@ -2779,6 +2795,7 @@ module Base = struct
   *)
   let%snarkydef main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
+    let%bind () = dummy_constraints () in
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__

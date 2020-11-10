@@ -174,8 +174,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-          )
+            ~parent:parent_breadcrumb
+            ~transition:
+              mostly_validated_transition (* TODO: Can we skip here? *)
+            ~skip_staged_ledger_verification:false () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->

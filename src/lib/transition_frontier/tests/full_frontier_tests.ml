@@ -42,14 +42,22 @@ let%test_module "Full_frontier tests" =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
       ignore
         (Full_frontier.apply_diffs frontier diffs
-           ~ignore_consensus_local_state:false)
+           ~enable_epoch_ledger_sync:`Disabled)
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
     let create_frontier () =
+      let open Core in
+      let epoch_ledger_location =
+        Filename.temp_dir_name ^/ "epoch_ledger"
+        ^ (Uuid_unix.create () |> Uuid.to_string)
+      in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-          ~genesis_ledger:Genesis_ledger.t
+          ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
+          ~ledger_depth:constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       let root_ledger =
         Or_error.ok_exn

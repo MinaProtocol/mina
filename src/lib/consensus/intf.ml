@@ -276,8 +276,6 @@ module type S = sig
         type t =
           { delta: int
           ; k: int
-          ; c: int
-          ; c_times_k: int
           ; slots_per_epoch: int
           ; slot_duration: int
           ; epoch_duration: int
@@ -295,11 +293,26 @@ module type S = sig
 
   module Data : sig
     module Local_state : sig
-      type t [@@deriving sexp, to_yojson]
+      module Snapshot : sig
+        module Ledger_snapshot : sig
+          type t =
+            | Genesis_ledger of Coda_base.Ledger.t
+            | Ledger_db of Coda_base.Ledger.Db.t
+
+          val close : t -> unit
+
+          val merkle_root : t -> Coda_base.Ledger_hash.t
+        end
+      end
+
+      type t [@@deriving to_yojson]
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> epoch_ledger_location:string
+        -> ledger_depth:int
+        -> genesis_state_hash:State_hash.t
         -> t
 
       val current_block_production_keys :
@@ -315,6 +328,10 @@ module type S = sig
         -> Coda_base.Account.t Coda_base.Account.Index.Table.t
            Public_key.Compressed.Table.t
            option
+
+      val next_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
+
+      val staking_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
 
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
@@ -402,7 +419,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, sexp, to_yojson]
+            type t [@@deriving hash, eq, compare, sexp, yojson]
           end
         end]
 
@@ -463,7 +480,11 @@ module type S = sig
 
       val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
 
+      val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+
       val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+
+      val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
@@ -564,7 +585,7 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
+      -> snarked_ledger:Coda_base.Ledger.Db.t
       -> unit
 
     (**
@@ -581,7 +602,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> Coda_base.Sparse_ledger.t
+      -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
@@ -604,6 +625,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
+      -> ledger_depth:int
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 

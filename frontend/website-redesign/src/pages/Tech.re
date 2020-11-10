@@ -155,8 +155,8 @@ module TechSideNav = {
       <SideNav.Item title="Projects & Possibilities" slug="#projects" />
       <SideNav.Item title="Incentive Structure" slug="#incentives" />
       <SideNav.Item title="Where We're Headed" slug="#roadmap" />
+      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
     </SideNav>;
-    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -418,7 +418,8 @@ module Incentives = {
               <span className=Theme.Type.link>
                 {React.string("Run a Node")}
               </span>
-              <Icon size=1.5 kind=Icon.ArrowRightLarge />
+              <Spacer width=0.5 />
+              <Icon size=1.5 kind=Icon.ArrowRightMedium />
             </a>
           </Next.Link>
         </div>
@@ -436,7 +437,7 @@ module Incentives = {
         slug="incentives">
         <Button
           width={`rem(15.25)}
-          href={`Internal("/static/pdf/economicsWP.pdf")}>
+          href={`Internal("/static/pdf/economicsWhitepaper.pdf")}>
           {React.string("Economics Whitepaper")}
           <Icon kind=Icon.ArrowRightSmall />
         </Button>
@@ -447,7 +448,7 @@ module Incentives = {
         <Spacer height=2. />
         <p className=Theme.Type.sectionSubhead>
           {React.string(
-             "Mina is breaking down barriers to participation and unleashing a host of exciting new pathways to earn tokens.",
+             "The second type of node operator on Mina, SNARK producers, help compress data in the network by generating SNARK proofs of transactions.",
            )}
         </p>
         <Spacer height=3. />
@@ -481,12 +482,12 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/tech-hero-desktop.jpg",
-        Theme.tablet: "/static/img/tech-hero-tablet.jpg",
-        Theme.mobile: "/static/img/tech-hero-mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/tech-hero-desktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/tech-hero-tablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/tech-hero-mobile.jpg",
       }
       title="Tech"
-      header="An Elegant Solution"
+      header={Some("An Elegant Solution")}
       copy={
         Some(
           "Rather than apply brute computing force, Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
@@ -508,7 +509,17 @@ let make = () => {
           generation of participants.
         |js}
         slug="roadmap">
-        <img src="/static/img/tech-roadmap.svg" width="100%" />
+        <picture>
+          <source
+            media=Theme.MediaQuery.mobile
+            srcSet="/static/img/tech-roadmap-mobile.svg"
+          />
+          <source
+            media=Theme.MediaQuery.notMobile
+            srcSet="/static/img/tech-roadmap-desktop.svg"
+          />
+          <img src="/static/img/tech-roadmap-desktop.svg" width="100%" />
+        </picture>
       </Section>
       <Spacer height=7. />
     </div>
@@ -536,15 +547,13 @@ let make = () => {
         contentBackground: Color(Css.white),
       }
     />
-    /*
-     <div className=Styles.sectionContainer("")>
-       <Spacer height=6. />
-       <div className=Styles.section id="knowledge">
-         <h2 className=Theme.Type.h2> {React.string("Knowledge Base")} </h2>
-       </div>
-     </div>
-     <Spacer height=12. />
-     */
+    <div className={Styles.sectionContainer("")}>
+      <section className=Styles.section id="knowledge">
+        <Spacer height=6. />
+        <KnowledgeBase />
+      </section>
+    </div>
+    <Spacer height=12. />
     <FeaturedSingleRow
       row={
         rowType: FeaturedSingleRow.Row.ImageLeftCopyRight,
@@ -563,7 +572,7 @@ let make = () => {
             buttonTextColor: Css.white,
             buttonText: "Get Started",
             dark: false,
-            href: `Internal("/docs"),
+            href: `Internal("/work-with-mina"),
           }),
         contentBackground: Color(Css.white),
       }

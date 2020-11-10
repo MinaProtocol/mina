@@ -24,6 +24,12 @@ module Styles = {
       media(Theme.MediaQuery.desktop, [padding(`zero)]),
     ]);
 
+  let knowledgebaseBackground =
+    style([
+      backgroundImage(`url("/static/img/backgrounds/KnowledgeBase.jpg")),
+      backgroundSize(`cover),
+    ]);
+
   let divider =
     style([
       maxWidth(`rem(71.)),
@@ -124,13 +130,15 @@ module NodeOperatorsSideNav = {
 
     <SideNav currentSlug=hash className={Styles.sideNav(scrollTop > 1000)}>
       <SideNav.Item title="Node Overview" slug="#how-mina-works" />
+      <SideNav.Item title="Testnet" slug="#testnet" />
+      <SideNav.Item title="Genesis Program" slug="#genesis" />
+      <SideNav.Item title="Knowledge Base" slug="#knowledge" />
       <SideNav.Item title="Help And Support" slug="#help-and-support" />
     </SideNav>;
     // <SideNav.Item
     //   title="Block Explorers & Tools"
     //   slug="#block-explorers-tools"
     // />
-    // <SideNav.Item title="Knowledge Base" slug="#knowledge" />
   };
 };
 
@@ -185,14 +193,14 @@ module Roles = {
           title="Block Producers"
           copy={js|Similar to miners or stakers in other protocols, block producers can be selected to produce a block and earn block rewards, coinbase, transaction fees and network fees. Block producers can also be SNARK producers and generate their own proofs.|js}
           linkCopy="Block Producer Documentation"
-          linkUrl="/docs"
+          linkUrl="/docs/node-operator/#participating-in-consensus"
         />
         <Role
           img="/static/img/SnarkProducers_2x.svg"
           title="Snark Producers"
           copy={js|SNARK producers help compress data in the network by generating SNARK proofs of transactions. They then sell those SNARK proofs to block producers on the Snarketplace in return for a portion of the block rewards|js}
-          linkCopy="Snark Producer Documentation"
-          linkUrl="/docs"
+          linkCopy="SNARK Producer Documentation"
+          linkUrl="/docs/node-operator/#compressing-data-in-the-mina-network"
         />
       </div>
     </div>;
@@ -348,12 +356,12 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       background={
-        Theme.desktop: "/static/img/NodeOperatorHero.jpg",
-        Theme.tablet: "/static/img/NodeOperatorHero.jpg",
-        Theme.mobile: "/static/img/NodeOperatorHero.jpg",
+        Theme.desktop: "/static/img/backgrounds/NodeOperatorHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/NodeOperatorHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/NodeOperatorHeroMobile.jpg",
       }
       title="Get Started For Node Operators"
-      header="Run a Node"
+      header=Some("Run a Node")
       copy={
         Some(
           {js|With the world’s lightest blockchain, running a node is easier than ever. Here you’ll find everything you need to get up and running.|js},
@@ -372,50 +380,60 @@ let make = () => {
     </Hero>
     <NodeOperatorsSideNav />
     <NodeOverview />
-    <FeaturedSingleRow
-      row={
-        FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
-        title: "Testnet",
-        copySize: `Small,
-        description: {js|Check out what’s in beta, take on Testnet challenges and earn Testnet points.|js},
-        textColor: Theme.Colors.white,
-        image: "/static/img/NodeOperators_large.jpg",
-        background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        link:
-          FeaturedSingleRow.Row.Button({
-            FeaturedSingleRow.Row.buttonText: "Go to Testnet",
-            buttonColor: Theme.Colors.orange,
-            buttonTextColor: Theme.Colors.white,
-            dark: true,
-            href: `Internal("/testnet"),
-          }),
-      }
-    />
+    <section id="testnet">
+      <FeaturedSingleRow
+        row={
+          FeaturedSingleRow.Row.rowType: ImageLeftCopyRight,
+          title: "Testnet",
+          copySize: `Small,
+          description: {js|Check out what’s in beta, take on Testnet challenges and earn Testnet points.|js},
+          textColor: Theme.Colors.white,
+          image: "/static/img/NodeOperators_large.jpg",
+          background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "Go to Testnet",
+              buttonColor: Theme.Colors.orange,
+              buttonTextColor: Theme.Colors.white,
+              dark: true,
+              href: `Internal("/testnet"),
+            }),
+        }
+      />
+    </section>
     // TODO: Not currently ready to ship. Update component with proper info when available.
     //<BlockExplorersAndTools />
-    <FeaturedSingleRow
-      row=FeaturedSingleRow.Row.{
-        rowType: ImageRightCopyLeft,
-        copySize: `Large,
-        title: "Genesis Program",
-        description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
-        textColor: Theme.Colors.white,
-        image: "/static/img/BlogLandingHero.jpg",
-        background:
-          Image("/static/img/community-page/CommunityBackground.jpg"),
-        contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
-        link:
-          {FeaturedSingleRow.Row.Button({
-             buttonColor: Theme.Colors.mint,
-             buttonTextColor: Theme.Colors.digitalBlack,
-             buttonText: "Learn More",
-             dark: true,
-             href: `Internal("/genesis"),
-           })},
-      }
-    />
-    // TODO: Knowledge Base
+    <section id="genesis">
+      <FeaturedSingleRow
+        row=FeaturedSingleRow.Row.{
+          rowType: ImageRightCopyLeft,
+          copySize: `Large,
+          title: "Genesis Program",
+          description: "Calling all block producers and snark producers, community leaders and content creators! Join Genesis, meet great people, play an essential role in the network, and earn Mina tokens.",
+          textColor: Theme.Colors.white,
+          image: "/static/img/BlogLandingHero.jpg",
+          background:
+            Image("/static/img/community-page/CommunityBackground.jpg"),
+          contentBackground: Image("/static/img/BecomeAGenesisMember.jpg"),
+          link:
+            {FeaturedSingleRow.Row.Button({
+               buttonColor: Theme.Colors.mint,
+               buttonTextColor: Theme.Colors.digitalBlack,
+               buttonText: "Learn More",
+               dark: true,
+               href: `Internal("/genesis"),
+             })},
+        }
+      />
+    </section>
+    <div className=Styles.knowledgebaseBackground>
+      <Wrapped>
+        <Section title="" subhead="" slug="knowledge">
+          <KnowledgeBase />
+        </Section>
+      </Wrapped>
+    </div>
     <section id="help-and-support">
       <ButtonBar
         kind=ButtonBar.HelpAndSupport

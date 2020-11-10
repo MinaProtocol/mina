@@ -38,8 +38,8 @@ let make =
       <meta property="og:type" content="website" />
       <meta property="og:description" content=description />
       <meta name="description" content=description />
-      <meta property="og:url" content={"https://minaprotocol.com" ++ route} />
-      <link rel="canonical" href={"https://minaprotocol.com" ++ route} />
+      <meta property="og:url" content={Constants.minaProtocolUrl ++ route} />
+      <link rel="canonical" href={Constants.minaProtocolUrl ++ route} />
       <link
         rel="icon"
         type_="image/png"

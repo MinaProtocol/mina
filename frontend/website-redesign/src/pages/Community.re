@@ -53,6 +53,8 @@ module Styles = {
       ),
       backgroundSize(`cover),
       paddingTop(`rem(4.)),
+      overflowX(`hidden),
+      width(`percent(100.)),
     ]);
 
   let cultureBackground =
@@ -121,16 +123,16 @@ let make = (~profiles) => {
     <div className=Nav.Styles.spacer />
     <Hero
       title="Community"
-      header="Welcome"
+      header={Some("Welcome")}
       copy={
         Some(
           "We're an inclusive community uniting people around the world with a passion for decentralized blockchain.",
         )
       }
       background={
-        Theme.desktop: "/static/img/community-page/09_Community_1_2880x1504.jpg",
-        Theme.tablet: "/static/img/community-page/09_Community_1_1536x1504_tablet.jpg",
-        Theme.mobile: "/static/img/community-page/09_Community_1_750x1056_mobile.jpg",
+        Theme.desktop: "/static/img/backgrounds/CommunityHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/CommunityHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/CommunityHeroMobile.jpg",
       }
     />
     <ButtonBar
@@ -154,42 +156,18 @@ let make = (~profiles) => {
                buttonTextColor: Theme.Colors.digitalBlack,
                buttonText: "Apply now",
                dark: true,
-               href: `Internal("/genesis"),
+               href: `External(Constants.genesisGrantApplication),
              })},
         }>
         <Spacer height=4. />
         <Rule color=Theme.Colors.white />
-        <Spacer height=4. />
-        <h2 className=Styles.h2>
-          {React.string("Genesis Founding Members")}
-        </h2>
-        <p className=Styles.sectionSubhead>
-          {React.string(
-             "Get to know some of the founding members working to strengthen the protocol and build our community.",
-           )}
-        </p>
-        <Spacer height=6. />
-        <div className=Styles.profileRow>
-          {React.array(
-             Array.map(
-               (p: ContentType.GenesisProfile.t) => {
-                 <div className=Styles.profile>
-                   <GenesisMemberProfile
-                     key={p.name}
-                     name={p.name}
-                     photo={p.profilePhoto.fields.file.url}
-                     quote={"\"" ++ p.quote ++ "\""}
-                     location={p.memberLocation}
-                     twitter={p.twitter}
-                     github={p.github}
-                     blogPost={p.blogPost.fields.slug}
-                   />
-                 </div>
-               },
-               profiles,
-             ),
-           )}
-        </div>
+        <Carousel
+          title="Genesis Founding Members"
+          copy="Get to know some of the Founding Members working to strengthen the protocol and build our community."
+          items=profiles
+          textColor=Theme.Colors.white
+          slideWidthRem=24.5
+        />
       </FeaturedSingleRow>
       <Spacer height=6. />
     </div>
@@ -320,7 +298,6 @@ Next.injectGetInitialProps(make, _ => {
       "include": 1,
       "content_type": ContentType.GenesisProfile.id,
       "order": "-fields.publishDate",
-      "limit": 3,
     },
   )
   |> Promise.map((entries: ContentType.GenesisProfile.entries) => {

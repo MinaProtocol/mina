@@ -259,7 +259,7 @@ let make = () => {
       <div className=Styles.heroRight>
         <div className=Styles.buttonRow>
           <Button
-            href={`External("https://bit.ly/3dNmPle")}
+            href={`External(Constants.currentChallenges)}
             bgColor=Theme.Colors.black
             width={`rem(15.)}
             paddingX=1.5>
@@ -283,18 +283,18 @@ let make = () => {
         <Spacer height=4.8 />
         <div className=Styles.heroLinks>
           <div className=Styles.flexColumn>
-            <Next.Link href="https://bit.ly/leaderboardFAQ">
+            <a href=Constants.leaderboardFAQ>
               <a className=Styles.link>
                 {React.string("Leaderboard FAQ")}
                 <Icon kind=Icon.Digital />
               </a>
-            </Next.Link>
-            <Next.Link href="https://bit.ly/MinaDiscord">
+            </a>
+            <a href=Constants.minaDiscordSocial>
               <a className=Styles.link>
                 {React.string("Discord #Leaderboard Channel")}
                 <Icon kind=Icon.Digital />
               </a>
-            </Next.Link>
+            </a>
             <span className=Styles.updatedDate>
               {switch (state.statistics) {
                | Some(statistics) =>

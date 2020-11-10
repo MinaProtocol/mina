@@ -410,6 +410,8 @@ module Structured = struct
   let fatal = log ~level:Fatal
 
   let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+  let best_tip_diff = log ~level:Spam ~module_:"" ~location:""
 end
 
 module Str = Structured

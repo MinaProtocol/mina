@@ -37,19 +37,6 @@ module Styles = {
       media(Theme.MediaQuery.desktop, [display(`block)]),
     ]);
 
-  let grantRowContainer =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      justifyContent(`spaceBetween),
-      alignItems(`flexStart),
-      padding2(~v=`rem(6.5), ~h=`zero),
-      media(
-        Theme.MediaQuery.notMobile,
-        [flexDirection(`row), alignItems(`center)],
-      ),
-    ]);
-
   let typesOfGrantsImage =
     style([
       important(backgroundSize(`cover)),
@@ -71,25 +58,6 @@ module Styles = {
       width(`percent(100.)),
       padding(`rem(2.)),
       backgroundColor(white),
-    ]);
-
-  let grantColumnContainer =
-    style([
-      display(`flex),
-      flexDirection(`column),
-      width(`rem(26.)),
-      height(`percent(100.)),
-      marginTop(`rem(2.)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [marginTop(`zero), marginLeft(`rem(3.))],
-      ),
-    ]);
-
-  let grantRowImage =
-    style([
-      width(`percent(100.)),
-      media(Theme.MediaQuery.notMobile, [width(`rem(35.))]),
     ]);
 
   let faqList =
@@ -116,11 +84,45 @@ module Styles = {
     ]);
 
   let grantDescriptionInnerContainer =
-    style([display(`flex), justifyContent(`spaceBetween)]);
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`spaceBetween),
+      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+    ]);
 
-  let grantTwoColumnContent = style([width(`percent(48.))]);
+  let grantTwoColumnContent =
+    style([
+      marginTop(`rem(1.5)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(48.)), marginTop(`zero)],
+      ),
+    ]);
 
-  let grantThreeColumnContent = style([width(`percent(30.))]);
+  let grantThreeColumnContent =
+    style([
+      marginTop(`rem(2.)),
+      width(`percent(100.)),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`percent(30.)), marginTop(`zero)],
+      ),
+    ]);
+
+  let link =
+    merge([
+      Theme.Type.link,
+      style([
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+        media(
+          Theme.MediaQuery.tablet,
+          [fontSize(`rem(1.125)), lineHeight(`rem(1.69))],
+        ),
+      ]),
+    ]);
 };
 
 module GrantsSideNav = {
@@ -174,27 +176,6 @@ module Section = {
   };
 };
 
-module GrantRow = {
-  [@react.component]
-  let make = (~img, ~title, ~copy, ~buttonCopy, ~buttonUrl) => {
-    <Wrapped>
-      <div className=Styles.grantRowContainer>
-        <img className=Styles.grantRowImage src=img />
-        <div className=Styles.grantColumnContainer>
-          <h2 className=Theme.Type.h2> {React.string(title)} </h2>
-          <Spacer height=1. />
-          <p className=Theme.Type.paragraph> {React.string(copy)} </p>
-          <Spacer height=2.5 />
-          <Button href={`Internal(buttonUrl)} bgColor=Theme.Colors.orange>
-            {React.string(buttonCopy)}
-            <Icon kind=Icon.ArrowRightMedium />
-          </Button>
-        </div>
-      </div>
-    </Wrapped>;
-  };
-};
-
 module FAQ = {
   module FAQRow = {
     [@react.component]
@@ -219,7 +200,7 @@ module FAQ = {
             <span className=Theme.Type.paragraph>
               <span> {React.string("Visit ")} </span>
               <Next.Link href="/docs">
-                <span className=Theme.Type.link>
+                <span className=Styles.link>
                   {React.string("the Mina Docs.")}
                 </span>
               </Next.Link>
@@ -240,21 +221,21 @@ module FAQ = {
             <Spacer height=1. />
             <span className=Theme.Type.paragraph>
               <span> {React.string("See the ")} </span>
-              <Next.Link href=Constants.projectGrantApplication>
-                <span className=Theme.Type.link>
+              <a href=Constants.projectGrantApplication>
+                <span className=Styles.link>
                   {React.string("Application Process ")}
                 </span>
-              </Next.Link>
+              </a>
               <span>
                 {React.string(
                    "section for selection criteria. Please also reach out to us if you have any unique skills that don't apply to current projects. You can also start ",
                  )}
               </span>
-              <Next.Link href=Constants.githubUrl>
-                <span className=Theme.Type.link>
-                  {React.string("Contributing code to Mina ")}
+              <a href=Constants.minaGithub>
+                <span className=Styles.link>
+                  {React.string("contributing code to Mina ")}
                 </span>
-              </Next.Link>
+              </a>
               <span>
                 {React.string(
                    "-- grants will give precedence to previous contributors.",
@@ -690,7 +671,7 @@ module HowToApply = {
                      )}
                   </span>
                   <Next.Link href="/privacy">
-                    <span className=Theme.Type.link>
+                    <span className=Styles.link>
                       {React.string("Privacy Policy")}
                     </span>
                   </Next.Link>
@@ -728,26 +709,18 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Grants Program"
+      header={Some("Grants Program")}
       copy={
         Some(
           "The Project Grant program is designed to encourage community members to work on projects related to developing the Mina protocol and community.",
         )
       }
       background={
-        Theme.desktop: "/static/img/GrantsHero.jpg",
-        Theme.tablet: "/static/img/GrantsHero.jpg",
-        Theme.mobile: "/static/img/GrantsHero.jpg",
+        Theme.desktop: "/static/img/backgrounds/GrantsHeroDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/GrantsHeroTablet.jpg",
+        Theme.mobile: "/static/img/backgrounds/GrantsHeroMobile.jpg",
       }
     />
-    // TODO: Currently to be removed. Not sure if this will be added back? Delete this later if it's been a reasonable amount of time.
-    // <GrantRow
-    //   img="/static/img/GrantsRow.jpg"
-    //   title="Work on projects with us and earn Mina tokens"
-    //   copy={js|About $2.1M USD in Mina token grants has been allocated to support these efforts prior to Mina’s mainnet launch. There will be additional Mina token grants allocated after mainnet.|js}
-    //   buttonCopy="Learn More"
-    //   buttonUrl="/docs"
-    // />
     <div className=Styles.typesOfGrantsImage>
       <Wrapped>
         <div className=Styles.typeOfGrantsContainer>

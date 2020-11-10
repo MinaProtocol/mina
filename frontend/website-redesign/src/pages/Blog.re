@@ -165,11 +165,13 @@ module InternalCtaSection = {
         title: "About the Tech",
         img: "/static/img/AboutTechCta.png",
         snippet: "Mina uses advanced cryptography and recursive zk-SNARKs to deliver true decentralization at scale.",
+        url: "/tech",
       }
       rightItem=InternalCtaSection.Item.{
         title: "Get Started",
         img: "/static/img/GetStartedCta.png",
         snippet: "Mina makes it simple to run a node, build and join the community.",
+        url: "/docs",
       }
     />;
   };
@@ -186,13 +188,13 @@ let make = (~posts) => {
       <div className=Style.background>
         <FeaturedSingleRowFull
           row=FeaturedSingleRowFull.Row.{
+            FeaturedSingleRowFull.Row.rowType: ImageLeftCopyRight,
             header:
               Some({
                 kind: "Blog",
                 author: featured.ContentType.BlogPost.author,
                 date: featured.ContentType.BlogPost.date,
               }),
-
             title: featured.ContentType.BlogPost.title,
             description: featured.snippet,
             textColor: Theme.Colors.white,

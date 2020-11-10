@@ -21,7 +21,14 @@ module Styles = {
       ]),
     ]);
 
-  let flexCenter = style([display(`flex), alignItems(`center)]);
+  let flexCenter =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+      width(`percent(100.)),
+      media(Theme.MediaQuery.notMobile, [justifyContent(`flexStart)]),
+    ]);
 
   let hideIfMobileElseShow =
     style([
@@ -74,9 +81,7 @@ let make = (~children, ~dark=false) => {
 
       <div className=Styles.flexCenter>
         <span className=Styles.announcementText> children </span>
-        <a
-          className=Styles.linkAnchor
-          href="https://share.hsforms.com/1olz9N8_zTHW-RKQus2o3Kw4xuul">
+        <a className=Styles.linkAnchor href=Constants.minaNewsletter>
           <div className=Styles.link>
             <span className=Styles.learnMoreText>
               {React.string("Subscribe to stay updated")}

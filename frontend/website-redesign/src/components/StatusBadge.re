@@ -13,11 +13,16 @@ module Styles = {
       justifyContent(`center),
       alignItems(`center),
       padding2(~v=`zero, ~h=`rem(1.)),
-      selector(
-        "svg",
+      media(
+        Theme.MediaQuery.tablet,
         [
-          marginLeft(`rem(0.5)),
-          SVG.fill(Theme.Colors.digitalBlackA(0.5)),
+          selector(
+            "svg",
+            [
+              marginLeft(`rem(0.5)),
+              SVG.fill(Theme.Colors.digitalBlackA(0.5)),
+            ],
+          ),
         ],
       ),
       hover([
@@ -33,17 +38,12 @@ module Styles = {
       backgroundColor(`currentColor),
       marginRight(`rem(0.5)),
     ]);
-  let link =
-    style([
-      textDecoration(`none),
-      display(`inline),
-      margin2(~v=`zero, ~h=`rem(0.5)),
-    ]);
+  let link = style([textDecoration(`none), display(`inline)]);
 
   let icon = style([display(`inlineFlex), alignItems(`center)]);
 };
 
-let url = "https://status.minaprotocol.com";
+let url = Constants.minaStatus;
 let apiPath = "/api/v2/summary.json";
 
 type component = {

@@ -71,7 +71,7 @@ module Node = struct
           ; Malleable_error.Hard_fail.soft_errors= _ } ->
           Malleable_error.of_error_hard e.error
 
-    (* default port is 3085, may need to be explicit if multiple daemons are running *)
+    (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
     let set_port_forwarding ~logger t port =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
@@ -80,7 +80,7 @@ module Node = struct
       in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
-      let%bind.Malleable_error.Let_syntax proc =
+      let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
           (Process.create ~prog:"kubectl" ~args ())
       in
@@ -100,44 +100,58 @@ module Node = struct
     module Unlock_account =
     [%graphql
     {|
-          mutation ($password: String!,
-          $public_key: PublicKey!) {
-             unlockAccount(input: {password: $password, publicKey: $public_key }) {
-                 public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
-             }
-          }
+      mutation ($password: String!, $public_key: PublicKey!) {
+        unlockAccount(input: {password: $password, publicKey: $public_key }) {
+          public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+        }
+      }
     |}]
 
     module Send_payment =
     [%graphql
     {|
-          mutation ($sender: PublicKey!,
-          $receiver: PublicKey!,
-          $amount: UInt64!,
-          $token: UInt64,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-          sendPayment(input:
-            {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-              payment {
-        id
+      mutation ($sender: PublicKey!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $token: UInt64,
+      $fee: UInt64!,
+      $nonce: UInt32,
+      $memo: String) {
+        sendPayment(input:
+          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+            payment {
+              id
+            }
+          }
       }
-    }
-  }
-  |}]
+    |}]
 
     module Get_balance =
     [%graphql
     {|
-    query ($public_key: PublicKey, $token: UInt64) {
-      account(publicKey: $public_key, token: $token) {
-        balance {
-          total @bsDecoder(fn: "Decoders.balance")
+      query ($public_key: PublicKey, $token: UInt64) {
+        account(publicKey: $public_key, token: $token) {
+          balance {
+            total @bsDecoder(fn: "Decoders.balance")
+          }
         }
       }
-    }
-  |}]
+    |}]
+
+    module Query_peer_id =
+    [%graphql
+    {|
+      query {
+        daemonStatus {
+          addrsAndPorts {
+            peer {
+              peerId
+            }
+          }
+          peers
+        }
+      }
+    |}]
   end
 
   let set_port_forwarding_exn ~logger t graphql_port =
@@ -152,13 +166,14 @@ module Node = struct
           ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
         failwith "Could not run k8s port forwarding"
 
-  (* GraphQL not immediately available, retry as needed *)
-  let retry ?(num_tries = 10) ?(retry_delay_sec = 30.0)
+  (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
+  let exec_graphql_reqest ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 30.0) ~logger ~graphql_port
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
+    [%log info] "Will now attempt to make GraphQL request: %s" query_name ;
     let err_str str = sprintf "%s: %s" query_name str in
-    let rec go n =
+    let rec retry n =
       if n <= 0 then (
         let err_str = err_str "too many tries" in
         [%log fatal] "%s" err_str ;
@@ -183,7 +198,7 @@ module Node = struct
               Deferred.bind ~f:Malleable_error.return
                 (after (Time.Span.of_sec retry_delay_sec))
             in
-            go (n - 1)
+            retry (n - 1)
         | Error (`Graphql_error err_string) ->
             let err_str = err_str (sprintf "GraphQL error: %s" err_string) in
             [%log error] "%s" err_str ;
@@ -192,15 +207,38 @@ module Node = struct
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log info] "%d tries left" (n - 1) ;
-              go (n - 1) )
+              [%log info] "After GraphQL error, %d tries left" (n - 1) ;
+              retry (n - 1) )
             else Malleable_error.of_string_hard_error err_string
     in
     let%bind () =
       Deferred.bind ~f:Malleable_error.return
         (after (Time.Span.of_sec initial_delay_sec))
     in
-    go num_tries
+    retry num_tries
+
+  let get_peer_id ~logger t =
+    let open Malleable_error.Let_syntax in
+    [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
+      ~metadata:
+        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
+    let graphql_port = 3085 in
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
+    let query_obj = Graphql.Query_peer_id.make () in
+    let%bind query_result_obj =
+      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true
+        ~query_name:"query_peer_id" query_obj
+    in
+    let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
+    let%bind self_id =
+      match self_id_obj with
+      | None ->
+          Malleable_error.of_string_hard_error "Peer not found"
+      | Some peer ->
+          Malleable_error.return peer#peerId
+    in
+    let peers_ids = (query_result_obj#daemonStatus)#peers in
+    return (self_id, Array.to_list peers_ids)
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
@@ -221,7 +259,7 @@ module Node = struct
           ()
       in
       let%bind balance_obj =
-        retry ~logger ~graphql_port ~retry_on_graphql_error:true
+        exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true
           ~query_name:"get_balance_graphql" get_balance_obj
       in
       match balance_obj#account with
@@ -235,14 +273,15 @@ module Node = struct
     in
     get_balance ()
 
-  let send_payment ~logger t ~sender ~receiver ~amount ~fee =
-    [%log info] "Sending a payment.."
+  (* if we expect failure, might want retry_on_graphql_error to be false *)
+  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
+      ~amount ~fee =
+    [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let graphql_port = 3085 in
     let open Malleable_error.Let_syntax in
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    let graphql_port = 3085 in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
@@ -251,8 +290,8 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      retry ~logger ~graphql_port ~query_name:"unlock_sender_account_graphql"
-        unlock_account_obj
+      exec_graphql_reqest ~logger ~graphql_port
+        ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
     let send_payment_graphql () =
@@ -265,7 +304,7 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      retry ~logger ~graphql_port ~retry_on_graphql_error:true
+      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error
         ~query_name:"send_payment_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
