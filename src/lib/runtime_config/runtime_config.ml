@@ -866,6 +866,7 @@ module Test_configs = struct
   , "genesis":
       { "k": 4
       , "delta": 0
+      , "slots_per_epoch": 72
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
