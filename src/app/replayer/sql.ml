@@ -274,23 +274,34 @@ module Epoch_data = struct
     let rep = Caqti_type.(tup2 int int) in
     Caqti_type.custom ~encode ~decode rep
 
-  (* epoch data ids are from successor block of block with given state hash *)
+  (* epoch data ids are from block with given state hash *)
   let query_epoch_data_ids =
     Caqti_request.find Caqti_type.string epoch_data_ids_typ
-      {| SELECT successor.staking_epoch_data_id,successor.next_epoch_data_id FROM
+      {| SELECT staking_epoch_data_id,next_epoch_data_id FROM blocks
 
-       (SELECT id FROM blocks
-
-       WHERE blocks.state_hash = ?) AS parent
-
-       INNER JOIN blocks AS successor
-
-       ON successor.parent_id = parent.id
-
-       LIMIT 1
-
+         WHERE state_hash = ?
     |}
 
   let get_epoch_data_ids (module Conn : Caqti_async.CONNECTION) state_hash =
     Conn.find query_epoch_data_ids state_hash
+end
+
+module Fork_block = struct
+  (* fork block is parent of block with the given state hash *)
+  let query_state_hash =
+    Caqti_request.find Caqti_type.string Caqti_type.string
+      {| SELECT parent.state_hash FROM blocks AS parent
+
+         INNER JOIN
+
+         (SELECT parent_id FROM blocks
+
+          WHERE state_hash = ?) AS epoch_ledgers_block
+
+         ON epoch_ledgers_block.parent_id = parent.id
+    |}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION)
+      epoch_ledgers_state_hash =
+    Conn.find query_state_hash epoch_ledgers_state_hash
 end

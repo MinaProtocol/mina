@@ -4,13 +4,14 @@ open Core
 open Async
 open Coda_base
 
-(* identify a target block B to replay to, by indicating its
-   state hash
+(* identify a target block B containing staking and next epoch ledgers
+   to be used in a hard fork, by giving its state hash
 
-   from B, we choose a successor block, and obtain its "staking"
-   and "next" epoch ledger hashes
+   from B, we choose a predecessor block B_fork, which is the block to
+   fork from
 
-   we replay all commands, one by one
+   we replay all commands, one by one, from the genesis block through
+   B_fork
 
    when the Merkle root of the replay ledger matches one of the
    epoch ledger hashes, we make a copy of the replay ledger to
@@ -23,11 +24,13 @@ open Coda_base
 *)
 
 type input =
-  {target_state_hash: State_hash.t; genesis_ledger: Runtime_config.Ledger.t}
+  { target_epoch_ledgers_state_hash: State_hash.t
+  ; genesis_ledger: Runtime_config.Ledger.t }
 [@@deriving yojson]
 
 type output =
-  { target_state_hash: State_hash.t
+  { target_epoch_ledgers_state_hash: State_hash.t
+  ; target_fork_state_hash: State_hash.t
   ; target_genesis_ledger: Runtime_config.Ledger.t
   ; target_staking_epoch_ledger: Runtime_config.Ledger.t
   ; target_staking_seed: Epoch_seed.t
@@ -42,8 +45,8 @@ let proof_level = Genesis_constants.Proof_level.Full
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
-let create_output ~target_state_hash ~ledger ~staking_epoch_ledger
-    ~staking_seed ~next_epoch_ledger ~next_seed
+let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
+    ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
   let create_ledger_as_list ledger =
     List.map (Ledger.to_list ledger) ~f:(fun acc ->
@@ -63,7 +66,8 @@ let create_output ~target_state_hash ~ledger ~staking_epoch_ledger
   let target_next_epoch_ledger =
     {input_genesis_ledger with base= Accounts next_epoch_ledger_as_list}
   in
-  { target_state_hash
+  { target_fork_state_hash
+  ; target_epoch_ledgers_state_hash
   ; target_genesis_ledger
   ; target_staking_epoch_ledger
   ; target_staking_seed= staking_seed
@@ -101,6 +105,24 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
       | Error msg ->
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
+
+let state_hash_of_epoch_ledgers_state_hash ~logger pool
+    epoch_ledgers_state_hash =
+  match%map
+    Caqti_async.Pool.use
+      (fun db -> Sql.Fork_block.get_state_hash db epoch_ledgers_state_hash)
+      pool
+  with
+  | Ok state_hash ->
+      [%log info]
+        "Given epoch ledgers state hash %s, found state hash %s for fork block"
+        epoch_ledgers_state_hash state_hash ;
+      state_hash
+  | Error msg ->
+      failwithf
+        "Error retrieving state hash for fork block, given epoch ledgers \
+         state hash %s, error: %s"
+        epoch_ledgers_state_hash (Caqti_error.show msg) ()
 
 let epoch_data_ids_of_state_hash ~logger pool state_hash =
   match%map
@@ -452,10 +474,17 @@ let main ~input_file ~output_file ~archive_uri () =
           ~depth:constraint_constants.ledger_depth padded_accounts
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-      let state_hash = State_hash.to_string input.target_state_hash in
+      let epoch_ledgers_state_hash =
+        State_hash.to_string input.target_epoch_ledgers_state_hash
+      in
+      [%log info] "Retrieving fork block state_hash" ;
+      let%bind fork_state_hash =
+        state_hash_of_epoch_ledgers_state_hash ~logger pool
+          epoch_ledgers_state_hash
+      in
       [%log info] "Loading epoch ledger data" ;
       let%bind {staking_epoch_data_id; next_epoch_data_id} =
-        epoch_data_ids_of_state_hash ~logger pool state_hash
+        epoch_data_ids_of_state_hash ~logger pool fork_state_hash
       in
       let%bind { epoch_data_hash= staking_epoch_ledger_hash_str
                ; epoch_data_seed= staking_seed_str } =
@@ -475,7 +504,7 @@ let main ~input_file ~output_file ~archive_uri () =
       let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
-        process_block_info_of_state_hash ~logger pool state_hash
+        process_block_info_of_state_hash ~logger pool fork_state_hash
           ~f:(fun block_info ->
             let ids =
               List.map block_info ~f:(fun (id, _global_slot, _hash) -> id)
@@ -501,7 +530,7 @@ let main ~input_file ~output_file ~archive_uri () =
       let%bind user_cmd_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.User_command_ids.run db state_hash)
+            (fun db -> Sql.User_command_ids.run db fork_state_hash)
             pool
         with
         | Ok ids ->
@@ -515,7 +544,7 @@ let main ~input_file ~output_file ~archive_uri () =
       let%bind internal_cmd_ids =
         match%bind
           Caqti_async.Pool.use
-            (fun db -> Sql.Internal_command_ids.run db state_hash)
+            (fun db -> Sql.Internal_command_ids.run db fork_state_hash)
             pool
         with
         | Ok ids ->
@@ -716,9 +745,12 @@ let main ~input_file ~output_file ~archive_uri () =
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =
-        create_output ~target_state_hash:input.target_state_hash ~ledger
-          ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
-          input.genesis_ledger
+        create_output
+          ~target_epoch_ledgers_state_hash:
+            input.target_epoch_ledgers_state_hash
+          ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
+          ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger
+          ~next_seed input.genesis_ledger
         |> output_to_yojson |> Yojson.Safe.to_string
       in
       let%map writer = Async_unix.Writer.open_file output_file in
