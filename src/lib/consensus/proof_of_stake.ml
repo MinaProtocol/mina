@@ -377,11 +377,12 @@ module Data = struct
                 res
             | Error str ->
                 [%log error]
-                  "Failed to read epoch ledger uuids from file $path: $error"
+                  "Failed to read epoch ledger uuids from file $path: $error. \
+                   Creating new uuids.."
                   ~metadata:
                     [ ("path", `String epoch_ledger_uuids_location)
                     ; ("error", `String str) ] ;
-                failwith "Failed to load epoch ledger uuids from file"
+                create_new_uuids ()
           in
           if
             Coda_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
