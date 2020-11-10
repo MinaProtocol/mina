@@ -162,7 +162,7 @@ let make = () => {
               buttonColor: Theme.Colors.mint,
               buttonTextColor: Theme.Colors.digitalBlack,
               dark: true,
-              href: `External("http://bit.ly/TestnetChallenges"),
+              href: `External(Constants.currentChallenges),
             }),
         }
       />
