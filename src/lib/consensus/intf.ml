@@ -296,6 +296,20 @@ module type S = sig
       -> t
   end
 
+  module Genesis_epoch_data : sig
+    module Data : sig
+      type t = {ledger: Coda_base.Ledger.t Lazy.t; seed: Coda_base.Epoch_seed.t}
+    end
+
+    type tt = {staking: Data.t; next: Data.t option}
+
+    type t = tt option
+
+    val for_unit_tests : t
+
+    val compiled : t
+  end
+
   module Data : sig
     module Local_state : sig
       module Snapshot : sig

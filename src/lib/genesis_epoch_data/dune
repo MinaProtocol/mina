@@ -1,6 +1,0 @@
-(library
-  (public_name genesis_epoch_data)
-  (name genesis_epoch_data)
-  (libraries core_kernel coda_base signature_lib runtime_config genesis_ledger)
-  (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_optcomp ppx_let bisect_ppx -- --conditional)))

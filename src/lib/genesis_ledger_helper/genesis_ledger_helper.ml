@@ -805,7 +805,7 @@ module Epoch_data = struct
           in
           [%log info] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[("ledger_file", `String ledger_file)] ;
-          ( { Genesis_epoch_data.Data.ledger=
+          ( { Consensus.Genesis_epoch_data.Data.ledger=
                 Genesis_ledger.Packed.t staking_ledger
             ; seed= Epoch_seed.of_string config.staking.seed }
           , {config.staking with ledger= config'} )
@@ -824,12 +824,12 @@ module Epoch_data = struct
               [%log info] "Loaded next epoch ledger from $ledger_file"
                 ~metadata:[("ledger_file", `String ledger_file)] ;
               ( Some
-                  { Genesis_epoch_data.Data.ledger=
+                  { Consensus.Genesis_epoch_data.Data.ledger=
                       Genesis_ledger.Packed.t next_ledger
                   ; seed= Epoch_seed.of_string seed }
               , Some {Runtime_config.Epoch_data.Data.ledger= config''; seed} )
         in
-        ( Some {Genesis_epoch_data.staking; next}
+        ( Some {Consensus.Genesis_epoch_data.staking; next}
         , Some {Runtime_config.Epoch_data.staking= config'; next= config''} )
 end
 

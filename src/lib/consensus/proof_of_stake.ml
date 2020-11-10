@@ -119,6 +119,7 @@ module Configuration = struct
 end
 
 module Constants = Constants
+module Genesis_epoch_data = Genesis_epoch_data
 
 module Data = struct
   module Epoch_seed = struct
@@ -2559,7 +2560,7 @@ module Hooks = struct
                                  genesis_epoch_ledger)
                           then
                             Some
-                              ("refusing to serve genesis epoch ledger", None)
+                              (Error "refusing to serve genesis epoch ledger")
                           else None
                       | Ledger_db ledger ->
                           if
@@ -2567,17 +2568,14 @@ module Hooks = struct
                               (Coda_base.Ledger.Db.merkle_root ledger)
                           then
                             Some
-                              ( ""
-                              , Some
-                                  ( Coda_base.Sparse_ledger.of_any_ledger
-                                  @@ Coda_base.Ledger.Any_ledger.cast
-                                       (module Coda_base.Ledger.Db)
-                                       ledger ) )
+                              (Ok
+                                 ( Coda_base.Sparse_ledger.of_any_ledger
+                                 @@ Coda_base.Ledger.Any_ledger.cast
+                                      (module Coda_base.Ledger.Db)
+                                      ledger ))
                           else None )
                 in
-                Option.value_map res ~default:(Error "epoch ledger not found")
-                  ~f:(fun (err_str, ledger_opt) ->
-                    Result.of_option ledger_opt ~error:err_str )
+                Option.value res ~default:(Error "epoch ledger not found")
             in
             Result.iter_error response ~f:(fun err ->
                 [%log info]

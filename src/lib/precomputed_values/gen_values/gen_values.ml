@@ -93,7 +93,7 @@ module Make_real () = struct
 
   let genesis_constants = Genesis_constants.compiled
 
-  let genesis_epoch_data = Genesis_epoch_data.compiled
+  let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled
 
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
@@ -192,7 +192,7 @@ let main () =
           (let protocol_state_with_hash =
              Coda_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
-               ~genesis_epoch_data:Genesis_epoch_data.for_unit_tests
+               ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
                ~constraint_constants:
                  Genesis_constants.Constraint_constants.for_unit_tests
                ~consensus_constants:
@@ -204,7 +204,7 @@ let main () =
            ; proof_level= Genesis_constants.Proof_level.for_unit_tests
            ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
-           ; genesis_epoch_data= Genesis_epoch_data.for_unit_tests
+           ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
            ; genesis_proof= Coda_base.Proof.blockchain_dummy })
@@ -221,7 +221,7 @@ let main () =
              Genesis_constants.Constraint_constants.compiled
            in
            let genesis_constants = Genesis_constants.compiled in
-           let genesis_epoch_data = Genesis_epoch_data.compiled in
+           let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
            let consensus_constants =
              Consensus.Constants.create ~constraint_constants
                ~protocol_constants:genesis_constants.protocol

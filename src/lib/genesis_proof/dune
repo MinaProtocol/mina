@@ -7,6 +7,5 @@
    blockchain_snark
    genesis_constants
    runtime_config
-   with_hash
-   genesis_epoch_data)
+   with_hash)
  (preprocess (pps ppx_version bisect_ppx -- --conditional)))
