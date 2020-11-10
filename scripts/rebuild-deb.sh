@@ -41,7 +41,7 @@ BUILDDIR="deb_build"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
-Package: coda-generate-keypair-phase3
+Package: mina-generate-keypair
 Version: ${GENERATE_KEYPAIR_VERSION}
 License: Apache-2.0
 Vendor: none
@@ -51,9 +51,9 @@ Installed-Size:
 Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
 Section: base
 Priority: optional
-Homepage: https://codaprotocol.com/
-Description: Utility to generate coda private/public keys in new format
- Utility to regenerate coda private public keys in new format
+Homepage: https://minaprotocol.com/
+Description: Utility to generate mina private/public keys in new format
+ Utility to regenerate mina private public keys in new format
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
@@ -63,7 +63,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
+cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -72,11 +72,11 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" coda-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
-ls -lh coda*.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
+ls -lh mina*.deb
 
 # Remove generate-keypair binary before other builds with the same dir
-rm -f "${BUILDDIR}/usr/local/bin/coda-generate-keypair-phase3"
+rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
