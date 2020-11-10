@@ -137,6 +137,9 @@ module Go_log = struct
                   let%map msg = set_field "msg" msg string_of_yojson json in
                   (ts, module_, level, msg, metadata)
               | _ ->
+                  let field =
+                    if String.equal field "error" then "go_error" else field
+                  in
                   Ok
                     ( ts
                     , module_
