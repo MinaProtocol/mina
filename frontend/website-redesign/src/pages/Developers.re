@@ -1,6 +1,4 @@
-module Styles = {
-  open Css;
-};
+module Styles = {};
 
 [@react.component]
 let make = () => {
