@@ -237,34 +237,60 @@ module Public_key = struct
     Conn.find_opt query pk_id
 end
 
-module Epoch_ledger_hash = struct
-  (* given an epoch ledger hash, what are the state hashes in blocks
-     with a next epoch data id that refers to that epoch ledger hash
+module Epoch_data = struct
+  type epoch_data = {epoch_data_hash: string; epoch_data_seed: string}
 
-     returned in descending order of the global slot in those blocks
+  let epoch_data_typ =
+    let encode t = Ok (t.epoch_data_hash, t.epoch_data_seed) in
+    let decode (epoch_data_hash, epoch_data_seed) =
+      Ok {epoch_data_hash; epoch_data_seed}
+    in
+    let rep = Caqti_type.(tup2 string string) in
+    Caqti_type.custom ~encode ~decode rep
 
-     the state hashes may or may not refer to blocks with a chain back
-     to the genesis block
-   *)
+  let query_epoch_data =
+    Caqti_request.find Caqti_type.int epoch_data_typ
+      {| SELECT slh.value, ed.seed FROM snarked_ledger_hashes AS slh
 
-  let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.string
-      {|
-         SELECT state_hash FROM blocks
+       INNER JOIN
 
-         INNER JOIN epoch_data
+       epoch_data AS ed
 
-         ON blocks.next_epoch_data_id = epoch_data.id
+       ON slh.id = ed.ledger_hash_id
 
-         INNER JOIN snarked_ledger_hashes
+       WHERE ed.id = ?
+    |}
 
-         ON epoch_data.ledger_hash_id = snarked_ledger_hashes.id
+  let get_epoch_data (module Conn : Caqti_async.CONNECTION) epoch_ledger_id =
+    Conn.find query_epoch_data epoch_ledger_id
 
-         WHERE snarked_ledger_hashes.value = ?
+  type epoch_data_ids = {staking_epoch_data_id: int; next_epoch_data_id: int}
 
-         ORDER BY global_slot DESC
-       |}
+  let epoch_data_ids_typ =
+    let encode t = Ok (t.staking_epoch_data_id, t.next_epoch_data_id) in
+    let decode (staking_epoch_data_id, next_epoch_data_id) =
+      Ok {staking_epoch_data_id; next_epoch_data_id}
+    in
+    let rep = Caqti_type.(tup2 int int) in
+    Caqti_type.custom ~encode ~decode rep
 
-  let get_state_hash (module Conn : Caqti_async.CONNECTION) epoch_ledger_hash =
-    Conn.collect_list query epoch_ledger_hash
+  (* epoch data ids are from successor block of block with given state hash *)
+  let query_epoch_data_ids =
+    Caqti_request.find Caqti_type.string epoch_data_ids_typ
+      {| SELECT successor.staking_epoch_data_id,successor.next_epoch_data_id FROM
+
+       (SELECT id FROM blocks
+
+       WHERE blocks.state_hash = ?) AS parent
+
+       INNER JOIN blocks AS successor
+
+       ON successor.parent_id = parent.id
+
+       LIMIT 1
+
+    |}
+
+  let get_epoch_data_ids (module Conn : Caqti_async.CONNECTION) state_hash =
+    Conn.find query_epoch_data_ids state_hash
 end

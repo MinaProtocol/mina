@@ -4,38 +4,36 @@ open Core
 open Async
 open Coda_base
 
-(* identify a target block B to replay to, either with
+(* identify a target block B to replay to, by indicating its
+   state hash
 
-   1)  target state hash  = protocol state hash in B
+   from B, we choose a successor block, and obtain its "staking"
+   and "next" epoch ledger hashes
 
-   or
+   we replay all commands, one by one
 
-   2)  target epoch ledger hash = epoch ledger hash (a SNARKed ledger hash) that
-       is the "next epoch ledger" in B
+   when the Merkle root of the replay ledger matches one of the
+   epoch ledger hashes, we make a copy of the replay ledger to
+   become that target epoch ledger
 
-   For (1), we replay all commands in all blocks from the genesis block through B
-
-   For (2), we replay commands from the genesis block, one by one, until the ledger hash
-    matches the target epoch ledger hash
+   when all commands from a block have been replayed, we verify
+   that the Merkle root of the replay ledger matches the stored
+   ledger hash in the archive database
 
 *)
 
-type target =
-  | State_hash_target of State_hash.t
-  | Epoch_ledger_hash_target of Frozen_ledger_hash.t
+type input =
+  {target_state_hash: State_hash.t; genesis_ledger: Runtime_config.Ledger.t}
 [@@deriving yojson]
 
-type input = {target: target; genesis_ledger: Runtime_config.Ledger.t}
+type output =
+  { target_state_hash: State_hash.t
+  ; target_genesis_ledger: Runtime_config.Ledger.t
+  ; target_staking_epoch_ledger: Runtime_config.Ledger.t
+  ; target_staking_seed: Epoch_seed.t
+  ; target_next_epoch_ledger: Runtime_config.Ledger.t
+  ; target_next_seed: Epoch_seed.t }
 [@@deriving yojson]
-
-type output = {target: target; target_ledger: Runtime_config.Ledger.t}
-[@@deriving yojson]
-
-let is_epoch_ledger_mode = function
-  | Epoch_ledger_hash_target _ ->
-      true
-  | _ ->
-      false
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
@@ -44,16 +42,33 @@ let proof_level = Genesis_constants.Proof_level.Full
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
-let create_output target ledger
+let create_output ~target_state_hash ~ledger ~staking_epoch_ledger
+    ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
-  let ledger_as_list =
+  let create_ledger_as_list ledger =
     List.map (Ledger.to_list ledger) ~f:(fun acc ->
         Genesis_ledger_helper.Accounts.Single.of_account acc None )
   in
-  let target_ledger =
-    {input_genesis_ledger with base= Accounts ledger_as_list}
+  let genesis_ledger_as_list = create_ledger_as_list ledger in
+  let staking_epoch_ledger_as_list =
+    create_ledger_as_list staking_epoch_ledger
   in
-  {target; target_ledger}
+  let next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
+  let target_genesis_ledger =
+    {input_genesis_ledger with base= Accounts genesis_ledger_as_list}
+  in
+  let target_staking_epoch_ledger =
+    {input_genesis_ledger with base= Accounts staking_epoch_ledger_as_list}
+  in
+  let target_next_epoch_ledger =
+    {input_genesis_ledger with base= Accounts next_epoch_ledger_as_list}
+  in
+  { target_state_hash
+  ; target_genesis_ledger
+  ; target_staking_epoch_ledger
+  ; target_staking_seed= staking_seed
+  ; target_next_epoch_ledger
+  ; target_next_seed= next_seed }
 
 (* map from global slots to expected ledger hashes *)
 let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
@@ -87,6 +102,33 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
 
+let epoch_data_ids_of_state_hash ~logger pool state_hash =
+  match%map
+    Caqti_async.Pool.use
+      (fun db -> Sql.Epoch_data.get_epoch_data_ids db state_hash)
+      pool
+  with
+  | Ok {staking_epoch_data_id; next_epoch_data_id} ->
+      [%log info] "Found epoch data ids for state hash %s" state_hash ;
+      ( {staking_epoch_data_id; next_epoch_data_id}
+        : Sql.Epoch_data.epoch_data_ids )
+  | Error msg ->
+      failwithf "Error retrieving epoch data ids for state hash %s, error: %s"
+        state_hash (Caqti_error.show msg) ()
+
+let epoch_data_of_id ~logger pool epoch_data_id =
+  match%map
+    Caqti_async.Pool.use
+      (fun db -> Sql.Epoch_data.get_epoch_data db epoch_data_id)
+      pool
+  with
+  | Ok {epoch_data_hash; epoch_data_seed} ->
+      [%log info] "Found epoch data for id %d" epoch_data_id ;
+      ({epoch_data_hash; epoch_data_seed} : Sql.Epoch_data.epoch_data)
+  | Error msg ->
+      failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
+        epoch_data_id (Caqti_error.show msg) ()
+
 let process_block_info_of_state_hash ~logger pool state_hash ~f =
   match%bind
     Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
@@ -100,80 +142,46 @@ let process_block_info_of_state_hash ~logger pool state_hash ~f =
           ; ("state_hash", `String state_hash) ] ;
       exit 1
 
-let state_hash_of_target ~logger pool target : string Deferred.t =
-  match target with
-  | State_hash_target state_hash ->
-      return (State_hash.to_string state_hash)
-  | Epoch_ledger_hash_target epoch_ledger_hash -> (
-      let epoch_ledger_hash = Frozen_ledger_hash.to_string epoch_ledger_hash in
-      match%bind
-        Caqti_async.Pool.use
-          (fun db -> Sql.Epoch_ledger_hash.get_state_hash db epoch_ledger_hash)
-          pool
-      with
-      | Ok [] ->
-          failwithf
-            "Could not find any state hashes for blocks associated with epoch \
-             ledger hash \"%s\""
-            epoch_ledger_hash ()
-      | Ok candidate_state_hashes ->
-          (* candidates are state hashes whose next epoch data id matches the epoch ledger
-           hash, given in descending global slot order of the blocks the state hashes appear in
-
-           the state hashes might not have a chain back to the genesis block, try them
-           until we find such a chain
-        *)
-          let rec go : string list -> string Deferred.t = function
-            | [] ->
+let update_epoch_ledger ~logger ~name ledger epoch_ledger_opt epoch_ledger_hash
+    =
+  match epoch_ledger_opt with
+  | Some _ ->
+      (* already have this epoch ledger *)
+      epoch_ledger_opt
+  | None ->
+      let curr_ledger_hash = Ledger.merkle_root ledger in
+      if Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash then (
+        [%log info]
+          "Creating %s epoch ledger from ledger with Merkle root matching \
+           epoch ledger hash %s"
+          name
+          (Ledger_hash.to_string epoch_ledger_hash) ;
+        (* Ledger.copy doesn't actually copy, roll our own here *)
+        let accounts = Ledger.to_list ledger in
+        let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
+        List.iter accounts ~f:(fun account ->
+            let pk = Account.public_key account in
+            let token = Account.token account in
+            let account_id = Account_id.create pk token in
+            match
+              Ledger.get_or_create_account epoch_ledger account_id account
+            with
+            | Ok (`Added, _loc) ->
+                ()
+            | Ok (`Existed, _loc) ->
                 failwithf
-                  "Could not find a state hash for a block associated with \
-                   epoch ledger hash \"%s\" with a parent chain back to the \
-                   genesis block"
-                  epoch_ledger_hash ()
-            | cand :: cands ->
-                [%log info]
-                  "For epoch ledger hash $epoch_ledger_hash, trying candidate \
-                   state hash $state_hash"
-                  ~metadata:
-                    [ ("epoch_ledger_hash", `String epoch_ledger_hash)
-                    ; ("state_hash", `String cand) ] ;
-                let%bind found_chain =
-                  process_block_info_of_state_hash ~logger pool cand
-                    ~f:(fun block_info ->
-                      let global_slots =
-                        List.map block_info
-                          ~f:(fun (_id, global_slot, _hash) -> global_slot)
-                      in
-                      Deferred.return
-                        (List.mem global_slots 0L ~equal:Int64.equal) )
-                in
-                if found_chain then (
-                  [%log info]
-                    "For epoch ledger hash $epoch_ledger_hash, state hash \
-                     $state_hash has a parent chain back to the genesis block"
-                    ~metadata:
-                      [ ("epoch_ledger_hash", `String epoch_ledger_hash)
-                      ; ("state_hash", `String cand) ] ;
-                  Deferred.return cand )
-                else go cands
-          in
-          go candidate_state_hashes
-      | Error err ->
-          failwithf
-            "Error retrieving state hashes for blocks associated with epoch \
-             ledger hash \"%s\", error: %s"
-            epoch_ledger_hash (Caqti_error.show err) () )
-
-let ledger_has_epoch_ledger_hash_target ledger target =
-  let target_hash =
-    match target with
-    | Epoch_ledger_hash_target epoch_ledger_hash ->
-        epoch_ledger_hash
-    | State_hash_target _ ->
-        failwith "Target does not contain an epoch ledger hash"
-  in
-  let curr_ledger_hash = Ledger.merkle_root ledger in
-  Frozen_ledger_hash.equal target_hash curr_ledger_hash
+                  "When creating epoch ledger, account with public key %s and \
+                   token %s already existed"
+                  (Signature_lib.Public_key.Compressed.to_string pk)
+                  (Token_id.to_string token) ()
+            | Error err ->
+                failwithf
+                  "When creating epoch ledger, error when adding account with \
+                   public key %s and token %s: %s"
+                  (Signature_lib.Public_key.Compressed.to_string pk)
+                  (Token_id.to_string token) (Error.to_string_hum err) () ) ;
+        Some epoch_ledger )
+      else None
 
 (* cache of fee transfers for coinbases *)
 module Fee_transfer_key = struct
@@ -444,7 +452,27 @@ let main ~input_file ~output_file ~archive_uri () =
           ~depth:constraint_constants.ledger_depth padded_accounts
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-      let%bind state_hash = state_hash_of_target ~logger pool input.target in
+      let state_hash = State_hash.to_string input.target_state_hash in
+      [%log info] "Loading epoch ledger data" ;
+      let%bind {staking_epoch_data_id; next_epoch_data_id} =
+        epoch_data_ids_of_state_hash ~logger pool state_hash
+      in
+      let%bind { epoch_data_hash= staking_epoch_ledger_hash_str
+               ; epoch_data_seed= staking_seed_str } =
+        epoch_data_of_id ~logger pool staking_epoch_data_id
+      in
+      let%bind { epoch_data_hash= next_epoch_ledger_hash_str
+               ; epoch_data_seed= next_seed_str } =
+        epoch_data_of_id ~logger pool next_epoch_data_id
+      in
+      let staking_epoch_ledger_hash =
+        Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
+      in
+      let staking_seed = Epoch_seed.of_string staking_seed_str in
+      let next_epoch_ledger_hash =
+        Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
+      in
+      let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_info_of_state_hash ~logger pool state_hash
@@ -569,7 +597,16 @@ let main ~input_file ~output_file ~archive_uri () =
         (List.length sorted_internal_cmds) ;
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
-          (user_cmds : Sql.User_command.t list) ~last_global_slot =
+          (user_cmds : Sql.User_command.t list) ~last_global_slot
+          ~staking_epoch_ledger_opt ~next_epoch_ledger_opt =
+        let staking_epoch_ledger_opt =
+          update_epoch_ledger ~logger ~name:"staking" ledger
+            staking_epoch_ledger_opt staking_epoch_ledger_hash
+        in
+        let next_epoch_ledger_opt =
+          update_epoch_ledger ~logger ~name:"next" ledger next_epoch_ledger_opt
+            next_epoch_ledger_hash
+        in
         let log_ledger_hash_after_last_slot () =
           let expected_ledger_hash =
             Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
@@ -612,64 +649,76 @@ let main ~input_file ~output_file ~archive_uri () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
               in
               apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
+                ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
           | _ ->
               log_on_slot_change ic.global_slot ;
               let%bind () = run_internal_command ~logger ~pool ~ledger ic in
               apply_commands ics user_cmds ~last_global_slot:ic.global_slot
+                ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
         in
-        (* choose command with least global slot, sequence number
-           TODO: check for gaps?
-        *)
+        (* choose command with least global slot, sequence number *)
         let cmp_ic_uc (ic : Sql.Internal_command.t) (uc : Sql.User_command.t) =
           [%compare: int64 * int]
             (ic.global_slot, ic.sequence_no)
             (uc.global_slot, uc.sequence_no)
         in
-        let apply_more_commands =
-          if is_epoch_ledger_mode input.target then
-            not (ledger_has_epoch_ledger_hash_target ledger input.target)
-          else true
-        in
-        if apply_more_commands then
-          match (internal_cmds, user_cmds) with
-          | [], [] ->
-              log_ledger_hash_after_last_slot () ;
-              if is_epoch_ledger_mode input.target then (
+        match (internal_cmds, user_cmds) with
+        | [], [] ->
+            log_ledger_hash_after_last_slot () ;
+            let found_staking = Option.is_some staking_epoch_ledger_opt in
+            let found_next = Option.is_some next_epoch_ledger_opt in
+            ( match (found_staking, found_next) with
+            | false, false ->
                 [%log error]
-                  "Replayed all commands, did not find target epoch ledger hash" ;
-                Core_kernel.exit 1 ) ;
-              Deferred.unit
-          | [], uc :: ucs ->
-              log_on_slot_change uc.global_slot ;
-              let%bind () = run_user_command ~logger ~pool ~ledger uc in
-              apply_commands [] ucs ~last_global_slot:uc.global_slot
-          | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
-              log_on_slot_change uc.global_slot ;
-              let%bind () = run_user_command ~logger ~pool ~ledger uc in
-              apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
-          | ic :: ics, [] ->
-              combine_or_run_internal_cmds ic ics
-          | ic :: ics, uc :: _ when cmp_ic_uc ic uc < 0 ->
-              combine_or_run_internal_cmds ic ics
-          | ic :: _, _ :: __ ->
-              failwithf
-                "An internal command and a user command have the same global \
-                 slot %Ld and sequence number %d"
-                ic.global_slot ic.sequence_no ()
-        else (
-          [%log info] "Ledger has target epoch ledger hash" ;
-          Deferred.unit )
+                  "Replayed all commands, found neither staking epoch ledger \
+                   nor next epoch ledger" ;
+                Core_kernel.exit 1
+            | false, true ->
+                [%log error]
+                  "Replayed all commands, did not find staking epoch ledger" ;
+                Core_kernel.exit 1
+            | true, false ->
+                [%log error]
+                  "Replayed all commands, did not find next epoch ledger" ;
+                Core_kernel.exit 1
+            | true, true ->
+                () ) ;
+            Deferred.return
+              ( Option.value_exn staking_epoch_ledger_opt
+              , Option.value_exn next_epoch_ledger_opt )
+        | [], uc :: ucs ->
+            log_on_slot_change uc.global_slot ;
+            let%bind () = run_user_command ~logger ~pool ~ledger uc in
+            apply_commands [] ucs ~last_global_slot:uc.global_slot
+              ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+        | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
+            log_on_slot_change uc.global_slot ;
+            let%bind () = run_user_command ~logger ~pool ~ledger uc in
+            apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
+              ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+        | ic :: ics, [] ->
+            combine_or_run_internal_cmds ic ics
+        | ic :: ics, uc :: _ when cmp_ic_uc ic uc < 0 ->
+            combine_or_run_internal_cmds ic ics
+        | ic :: _, _ :: __ ->
+            failwithf
+              "An internal command and a user command have the same global \
+               slot %Ld and sequence number %d"
+              ic.global_slot ic.sequence_no ()
       in
       [%log info] "At genesis, ledger hash"
         ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
-      let%bind () =
+      let%bind staking_epoch_ledger, next_epoch_ledger =
         apply_commands sorted_internal_cmds sorted_user_cmds
-          ~last_global_slot:0L
+          ~last_global_slot:0L ~staking_epoch_ledger_opt:None
+          ~next_epoch_ledger_opt:None
       in
       [%log info] "Writing output to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
       let output =
-        create_output input.target ledger input.genesis_ledger
+        create_output ~target_state_hash:input.target_state_hash ~ledger
+          ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
+          input.genesis_ledger
         |> output_to_yojson |> Yojson.Safe.to_string
       in
       let%map writer = Async_unix.Writer.open_file output_file in

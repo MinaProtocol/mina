@@ -1,4 +1,5 @@
 {
+    "target_state_hash": "3NKi8C2fcLFq8cTAMg7zd5QDTfNzfP86B8oKQ9FQaJc39iJndrAW",
     "genesis_ledger": {
         "accounts": [
             {
@@ -15,8 +16,5 @@
             }
         ],
         "add_genesis_winner": false
-    },
-    "target": [
-        "State_hash_target","3NKArwTBxom3RWyRYrLXCMMmKTgWidcmxs5U9MTHe3Q5s4mLSrX3"
-    ]
+    }
 }

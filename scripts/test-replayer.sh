@@ -12,6 +12,8 @@ PG_PORT=5432
 PG_PASSWORD=somepassword
 PG_CONN=postgres://postgres:$PG_PASSWORD@localhost:$PG_PORT/$DB
 
+SOCKET_DIR=/var/run/postgresql
+
 function cleanup () {
     CONTAINER=`cat $CONTAINER_FILE`
 
@@ -36,7 +38,7 @@ function report () {
 # -v mounts dir with Unix socket on host
 echo "Starting docker with Postgresql"
 docker run \
-       --name replayer-postgres -d -v /var/run/postgresql:/var/run/postgresql -p $PG_PORT:$PG_PORT \
+       --name replayer-postgres -d -v $SOCKET_DIR:$SOCKET_DIR -p $PG_PORT:$PG_PORT \
        -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=$PG_PASSWORD -e POSTGRES_DB=$DB postgres:$DOCKER_IMAGE > $CONTAINER_FILE
 
 trap "cleanup; exit 1" SIGINT
@@ -53,26 +55,14 @@ psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
 echo "Building replayer"
 dune b $REPLAYER_DIR/replayer.exe --profile=dev
 
-echo "Running replayer with state hash target"
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input-state-hash.json --output-file /dev/null
+echo "Running replayer"
+# ./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
+./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /tmp/replayer-out.json
 
-STATE_HASH_RESULT=$?
+RESULT=$?
 
-report $STATE_HASH_RESULT
-
-echo "Running replayer with epoch ledger hash target"
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input-epoch-ledger-hash.json --output-file /dev/null
-
-EPOCH_LEDGER_RESULT=$?
-
-report $EPOCH_LEDGER_RESULT
+report $RESULT
 
 cleanup
-
-if [[ $STATE_HASH_RESULT == 0 && $EPOCH_LEDGER_RESULT = 0 ]]; then
-    RESULT=0
-else
-    RESULT=1
-fi
 
 exit $RESULT
