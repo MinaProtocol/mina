@@ -3000,7 +3000,7 @@ module Hooks = struct
             !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             (epoch_snapshot_name source)
             snapshot_ledger_hash ;
-          (*These are computed separately*)
+          (*These are computed using different values but are supposed to be equal*)
           assert (
             Coda_base.Frozen_ledger_hash.equal snapshot_ledger_hash
               epoch_data.ledger.hash ) ;
