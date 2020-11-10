@@ -1,4 +1,4 @@
 (executable
  (name test)
  (libraries marlin_plonk_bindings_tweedle_fp_urs)
- (preprocess (pps ppx_version bisect_ppx)))
+ (preprocess (pps ppx_version bisect_ppx --conditional)))

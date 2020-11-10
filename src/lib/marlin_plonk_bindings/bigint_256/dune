@@ -2,4 +2,4 @@
  (name marlin_plonk_bindings_bigint_256)
  (public_name marlin_plonk_bindings.bigint_256)
  (libraries marlin_plonk_bindings_stubs)
- (preprocess (pps ppx_version bisect_ppx)))
+ (preprocess (pps ppx_version bisect_ppx --conditional)))

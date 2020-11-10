@@ -35,4 +35,4 @@
    ;; Oracles
    marlin_plonk_bindings_tweedle_fp_oracles
    marlin_plonk_bindings_tweedle_fq_oracles)
- (preprocess (pps ppx_version bisect_ppx)))
+ (preprocess (pps ppx_version bisect_ppx --conditional)))
