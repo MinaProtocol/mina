@@ -1,23 +1,26 @@
 module Styles = {
   open Css;
-  let headerCopy =
-    style([media(Theme.MediaQuery.desktop, [width(`rem(42.))])]);
 
-  let header = merge([Theme.Type.h2, style([marginBottom(`rem(0.5))])]);
-
+  let genesisHeader = merge([Theme.Type.h2, style([])]);
+  let genesisCopy =
+    style([
+      unsafe("grid-area", "1 /1 / span 1 / span 2"),
+      media(Theme.MediaQuery.tablet, [width(`rem(34.))]),
+    ]);
   let sectionSubhead =
     merge([
       Theme.Type.sectionSubhead,
       style([
         fontSize(`px(19)),
         lineHeight(`rem(1.75)),
-        marginBottom(`rem(2.93)),
+        marginTop(`rem(0.5)),
+        marginBottom(`rem(2.)),
         letterSpacing(`pxFloat(-0.4)),
       ]),
     ]);
-
   let grid =
     style([
+      marginTop(`rem(1.)),
       display(`grid),
       paddingTop(`rem(1.)),
       gridTemplateColumns([`rem(10.), `rem(10.)]),
@@ -26,51 +29,38 @@ module Styles = {
       gridRowGap(`rem(1.)),
       media(
         Theme.MediaQuery.tablet,
-        [
-          gridTemplateColumns([
-            `rem(10.),
-            `rem(10.),
-            `rem(10.),
-            `rem(10.),
-          ]),
-        ],
+        [gridTemplateColumns([`repeat((`num(3), `rem(10.)))])],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [
-          gridTemplateColumns([
-            `rem(11.),
-            `rem(11.),
-            `rem(11.),
-            `rem(11.),
-            `rem(11.),
-            `rem(11.),
-          ]),
-        ],
+        [gridTemplateColumns([`repeat((`num(5), `rem(11.)))])],
       ),
     ]);
 };
 
 [@react.component]
-let make = (~profiles, ~switchModalState, ~setCurrentIndexAndMembers) => {
+let make = (~genesisMembers, ~switchModalState, ~setCurrentIndexAndMembers) => {
   <>
-    <div className=Styles.headerCopy>
-      <h2 className=Styles.header> {React.string("Meet the Team")} </h2>
+    <Spacer height=3. />
+    <div className=Styles.genesisCopy>
+      <h2 className=Styles.genesisHeader>
+        {React.string("Genesis Members")}
+      </h2>
       <p className=Styles.sectionSubhead>
         {React.string(
-           "Mina is an inclusive open source protocol uniting teams and technicians from San Francisco and around the world.",
+           "Meet the node operators, developers, and community builders making Mina happen.",
          )}
       </p>
     </div>
     <div className=Styles.grid>
       {React.array(
-         profiles
+         genesisMembers
          |> Array.map((member: ContentType.GenericMember.t) => {
               <div
                 key={member.name}
                 onClick={_ => {
                   switchModalState();
-                  setCurrentIndexAndMembers(member, profiles);
+                  setCurrentIndexAndMembers(member, genesisMembers);
                 }}>
                 <SmallCard member />
               </div>
