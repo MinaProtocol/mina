@@ -595,6 +595,7 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> snarked_ledger:Coda_base.Ledger.Db.t
+      -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
       -> unit
 
     (**

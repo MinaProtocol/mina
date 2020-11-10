@@ -2542,28 +2542,42 @@ module Hooks = struct
               if
                 Ledger_hash.equal ledger_hash
                   (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
-              then Error "refusing to serve genesis epoch ledger"
+              then Error "refusing to serve genesis ledger"
               else
                 let candidate_snapshots =
                   [ !local_state.Data.staking_epoch_snapshot
                   ; !local_state.Data.next_epoch_snapshot ]
                 in
-                List.find_map candidate_snapshots ~f:(fun snapshot ->
-                    match snapshot.ledger with
-                    | Genesis_epoch_ledger _ ->
-                        None
-                    | Ledger_db ledger ->
-                        if
-                          Ledger_hash.equal ledger_hash
-                            (Coda_base.Ledger.Db.merkle_root ledger)
-                        then
-                          Some
-                            ( Coda_base.Sparse_ledger.of_any_ledger
-                            @@ Coda_base.Ledger.Any_ledger.cast
-                                 (module Coda_base.Ledger.Db)
-                                 ledger )
-                        else None )
-                |> Result.of_option ~error:"epoch ledger not found"
+                let res =
+                  List.find_map candidate_snapshots ~f:(fun snapshot ->
+                      (* if genesis epoch ledger is different from genesis ledger*)
+                      match snapshot.ledger with
+                      | Genesis_epoch_ledger genesis_epoch_ledger ->
+                          if
+                            Ledger_hash.equal ledger_hash
+                              (Coda_base.Ledger.merkle_root
+                                 genesis_epoch_ledger)
+                          then
+                            Some
+                              ("refusing to serve genesis epoch ledger", None)
+                          else None
+                      | Ledger_db ledger ->
+                          if
+                            Ledger_hash.equal ledger_hash
+                              (Coda_base.Ledger.Db.merkle_root ledger)
+                          then
+                            Some
+                              ( ""
+                              , Some
+                                  ( Coda_base.Sparse_ledger.of_any_ledger
+                                  @@ Coda_base.Ledger.Any_ledger.cast
+                                       (module Coda_base.Ledger.Db)
+                                       ledger ) )
+                          else None )
+                in
+                Option.value_map res ~default:(Error "epoch ledger not found")
+                  ~f:(fun (err_str, ledger_opt) ->
+                    Result.of_option ledger_opt ~error:err_str )
             in
             Result.iter_error response ~f:(fun err ->
                 [%log info]
@@ -2907,7 +2921,7 @@ module Hooks = struct
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , Length.(existing.min_window_density <= candidate.min_window_density)
+        , Length.(existing.min_window_density < candidate.min_window_density)
         )
     in
     let choice = if should_take then `Take else `Keep in
@@ -3067,7 +3081,8 @@ module Hooks = struct
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~(local_state : Local_state.t)
-      ~snarked_ledger =
+      ~snarked_ledger ~genesis_ledger_hash =
+    let snarked_ledger_hash = Coda_base.Ledger.Db.merkle_root snarked_ledger in
     if
       not
         (Epoch.equal
@@ -3080,29 +3095,35 @@ module Hooks = struct
         !local_state.staking_epoch_snapshot.ledger
         ~location:(Local_state.staking_epoch_ledger_location local_state) ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
-      let epoch_ledger_uuids =
-        Local_state.Data.
-          { staking= !local_state.epoch_ledger_uuids.next
-          ; next= Uuid_unix.create ()
-          ; genesis_state_hash=
-              !local_state.epoch_ledger_uuids.genesis_state_hash }
-      in
-      !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
-      Yojson.Safe.to_file
-        (!local_state.epoch_ledger_location ^ ".json")
-        (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
-      !local_state.next_epoch_snapshot
-      <- { ledger=
-             Local_state.Snapshot.Ledger_snapshot.Ledger_db
-               (Coda_base.Ledger.Db.create_checkpoint snarked_ledger
-                  ~directory_name:
-                    ( !local_state.epoch_ledger_location
-                    ^ Uuid.to_string epoch_ledger_uuids.next )
-                  ())
-         ; delegatee_table=
-             compute_delegatee_table_ledger_db
-               (Local_state.current_block_production_keys local_state)
-               snarked_ledger } )
+      (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
+      if
+        not
+          (Coda_base.Frozen_ledger_hash.equal snarked_ledger_hash
+             genesis_ledger_hash)
+      then (
+        let epoch_ledger_uuids =
+          Local_state.Data.
+            { staking= !local_state.epoch_ledger_uuids.next
+            ; next= Uuid_unix.create ()
+            ; genesis_state_hash=
+                !local_state.epoch_ledger_uuids.genesis_state_hash }
+        in
+        !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
+        Yojson.Safe.to_file
+          (!local_state.epoch_ledger_location ^ ".json")
+          (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+        !local_state.next_epoch_snapshot
+        <- { ledger=
+               Local_state.Snapshot.Ledger_snapshot.Ledger_db
+                 (Coda_base.Ledger.Db.create_checkpoint snarked_ledger
+                    ~directory_name:
+                      ( !local_state.epoch_ledger_location
+                      ^ Uuid.to_string epoch_ledger_uuids.next )
+                    ())
+           ; delegatee_table=
+               compute_delegatee_table_ledger_db
+                 (Local_state.current_block_production_keys local_state)
+                 snarked_ledger } ) )
 
   let should_bootstrap_len ~(constants : Constants.t) ~existing ~candidate =
     let open UInt32.Infix in
