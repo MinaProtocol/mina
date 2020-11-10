@@ -84,8 +84,73 @@ module Go_log = struct
     ; module_: string [@key "logger"]
     ; level: string
     ; msg: string
-    ; error: string [@default ""] }
-  [@@deriving of_yojson]
+    ; metadata: Yojson.Safe.t String.Map.t }
+
+  let record_of_yojson (json : Yojson.Safe.t) =
+    let open Result.Let_syntax in
+    let prefix = "Coda_net2.Go_log.record_of_yojson: " in
+    match json with
+    | `Assoc fields ->
+        let set_field field_name prev_value parse json =
+          match prev_value with
+          | Some _ ->
+              Error
+                (prefix ^ "Field '" ^ field_name ^ "' appears multiple times")
+          | None ->
+              parse json
+              |> Result.map_error ~f:(fun err ->
+                     prefix ^ "Could not parse field '" ^ field_name ^ "':"
+                     ^ err )
+              |> Result.map ~f:Option.return
+        in
+        let get_field field_name value =
+          match value with
+          | Some x ->
+              Ok x
+          | None ->
+              Error (prefix ^ "Field '" ^ field_name ^ "' is required")
+        in
+        let string_of_yojson = function
+          | `String s ->
+              Ok s
+          | _ ->
+              Error "Expected a string"
+        in
+        let%bind ts, module_, level, msg, metadata =
+          List.fold_result ~init:(None, None, None, None, String.Map.empty)
+            fields ~f:(fun (ts, module_, level, msg, metadata) (field, json) ->
+              match field with
+              | "ts" ->
+                  let%map ts = set_field "ts" ts string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | "logger" ->
+                  let%map module_ =
+                    set_field "logger" module_ string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "level" ->
+                  let%map level =
+                    set_field "level" level string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "msg" ->
+                  let%map msg = set_field "msg" msg string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | _ ->
+                  Ok
+                    ( ts
+                    , module_
+                    , level
+                    , msg
+                    , Map.set ~key:field ~data:json metadata ) )
+        in
+        let%bind ts = get_field "ts" ts in
+        let%bind module_ = get_field "logger" module_ in
+        let%bind level = get_field "level" level in
+        let%map msg = get_field "msg" msg in
+        {ts; module_; level; msg; metadata}
+    | _ ->
+        Error (prefix ^ "Expected a JSON object")
 
   let record_to_message r =
     Logger.Message.
@@ -97,10 +162,7 @@ module Go_log = struct
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
       ; message= r.msg
-      ; metadata=
-          ( if r.error <> "" then
-            String.Map.singleton "go_error" (`String r.error)
-          else String.Map.empty )
+      ; metadata= r.metadata
       ; event_id= None }
 end
 
