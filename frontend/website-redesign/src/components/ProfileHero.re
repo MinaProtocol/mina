@@ -164,19 +164,15 @@ module Links = {
   let make = () => {
     <div className=Styles.buttonAndLinks>
       <Button
-        href={
-               `External(
-                 "https://forums.minaprotocol.com/t/testnet-beta-release-3-2b-challenges/435",
-               )
-             }
+        href={`External(Constants.currentChallenges)}
         bgColor=Theme.Colors.black>
         {React.string("Current Challenges")}
       </Button>
       <div className=Styles.linksColumn>
-        <a href="https://bit.ly/leaderboardFAQ" className=Styles.link>
+        <a href=Constants.leaderboardFAQ className=Styles.link>
           {React.string("Leaderboard FAQ")}
         </a>
-        <a href="https://bit.ly/MinaDiscord" className=Styles.link>
+        <a href=Constants.minaDiscordSocial className=Styles.link>
           {React.string("Discord #leaderboard-qa Channel")}
         </a>
       </div>

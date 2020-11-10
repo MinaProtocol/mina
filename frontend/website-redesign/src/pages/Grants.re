@@ -221,21 +221,21 @@ module FAQ = {
             <Spacer height=1. />
             <span className=Theme.Type.paragraph>
               <span> {React.string("See the ")} </span>
-              <Next.Link href=Constants.projectGrantApplication>
+              <a href=Constants.projectGrantApplication>
                 <span className=Styles.link>
                   {React.string("Application Process ")}
                 </span>
-              </Next.Link>
+              </a>
               <span>
                 {React.string(
                    "section for selection criteria. Please also reach out to us if you have any unique skills that don't apply to current projects. You can also start ",
                  )}
               </span>
-              <Next.Link href=Constants.githubUrl>
+              <a href=Constants.minaGithub>
                 <span className=Styles.link>
                   {React.string("contributing code to Mina ")}
                 </span>
-              </Next.Link>
+              </a>
               <span>
                 {React.string(
                    "-- grants will give precedence to previous contributors.",

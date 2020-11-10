@@ -112,17 +112,21 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
           </div>
         </>
         <div className=Styles.socialTags>
-          <a
-            target="_blank"
-            href={"https://twitter.com/" ++ twitter}
-            className=Styles.iconLink>
-            <Icon kind=Icon.Twitter />
-          </a>
+          {switch (twitter) {
+           | Some(twitter) =>
+             <a
+               target="_blank"
+               href={Constants.twitterUrl ++ twitter}
+               className=Styles.iconLink>
+               <Icon kind=Icon.Twitter />
+             </a>
+           | _ => React.null
+           }}
           {switch (github) {
            | Some(github) =>
              <a
                target="_blank"
-               href={"https://github.com/" ++ github}
+               href={Constants.githubUrl ++ github}
                className=Styles.iconLink>
                <Icon kind=Icon.Github />
              </a>

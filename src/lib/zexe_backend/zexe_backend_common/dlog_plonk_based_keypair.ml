@@ -114,15 +114,15 @@ module Make (Inputs : Inputs_intf) = struct
             Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
               (fun () ~path ->
-                match Urs.read path with
-                | Some urs ->
-                    urs
-                | None ->
-                    (* TODO: Handle this properly. *)
-                    failwith
-                      "Could not read the URS from disk; its format did not \
-                       match the expected format" )
-              Urs.write
+                Or_error.try_with_join (fun () ->
+                    match Urs.read path with
+                    | Some urs ->
+                        Ok urs
+                    | None ->
+                        Or_error.errorf
+                          "Could not read the URS from disk; its format did \
+                           not match the expected format" ) )
+              (fun urs path -> Or_error.try_with (fun () -> Urs.write urs path))
           in
           let u =
             match Key_cache.Sync.read specs store () with

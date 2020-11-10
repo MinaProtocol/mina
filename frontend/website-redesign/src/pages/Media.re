@@ -17,11 +17,7 @@ let make = () => {
       }>
       <Spacer height=1.5 />
       <Button
-        href={
-               `External(
-                 "https://drive.google.com/file/d/177Xzj6Rqd9UnYwzRzMRLPKoyows-iwKx/view?usp=sharing",
-               )
-             }
+        href={`External(Constants.minaPressKit)}
         bgColor=Theme.Colors.black
         width={`rem(14.)}>
         {React.string("Download Media Kit")}

@@ -53,7 +53,7 @@ module EditLink = {
       name="Edit Link"
       target="_blank"
       href={
-        "https://github.com/MinaProtocol/mina/edit/develop/frontend/website/pages"
+        Constants.minaDocsEditLink
         ++ route
         ++ ".mdx"
       }
