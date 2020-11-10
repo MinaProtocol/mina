@@ -1121,8 +1121,8 @@ func main() {
 	logging.SetLogLevel("nat", "debug")
 	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
 	logging.SetLogLevel("providers", "debug")
-	logging.SetLogLevel("dht/RtRefreshManager", "debug")
-	logging.SetLogLevel("dht", "debug") // Trace and debug logs are mixed at debug level :(
+	logging.SetLogLevel("dht/RtRefreshManager", "info") // Ping logs are spammy. Possibly should be above info to avoid cpl logs.
+	logging.SetLogLevel("dht", "info") // Logs every operation to debug
 	logging.SetLogLevel("peerstore", "debug")
 	logging.SetLogLevel("diversityFilter", "debug")
 	logging.SetLogLevel("table", "debug")
