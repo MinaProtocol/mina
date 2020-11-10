@@ -1,3 +1,11 @@
+""" config/txn_pool
+
+Command-line flag and configuration constant for medium transaction pool.
+
+Note this value needs to be consistent across nodes to prevent
+spurious bans. See comment in transaction_pool.ml for more details.
+"""
+
 load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "int_setting")
 
 int_flag( name = "max_size", build_setting_default = 3000,

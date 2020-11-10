@@ -1,10 +1,8 @@
-load("@obazl_rules_ocaml//ocaml:build.bzl",
-     "ocaml_binary",
+load("@obazl_rules_ocaml//ocaml:rules.bzl",
      "ocaml_library",
-     "ppx_binary",
      "ppx_library")
 
-load("config.bzl",
+load(":BUILD.bzl",
      "coda_config",
      "coda_test_config")
 
@@ -14,18 +12,27 @@ load("@bazel_skylib//rules:common_settings.bzl",
      "int_flag", "int_setting",
      "string_flag", "string_setting")
 
+exports_files(["config.mlh.tpl"])
+
 # default values taken from config/dev.mlh
-string_flag( name = "protocol_version", build_setting_default = "0.1.0",
-             values = ["0.1.0"],
+
+int_flag( name = "supercharged_coinbase_factor", build_setting_default = 2,
              visibility = ["//visibility:public"])
-string_setting( name = "protocol_version_0_1_0", build_setting_default = "0.1.0",
+int_setting( name = "supercharged_coinbase_factor_2", build_setting_default = 2,
                 visibility = ["//visibility:public"])
 
 bool_flag( name = "time_offsets", build_setting_default = True,
            visibility = ["//visibility:public"])
 bool_setting( name = "time_offsets_true", build_setting_default = True,
               visibility = ["//visibility:public"])
-bool_setting( name = "time_offsets_false", build_setting_default = True,
+bool_setting( name = "time_offsets_false", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "plugins", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "plugins_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "plugins_false", build_setting_default = False,
               visibility = ["//visibility:public"])
 
 bool_flag( name = "with_fake_hash", build_setting_default = False,
@@ -48,6 +55,11 @@ bool_setting( name = "integration_tests_false", build_setting_default = False,
 bool_flag( name = "force_updates", build_setting_default = False,
            visibility = ["//visibility:public"])
 bool_setting( name = "force_updates_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "download_snark_keys", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "download_snark_keys_true", build_setting_default = True,
               visibility = ["//visibility:public"])
 
 bool_flag( name = "mock_frontend_data", build_setting_default = False,
@@ -98,7 +110,8 @@ coda_test_config(
         ":config_fake_hash": ":fake_hash",
         ":config_testnet_public": ":testnet_public",
         # "//conditions:default": ":config"
-    })
+    }),
+    visibility = ["//visibility:public"],
 )
 
 # convenience target, so //src/config will build //src/config:dev
@@ -107,20 +120,6 @@ coda_test_config(
 
 coda_config(name="dev", # default values: dev.mlh
             visibility = ["//visibility:public"])
-
-coda_config(
-    name = "debug", # src/config/debug.mlh
-    visibility = ["//visibility:public"],
-    # scan_state/standard.mlh
-    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/std:txn_capacity_log2", # 7,
-    scan_state_work_delay = "//src/config/scan_state/std:work_delay", # 7, # scan_state/standard.mlh
-    debug_logs = "//src/config/debug/all:logs",  # debug_level/all.mlh
-    call_logger = "//src/config/debug/all:call_logger",
-    record_async_backtraces = "//src/config/debug/all:record_async_backtraces",
-
-    account_creation_fee_int = "//src/config/fees/std:account_creation",
-    time_offsets = "//src/config:time_offsets_false"
-)
 
 coda_config(
     name = "fake_hash",
@@ -147,5 +146,6 @@ coda_config(
     genesis_ledger = "//src/config/genesis/ledger:testnet_postake",
     block_window_duration = ":block_window_duration_20000",
     integration_tests = ":integration_tests_false",
-    force_updates = ":force_updates_true"
+    force_updates = ":force_updates_true",
+    download_snark_keys = ":download_snark_keys_true"
 )

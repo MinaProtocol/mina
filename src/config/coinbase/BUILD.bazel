@@ -8,3 +8,6 @@ int_setting( name = "standard", build_setting_default = 20,
 int_setting( name = "realistic", build_setting_default = 20,
              visibility = ["//visibility:public"])
 
+int_setting( name = "supercharged_factor", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+

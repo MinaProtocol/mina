@@ -1,0 +1,9 @@
+""" config/fees/user_cmd/standard
+
+Configuration constants for standard user command fees.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "string_setting")
+
+string_setting( name = "min", build_setting_default = "2",
+                visibility = ["//visibility:public"])

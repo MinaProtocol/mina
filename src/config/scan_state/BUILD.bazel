@@ -1,15 +1,42 @@
+""" config/scan_state
+
+Command-line configuration flags for scan_state.
+"""
+
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag")
 
-# defaults: medium
-bool_flag( name = "with_tps_goal", build_setting_default = False,
-          visibility = ["//visibility:public"])
+# defaults: config/scan_state/medium.mlh
 
-int_flag( name = "tps_goal_x10", build_setting_default = 10,
-             visibility = ["//visibility:public"])
+bool_flag(
+    name = "tps_goal",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
 
-int_flag( name = "txn_capacity_log2", build_setting_default = 3,
-             visibility = ["//visibility:public"])
+config_setting(
+    name = "enable_tps_goal",
+    flag_values = {":tps_goal": str(True)},
+)
 
-int_flag( name = "work_delay", build_setting_default = 2,
-             visibility = ["//visibility:public"])
+config_setting(
+    name = "disable_tps_goal",
+    flag_values = {":tps_goal": str(False)},
+)
 
+int_flag(
+    name = "tps_goal_x10",
+    build_setting_default = 10,
+    visibility = ["//visibility:public"],
+)
+
+int_flag(
+    name = "txn_capacity_log2",
+    build_setting_default = 3,
+    visibility = ["//visibility:public"],
+)
+
+int_flag(
+    name = "work_delay",
+    build_setting_default = 2,
+    visibility = ["//visibility:public"],
+)
