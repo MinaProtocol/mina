@@ -5,53 +5,132 @@ load(
     "ocaml_executable",
     "ocaml_module",
 )
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 load(
     "//:BUILD.bzl",
-    "GLOBAL_EXECUTABLE_OPTS",
-    "GLOBAL_MODULE_OPTS",
-)
-load(
-    "//mina:BUILD.bzl",
     "REPO_EXECUTABLE_OPTS",
     "REPO_MODULE_OPTS",
 )
-
-################################################################
-#### Package CLI Options
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-
-bool_flag(name = "debug", build_setting_default = True)
-config_setting(name = "enable_debug", flag_values = {":debug": str(True)})
-PKG_DEBUG_OPT = select({":enable_debug": ["-g"], "//conditions:default": []})
-
-bool_flag(name = "verbose", build_setting_default = False)
-config_setting(name = "enable_verbose", flag_values = {":verbose": str(True)})
-PKG_VERBOSE_OPT = select({":enable_verbose": ["-verbose"], "//conditions:default": []})
-
-################################################################
-ocaml_executable(
-    name = "gen_values.exe",
-    opts = GLOBAL_EXECUTABLE_OPTS + REPO_EXECUTABLE_OPTS + PKG_DEBUG_OPT + PKG_VERBOSE_OPT,
-    deps = [
-        # do not sort (buildifier)
-        "@opam//pkg:digestif.c",
-        ":Gen_values",
-    ],
-    visibility = ["//src/lib/dummy_values:__pkg__"]
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
 )
 
-ocaml_module(
-    name = "Gen_values",
-    src = "gen_values.ml",
-    opts = GLOBAL_MODULE_OPTS + REPO_MODULE_OPTS + PKG_DEBUG_OPT + PKG_VERBOSE_OPT,
-    ppx = "//bzl/ppx:ppx[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]",
-    ppx_args = ["--conditional"],
-    deps = [
+################################################################
+## STANZA 1: EXECUTABLE GEN_VALUES
+################################################################
+GEN_VALUES_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+GEN_VALUES_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+GEN_VALUES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:ppxlib",
+    "@mina//src/lib/crypto_params",
+    "@mina//src/lib/pickles",
+]
+
+GEN_VALUES_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]"
+
+GEN_VALUES_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "gen_values",
+]
+
+#################
+ocaml_executable(
+    name = "gen_values.exe",
+    opts = GEN_VALUES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_VALUES_DEPS + [
         # do not sort (buildifier)
-        "@opam//pkg:async",
-        "@opam//pkg:core",
-        "@opam//pkg:ppxlib",
-        "@mina//src/lib/crypto_params",
-        "@mina//src/lib/pickles",
-    ]
+        ":_Gen_values",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Gen_values",
+    src = "gen_values.ml",
+    opts = GEN_VALUES_MODULE_OPTS,
+    ppx = GEN_VALUES_PPX,
+    ppx_args = GEN_VALUES_PPX_ARGS,
+    deps = GEN_VALUES_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
 )
