@@ -24,18 +24,15 @@ open Coda_base
 *)
 
 type input =
-  { target_epoch_ledgers_state_hash: State_hash.t
+  { target_epoch_ledger_state_hash: State_hash.t
   ; genesis_ledger: Runtime_config.Ledger.t }
 [@@deriving yojson]
 
 type output =
-  { target_epoch_ledgers_state_hash: State_hash.t
+  { target_epoch_ledger_state_hash: State_hash.t
   ; target_fork_state_hash: State_hash.t
   ; target_genesis_ledger: Runtime_config.Ledger.t
-  ; target_staking_epoch_ledger: Runtime_config.Ledger.t
-  ; target_staking_seed: Epoch_seed.t
-  ; target_next_epoch_ledger: Runtime_config.Ledger.t
-  ; target_next_seed: Epoch_seed.t }
+  ; target_epoch_data: Runtime_config.Epoch_data.t }
 [@@deriving yojson]
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -45,7 +42,7 @@ let proof_level = Genesis_constants.Proof_level.Full
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
-let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
+let create_output ~target_fork_state_hash ~target_epoch_ledger_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
   let create_ledger_as_list ledger =
@@ -53,26 +50,32 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
         Genesis_ledger_helper.Accounts.Single.of_account acc None )
   in
   let genesis_ledger_as_list = create_ledger_as_list ledger in
+  let target_genesis_ledger =
+    {input_genesis_ledger with base= Accounts genesis_ledger_as_list}
+  in
   let staking_epoch_ledger_as_list =
     create_ledger_as_list staking_epoch_ledger
   in
   let next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
-  let target_genesis_ledger =
-    {input_genesis_ledger with base= Accounts genesis_ledger_as_list}
+  let target_staking_epoch_data : Runtime_config.Epoch_data.Data.t =
+    let ledger =
+      {input_genesis_ledger with base= Accounts staking_epoch_ledger_as_list}
+    in
+    {ledger; seed= staking_seed}
   in
-  let target_staking_epoch_ledger =
-    {input_genesis_ledger with base= Accounts staking_epoch_ledger_as_list}
+  let target_next_epoch_data : Runtime_config.Epoch_data.Data.t =
+    let ledger =
+      {input_genesis_ledger with base= Accounts next_epoch_ledger_as_list}
+    in
+    {ledger; seed= next_seed}
   in
-  let target_next_epoch_ledger =
-    {input_genesis_ledger with base= Accounts next_epoch_ledger_as_list}
+  let target_epoch_data : Runtime_config.Epoch_data.t =
+    {staking= target_staking_epoch_data; next= Some target_next_epoch_data}
   in
   { target_fork_state_hash
-  ; target_epoch_ledgers_state_hash
+  ; target_epoch_ledger_state_hash
   ; target_genesis_ledger
-  ; target_staking_epoch_ledger
-  ; target_staking_seed= staking_seed
-  ; target_next_epoch_ledger
-  ; target_next_seed= next_seed }
+  ; target_epoch_data }
 
 (* map from global slots to expected ledger hashes *)
 let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
@@ -124,18 +127,32 @@ let state_hash_of_epoch_ledgers_state_hash ~logger pool
          state hash %s, error: %s"
         epoch_ledgers_state_hash (Caqti_error.show msg) ()
 
-let epoch_data_ids_of_state_hash ~logger pool state_hash =
+let epoch_staking_id_of_state_hash ~logger pool state_hash =
   match%map
     Caqti_async.Pool.use
-      (fun db -> Sql.Epoch_data.get_epoch_data_ids db state_hash)
+      (fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
       pool
   with
-  | Ok {staking_epoch_data_id; next_epoch_data_id} ->
-      [%log info] "Found epoch data ids for state hash %s" state_hash ;
-      ( {staking_epoch_data_id; next_epoch_data_id}
-        : Sql.Epoch_data.epoch_data_ids )
+  | Ok staking_epoch_data_id ->
+      [%log info] "Found staking epoch data id for state hash %s" state_hash ;
+      staking_epoch_data_id
   | Error msg ->
-      failwithf "Error retrieving epoch data ids for state hash %s, error: %s"
+      failwithf
+        "Error retrieving staking epoch data id for state hash %s, error: %s"
+        state_hash (Caqti_error.show msg) ()
+
+let epoch_next_id_of_state_hash ~logger pool state_hash =
+  match%map
+    Caqti_async.Pool.use
+      (fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
+      pool
+  with
+  | Ok next_epoch_data_id ->
+      [%log info] "Found next epoch data id for state hash %s" state_hash ;
+      next_epoch_data_id
+  | Error msg ->
+      failwithf
+        "Error retrieving next epoch data id for state hash %s, error: %s"
         state_hash (Caqti_error.show msg) ()
 
 let epoch_data_of_id ~logger pool epoch_data_id =
@@ -144,9 +161,9 @@ let epoch_data_of_id ~logger pool epoch_data_id =
       (fun db -> Sql.Epoch_data.get_epoch_data db epoch_data_id)
       pool
   with
-  | Ok {epoch_data_hash; epoch_data_seed} ->
+  | Ok {epoch_ledger_hash; epoch_data_seed} ->
       [%log info] "Found epoch data for id %d" epoch_data_id ;
-      ({epoch_data_hash; epoch_data_seed} : Sql.Epoch_data.epoch_data)
+      ({epoch_ledger_hash; epoch_data_seed} : Sql.Epoch_data.epoch_data)
   | Error msg ->
       failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
         epoch_data_id (Caqti_error.show msg) ()
@@ -474,34 +491,39 @@ let main ~input_file ~output_file ~archive_uri () =
           ~depth:constraint_constants.ledger_depth padded_accounts
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-      let epoch_ledgers_state_hash =
-        State_hash.to_string input.target_epoch_ledgers_state_hash
+      let epoch_ledger_state_hash =
+        State_hash.to_string input.target_epoch_ledger_state_hash
       in
       [%log info] "Retrieving fork block state_hash" ;
       let%bind fork_state_hash =
         state_hash_of_epoch_ledgers_state_hash ~logger pool
-          epoch_ledgers_state_hash
+          epoch_ledger_state_hash
       in
       [%log info] "Loading epoch ledger data" ;
-      let%bind {staking_epoch_data_id; next_epoch_data_id} =
-        epoch_data_ids_of_state_hash ~logger pool fork_state_hash
+      let%bind staking_epoch_data_id =
+        epoch_staking_id_of_state_hash ~logger pool epoch_ledger_state_hash
       in
-      let%bind { epoch_data_hash= staking_epoch_ledger_hash_str
+      let%bind next_epoch_data_id =
+        epoch_next_id_of_state_hash ~logger pool fork_state_hash
+      in
+      let%bind { epoch_ledger_hash= staking_epoch_ledger_hash_str
                ; epoch_data_seed= staking_seed_str } =
         epoch_data_of_id ~logger pool staking_epoch_data_id
       in
-      let%bind { epoch_data_hash= next_epoch_ledger_hash_str
+      let%bind { epoch_ledger_hash= next_epoch_ledger_hash_str
                ; epoch_data_seed= next_seed_str } =
         epoch_data_of_id ~logger pool next_epoch_data_id
       in
       let staking_epoch_ledger_hash =
         Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
       in
-      let staking_seed = Epoch_seed.of_string staking_seed_str in
+      (* TODO : Epoch_seed.of_string *)
+      let staking_seed = Snark_params.Tick.Field.of_string staking_seed_str in
       let next_epoch_ledger_hash =
         Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
       in
-      let next_seed = Epoch_seed.of_string next_seed_str in
+      (* TODO : Epoch_seed.of_string *)
+      let next_seed = Snark_params.Tick.Field.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_info_of_state_hash ~logger pool fork_state_hash
@@ -746,11 +768,13 @@ let main ~input_file ~output_file ~archive_uri () =
         ~metadata:[("output_file", `String output_file)] ;
       let output =
         create_output
-          ~target_epoch_ledgers_state_hash:
-            input.target_epoch_ledgers_state_hash
+          ~target_epoch_ledger_state_hash:input.target_epoch_ledger_state_hash
           ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
-          ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger
-          ~next_seed input.genesis_ledger
+          ~ledger ~staking_epoch_ledger
+          ~staking_seed:(Epoch_seed.to_string staking_seed)
+          ~next_epoch_ledger
+          ~next_seed:(Epoch_seed.to_string next_seed)
+          input.genesis_ledger
         |> output_to_yojson |> Yojson.Safe.to_string
       in
       let%map writer = Async_unix.Writer.open_file output_file in

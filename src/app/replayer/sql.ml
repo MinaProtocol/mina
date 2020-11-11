@@ -238,12 +238,12 @@ module Public_key = struct
 end
 
 module Epoch_data = struct
-  type epoch_data = {epoch_data_hash: string; epoch_data_seed: string}
+  type epoch_data = {epoch_ledger_hash: string; epoch_data_seed: string}
 
   let epoch_data_typ =
-    let encode t = Ok (t.epoch_data_hash, t.epoch_data_seed) in
-    let decode (epoch_data_hash, epoch_data_seed) =
-      Ok {epoch_data_hash; epoch_data_seed}
+    let encode t = Ok (t.epoch_ledger_hash, t.epoch_data_seed) in
+    let decode (epoch_ledger_hash, epoch_data_seed) =
+      Ok {epoch_ledger_hash; epoch_data_seed}
     in
     let rep = Caqti_type.(tup2 string string) in
     Caqti_type.custom ~encode ~decode rep
@@ -264,26 +264,27 @@ module Epoch_data = struct
   let get_epoch_data (module Conn : Caqti_async.CONNECTION) epoch_ledger_id =
     Conn.find query_epoch_data epoch_ledger_id
 
-  type epoch_data_ids = {staking_epoch_data_id: int; next_epoch_data_id: int}
-
-  let epoch_data_ids_typ =
-    let encode t = Ok (t.staking_epoch_data_id, t.next_epoch_data_id) in
-    let decode (staking_epoch_data_id, next_epoch_data_id) =
-      Ok {staking_epoch_data_id; next_epoch_data_id}
-    in
-    let rep = Caqti_type.(tup2 int int) in
-    Caqti_type.custom ~encode ~decode rep
-
-  (* epoch data ids are from block with given state hash *)
-  let query_epoch_data_ids =
-    Caqti_request.find Caqti_type.string epoch_data_ids_typ
-      {| SELECT staking_epoch_data_id,next_epoch_data_id FROM blocks
+  let query_staking_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT staking_epoch_data_id FROM blocks
 
          WHERE state_hash = ?
     |}
 
-  let get_epoch_data_ids (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.find query_epoch_data_ids state_hash
+  let get_staking_epoch_data_id (module Conn : Caqti_async.CONNECTION)
+      state_hash =
+    Conn.find query_staking_epoch_data_id state_hash
+
+  let query_next_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT next_epoch_data_id FROM blocks
+
+         WHERE state_hash = ?
+    |}
+
+  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash
+      =
+    Conn.find query_next_epoch_data_id state_hash
 end
 
 module Fork_block = struct

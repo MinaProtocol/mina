@@ -319,6 +319,26 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Epoch_data = struct
+    module Data = struct
+      type t = {accounts: Accounts.t; seed: string}
+      [@@deriving yojson, dhall_type]
+
+      let fields = [|"accounts"; "seed"|]
+
+      let of_yojson json = of_yojson_generic ~fields of_yojson json
+    end
+
+    type t =
+      { staking: Data.t
+      ; next: (Data.t option[@default None]) (*If None then next = staking*) }
+    [@@deriving yojson, dhall_type]
+
+    let fields = [|"staking"; "next"|]
+
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
+  end
+
   type t =
     { daemon: (Daemon.t option[@default None])
     ; genesis: (Genesis.t option[@default None])
@@ -736,6 +756,55 @@ module Daemon = struct
   let combine t1 t2 =
     { txpool_max_size=
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size }
+end
+
+module Epoch_data = struct
+  module Data = struct
+    type t = {ledger: Ledger.t; seed: string}
+    [@@deriving bin_io_unversioned, yojson]
+  end
+
+  type t =
+    {staking: Data.t; next: Data.t option (*If None, then next = staking*)}
+  [@@deriving bin_io_unversioned, yojson]
+
+  let to_json_layout : t -> Json_layout.Epoch_data.t =
+   fun {staking; next} ->
+    let accounts (ledger : Ledger.t) =
+      match ledger.base with Accounts acc -> acc | _ -> assert false
+    in
+    let staking =
+      { Json_layout.Epoch_data.Data.accounts= accounts staking.ledger
+      ; seed= staking.seed }
+    in
+    let next =
+      Option.map next ~f:(fun n ->
+          { Json_layout.Epoch_data.Data.accounts= accounts n.ledger
+          ; seed= n.seed } )
+    in
+    {Json_layout.Epoch_data.staking; next}
+
+  let of_json_layout : Json_layout.Epoch_data.t -> (t, string) Result.t =
+   fun {staking; next} ->
+    let data accounts seed =
+      let ledger =
+        { Ledger.base= Accounts accounts
+        ; num_accounts= None
+        ; balances= []
+        ; hash= None
+        ; name= None
+        ; add_genesis_winner= Some false }
+      in
+      {Data.ledger; seed}
+    in
+    let staking = data staking.accounts staking.seed in
+    let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
+    Ok {staking; next}
+
+  let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
+
+  let of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
 end
 
 type t =

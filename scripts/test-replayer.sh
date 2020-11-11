@@ -56,8 +56,7 @@ echo "Building replayer"
 dune b $REPLAYER_DIR/replayer.exe --profile=dev
 
 echo "Running replayer"
-# ./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
-./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /tmp/replayer-out.json
+./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null
 
 RESULT=$?
 
