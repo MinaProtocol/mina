@@ -149,7 +149,7 @@ spec:
         resources:
           limits:
           requests:
-            memory: 14.0Gi
+            memory: 8.0Gi
             cpu: 8.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",

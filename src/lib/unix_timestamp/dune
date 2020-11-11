@@ -1,6 +1,7 @@
 (library
  (name unix_timestamp)
  (public_name unix_timestamp)
- (preprocess (pps ppx_version bisect_ppx -- --conditional))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
  (library_flags -linkall)
  (libraries core_kernel))

@@ -1,19 +1,20 @@
 (executable
-  (package replayer)
-  (name replayer)
-  (public_name replayer)
-  (libraries
-    async_kernel
-    core
-    caqti
-    caqti-async
-    caqti-driver-postgresql
-    coda_base
-    coda_state
-    genesis_constants
-    genesis_ledger_helper
-    yojson
-  )
-  (preprocessor_deps ../../config.mlh)
+ (package replayer)
+ (name replayer)
+ (public_name replayer)
+ (libraries
+   async_kernel
+   core
+   caqti
+   caqti-async
+   caqti-driver-postgresql
+   coda_base
+   coda_state
+   genesis_constants
+   genesis_ledger_helper
+   yojson
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv
                   ppx_hash ppx_compare ppx_deriving_yojson)))
