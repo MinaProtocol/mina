@@ -252,12 +252,13 @@ let setup_daemon logger =
   and proposed_protocol_version =
     flag "proposed-protocol-version" (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and config_file =
+  and config_files =
     flag "config-file"
       ~doc:
         "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
-         default: <config_dir>/daemon.json)"
-      (optional string)
+         default: <config_dir>/daemon.json). Pass multiple times to override \
+         fields from earlier config files"
+      (listed string)
   and may_generate =
     flag "generate-genesis-proof"
       ~doc:
@@ -400,84 +401,91 @@ let setup_daemon logger =
     in
     let may_generate = Option.value ~default:false may_generate in
     let coda_initialization_deferred () =
-      let config_file, must_find_config_file =
-        match config_file with
+      let config_file_installed =
+        (* Search for config files installed as part of a deb/brew package.
+           These files are commit-dependent, to ensure that we don't clobber
+           configuration for dev builds or use incompatible configs.
+        *)
+        let config_file_installed =
+          let json = "config_" ^ Coda_version.commit_id_short ^ ".json" in
+          List.fold_until ~init:None
+            (Cache_dir.possible_paths json)
+            ~f:(fun _acc f ->
+              match Core.Sys.file_exists f with
+              | `Yes ->
+                  Stop (Some f)
+              | _ ->
+                  Continue None )
+            ~finish:Fn.id
+        in
+        match config_file_installed with
         | Some config_file ->
-            (config_file, true)
-        | None -> (
-          match Sys.getenv "CODA_CONFIG_FILE" with
-          | Some config_file ->
-              (config_file, false)
-          | None -> (
-              (*Check if the config file is installed as part of the deb before resorting to the default*)
-              let config_file_installed =
-                let json =
-                  "config_" ^ Coda_version.commit_id_short ^ ".json"
-                in
-                List.fold_until ~init:None
-                  (Cache_dir.possible_paths json)
-                  ~f:(fun _acc f ->
-                    match Core.Sys.file_exists f with
-                    | `Yes ->
-                        Stop (Some f)
-                    | _ ->
-                        Continue None )
-                  ~finish:Fn.id
-              in
-              match config_file_installed with
-              | Some config_file ->
-                  (config_file, false)
-              | None ->
-                  (conf_dir ^/ "daemon.json", false) ) )
-      in
-      let%bind config_json =
-        [%log info] "Trying to read runtime config from $config_file"
-          ~metadata:[("config_file", `String config_file)] ;
-        match%map Genesis_ledger_helper.load_config_json config_file with
-        | Ok config ->
-            Some config
-        | Error err when must_find_config_file ->
-            [%log fatal]
-              "Failed reading configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
-            Error.raise err
-        | Error err ->
-            [%log warn]
-              "Failed reading configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+            Some (config_file, `Must_exist)
+        | None ->
             None
       in
-      let%bind config_json =
-        match config_json with
-        | Some config_json ->
-            let%map config_json =
-              Genesis_ledger_helper.upgrade_old_config ~logger config_file
-                config_json
-            in
-            Some config_json
+      let config_file_configdir =
+        (conf_dir ^/ "daemon.json", `May_be_missing)
+      in
+      let config_file_envvar =
+        match Sys.getenv "CODA_CONFIG_FILE" with
+        | Some config_file ->
+            Some (config_file, `Must_exist)
         | None ->
-            return None
+            None
+      in
+      let config_files =
+        Option.to_list config_file_installed
+        @ (config_file_configdir :: Option.to_list config_file_envvar)
+        @ List.map config_files ~f:(fun config_file ->
+              (config_file, `Must_exist) )
+      in
+      let%bind config_jsons =
+        let config_files_paths =
+          List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+        in
+        [%log info] "Reading configuration files $config_files"
+          ~metadata:[("config_files", `List config_files_paths)] ;
+        Deferred.List.filter_map config_files
+          ~f:(fun (config_file, handle_missing) ->
+            match%bind Genesis_ledger_helper.load_config_json config_file with
+            | Ok config_json ->
+                let%map config_json =
+                  Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                    config_json
+                in
+                Some (config_file, config_json)
+            | Error err -> (
+              match handle_missing with
+              | `Must_exist ->
+                  [%log fatal]
+                    "Failed reading configuration from $config_file: $error"
+                    ~metadata:
+                      [ ("config_file", `String config_file)
+                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                  Error.raise err
+              | `May_be_missing ->
+                  [%log warn]
+                    "Could not read configuration from $config_file: $error"
+                    ~metadata:
+                      [ ("config_file", `String config_file)
+                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                  return None ) )
       in
       let config =
-        match config_json with
-        | Some config_json -> (
-          match Runtime_config.of_yojson config_json with
-          | Ok config ->
-              config
-          | Error err ->
-              [%log fatal]
-                "Could not parse configuration from $config_file: $error"
-                ~metadata:
-                  [ ("config_file", `String config_file)
-                  ; ("config_json", config_json)
-                  ; ("error", `String err) ] ;
-              failwithf "Could not parse configuration: %s" err () )
-        | _ ->
-            Runtime_config.default
+        List.fold ~init:Runtime_config.default config_jsons
+          ~f:(fun config (config_file, config_json) ->
+            match Runtime_config.of_yojson config_json with
+            | Ok loaded_config ->
+                Runtime_config.combine config loaded_config
+            | Error err ->
+                [%log fatal]
+                  "Could not parse configuration from $config_file: $error"
+                  ~metadata:
+                    [ ("config_file", `String config_file)
+                    ; ("config_json", config_json)
+                    ; ("error", `String err) ] ;
+                failwithf "Could not parse configuration file: %s" err () )
       in
       let genesis_dir =
         Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
@@ -497,9 +505,11 @@ let setup_daemon logger =
                 ; ("error", `String (Error.to_string_hum err)) ] ;
             Error.raise err
       in
-      let daemon_config =
-        Option.bind config_json ~f:(fun config_json ->
-            YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json)) )
+      let rev_daemon_configs =
+        List.rev_filter_map config_jsons ~f:(fun (config_file, config_json) ->
+            Option.map
+              YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
+              ~f:(fun daemon_config -> (config_file, daemon_config)) )
       in
       let maybe_from_config (type a) (f : YJ.t -> a option) (keyname : string)
           (actual_value : a option) : a option =
@@ -509,13 +519,23 @@ let setup_daemon logger =
         | Some v ->
             Some v
         | None ->
-            let%bind daemon_config = daemon_config in
-            let%bind json_val =
-              to_option Fn.id (member keyname daemon_config)
+            (* Load value from the first config file that both
+               * has the key we are looking for, and
+               * has the key in a format that [f] can parse.
+            *)
+            let%map config_file, data =
+              List.find_map rev_daemon_configs
+                ~f:(fun (config_file, daemon_config) ->
+                  let%bind json_val =
+                    to_option Fn.id (member keyname daemon_config)
+                  in
+                  let%map data = f json_val in
+                  (config_file, data) )
             in
-            [%log debug] "Key $key being used from config file"
-              ~metadata:[("key", `String keyname)] ;
-            f json_val
+            [%log debug] "Key $key being used from config file $config_file"
+              ~metadata:
+                [("key", `String keyname); ("config_file", `String config_file)] ;
+            data
       in
       let or_from_config map keyname actual_value ~default =
         match maybe_from_config map keyname actual_value with
