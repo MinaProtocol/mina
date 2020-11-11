@@ -24,12 +24,12 @@ open Coda_base
 *)
 
 type input =
-  { target_epoch_ledger_state_hash: State_hash.t
+  { target_epoch_ledgers_state_hash: State_hash.t
   ; genesis_ledger: Runtime_config.Ledger.t }
 [@@deriving yojson]
 
 type output =
-  { target_epoch_ledger_state_hash: State_hash.t
+  { target_epoch_ledgers_state_hash: State_hash.t
   ; target_fork_state_hash: State_hash.t
   ; target_genesis_ledger: Runtime_config.Ledger.t
   ; target_epoch_data: Runtime_config.Epoch_data.t }
@@ -42,7 +42,7 @@ let proof_level = Genesis_constants.Proof_level.Full
 let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
-let create_output ~target_fork_state_hash ~target_epoch_ledger_state_hash
+let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
   let create_ledger_as_list ledger =
@@ -73,7 +73,7 @@ let create_output ~target_fork_state_hash ~target_epoch_ledger_state_hash
     {staking= target_staking_epoch_data; next= Some target_next_epoch_data}
   in
   { target_fork_state_hash
-  ; target_epoch_ledger_state_hash
+  ; target_epoch_ledgers_state_hash
   ; target_genesis_ledger
   ; target_epoch_data }
 
@@ -491,31 +491,31 @@ let main ~input_file ~output_file ~archive_uri () =
           ~depth:constraint_constants.ledger_depth padded_accounts
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-      let epoch_ledger_state_hash =
-        State_hash.to_string input.target_epoch_ledger_state_hash
+      let epoch_ledgers_state_hash =
+        State_hash.to_string input.target_epoch_ledgers_state_hash
       in
       [%log info] "Retrieving fork block state_hash" ;
       let%bind fork_state_hash =
         state_hash_of_epoch_ledgers_state_hash ~logger pool
-          epoch_ledger_state_hash
+          epoch_ledgers_state_hash
       in
       [%log info] "Loading epoch ledger data" ;
-      let%bind staking_id_from_epoch_ledger_state_hash =
-        epoch_staking_id_of_state_hash ~logger pool epoch_ledger_state_hash
+      let%bind staking_id_from_epoch_ledgers_state_hash =
+        epoch_staking_id_of_state_hash ~logger pool epoch_ledgers_state_hash
       in
-      let%bind next_id_from_epoch_ledger_state_hash =
-        epoch_next_id_of_state_hash ~logger pool epoch_ledger_state_hash
+      let%bind next_id_from_epoch_ledgers_state_hash =
+        epoch_next_id_of_state_hash ~logger pool epoch_ledgers_state_hash
       in
       let%bind next_id_from_fork_state_hash =
         epoch_next_id_of_state_hash ~logger pool fork_state_hash
       in
       let%bind { epoch_ledger_hash= staking_epoch_ledger_hash_str
                ; epoch_data_seed= staking_seed_str } =
-        epoch_data_of_id ~logger pool staking_id_from_epoch_ledger_state_hash
+        epoch_data_of_id ~logger pool staking_id_from_epoch_ledgers_state_hash
       in
       let%bind { epoch_ledger_hash= next_epoch_ledger_hash_str
                ; epoch_data_seed= _ } =
-        epoch_data_of_id ~logger pool next_id_from_epoch_ledger_state_hash
+        epoch_data_of_id ~logger pool next_id_from_epoch_ledgers_state_hash
       in
       let%bind {epoch_ledger_hash= _; epoch_data_seed= next_seed_str} =
         epoch_data_of_id ~logger pool next_id_from_fork_state_hash
@@ -774,7 +774,8 @@ let main ~input_file ~output_file ~archive_uri () =
         ~metadata:[("output_file", `String output_file)] ;
       let output =
         create_output
-          ~target_epoch_ledger_state_hash:input.target_epoch_ledger_state_hash
+          ~target_epoch_ledgers_state_hash:
+            input.target_epoch_ledgers_state_hash
           ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
           ~ledger ~staking_epoch_ledger
           ~staking_seed:(Epoch_seed.to_string staking_seed)
