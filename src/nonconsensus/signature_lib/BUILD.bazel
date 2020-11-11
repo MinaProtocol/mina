@@ -1,0 +1,305 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY SIGNATURE_LIB_NONCONSENSUS
+################################################################
+SIGNATURE_LIB_NONCONSENSUS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+SIGNATURE_LIB_NONCONSENSUS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SIGNATURE_LIB_NONCONSENSUS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+SIGNATURE_LIB_NONCONSENSUS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+SIGNATURE_LIB_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/bignum_bigint",
+    "@mina//src/lib/blake2",
+    "@mina//src/nonconsensus/hash_prefix_states:hash_prefix_states_nonconsensus",
+    "@mina//src/nonconsensus/non_zero_curve_point:non_zero_curve_point_nonconsensus",
+    "@mina//src/nonconsensus/random_oracle:random_oracle_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "signature_lib_nonconsensus",
+    doc = "Schnorr signatures using the tick and tock curves",
+    opts = SIGNATURE_LIB_NONCONSENSUS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Keypair",
+        ":_Private_key",
+        ":_Public_key",
+        ":_Schnorr",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Signature_lib_nonconsensus_ns",
+    ns = "signature_lib_nonconsensus",
+    opts = SIGNATURE_LIB_NONCONSENSUS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "keypair.ml",
+        "private_key.ml",
+        "public_key.ml",
+        "schnorr.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Keypair",
+    src = "keypair.ml",
+    intf = ":_Keypair.cmi",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+        ":_Public_key",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Keypair.cmi",
+    src = "keypair.mli",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+        ":_Public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Private_key",
+    src = "private_key.ml",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Public_key",
+    src = "public_key.ml",
+    intf = ":_Public_key.cmi",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Public_key.cmi",
+    src = "public_key.mli",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Schnorr",
+    src = "schnorr.ml",
+    ns = ":Signature_lib_nonconsensus_ns",
+    opts = SIGNATURE_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "signature_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SIGNATURE_LIB_NONCONSENSUS_DEPS + [":_Private_key"] # obazl:retain
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/nonconsensus/signature_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

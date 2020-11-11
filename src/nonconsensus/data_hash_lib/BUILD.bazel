@@ -1,0 +1,275 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY DATA_HASH_LIB_NONCONSENSUS
+################################################################
+DATA_HASH_LIB_NONCONSENSUS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+DATA_HASH_LIB_NONCONSENSUS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+DATA_HASH_LIB_NONCONSENSUS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+DATA_HASH_LIB_NONCONSENSUS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+DATA_HASH_LIB_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/codable",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+    "@mina//src/nonconsensus/outside_hash_image:outside_hash_image_nonconsensus",
+    "@mina//src/nonconsensus/random_oracle:random_oracle_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "data_hash_lib_nonconsensus",
+    doc = "Data hash, nonconsensus version",
+    opts = DATA_HASH_LIB_NONCONSENSUS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+        ":_Data_hash_intf",
+        ":_State_hash",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Data_hash_lib_nonconsensus_ns",
+    ns = "data_hash_lib_nonconsensus",
+    opts = DATA_HASH_LIB_NONCONSENSUS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "data_hash.ml",
+        "data_hash_intf.ml",
+        "state_hash.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Data_hash",
+    src = "data_hash.ml",
+    intf = ":_Data_hash.cmi",
+    ns = ":Data_hash_lib_nonconsensus_ns",
+    opts = DATA_HASH_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "data_hash_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash_intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Data_hash.cmi",
+    src = "data_hash.mli",
+    ns = ":Data_hash_lib_nonconsensus_ns",
+    opts = DATA_HASH_LIB_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "data_hash_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Data_hash_intf",
+    src = "data_hash_intf.ml",
+    ns = ":Data_hash_lib_nonconsensus_ns",
+    opts = DATA_HASH_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "data_hash_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_State_hash",
+    src = "state_hash.ml",
+    intf = ":_State_hash.cmi",
+    ns = ":Data_hash_lib_nonconsensus_ns",
+    opts = DATA_HASH_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "data_hash_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_State_hash.cmi",
+    src = "state_hash.mli",
+    ns = ":Data_hash_lib_nonconsensus_ns",
+    opts = DATA_HASH_LIB_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "data_hash_lib_nonconsensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = DATA_HASH_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/nonconsensus/data_hash_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
