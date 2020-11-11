@@ -27,11 +27,11 @@ spec:
         resources:
           limits:
           requests:
-            memory: 18.5Gi
+            memory: 24Gi
             cpu: 8.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
-          "-log-level", "Trace",
+          "-log-level", "Debug",
           "-log-json",
           "-config-directory", "/root/.coda-config",
           "-log-received-blocks", "true",

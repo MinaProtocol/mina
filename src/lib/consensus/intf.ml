@@ -60,6 +60,7 @@ module type Blockchain_state = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
     -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Frozen_ledger_hash.t
     -> snarked_next_available_token:Token_id.t
     -> timestamp:Block_time.t
     -> Value.t
@@ -68,6 +69,9 @@ module type Blockchain_state = sig
     ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+
+  val genesis_ledger_hash :
     (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
   val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
@@ -220,6 +224,7 @@ module type State_hooks = sig
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -291,12 +296,26 @@ module type S = sig
       -> t
   end
 
+  module Genesis_epoch_data : sig
+    module Data : sig
+      type t = {ledger: Coda_base.Ledger.t Lazy.t; seed: Coda_base.Epoch_seed.t}
+    end
+
+    type tt = {staking: Data.t; next: Data.t option}
+
+    type t = tt option
+
+    val for_unit_tests : t
+
+    val compiled : t
+  end
+
   module Data : sig
     module Local_state : sig
       module Snapshot : sig
         module Ledger_snapshot : sig
           type t =
-            | Genesis_ledger of Coda_base.Ledger.t
+            | Genesis_epoch_ledger of Coda_base.Ledger.t
             | Ledger_db of Coda_base.Ledger.Db.t
 
           val close : t -> unit
@@ -310,6 +329,7 @@ module type S = sig
       val create :
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> ledger_depth:int
         -> genesis_state_hash:State_hash.t
@@ -357,7 +377,7 @@ module type S = sig
 
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> genesis_epoch_ledger:Coda_base.Ledger.t Lazy.t
         -> Snark_params.Tick.Handler.t
 
       val handler :
@@ -438,6 +458,7 @@ module type S = sig
 
       val negative_one :
            genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constants:Constants.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Value.t
@@ -446,6 +467,7 @@ module type S = sig
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
@@ -453,6 +475,7 @@ module type S = sig
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
@@ -586,6 +609,7 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> snarked_ledger:Coda_base.Ledger.Db.t
+      -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
       -> unit
 
     (**

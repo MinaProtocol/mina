@@ -55,7 +55,8 @@ module Make (Inputs : Inputs_intf) :
            staking_epoch_ledger)
     then
       match staking_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
@@ -65,7 +66,8 @@ module Make (Inputs : Inputs_intf) :
            next_epoch_ledger)
     then
       match next_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)

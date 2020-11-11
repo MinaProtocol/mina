@@ -28,7 +28,7 @@ spec:
           limits:
             memory: 16.0Gi
           requests:
-            memory: 13.0Gi # ember is confused why this is soooo much ram
+            memory: 6.0Gi
             cpu: 4
         image: {{ $.Values.coda.image }}
         command: ["bash", "-c"]
