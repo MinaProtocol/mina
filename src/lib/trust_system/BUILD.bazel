@@ -5,21 +5,17 @@ load(
     "ocaml_archive",
     "ocaml_interface",
     "ocaml_module",
-    "ocaml_ns_module",
+    "ocaml_ns",
+    "ppx_executable",
 )
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 load(
     "//:BUILD.bzl",
-    "GLOBAL_ARCHIVE_OPTS",
-    "GLOBAL_INTERFACE_OPTS",
-    "GLOBAL_MODULE_OPTS",
-    "GLOBAL_NS_MODULE_OPTS",
-)
-load(
-    "//mina:BUILD.bzl",
     "REPO_ARCHIVE_OPTS",
     "REPO_INTERFACE_OPTS",
     "REPO_MODULE_OPTS",
     "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
 )
 load(
     ":BUILD.bzl",
@@ -27,42 +23,21 @@ load(
     "PKG_INTERFACE_OPTS",
     "PKG_MODULE_OPTS",
     "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
 )
 
-################################################################
-#### Package CLI Options
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-
-bool_flag(
-    name = "debug",
-    build_setting_default = True,
-)
-
-config_setting(
-    name = "enable_debug",
-    flag_values = {":debug": str(True)},
-)
-
-bool_flag(
-    name = "verbose",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "enable_verbose",
-    flag_values = {":verbose": str(True)},
-)
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
 
 ################################################################
 ## STANZA 1: LIBRARY TRUST_SYSTEM
 ################################################################
-TRUST_SYSTEM_ARCHIVE_OPTS = GLOBAL_ARCHIVE_OPTS + REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+TRUST_SYSTEM_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
 
-TRUST_SYSTEM_INTERFACE_OPTS = []
+TRUST_SYSTEM_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
 
-TRUST_SYSTEM_MODULE_OPTS = GLOBAL_MODULE_OPTS + REPO_MODULE_OPTS + PKG_MODULE_OPTS + []
+TRUST_SYSTEM_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
 
-TRUST_SYSTEM_NS_MODULE_OPTS = []
+TRUST_SYSTEM_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
 
 TRUST_SYSTEM_DEPS = [
     # do not sort (buildifier)
@@ -77,15 +52,7 @@ TRUST_SYSTEM_DEPS = [
     "@ppx_version//src/runtime:ppx_version_runtime",
 ]
 
-TRUST_SYSTEM_PPX = "@//bzl/ppx:ppx[bisect_ppx][ppx_assert][ppx_base][ppx_bin_prot][ppx_coda][ppx_custom_printf][ppx_deriving.std][ppx_deriving_yojson][ppx_fields_conv][ppx_inline_test][ppx_let][ppx_optcomp][ppx_register_event][ppx_sexp_conv][ppx_snarky][ppx_version]"
-
-TRUST_SYSTEM_PPX_ARGS = [
-    # do not sort (buildifier)
-    "-inline-test-lib",
-    "trust_system",
-    "--conditional",
-]
-
+##############
 ocaml_archive(
     name = "trust_system",
     doc = "Track how much we trust peers",
@@ -93,15 +60,16 @@ ocaml_archive(
     visibility = ["//visibility:public"],
     deps = TRUST_SYSTEM_DEPS + [
         # do not sort (buildifier)
-        ":Banned_status",
-        ":Peer_status",
-        ":Peer_trust",
-        ":Record",
-        ":Trust_system",
+        ":_Banned_status",
+        ":_Peer_status",
+        ":_Peer_trust",
+        ":_Record",
+        ":_Trust_system",
     ],
 )
 
-ocaml_ns_module(
+#########
+ocaml_ns(
     name = "Trust_system_ns",
     ns = "trust_system",
     opts = TRUST_SYSTEM_NS_MODULE_OPTS,
@@ -115,94 +83,246 @@ ocaml_ns_module(
     ],
 )
 
+#############
 ocaml_module(
-    name = "Banned_status",
+    name = "_Banned_status",
     src = "banned_status.ml",
-    ns_module = ":Trust_system_ns",
+    ns = ":Trust_system_ns",
     opts = TRUST_SYSTEM_MODULE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
     deps = TRUST_SYSTEM_DEPS,
 )
 
+#############
 ocaml_module(
-    name = "Peer_status",
+    name = "_Peer_status",
     src = "peer_status.ml",
-    ns_module = ":Trust_system_ns",
+    ns = ":Trust_system_ns",
     opts = TRUST_SYSTEM_MODULE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
-    deps = TRUST_SYSTEM_DEPS + [
-        ":Banned_status"
-    ],
-)
-
-ocaml_module(
-    name = "Peer_trust",
-    src = "peer_trust.ml",
-    intf = ":_Peer_trust",
-    ns_module = ":Trust_system_ns",
-    opts = TRUST_SYSTEM_MODULE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
-    deps = TRUST_SYSTEM_DEPS + [
+    ppx = ":ppx.exe",
+    ppx_args = [
         # do not sort (buildifier)
-        ":Record",
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
     ],
+    deps = TRUST_SYSTEM_DEPS + [":_Banned_status"],  # obaz:retain
 )
 
-ocaml_interface(
+#############
+ocaml_module(
     name = "_Peer_trust",
-    src = "peer_trust.mli",
-    ns_module = ":Trust_system_ns",
-    opts = TRUST_SYSTEM_INTERFACE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
-    deps = TRUST_SYSTEM_DEPS + [
-        # do not sort (buildifier)
-        ":Peer_status",
-    ],
-)
-
-ocaml_module(
-    name = "Record",
-    src = "record.ml",
-    intf = ":_Record",
-    ns_module = ":Trust_system_ns",
+    src = "peer_trust.ml",
+    intf = ":_Peer_trust.cmi",
+    ns = ":Trust_system_ns",
     opts = TRUST_SYSTEM_MODULE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
     deps = TRUST_SYSTEM_DEPS + [
         # do not sort (buildifier)
-        ":Banned_status",
-        ":Peer_status",
+        ":_Record",
     ],
 )
 
+################
 ocaml_interface(
-    name = "_Record",
-    src = "record.mli",
-    ns_module = ":Trust_system_ns",
+    name = "_Peer_trust.cmi",
+    src = "peer_trust.mli",
+    ns = ":Trust_system_ns",
     opts = TRUST_SYSTEM_INTERFACE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
     deps = TRUST_SYSTEM_DEPS + [
         # do not sort (buildifier)
-        ":Peer_status",
+        ":_Peer_status",
     ],
 )
 
+#############
 ocaml_module(
-    name = "Trust_system",
-    src = "trust_system.ml",
-    ns_module = ":Trust_system_ns",
+    name = "_Record",
+    src = "record.ml",
+    intf = ":_Record.cmi",
+    ns = ":Trust_system_ns",
     opts = TRUST_SYSTEM_MODULE_OPTS,
-    ppx = TRUST_SYSTEM_PPX,
-    ppx_args = TRUST_SYSTEM_PPX_ARGS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
     deps = TRUST_SYSTEM_DEPS + [
         # do not sort (buildifier)
-        ":Banned_status",
-        ":Peer_status",
-        ":Peer_trust",
+        ":_Banned_status",
+        ":_Peer_status",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Record.cmi",
+    src = "record.mli",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Peer_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Trust_system",
+    src = "trust_system.ml",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Banned_status",
+        ":_Peer_status",
+        ":_Peer_trust",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/trust_system:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
     ],
 )
