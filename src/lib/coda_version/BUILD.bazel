@@ -1,0 +1,75 @@
+load("@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+     "xrule_stamp_template"
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load("//:BUILD.bzl",
+    "REPO_INTERFACE_OPTS",
+)
+load(":BUILD.bzl",
+    "PKG_INTERFACE_OPTS"
+)
+
+## stanza_singleton_ocaml.mustache
+CODA_VERSION_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+ocaml_module(
+    name = "coda_version",
+    src  = ":coda_version.ml",
+    intf = ":_Coda_version.cmi",
+    # opts = [],
+    ppx = "//bzl/ppx:ppx.exe[ppx_version][bisect_ppx]",
+    ppx_args = ["--conditional"],
+    visibility = [
+        "//src/lib/coda_commands:__pkg__",
+        "//src/app/cli/src/init:__pkg__",
+        "//src/app/cli/src/tests:__pkg__"
+    ],
+)
+
+#################
+xrule_stamp_template(
+    name = "gensrc",
+    output   = "coda_version.ml",
+    template = "coda_version.template",
+    substitutions = {
+        "{BRANCH}": "STABLE_GIT_BRANCH",
+        "{COMMIT_ID}": "STABLE_GIT_COMMIT_ID",
+        "{COMMIT_ID_SHORT}": "STABLE_GIT_COMMIT_ID_SHORT"
+        # "{BRANCH}": "bazel-base",
+        # "{COMMIT_ID}": "79517ccd5a026663449ab8433b91264eac0eb570",
+        # "{COMMIT_ID_SHORT}": "79517ccd"
+    }
+)
+
+################
+ocaml_interface(
+    name = "_Coda_version.cmi",
+    src = "coda_version.mli",
+    opts = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS,
+    ppx = "//bzl/ppx:ppx.exe[ppx_version][bisect_ppx]",
+    ppx_args = ["--conditional"]
+)
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag( name = "always-link", build_setting_default = False )
+config_setting(name = "enable_always_link", flag_values = {":always-link": str(True)})
+
+bool_flag( name = "debug", build_setting_default = True )
+config_setting(name = "enable_debug", flag_values = {":debug": str(True)})
+
+bool_flag( name = "threads", build_setting_default = True )
+config_setting(name = "enable_threads", flag_values = {":threads": str(True)})
+
+bool_flag( name = "tooling", build_setting_default = False )
+config_setting(name = "enable_tooling", flag_values = {":tooling": str(True)})
+
+bool_flag( name = "verbose", build_setting_default = False )
+config_setting(name = "enable_verbose", flag_values = {":verbose": str(True)})
+
+## PPX control
+string_flag( name = "ppx-out", build_setting_default = "binary", values = ["binary", "text"])
+config_setting( name = "enable_ppx_output_format_text",   flag_values = { ":ppx-out": "text" })
+config_setting( name = "enable_ppx_output_format_binary", flag_values = { ":ppx-out": "binary" })
+

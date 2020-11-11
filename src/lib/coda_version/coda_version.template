@@ -1,0 +1,3 @@
+let commit_id = "{COMMIT_ID}"
+let commit_id_short = "{COMMIT_ID_SHORT}"
+let branch = "{BRANCH}"

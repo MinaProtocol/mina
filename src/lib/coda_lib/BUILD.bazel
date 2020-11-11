@@ -1,0 +1,326 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY CODA_LIB
+################################################################
+CODA_LIB_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+CODA_LIB_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+CODA_LIB_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+CODA_LIB_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+CODA_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:async_extra",
+    "@opam//pkg:incremental",
+    "@mina//src/lib/coda_intf",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/user_command_input",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/unix_timestamp",
+    "@mina//src/lib/debug_assert",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/secrets",
+    "@mina//src/lib/auxiliary_database",
+    "@mina//src/lib/work_selector",
+    "@mina//src/lib/coda_networking",
+    "@mina//src/lib/block_producer",
+    "@mina//src/lib/genesis_constants",
+    "@mina//src/lib/sync_handler",
+    "@mina//src/lib/transition_router",
+    "@mina//src/lib/node_addrs_and_ports",
+    "@mina//src/lib/otp_lib",
+    "@mina//src/lib/protocol_version",
+    "@mina//src/lib/snark_worker",
+    "@mina//src/lib/participating_state",
+    "@mina//src/lib/transaction_status",
+    "@mina//src/lib/receipt_chain_database",
+    "@mina//src/lib/sync_status",
+    "@mina//src/lib/daemon_rpcs",
+    "@mina//src/app/archive/archive_lib",
+    "@mina//src/lib/exit_handlers",
+]
+
+##############
+ocaml_archive(
+    name = "coda_lib",
+    doc = "Coda gut layer",
+    opts = CODA_LIB_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CODA_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Archive_client",
+        ":_Coda_lib",
+        ":_Coda_subscriptions",
+        ":_Config",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_lib_ns",
+    ns = "coda_lib",
+    opts = CODA_LIB_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "archive_client.ml",
+        "coda_lib.ml",
+        "coda_subscriptions.ml",
+        "config.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Archive_client",
+    src = "archive_client.ml",
+    intf = ":_Archive_client.cmi",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Archive_client.cmi",
+    src = "archive_client.mli",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coda_lib",
+    src = "coda_lib.ml",
+    intf = ":_Coda_lib.cmi",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_subscriptions",
+        ":_Config",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Coda_lib.cmi",
+    src = "coda_lib.mli",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_subscriptions",
+        ":_Config",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_subscriptions",
+    src = "coda_subscriptions.ml",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Config",
+    src = "config.ml",
+    ns = ":Coda_lib_ns",
+    opts = CODA_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_lib",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_LIB_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/coda_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

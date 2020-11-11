@@ -1,0 +1,141 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+)
+
+## stanza_singleton_ocaml.mustache
+TRANSITION_FRONTIER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+TRANSITION_FRONTIER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "transition_frontier",
+    src = "transition_frontier.ml",
+    intf = ":_Transition_frontier.cmi",
+    opts = TRANSITION_FRONTIER_MODULE_OPTS,
+    ppx = "//bzl/ppx:ppx.exe[ppx_jane][ppx_coda][ppx_version][ppx_deriving.eq][ppx_deriving_yojson][bisect_ppx]",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "transition_frontier",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/transition_frontier/extensions",
+        "@mina//src/lib/transition_frontier/frontier_base",
+        "@mina//src/lib/transition_frontier/full_frontier",
+        "@mina//src/lib/transition_frontier/persistent_frontier",
+        "@mina//src/lib/transition_frontier/persistent_root",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_frontier.cmi",
+    src = "transition_frontier.mli",
+    opts = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS,
+    ppx = "//bzl/ppx:ppx.exe[ppx_jane][ppx_coda][ppx_version][ppx_deriving.eq][ppx_deriving_yojson][bisect_ppx]",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "transition_frontier",
+    ],
+    deps = [
+        "@mina//src/lib/transition_frontier/extensions",
+        "@mina//src/lib/transition_frontier/frontier_base",
+        "@mina//src/lib/transition_frontier/full_frontier",
+        "@mina//src/lib/transition_frontier/persistent_frontier",
+        "@mina//src/lib/transition_frontier/persistent_root",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

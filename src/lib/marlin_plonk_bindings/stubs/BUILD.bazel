@@ -1,0 +1,38 @@
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library")
+load("//bzl/config/rust:BUILD.bzl", "RUST_PROFILE")
+
+# $ (cd _build/default && /Users/gar/.opam/4.07.1/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -w -49 -nopervasives -nostdlib -g -I src/lib/marlin_plonk_bindings/stubs/.marlin_plonk_bindings_stubs.objs/byte -I src/lib/marlin_plonk_bindings/stubs/.marlin_plonk_bindings_stubs.objs/native -intf-suffix .ml-gen -no-alias-deps -opaque -o src/lib/marlin_plonk_bindings/stubs/.marlin_plonk_bindings_stubs.objs/native/marlin_plonk_bindings_stubs.cmx -c -impl src/lib/marlin_plonk_bindings/stubs/marlin_plonk_bindings_stubs.ml-gen)
+ 
+## MacOS:  ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+rust_library(
+    name = "marlin_plonk_stubs",
+    visibility = ["//visibility:public"],
+    edition = "2018",
+    crate_type = "staticlib",
+    rustc_flags = [
+        "-C", "target-feature=+bmi2,+adx",
+    ] + RUST_PROFILE,
+    srcs = glob(["src/**/*.rs"]),
+    deps = [
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:libc",
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:num_bigint",
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:ocaml",
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:rand",
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:rand_core",
+        "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:rayon",
+
+        "@zexe//algebra",
+        "@zexe//ff-fft",
+        "@zexe//groupmap",
+        "@marlin//oracle",
+        "@marlin//dlog/commitment:commitment_dlog",
+        "@marlin//dlog/marlin:marlin_protocol_dlog",
+        "@marlin//dlog/plonk:plonk_protocol_dlog",
+        "@marlin//dlog_solver",
+        "@marlin//circuits/marlin:marlin_circuits",
+        "@marlin//circuits/plonk:plonk_circuits",
+        "@marlin//pairing/commitment:commitment_pairing",
+        "@marlin//pairing/marlin:marlin_protocol_pairing",
+    ]
+)

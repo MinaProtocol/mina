@@ -1,0 +1,281 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY PIPE_LIB
+################################################################
+PIPE_LIB_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+PIPE_LIB_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+PIPE_LIB_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+PIPE_LIB_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+PIPE_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:async",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/logger",
+]
+
+##############
+ocaml_archive(
+    name = "pipe_lib",
+    opts = PIPE_LIB_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = PIPE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Broadcast_pipe",
+        ":_Linear_pipe",
+        ":_Strict_pipe",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Pipe_lib_ns",
+    ns = "pipe_lib",
+    opts = PIPE_LIB_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "broadcast_pipe.ml",
+        "linear_pipe.ml",
+        "strict_pipe.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Broadcast_pipe",
+    src = "broadcast_pipe.ml",
+    intf = ":_Broadcast_pipe.cmi",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Broadcast_pipe.cmi",
+    src = "broadcast_pipe.mli",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Linear_pipe",
+    src = "linear_pipe.ml",
+    intf = ":_Linear_pipe.cmi",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Linear_pipe.cmi",
+    src = "linear_pipe.mli",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Strict_pipe",
+    src = "strict_pipe.ml",
+    intf = ":_Strict_pipe.cmi",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Linear_pipe",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Strict_pipe.cmi",
+    src = "strict_pipe.mli",
+    ns = ":Pipe_lib_ns",
+    opts = PIPE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "pipe_lib",
+    ],
+    deps = PIPE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Linear_pipe",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/pipe_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)

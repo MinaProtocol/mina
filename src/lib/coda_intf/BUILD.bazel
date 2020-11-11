@@ -1,0 +1,236 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY CODA_INTF
+################################################################
+CODA_INTF_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+CODA_INTF_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+CODA_INTF_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+CODA_INTF_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async_kernel",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/truth",
+    "@mina//src/lib/gadt_lib",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/cache_lib",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/snark_work_lib",
+    "@mina//src/lib/proof_carrying_data",
+    "@mina//src/lib/coda_incremental",
+    "@mina//src/lib/blockchain_snark",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/coda_transition",
+]
+
+##############
+ocaml_archive(
+    name = "coda_intf",
+    opts = CODA_INTF_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CODA_INTF_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_intf",
+        ":_Core_intf",
+        ":_Transition_frontier_components_intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_intf_ns",
+    ns = "coda_intf",
+    opts = CODA_INTF_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "coda_intf.ml",
+        "core_intf.ml",
+        "transition_frontier_components_intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_intf",
+    src = "coda_intf.ml",
+    ns = ":Coda_intf_ns",
+    opts = CODA_INTF_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_intf",
+    ],
+    deps = CODA_INTF_DEPS + [
+        # do not sort (buildifier)
+        ":_Core_intf",
+        ":_Transition_frontier_components_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Core_intf",
+    src = "core_intf.ml",
+    ns = ":Coda_intf_ns",
+    opts = CODA_INTF_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_intf",
+    ],
+    deps = CODA_INTF_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_frontier_components_intf",
+    src = "transition_frontier_components_intf.ml",
+    ns = ":Coda_intf_ns",
+    opts = CODA_INTF_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_intf",
+    ],
+    deps = CODA_INTF_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/coda_intf:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)

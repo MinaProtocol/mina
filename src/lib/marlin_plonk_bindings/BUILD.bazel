@@ -1,0 +1,385 @@
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_MODULE_OPTS",
+)
+
+THIS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS + ["-linkall"]
+
+THIS_PPX      = "//bzl/ppx:ppx.exe[ppx_version][bisect_ppx]"
+
+THIS_PPX_ARGS = ["--conditional"] # FIXME: why is this needed? not used in dune build
+# THIS_PPX_ARGS = ["-cookie", "library-name=\"marlin_plonk_bindings\""]
+
+#############
+## NB: this is a hand-rolled ns module
+ocaml_module(
+    name       = "marlin_plonk_bindings",
+    src        = "marlin_plonk_bindings.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    visibility = ["//visibility:public"],
+    deps       = [
+        ":bigint_256",
+        ":bigint_384",
+        ":bn_382_fp",
+        ":bn_382_fp_vector",
+        ":bn_382_fq",
+        ":bn_382_fq_vector",
+        ":tweedle_dee",
+        ":tweedle_dum",
+        ":tweedle_fp",
+        ":tweedle_fp_vector",
+        ":tweedle_fp_index",
+        ":tweedle_fp_oracles",
+        ":tweedle_fp_verifier_index",
+        ":tweedle_fp_proof",
+        ":tweedle_fp_urs",
+        ":tweedle_fq",
+        ":tweedle_fq_vector",
+        ":tweedle_fq_index",
+        ":tweedle_fq_oracles",
+        ":tweedle_fq_verifier_index",
+        ":tweedle_fq_proof",
+        ":tweedle_fq_urs",
+        ":types",
+    ],
+    cc_deps    = {
+        "@mina//src/lib/marlin_plonk_bindings/stubs:marlin_plonk_stubs": "static",
+        # "//bzl/external/jemalloc": "default"
+    }
+)
+
+#############
+ocaml_module(
+    name       = "bigint_256",
+    src        = "bigint_256/marlin_plonk_bindings_bigint_256.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+)
+
+#############
+ocaml_module(
+    name       = "bigint_384",
+    src        = "bigint_384/marlin_plonk_bindings_bigint_384.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+)
+
+#############
+ocaml_module(
+    name       = "bn_382_fp",
+    src        = "bn_382_fp/marlin_plonk_bindings_bn_382_fp.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bigint_384"],
+)
+
+#############
+ocaml_module(
+    name       = "bn_382_fp_vector",
+    src        = "bn_382_fp/vector/marlin_plonk_bindings_bn_382_fp_vector.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bn_382_fp"],
+)
+
+#############
+ocaml_module(
+    name       = "bn_382_fq",
+    src        = "bn_382_fq/marlin_plonk_bindings_bn_382_fq.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bigint_384"]
+)
+
+#############
+ocaml_module(
+    name       = "bn_382_fq_vector",
+    src        = "bn_382_fq/vector/marlin_plonk_bindings_bn_382_fq_vector.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bn_382_fq"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_dee",
+    src        = "tweedle_dee/marlin_plonk_bindings_tweedle_dee.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_fp",
+        ":tweedle_fq",
+        ":types",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_dum",
+    src        = "tweedle_dum/marlin_plonk_bindings_tweedle_dum.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_fp",
+        ":tweedle_fq",
+        ":types",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp",
+    src        = "tweedle_fp/marlin_plonk_bindings_tweedle_fp.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bigint_256"],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_vector",
+    src        = "tweedle_fp/vector/marlin_plonk_bindings_tweedle_fp_vector.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fp"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_index",
+    src        = "tweedle_fp_index/marlin_plonk_bindings_tweedle_fp_index.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fp_urs"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_oracles",
+    src        = "tweedle_fp_plonk_oracles/marlin_plonk_bindings_tweedle_fp_oracles.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fp_proof"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_verifier_index",
+    src        = "tweedle_fp_plonk_verifier_index/marlin_plonk_bindings_tweedle_fp_verifier_index.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fp_index"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_proof",
+    src        = "tweedle_fp_proof/marlin_plonk_bindings_tweedle_fp_proof.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_fp_vector",
+        ":tweedle_fp_verifier_index",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fp_urs",
+    src        = "tweedle_fp_urs/marlin_plonk_bindings_tweedle_fp_urs.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_dee",
+        ":tweedle_fp",
+        ":tweedle_fq",
+        ":types",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq",
+    src        = "tweedle_fq/marlin_plonk_bindings_tweedle_fq.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":bigint_256"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_vector",
+    src        = "tweedle_fq/vector/marlin_plonk_bindings_tweedle_fq_vector.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fq"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_index",
+    src        = "tweedle_fq_index/marlin_plonk_bindings_tweedle_fq_index.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    visibility = ["//visibility:public"],
+    deps       = [":tweedle_fq_urs"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_oracles",
+    src        = "tweedle_fq_plonk_oracles/marlin_plonk_bindings_tweedle_fq_oracles.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fq_proof"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_verifier_index",
+    src        = "tweedle_fq_plonk_verifier_index/marlin_plonk_bindings_tweedle_fq_verifier_index.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [":tweedle_fq_index"]
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_proof",
+    src        = "tweedle_fq_proof/marlin_plonk_bindings_tweedle_fq_proof.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_fq_vector",
+        ":tweedle_fq_verifier_index",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "tweedle_fq_urs",
+    src        = "tweedle_fq_urs/marlin_plonk_bindings_tweedle_fq_urs.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    deps       = [
+        ":tweedle_dum",
+        ":tweedle_fp",
+        ":tweedle_fq",
+        ":types",
+    ],
+)
+
+#############
+ocaml_module(
+    name       = "types",
+    src        = "types/marlin_plonk_bindings_types.ml",
+    opts       = THIS_MODULE_OPTS,
+    ppx        = THIS_PPX,
+    ppx_args   = THIS_PPX_ARGS,
+    visibility = [":__pkg__", "//src/lib/pickles_types:__pkg__"]
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

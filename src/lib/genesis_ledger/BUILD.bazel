@@ -1,0 +1,249 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY GENESIS_LEDGER
+################################################################
+GENESIS_LEDGER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+GENESIS_LEDGER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+GENESIS_LEDGER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+GENESIS_LEDGER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/runtime_config",
+]
+
+GENESIS_LEDGER_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_optcomp][ppx_let][bisect_ppx]"
+
+GENESIS_LEDGER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+]
+
+##############
+ocaml_archive(
+    name = "genesis_ledger",
+    opts = GENESIS_LEDGER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Fake_accounts",
+        ":_Fuzz_ledger",
+        ":_Genesis_ledger",
+        ":_Intf",
+        ":_Release_ledger",
+        ":_Test_ledger",
+        ":_Testnet_postake_ledger",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Genesis_ledger_ns",
+    ns = "genesis_ledger",
+    opts = GENESIS_LEDGER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "fake_accounts.ml",
+        "fuzz_ledger.ml",
+        "genesis_ledger.ml",
+        "intf.ml",
+        "release_ledger.ml",
+        "test_ledger.ml",
+        "testnet_postake_ledger.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fake_accounts",
+    src = "fake_accounts.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fuzz_ledger",
+    src = "fuzz_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Genesis_ledger",
+    src = "genesis_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Fuzz_ledger",
+        ":_Intf",
+        ":_Release_ledger",
+        ":_Test_ledger",
+        ":_Testnet_postake_ledger",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Release_ledger",
+    src = "release_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test_ledger",
+    src = "test_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Testnet_postake_ledger",
+    src = "testnet_postake_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_ledger",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

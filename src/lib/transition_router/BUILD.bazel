@@ -1,0 +1,188 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRANSITION_ROUTER
+################################################################
+TRANSITION_ROUTER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+TRANSITION_ROUTER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TRANSITION_ROUTER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+TRANSITION_ROUTER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+TRANSITION_ROUTER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/transition_frontier_controller",
+    "@mina//src/lib/bootstrap_controller",
+    "@mina//src/lib/coda_networking",
+]
+
+TRANSITION_ROUTER_PPX = "@//bzl/ppx:ppx.exe[ppx_coda][ppx_version][ppx_jane][ppx_deriving.eq][bisect_ppx]"
+
+TRANSITION_ROUTER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "transition_router",
+]
+
+##############
+ocaml_archive(
+    name = "transition_router",
+    opts = TRANSITION_ROUTER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TRANSITION_ROUTER_DEPS + [
+        # do not sort (buildifier)
+        ":_Initial_validator",
+        ":_Transition_router",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Transition_router_ns",
+    ns = "transition_router",
+    opts = TRANSITION_ROUTER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "initial_validator.ml",
+        "transition_router.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Initial_validator",
+    src = "initial_validator.ml",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_MODULE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_router",
+    src = "transition_router.ml",
+    intf = ":_Transition_router.cmi",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_MODULE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS + [
+        # do not sort (buildifier)
+        ":_Initial_validator",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_router.cmi",
+    src = "transition_router.mli",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_INTERFACE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

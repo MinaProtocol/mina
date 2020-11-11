@@ -1,0 +1,250 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY BOOTSTRAP_CONTROLLER
+################################################################
+BOOTSTRAP_CONTROLLER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+BOOTSTRAP_CONTROLLER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+BOOTSTRAP_CONTROLLER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+BOOTSTRAP_CONTROLLER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+BOOTSTRAP_CONTROLLER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/syncable_ledger",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/coda_networking",
+    "@mina//src/lib/sync_handler",
+    "@mina//src/lib/fake_network",
+]
+
+##############
+ocaml_archive(
+    name = "bootstrap_controller",
+    opts = BOOTSTRAP_CONTROLLER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = BOOTSTRAP_CONTROLLER_DEPS + [
+        # do not sort (buildifier)
+        ":_Bootstrap_controller",
+        ":_Transition_cache",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Bootstrap_controller_ns",
+    ns = "bootstrap_controller",
+    opts = BOOTSTRAP_CONTROLLER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "bootstrap_controller.ml",
+        "transition_cache.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bootstrap_controller",
+    src = "bootstrap_controller.ml",
+    intf = ":_Bootstrap_controller.cmi",
+    ns = ":Bootstrap_controller_ns",
+    opts = BOOTSTRAP_CONTROLLER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "bootstrap_controller",
+    ],
+    deps = BOOTSTRAP_CONTROLLER_DEPS + [
+        # do not sort (buildifier)
+        ":_Transition_cache",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Bootstrap_controller.cmi",
+    src = "bootstrap_controller.mli",
+    ns = ":Bootstrap_controller_ns",
+    opts = BOOTSTRAP_CONTROLLER_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "bootstrap_controller",
+    ],
+    deps = BOOTSTRAP_CONTROLLER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_cache",
+    src = "transition_cache.ml",
+    intf = ":_Transition_cache.cmi",
+    ns = ":Bootstrap_controller_ns",
+    opts = BOOTSTRAP_CONTROLLER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "bootstrap_controller",
+    ],
+    deps = BOOTSTRAP_CONTROLLER_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Transition_cache.cmi",
+    src = "transition_cache.mli",
+    ns = ":Bootstrap_controller_ns",
+    opts = BOOTSTRAP_CONTROLLER_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "bootstrap_controller",
+    ],
+    deps = BOOTSTRAP_CONTROLLER_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/bootstrap_controller:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)

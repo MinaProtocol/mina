@@ -1,0 +1,275 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY STAGED_LEDGER
+################################################################
+STAGED_LEDGER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+STAGED_LEDGER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+STAGED_LEDGER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+STAGED_LEDGER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+STAGED_LEDGER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:lens",
+    "@opam//pkg:async",
+    "@opam//pkg:async_extra",
+    "@mina//src/lib/transaction_snark_scan_state",
+    "@mina//src/lib/sgn",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/merkle_mask",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/ledger_proof",
+    "@mina//src/lib/verifier",
+    "@mina//src/lib/transaction_snark_work",
+    "@mina//src/lib/staged_ledger_diff",
+]
+
+##############
+ocaml_archive(
+    name = "staged_ledger",
+    doc = "Staged Ledger updates the current ledger with new transactions",
+    opts = STAGED_LEDGER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = STAGED_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Diff_creation_log",
+        ":_Pre_diff_info",
+        ":_Staged_ledger",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Staged_ledger_ns",
+    ns = "staged_ledger",
+    opts = STAGED_LEDGER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "diff_creation_log.ml",
+        "pre_diff_info.ml",
+        "staged_ledger.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Diff_creation_log",
+    src = "diff_creation_log.ml",
+    ns = ":Staged_ledger_ns",
+    opts = STAGED_LEDGER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "staged_ledger",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = STAGED_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Pre_diff_info",
+    src = "pre_diff_info.ml",
+    ns = ":Staged_ledger_ns",
+    opts = STAGED_LEDGER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "staged_ledger",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = STAGED_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Staged_ledger",
+    src = "staged_ledger.ml",
+    intf = ":_Staged_ledger.cmi",
+    ns = ":Staged_ledger_ns",
+    opts = STAGED_LEDGER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "staged_ledger",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = STAGED_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Diff_creation_log",
+        ":_Pre_diff_info",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Staged_ledger.cmi",
+    src = "staged_ledger.mli",
+    ns = ":Staged_ledger_ns",
+    opts = STAGED_LEDGER_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "staged_ledger",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = STAGED_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Pre_diff_info",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:lens",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/staged_ledger:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:lens.ppx_deriving",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_pipebang",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

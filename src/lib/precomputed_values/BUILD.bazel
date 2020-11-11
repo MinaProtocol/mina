@@ -1,0 +1,102 @@
+load("@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns"
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load("//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS"
+)
+
+
+################################################################
+## STANZA 1: LIBRARY PRECOMPUTED_VALUES
+################################################################
+PRECOMPUTED_VALUES_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+PRECOMPUTED_VALUES_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+PRECOMPUTED_VALUES_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+PRECOMPUTED_VALUES_DEPS = [
+        # do not sort (buildifier)
+          "@mina//src/lib/coda_base",
+          "@mina//src/lib/crypto_params",
+          "@mina//src/lib/dummy_values",
+          "@mina//src/lib/genesis_proof",
+          "@mina//src/lib/snark_keys",
+          "@snarky//src/base:snarky_backendless",
+]
+
+##############
+ocaml_archive(
+    name = "precomputed_values",
+    opts = PRECOMPUTED_VALUES_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = PRECOMPUTED_VALUES_DEPS + [
+        # do not sort (buildifier)
+        ":_Precomputed_values"
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Precomputed_values_ns",
+    ns="precomputed_values",
+    submodules = [":precomputed_values.ml"]
+)
+
+ocaml_module(
+    name     = "_Precomputed_values",
+    src      = ":precomputed_values.ml",
+    opts     = PRECOMPUTED_VALUES_MODULE_OPTS,
+    ppx      = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "precomputed_values"
+    ],
+    deps = PRECOMPUTED_VALUES_DEPS
+)
+
+################################################################
+TOOL = "//src/lib/precomputed_values/gen_values:gen_values.exe"
+genrule(
+    name = "gensrcs",
+    outs = ["precomputed_values.ml"],
+    tools = [TOOL],
+    cmd = "\n".join([
+        "$(location {tool})  precomputed_values.ml".format(tool = TOOL),
+        "cp precomputed_values.ml \"$(RULEDIR)/\"",
+    ]),
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag( name = "always-link", build_setting_default = False )
+config_setting(name = "enable_always_link", flag_values = {":always-link": str(True)})
+
+bool_flag( name = "debug", build_setting_default = True )
+config_setting(name = "enable_debug", flag_values = {":debug": str(True)})
+
+bool_flag( name = "threads", build_setting_default = True )
+config_setting(name = "enable_threads", flag_values = {":threads": str(True)})
+
+bool_flag( name = "tooling", build_setting_default = False )
+config_setting(name = "enable_tooling", flag_values = {":tooling": str(True)})
+
+bool_flag( name = "verbose", build_setting_default = False )
+config_setting(name = "enable_verbose", flag_values = {":verbose": str(True)})
+
+## PPX control
+string_flag( name = "ppx-out", build_setting_default = "binary", values = ["binary", "text"])
+config_setting( name = "enable_ppx_output_format_text",   flag_values = { ":ppx-out": "text" })
+config_setting( name = "enable_ppx_output_format_binary", flag_values = { ":ppx-out": "binary" })
+
+

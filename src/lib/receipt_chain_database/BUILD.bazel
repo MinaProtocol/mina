@@ -1,0 +1,256 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY RECEIPT_CHAIN_DATABASE
+################################################################
+RECEIPT_CHAIN_DATABASE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+RECEIPT_CHAIN_DATABASE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+RECEIPT_CHAIN_DATABASE_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+RECEIPT_CHAIN_DATABASE_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+RECEIPT_CHAIN_DATABASE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/key_value_database",
+    "@mina//src/lib/merkle_list_prover",
+    "@mina//src/lib/merkle_list_verifier",
+    "@mina//src/lib/coda_base",
+]
+
+##############
+ocaml_archive(
+    name = "receipt_chain_database",
+    doc = "A library that contains a database that records sent payments for an individual account and generates a proof of a payment. Also, the library contains a verifier that proves the correctness of the proof of payments",
+    opts = RECEIPT_CHAIN_DATABASE_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = RECEIPT_CHAIN_DATABASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Receipt_chain_database",
+        ":_Tree_node",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Receipt_chain_database_ns",
+    ns = "receipt_chain_database",
+    opts = RECEIPT_CHAIN_DATABASE_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "receipt_chain_database.ml",
+        "tree_node.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Receipt_chain_database_ns",
+    opts = RECEIPT_CHAIN_DATABASE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "receipt_chain_database",
+    ],
+    deps = RECEIPT_CHAIN_DATABASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Receipt_chain_database",
+    src = "receipt_chain_database.ml",
+    intf = ":_Receipt_chain_database.cmi",
+    ns = ":Receipt_chain_database_ns",
+    opts = RECEIPT_CHAIN_DATABASE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "receipt_chain_database",
+    ],
+    deps = RECEIPT_CHAIN_DATABASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Tree_node",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Receipt_chain_database.cmi",
+    src = "receipt_chain_database.mli",
+    ns = ":Receipt_chain_database_ns",
+    opts = RECEIPT_CHAIN_DATABASE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "receipt_chain_database",
+    ],
+    deps = RECEIPT_CHAIN_DATABASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Tree_node",
+    src = "tree_node.ml",
+    ns = ":Receipt_chain_database_ns",
+    opts = RECEIPT_CHAIN_DATABASE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "receipt_chain_database",
+    ],
+    deps = RECEIPT_CHAIN_DATABASE_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/receipt_chain_database:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)

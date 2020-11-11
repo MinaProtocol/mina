@@ -1,0 +1,184 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_TAYLOR
+################################################################
+SNARKY_TAYLOR_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+SNARKY_TAYLOR_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SNARKY_TAYLOR_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+SNARKY_TAYLOR_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+SNARKY_TAYLOR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//snarky_integer",
+]
+
+SNARKY_TAYLOR_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppx_deriving.eq][bisect_ppx]"
+
+SNARKY_TAYLOR_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "snarky_taylor",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_taylor",
+    opts = SNARKY_TAYLOR_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SNARKY_TAYLOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Floating_point",
+        ":_Snarky_taylor",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_taylor_ns",
+    ns = "snarky_taylor",
+    opts = SNARKY_TAYLOR_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "floating_point.ml",
+        "snarky_taylor.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Floating_point",
+    src = "floating_point.ml",
+    intf = ":_Floating_point.cmi",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_MODULE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Floating_point.cmi",
+    src = "floating_point.mli",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_INTERFACE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snarky_taylor",
+    src = "snarky_taylor.ml",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_MODULE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Floating_point",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

@@ -1,0 +1,243 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+## stanza_singleton_ocaml.mustache
+UNEXPIRED_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "unexpired",
+    src = "unexpired.ml",
+    opts = UNEXPIRED_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "unexpired",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+DEFINE_LOCALLY_GOOD_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "define_locally_good",
+    src = "define_locally_good.ml",
+    opts = DEFINE_LOCALLY_GOOD_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "define_locally_good",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+DEFINE_FROM_SCOPE_GOOD_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "define_from_scope_good",
+    src = "define_from_scope_good.ml",
+    opts = DEFINE_FROM_SCOPE_GOOD_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "define_from_scope_good",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+EXPIRED_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "expired",
+    src = "expired.ml",
+    opts = EXPIRED_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "expired",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+EXPIRY_IN_MODULE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "expiry_in_module",
+    src = "expiry_in_module.ml",
+    opts = EXPIRY_IN_MODULE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "expiry_in_module",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+EXPIRY_INVALID_DATE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "expiry_invalid_date",
+    src = "expiry_invalid_date.ml",
+    opts = EXPIRY_INVALID_DATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "expiry_invalid_date",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+## stanza_singleton_ocaml.mustache
+EXPIRY_INVALID_FORMAT_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+#############
+ocaml_module(
+    name = "expiry_invalid_format",
+    src = "expiry_invalid_format.ml",
+    opts = EXPIRY_INVALID_FORMAT_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "expiry_invalid_format",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:Driver",
+    opts = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS,
+    visibility = ["//src/lib/ppx_coda/tests:__pkg__"],
+    deps = [
+        "@opam//pkg:ppx_deriving_yojson",
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)

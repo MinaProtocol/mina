@@ -1,0 +1,495 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY ZEXE_BACKEND_COMMON
+################################################################
+ZEXE_BACKEND_COMMON_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+ZEXE_BACKEND_COMMON_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+ZEXE_BACKEND_COMMON_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+ZEXE_BACKEND_COMMON_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+ZEXE_BACKEND_COMMON_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:core",
+    "@opam//pkg:integers",
+    "@mina//src/lib/hex",
+    "@mina//src/lib/pickles_types",
+    "@mina//src/lib/marlin_plonk_bindings",
+    "@zexe//snarky-bn382",
+    "@mina//src/lib/key_cache",
+    "@mina//src/lib/sgn_type",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//sponge",
+    "@snarky//snarkette",
+]
+
+##############
+ocaml_archive(
+    name = "zexe_backend_common",
+    opts = ZEXE_BACKEND_COMMON_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Bigint",
+        ":_Curve",
+        ":_Dlog_plonk_based_keypair",
+        ":_Dlog_urs",
+        ":_Endoscale_round",
+        ":_Field",
+        ":_Intf",
+        ":_Plonk_constraint_system",
+        ":_Plonk_dlog_oracles",
+        ":_Plonk_dlog_proof",
+        ":_Poly_comm",
+        ":_Scale_round",
+        ":_Var",
+        ":_Version",
+    ],
+    # cc_deps = {
+    #     "//bzl/external/jemalloc": "default"
+    # }
+)
+
+#########
+ocaml_ns(
+    name = "Zexe_backend_common_ns",
+    ns = "zexe_backend_common",
+    opts = ZEXE_BACKEND_COMMON_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "bigint.ml",
+        "curve.ml",
+        "dlog_plonk_based_keypair.ml",
+        "dlog_urs.ml",
+        "endoscale_round.ml",
+        "field.ml",
+        "intf.ml",
+        "plonk_constraint_system.ml",
+        "plonk_dlog_oracles.ml",
+        "plonk_dlog_proof.ml",
+        "poly_comm.ml",
+        "scale_round.ml",
+        "var.ml",
+        "@marlin//:version.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bigint",
+    src = "bigint.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Curve",
+    src = "curve.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_plonk_based_keypair",
+    src = "dlog_plonk_based_keypair.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Curve",
+        ":_Intf",
+        ":_Plonk_constraint_system",
+        ":_Poly_comm",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_urs",
+    src = "dlog_urs.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Version",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Endoscale_round",
+    src = "endoscale_round.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Field",
+    src = "field.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Bigint",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_constraint_system",
+    src = "plonk_constraint_system.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Bigint",
+        ":_Endoscale_round",
+        ":_Field",
+        ":_Scale_round",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_dlog_oracles",
+    src = "plonk_dlog_oracles.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Field",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_dlog_proof",
+    src = "plonk_dlog_proof.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Curve",
+        ":_Intf",
+        ":_Poly_comm",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Poly_comm",
+    src = "poly_comm.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Curve",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Scale_round",
+    src = "scale_round.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Var",
+    src = "var.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Version.cmi",
+    src = "version.mli",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+################################################################
+ocaml_module(
+    name = "_Version",
+    src = "@marlin//:version.ml",
+    intf = ":_Version.cmi",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+        "--conditional",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    warnings = ["-27"],
+    visibility = [
+        "//src/lib/zexe_backend/zexe_backend_common:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+    # cc_deps = {
+    #     "//bzl/external/jemalloc": "default"
+    # }
+)

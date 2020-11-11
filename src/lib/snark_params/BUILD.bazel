@@ -1,0 +1,246 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY SNARK_PARAMS
+################################################################
+SNARK_PARAMS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SNARK_PARAMS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+SNARK_PARAMS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+SNARK_PARAMS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif",
+    "@opam//pkg:core_kernel",
+    "@snarky//sponge",
+    "@snarky//group_map",
+    "@snarky//fold_lib",
+    "@mina//src/lib/o1trace",
+    "@snarky//tuple_lib",
+    "@snarky//bitstring_lib",
+    "@mina//src/lib/snarky_group_map",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/snarky_curves",
+    "@mina//src/lib/snark_bits",
+    "@mina//src/lib/pickles",
+    "@mina//src/lib/crypto_params",
+]
+
+##############
+ocaml_archive(
+    name = "snark_params",
+    doc = "Snark parameters",
+    opts = SNARK_PARAMS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SNARK_PARAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Snark_intf",
+        ":_Snark_params",
+        ":_Snark_util",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snark_params_ns",
+    ns = "snark_params",
+    opts = SNARK_PARAMS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "snark_intf.ml",
+        "snark_params.ml",
+        "snark_util.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_intf",
+    src = "snark_intf.ml",
+    ns = ":Snark_params_ns",
+    opts = SNARK_PARAMS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_params",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_PARAMS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snark_params",
+    src = "snark_params.ml",
+    ns = ":Snark_params_ns",
+    opts = SNARK_PARAMS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_params",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_PARAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Snark_intf",
+        ":_Snark_util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_util",
+    src = "snark_util.ml",
+    ns = ":Snark_params_ns",
+    opts = SNARK_PARAMS_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_params",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_PARAMS_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/snark_params:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bench",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

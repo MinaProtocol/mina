@@ -1,0 +1,45 @@
+[workspace]
+
+[package]
+name = "marlin_plonk_stubs"
+version = "0.1.0"
+authors = ["opensource@o1labs.org"]
+description = "OCaml stubs for marlin and plonk proof systems"
+repository = "https://github.com/MinaProtocol/mina"
+license = "MIT/Apache-2.0"
+edition = "2018"
+
+[dependencies]
+libc = { version = "0.2.0" }
+num-bigint = { version = "0.2.3" }
+ocaml = { version = "0.18.1", features = ["docs-rs"] }
+rand = { version = "0.7" }
+sprs = { version = "0.7.1" }
+rand_core = { version = "0.5" }
+rayon = { version = "1" }
+
+[lib]
+# Mandatory (or Cargo tooling is unhappy)
+path = "fake_lib.rs"
+
+[package.metadata.raze]
+# The WORKSPACE relative path to the Cargo.toml working directory.
+workspace_path = "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo"
+
+genmode = "Remote"
+
+# The target to generate BUILD rules for.
+# target = "x86_64-unknown-linux-gnu"
+# target = "x86_64-apple-darwin"
+
+# without this we get "Error: Is a directory (os error 21)"
+output_buildfile_suffix = "BUILD.bazel"
+
+## generate bazel code to run all the build.rs files
+default_gen_buildrs = true
+
+# [package.metadata.raze.crates.ocaml.'0.18.1']
+# gen_buildrs = true
+
+# [package.metadata.raze.crates.ocaml-sys.'0.18.1']
+# gen_buildrs = true

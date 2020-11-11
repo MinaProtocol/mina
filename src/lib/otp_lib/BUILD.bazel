@@ -1,0 +1,206 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY OTP_LIB
+################################################################
+OTP_LIB_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+OTP_LIB_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+OTP_LIB_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+OTP_LIB_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+OTP_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:async_kernel",
+    "@mina//src/lib/pipe_lib",
+]
+
+OTP_LIB_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][bisect_ppx]"
+
+OTP_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "otp_lib",
+]
+
+##############
+ocaml_archive(
+    name = "otp_lib",
+    opts = OTP_LIB_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = OTP_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Agent",
+        ":_Capped_supervisor",
+        ":_Worker_supervisor",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Otp_lib_ns",
+    ns = "otp_lib",
+    opts = OTP_LIB_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "agent.ml",
+        "capped_supervisor.ml",
+        "worker_supervisor.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Agent",
+    src = "agent.ml",
+    intf = ":_Agent.cmi",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Agent.cmi",
+    src = "agent.mli",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_INTERFACE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Capped_supervisor",
+    src = "capped_supervisor.ml",
+    intf = ":_Capped_supervisor.cmi",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Capped_supervisor.cmi",
+    src = "capped_supervisor.mli",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_INTERFACE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Worker_supervisor",
+    src = "worker_supervisor.ml",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

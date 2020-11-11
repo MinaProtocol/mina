@@ -1,0 +1,162 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRANSITION_FRONTIER_TESTS
+################################################################
+TRANSITION_FRONTIER_TESTS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TRANSITION_FRONTIER_TESTS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+TRANSITION_FRONTIER_TESTS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+TRANSITION_FRONTIER_TESTS_DEPS = [
+    # do not sort (buildifier)
+    "@mina//src/lib/transition_frontier",
+]
+
+TRANSITION_FRONTIER_TESTS_PPX = "@//bzl/ppx:ppx.exe[ppx_jane][ppx_version][bisect_ppx]"
+
+TRANSITION_FRONTIER_TESTS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "transition_frontier_tests",
+]
+
+##############
+ocaml_archive(
+    name = "transition_frontier_tests",
+    opts = TRANSITION_FRONTIER_TESTS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TRANSITION_FRONTIER_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Full_frontier_tests",
+        ":_Transition_frontier_tests",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Transition_frontier_tests_ns",
+    ns = "transition_frontier_tests",
+    opts = TRANSITION_FRONTIER_TESTS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "full_frontier_tests.ml",
+        "transition_frontier_tests.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Full_frontier_tests",
+    src = "full_frontier_tests.ml",
+    ns = ":Transition_frontier_tests_ns",
+    opts = TRANSITION_FRONTIER_TESTS_MODULE_OPTS,
+    ppx = TRANSITION_FRONTIER_TESTS_PPX,
+    ppx_args = TRANSITION_FRONTIER_TESTS_PPX_ARGS,
+    deps = TRANSITION_FRONTIER_TESTS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_frontier_tests",
+    src = "transition_frontier_tests.ml",
+    ns = ":Transition_frontier_tests_ns",
+    opts = TRANSITION_FRONTIER_TESTS_MODULE_OPTS,
+    ppx = TRANSITION_FRONTIER_TESTS_PPX,
+    ppx_args = TRANSITION_FRONTIER_TESTS_PPX_ARGS,
+    deps = TRANSITION_FRONTIER_TESTS_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

@@ -1,0 +1,218 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY ONE_OR_TWO
+################################################################
+ONE_OR_TWO_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+ONE_OR_TWO_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+ONE_OR_TWO_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+ONE_OR_TWO_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+ONE_OR_TWO_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+]
+
+##############
+ocaml_archive(
+    name = "one_or_two",
+    opts = ONE_OR_TWO_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+        ":_One_or_two",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "One_or_two_ns",
+    ns = "one_or_two",
+    opts = ONE_OR_TWO_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "intfs.ml",
+        "one_or_two.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intfs",
+    src = "intfs.ml",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    deps = ONE_OR_TWO_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_One_or_two",
+    src = "one_or_two.ml",
+    intf = ":_One_or_two.cmi",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_One_or_two.cmi",
+    src = "one_or_two.mli",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/one_or_two:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_let",
+        "@ppx_version//src:ppx_version",
+    ],
+)

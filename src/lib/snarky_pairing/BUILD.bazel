@@ -1,0 +1,196 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_PAIRING
+################################################################
+SNARKY_PAIRING_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SNARKY_PAIRING_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+SNARKY_PAIRING_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+SNARKY_PAIRING_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/sgn_type",
+    "@mina//src/lib/snarky_field_extensions",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//snarkette",
+]
+
+SNARKY_PAIRING_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppx_deriving.eq][bisect_ppx]"
+
+SNARKY_PAIRING_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "snarky_pairing",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_pairing",
+    opts = SNARKY_PAIRING_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SNARKY_PAIRING_DEPS + [
+        # do not sort (buildifier)
+        ":_Final_exponentiation",
+        ":_G1_precomputation",
+        ":_G2_precomputation",
+        ":_Miller_loop",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_pairing_ns",
+    ns = "snarky_pairing",
+    opts = SNARKY_PAIRING_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "final_exponentiation.ml",
+        "g1_precomputation.ml",
+        "g2_precomputation.ml",
+        "miller_loop.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Final_exponentiation",
+    src = "final_exponentiation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_G1_precomputation",
+    src = "g1_precomputation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_G2_precomputation",
+    src = "g2_precomputation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Miller_loop",
+    src = "miller_loop.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS + [
+        # do not sort (buildifier)
+        ":_G1_precomputation",
+        ":_G2_precomputation",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

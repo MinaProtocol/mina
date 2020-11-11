@@ -1,0 +1,239 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY PERF_HISTOGRAMS
+################################################################
+PERF_HISTOGRAMS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+PERF_HISTOGRAMS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+PERF_HISTOGRAMS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+PERF_HISTOGRAMS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+PERF_HISTOGRAMS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@mina//src/lib/coda_metrics",
+]
+
+PERF_HISTOGRAMS_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppx_deriving.eq][ppx_deriving_yojson][bisect_ppx]"
+
+PERF_HISTOGRAMS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "perf_histograms",
+]
+
+##############
+ocaml_archive(
+    name = "perf_histograms",
+    doc = "Performance monitoring with histograms",
+    opts = PERF_HISTOGRAMS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+        ":_Intf",
+        ":_Perf_histograms",
+        ":_Perf_histograms0",
+        ":_Rpc",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Perf_histograms_ns",
+    ns = "perf_histograms",
+    opts = PERF_HISTOGRAMS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "histogram.ml",
+        "intf.ml",
+        "perf_histograms.ml",
+        "perf_histograms0.ml",
+        "rpc.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Histogram",
+    src = "histogram.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Perf_histograms",
+    src = "perf_histograms.ml",
+    intf = ":_Perf_histograms.cmi",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+        ":_Perf_histograms0",
+        ":_Rpc",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Perf_histograms.cmi",
+    src = "perf_histograms.mli",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_INTERFACE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Perf_histograms0",
+    src = "perf_histograms0.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rpc",
+    src = "rpc.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Perf_histograms0"    # obazl:retain
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

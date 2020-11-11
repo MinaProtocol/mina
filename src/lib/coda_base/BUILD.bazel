@@ -1,0 +1,2525 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY CODA_BASE
+################################################################
+CODA_BASE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+CODA_BASE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+CODA_BASE_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+CODA_BASE_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+CODA_BASE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_extra",
+    "@opam//pkg:digestif",
+    "@opam//pkg:core",
+    "@opam//pkg:sexp_diff_kernel",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/base58_check",
+    "@mina//src/lib/bignum_bigint",
+    "@mina//src/lib/block_time",
+    "@mina//src/lib/coda_compile_config",
+    "@mina//src/lib/genesis_constants",
+    "@mina//src/lib/coda_numbers",
+    "@mina//src/lib/codable",
+    "@mina//src/lib/crypto_params",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/debug_assert",
+    "@mina//src/lib/dummy_values",
+    "@snarky//fold_lib",
+    "@mina//src/lib/hash_prefix_states",
+    "@mina//src/lib/hash_prefixes",
+    "@mina//src/lib/linked_tree",
+    "@mina//src/lib/merkle_ledger",
+    "@mina//src/lib/merkle_mask",
+    "@mina//src/lib/one_or_two",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/outside_hash_image",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+    "@mina//src/lib/quickcheck_lib",
+    "@mina//src/lib/random_oracle",
+    "@mina//src/lib/rocksdb",
+    "@mina//src/lib/rosetta_coding",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/snark_bits",
+    "@mina//src/lib/snark_params",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/sparse_ledger_lib",
+    "@mina//src/lib/storage",
+    "@mina//src/lib/syncable_ledger",
+    "@mina//src/lib/test_util",
+    "@mina//src/lib/trust_system",
+    "@mina//src/lib/unsigned_extended",
+    "@mina//src/lib/visualization",
+    "@mina//src/lib/with_hash",
+]
+
+##############
+ocaml_archive(
+    name = "coda_base",
+    doc = "Snarks and friends necessary for keypair generation",
+    opts = CODA_BASE_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Coinbase",
+        ":_Coinbase_fee_transfer",
+        ":_Control",
+        ":_Data_hash",
+        ":_Epoch_data",
+        ":_Epoch_ledger",
+        ":_Epoch_seed",
+        ":_Fee_excess",
+        ":_Fee_transfer",
+        ":_Fee_with_prover",
+        ":_Frozen_ledger_hash",
+        ":_Frozen_ledger_hash0",
+        ":_Hack_snarky_tests",
+        ":_Hash_prefix",
+        ":_How_to_obtain_keys",
+        ":_Import",
+        ":_Insecure",
+        ":_Ledger",
+        ":_Ledger_hash",
+        ":_Ledger_hash0",
+        ":_Ledger_hash_intf",
+        ":_Ledger_hash_intf0",
+        ":_Ledger_transfer",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Other_fee_payer",
+        ":_Payment_payload",
+        ":_Pending_coinbase",
+        ":_Pending_coinbase_intf",
+        ":_Pending_coinbase_witness",
+        ":_Permissions",
+        ":_Proof",
+        ":_Protocol_constants_checked",
+        ":_Receipt",
+        ":_Rpc_intf",
+        ":_Side_loaded_verification_key",
+        ":_Signature",
+        ":_Signature_poly",
+        ":_Signed_command",
+        ":_Signed_command_intf",
+        ":_Signed_command_memo",
+        ":_Signed_command_payload",
+        ":_Snapp_account",
+        ":_Snapp_basic",
+        ":_Snapp_command",
+        ":_Snapp_predicate",
+        ":_Snapp_state",
+        ":_Snapp_statement",
+        ":_Sok_message",
+        ":_Sparse_ledger",
+        ":_Staged_ledger_hash",
+        ":_Stake_delegation",
+        ":_State_body_hash",
+        ":_State_hash",
+        ":_Sync_ledger",
+        ":_Token_id",
+        ":_Token_permissions",
+        ":_Transaction",
+        ":_Transaction_hash",
+        ":_Transaction_logic",
+        ":_Transaction_union",
+        ":_Transaction_union_payload",
+        ":_Transaction_union_tag",
+        ":_Transaction_validator",
+        ":_User_command",
+        ":_User_command_status",
+        ":_Util",
+        ":_With_status",
+        ":_Sample_keypairs"
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_base_ns",
+    ns = "coda_base",
+    opts = CODA_BASE_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "account.ml",
+        "account_id.ml",
+        "account_timing.ml",
+        "coinbase.ml",
+        "coinbase_fee_transfer.ml",
+        "control.ml",
+        "data_hash.ml",
+        "epoch_data.ml",
+        "epoch_ledger.ml",
+        "epoch_seed.ml",
+        "fee_excess.ml",
+        "fee_transfer.ml",
+        "fee_with_prover.ml",
+        "frozen_ledger_hash.ml",
+        "frozen_ledger_hash0.ml",
+        "hack_snarky_tests.ml",
+        "hash_prefix.ml",
+        "how_to_obtain_keys.ml",
+        "import.ml",
+        "insecure.ml",
+        "ledger.ml",
+        "ledger_hash.ml",
+        "ledger_hash0.ml",
+        "ledger_hash_intf.ml",
+        "ledger_hash_intf0.ml",
+        "ledger_transfer.ml",
+        "minting_payload.ml",
+        "new_account_payload.ml",
+        "new_token_payload.ml",
+        "other_fee_payer.ml",
+        "payment_payload.ml",
+        "pending_coinbase.ml",
+        "pending_coinbase_intf.ml",
+        "pending_coinbase_witness.ml",
+        "permissions.ml",
+        "proof.ml",
+        "protocol_constants_checked.ml",
+        "receipt.ml",
+        "rpc_intf.ml",
+        "side_loaded_verification_key.ml",
+        "signature.ml",
+        "signature_poly.ml",
+        "signed_command.ml",
+        "signed_command_intf.ml",
+        "signed_command_memo.ml",
+        "signed_command_payload.ml",
+        "snapp_account.ml",
+        "snapp_basic.ml",
+        "snapp_command.ml",
+        "snapp_predicate.ml",
+        "snapp_state.ml",
+        "snapp_statement.ml",
+        "sok_message.ml",
+        "sparse_ledger.ml",
+        "staged_ledger_hash.ml",
+        "stake_delegation.ml",
+        "state_body_hash.ml",
+        "state_hash.ml",
+        "sync_ledger.ml",
+        "token_id.ml",
+        "token_permissions.ml",
+        "transaction.ml",
+        "transaction_hash.ml",
+        "transaction_logic.ml",
+        "transaction_union.ml",
+        "transaction_union_payload.ml",
+        "transaction_union_tag.ml",
+        "transaction_validator.ml",
+        "user_command.ml",
+        "user_command_status.ml",
+        "util.ml",
+        "with_status.ml",
+        "sample_keypairs.ml"
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account",
+    src = "account.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Hash_prefix",
+        ":_Import",
+        ":_Permissions",
+        ":_Receipt",
+        ":_Snapp_account",
+        ":_State_hash",
+        ":_Token_id",
+        ":_Token_permissions",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_id",
+    src = "account_id.ml",
+    intf = ":_Account_id.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Account_id.cmi",
+    src = "account_id.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_timing",
+    src = "account_timing.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coinbase",
+    src = "coinbase.ml",
+    intf = ":_Coinbase.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Coinbase_fee_transfer",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Coinbase.cmi",
+    src = "coinbase.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Coinbase_fee_transfer",
+        ":_Fee_excess",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coinbase_fee_transfer",
+    src = "coinbase_fee_transfer.ml",
+    intf = ":_Coinbase_fee_transfer.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_transfer",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Coinbase_fee_transfer.cmi",
+    src = "coinbase_fee_transfer.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_transfer",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Control",
+    src = "control.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [":_Signature"], # obazl:retain
+)
+
+#############
+ocaml_module(
+    name = "_Data_hash",
+    src = "data_hash.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Epoch_data",
+    src = "epoch_data.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Epoch_ledger",
+        ":_Epoch_seed",
+        ":_State_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Epoch_ledger",
+    src = "epoch_ledger.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Frozen_ledger_hash0",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Epoch_seed",
+    src = "epoch_seed.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fee_excess",
+    src = "fee_excess.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fee_transfer",
+    src = "fee_transfer.ml",
+    intf = ":_Fee_transfer.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Fee_transfer.cmi",
+    src = "fee_transfer.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fee_with_prover",
+    src = "fee_with_prover.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Frozen_ledger_hash",
+    src = "frozen_ledger_hash.ml",
+    intf = ":_Frozen_ledger_hash.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Frozen_ledger_hash.cmi",
+    src = "frozen_ledger_hash.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Frozen_ledger_hash0",
+        ":_Ledger_hash",
+        ":_Ledger_hash_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Frozen_ledger_hash0",
+    src = "frozen_ledger_hash0.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash0",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hack_snarky_tests",
+    src = "hack_snarky_tests.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Hash_prefix",
+    src = "hash_prefix.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_How_to_obtain_keys",
+    src = "how_to_obtain_keys.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Import",
+    src = "import.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Insecure",
+    src = "insecure.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Ledger",
+    src = "ledger.ml",
+    intf = ":_Ledger.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Ledger_hash",
+        ":_Token_id",
+        ":_Transaction_logic",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger.cmi",
+    src = "ledger.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Coinbase",
+        ":_Fee_transfer",
+        ":_Ledger_hash",
+        ":_Receipt",
+        ":_Signed_command",
+        ":_Snapp_command",
+        ":_Snapp_predicate",
+        ":_Token_id",
+        ":_Transaction",
+        ":_Transaction_logic",
+        ":_User_command_status",
+        ":_With_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_hash",
+    src = "ledger_hash.ml",
+    intf = ":_Ledger_hash.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Hash_prefix",
+        ":_Import",
+        ":_Ledger_hash0",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_hash.cmi",
+    src = "ledger_hash.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash0",
+        ":_Ledger_hash_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_hash0",
+    src = "ledger_hash0.ml",
+    intf = ":_Ledger_hash0.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_hash0.cmi",
+    src = "ledger_hash0.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash_intf0",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_hash_intf",
+    src = "ledger_hash_intf.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Ledger_hash_intf0",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_hash_intf0",
+    src = "ledger_hash_intf0.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_transfer",
+    src = "ledger_transfer.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Ledger_hash",
+        ":_Sparse_ledger",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Minting_payload",
+    src = "minting_payload.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_New_account_payload",
+    src = "new_account_payload.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_New_token_payload",
+    src = "new_token_payload.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Other_fee_payer",
+    src = "other_fee_payer.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Signature",          # obazl:retain
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Payment_payload",
+    src = "payment_payload.ml",
+    intf = ":_Payment_payload.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Payment_payload.cmi",
+    src = "payment_payload.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pending_coinbase",
+    src = "pending_coinbase.ml",
+    intf = ":_Pending_coinbase.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Coinbase",
+        ":_Data_hash",
+        ":_Hash_prefix",
+        ":_Import",
+        ":_State_body_hash",
+        ":_Util",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Pending_coinbase.cmi",
+    src = "pending_coinbase.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Pending_coinbase_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pending_coinbase_intf",
+    src = "pending_coinbase_intf.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Coinbase",
+        ":_State_body_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pending_coinbase_witness",
+    src = "pending_coinbase_witness.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [":_Pending_coinbase"],  ## obazl:retain
+)
+
+#############
+ocaml_module(
+    name = "_Permissions",
+    src = "permissions.ml",
+    intf = ":_Permissions.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Control",
+        ":_Frozen_ledger_hash0",
+        ":_Ledger_hash0",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Permissions.cmi",
+    src = "permissions.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Control",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Proof",
+    src = "proof.ml",
+    intf = ":_Proof.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Proof.cmi",
+    src = "proof.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Protocol_constants_checked",
+    src = "protocol_constants_checked.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Receipt",
+    src = "receipt.ml",
+    intf = ":_Receipt.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+        ":_Hash_prefix",
+        ":_Signed_command",
+        ":_Transaction_union_payload",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Receipt.cmi",
+    src = "receipt.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+        ":_Signed_command",
+        ":_Transaction_union_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rpc_intf",
+    src = "rpc_intf.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Side_loaded_verification_key",
+    src = "side_loaded_verification_key.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signature",
+    src = "signature.ml",
+    intf = ":_Signature.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Signature_poly",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signature.cmi",
+    src = "signature.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signature_poly",
+    src = "signature_poly.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command",
+    src = "signed_command.ml",
+    intf = ":_Signed_command.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Import",
+        ":_Signature",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_payload",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command.cmi",
+    src = "signed_command.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Signed_command_intf",
+        ":_Signed_command_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_intf",
+    src = "signed_command_intf.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Signature",
+        ":_Signed_command_memo",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_memo",
+    src = "signed_command_memo.ml",
+    intf = ":_Signed_command_memo.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command_memo.cmi",
+    src = "signed_command_memo.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_payload",
+    src = "signed_command_payload.ml",
+    intf = ":_Signed_command_payload.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Payment_payload",
+        ":_Signed_command_memo",
+        ":_Stake_delegation",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command_payload.cmi",
+    src = "signed_command_payload.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Payment_payload",
+        ":_Signed_command_memo",
+        ":_Stake_delegation",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_account",
+    src = "snapp_account.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Side_loaded_verification_key",
+        ":_Snapp_basic",
+        ":_Snapp_state",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_basic",
+    src = "snapp_basic.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_command",
+    src = "snapp_command.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Hash_prefix",
+        ":_Other_fee_payer",
+        ":_Permissions",
+        ":_Signature",
+        ":_Snapp_basic",
+        ":_Snapp_predicate",
+        ":_Snapp_state",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_predicate",
+    src = "snapp_predicate.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Epoch_data",
+        ":_Epoch_ledger",
+        ":_Epoch_seed",
+        ":_Frozen_ledger_hash",
+        ":_Hash_prefix",
+        ":_Ledger_hash",
+        ":_Receipt",
+        ":_Snapp_account",
+        ":_Snapp_basic",
+        ":_Snapp_state",
+        ":_State_hash",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_state",
+    src = "snapp_state.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [":_Snapp_basic"], # obazl:retain
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_statement",
+    src = "snapp_statement.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Other_fee_payer",
+        ":_Snapp_basic",
+        ":_Snapp_command",
+        ":_Snapp_predicate",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sok_message",
+    src = "sok_message.ml",
+    intf = ":_Sok_message.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Sok_message.cmi",
+    src = "sok_message.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sparse_ledger",
+    src = "sparse_ledger.ml",
+    intf = ":_Sparse_ledger.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Coinbase",
+        ":_Fee_transfer",
+        ":_Import",
+        ":_Ledger",
+        ":_Ledger_hash",
+        ":_Receipt",
+        ":_Signed_command",
+        ":_Snapp_command",
+        ":_Snapp_predicate",
+        ":_Token_id",
+        ":_Token_permissions",
+        ":_Transaction",
+        ":_Transaction_logic",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Sparse_ledger.cmi",
+    src = "sparse_ledger.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Ledger",
+        ":_Ledger_hash",
+        ":_Signed_command",
+        ":_Snapp_account",
+        ":_Snapp_predicate",
+        ":_Token_id",
+        ":_Transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Staged_ledger_hash",
+    src = "staged_ledger_hash.ml",
+    intf = ":_Staged_ledger_hash.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash",
+        ":_Pending_coinbase",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Staged_ledger_hash.cmi",
+    src = "staged_ledger_hash.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash",
+        ":_Pending_coinbase",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Stake_delegation",
+    src = "stake_delegation.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_State_body_hash",
+    src = "state_body_hash.ml",
+    intf = ":_State_body_hash.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_State_body_hash.cmi",
+    src = "state_body_hash.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_State_hash",
+    src = "state_hash.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Sync_ledger",
+    src = "sync_ledger.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Ledger",
+        ":_Ledger_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Token_id",
+    src = "token_id.ml",
+    intf = ":_Token_id.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Token_id.cmi",
+    src = "token_id.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Token_permissions",
+    src = "token_permissions.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction",
+    src = "transaction.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Coinbase",
+        ":_Fee_excess",
+        ":_Fee_transfer",
+        ":_Signed_command",
+        ":_Snapp_command",
+        ":_User_command"        # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_hash",
+    src = "transaction_hash.ml",
+    intf = ":_Transaction_hash.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Coinbase",
+        ":_Fee_transfer",
+        ":_User_command",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transaction_hash.cmi",
+    src = "transaction_hash.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Coinbase",
+        ":_Fee_transfer",
+        ":_User_command",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_logic",
+    src = "transaction_logic.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Coinbase",
+        ":_Control",
+        ":_Fee_transfer",
+        ":_Ledger_hash",
+        ":_Other_fee_payer",
+        ":_Receipt",
+        ":_Signed_command",
+        ":_Snapp_basic",
+        ":_Snapp_command",
+        ":_Snapp_predicate",
+        ":_Token_id",
+        ":_Transaction",
+        ":_User_command",
+        ":_User_command_status",
+        ":_With_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_union",
+    src = "transaction_union.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Coinbase",
+        ":_Fee_transfer",
+        ":_Signature",
+        ":_Signed_command",
+        ":_Signed_command_memo",
+        ":_Token_id",
+        ":_Transaction",
+        ":_Transaction_union_payload",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_union_payload",
+    src = "transaction_union_payload.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Fee_excess",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_union_tag",
+    src = "transaction_union_tag.ml",
+    intf = ":_Transaction_union_tag.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transaction_union_tag.cmi",
+    src = "transaction_union_tag.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_validator",
+    src = "transaction_validator.ml",
+    intf = ":_Transaction_validator.cmi",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Ledger",
+        ":_Ledger_hash",
+        ":_Token_id",
+        ":_Transaction_logic",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transaction_validator.cmi",
+    src = "transaction_validator.mli",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Ledger",
+        ":_Signed_command",
+        ":_Snapp_predicate",
+        ":_Transaction",
+        ":_Transaction_logic",
+        ":_User_command_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_User_command",
+    src = "user_command.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Signed_command",
+        ":_Signed_command_intf",
+        ":_Snapp_command",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_User_command_status",
+    src = "user_command_status.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [":_Token_id"] # obazl:retain
+)
+
+#############
+ocaml_module(
+    name = "_Util",
+    src = "util.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_With_status",
+    src = "with_status.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS + [":_User_command_status"], # obazl:retain
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+########
+# TODO: make an ocaml_module rule for sample_keypairs.ml
+# TODO: add missing deps:
+# Pending_coinbase_witness + [":_Pending_coinbase"]
+# With_status + [":_User_command_status"]
+# Snap_state  + [":_Snapp_basic"]
+# Transaction ":_User_command"
+
+#############
+ocaml_module(
+    name = "_Sample_keypairs",
+    src = "sample_keypairs.ml",
+    ns = ":Coda_base_ns",
+    opts = CODA_BASE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "coda_base",
+    ],
+    ppx_output_format = "text",
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_BASE_DEPS,
+)
+
+TOOL = "//src/lib/coda_base/gen:gen.exe"
+genrule(
+    name = "gensrcs",
+    tools = [TOOL],
+    outs = [
+        "sample_keypairs.ml",
+        "sample_keypairs.json",
+    ],
+    cmd = "\n".join([
+        "$(location {tool})".format( tool = TOOL ),
+        "cp -v sample_keypairs.ml \"$(RULEDIR)/\"",
+        "cp -v sample_keypairs.json \"$(RULEDIR)/\"",
+    ]),
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/coda_base:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bench",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.enum",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.ord",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_here",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

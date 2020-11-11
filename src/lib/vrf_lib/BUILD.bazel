@@ -1,0 +1,167 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY VRF_LIB
+################################################################
+VRF_LIB_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+VRF_LIB_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+VRF_LIB_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+VRF_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/genesis_constants",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/snarky_curves",
+    "@mina//src/lib/test_util",
+]
+
+VRF_LIB_PPX = "@//bzl/ppx:ppx.exe[bisect_ppx][h_list.ppx][ppx_bench][ppx_deriving.eq][ppx_jane][ppx_version]"
+
+VRF_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "vrf_lib",
+]
+
+##############
+ocaml_archive(
+    name = "vrf_lib",
+    doc = "VRF instantiation",
+    opts = VRF_LIB_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = VRF_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Integrated",
+        ":_Standalone",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Vrf_lib_ns",
+    ns = "vrf_lib",
+    opts = VRF_LIB_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "integrated.ml",
+        "standalone.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Integrated",
+    src = "integrated.ml",
+    ns = ":Vrf_lib_ns",
+    opts = VRF_LIB_MODULE_OPTS,
+    ppx = VRF_LIB_PPX,
+    ppx_args = VRF_LIB_PPX_ARGS,
+    deps = VRF_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Standalone",
+    src = "standalone.ml",
+    ns = ":Vrf_lib_ns",
+    opts = VRF_LIB_MODULE_OPTS,
+    ppx = VRF_LIB_PPX,
+    ppx_args = VRF_LIB_PPX_ARGS,
+    deps = VRF_LIB_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

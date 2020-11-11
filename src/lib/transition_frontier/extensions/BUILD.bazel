@@ -1,0 +1,436 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY EXTENSIONS
+################################################################
+EXTENSIONS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+EXTENSIONS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+EXTENSIONS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+EXTENSIONS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+EXTENSIONS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async_kernel",
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/transition_frontier/frontier_base",
+    "@mina//src/lib/transition_frontier/full_frontier",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/pipe_lib",
+]
+
+EXTENSIONS_PPX = "@//bzl/ppx:ppx.exe[ppx_jane][ppx_coda][ppx_version][bisect_ppx]"
+
+EXTENSIONS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "extensions",
+]
+
+##############
+ocaml_archive(
+    name = "extensions",
+    opts = EXTENSIONS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Best_tip_diff",
+        ":_Extensions",
+        ":_Functor",
+        ":_Identity",
+        ":_Intf",
+        ":_Ledger_table",
+        ":_New_breadcrumbs",
+        ":_Root_history",
+        ":_Snark_pool_refcount",
+        ":_Transition_registry",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Extensions_ns",
+    ns = "extensions",
+    opts = EXTENSIONS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "best_tip_diff.ml",
+        "extensions.ml",
+        "functor.ml",
+        "identity.ml",
+        "intf.ml",
+        "ledger_table.ml",
+        "new_breadcrumbs.ml",
+        "root_history.ml",
+        "snark_pool_refcount.ml",
+        "transition_registry.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Best_tip_diff",
+    src = "best_tip_diff.ml",
+    intf = ":_Best_tip_diff.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Best_tip_diff.cmi",
+    src = "best_tip_diff.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Extensions",
+    src = "extensions.ml",
+    intf = ":_Extensions.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Best_tip_diff",
+        ":_Identity",
+        ":_Intf",
+        ":_Ledger_table",
+        ":_New_breadcrumbs",
+        ":_Root_history",
+        ":_Snark_pool_refcount",
+        ":_Transition_registry",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Extensions.cmi",
+    src = "extensions.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Best_tip_diff",
+        ":_Identity",
+        ":_Ledger_table",
+        ":_New_breadcrumbs",
+        ":_Root_history",
+        ":_Snark_pool_refcount",
+        ":_Transition_registry",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Functor",
+    src = "functor.ml",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Identity",
+    src = "identity.ml",
+    intf = ":_Identity.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Identity.cmi",
+    src = "identity.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_table",
+    src = "ledger_table.ml",
+    intf = ":_Ledger_table.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_table.cmi",
+    src = "ledger_table.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_New_breadcrumbs",
+    src = "new_breadcrumbs.ml",
+    intf = ":_New_breadcrumbs.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_New_breadcrumbs.cmi",
+    src = "new_breadcrumbs.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Root_history",
+    src = "root_history.ml",
+    intf = ":_Root_history.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Root_history.cmi",
+    src = "root_history.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_pool_refcount",
+    src = "snark_pool_refcount.ml",
+    intf = ":_Snark_pool_refcount.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snark_pool_refcount.cmi",
+    src = "snark_pool_refcount.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transition_registry",
+    src = "transition_registry.ml",
+    intf = ":_Transition_registry.cmi",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_MODULE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Functor",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_registry.cmi",
+    src = "transition_registry.mli",
+    ns = ":Extensions_ns",
+    opts = EXTENSIONS_INTERFACE_OPTS,
+    ppx = EXTENSIONS_PPX,
+    ppx_args = EXTENSIONS_PPX_ARGS,
+    deps = EXTENSIONS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

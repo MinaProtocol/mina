@@ -1,0 +1,239 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY UNSIGNED_EXTENDED
+################################################################
+UNSIGNED_EXTENDED_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+UNSIGNED_EXTENDED_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+UNSIGNED_EXTENDED_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+UNSIGNED_EXTENDED_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+UNSIGNED_EXTENDED_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:integers",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/ppx_dhall_type",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+]
+
+##############
+ocaml_archive(
+    name = "unsigned_extended",
+    doc = "Unsigned integer functions",
+    opts = UNSIGNED_EXTENDED_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = UNSIGNED_EXTENDED_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Unsigned_extended",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Unsigned_extended_ns",
+    ns = "unsigned_extended",
+    opts = UNSIGNED_EXTENDED_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "unsigned_extended.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Unsigned_extended_ns",
+    opts = UNSIGNED_EXTENDED_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "unsigned_extended",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = UNSIGNED_EXTENDED_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Unsigned_extended",
+    src = "unsigned_extended.ml",
+    intf = ":_Unsigned_extended.cmi",
+    ns = ":Unsigned_extended_ns",
+    opts = UNSIGNED_EXTENDED_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "unsigned_extended",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = UNSIGNED_EXTENDED_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Unsigned_extended.cmi",
+    src = "unsigned_extended.mli",
+    ns = ":Unsigned_extended_ns",
+    opts = UNSIGNED_EXTENDED_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "unsigned_extended",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = UNSIGNED_EXTENDED_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/unsigned_extended:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

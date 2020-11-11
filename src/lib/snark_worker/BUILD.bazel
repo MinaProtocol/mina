@@ -1,0 +1,331 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY SNARK_WORKER
+################################################################
+SNARK_WORKER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+SNARK_WORKER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SNARK_WORKER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+SNARK_WORKER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+SNARK_WORKER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:core_kernel.hash_heap",
+    "@mina//src/lib/cli_lib",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/snark_work_lib",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/blockchain_snark",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/perf_histograms",
+    "@mina//src/lib/sparse_ledger_lib",
+    "@mina//src/lib/ledger_proof",
+    "@mina//src/lib/transaction_witness",
+]
+
+##############
+ocaml_archive(
+    name = "snark_worker",
+    doc = "Lib powering the snark_worker interactions with the daemon",
+    opts = SNARK_WORKER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Debug",
+        ":_Functor",
+        ":_Intf",
+        ":_Prod",
+        ":_Rpcs",
+        ":_Snark_worker",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snark_worker_ns",
+    ns = "snark_worker",
+    opts = SNARK_WORKER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "debug.ml",
+        "functor.ml",
+        "intf.ml",
+        "prod.ml",
+        "rpcs.ml",
+        "snark_worker.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Debug",
+    src = "debug.ml",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Functor",
+    src = "functor.ml",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Rpcs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Prod",
+    src = "prod.ml",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Rpcs",
+    src = "rpcs.ml",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_worker",
+    src = "snark_worker.ml",
+    intf = ":_Snark_worker.cmi",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Debug",
+        ":_Functor",
+        ":_Intf",
+        ":_Prod",
+        ":_Rpcs",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snark_worker.cmi",
+    src = "snark_worker.mli",
+    ns = ":Snark_worker_ns",
+    opts = SNARK_WORKER_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "snark_worker",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/snark_worker:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

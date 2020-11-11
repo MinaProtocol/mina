@@ -1,0 +1,338 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY INTEGRATION_TEST_CLOUD_ENGINE
+################################################################
+INTEGRATION_TEST_CLOUD_ENGINE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+INTEGRATION_TEST_CLOUD_ENGINE_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+INTEGRATION_TEST_CLOUD_ENGINE_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+INTEGRATION_TEST_CLOUD_ENGINE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:lens",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/runtime_config",
+    "@mina//src/lib/genesis_constants",
+    "@mina//src/lib/graphql_lib",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/user_command_input",
+    "@mina//src/lib/genesis_ledger_helper",
+    "@mina//src/lib/integration_test_lib",
+    "@mina//src/lib/block_time",
+    "@mina//src/lib/interruptible",
+]
+
+##############
+ocaml_archive(
+    name = "integration_test_cloud_engine",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Cmd_util",
+        ":_Coda_automation",
+        ":_Integration_test_cloud_engine",
+        ":_Kubernetes_network",
+        ":_Stack_driver_log_engine",
+        ":_Terraform",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Integration_test_cloud_engine_ns",
+    ns = "integration_test_cloud_engine",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "cli_inputs.ml",
+        "cmd_util.ml",
+        "coda_automation.ml",
+        "integration_test_cloud_engine.ml",
+        "kubernetes_network.ml",
+        "stack_driver_log_engine.ml",
+        "terraform.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cli_inputs",
+    src = "cli_inputs.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Cmd_util",
+    src = "cmd_util.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coda_automation",
+    src = "coda_automation.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Cmd_util",
+        ":_Kubernetes_network",
+        ":_Terraform",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Integration_test_cloud_engine",
+    src = "integration_test_cloud_engine.ml",
+    intf = ":_Integration_test_cloud_engine.cmi",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Coda_automation",
+        ":_Kubernetes_network",
+        ":_Stack_driver_log_engine",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Integration_test_cloud_engine.cmi",
+    src = "integration_test_cloud_engine.mli",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Kubernetes_network",
+    src = "kubernetes_network.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Stack_driver_log_engine",
+    src = "stack_driver_log_engine.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Kubernetes_network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Terraform",
+    src = "terraform.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:lens",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/integration_test_cloud_engine:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:graphql_ppx",
+        "@opam//pkg:lens.ppx_deriving",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

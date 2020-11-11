@@ -1,0 +1,140 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN
+################################################################
+GEN_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+GEN_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+GEN_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/crs",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//tuple_lib",
+    "@mina//src/lib/crypto_params",
+    "@mina//src/lib/signature_lib",
+]
+
+GEN_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_jane][ppxlib.metaquot][bisect_ppx]"
+
+GEN_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "gen",
+]
+
+#################
+ocaml_executable(
+    name = "gen.exe",
+    opts = GEN_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Gen",
+    src = "gen.ml",
+    opts = GEN_MODULE_OPTS,
+    ppx = GEN_PPX,
+    ppx_args = GEN_PPX_ARGS,
+    deps = GEN_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

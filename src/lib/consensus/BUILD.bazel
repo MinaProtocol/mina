@@ -1,0 +1,635 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_executable",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY CONSENSUS
+################################################################
+CONSENSUS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+CONSENSUS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+CONSENSUS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+CONSENSUS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+CONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/snarky_taylor",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/block_time",
+    "@mina//src/lib/with_hash",
+    "@mina//src/lib/test_genesis_ledger",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/perf_histograms",
+    "@mina//src/lib/rc_pool",
+    "@mina//src/lib/test_util",
+    "@mina//src/lib/vrf_lib",
+    "@mina//src/lib/unix_timestamp",
+    "@mina//src/lib/global_signer_private_key",
+    "@mina//src/lib/non_zero_curve_point",
+    "@mina//src/lib/coda_metrics",
+    "@mina//src/lib/graphql_lib",
+]
+
+##############
+ocaml_archive(
+    name = "consensus",
+    doc = "Consensus mechanisms",
+    opts = CONSENSUS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Consensus",
+        ":_Constants",
+        ":_Epoch",
+        ":_Genesis_epoch_data",
+        ":_Global_slot",
+        ":_Global_sub_window",
+        ":_Intf",
+        ":_Num_util",
+        ":_Proof_of_stake",
+        ":_Slot",
+        ":_Stake_proof",
+        ":_Sub_window",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Consensus_ns",
+    ns = "consensus",
+    opts = CONSENSUS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "consensus.ml",
+        "constants.ml",
+        "epoch.ml",
+        "global_slot.ml",
+        "genesis_epoch_data.ml",
+        "global_sub_window.ml",
+        "intf.ml",
+        "num_util.ml",
+        "proof_of_stake.ml",
+        "slot.ml",
+        "stake_proof.ml",
+        "sub_window.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Consensus",
+    src = "consensus.ml",
+    intf = ":_Consensus.cmi",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Proof_of_stake",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Consensus.cmi",
+    src = "consensus.mli",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Proof_of_stake",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Constants",
+    src = "constants.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Epoch",
+    src = "epoch.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Num_util",
+        ":_Slot",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Genesis_epoch_data",
+    src = "genesis_epoch_data.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        # ":_Constants",
+        # ":_Epoch",
+        # ":_Slot",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Global_slot",
+    src = "global_slot.ml",
+    intf = ":_Global_slot.cmi",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Epoch",
+        ":_Slot",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Global_slot.cmi",
+    src = "global_slot.mli",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Epoch",
+        ":_Slot",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Global_sub_window",
+    src = "global_sub_window.ml",
+    intf = ":_Global_sub_window.cmi",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Global_slot",
+        ":_Sub_window",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Global_sub_window.cmi",
+    src = "global_sub_window.mli",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Global_slot",
+        ":_Sub_window",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Global_slot",
+        ":_Slot",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Num_util",
+    src = "num_util.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Proof_of_stake",
+    src = "proof_of_stake.ml",
+    intf = ":_Proof_of_stake.cmi",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+        ":_Epoch",
+        ":_Genesis_epoch_data",
+        ":_Global_slot",
+        ":_Global_sub_window",
+        ":_Intf",
+        ":_Num_util",
+        ":_Slot",
+        ":_Stake_proof",
+        ":_Sub_window",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Proof_of_stake.cmi",
+    src = "proof_of_stake.mli",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Global_slot",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Slot",
+    src = "slot.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Constants",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Stake_proof",
+    src = "stake_proof.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Sub_window",
+    src = "sub_window.ml",
+    ns = ":Consensus_ns",
+    opts = CONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "consensus",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CONSENSUS_DEPS,
+)
+
+################################################################
+## STANZA 2: EXECUTABLE PROOF_OF_STAKE_FUZZER
+################################################################
+PROOF_OF_STAKE_FUZZER_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+PROOF_OF_STAKE_FUZZER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+PROOF_OF_STAKE_FUZZER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+PROOF_OF_STAKE_FUZZER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+PROOF_OF_STAKE_FUZZER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+PROOF_OF_STAKE_FUZZER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/prover",
+    "@mina//src/lib/blockchain_snark",
+]
+
+#################
+ocaml_executable(
+    name = "proof_of_stake_fuzzer.exe",
+    opts = PROOF_OF_STAKE_FUZZER_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = PROOF_OF_STAKE_FUZZER_DEPS + [
+        # do not sort (buildifier)
+        ":_Proof_of_stake_fuzzer",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Proof_of_stake_fuzzer",
+    src = "proof_of_stake_fuzzer.ml",
+    opts = PROOF_OF_STAKE_FUZZER_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "proof_of_stake_fuzzer",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = PROOF_OF_STAKE_FUZZER_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx2.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/consensus:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/consensus:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

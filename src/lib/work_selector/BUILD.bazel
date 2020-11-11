@@ -1,0 +1,402 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY WORK_SELECTOR
+################################################################
+WORK_SELECTOR_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+WORK_SELECTOR_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+WORK_SELECTOR_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+WORK_SELECTOR_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+WORK_SELECTOR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:async_extra",
+    "@mina//src/lib/debug_assert",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/coda_intf",
+    "@mina//src/lib/unix_timestamp",
+    "@mina//src/lib/staged_ledger",
+    "@mina//src/lib/network_pool",
+]
+
+##############
+ocaml_archive(
+    name = "work_selector",
+    doc = "Selects work from the work pool",
+    opts = WORK_SELECTOR_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Inputs",
+        ":_Intf",
+        ":_Random",
+        ":_Sequence",
+        ":_Test",
+        ":_Work_lib",
+        ":_Work_selector",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Work_selector_ns",
+    ns = "work_selector",
+    opts = WORK_SELECTOR_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "inputs.ml",
+        "intf.ml",
+        "random.ml",
+        "sequence.ml",
+        "test.ml",
+        "work_lib.ml",
+        "work_selector.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Inputs",
+    src = "inputs.ml",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Random",
+    src = "random.ml",
+    intf = ":_Random.cmi",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Test"                # obazl:retain
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Random.cmi",
+    src = "random.mli",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sequence",
+    src = "sequence.ml",
+    intf = ":_Sequence.cmi",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Test"                # obazl:retain
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Sequence.cmi",
+    src = "sequence.mli",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Inputs",
+        ":_Intf",
+        ":_Work_lib",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Work_lib",
+    src = "work_lib.ml",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Work_selector",
+    src = "work_selector.ml",
+    intf = ":_Work_selector.cmi",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Inputs",
+        ":_Intf",
+        ":_Random",
+        ":_Sequence",
+        ":_Work_lib",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Work_selector.cmi",
+    src = "work_selector.mli",
+    ns = ":Work_selector_ns",
+    opts = WORK_SELECTOR_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "work_selector",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = WORK_SELECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/work_selector:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

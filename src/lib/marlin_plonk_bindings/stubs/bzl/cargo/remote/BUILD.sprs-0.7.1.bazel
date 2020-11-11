@@ -1,0 +1,66 @@
+"""
+@generated
+cargo-raze crate build file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+# buildifier: disable=load
+load(
+    "@io_bazel_rules_rust//rust:rust.bzl",
+    "rust_binary",
+    "rust_library",
+    "rust_test",
+)
+
+# buildifier: disable=load
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = [
+    # Public for visibility by "@raze__crate__version//" targets.
+    #
+    # Prefer access through "//src/lib/marlin_plonk_bindings/stubs/bzl/cargo", which limits external
+    # visibility to explicit Cargo.toml dependencies.
+    "//visibility:public",
+])
+
+licenses([
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
+])
+
+# Generated Targets
+
+# Unsupported target "sparse_dense_products" with type "bench" omitted
+
+# Unsupported target "suite" with type "bench" omitted
+
+# Unsupported target "heat" with type "example" omitted
+
+rust_library(
+    name = "sprs",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+        "alga",
+        "default",
+    ],
+    crate_root = "src/lib.rs",
+    crate_type = "lib",
+    edition = "2015",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.7.1",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__alga__0_9_3//:alga",
+        "@raze__ndarray__0_13_1//:ndarray",
+        "@raze__num_complex__0_2_4//:num_complex",
+        "@raze__num_traits__0_1_43//:num_traits",
+    ],
+)
+
+# Unsupported target "bincode_ser" with type "test" omitted

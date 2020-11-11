@@ -1,0 +1,250 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRANSITION_HANDLER
+################################################################
+TRANSITION_HANDLER_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+TRANSITION_HANDLER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TRANSITION_HANDLER_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS
+
+TRANSITION_HANDLER_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+TRANSITION_HANDLER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_metrics",
+    "@mina//src/lib/perf_histograms",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/coda_intf",
+    "@mina//src/lib/rose_tree",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/otp_lib",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/cache_lib",
+]
+
+TRANSITION_HANDLER_PPX = "@//bzl/ppx:ppx.exe[ppx_coda][ppx_version][ppx_jane][bisect_ppx]"
+
+TRANSITION_HANDLER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "transition_handler",
+]
+
+##############
+ocaml_archive(
+    name = "transition_handler",
+    opts = TRANSITION_HANDLER_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TRANSITION_HANDLER_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb_builder",
+        ":_Catchup_scheduler",
+        ":_Core_extended_cache",
+        ":_Processor",
+        ":_Unprocessed_transition_cache",
+        ":_Validator",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Transition_handler_ns",
+    ns = "transition_handler",
+    opts = TRANSITION_HANDLER_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "breadcrumb_builder.ml",
+        "catchup_scheduler.ml",
+        "core_extended_cache.ml",
+        "processor.ml",
+        "unprocessed_transition_cache.ml",
+        "validator.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Breadcrumb_builder",
+    src = "breadcrumb_builder.ml",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Catchup_scheduler",
+    src = "catchup_scheduler.ml",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS + [
+        ":_Breadcrumb_builder",
+        ":_Unprocessed_transition_cache",
+    ] # obazl:retain
+)
+
+#############
+ocaml_module(
+    name = "_Core_extended_cache",
+    src = "core_extended_cache.ml",
+    intf = ":_Core_extended_cache.cmi",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Core_extended_cache.cmi",
+    src = "core_extended_cache.mli",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_INTERFACE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Processor",
+    src = "processor.ml",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS + [
+        # do not sort (buildifier)
+        ":_Catchup_scheduler",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Unprocessed_transition_cache",
+    src = "unprocessed_transition_cache.ml",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Validator",
+    src = "validator.ml",
+    ns = ":Transition_handler_ns",
+    opts = TRANSITION_HANDLER_MODULE_OPTS,
+    ppx = TRANSITION_HANDLER_PPX,
+    ppx_args = TRANSITION_HANDLER_PPX_ARGS,
+    deps = TRANSITION_HANDLER_DEPS + [
+        # do not sort (buildifier)
+        ":_Core_extended_cache",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

@@ -1,0 +1,276 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY FRONTIER_BASE
+################################################################
+FRONTIER_BASE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+FRONTIER_BASE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+FRONTIER_BASE_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+FRONTIER_BASE_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+FRONTIER_BASE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/staged_ledger",
+    "@mina//src/lib/base58_check",
+]
+
+FRONTIER_BASE_PPX = "@//bzl/ppx:ppx.exe[ppx_jane][ppx_coda][ppx_version][ppx_deriving.std][ppx_deriving_yojson][bisect_ppx]"
+
+FRONTIER_BASE_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "frontier_base",
+]
+
+##############
+ocaml_archive(
+    name = "frontier_base",
+    opts = FRONTIER_BASE_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Diff",
+        ":_Frontier_intf",
+        ":_Root_data",
+        ":_Root_identifier",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Frontier_base_ns",
+    ns = "frontier_base",
+    opts = FRONTIER_BASE_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "breadcrumb.ml",
+        "diff.ml",
+        "frontier_intf.ml",
+        "root_data.ml",
+        "root_identifier.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Breadcrumb",
+    src = "breadcrumb.ml",
+    intf = ":_Breadcrumb.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Breadcrumb.cmi",
+    src = "breadcrumb.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Diff",
+    src = "diff.ml",
+    intf = ":_Diff.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Root_data",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Diff.cmi",
+    src = "diff.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Root_data",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Frontier_intf",
+    src = "frontier_intf.ml",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Root_data",
+    src = "root_data.ml",
+    intf = ":_Root_data.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Root_data.cmi",
+    src = "root_data.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Root_identifier",
+    src = "root_identifier.ml",
+    intf = ":_Root_identifier.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Root_identifier.cmi",
+    src = "root_identifier.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

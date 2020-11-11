@@ -1,0 +1,191 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY RANDOM_ORACLE
+################################################################
+RANDOM_ORACLE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+RANDOM_ORACLE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+RANDOM_ORACLE_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+RANDOM_ORACLE_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+RANDOM_ORACLE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/random_oracle_input",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/pickles",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//sponge",
+]
+
+RANDOM_ORACLE_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_optcomp][ppx_sexp_conv][ppx_compare][ppx_inline_test][ppx_assert][ppx_deriving.eq][ppx_deriving_yojson][ppx_let][bisect_ppx]"
+
+RANDOM_ORACLE_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "random_oracle",
+]
+
+##############
+ocaml_archive(
+    name = "random_oracle",
+    opts = RANDOM_ORACLE_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = RANDOM_ORACLE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Random_oracle",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Random_oracle_ns",
+    ns = "random_oracle",
+    opts = RANDOM_ORACLE_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "random_oracle.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_MODULE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = RANDOM_ORACLE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Random_oracle",
+    src = "random_oracle.ml",
+    intf = ":_Random_oracle.cmi",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_MODULE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = RANDOM_ORACLE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Random_oracle.cmi",
+    src = "random_oracle.mli",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_INTERFACE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = RANDOM_ORACLE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

@@ -1,0 +1,202 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY LIMB_VECTOR
+################################################################
+LIMB_VECTOR_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+LIMB_VECTOR_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+LIMB_VECTOR_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+LIMB_VECTOR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/pickles/backend",
+    "@mina//src/lib/pickles_types",
+    "@snarky//src/base:snarky_backendless",
+]
+
+LIMB_VECTOR_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_coda][ppx_jane][ppx_deriving.std][ppx_deriving_yojson][bisect_ppx]"
+
+LIMB_VECTOR_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "limb_vector",
+]
+
+##############
+ocaml_archive(
+    name = "limb_vector",
+    opts = LIMB_VECTOR_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = LIMB_VECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Challenge",
+        ":_Constant",
+        ":_Limb_vector",
+        ":_Make",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Limb_vector_ns",
+    ns = "limb_vector",
+    opts = LIMB_VECTOR_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "challenge.ml",
+        "constant.ml",
+        "limb_vector.ml",
+        "make.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Challenge",
+    src = "challenge.ml",
+    ns = ":Limb_vector_ns",
+    opts = LIMB_VECTOR_MODULE_OPTS,
+    ppx = LIMB_VECTOR_PPX,
+    ppx_args = LIMB_VECTOR_PPX_ARGS,
+    deps = LIMB_VECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Constant",
+        ":_Make",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Constant",
+    src = "constant.ml",
+    ns = ":Limb_vector_ns",
+    opts = LIMB_VECTOR_MODULE_OPTS,
+    ppx = LIMB_VECTOR_PPX,
+    ppx_args = LIMB_VECTOR_PPX_ARGS,
+    deps = LIMB_VECTOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Limb_vector",
+    src = "limb_vector.ml",
+    ns = ":Limb_vector_ns",
+    opts = LIMB_VECTOR_MODULE_OPTS,
+    ppx = LIMB_VECTOR_PPX,
+    ppx_args = LIMB_VECTOR_PPX_ARGS,
+    deps = LIMB_VECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Challenge",
+        ":_Constant",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Make",
+    src = "make.ml",
+    ns = ":Limb_vector_ns",
+    opts = LIMB_VECTOR_MODULE_OPTS,
+    ppx = LIMB_VECTOR_PPX,
+    ppx_args = LIMB_VECTOR_PPX_ARGS,
+    deps = LIMB_VECTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Constant",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

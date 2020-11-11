@@ -1,0 +1,524 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY NETWORK_POOL
+################################################################
+NETWORK_POOL_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+NETWORK_POOL_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+NETWORK_POOL_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + ["-linkall"]
+
+NETWORK_POOL_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+NETWORK_POOL_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@mina//src/lib/one_or_two",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/quickcheck_lib",
+    "@mina//src/lib/verifier",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/ledger_proof",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/coda_numbers",
+]
+
+##############
+ocaml_archive(
+    name = "network_pool",
+    doc = "Network pool is an interface that processes incoming diffs and then broadcasts them",
+    opts = NETWORK_POOL_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Batcher",
+        ":_F_sequence",
+        ":_Indexed_pool",
+        ":_Intf",
+        ":_Map_set",
+        ":_Mocks",
+        ":_Network_pool_base",
+        ":_Priced_proof",
+        ":_Snark_pool",
+        ":_Snark_pool_diff",
+        ":_Test",
+        ":_Transaction_pool",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Network_pool_ns",
+    ns = "network_pool",
+    opts = NETWORK_POOL_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "batcher.ml",
+        "f_sequence.ml",
+        "indexed_pool.ml",
+        "intf.ml",
+        "map_set.ml",
+        "mocks.ml",
+        "network_pool_base.ml",
+        "priced_proof.ml",
+        "snark_pool.ml",
+        "snark_pool_diff.ml",
+        "test.ml",
+        "transaction_pool.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Batcher",
+    src = "batcher.ml",
+    intf = ":_Batcher.cmi",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Batcher.cmi",
+    src = "batcher.mli",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_F_sequence",
+    src = "f_sequence.ml",
+    intf = ":_F_sequence.cmi",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_F_sequence.cmi",
+    src = "f_sequence.mli",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Indexed_pool",
+    src = "indexed_pool.ml",
+    intf = ":_Indexed_pool.cmi",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_F_sequence",
+        ":_Map_set",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Indexed_pool.cmi",
+    src = "indexed_pool.mli",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Priced_proof",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Map_set",
+    src = "map_set.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Mocks",
+    src = "mocks.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Network_pool_base",
+    src = "network_pool_base.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Priced_proof",
+    src = "priced_proof.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snark_pool",
+    src = "snark_pool.ml",
+    intf = ":_Snark_pool.cmi",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Batcher",
+        ":_Intf",
+        ":_Network_pool_base",
+        ":_Priced_proof",
+        ":_Snark_pool_diff",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snark_pool.cmi",
+    src = "snark_pool.mli",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_pool_diff",
+    src = "snark_pool_diff.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Priced_proof",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        ":_Mocks",              # obazl:retain
+        ":_Snark_pool"          # obazl:retain
+    ]
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_pool",
+    src = "transaction_pool.ml",
+    ns = ":Network_pool_ns",
+    opts = NETWORK_POOL_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "network_pool",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = NETWORK_POOL_DEPS + [
+        # do not sort (buildifier)
+        ":_Batcher",
+        ":_Indexed_pool",
+        ":_Intf",
+        ":_Network_pool_base",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/network_pool:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_pipebang",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

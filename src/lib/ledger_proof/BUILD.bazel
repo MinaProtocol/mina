@@ -1,0 +1,225 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: LIBRARY LEDGER_PROOF
+################################################################
+LEDGER_PROOF_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+LEDGER_PROOF_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+LEDGER_PROOF_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+LEDGER_PROOF_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+LEDGER_PROOF_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/transaction_snark",
+]
+
+##############
+ocaml_archive(
+    name = "ledger_proof",
+    opts = LEDGER_PROOF_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof",
+        ":_Ledger_proof_intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Ledger_proof_ns",
+    ns = "ledger_proof",
+    opts = LEDGER_PROOF_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "ledger_proof.ml",
+        "ledger_proof_intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_proof",
+    src = "ledger_proof.ml",
+    intf = ":_Ledger_proof.cmi",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof_intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_proof.cmi",
+    src = "ledger_proof.mli",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_INTERFACE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_proof_intf",
+    src = "ledger_proof_intf.ml",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_MODULE_OPTS,
+    ppx = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = LEDGER_PROOF_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/lib/ledger_proof:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_sexp_conv",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

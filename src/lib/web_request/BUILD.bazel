@@ -1,0 +1,162 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_ARCHIVE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_NS_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: LIBRARY WEB_REQUEST
+################################################################
+WEB_REQUEST_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+WEB_REQUEST_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+WEB_REQUEST_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+WEB_REQUEST_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+]
+
+WEB_REQUEST_PPX = "@//bzl/ppx:ppx.exe[ppx_version][bisect_ppx]"
+
+WEB_REQUEST_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+]
+
+##############
+ocaml_archive(
+    name = "web_request",
+    doc = "Web tools that are used to send put requests",
+    opts = WEB_REQUEST_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = WEB_REQUEST_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_S3_put_request",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Web_request_ns",
+    ns = "web_request",
+    opts = WEB_REQUEST_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "s3_put_request.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Web_request_ns",
+    opts = WEB_REQUEST_MODULE_OPTS,
+    ppx = WEB_REQUEST_PPX,
+    ppx_args = WEB_REQUEST_PPX_ARGS,
+    deps = WEB_REQUEST_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_S3_put_request",
+    src = "s3_put_request.ml",
+    ns = ":Web_request_ns",
+    opts = WEB_REQUEST_MODULE_OPTS,
+    ppx = WEB_REQUEST_PPX,
+    ppx_args = WEB_REQUEST_PPX_ARGS,
+    deps = WEB_REQUEST_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
