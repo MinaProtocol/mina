@@ -225,7 +225,7 @@ let update_epoch_ledger ~logger ~name ledger epoch_ledger_opt epoch_ledger_hash
 (* cache of fee transfers for coinbases *)
 module Fee_transfer_key = struct
   module T = struct
-    type t = int64 * int [@@deriving hash, sexp, compare]
+    type t = int64 * int * int [@@deriving hash, sexp, compare]
   end
 
   type t = T.t
@@ -247,7 +247,10 @@ let cache_fee_transfer_via_coinbase pool
       in
       let fee_transfer = Coinbase_fee_transfer.create ~receiver_pk ~fee in
       Hashtbl.add_exn fee_transfer_tbl
-        ~key:(internal_cmd.global_slot, internal_cmd.sequence_no)
+        ~key:
+          ( internal_cmd.global_slot
+          , internal_cmd.sequence_no
+          , internal_cmd.secondary_sequence_no )
         ~data:fee_transfer
   | _ ->
       Deferred.unit
@@ -289,7 +292,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       let amount = Currency.Fee.to_uint64 fee |> Currency.Amount.of_uint64 in
       (* combining situation 1: add cached coinbase fee transfer, if it exists *)
       let fee_transfer =
-        Hashtbl.find fee_transfer_tbl (cmd.global_slot, cmd.sequence_no)
+        Hashtbl.find fee_transfer_tbl
+          (cmd.global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
       in
       let coinbase =
         match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
@@ -585,6 +589,7 @@ let main ~input_file ~output_file ~archive_uri () =
       [%log info] "Obtained %d user command ids and %d internal command ids"
         (List.length user_cmd_ids)
         (List.length internal_cmd_ids) ;
+      [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
@@ -617,10 +622,12 @@ let main ~input_file ~output_file ~archive_uri () =
             [%compare: int64 * int * int] (tuple ic1) (tuple ic2) )
       in
       (* populate cache of fee transfer via coinbase items *)
+      [%log info] "Populating fee transfer via coinbase cache" ;
       let%bind () =
         Deferred.List.iter sorted_internal_cmds
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
+      [%log info] "Loading user commands" ;
       let%bind unsorted_user_cmds_list =
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
