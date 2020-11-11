@@ -738,6 +738,7 @@ let setup_daemon logger =
         Consensus.Data.Local_state.create
           ~genesis_ledger:
             (Precomputed_values.genesis_ledger precomputed_values)
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
           ~epoch_ledger_location
           ( Option.map block_production_keypair ~f:(fun keypair ->
                 let open Keypair in

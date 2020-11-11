@@ -1883,6 +1883,7 @@ let%test_module "test" =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Coda_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
         in
         compile_time_genesis.data |> Coda_state.Protocol_state.body

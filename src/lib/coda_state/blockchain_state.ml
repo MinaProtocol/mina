@@ -9,6 +9,7 @@ module Poly = struct
       type ('staged_ledger_hash, 'snarked_ledger_hash, 'token_id, 'time) t =
         { staged_ledger_hash: 'staged_ledger_hash
         ; snarked_ledger_hash: 'snarked_ledger_hash
+        ; genesis_ledger_hash: 'snarked_ledger_hash
         ; snarked_next_available_token: 'token_id
         ; timestamp: 'time }
       [@@deriving sexp, fields, eq, compare, hash, yojson, hlist]
@@ -20,6 +21,7 @@ end
 Poly.
   ( staged_ledger_hash
   , snarked_ledger_hash
+  , genesis_ledger_hash
   , snarked_next_available_token
   , timestamp
   , to_hlist
@@ -49,16 +51,18 @@ type var =
   , Block_time.Unpacked.var )
   Poly.t
 
-let create_value ~staged_ledger_hash ~snarked_ledger_hash
+let create_value ~staged_ledger_hash ~snarked_ledger_hash ~genesis_ledger_hash
     ~snarked_next_available_token ~timestamp =
   { Poly.staged_ledger_hash
   ; snarked_ledger_hash
+  ; genesis_ledger_hash
   ; snarked_next_available_token
   ; timestamp }
 
 let data_spec =
   let open Data_spec in
   [ Staged_ledger_hash.typ
+  ; Frozen_ledger_hash.typ
   ; Frozen_ledger_hash.typ
   ; Token_id.typ
   ; Block_time.Unpacked.typ ]
@@ -70,6 +74,7 @@ let typ : (var, Value.t) Typ.t =
 let var_to_input
     ({ staged_ledger_hash
      ; snarked_ledger_hash
+     ; genesis_ledger_hash
      ; snarked_next_available_token
      ; timestamp } :
       var) =
@@ -80,6 +85,7 @@ let var_to_input
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
     ; field (Frozen_ledger_hash.var_to_hash_packed snarked_ledger_hash)
+    ; field (Frozen_ledger_hash.var_to_hash_packed genesis_ledger_hash)
     ; snarked_next_available_token
     ; bitstring
         (Bitstring_lib.Bitstring.Lsb_first.to_list
@@ -88,6 +94,7 @@ let var_to_input
 let to_input
     ({ staged_ledger_hash
      ; snarked_ledger_hash
+     ; genesis_ledger_hash
      ; snarked_next_available_token
      ; timestamp } :
       Value.t) =
@@ -95,6 +102,7 @@ let to_input
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; field (snarked_ledger_hash :> Field.t)
+    ; field (genesis_ledger_hash :> Field.t)
     ; Token_id.to_input snarked_next_available_token
     ; bitstring (Block_time.Bits.to_bits timestamp) ]
 
@@ -103,9 +111,13 @@ let set_timestamp t timestamp = {t with Poly.timestamp}
 let negative_one
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~genesis_ledger_hash ~snarked_next_available_token : Value.t =
+  let genesis_ledger_hash =
+    Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
+  in
   { staged_ledger_hash=
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
-  ; snarked_ledger_hash= Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
+  ; snarked_ledger_hash= genesis_ledger_hash
+  ; genesis_ledger_hash
   ; snarked_next_available_token
   ; timestamp= Block_time.of_time Time.epoch }
 
@@ -118,6 +130,7 @@ let display
     Poly.
       { staged_ledger_hash
       ; snarked_ledger_hash
+      ; genesis_ledger_hash
       ; snarked_next_available_token
       ; timestamp } =
   { Poly.staged_ledger_hash=
@@ -126,6 +139,9 @@ let display
   ; snarked_ledger_hash=
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_string snarked_ledger_hash
+  ; genesis_ledger_hash=
+      Visualization.display_prefix_of_string
+      @@ Frozen_ledger_hash.to_string genesis_ledger_hash
   ; snarked_next_available_token=
       Token_id.to_string snarked_next_available_token
   ; timestamp=
