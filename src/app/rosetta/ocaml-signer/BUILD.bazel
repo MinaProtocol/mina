@@ -1,0 +1,139 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE SIGNER
+################################################################
+SIGNER_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+SIGNER_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+SIGNER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_ssl",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/app/rosetta/lib",
+]
+
+SIGNER_PPX = "@//bzl/ppx:ppx.exe[graphql_ppx][ppx_coda][ppx_deriving.show][ppx_deriving_yojson][ppx_jane][ppx_version][ppx_deriving.eq][bisect_ppx]"
+
+SIGNER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "signer",
+]
+
+#################
+ocaml_executable(
+    name = "signer.exe",
+    opts = SIGNER_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SIGNER_DEPS + [
+        # do not sort (buildifier)
+        ":_Signer",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signer",
+    src = "signer.ml",
+    opts = SIGNER_MODULE_OPTS,
+    ppx = SIGNER_PPX,
+    ppx_args = SIGNER_PPX_ARGS,
+    deps = SIGNER_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

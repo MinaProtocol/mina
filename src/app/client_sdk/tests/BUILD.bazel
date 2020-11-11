@@ -1,0 +1,217 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: EXECUTABLE TEST_SIGNATURES
+################################################################
+TEST_SIGNATURES_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+TEST_SIGNATURES_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TEST_SIGNATURES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/coda_numbers",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/snark_params",
+]
+
+#################
+ocaml_executable(
+    name = "test_signatures.exe",
+    opts = TEST_SIGNATURES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_SIGNATURES_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_signatures",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_signatures",
+    src = "test_signatures.ml",
+    opts = TEST_SIGNATURES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = TEST_SIGNATURES_DEPS,
+)
+
+################################################################
+## STANZA 2: EXECUTABLE TEST_SIGNATURES_NONCONSENSUS
+################################################################
+TEST_SIGNATURES_NONCONSENSUS_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+TEST_SIGNATURES_NONCONSENSUS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TEST_SIGNATURES_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/nonconsensus/coda_base:coda_base_nonconsensus",
+    "@mina//src/nonconsensus/coda_numbers:coda_numbers_nonconsensus",
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+    "@mina//src/nonconsensus/signature_lib:signature_lib_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+]
+
+#################
+ocaml_executable(
+    name = "test_signatures_nonconsensus.exe",
+    opts = TEST_SIGNATURES_NONCONSENSUS_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_SIGNATURES_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_signatures_nonconsensus",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_signatures_nonconsensus",
+    src = "test_signatures_nonconsensus.ml",
+    opts = TEST_SIGNATURES_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = TEST_SIGNATURES_NONCONSENSUS_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx2.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/app/client_sdk/tests:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_custom_printf",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/app/client_sdk/tests:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_custom_printf",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

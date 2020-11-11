@@ -1,0 +1,131 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GENERATE_KEYPAIR
+################################################################
+GENERATE_KEYPAIR_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+GENERATE_KEYPAIR_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+GENERATE_KEYPAIR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/cli_lib",
+]
+
+GENERATE_KEYPAIR_PPX = "@//bzl/ppx:ppx.exe[ppx_version][ppx_let][ppx_sexp_conv][ppx_optcomp][bisect_ppx]"
+
+GENERATE_KEYPAIR_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+]
+
+#################
+ocaml_executable(
+    name = "generate_keypair.exe",
+    opts = GENERATE_KEYPAIR_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GENERATE_KEYPAIR_DEPS + [
+        # do not sort (buildifier)
+        ":_Generate_keypair",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Generate_keypair",
+    src = "generate_keypair.ml",
+    opts = GENERATE_KEYPAIR_MODULE_OPTS,
+    ppx = GENERATE_KEYPAIR_PPX,
+    ppx_args = GENERATE_KEYPAIR_PPX_ARGS,
+    deps = GENERATE_KEYPAIR_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

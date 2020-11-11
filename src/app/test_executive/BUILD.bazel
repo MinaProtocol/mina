@@ -1,0 +1,316 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_INTERFACE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+
+################################################################
+## STANZA 1: EXECUTABLE TEST_EXECUTIVE
+################################################################
+TEST_EXECUTIVE_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+TEST_EXECUTIVE_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+TEST_EXECUTIVE_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+TEST_EXECUTIVE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@opam//pkg:cmdliner",
+    "@mina//src/lib/file_system",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/coda_base",
+    "@mina//src/lib/runtime_config",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/secrets",
+    "@mina//src/lib/integration_test_lib",
+    "@mina//src/lib/integration_test_cloud_engine",
+    "@mina//src/lib/bash_colors",
+]
+
+#################
+ocaml_executable(
+    name = "test_executive.exe",
+    opts = TEST_EXECUTIVE_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_EXECUTIVE_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_production_test",
+        ":_Block_production_test_timed_accounts",
+        ":_Bootstrap_test",
+        ":_Mina_peers_test",
+        ":_Payments_timed_accounts",
+        ":_Send_payment_test",
+        ":_Test_executive",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_production_test",
+    src = "block_production_test.ml",
+    intf = ":_Block_production_test.cmi",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Block_production_test.cmi",
+    src = "block_production_test.mli",
+    opts = TEST_EXECUTIVE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Block_production_test_timed_accounts",
+    src = "block_production_test_timed_accounts.ml",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Bootstrap_test",
+    src = "bootstrap_test.ml",
+    intf = ":_Bootstrap_test.cmi",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Bootstrap_test.cmi",
+    src = "bootstrap_test.mli",
+    opts = TEST_EXECUTIVE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Mina_peers_test",
+    src = "mina_peers_test.ml",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Payments_timed_accounts",
+    src = "payments_timed_accounts.ml",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Send_payment_test",
+    src = "send_payment_test.ml",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test_executive",
+    src = "test_executive.ml",
+    opts = TEST_EXECUTIVE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "test_executive",
+    ],
+    deps = TEST_EXECUTIVE_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_production_test",
+        ":_Block_production_test_timed_accounts",
+        ":_Bootstrap_test",
+        ":_Mina_peers_test",
+        ":_Payments_timed_accounts",
+        ":_Send_payment_test",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx:driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/app/test_executive:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@ppx_version//src:ppx_version",
+    ],
+)

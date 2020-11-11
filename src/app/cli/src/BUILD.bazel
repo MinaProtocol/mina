@@ -1,0 +1,177 @@
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+    "ppx_executable",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_PPX_EXECUTABLE_OPTS",
+    "REPO_PPX_RUNTIME_DATA",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+    "PKG_PPX_EXECUTABLE_OPTS",
+)
+
+THIS_PPX_EXECUTABLE_OPTS = REPO_PPX_EXECUTABLE_OPTS + PKG_PPX_EXECUTABLE_OPTS
+################################################################
+## STANZA 2: EXECUTABLE CODA
+################################################################
+
+CODA_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:jemalloc",
+    "@mina//src/app/cli/src/init",
+    "@mina//src/app/cli/src/tests",
+    "@mina//src/lib/child_processes",
+    "@mina//src/lib/memory_stats",
+    "@mina//src/lib/node_addrs_and_ports",
+    "@mina//src/lib/genesis_ledger_helper",
+    "@mina//src/lib/coda_plugins",
+]
+
+CODA_MODULE_OPTS =[
+    "-short-paths",
+    "-w",  "@a-4-29-40-41-42-44-45-48-58-59-60-66",
+    "-cclib", "-ljemalloc"
+]
+
+CODA_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+#################
+ocaml_executable(
+    name = "coda.exe",
+    opts = CODA_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CODA_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda",
+    ],
+    cc_deps = {
+        "//bzl/external/bzip2": "static",    # -lbz2
+        "//bzl/external/zlib": "default"     # -lz
+    },
+    cc_linkall  = ["//bzl/external/rocksdb"], # -Wl,-force_load (MacOS) or -whole-archive (Linux)
+    cc_linkopts = select({
+        "//bzl/host:macos": ["-lc++abi", "-lc++"],
+        "//bzl/host:linux": ["-lstdc++"],
+    }, no_match_error = "Unsupported platform. Only Linux and MacOS supported.")
+)
+
+#############
+ocaml_module(
+    name = "_Coda",
+    src = "coda.ml",
+    opts = CODA_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = CODA_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx2.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+    ],
+    main = "//bzl/ppx:Driver",
+    opts = THIS_PPX_EXECUTABLE_OPTS,
+    visibility = [
+        "//src/app/cli/src:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)

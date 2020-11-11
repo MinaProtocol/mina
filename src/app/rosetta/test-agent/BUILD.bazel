@@ -1,0 +1,196 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+load(
+    "//:BUILD.bzl",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_MODULE_OPTS",
+)
+load(
+    ":BUILD.bzl",
+    "PKG_EXECUTABLE_OPTS",
+    "PKG_MODULE_OPTS",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE AGENT
+################################################################
+AGENT_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS
+
+AGENT_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+AGENT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_ssl",
+    "@opam//pkg:caqti",
+    "@opam//pkg:caqti-async",
+    "@opam//pkg:caqti-driver-postgresql",
+    "@opam//pkg:cohttp",
+    "@opam//pkg:ctypes",
+    "@opam//pkg:cohttp-async",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/app/rosetta/lib",
+]
+
+AGENT_PPX = "@//bzl/ppx:ppx.exe[graphql_ppx][ppx_coda][ppx_deriving.show][ppx_deriving_yojson][ppx_jane][ppx_version][ppx_deriving.eq][bisect_ppx]"
+
+AGENT_PPX_ARGS = [
+    # do not sort (buildifier)
+    "--conditional",
+    "-inline-test-lib",
+    "agent",
+]
+
+#################
+ocaml_executable(
+    name = "agent.exe",
+    opts = AGENT_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Agent",
+        ":_Offline",
+        ":_Operation_expectation",
+        ":_Peek",
+        ":_Poke",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Agent",
+    src = "agent.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Operation_expectation",
+        ":_Poke",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Offline",
+    src = "offline.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Peek",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Operation_expectation",
+    src = "operation_expectation.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Peek",
+    src = "peek.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Poke",
+    src = "poke.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS,
+)
+
+###################################################################
+######## Configuration Settings - see :BUILD.bzl #################
+bool_flag(
+    name = "always-link",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_always_link",
+    flag_values = {":always-link": str(True)},
+)
+
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "threads",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_threads",
+    flag_values = {":threads": str(True)},
+)
+
+bool_flag(
+    name = "tooling",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_tooling",
+    flag_values = {":tooling": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
+
+## PPX control
+string_flag(
+    name = "ppx-out",
+    build_setting_default = "binary",
+    values = [
+        "binary",
+        "text",
+    ],
+)
+
+config_setting(
+    name = "enable_ppx_output_format_text",
+    flag_values = {":ppx-out": "text"},
+)
+
+config_setting(
+    name = "enable_ppx_output_format_binary",
+    flag_values = {":ppx-out": "binary"},
+)
