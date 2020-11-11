@@ -482,6 +482,7 @@ let main ~input_file ~output_file ~archive_uri () =
         match
           Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
             ~logger ~proof_level input.genesis_ledger
+            ~ledger_name_prefix:"genesis_ledger"
         with
         | None ->
             [%log fatal]

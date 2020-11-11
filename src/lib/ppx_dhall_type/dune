@@ -4,4 +4,5 @@
  (kind ppx_deriver)
  (libraries ppxlib core_kernel)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_version ppxlib.metaquot bisect_ppx -- --conditional)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppxlib.metaquot)))
