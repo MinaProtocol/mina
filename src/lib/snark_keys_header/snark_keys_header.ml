@@ -71,15 +71,15 @@ module Constraint_constants = struct
   end
 
   (** The constants used in the constraint system.  *)
-  type constraint_constants =
+  type t =
     { sub_windows_per_window: int
     ; ledger_depth: int
     ; work_delay: int
     ; block_window_duration_ms: int
     ; transaction_capacity: Transaction_capacity.t
-    ; coinbase_amount: Unsigned_extended.Uint64.t
+    ; coinbase_amount: Unsigned_extended.UInt64.t
     ; supercharged_coinbase_factor: int
-    ; account_creation_fee: Unsigned_extended.Uint64.t
+    ; account_creation_fee: Unsigned_extended.UInt64.t
     ; fork:
         (Fork_config.t option[@to_yojson Fork_config.opt_to_yojson]
                              [@of_yojson Fork_config.opt_of_yojson]) }
