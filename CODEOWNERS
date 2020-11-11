@@ -12,7 +12,7 @@
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 
-/src/external/ @emberian @bkase @psteckler @imeckler
+/src/external/ @emberian @bkase @psteckler @imeckler @mrmr1993
 
 /src/app/archive @MinaProtocol/product-eng-reviewers
 /src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
