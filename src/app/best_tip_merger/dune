@@ -12,12 +12,12 @@
     cli_lib
     yojson
     )
-  (preprocess (pps
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps
     ppx_coda
     ppx_deriving.show
     ppx_deriving_yojson
     ppx_jane
     ppx_version
-    ppx_deriving.eq
-     bisect_ppx -- --conditional))
+    ppx_deriving.eq))
   )
