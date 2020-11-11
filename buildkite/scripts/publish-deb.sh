@@ -34,7 +34,11 @@ esac
 
 echo "Publishing debs: ${DEBS}"
 set -x
-${DEBS3} --codename "${CODENAME}" "${DEBS}"
+# Upload the deb files to s3.
+# If this fails, attempt to remove the lockfile and retry.
+${DEBS3} --codename "${CODENAME}" "${DEBS}" \
+|| (  scripts/clear-deb-s3-lockfile.sh \
+   && ${DEBS3} --codename "${CODENAME}" "${DEBS}")
 set +x
 echo "Exporting Variables: "
 
