@@ -1728,11 +1728,11 @@ let%test_module "scans" =
               in
               let buf = Bin_prot.Common.create_buf sz in
               ignore
-                (State.Stable.V1.bin_write_t Int64.bin_write_t
+                (State.Stable.Latest.bin_write_t Int64.bin_write_t
                    Int64.bin_write_t buf ~pos:0 s) ;
               let deserialized =
-                State.Stable.V1.bin_read_t Int64.bin_read_t Int64.bin_read_t
-                  ~pos_ref:(ref 0) buf
+                State.Stable.Latest.bin_read_t Int64.bin_read_t
+                  Int64.bin_read_t ~pos_ref:(ref 0) buf
               in
               let new_hash =
                 State.hash deserialized Int64.to_string Int64.to_string

@@ -2,5 +2,6 @@
  (name hex_nonconsensus)
  (public_name hex_nonconsensus)
  (inline_tests)
- (preprocess (pps ppx_jane ppx_version ppx_inline_test bisect_ppx -- --conditional))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version ppx_inline_test))
  (libraries core_kernel))

@@ -8,5 +8,5 @@
    zexe_backend)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
  (modes native))
-

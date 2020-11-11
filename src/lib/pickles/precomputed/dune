@@ -6,7 +6,8 @@
    zexe_backend)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps bisect_ppx ppx_version ppx_jane ppxlib.metaquot -- --conditional)))
+  (pps ppx_version ppx_jane ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx)))
 
 ;(rule
 ; (targets precomp.ml)
