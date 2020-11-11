@@ -1,6 +1,7 @@
 (library
-  (name otp_lib)
-  (public_name otp_lib)
-  (inline_tests)
-  (libraries core_kernel async_kernel pipe_lib)
-  (preprocess (pps ppx_version ppx_jane bisect_ppx -- --conditional)))
+ (name otp_lib)
+ (public_name otp_lib)
+ (inline_tests)
+ (libraries core_kernel async_kernel pipe_lib)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane)))

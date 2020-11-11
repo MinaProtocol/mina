@@ -4,13 +4,14 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-    core_kernel
-    codable
-    snark_params
-    outside_hash_image
-    random_oracle
-    )
+   core_kernel
+   codable
+   snark_params
+   outside_hash_image
+   random_oracle
+ )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_version ppx_snarky ppx_let ppx_inline_test ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp bisect_ppx -- --conditional))
+  (pps ppx_coda ppx_version ppx_snarky ppx_let ppx_inline_test ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Data hash"))
