@@ -96,6 +96,8 @@
                "app/archive/archive_lib/dune" ;; ppx-injected dep
                "app/archive/archive_lib/graphql_query/dune" ;; ppx-injected deps
 
+               "src/external/dune"
+
                ;; @graphql_ppx
                "src/external/graphql_ppx/dune"
                "src/external/graphql_ppx/discover/dune"
