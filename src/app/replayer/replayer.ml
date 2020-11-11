@@ -500,19 +500,25 @@ let main ~input_file ~output_file ~archive_uri () =
           epoch_ledger_state_hash
       in
       [%log info] "Loading epoch ledger data" ;
-      let%bind staking_epoch_data_id =
+      let%bind staking_id_from_epoch_ledger_state_hash =
         epoch_staking_id_of_state_hash ~logger pool epoch_ledger_state_hash
       in
-      let%bind next_epoch_data_id =
+      let%bind next_id_from_epoch_ledger_state_hash =
+        epoch_next_id_of_state_hash ~logger pool epoch_ledger_state_hash
+      in
+      let%bind next_id_from_fork_state_hash =
         epoch_next_id_of_state_hash ~logger pool fork_state_hash
       in
       let%bind { epoch_ledger_hash= staking_epoch_ledger_hash_str
                ; epoch_data_seed= staking_seed_str } =
-        epoch_data_of_id ~logger pool staking_epoch_data_id
+        epoch_data_of_id ~logger pool staking_id_from_epoch_ledger_state_hash
       in
       let%bind { epoch_ledger_hash= next_epoch_ledger_hash_str
-               ; epoch_data_seed= next_seed_str } =
-        epoch_data_of_id ~logger pool next_epoch_data_id
+               ; epoch_data_seed= _ } =
+        epoch_data_of_id ~logger pool next_id_from_epoch_ledger_state_hash
+      in
+      let%bind {epoch_ledger_hash= _; epoch_data_seed= next_seed_str} =
+        epoch_data_of_id ~logger pool next_id_from_fork_state_hash
       in
       let staking_epoch_ledger_hash =
         Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
