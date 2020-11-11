@@ -31,7 +31,7 @@ module Constraint_constants = struct
 
     let to_yojson t : Yojson.Safe.t =
       match t with
-      | Log2 i ->
+      | Log_2 i ->
           `Assoc [("two_to_the", `Int i)]
       | Txns_per_second_x10 i ->
           `Assoc [("txns_per_second_x10", `Int i)]
@@ -39,7 +39,7 @@ module Constraint_constants = struct
     let of_yojson (json : Yojson.Safe.t) =
       match json with
       | `Assoc [("two_to_the", `Int i)] ->
-          Ok (Log2 i)
+          Ok (Log_2 i)
       | `Assoc [("txns_per_second_x10", `Int i)] ->
           Ok (Txns_per_second_x10 i)
       | `Assoc _ ->
@@ -55,7 +55,7 @@ module Constraint_constants = struct
 
   module Fork_config = struct
     (** Fork data *)
-    type t = Runtime_config.t =
+    type t = Runtime_config.Fork_config.t =
       {previous_state_hash: string; previous_length: int}
     [@@deriving yojson]
 
