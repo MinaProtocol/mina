@@ -1,10 +1,22 @@
 workspace( name = "mina" )
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
 
-################################################################
-#### OCAML ####
+########################################
+## skylib required for obazl_rules_ocaml
+http_archive(
+    name = "bazel_skylib",
+    urls = [
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+    ],
+    sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
+)
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+bazel_skylib_workspace()
+
+###############
 git_repository(
     name = "obazl_rules_ocaml",
     remote = "https://github.com/obazl/rules_ocaml",
@@ -15,33 +27,28 @@ git_repository(
 
 load("@obazl_rules_ocaml//ocaml:bootstrap.bzl",
      "ocaml_configure",
-     "opam_configure",
-     "ocaml_register_toolchains")
+     # "opam_configure",
+     # "ocaml_register_toolchains"
+     )
 
-opam_configure()
+# opam_configure()
 
 ocaml_configure()
 
-ocaml_register_toolchains(installation="host")
+# ocaml_register_toolchains(installation="host")
 
-################################################################
-local_repository( name = "async_kernel" , path = "src/external/async_kernel")
-local_repository( name = "graphql_ppx"  , path = "src/external/graphql_ppx")
-local_repository( name = "ocaml_extlib" , path = "src/external/ocaml_extlib")
-local_repository( name = "ppx_optcomp"  , path = "src/external/ppx_optcomp")
-local_repository( name = "ppx_version"  , path = "src/external/ppx_version")
-local_repository( name = "rpc_parallel" , path = "src/external/rpc_parallel")
+############################################
+################ C/C++ Libs ################
+load("//bzl/external:cc_deps.bzl", "cc_bootstrap")
+cc_bootstrap()
 
-######################################
-########    Golang Support    ########
-http_archive(
-    name = "io_bazel_rules_go",
-    sha256 = "b725e6497741d7fc2d55fcc29a276627d10e43fa5d0bb692692890ae30d98d00",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.24.3/rules_go-v0.24.3.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.24.3/rules_go-v0.24.3.tar.gz",
-    ],
-)
+load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+rules_foreign_cc_dependencies()
+
+################################################
+################ Golang Support ################
+load("//bzl/external:go_deps.bzl", "go_bootstrap")
+go_bootstrap()
 
 load(
     "@io_bazel_rules_go//go:deps.bzl",
@@ -49,46 +56,75 @@ load(
     "go_register_toolchains",
     "go_rules_dependencies",
 )
-
 go_download_sdk(
     name = "go_sdk",
     version = "1.13",
 )
-
 go_rules_dependencies()
-
 go_register_toolchains()
 
-## protobuf needed by some go deps
-git_repository(
-    name = "com_google_protobuf",
-    commit = "09745575a923640154bcf307fba8aedff47f240a",
-    remote = "https://github.com/protocolbuffers/protobuf",
-    shallow_since = "1558721209 -0700",
-)
-
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
 protobuf_deps()
-
-# gazelle:proto disable_global
-
-http_archive(
-    name = "bazel_gazelle",
-    sha256 = "d4113967ab451dd4d2d767c3ca5f927fec4b30f3b2c6f8135a2033b9c05a5687",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.0/bazel-gazelle-v0.22.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.0/bazel-gazelle-v0.22.0.tar.gz",
-    ],
-)
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
-local_repository(
-    name = "libp2p_helper",
-    path = "src/app/libp2p_helper"
-)
+## Local Go packages
+local_repository(name = "libp2p_helper", path = "src/app/libp2p_helper")
 load("@libp2p_helper//bzl/libp2p:deps.bzl", "libp2p_bootstrap")
 libp2p_bootstrap()
-
 gazelle_dependencies(go_repository_default_config = "@libp2p_helper//:WORKSPACE.bazel")
+
+################################################
+################  RUST SUPPORT  ################
+load("//bzl/external:rust_deps.bzl", "rust_bootstrap")
+rust_bootstrap()
+
+load("@io_bazel_rules_rust//rust:repositories.bzl",
+     "rust_repositories", "rust_repository_set")
+rust_repositories(version = "1.47.0", edition="2018")
+
+load("@io_bazel_rules_rust//:workspace.bzl", "bazel_version")
+bazel_version(name = "bazel_version")
+
+## Golang application repos
+## first zexe, then marlin
+local_repository( name = "zexe" , path = "src/lib/zexe")
+load("@zexe//bzl/cargo:crates.bzl", "zexe_fetch_remote_crates")
+zexe_fetch_remote_crates()
+
+local_repository( name = "marlin" , path = "src/lib/marlin")
+load("@marlin//bzl/cargo:crates.bzl", "marlin_fetch_remote_crates")
+marlin_fetch_remote_crates()
+
+load("//src/lib/marlin_plonk_bindings/stubs/bzl/cargo:crates.bzl", "marlin_plonk_bindings_fetch_remote_crates")
+marlin_plonk_bindings_fetch_remote_crates()
+
+######################################################
+################ OCaml External Repos ################
+## to use remote repos use this instead of the local_repository rules below
+# load("//bzl/external:ocaml_deps.bzl", "ocaml_bootstrap")
+# ocaml_bootstrap()
+
+## use embedded git submodules
+local_repository( name = "async_kernel" , path = "src/external/async_kernel")
+local_repository( name = "graphql_ppx"  , path = "src/external/graphql_ppx")
+local_repository( name = "ocaml_extlib" , path = "src/external/ocaml_extlib")
+local_repository( name = "ppx_optcomp"  , path = "src/external/ppx_optcomp")
+local_repository( name = "ppx_version"  , path = "src/external/ppx_version")
+local_repository( name = "rpc_parallel" , path = "src/external/rpc_parallel")
+
+# https://github.com/MinaProtocol/coda-automation.git
+local_repository( name = "coda-automation" , path = "coda-automation")
+
+# https://github.com/bkase/tablecloth
+local_repository( name = "tablecloth" , path = "frontend/wallet/tablecloth")
+
+local_repository( name = "snarky" , path = "src/lib/snarky")
+
+## legacy C/C++ snarky
+# local_repository( name = "libsnark" , path = "src/lib/snarky/src/camlsnark_c/libsnark-caml")
+# local_repository( name = "libfqfft" , path = "src/lib/snarky/src/camlsnark_c/libsnark-caml/depends/libfqfft")
+# local_repository( name = "libff" , path = "src/lib/snarky/src/camlsnark_c/libsnark-caml/depends/libff")
+# local_repository( name = "ate_pairing" , path = "src/lib/snarky/src/camlsnark_c/libsnark-caml/depends/ate-pairing")
+# local_repository( name = "xbyak" , path = "src/lib/snarky/src/camlsnark_c/libsnark-caml/depends/xbyak" )
+

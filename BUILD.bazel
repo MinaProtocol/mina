@@ -1,3 +1,98 @@
-load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_setting")
 
-gazelle(name = "gazelle")
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["graphql_schema.json"])
+
+## Generate an ml file with the git revision in a string.
+## Used by @mina//src/lib/coda_version
+genrule(
+    name = 'version_ml',
+    srcs = glob(['.git/HEAD', '.git/refs/**']),
+    outs = ['version.ml'],
+    cmd = "\n".join([
+        'pushd `dirname $(rootpath version.ml)`',
+        'branch=$$(git rev-parse --verify --abbrev-ref HEAD || echo "<none found>")',
+        'commit_id_short=$$(git rev-parse --short=8 --verify HEAD)',
+        'echo "let commit_id_short = \"$$commit_id_short\"" >> \"$@\"',
+        'echo "let branch = \"$$branch\"" >> \"$@\"',
+        'popd'
+    ]),
+    visibility = ["//visibility:public"],
+)
+        # 'echo \"let commit_id = \\"$$id\\"\" > \"$@\"',
+
+
+#################################################
+####    GLOBAL/SHARED CONFIG SETTING DEPS    ####
+#################################################
+## OCaml
+bool_flag( name = "always-link", build_setting_default = False )
+config_setting( name = "enable_always_link", flag_values = { ":always-link": "True" })
+config_setting( name = "disable_always_link", flag_values = { ":always-link": "False" })
+
+bool_flag( name = "debug", build_setting_default = False)
+config_setting( name = "enable_debug", flag_values = { ":debug": "True" })
+config_setting( name = "disable_debug", flag_values = { ":debug": "False" })
+
+bool_flag( name = "tooling", build_setting_default = True )
+config_setting( name = "enable_tooling", flag_values = { ":tooling": "True" })
+config_setting( name = "disable_tooling", flag_values = { ":tooling": "False" })
+
+bool_flag( name = "threads", build_setting_default = True )
+config_setting( name = "enable_threads", flag_values = { ":threads": "True" })
+config_setting( name = "disable_threads", flag_values = { ":threads": "False" })
+
+bool_flag( name = "verbose", build_setting_default = False)
+config_setting( name = "enable_verbose", flag_values = { ":verbose": "True" })
+config_setting( name = "disable_verbose", flag_values = { ":verbose": "False" })
+
+bool_flag( name = "enable_gpu", build_setting_default = False,
+           visibility = ["//visibility:public"])
+
+#### control linking cc libs to ocaml
+string_flag( name = "cc_linkage", build_setting_default = "dynamic",
+             values = ["dynamic", "static"],
+             visibility = ["//visibility:public"])
+
+#### configuration profiles ####
+string_flag( name = "profile", build_setting_default = "dev",
+             values = ["dev", "debug", "release",
+                       "fake_hash", "testnet_public"],
+             visibility = ["//visibility:public"])
+config_setting( name = "profile_debug", flag_values = { ":profile": "debug" })
+config_setting( name = "profile_dev", flag_values = { ":profile": "dev" })
+config_setting( name = "profile_release", flag_values = { ":profile": "release" })
+config_setting( name = "profile_fake_hash", flag_values = { ":profile": "fake_hash" })
+config_setting( name = "profile_testnet_public", flag_values = { ":profile": "testnet_public" })
+
+################################################################
+## C/C++
+bool_flag( name = "cxx_debug", build_setting_default = False,
+           visibility = ["//visibility:public"])
+
+## Upstream
+string_flag( name = "curve", build_setting_default = "bn128",
+             values = ["bn128", "alt_bn128", "edwards", "mnt4", "mnt6"],
+             visibility = ["//bzl/config:__pkg__",
+                           "@libff//bzl/config:__pkg__"])
+             # visibility = ["//visibility:public"])
+
+## Downstream
+
+# ## serialization: libfqfft, libff
+# bool_flag( name = "binary_output", build_setting_default = True,
+#            visibility = ["//bzl/config:__pkg__"])
+
+# libsnark, libfqfft:
+bool_flag( name = "with_openmp", build_setting_default = False,
+           visibility = ["//visibility:public"])
+
+# ate-pairing flag:
+bool_flag( name = "with_libgmp", build_setting_default = True,
+           visibility = ["//visibility:public"])
+
+# ate-pairing config setting:
+config_setting( name = "enable_snark", flag_values = { ":curve": "bn128" },
+                visibility = ["//visibility:public"])
+
