@@ -257,9 +257,9 @@ let cache_fee_transfer_via_coinbase pool
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
-    "Applying internal command with global slot %Ld, sequence number %d, and \
-     secondary sequence number %d"
-    cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no ;
+    "Applying internal command (%s) with global slot %Ld, sequence number %d, \
+     and secondary sequence number %d"
+    cmd.type_ cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no ;
   let%bind receiver_pk = pk_of_pk_id pool cmd.receiver_id in
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
@@ -405,9 +405,9 @@ let body_of_sql_user_cmd pool
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   [%log info]
-    "Applying user command with nonce %Ld, global slot %Ld, and sequence \
+    "Applying user command (%s) with nonce %Ld, global slot %Ld, and sequence \
      number %d"
-    cmd.nonce cmd.global_slot cmd.sequence_no ;
+    cmd.type_ cmd.nonce cmd.global_slot cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
