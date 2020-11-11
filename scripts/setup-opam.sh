@@ -42,6 +42,7 @@ else
 fi
 
 # All our ocaml packages
+opam update
 opam switch import src/opam.export
 eval $(opam config env)
 
