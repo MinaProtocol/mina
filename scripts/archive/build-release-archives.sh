@@ -11,7 +11,7 @@ cd "${SCRIPTPATH}/../.."
 
 source "buildkite/scripts/export-git-env-vars.sh"
 
-PROJECT="coda-archive"
+PROJECT="mina-archive"
 BUILD_DIR="deb_build"
 
 mkdir -p "${BUILD_DIR}/DEBIAN"
@@ -23,10 +23,10 @@ Priority: optional
 Architecture: amd64
 Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
 License: Apache-2.0
-Homepage: https://codaprotocol.com/
+Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
-Description: Coda Archive Process
- Compatible with Coda Daemon
+Description: Mina Archive Process
+ Compatible with Mina Daemon
  Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
@@ -50,7 +50,7 @@ find "${BUILD_DIR}"
 # Build the package
 echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 ###
 # Release the .deb
@@ -85,9 +85,9 @@ else
     esac
 
     echo "Publishing debs:"
-    ls coda-*.deb
+    ls mina-*.deb
     set -x
-    ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+    ${DEBS3} --codename ${CODENAME} --component main mina-*.deb
 fi
 
 ###
@@ -106,7 +106,7 @@ if [ -n "${BUILDKITE+x}" ]; then
     set +x
 else
     mkdir docker_build 
-    mv coda-*.deb docker_build/.
+    mv mina-*.deb docker_build/.
 
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
