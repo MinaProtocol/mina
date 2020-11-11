@@ -18,4 +18,5 @@
  (name marlin_plonk_bindings_stubs)
  (foreign_archives marlin_plonk_stubs)
  (c_library_flags :standard "-lpthread")
- (preprocess (pps ppx_version bisect_ppx -- --conditional)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
