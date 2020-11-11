@@ -2,5 +2,6 @@
  (name gen_values)
  (libraries async core crypto_params pickles ppxlib)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot bisect_ppx -- --conditional))
+  (pps ppx_version ppx_jane ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
  (modes native))
