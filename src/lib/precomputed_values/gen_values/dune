@@ -13,8 +13,9 @@
    ppx_util
    snark_keys
    snark_params
-   snarky.backendless )
+   snarky.backendless)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot bisect_ppx -- --conditional))
+  (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
  (modes native))

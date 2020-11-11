@@ -986,7 +986,7 @@ struct
     in
     let%bind () =
       (* need pervasive (=) in scope for comparing polymorphic variant *)
-      let ( = ) = Pervasives.( = ) in
+      let ( = ) = Stdlib.( = ) in
       Result.ok_if_true
         ( `Take
         = Consensus.Hooks.select ~constants:consensus_constants
@@ -1014,7 +1014,8 @@ module Staged_ledger_validation = struct
     Fn.compose statement_target statement
 
   let validate_staged_ledger_diff :
-         ( 'time_received
+         ?skip_staged_ledger_verification:bool
+      -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain
@@ -1045,19 +1046,21 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~precomputed_values ~verifier
-       ~parent_staged_ledger ~parent_protocol_state ->
+   fun ?skip_staged_ledger_verification (t, validation) ~logger
+       ~precomputed_values ~verifier ~parent_staged_ledger
+       ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_update _ ) =
-      Staged_ledger.apply
+      Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
         ~current_state_view:
@@ -1071,6 +1074,12 @@ module Staged_ledger_validation = struct
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float Core.Time.(Span.to_ms @@ diff (now ()) apply_start_time) )
+        ]
+      "Staged_ledger.apply takes $time_elapsed" ;
     let target_ledger_hash =
       match proof_opt with
       | None ->

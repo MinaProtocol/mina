@@ -57,10 +57,10 @@ module Styles = {
 
   let header =
     merge([
-      Theme.Type.h2,
+      Theme.Type.h1,
       style([
         marginTop(`rem(2.06)),
-        media(Theme.MediaQuery.desktop, [width(`rem(18.2))]),
+        media(Theme.MediaQuery.desktop, [width(`rem(25.2))]),
       ]),
     ]);
   let subhead =
@@ -95,18 +95,18 @@ module Styles = {
     merge([
       heroRowImage,
       style([
-        backgroundImage(`url("/static/img/triangle_mobile.png")),
+        backgroundImage(`url("/static/img/triangle_mobile.jpg")),
         media(
           Theme.MediaQuery.tablet,
           [
             position(`absolute),
             left(`zero),
-            backgroundImage(`url("/static/img/triangle_tablet.png")),
+            backgroundImage(`url("/static/img/triangle_tablet.jpg")),
           ],
         ),
         media(
           Theme.MediaQuery.desktop,
-          [backgroundImage(`url("/static/img/triangle_desktop.png"))],
+          [backgroundImage(`url("/static/img/triangle_desktop.jpg"))],
         ),
       ]),
     ]);
@@ -120,7 +120,14 @@ module Styles = {
       border(`px(1), `solid, black),
     ]);
   let orange =
-    merge([copy, style([display(`inlineBlock), color(orange)])]);
+    merge([
+      copy,
+      style([
+        display(`inlineBlock),
+        textDecoration(`none),
+        color(Theme.Colors.orange),
+      ]),
+    ]);
 };
 
 [@react.component]
@@ -186,9 +193,11 @@ let make = () => {
                to introduce Mina to the wider world. Here, developers
                can build ",
            )}
-          <span className=Styles.orange>
-            {React.string("powerful applications ")}
-          </span>
+          <Next.Link href="/docs">
+            <span className=Styles.orange>
+              {React.string("powerful applications ")}
+            </span>
+          </Next.Link>
           {React.string(
              " like Snapps (SNARK-powered apps)
                to offer financial services without compromising data privacy
@@ -212,7 +221,7 @@ let make = () => {
         </p>
         <img
           className=Styles.secondImage
-          src="/static/img/triangle_desktop.png"
+          src="/static/img/triangle_desktop.jpg"
         />
       </div>
     </div>

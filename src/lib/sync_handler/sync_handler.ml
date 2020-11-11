@@ -37,10 +37,40 @@ module Make (Inputs : Inputs_intf) :
       Ledger.Any_ledger.cast (module Ledger.Db)
       @@ Transition_frontier.root_snarked_ledger frontier
     in
+    let staking_epoch_ledger =
+      Transition_frontier.consensus_local_state frontier
+      |> Consensus.Data.Local_state.staking_epoch_ledger
+    in
+    let next_epoch_ledger =
+      Transition_frontier.consensus_local_state frontier
+      |> Consensus.Data.Local_state.next_epoch_ledger
+    in
     if
       Ledger_hash.equal ledger_hash
         (Ledger.Any_ledger.M.merkle_root root_ledger)
     then Some root_ledger
+    else if
+      Ledger_hash.equal ledger_hash
+        (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+           staking_epoch_ledger)
+    then
+      match staking_epoch_ledger with
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
+          None
+      | Ledger_db ledger ->
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+    else if
+      Ledger_hash.equal ledger_hash
+        (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
+           next_epoch_ledger)
+    then
+      match next_epoch_ledger with
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
+          None
+      | Ledger_db ledger ->
+          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
     else None
 
   let answer_query :
@@ -142,11 +172,12 @@ module Make (Inputs : Inputs_intf) :
       best_tip_with_witness
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
-        observed_state peer_root =
+        ~precomputed_values observed_state peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants peer_root
+        Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
+          peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.select ~constants:consensus_constants

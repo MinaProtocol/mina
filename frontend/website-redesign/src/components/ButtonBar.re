@@ -157,27 +157,17 @@ module CommunityLanding = {
       <div className=ButtonBarStyles.grid>
         {renderCard(
            Icon.Twitter,
-           `External("https://twitter.com/minaprotocol"),
+           `External(Constants.minaTwitter),
            "Twitter",
          )}
-        {renderCard(
-           Icon.Forums,
-           `External("https://forums.minaprotocol.com/"),
-           "Forums",
-         )}
-        {renderCard(Icon.Wiki, `External("https://minawiki.com"), "Wiki")}
+        {renderCard(Icon.Forums, `External(Constants.minaForums), "Forums")}
+        {renderCard(Icon.Wiki, `External(Constants.minaWiki), "Wiki")}
         {renderCard(
            Icon.Facebook,
-           `External("https://facebook.com/minaprotocol"),
+           `External(Constants.minaFacebook),
            "Facebook",
          )}
-        {renderCard(
-           Icon.WeChat,
-           `External(
-             "https://forums.minaprotocol.com/t/mina-protocol-chinese-resources/200",
-           ),
-           "Wechat",
-         )}
+        {renderCard(Icon.WeChat, `External(Constants.minaWeChat), "Wechat")}
       </div>
     </div>;
   };
@@ -198,6 +188,7 @@ module HelpAndSupport = {
           Theme.Typeface.monumentGrotesk,
           color(Theme.Colors.white),
           fontSize(`rem(0.75)),
+          textAlign(`center),
           lineHeight(`rem(1.)),
           textTransform(`uppercase),
           letterSpacing(`em(0.02)),
@@ -248,31 +239,31 @@ module HelpAndSupport = {
       <div className=ButtonBarStyles.grid>
         {renderCard(
            Icon.Discord,
-           `External("https://discord.com/invite/Vexf4ED"),
+           `External(Constants.minaDiscordRulesAndGuidelines),
            "Discord",
            "Interact with other users, ask questions and get feedback.",
          )}
         {renderCard(
            Icon.Forums,
-           `External("https://forums.minaprotocol.com/"),
+           `External(Constants.minaForums),
            "Forums",
            "Explore tech topics in-depth. Good for reference.",
          )}
         {renderCard(
            Icon.Github,
-           `External("https://github.com/minaprotocol/mina"),
+           `External(Constants.minaGithub),
            "Github",
            "Work on the protocol  and contribute to Mina's codebase.",
          )}
         {renderCard(
            Icon.Wiki,
-           `External("https://minawiki.com"),
+           `External(Constants.minaWiki),
            "Wiki",
            "Resources from the O(1) Labs team and community members.",
          )}
         {renderCard(
            Icon.Email,
-           `External("https://github.com/minaprotocol/mina"),
+           `External(Constants.minaGithub),
            "Report A Bug",
            "Share any issues with the protocol, website or anything else.",
          )}
@@ -343,36 +334,34 @@ module GetStarted = {
       </Card>;
     };
 
-    <Wrapped>
-      <div className=ButtonBarStyles.container>
-        <div className=ButtonBarStyles.grid>
-          {renderCard(
-             Icon.NodeOperators,
-             `Internal("/tech"),
-             "Run a node",
-             "Getting started is easier than you think.",
-           )}
-          {renderCard(
-             Icon.Developers,
-             `Internal("/docs"),
-             "Build on Mina",
-             "Work on the protocol  and contribute to Mina's codebase.",
-           )}
-          {renderCard(
-             Icon.Community,
-             `Internal("/community"),
-             "Join the Community",
-             "Let's keep it positive and productive.",
-           )}
-          {renderCard(
-             Icon.GrantsProgram,
-             `Internal("/docs/contributing#mina-grants"),
-             "Apply for a Grant",
-             "Roll up your sleeves and help build Mina.",
-           )}
-        </div>
+    <div className=ButtonBarStyles.container>
+      <div className=ButtonBarStyles.grid>
+        {renderCard(
+           Icon.NodeOperators,
+           `Internal("/tech"),
+           "Run a node",
+           "Getting started is easier than you think.",
+         )}
+        {renderCard(
+           Icon.Developers,
+           `Internal("/docs"),
+           "Build on Mina",
+           "Work on the protocol  and contribute to Mina's codebase.",
+         )}
+        {renderCard(
+           Icon.Community,
+           `Internal("/community"),
+           "Join the Community",
+           "Let's keep it positive and productive.",
+         )}
+        {renderCard(
+           Icon.GrantsProgram,
+           `Internal("/docs/contributing#mina-grants"),
+           "Apply for a Grant",
+           "Roll up your sleeves and help build Mina.",
+         )}
       </div>
-    </Wrapped>;
+    </div>;
   };
 };
 

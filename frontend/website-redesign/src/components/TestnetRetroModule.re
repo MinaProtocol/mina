@@ -17,7 +17,14 @@ let fetchBlogs = () => {
 module Styles = {
   open Css;
 
-  let container = style([margin2(~v=`rem(7.), ~h=`zero)]);
+  let container =
+    style([
+      margin2(~v=`rem(3.), ~h=`zero),
+      media(
+        Theme.MediaQuery.notMobile,
+        [margin2(~v=`rem(7.25), ~h=`zero)],
+      ),
+    ]);
 
   let header =
     style([

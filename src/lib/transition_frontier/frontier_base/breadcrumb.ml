@@ -21,14 +21,16 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
+let build ?skip_staged_ledger_verification ~logger ~precomputed_values
+    ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender =
+                  External_transition.Almost_validated.t) ~sender () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
+        .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+          ~precomputed_values ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -88,20 +90,25 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                 let open Trust_system.Actions in
                 (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
-                let action =
-                  match staged_ledger_error with
-                  | Invalid_proofs _ ->
-                      make_actions Sent_invalid_proof
-                  | Pre_diff (Verification_failed _) ->
-                      make_actions Sent_invalid_signature_or_proof
-                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
-                      make_actions Gossiped_invalid_transition
-                  | Unexpected _ ->
-                      failwith
-                        "build: Unexpected staged ledger error should have \
-                         been caught in another pattern"
-                in
-                Trust_system.record trust_system logger peer action
+                with_return (fun {return} ->
+                    let action =
+                      match staged_ledger_error with
+                      | Couldn't_reach_verifier _ ->
+                          return Deferred.unit
+                      | Invalid_proofs _ ->
+                          make_actions Sent_invalid_proof
+                      | Pre_diff (Verification_failed _) ->
+                          make_actions Sent_invalid_signature_or_proof
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger peer action )
           in
           Error
             (`Invalid_staged_ledger_diff
@@ -334,11 +341,15 @@ module For_tests = struct
             previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.snarked_next_available_token
       in
+      let genesis_ledger_hash =
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.genesis_ledger_hash
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
-          ~staged_ledger_hash:next_staged_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
@@ -375,7 +386,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None
+          ~sender:None ~skip_staged_ledger_verification:true ()
       with
       | Ok new_breadcrumb ->
           [%log info]

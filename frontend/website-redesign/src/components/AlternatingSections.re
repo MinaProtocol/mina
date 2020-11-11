@@ -47,19 +47,18 @@ module Section = {
         display(`flex),
         alignItems(`center),
         justifyContent(`center),
-        marginLeft(`rem(0.5)),
+        marginLeft(`rem(0.3)),
         marginTop(`rem(0.2)),
+        color(Theme.Colors.orange),
       ]);
 
     let image =
       style([
         width(`percent(100.)),
-        maxWidth(`rem(23.)),
+        maxWidth(`rem(11.5)),
         height(`auto),
-        media(
-          Theme.MediaQuery.desktop,
-          [maxWidth(`rem(35.)), marginTop(`rem(2.))],
-        ),
+        marginTop(`rem(2.)),
+        media(Theme.MediaQuery.desktop, [maxWidth(`rem(17.5))]),
       ]);
   };
   module SimpleRow = {
@@ -92,12 +91,7 @@ module Section = {
       |> Array.mapi((idx, row) => {
            <div
              key={row.title}
-             className={Styles.rowContainer(
-               ~reverse={
-                 idx mod 2 != 0;
-               },
-               (),
-             )}>
+             className={Styles.rowContainer(~reverse={idx mod 2 != 0}, ())}>
              <div className=SectionStyles.textContainer>
                <h2 className=SectionStyles.title>
                  {React.string(row.title)}
@@ -109,11 +103,12 @@ module Section = {
                  <Button href={row.buttonUrl} bgColor=Theme.Colors.white>
                    {React.string(row.buttonCopy)}
                    <span className=SectionStyles.icon>
-                     <Icon kind=Icon.ArrowRightMedium />
+                     <Icon kind=Icon.ArrowRightSmall />
                    </span>
                  </Button>
                </div>
              </div>
+             <Spacer width=1.5 />
              <img src={row.image} className=Styles.image />
            </div>
          })
@@ -140,7 +135,7 @@ module Section = {
           borderBottom(`px(1), `solid, Theme.Colors.digitalBlack),
           before([
             contentRule(seperatorNumber),
-            Theme.Typeface.monumentGrotesk,
+            Theme.Typeface.monumentGroteskMono,
             color(Theme.Colors.digitalBlack),
             lineHeight(`rem(1.5)),
             letterSpacing(`px(-1)),
@@ -155,9 +150,7 @@ module Section = {
            <div
              key={row.title}
              className={SectionStyles.rowContainer(
-               ~reverse={
-                 idx mod 2 != 0;
-               },
+               ~reverse={idx mod 2 != 0},
                (),
              )}>
              <div className=SectionStyles.textContainer>
@@ -176,12 +169,13 @@ module Section = {
                    <span className=Theme.Type.buttonLink>
                      <span> {React.string(row.linkCopy)} </span>
                      <span className=SectionStyles.icon>
-                       <Icon kind=Icon.ArrowRightMedium />
+                       <Icon kind=Icon.ArrowRightSmall />
                      </span>
                    </span>
                  </span>
                </Next.Link>
              </div>
+             <Spacer width=1.5 />
              <img src={row.image} className=SectionStyles.image />
            </div>
          })

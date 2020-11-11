@@ -17,11 +17,26 @@ module System = {
     updatedAt: string,
   };
 
+  type includes;
+
   type entry('a) = {
     sys,
     fields: 'a,
+    includes,
   };
-  type entries('a) = {items: array(entry('a))};
+  type entries('a) = {
+    items: array(entry('a)),
+    includes,
+  };
+};
+
+module Link = {
+  type t = {
+    linkType: string,
+    id: string,
+  };
+
+  type entry = {sys: t};
 };
 
 module Image = {
@@ -75,17 +90,25 @@ module JobPost = {
   type entries = System.entries(t);
 };
 
-module KnowledgeBase = {
-  let id = "knowledgeBase";
-  type link = {
+module KnowledgeBaseResource = {
+  let id = "knowledgeeBaseResource";
+  type t = {
     title: string,
     url: string,
+    image: Image.entry,
   };
-  type links = {
-    articles: array(link),
-    videos: array(link),
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+  [@bs.get]
+  external getImages: System.includes => array(Image.entry) = "Asset";
+};
+
+module KnowledgeBaseCategory = {
+  let id = "knowledgeBaseCategory";
+  type t = {
+    title: string,
+    resources: array(KnowledgeBaseResource.entry),
   };
-  type t = {links};
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
@@ -94,14 +117,60 @@ module GenesisProfile = {
   let id = "genesisProfile";
   type t = {
     name: string,
-    profilePhoto: Image.entry,
+    image: Image.entry,
     quote: string,
     memberLocation: string,
-    twitter: string,
+    twitter: option(string),
     github: option(string),
     publishDate: string,
     blogPost: BlogPost.entry,
   };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module TeamProfile = {
+  let id = "teamMembers";
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+    bio: string,
+    quote: string,
+    twitter: option(string),
+    github: option(string),
+    linkedIn: option(string),
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module Advisor = {
+  let id = "advisors";
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module GenericMember = {
+  type t = {
+    name: string,
+    image: Image.entry,
+    title: string,
+    quote: option(string),
+    bio: option(string),
+    twitter: option(string),
+    github: option(string),
+    linkedIn: option(string),
+    blogPost: BlogPost.entry,
+    memberLocation: string,
+    publishDate: string,
+  };
+
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
@@ -148,7 +217,7 @@ module NormalizedPressBlog = {
   let ofAnnouncement = (announcement: Announcement.t) => {
     {
       title: announcement.title,
-      image: announcement.image,
+      image: None,
       link: `Slug(announcement.slug),
       featured: true,
       description: Some(announcement.snippet),

@@ -264,7 +264,7 @@ module Json_layout = struct
 
     type t =
       { level: (string option[@default None])
-      ; c: (int option[@default None])
+      ; sub_windows_per_window: (int option[@default None])
       ; ledger_depth: (int option[@default None])
       ; work_delay: (int option[@default None])
       ; block_window_duration_ms: (int option[@default None])
@@ -277,7 +277,7 @@ module Json_layout = struct
 
     let fields =
       [| "level"
-       ; "c"
+       ; "sub_windows_per_window"
        ; "ledger_depth"
        ; "work_delay"
        ; "block_window_duration_ms"
@@ -293,10 +293,19 @@ module Json_layout = struct
     type t =
       { k: (int option[@default None])
       ; delta: (int option[@default None])
+      ; slots_per_epoch: (int option[@default None])
+      ; slots_per_sub_window: (int option[@default None])
+      ; sub_windows_per_window: (int option[@default None])
       ; genesis_state_timestamp: (string option[@default None]) }
     [@@deriving yojson, dhall_type]
 
-    let fields = [|"k"; "delta"; "genesis_state_timestamp"|]
+    let fields =
+      [| "k"
+       ; "delta"
+       ; "slots_per_epoch"
+       ; "slots_per_sub_window"
+       ; "sub_window_per_window"
+       ; "genesis_state_timestamp" |]
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -310,14 +319,35 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Epoch_data = struct
+    module Data = struct
+      type t = {accounts: Accounts.t; seed: string}
+      [@@deriving yojson, dhall_type]
+
+      let fields = [|"accounts"; "seed"|]
+
+      let of_yojson json = of_yojson_generic ~fields of_yojson json
+    end
+
+    type t =
+      { staking: Data.t
+      ; next: (Data.t option[@default None]) (*If None then next = staking*) }
+    [@@deriving yojson, dhall_type]
+
+    let fields = [|"staking"; "next"|]
+
+    let of_yojson json = of_yojson_generic ~fields of_yojson json
+  end
+
   type t =
     { daemon: (Daemon.t option[@default None])
     ; genesis: (Genesis.t option[@default None])
     ; proof: (Proof_keys.t option[@default None])
-    ; ledger: (Ledger.t option[@default None]) }
+    ; ledger: (Ledger.t option[@default None])
+    ; epoch_data: (Epoch_data.t option[@default None]) }
   [@@deriving yojson, dhall_type]
 
-  let fields = [|"daemon"; "ledger"; "genesis"; "proof"|]
+  let fields = [|"daemon"; "ledger"; "genesis"; "proof"; "epoch_data"|]
 
   let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
@@ -329,10 +359,10 @@ end
   , "genesis": { "k": 1, "delta": 1 }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 14
       , "work_delay": 2
-      , "block_window_duration_ms": 180000
+      , "block_window_duration_ms": 120000
       , "transaction_capacity": {"txns_per_second_x10": 2}
       , "coinbase_amount": "200"
       , "supercharged_coinbase_factor": 2
@@ -584,7 +614,7 @@ module Proof_keys = struct
 
   type t =
     { level: Level.t option
-    ; c: int option
+    ; sub_windows_per_window: int option
     ; ledger_depth: int option
     ; work_delay: int option
     ; block_window_duration_ms: int option
@@ -597,7 +627,7 @@ module Proof_keys = struct
 
   let to_json_layout
       { level
-      ; c
+      ; sub_windows_per_window
       ; ledger_depth
       ; work_delay
       ; block_window_duration_ms
@@ -607,7 +637,7 @@ module Proof_keys = struct
       ; account_creation_fee
       ; fork } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
-    ; c
+    ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
@@ -620,7 +650,7 @@ module Proof_keys = struct
 
   let of_json_layout
       { Json_layout.Proof_keys.level
-      ; c
+      ; sub_windows_per_window
       ; ledger_depth
       ; work_delay
       ; block_window_duration_ms
@@ -635,7 +665,7 @@ module Proof_keys = struct
       result_opt ~f:Transaction_capacity.of_json_layout transaction_capacity
     in
     { level
-    ; c
+    ; sub_windows_per_window
     ; ledger_depth
     ; work_delay
     ; block_window_duration_ms
@@ -652,7 +682,9 @@ module Proof_keys = struct
 
   let combine t1 t2 =
     { level= opt_fallthrough ~default:t1.level t2.level
-    ; c= opt_fallthrough ~default:t1.c t2.c
+    ; sub_windows_per_window=
+        opt_fallthrough ~default:t1.sub_windows_per_window
+          t2.sub_windows_per_window
     ; ledger_depth= opt_fallthrough ~default:t1.ledger_depth t2.ledger_depth
     ; work_delay= opt_fallthrough ~default:t1.work_delay t2.work_delay
     ; block_window_duration_ms=
@@ -674,7 +706,12 @@ end
 
 module Genesis = struct
   type t = Json_layout.Genesis.t =
-    {k: int option; delta: int option; genesis_state_timestamp: string option}
+    { k: int option
+    ; delta: int option
+    ; slots_per_epoch: int option
+    ; slots_per_sub_window: int option
+    ; sub_windows_per_window: int option
+    ; genesis_state_timestamp: string option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Genesis.t = Fn.id
@@ -690,6 +727,14 @@ module Genesis = struct
   let combine t1 t2 =
     { k= opt_fallthrough ~default:t1.k t2.k
     ; delta= opt_fallthrough ~default:t1.delta t2.delta
+    ; sub_windows_per_window=
+        opt_fallthrough ~default:t1.sub_windows_per_window
+          t2.sub_windows_per_window
+    ; slots_per_epoch=
+        opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
+    ; slots_per_sub_window=
+        opt_fallthrough ~default:t1.slots_per_sub_window
+          t2.slots_per_sub_window
     ; genesis_state_timestamp=
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp }
@@ -714,32 +759,85 @@ module Daemon = struct
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size }
 end
 
+module Epoch_data = struct
+  module Data = struct
+    type t = {ledger: Ledger.t; seed: string}
+    [@@deriving bin_io_unversioned, yojson]
+  end
+
+  type t =
+    {staking: Data.t; next: Data.t option (*If None, then next = staking*)}
+  [@@deriving bin_io_unversioned, yojson]
+
+  let to_json_layout : t -> Json_layout.Epoch_data.t =
+   fun {staking; next} ->
+    let accounts (ledger : Ledger.t) =
+      match ledger.base with Accounts acc -> acc | _ -> assert false
+    in
+    let staking =
+      { Json_layout.Epoch_data.Data.accounts= accounts staking.ledger
+      ; seed= staking.seed }
+    in
+    let next =
+      Option.map next ~f:(fun n ->
+          { Json_layout.Epoch_data.Data.accounts= accounts n.ledger
+          ; seed= n.seed } )
+    in
+    {Json_layout.Epoch_data.staking; next}
+
+  let of_json_layout : Json_layout.Epoch_data.t -> (t, string) Result.t =
+   fun {staking; next} ->
+    let data accounts seed =
+      let ledger =
+        { Ledger.base= Accounts accounts
+        ; num_accounts= None
+        ; balances= []
+        ; hash= None
+        ; name= None
+        ; add_genesis_winner= Some false }
+      in
+      {Data.ledger; seed}
+    in
+    let staking = data staking.accounts staking.seed in
+    let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
+    Ok {staking; next}
+
+  let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
+
+  let of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
+end
+
 type t =
   { daemon: Daemon.t option
   ; genesis: Genesis.t option
   ; proof: Proof_keys.t option
-  ; ledger: Ledger.t option }
+  ; ledger: Ledger.t option
+  ; epoch_data: Epoch_data.t option }
 [@@deriving bin_io_unversioned]
 
-let to_json_layout {daemon; genesis; proof; ledger} =
+let to_json_layout {daemon; genesis; proof; ledger; epoch_data} =
   { Json_layout.daemon= Option.map ~f:Daemon.to_json_layout daemon
   ; genesis= Option.map ~f:Genesis.to_json_layout genesis
   ; proof= Option.map ~f:Proof_keys.to_json_layout proof
-  ; ledger= Option.map ~f:Ledger.to_json_layout ledger }
+  ; ledger= Option.map ~f:Ledger.to_json_layout ledger
+  ; epoch_data= Option.map ~f:Epoch_data.to_json_layout epoch_data }
 
-let of_json_layout {Json_layout.daemon; genesis; proof; ledger} =
+let of_json_layout {Json_layout.daemon; genesis; proof; ledger; epoch_data} =
   let open Result.Let_syntax in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
-  and ledger = result_opt ~f:Ledger.of_json_layout ledger in
-  {daemon; genesis; proof; ledger}
+  and ledger = result_opt ~f:Ledger.of_json_layout ledger
+  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
+  {daemon; genesis; proof; ledger; epoch_data}
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
-let default = {daemon= None; genesis= None; proof= None; ledger= None}
+let default =
+  {daemon= None; genesis= None; proof= None; ledger= None; epoch_data= None}
 
 let combine t1 t2 =
   let merge ~combine t1 t2 =
@@ -754,7 +852,8 @@ let combine t1 t2 =
   { daemon= merge ~combine:Daemon.combine t1.daemon t2.daemon
   ; genesis= merge ~combine:Genesis.combine t1.genesis t2.genesis
   ; proof= merge ~combine:Proof_keys.combine t1.proof t2.proof
-  ; ledger= opt_fallthrough ~default:t1.ledger t2.ledger }
+  ; ledger= opt_fallthrough ~default:t1.ledger t2.ledger
+  ; epoch_data= opt_fallthrough ~default:t1.epoch_data t2.epoch_data }
 
 module Test_configs = struct
   let bootstrap =
@@ -765,11 +864,11 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "none"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 1500
@@ -789,11 +888,11 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 6
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 6
       , "work_delay": 2
       , "block_window_duration_ms": 15000
@@ -815,11 +914,11 @@ module Test_configs = struct
       { "txpool_max_size": 3000 }
   , "genesis":
       { "k": 24
-      , "delta": 3
+      , "delta": 0
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 8
+      , "sub_windows_per_window": 8
       , "ledger_depth": 30
       , "work_delay": 1
       , "block_window_duration_ms": 10000
@@ -840,15 +939,16 @@ module Test_configs = struct
   { "daemon":
       { "txpool_max_size": 3000 }
   , "genesis":
-      { "k": 6
-      , "delta": 3
+      { "k": 4
+      , "delta": 0
+      , "slots_per_epoch": 72
       , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
   , "proof":
       { "level": "check"
-      , "c": 1
+      , "sub_windows_per_window": 4
       , "ledger_depth": 6
       , "work_delay": 1
-      , "block_window_duration_ms": 10000
+      , "block_window_duration_ms": 5000
       , "transaction_capacity": {"2_to_the": 2}
       , "coinbase_amount": "20"
       , "supercharged_coinbase_factor": 2

@@ -2,11 +2,11 @@
 
 open Core_kernel
 
-module Global_slots_and_ledger_hashes = struct
-  (* find all global slots in blocks, working back from block with given state hash *)
+module Block_info = struct
+  (* find all blocks, working back from block with given state hash *)
   let query =
     Caqti_request.collect Caqti_type.string
-      Caqti_type.(tup2 int64 string)
+      Caqti_type.(tup3 int int64 string)
       {|
          WITH RECURSIVE chain AS (
 
@@ -21,7 +21,7 @@ module Global_slots_and_ledger_hashes = struct
            ON b.id = chain.parent_id
         )
 
-        SELECT global_slot,ledger_hash FROM chain c
+        SELECT id,global_slot,ledger_hash FROM chain c
    |}
 
   let run (module Conn : Caqti_async.CONNECTION) state_hash =
@@ -80,6 +80,7 @@ module User_command = struct
     ; amount: int64 option
     ; memo: string
     ; nonce: int64
+    ; block_id: int
     ; global_slot: int64
     ; sequence_no: int }
 
@@ -89,12 +90,14 @@ module User_command = struct
       Ok
         ( (t.type_, t.fee_payer_id, t.source_id, t.receiver_id)
         , (t.fee, t.fee_token, t.token, t.amount)
-        , (t.memo, t.nonce, t.global_slot, t.sequence_no) )
+        , (t.memo, t.nonce)
+        , (t.block_id, t.global_slot, t.sequence_no) )
     in
     let decode
         ( (type_, fee_payer_id, source_id, receiver_id)
         , (fee, fee_token, token, amount)
-        , (memo, nonce, global_slot, sequence_no) ) =
+        , (memo, nonce)
+        , (block_id, global_slot, sequence_no) ) =
       Ok
         { type_
         ; fee_payer_id
@@ -106,21 +109,22 @@ module User_command = struct
         ; amount
         ; memo
         ; nonce
+        ; block_id
         ; global_slot
         ; sequence_no }
     in
     let rep =
       Caqti_type.(
-        tup3 (tup4 string int int int)
+        tup4 (tup4 string int int int)
           (tup4 int64 int64 int64 (option int64))
-          (tup4 string int64 int64 int))
+          (tup2 string int64) (tup3 int int64 int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,blocks.id,global_slot,sequence_no,status FROM
 
          (SELECT * FROM user_commands WHERE id = ?) AS uc
 
@@ -159,6 +163,7 @@ module Internal_command = struct
     ; receiver_id: int
     ; fee: int64
     ; token: int64
+    ; block_id: int
     ; global_slot: int64
     ; sequence_no: int
     ; secondary_sequence_no: int }
@@ -169,31 +174,35 @@ module Internal_command = struct
       Ok
         ( (t.type_, t.receiver_id)
         , (t.fee, t.token)
-        , (t.global_slot, t.sequence_no, t.secondary_sequence_no) )
+        , (t.block_id, t.global_slot)
+        , (t.sequence_no, t.secondary_sequence_no) )
     in
     let decode
         ( (type_, receiver_id)
         , (fee, token)
-        , (global_slot, sequence_no, secondary_sequence_no) ) =
+        , (block_id, global_slot)
+        , (sequence_no, secondary_sequence_no) ) =
       Ok
         { type_
         ; receiver_id
         ; fee
         ; token
+        ; block_id
         ; global_slot
         ; sequence_no
         ; secondary_sequence_no }
     in
     let rep =
       Caqti_type.(
-        tup3 (tup2 string int) (tup2 int64 int64) (tup3 int64 int int))
+        tup4 (tup2 string int) (tup2 int64 int64) (tup2 int int64)
+          (tup2 int int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,receiver_id,fee,token,global_slot,sequence_no,secondary_sequence_no FROM
+         SELECT type,receiver_id,fee,token,blocks.id,global_slot,sequence_no,secondary_sequence_no FROM
 
          (SELECT * FROM internal_commands WHERE id = ?) AS ic
 

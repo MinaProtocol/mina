@@ -56,7 +56,6 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`row),
-      justifyContent(`spaceBetween),
       width(`percent(100.)),
       height(`percent(100.)),
       maxWidth(`rem(35.)),
@@ -65,6 +64,7 @@ module Styles = {
       media(Theme.MediaQuery.notMobile, [flexDirection(`column)]),
     ]);
 
+  let h3 = merge([Theme.Type.h3, style([width(`rem(9.75))])]);
   let textContainer =
     style([
       display(`flex),
@@ -72,6 +72,7 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`flexStart),
       marginLeft(`rem(1.)),
+      marginTop(`rem(1.5)),
       media(
         Theme.MediaQuery.notMobile,
         [marginLeft(`zero), marginTop(`rem(1.))],
@@ -87,7 +88,7 @@ module Styles = {
     ]);
 
   let formatText =
-    style([Theme.Typeface.monumentGrotesk, fontSize(`rem(3.))]);
+    style([Theme.Typeface.monumentGrotesk, fontSize(`rem(2.))]);
 
   let comparisonImage =
     style([
@@ -109,7 +110,10 @@ module Styles = {
   let minaBlockChainImage = style([height(`percent(90.))]);
 
   let comparisonLabel =
-    merge([Theme.Type.label, style([fontSize(`rem(1.25))])]);
+    merge([
+      Theme.Type.label,
+      style([fontSize(`rem(1.25)), marginTop(`rem(1.))]),
+    ]);
 
   let otherBlockChainImage =
     style([height(`percent(100.)), marginLeft(`zero)]);
@@ -123,10 +127,8 @@ let make = () => {
         <div className=Styles.comparisonContainer>
           <div className=Styles.contentContainer>
             <div className=Styles.content>
-              <h3 className=Theme.Type.h3>
-                {React.string("Mina Blockchain")}
-              </h3>
-              <span className=Styles.textContainer>
+              <h3 className=Styles.h3> {React.string("Mina Blockchain")} </h3>
+              <div className=Styles.textContainer>
                 <span>
                   <span className=Styles.sizeText>
                     {React.string("22")}
@@ -138,7 +140,7 @@ let make = () => {
                 <span className=Styles.comparisonLabel>
                   {React.string("Fixed Size")}
                 </span>
-              </span>
+              </div>
             </div>
           </div>
           <div className=Styles.comparisonImage>
@@ -152,7 +154,7 @@ let make = () => {
         <div className=Styles.comparisonContainer>
           <div className=Styles.contentContainer>
             <div className=Styles.content>
-              <h3 className=Theme.Type.h3>
+              <h3 className=Styles.h3>
                 {React.string("Other Blockchains")}
               </h3>
               <span className=Styles.textContainer>

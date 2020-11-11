@@ -47,16 +47,24 @@ CREATE TABLE internal_commands
 , hash        text                  NOT NULL UNIQUE
 );
 
+CREATE TABLE epoch_data
+( id             serial PRIMARY KEY
+, seed           text   NOT NULL
+, ledger_hash_id int    NOT NULL REFERENCES snarked_ledger_hashes(id)
+);
+
 CREATE TABLE blocks
-( id                     serial PRIMARY KEY
-, state_hash             text   NOT NULL UNIQUE
-, parent_id              int                    REFERENCES blocks(id) ON DELETE SET NULL
-, creator_id             int    NOT NULL        REFERENCES public_keys(id)
-, snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
-, ledger_hash            text   NOT NULL
-, height                 bigint NOT NULL
-, global_slot            bigint NOT NULL
-, timestamp              bigint NOT NULL
+( id                      serial PRIMARY KEY
+, state_hash              text   NOT NULL UNIQUE
+, parent_id               int    NOT NULL        REFERENCES blocks(id)
+, creator_id              int    NOT NULL        REFERENCES public_keys(id)
+, snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
+, staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
+, next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
+, ledger_hash             text   NOT NULL
+, height                  bigint NOT NULL
+, global_slot             bigint NOT NULL
+, timestamp               bigint NOT NULL
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
@@ -74,6 +82,6 @@ CREATE TABLE blocks_internal_commands
 ( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
-, secondary_sequence_no int
-, PRIMARY KEY (block_id, internal_command_id)
+, secondary_sequence_no int NOT NULL
+, PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );

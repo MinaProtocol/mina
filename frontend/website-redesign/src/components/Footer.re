@@ -5,7 +5,7 @@ module Styles = {
       position(`relative),
       left(`zero),
       bottom(`zero),
-      height(`rem(106.)),
+      height(`percent(100.)),
       padding2(~v=`rem(4.), ~h=`rem(1.25)),
       backgroundImage(`url("/static/img/Small.jpg")),
       backgroundSize(`cover),
@@ -13,7 +13,7 @@ module Styles = {
         Theme.MediaQuery.tablet,
         [
           padding2(~v=`rem(4.), ~h=`rem(2.68)),
-          height(`rem(75.)),
+          height(`percent(100.)),
           backgroundImage(`url("/static/img/Medium.jpg")),
         ],
       ),
@@ -96,21 +96,19 @@ module SocialIcons = {
   [@react.component]
   let make = () => {
     <div className=Styles.iconsRow>
-      <a className=Styles.anchor href="https://bit.ly/MinaDiscord">
+      <a className=Styles.anchor href=Constants.minaDiscordRulesAndGuidelines>
         <Icon kind=Icon.Discord size=2. />
       </a>
-      <a className=Styles.anchor href="https://twitter.com/minaprotocol">
+      <a className=Styles.anchor href=Constants.minaTwitter>
         <Icon kind=Icon.Twitter size=2. />
       </a>
-      <a className=Styles.anchor href="http://bit.ly/MinaProtocolFacebook">
+      <a className=Styles.anchor href=Constants.minaFacebook>
         <Icon kind=Icon.Facebook size=2. />
       </a>
-      <a className=Styles.anchor href="http://bit.ly/MinaTelegram">
+      <a className=Styles.anchor href=Constants.minaTelegram>
         <Icon kind=Icon.Telegram size=2. />
       </a>
-      <a
-        className=Styles.anchor
-        href="https://forums.codaprotocol.com/t/coda-protocol-chinese-resources/200">
+      <a className=Styles.anchor href=Constants.minaWeChat>
         <Icon kind=Icon.WeChat size=2. />
       </a>
     </div>;
@@ -244,12 +242,10 @@ module Subfooter = {
   let make = () => {
     <div className=Styles.column>
       <div className=Styles.linksContainer>
-        <a href="https://o1labs.org/" className=Styles.smallLinks>
+        <a href=Constants.o1LabsUrl className=Styles.smallLinks>
           {React.string("O(1) Labs")}
         </a>
-        <a
-          href="https://github.com/MinaProtocol/mina/blob/develop/CODE_OF_CONDUCT.md"
-          className=Styles.smallLinks>
+        <a href=Constants.minaCodeOfConduct className=Styles.smallLinks>
           {React.string("Code of Conduct")}
         </a>
         <Next.Link href="/privacy">

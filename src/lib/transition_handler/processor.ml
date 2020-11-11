@@ -21,7 +21,7 @@ module Transition_frontier_validation =
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
-    ( precomputed_values.genesis_constants.protocol.delta
+    ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
@@ -174,8 +174,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-          )
+            ~parent:parent_breadcrumb
+            ~transition:
+              mostly_validated_transition (* TODO: Can we skip here? *)
+            ~skip_staged_ledger_verification:false () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->

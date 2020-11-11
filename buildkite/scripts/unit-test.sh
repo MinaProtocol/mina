@@ -10,12 +10,6 @@ fi
 profile=$1
 path=$2
 
-echo "--- CPU frequency info"
-lscpu | grep -i hz
-
-echo "--- CPU general info"
-cat /proc/cpuinfo
-
 source ~/.profile
 
 echo "--- Make build"

@@ -18,7 +18,11 @@ module Styles = {
       height(`percent(100.)),
     ]);
 
-  let title = merge([Theme.Type.h5, style([marginTop(`rem(1.))])]);
+  let title =
+    merge([
+      Theme.Type.h5,
+      style([fontWeight(`light), marginTop(`rem(1.))]),
+    ]);
 
   let description =
     merge([Theme.Type.paragraphSmall, style([marginTop(`rem(1.))])]);
@@ -33,13 +37,15 @@ module Styles = {
         display(`flex),
         alignItems(`center),
         cursor(`pointer),
-        marginTop(`rem(1.)),
+        marginTop(`auto),
       ]),
     ]);
 
   let mainListingContainer =
     style([
       width(`percent(100.)),
+      marginBottom(`rem(2.)),
+      height(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`percent(40.))]),
     ]);
 };
@@ -95,7 +101,7 @@ module MainListing = {
       {let inner =
          <div className=Styles.link>
            <span> {React.string("Read more")} </span>
-           <Icon kind=Icon.ArrowRightMedium />
+           <Icon kind=Icon.ArrowRightSmall />
          </div>;
        switch (item.link) {
        | `Slug(slug) =>
@@ -118,11 +124,7 @@ module Listing = {
         flexDirection(`column),
         borderTop(`px(1), `solid, Theme.Colors.digitalBlack),
         width(`percent(100.)),
-        marginTop(`rem(1.)),
-        media(
-          Theme.MediaQuery.notMobile,
-          [marginTop(`zero), width(`percent(80.))],
-        ),
+        media(Theme.MediaQuery.notMobile, [width(`percent(80.))]),
       ]);
 
     let link = merge([Styles.link, style([marginBottom(`rem(2.))])]);
@@ -134,7 +136,7 @@ module Listing = {
       let inner =
         <div className=ListingStyles.link>
           <span> {React.string("Read more")} </span>
-          <Icon kind=Icon.ArrowRightMedium />
+          <Icon kind=Icon.ArrowRightSmall />
         </div>;
       switch (item.link) {
       | `Slug(slug) =>

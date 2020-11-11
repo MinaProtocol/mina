@@ -11,10 +11,26 @@ module Styles = {
       selector("h4", [important(color(Theme.Colors.white))]),
     ]);
 
-  let statusBadge =
+  let statusBadgeContainer =
     merge([
       Theme.Type.label,
-      style([color(Theme.Colors.white), marginTop(`rem(4.5))]),
+      style([
+        color(Theme.Colors.white),
+        marginTop(`rem(4.5)),
+        display(`flex),
+        alignItems(`flexStart),
+        flexDirection(`column),
+        media(
+          Theme.MediaQuery.tablet,
+          [alignItems(`center), flexDirection(`row)],
+        ),
+      ]),
+    ]);
+
+  let statusBadge =
+    style([
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.tablet, [marginLeft(`rem(1.))]),
     ]);
 
   let leaderboardLink =
@@ -24,7 +40,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      alignItems(`center),
+      alignItems(`flexStart),
       justifyContent(`center),
       marginTop(`rem(4.)),
       marginBottom(`rem(2.)),
@@ -53,14 +69,15 @@ module Styles = {
       style([
         display(`listItem),
         listStylePosition(`inside),
-        marginBottom(`rem(14.)),
+        marginBottom(`rem(4.)),
         marginTop(`rem(3.)),
+        media(Theme.MediaQuery.notMobile, [marginBottom(`rem(12.))]),
       ]),
     ]);
 
   let leaderboardContainer =
     style([
-      height(`rem(45.)),
+      height(`rem(65.)),
       width(`percent(100.)),
       position(`relative),
       overflow(`hidden),
@@ -69,6 +86,7 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       justifyContent(`center),
+      media(Theme.MediaQuery.tablet, [height(`rem(43.))]),
     ]);
 };
 
@@ -79,7 +97,7 @@ let make = () => {
       <div className=Nav.Styles.spacer />
       <Hero
         title="Testnet"
-        header="Secure the Network"
+        header={Some("Secure the Network")}
         copy={
           Some(
             {j|Push the boundaries of Mina’s testnet to help prepare for mainnet.|j},
@@ -90,10 +108,12 @@ let make = () => {
           tablet: "/static/img/TestnetBackground.jpg",
           mobile: "/static/img/TestnetBackground.jpg",
         }>
-        <p className=Styles.statusBadge>
-          {React.string("Testnet Status: ")}
-          <StatusBadge service=`Network />
-        </p>
+        <div className=Styles.statusBadgeContainer>
+          <span> {React.string("Testnet Status: ")} </span>
+          <span className=Styles.statusBadge>
+            <StatusBadge service=`Network />
+          </span>
+        </div>
       </Hero>
       <Wrapped>
         <div className=Styles.leaderboardTextContainer>
@@ -128,21 +148,22 @@ let make = () => {
       <FeaturedSingleRow
         row={
           FeaturedSingleRow.Row.rowType: ImageRightCopyLeft,
-          copySize: `Small,
+          copySize: `Large,
           title: "Testnet Challenges",
           description: "Learn how to operate the protocol, while contributing to Mina's network resilience.",
           textColor: Theme.Colors.white,
-          image: "/static/img/AboutHeroDesktopBackground.jpg",
+          image: "/static/img/TestnetCopyBackgroundDesktop.jpg",
           background: Image("/static/img/MinaSpectrumPrimarySilver.jpg"),
           contentBackground:
             Image("/static/img/TestnetContentBlockBackground.png"),
-          button: {
-            FeaturedSingleRow.Row.buttonText: "See the Latest Challenges",
-            buttonColor: Theme.Colors.mint,
-            buttonTextColor: Theme.Colors.digitalBlack,
-            dark: true,
-            href: `External("http://bit.ly/TestnetChallenges"),
-          },
+          link:
+            FeaturedSingleRow.Row.Button({
+              FeaturedSingleRow.Row.buttonText: "See the Latest Challenges",
+              buttonColor: Theme.Colors.mint,
+              buttonTextColor: Theme.Colors.digitalBlack,
+              dark: true,
+              href: `External(Constants.currentChallenges),
+            }),
         }
       />
       <TestnetRetroModule />

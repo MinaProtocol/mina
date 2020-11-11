@@ -1,4 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -17,7 +20,11 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "helm" ],
+      dirtyWhen = [
+        S.contains "helm/",
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
+        S.exactly "buildkite/scripts/helm-ci" "sh"
+      ],
       path = "Lint",
       name = "HelmChart"
     },
@@ -28,6 +35,7 @@ Pipeline.build
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
           , target = Size.Small
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]

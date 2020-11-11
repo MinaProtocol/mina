@@ -47,10 +47,17 @@ module Make (Inputs : Inputs_intf) :
   let prove ~logger frontier =
     let open Option.Let_syntax in
     let genesis_constants = Transition_frontier.genesis_constants frontier in
+    let root = Transition_frontier.root frontier in
+    let root_state_hash = Frontier_base.Breadcrumb.state_hash root in
+    let root_is_genesis =
+      State_hash.(
+        root_state_hash = Transition_frontier.genesis_state_hash frontier)
+    in
     let%map () =
       Option.some_if
         ( Transition_frontier.best_tip_path_length_exn frontier
-        = Transition_frontier.global_max_length genesis_constants )
+          = Transition_frontier.global_max_length genesis_constants
+        || root_is_genesis )
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
@@ -96,11 +103,17 @@ module Make (Inputs : Inputs_intf) :
            ~f:
              (Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))
 
-  let verify ~verifier ~genesis_constants
+  let verify ~verifier ~genesis_constants ~precomputed_values
       {Proof_carrying_data.data= best_tip; proof= merkle_list, root} =
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
+    let genesis_transition = External_transition.genesis ~precomputed_values in
+    let genesis_state_hash =
+      External_transition.Validated.state_hash genesis_transition
+    in
+    let root_state_hash = External_transition.state_hash root in
+    let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =
       Deferred.return
         (Result.ok_if_true
@@ -109,7 +122,7 @@ module Make (Inputs : Inputs_intf) :
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
                   max_length merkle_list_length )
-           (Int.equal max_length merkle_list_length))
+           (Int.equal max_length merkle_list_length || root_is_genesis))
     in
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:External_transition.state_hash

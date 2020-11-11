@@ -4,20 +4,22 @@ let make = () => {
     <div className=Nav.Styles.spacer />
     <Hero
       title=""
-      header="Press & Media"
+      header={Some("Press & Media")}
       copy={
         Some(
           "Light. Accessible. Decentralized. SNARKy. Mina is a whole new kind of blockchain.",
         )
       }
       background={
-        Theme.desktop: "/static/img/backgrounds/15_PressAndMedia_1_2880x1504.jpg",
-        Theme.tablet: "/static/img/backgrounds/15_PressAndMedia_1_1536x1504_tablet.jpg",
+        Theme.desktop: "/static/img/backgrounds/PressAndMediaDesktop.jpg",
+        Theme.tablet: "/static/img/backgrounds/PressAndMediaTablet.jpg",
         Theme.mobile: "/static/img/backgrounds/15_PressandMedia_1_750x1056_mobile.jpg",
       }>
       <Spacer height=1.5 />
       <Button
-        href=`Scroll_to_top bgColor=Theme.Colors.black width={`rem(14.)}>
+        href={`External(Constants.minaPressKit)}
+        bgColor=Theme.Colors.black
+        width={`rem(14.)}>
         {React.string("Download Media Kit")}
         <Icon kind=Icon.ArrowRightMedium size=1. />
       </Button>
@@ -27,6 +29,7 @@ let make = () => {
       source=`Announcement
       title="Mina Announcements"
       itemKind=ListModule.Announcement
+      buttonHref={`Internal("/announcements")}
     />
   </Page>;
 };

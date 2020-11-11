@@ -73,7 +73,7 @@ module Go_log = struct
         (* this is intentionally debug, because the go info logs are too verbose for our info *)
         Debug
     | "debug" ->
-        Debug
+        Spam
     | _ ->
         Spam
 
@@ -84,8 +84,76 @@ module Go_log = struct
     ; module_: string [@key "logger"]
     ; level: string
     ; msg: string
-    ; error: string [@default ""] }
-  [@@deriving of_yojson]
+    ; metadata: Yojson.Safe.t String.Map.t }
+
+  let record_of_yojson (json : Yojson.Safe.t) =
+    let open Result.Let_syntax in
+    let prefix = "Coda_net2.Go_log.record_of_yojson: " in
+    match json with
+    | `Assoc fields ->
+        let set_field field_name prev_value parse json =
+          match prev_value with
+          | Some _ ->
+              Error
+                (prefix ^ "Field '" ^ field_name ^ "' appears multiple times")
+          | None ->
+              parse json
+              |> Result.map_error ~f:(fun err ->
+                     prefix ^ "Could not parse field '" ^ field_name ^ "':"
+                     ^ err )
+              |> Result.map ~f:Option.return
+        in
+        let get_field field_name value =
+          match value with
+          | Some x ->
+              Ok x
+          | None ->
+              Error (prefix ^ "Field '" ^ field_name ^ "' is required")
+        in
+        let string_of_yojson = function
+          | `String s ->
+              Ok s
+          | _ ->
+              Error "Expected a string"
+        in
+        let%bind ts, module_, level, msg, metadata =
+          List.fold_result ~init:(None, None, None, None, String.Map.empty)
+            fields ~f:(fun (ts, module_, level, msg, metadata) (field, json) ->
+              match field with
+              | "ts" ->
+                  let%map ts = set_field "ts" ts string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | "logger" ->
+                  let%map module_ =
+                    set_field "logger" module_ string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "level" ->
+                  let%map level =
+                    set_field "level" level string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "msg" ->
+                  let%map msg = set_field "msg" msg string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | _ ->
+                  let field =
+                    if String.equal field "error" then "go_error" else field
+                  in
+                  Ok
+                    ( ts
+                    , module_
+                    , level
+                    , msg
+                    , Map.set ~key:field ~data:json metadata ) )
+        in
+        let%bind ts = get_field "ts" ts in
+        let%bind module_ = get_field "logger" module_ in
+        let%bind level = get_field "level" level in
+        let%map msg = get_field "msg" msg in
+        {ts; module_; level; msg; metadata}
+    | _ ->
+        Error (prefix ^ "Expected a JSON object")
 
   let record_to_message r =
     Logger.Message.
@@ -97,10 +165,7 @@ module Go_log = struct
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
       ; message= r.msg
-      ; metadata=
-          ( if r.error <> "" then
-            String.Map.singleton "go_error" (`String r.error)
-          else String.Map.empty )
+      ; metadata= r.metadata
       ; event_id= None }
 end
 
@@ -294,7 +359,7 @@ module Helper = struct
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
-        ; flooding: bool
+        ; flood: bool
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
@@ -347,7 +412,7 @@ module Helper = struct
     end
 
     module Validation_complete = struct
-      type input = {seqno: int; action: string} [@@deriving yojson]
+      type input = {seqno: int; is_valid: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -815,7 +880,7 @@ module Helper = struct
               do_rpc t
                 (module Rpcs.Validation_complete)
                 { seqno
-                ; action=
+                ; is_valid=
                     ( match action with
                     | `Accept ->
                         "accept"
@@ -1142,9 +1207,15 @@ let list_peers net =
   | Error _ ->
       []
 
-let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
-    ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange ~seed_peers
-    ~initial_gating_config =
+let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
+    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
+    ~seed_peers ~initial_gating_config =
+  net.Helper.new_peer_callback
+  <- Some
+       (fun peer_id peer_addrs ->
+         on_new_peer
+           { id= Peer.Id.unsafe_of_string peer_id
+           ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1154,7 +1225,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
-      ; flooding
+      ; flood= flooding
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
@@ -1163,12 +1234,6 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
-      net.new_peer_callback
-      <- Some
-           (fun peer_id peer_addrs ->
-             on_new_peer
-               { id= Peer.Id.unsafe_of_string peer_id
-               ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1424,7 +1489,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                   ; metadata= String.Map.singleton "line" (`String r.message)
                   } )
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
@@ -1447,7 +1512,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
           | Ok (Ok ()) ->
               ()
           | Error err ->
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("line", `String line)
                   ; ("error", `String (Error.to_string_hum err)) ]
@@ -1492,16 +1557,18 @@ let%test_module "coda network tests" =
       let%bind kp_b = Keypair.random a in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
-        configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
-          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
+        configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
+          ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       and () =
-        configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~peer_exchange:true ~direct_peers:[] ~seed_peers:[]
-          ~on_new_peer:Fn.ignore ~flooding:false ~unsafe_no_trust_ip:true
+        configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
+          ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
