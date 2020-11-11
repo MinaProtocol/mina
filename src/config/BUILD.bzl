@@ -3,23 +3,23 @@ load("@bazel_skylib//rules:common_settings.bzl",
      "string_flag",
      "BuildSettingInfo")
 
-def _coda_test_config_impl(ctx):
+def _mina_test_config_impl(ctx):
     return [DefaultInfo(files = ctx.attr.config[DefaultInfo].files)]
 
-coda_test_config = rule(
-    implementation = _coda_test_config_impl,
+mina_test_config = rule(
+    implementation = _mina_test_config_impl,
     # defaults are from src/config/dev.mlh
     attrs = {
         "config": attr.label()
     }
 )
 
-def _coda_config_impl(ctx):
+def _mina_config_impl(ctx):
     outfile = ctx.actions.declare_file("config.mlh")
     ##FIXME: validate: timestamp, duration
     # proof_level: check, full, none
     runfiles = ctx.runfiles(files = [outfile])
-    print("_coda_config_impl")
+    print("_mina_config_impl")
     ctx.actions.expand_template(
         output = outfile,
         template = ctx.file._template,
@@ -129,8 +129,8 @@ def _coda_config_impl(ctx):
     )
     return [DefaultInfo(files = depset([outfile]), runfiles=runfiles)]
 
-coda_config = rule(
-    implementation = _coda_config_impl,
+mina_config = rule(
+    implementation = _mina_config_impl,
     # defaults are from src/config/dev.mlh
     attrs = {
         # [%%import "/src/config/ledger_depth/small.mlh"]
