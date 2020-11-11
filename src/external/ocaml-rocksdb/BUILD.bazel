@@ -1,0 +1,215 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_executable",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "REPO_ARCHIVE_OPTS",
+    "REPO_EXECUTABLE_OPTS",
+    "REPO_INTERFACE_OPTS",
+    "REPO_MODULE_OPTS",
+    "REPO_NS_MODULE_OPTS",
+)
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+PKG_DEBUG_OPT = select({
+    ":enable_debug": ["-g"],
+    "//conditions:default": [],
+})
+
+PKG_VERBOSE_OPT = select({
+    ":enable_verbose": ["-verbose"],
+    "//conditions:default": [],
+})
+
+PKG_OPTS = PKG_DEBUG_OPT + PKG_VERBOSE_OPT
+PKG_ARCHIVE_OPTS = PKG_OPTS + ["-nodynlink"]
+PKG_NS_MODULE_OPTS = PKG_OPTS
+PKG_EXECUTABLE_OPTS = PKG_OPTS + ["-nodynlink"]
+PKG_INTERFACE_OPTS = PKG_OPTS
+PKG_MODULE_OPTS = PKG_OPTS + ["-nodynlink"]
+
+################################################################
+## STANZA 1: LIBRARY ROCKS
+################################################################
+ROCKS_INTERFACE_OPTS = REPO_INTERFACE_OPTS + PKG_INTERFACE_OPTS
+
+ROCKS_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS
+
+ROCKS_ARCHIVE_OPTS = REPO_ARCHIVE_OPTS + PKG_ARCHIVE_OPTS + []
+
+ROCKS_NS_MODULE_OPTS = REPO_NS_MODULE_OPTS + PKG_NS_MODULE_OPTS
+
+ROCKS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:ctypes",
+    "@opam//pkg:ctypes.foreign",
+]
+
+ocaml_archive(
+    name = "rocks",
+    opts = ROCKS_ARCHIVE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = ROCKS_DEPS + [
+        ":_Rocks",
+        ":_Rocks_common",
+        ":_Rocks_intf",
+        ":_Rocks_options",
+    ],
+    cc_deps = {
+        "//bzl/external/bzip2": "static",    # -lbz2
+        "//bzl/external/zlib": "default"     # -lz
+    },
+    cc_linkall  = ["//bzl/external/rocksdb"], # -Wl,-force_load (MacOS) or -whole-archive (Linux)
+    cc_linkopts = select({
+        "//bzl/host:macos": ["-lc++abi", "-lc++"],
+        "//bzl/host:linux": ["-lstdc++"],
+    }, no_match_error = "Unsupported platform. Only Linux and MacOS supported.")
+)
+
+ocaml_ns(
+    name = "Rocks_ns",
+    ns = "rocks",
+    opts = ROCKS_NS_MODULE_OPTS,
+    submodules = [
+        # do not sort (buildifier)
+        "rocks.ml",
+        "rocks_common.ml",
+        "rocks_intf.ml",
+        "rocks_options.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rocks",
+    src = "rocks.ml",
+    intf = ":_Rocks.cmi",
+    ns = ":Rocks_ns",
+    opts = ROCKS_MODULE_OPTS,
+    deps = ROCKS_DEPS + [
+        # do not sort (buildifier)
+        ":_Rocks_common",
+        ":_Rocks_intf",
+        ":_Rocks_options",
+    ],
+)
+
+#####
+ocaml_interface(
+    name = "_Rocks.cmi",
+    src = "rocks.mli",
+    ns = ":Rocks_ns",
+    opts = ROCKS_INTERFACE_OPTS,
+    deps = ROCKS_DEPS + [
+        # do not sort (buildifier)
+        ":_Rocks_common",
+        ":_Rocks_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rocks_common",
+    src = "rocks_common.ml",
+    ns = ":Rocks_ns",
+    opts = ROCKS_MODULE_OPTS,
+    deps = ROCKS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Rocks_intf",
+    src = "rocks_intf.ml",
+    ns = ":Rocks_ns",
+    opts = ROCKS_MODULE_OPTS,
+    deps = ROCKS_DEPS + [
+        # do not sort (buildifier)
+        ":_Rocks_options",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rocks_options",
+    src = "rocks_options.ml",
+    ns = ":Rocks_ns",
+    opts = ROCKS_MODULE_OPTS,
+    deps = ROCKS_DEPS + [
+        # do not sort (buildifier)
+        ":_Rocks_common",
+    ],
+)
+
+################################################################
+## STANZA 2 (rocks_linker_flags_gen)
+################################################################
+
+# ROCKS_LINKER_FLAGS_GEN_OPTS = []
+
+# ROCKS_LINKER_FLAGS_GEN_DEPS = [
+#     # do not sort (buildifier)
+#     "@opam//pkg:dune.configurator",
+# ]
+
+# genrule(
+#     name = "gen_flags",
+#     outs = ["flags.sexp"],
+#     tools = [":rocks_linker_flags_gen.exe"],
+#     cmd = "\n".join([
+#         "$(location :rocks_linker_flags_gen.exe)",
+#         "cp flags.sexp \"$@\""
+#     ]),
+# )
+
+# ################################################################
+# ROCKS_LINKER_FLAGS_GEN_EXECUTABLE_OPTS = REPO_EXECUTABLE_OPTS + PKG_EXECUTABLE_OPTS + []
+# ROCKS_LINKER_FLAGS_GEN_MODULE_OPTS = REPO_MODULE_OPTS + PKG_MODULE_OPTS + []
+# ROCKS_LINKER_FLAGS_GEN_DEPS = [
+#     # do not sort (buildifier)
+#     "@opam//pkg:dune.configurator",
+# ]
+
+# ocaml_executable(
+#     name = "rocks_linker_flags_gen.exe",
+#     main = "Rocks_linker_flags_gen",
+#     opts = ROCKS_LINKER_FLAGS_GEN_EXECUTABLE_OPTS,
+#     visibility = ["//visibility:public"],
+#     deps = ROCKS_LINKER_FLAGS_GEN_DEPS
+# )
+
+# ocaml_module(
+#     name = "Rocks_linker_flags_gen",
+#     src = "rocks_linker_flags_gen.ml",
+#     opts = ROCKS_LINKER_FLAGS_GEN_MODULE_OPTS,
+#     deps = ROCKS_LINKER_FLAGS_GEN_DEPS + [
+#         # do not sort (buildifier)
+#     ],
+# )
+
+################################################################
+bool_flag(
+    name = "debug",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "enable_debug",
+    flag_values = {":debug": str(True)},
+)
+
+bool_flag(
+    name = "verbose",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "enable_verbose",
+    flag_values = {":verbose": str(True)},
+)
