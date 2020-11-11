@@ -236,12 +236,12 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/mina*.deb /tmp/artifacts/.
 
 deb_optimized:
 	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
 	@mkdir -p /tmp/artifacts
-	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/mina*.deb /tmp/artifacts/.
 
 build_pv_keys:
 	$(info Building keys)

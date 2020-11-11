@@ -31,7 +31,7 @@ spec:
         image: gcr.io/o1labs-192920/coda-network-services:latest
         command: ["bash"]
         args: ["-c", "/code/main.sh"]
-        ports: 
+        ports:
           - name: metrics
             containerPort: 8000
         imagePullPolicy: Always
@@ -39,7 +39,7 @@ spec:
         resources:
           limits:
           requests:
-            memory: 14.0Gi
+            memory: 16.0Gi
             cpu: 8.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
