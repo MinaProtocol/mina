@@ -1,0 +1,17 @@
+################################################################
+TODO: add "@marlin//:version.ml" to ns module's submod list
+TODO: fix "snarky_bn382" in all three build files
+ocaml_module(
+    name = "_Version",
+    src  = "@marlin//:version.ml",
+    intf = ":_Version.cmi",
+    ns   = ":Zexe_backend_common_ns",
+    ppx  = ":ppx.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+        "--conditional",
+    ],
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+)

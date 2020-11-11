@@ -1,0 +1,44 @@
+build --color=yes
+# build --subcommands=pretty_print
+# build --subcommands   ## no pretty print
+# build --verbose_failures
+# build --sandbox_debug
+
+#### Mina config flags ####
+# build --//:verbose                 # enable verbose everywhere
+# build --//foo/bar:verbose          # enable verbose for pkg foo/bar
+# build --//:tooling                 # emit .cmt/.cmti files everywhere
+# build --//foo/bar:tooling          # emit .cmt/.cmti files for pkg foo/bar
+# build --//:ppx-print="text         # all ppx processing emits text instead of binary ast
+# build --//foo/bar:ppx-print="text  # ppx processing in pkg foo/bar emits text instead of binary ast
+
+#### config.mlh configuration ####
+# build --//src/config:dev  # default
+# build --//src/config:debug
+# build --//src/config:prod
+
+# build --show_timestamps
+# common --keep_going
+# build --jobs 600
+
+## override external repos:
+# common --override_repository=obazl_rules_ocaml=/Users/gar/bazel/obazl/rules_ocaml
+
+## OCaml repos:
+# common --override_repository=async_kernel=/ABSOLUTE/PATH/TO/async_kernel
+# common --override_repository=graphql_ppx=/ABSOLUTE/PATH/TO/graphql_ppx
+# common --override_repository=ppx_optcomp=/ABSOLUTE/PATH/TO/ppx_optcomp
+# common --override_repository=ppx_version=/ABSOLUTE/PATH/TO/ppx_version
+# common --override_repository=rpc_parallel=/ABSOLUTE/PATH/TO/rpc_parallel
+# common --override_repository=snarky=/ABSOLUTE/PATH/TO/snarky
+
+## Rust repos
+# common --override_repository=zexe=/ABSOLUTE/PATH/TO/zexe
+# common --override_repository=marlin=/ABSOLUTE/PATH/TO/marlin
+
+################################################################
+## DO NOT USE on MacOS:
+# build --symlink_prefix=.bazel/   # use hidden dir instead of top-level symlinks
+## DO NOT USE on MacOS:
+# build --experimental_no_product_name_out_symlink # do not create `bazel-out` symlink
+

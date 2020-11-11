@@ -4,28 +4,114 @@
 
  ;; TODO
  :overrides {
-             "digestif" "digestif.c"
+             ;; symbol label
+             Digestif "@opam//pkg:digestif.c"
              }
  :workspace "mina"
+ :cc-stuff {
+            "//src/lib/child_processes" "link caml_syslimits"
+            }
+ :injected-deps {
+                 ;; these are deps that are injected by ppx, and cannot be handled by the converter
+                 archive_lib {test [":_Processor"]} ;; app/
+                 cli_lib {commands [":_Exceptions", ":_Flag"]} ;; app/archive:archive.exe
+                 child_processes {child_processes [":_Syslimits"]} ;; app/archive:archive.exe
+                 coda_base {with_status [":_User_command_status"]
+                            control [":_Signature"]
+                            proof [":_Dummy_values"]
+                            other_fee_payer [":_Signature"]
+                            snapp_state [":_Snapp_basic"]
+                            transaction [":_User_command"]
+                            user_command_status [":_Token_id"]}
+                 coda_lib {test [":_Mocks"]}
+                 ;; graphql_query {}       ;; src/app/archive/archive_lib/graphql_query
+                 network_pool {test [":_Mocks" ":_Snark_pool"]}
+                 perf_historgrams {rpc [":_Perf_histograms0"]}
+                 snarky_verifyer { :all ["@opam//pkg:core"] }
+                 transistion_handler {catchup_scheduler [":_Breadcrump_builder"]}
+                 trust_system {peer_status [":_Banned_status"]}
+                 work_selector {random [":_Test"]
+                                sequence [":_Test"]}
+                 }
  :exclusions #{
                ;; list of dune files to NOT convert automatically
+               "src/dune",
 
-               ;; hand-edited OCaml-only buildfiles
+               ;; hand-edited OCaml-only buildfiles, in dep order
                ;; edits in the BUILD.bazel files marked by # obazl:retain
-               "src/lib/logger/dune" ;; .mli search path FIXME
-               "src/lib/coda_base/gen/dune" ;; digestif.c
-               "src/lib/dummy_values/dune" ;; hand-tuned
-               "src/lib/dummy_values/gen/dune" ;; hand-tuned
-               "src/lib/crypto_params/dune" ;; rule impl
-               "src/lib/pickles/limb_vector/dune" ;; -inline-test-lib
-               "src/lib/pickles_base/dune" ;; missing dep FIXME
-               "src/lib/pickles_types/dune" ;; ppx-added dep FIXME
-               "src/lib/snarky_curves/dune" ;; singleton
-               "src/lib/structured_log_events/dune" ;; singleton
 
-               "src/lib/zexe_backend/dune" ;; hand-optimized
-               "src/lib/zexe_backend/tweedle/dune" ;; hand-optimized
+               "src/app/cli/src/tests/dune",
+
                "src/lib/zexe_backend/zexe_backend_common/dune" ;; hand-optimized
+               "src/lib/zexe_backend/tweedle/dune" ;; hand-optimized
+               "src/lib/zexe_backend/dune" ;; hand-optimized
+               "src/lib/crypto_params/dune" ;; rule impl
+               "src/lib/child_processes/dune" ;; cc interop
+               "src/lib/dummy_values/gen/dune" ;; hand-tuned
+               "src/lib/dummy_values/dune" ;; hand-tuned (extensive)
+               "src/lib/perf_histograms/dune" ;; injected deps
+               ;; "src/lib/pickles_base/dune" ;; missing dep :_Domain
+               "src/lib/coda_base/dune" ;; ppx-injected deps
+               "src/lib/coda_lib/dune" ;; ppx-injected dep
+               "src/lib/coda_version/dune" ;; xrule_stamp_template
+               "src/lib/network_pool/dune" ;; ppx-injected deps
+               "src/lib/parallel_scan/dune" ;; hand-tuned
+               "src/lib/precomputed_values/dune" ;; genrule
+               "src/lib/rosetta_lib/dune" ;; hand-tuned lazy deps
+               ;; "src/lib/logger/dune" ;; .mli search path FIXME
+               ;; "src/lib/pickles/limb_vector/dune" ;; -inline-test-lib
+               ;; "src/lib/ppx_dhall_type/dune" ;; rule impl
+               "src/lib/snarky_log/examples/election/dune" ;; "examples" handling
+               "src/lib/snarky_verifier/dune" ;; add dep: core
+               "src/lib/transistion_handler/dune" ;; ppx-injected dep
+               "src/lib/trust_system/dune" ;; ppx-injected dep
+               "src/lib/work_selector/dune" ;; ppx-injected dep
+
+               ;; marlin_plonk_bindings entirely hand-crafted
+               "src/lib/marlin_plonk_bindings/dune"
+               "src/lib/marlin_plonk_bindings/bigint_256/dune"
+               "src/lib/marlin_plonk_bindings/bigint_384/dune"
+               "src/lib/marlin_plonk_bindings/bigint_382_fp/dune"
+               "src/lib/marlin_plonk_bindings/bigint_382_fp/vector/dune"
+               "src/lib/marlin_plonk_bindings/bigint_382_fq/dune"
+               "src/lib/marlin_plonk_bindings/bigint_382_fq/vector/dune"
+               "src/lib/marlin_plonk_bindings/stubs/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_dee/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_dum/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp/vector/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp_index/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp_plonk_oracles/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp_plonk_verifier_index/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp_proof/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fp_urs/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq/vector/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq_index/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq_plonk_oracles/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq_plonk_verifier_index/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq_proof/dune"
+               "src/lib/marlin_plonk_bindings/tweedle_fq_urs/dune"
+
+               "app/archive/archive_lib/dune" ;; ppx-injected dep
+               "app/archive/archive_lib/graphql_query/dune" ;; ppx-injected deps
+
+               ;; @graphql_ppx
+               "src/external/graphql_ppx/dune"
+               "src/external/graphql_ppx/discover/dune"
+               "src/external/graphql_ppx/src/dune"
+               "src/external/graphql_ppx/src/base/dune"
+               "src/external/graphql_ppx/src/bucklescript/dune"
+               "src/external/graphql_ppx/src/native/dune"
+               "src/external/graphql_ppx/tests_native/dune"
+
+               "src/external/ocaml-rocksdb/dune" ;; hand-optimized, depends on cc from bzl/external/rocksdb
+
+               ;; not yet supported
+               "src/lib/snarky/meja/src/dune"
+               "src/lib/snarky/meja/src/compiler_internals/dune"
+               "src/lib/snarky/meja/ocaml/dune"
+               "src/lib/snarky/meja/ocaml/of_ocaml/dune"
 
                ;; Polyglot buildfiles, hand-edited to add cc rules
                ;; FIXME: scope by repo
@@ -41,16 +127,31 @@
  :ns-sep "__"
  :opam {
         :pins {
-               ;; will be omitted from local deps list
+               ;; will be omitted from @u/local-deps cached list, so deps will be @opam//pkg
                async_kernel "src/external/async_kernel",
                base58 "src/external/coda_base58",
-               graphql_ppx "src/external/graphql_ppx"
+               ;; graphql_ppx "src/external/graphql_ppx"
                rpc_parallel "src/external/rpc_parallel",
                ocaml-extlib "src/external/ocaml-extlib",
                sodium "src/external/ocaml-sodium",
                }
         }
- :ppx {:shared-pkg "//bzl/ppx"}
+ :ppx {:shared-pkg "//bzl/ppx"
+       :runtime-data {
+                      "../../config.mlh" {:var CONFIG_MLH :target "//src:prod"}
+                      "../../../config.mlh" {:var CONFIG_MLH :target "//src:prod"}
+                      "../../../../config.mlh" {:var CONFIG_MLH :target "//src:prod"}
+                      "../../archive_graphql_schema.json"
+                      {:var GRAPHQL_SCHEMA_JSON :target "//app/archive/archive_lib/graphql_query:json"}
+                    }
+       ;; :overrides {
+       ;;             graphql_query {:libs '[ppx_jane ppx_version graphql_ppx bisect_ppx]
+       ;;                            :args [{:arg "-schema"}
+       ;;                                   {:arg "src/app/archive/archive_graphql_schema.json"}
+       ;;                                   {:arg "--conditional"}]
+       ;;                            }
+       ;;             }
+       }
  :profiles {
             :all {:flags [:standard "-short-paths" "-cclib" "-ljemalloc"
                           "-w" "e@a-4-29-40-41-42-44-45-48-58-59-60"]

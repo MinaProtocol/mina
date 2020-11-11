@@ -1,0 +1,26 @@
+load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
+
+## MacOS: make sure the native clang tools (e.g. 'ar') are not shadowed by e.g. homebrew binutils.
+configure_make(
+    name = "jemalloc",
+    autogen = True,
+    configure_in_place = True,
+    configure_env_vars = select({
+        "//bzl/host:macos": {
+            "AR": "",
+            # "OSX_DEPLOYMENT_TARGET": "10.14"
+        },
+        "//conditions:default": {}
+    }),
+    lib_source = "@jemalloc//:all",
+    out_lib_dir = "lib",
+    shared_libraries = select({
+        "//bzl/host:macos": ["libjemalloc.dylib"],
+        "//bzl/host:linux": ["libjemalloc.so"],
+        "//conditions:default": ["libjemalloc.so"]
+    }),
+    static_libraries = [
+        "libjemalloc.a",
+    ],
+    visibility = ["//visibility:public"],
+)

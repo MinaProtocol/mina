@@ -1,0 +1,20 @@
+########
+src: bzl/obazl/mina/src/lib/coda_base
+TODO: make an ocaml_module rule for sample_keypairs.ml
+TODO: add missing deps:
+    Pending_coinbase_witness + [":_Pending_coinbase"]
+    With_status + [":_User_command_status"]
+    Snap_state  + [":_Snapp_basic"]
+    Transaction ":_User_command"
+    etc.
+
+genrule(
+    name = "gensrcs",
+    outs = ["sample_keypairs.ml", "sample_keypairs.json"],
+    tools = ["//src/lib/coda_base/gen:gen.exe"],
+    cmd = "\n".join([
+        "$(location //src/lib/coda_base/gen:gen.exe)",
+        "cp sample_keypairs.ml \"$(RULEDIR)/\"",
+        "cp sample_keypairs.json \"$(RULEDIR)/\"",
+    ]),
+)

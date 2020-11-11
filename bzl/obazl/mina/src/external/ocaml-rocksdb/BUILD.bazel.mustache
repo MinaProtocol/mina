@@ -1,0 +1,15 @@
+genrule(
+    name = "",
+    srcs = [""],
+    outs = ["tmp/"],
+    cmd = join_strings([
+        "./$(location @opam//:bin/cppo) ",
+        "-D \"OCAML 407\"",
+        select({
+            "//bzl/config:has_bytes": "-D WITH_BYTES",
+            "//conditions:default": ""
+        }),
+        " $< > \"$@\""]),
+    tools = ["@opam//:bin/cppo"],
+)
+

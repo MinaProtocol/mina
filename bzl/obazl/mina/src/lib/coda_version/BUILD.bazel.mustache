@@ -1,0 +1,14 @@
+#################
+xrule_stamp_template(
+    name = "gensrc",
+    output   = "coda_version.ml",
+    template = "coda_version.template",
+    substitutions = {
+        "{BRANCH}": "STABLE_GIT_BRANCH",
+        "{COMMIT_ID}": "STABLE_GIT_COMMIT_ID",
+        "{COMMIT_ID_SHORT}": "STABLE_GIT_COMMIT_ID_SHORT"
+        # "{BRANCH}": "bazel-base",
+        # "{COMMIT_ID}": "79517ccd5a026663449ab8433b91264eac0eb570",
+        # "{COMMIT_ID_SHORT}": "79517ccd"
+    }
+)

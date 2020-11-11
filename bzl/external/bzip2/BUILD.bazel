@@ -1,0 +1,12 @@
+load("@rules_foreign_cc//tools/build_defs:make.bzl", "make")
+
+make(
+    name = "bzip2",
+    visibility = ["//visibility:public"],
+    static_libraries = ["libbz2.a"],
+    # shared_libraries = select({
+    #     "//bzl/host:macos": ["libbz2.dylib"],
+    #     "//bzl/host:linux": ["libbz2.so"],
+    # }, no_match_error = "Uknown host. Only MacOS and Linux."),
+    lib_source = "@bzip2//:all",
+)

@@ -1,0 +1,21 @@
+#############
+ocaml_module(
+    name = "_Assets",
+    src = "assets.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "--conditional",
+        "-inline-test-lib",
+        "init",
+    ],
+    ppx_data = REPO_PPX_RUNTIME_DATA,
+    deps = INIT_DEPS,
+)
+
+# (rule
+#  (targets assets.ml)
+#  (deps (source_tree assets))
+#  (action (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))
