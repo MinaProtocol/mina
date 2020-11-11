@@ -852,9 +852,9 @@ let create (config : Config.t)
     in
     return result
   in
+  let md p = [("peer", Peer.to_yojson p)] in
   let get_ancestry_rpc conn ~version:_ query =
-    [%log debug] "Sending root proof to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending root proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_ancestry query: $query" in
     let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
     let%bind result, sender =
@@ -870,8 +870,7 @@ let create (config : Config.t)
         if valid_protocol_versions then result else None
   in
   let get_best_tip_rpc conn ~version:_ query =
-    [%log debug] "Sending best_tip to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
     let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
     let%bind result, sender =
@@ -894,8 +893,7 @@ let create (config : Config.t)
         else None
   in
   let get_telemetry_data_rpc conn ~version:_ query =
-    [%log debug] "Sending telemetry data to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending telemetry data to $peer" ~metadata:(md conn) ;
     let action_msg = "Telemetry_data" in
     let msg_args = [] in
     (* if peer doesn't return telemetry data, don't change trust score *)
@@ -905,8 +903,7 @@ let create (config : Config.t)
     result
   in
   let get_transition_chain_proof_rpc conn ~version:_ query =
-    [%log info] "Sending transition_chain_proof to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
@@ -918,8 +915,7 @@ let create (config : Config.t)
     record_unknown_item result sender action_msg msg_args
   in
   let get_transition_chain_rpc conn ~version:_ query =
-    [%log info] "Sending transition_chain to peer with IP %s"
-      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    [%log debug] "Sending transition_chain to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain.query_to_yojson query)]
