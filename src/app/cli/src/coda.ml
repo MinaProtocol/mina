@@ -519,7 +519,7 @@ let setup_daemon logger =
         | Some v ->
             Some v
         | None ->
-            (* Load value from the first config file that both
+            (* Load value from the latest config file that both
                * has the key we are looking for, and
                * has the key in a format that [f] can parse.
             *)
