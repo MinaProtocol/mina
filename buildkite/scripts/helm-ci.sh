@@ -8,7 +8,7 @@ diff=$(
 )
 echo "--- Generated change DIFF: ${diff}"
 
-# Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
+# Identify modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
     find $(dirname ${val}) -name 'Chart.yaml' || true; # failures occur when value is undefined due to empty diff
