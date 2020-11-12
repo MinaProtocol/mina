@@ -18,7 +18,7 @@ module Block_info = struct
 
            INNER JOIN chain
 
-           ON b.id = chain.parent_id
+           ON b.id = chain.parent_id AND chain.id <> chain.parent_id
         )
 
         SELECT id,global_slot,ledger_hash FROM chain c
@@ -45,7 +45,7 @@ let find_command_ids_query s =
 
         INNER JOIN chain
 
-        ON b.id = chain.parent_id
+        ON b.id = chain.parent_id AND chain.id <> chain.parent_id
       )
 
       SELECT DISTINCT %s_command_id FROM chain c
@@ -235,4 +235,74 @@ module Public_key = struct
 
   let run (module Conn : Caqti_async.CONNECTION) pk_id =
     Conn.find_opt query pk_id
+end
+
+module Epoch_data = struct
+  type epoch_data = {epoch_ledger_hash: string; epoch_data_seed: string}
+
+  let epoch_data_typ =
+    let encode t = Ok (t.epoch_ledger_hash, t.epoch_data_seed) in
+    let decode (epoch_ledger_hash, epoch_data_seed) =
+      Ok {epoch_ledger_hash; epoch_data_seed}
+    in
+    let rep = Caqti_type.(tup2 string string) in
+    Caqti_type.custom ~encode ~decode rep
+
+  let query_epoch_data =
+    Caqti_request.find Caqti_type.int epoch_data_typ
+      {| SELECT slh.value, ed.seed FROM snarked_ledger_hashes AS slh
+
+       INNER JOIN
+
+       epoch_data AS ed
+
+       ON slh.id = ed.ledger_hash_id
+
+       WHERE ed.id = ?
+    |}
+
+  let get_epoch_data (module Conn : Caqti_async.CONNECTION) epoch_ledger_id =
+    Conn.find query_epoch_data epoch_ledger_id
+
+  let query_staking_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT staking_epoch_data_id FROM blocks
+
+         WHERE state_hash = ?
+    |}
+
+  let get_staking_epoch_data_id (module Conn : Caqti_async.CONNECTION)
+      state_hash =
+    Conn.find query_staking_epoch_data_id state_hash
+
+  let query_next_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT next_epoch_data_id FROM blocks
+
+         WHERE state_hash = ?
+    |}
+
+  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash
+      =
+    Conn.find query_next_epoch_data_id state_hash
+end
+
+module Fork_block = struct
+  (* fork block is parent of block with the given state hash *)
+  let query_state_hash =
+    Caqti_request.find Caqti_type.string Caqti_type.string
+      {| SELECT parent.state_hash FROM blocks AS parent
+
+         INNER JOIN
+
+         (SELECT parent_id FROM blocks
+
+          WHERE state_hash = ?) AS epoch_ledgers_block
+
+         ON epoch_ledgers_block.parent_id = parent.id
+    |}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION)
+      epoch_ledgers_state_hash =
+    Conn.find query_state_hash epoch_ledgers_state_hash
 end
