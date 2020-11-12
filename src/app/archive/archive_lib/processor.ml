@@ -130,10 +130,7 @@ module Epoch_data = struct
       Coda_base.Epoch_data.Poly.ledger t
     in
     let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
-    (* TODO : |> Epoch_seed.to_string *)
-    let seed =
-      Coda_base.Epoch_data.Poly.seed t |> Snark_params.Tick.Field.to_string
-    in
+    let seed = Coda_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -366,30 +363,32 @@ module Internal_command = struct
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-      =
+      ~(typ : string) =
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = ?")
-      (Transaction_hash.to_base58_check transaction_hash)
+      (Caqti_request.find_opt
+         Caqti_type.(tup2 string string)
+         Caqti_type.int
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
+      (Transaction_hash.to_base58_check transaction_hash, typ)
 end
 
 module Fee_transfer = struct
+  module Kind = struct
+    type t = [`Normal | `Via_coinbase]
+
+    let to_string : t -> string = function
+      | `Normal ->
+          "fee_transfer"
+      | `Via_coinbase ->
+          "fee_transfer_via_coinbase"
+  end
+
   type t =
-    { kind: [`Normal | `Via_coinbase]
-    ; receiver_id: int
-    ; fee: int
-    ; token: int64
-    ; hash: string }
+    {kind: Kind.t; receiver_id: int; fee: int; token: int64; hash: string}
 
   let typ =
     let encode t =
-      let kind =
-        match t.kind with
-        | `Normal ->
-            "fee_transfer"
-        | `Via_coinbase ->
-            "fee_transfer_via_coinbase"
-      in
+      let kind = Kind.to_string t.kind in
       Ok ((kind, t.receiver_id, t.fee, t.token), t.hash)
     in
     let decode ((kind, receiver_id, fee, token), hash) =
@@ -412,7 +411,11 @@ module Fee_transfer = struct
       (t : Fee_transfer.Single.t) (kind : [`Normal | `Via_coinbase]) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
-    match%bind Internal_command.find (module Conn) ~transaction_hash with
+    match%bind
+      Internal_command.find
+        (module Conn)
+        ~transaction_hash ~typ:(Kind.to_string kind)
+    with
     | Some internal_command_id ->
         return internal_command_id
     | None ->
@@ -435,10 +438,12 @@ end
 module Coinbase = struct
   type t = {receiver_id: int; amount: int; hash: string}
 
+  let coinbase_typ = "coinbase"
+
   let typ =
     let encode t =
       Ok
-        ( ( "coinbase"
+        ( ( coinbase_typ
           , t.receiver_id
           , t.amount
           , Token_id.(to_string default) |> Int64.of_string )
@@ -453,7 +458,9 @@ module Coinbase = struct
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_coinbase t in
-    match%bind Internal_command.find (module Conn) ~transaction_hash with
+    match%bind
+      Internal_command.find (module Conn) ~transaction_hash ~typ:coinbase_typ
+    with
     | Some internal_command_id ->
         return internal_command_id
     | None ->
