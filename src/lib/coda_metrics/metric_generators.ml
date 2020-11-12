@@ -100,14 +100,14 @@ module Moving_time_average (Spec : Time_average_spec_intf) () :
                   /. Time.Span.to_ns tick_interval )
 
               let render_average buckets =
-                let sum =
-                  List.fold buckets ~init:0.0 ~f:(fun sum (bucket_total, _) ->
-                      sum +. bucket_total )
+                let total_sum, count_sum =
+                  List.fold buckets ~init:(0.0, 0)
+                    ~f:(fun (total_sum, count_sum) (total, count) ->
+                      (total_sum +. total, count_sum + count) )
                 in
-                let open Float in
-                sum / Float.of_int num_buckets
+                total_sum /. Float.of_int count_sum
             end)
             ()
 
-  let update span = update (Core.Time.Span.to_ns span)
+  let update span = update (Core.Time.Span.to_sec span)
 end
