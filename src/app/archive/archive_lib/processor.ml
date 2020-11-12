@@ -130,6 +130,7 @@ module Epoch_data = struct
       Coda_base.Epoch_data.Poly.ledger t
     in
     let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
+    (* TODO : |> Epoch_seed.to_string *)
     let seed =
       Coda_base.Epoch_data.Poly.seed t |> Snark_params.Tick.Field.to_string
     in
