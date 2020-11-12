@@ -255,7 +255,7 @@ let setup_daemon logger =
   and config_files =
     flag "config-file"
       ~doc:
-        "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
+        "PATH path a the configuration file (overrides CODA_CONFIG_FILE, \
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
