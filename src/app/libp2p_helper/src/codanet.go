@@ -162,6 +162,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
+	// TODO: we may be able to take this gross hack out now
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
 	kadch := make(chan *dual.DHT)
 
@@ -192,6 +193,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	}
 
 	kad := <-kadch
+	kad.Bootstrap(ctx)
 
 	// nil fields are initialized by beginAdvertising
 	return &Helper{

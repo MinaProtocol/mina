@@ -19,7 +19,6 @@ import (
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	"github.com/ipfs/go-ipfs/core/bootstrap"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	coredisc "github.com/libp2p/go-libp2p-core/discovery"
@@ -57,7 +56,6 @@ type app struct {
 	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
 	OutChan         chan interface{}
-	Bootstrapper    io.Closer
 	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
 }
@@ -802,25 +800,7 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 }
 
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-	info, err := addrInfoOfString(ap.Multiaddr)
-	if err != nil {
-		return nil, err
-	}
-
-	app.AddedPeers = append(app.AddedPeers, *info)
-	if app.Bootstrapper != nil {
-		app.Bootstrapper.Close()
-	}
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
-
-	if err != nil {
-		return nil, badp2p(err)
-	}
-
-	return "addPeer success", nil
+	return nil, errors.New("addPeer is disabled -- rebootstrap logic needs reimplemented and tested")
 }
 
 type beginAdvertisingMsg struct {
@@ -876,13 +856,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 				Addrs:  addrStrings,
 				Upcall: "discoveredPeer",
 			})
-		}
-	}
-
-	if len(app.AddedPeers) > 0 {
-		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
-		if err != nil {
-			return nil, badp2p(err)
 		}
 	}
 
@@ -1100,6 +1073,48 @@ func main() {
 		File:   "",
 	})
 	helperLog := logging.Logger("helper top-level JSON handling")
+
+	helperLog.Infof("libp2p_helper has the following logging subsystems active: %v", logging.GetSubsystems())
+
+	// === Set subsystem log levels ===
+	// All subsystems that have been considered are explicitly listed. Any that
+	// are added when modifying this code should be considered and added to
+	// this list.
+	logging.SetLogLevel("mplex", "debug")
+	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
+	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
+	logging.SetLogLevel("ping", "info")         // Logs every ping timeout at debug
+	logging.SetLogLevel("basichost", "info")    // Spammy at debug
+	logging.SetLogLevel("test-logger", "debug")
+	logging.SetLogLevel("blankhost", "debug")
+	logging.SetLogLevel("connmgr", "debug")
+	logging.SetLogLevel("eventlog", "debug")
+	logging.SetLogLevel("p2p-config", "debug")
+	logging.SetLogLevel("ipns", "debug")
+	logging.SetLogLevel("nat", "debug")
+	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
+	logging.SetLogLevel("providers", "debug")
+	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
+	logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
+	logging.SetLogLevel("peerstore", "debug")
+	logging.SetLogLevel("diversityFilter", "debug")
+	logging.SetLogLevel("table", "debug")
+	logging.SetLogLevel("stream-upgrader", "debug")
+	logging.SetLogLevel("helper top-level JSON handling", "debug")
+	logging.SetLogLevel("dht.pb", "debug")
+	logging.SetLogLevel("tcp-tpt", "debug")
+	logging.SetLogLevel("autonat", "debug")
+	logging.SetLogLevel("discovery", "debug")
+	logging.SetLogLevel("routing/record", "debug")
+	logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
+	logging.SetLogLevel("badger", "debug")
+	logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
+	logging.SetLogLevel("routedhost", "debug")
+	logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
+	logging.SetLogLevel("peerstore/ds", "debug")
+	logging.SetLogLevel("mdns", "info") // Logs each mdns call
+	logging.SetLogLevel("bootstrap", "debug")
+	logging.SetLogLevel("reuseport-transport", "debug")
 
 	go func() {
 		i := 0
