@@ -57,9 +57,11 @@ bot)
   ;;
 coda-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 coda-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
