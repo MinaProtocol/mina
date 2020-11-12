@@ -264,7 +264,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
   let txn_global_slot =
-    cmd.global_slot |> Unsigned.UInt32.of_int64
+    cmd.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Coda_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
@@ -340,7 +340,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
           (Error.to_string_hum err) ()
   in
   let txn_global_slot =
-    cmd2.global_slot |> Unsigned.UInt32.of_int64
+    cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Coda_numbers.Global_slot.of_uint32
   in
   let undo_or_error =
@@ -434,7 +434,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
         valid_signed_cmd) =
     Signed_command.to_valid_unsafe signed_cmd
   in
-  let txn_global_slot = Unsigned.UInt32.of_int64 cmd.global_slot in
+  let txn_global_slot = Unsigned.UInt32.of_int64 cmd.txn_global_slot in
   match
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
