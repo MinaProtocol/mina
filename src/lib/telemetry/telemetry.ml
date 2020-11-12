@@ -31,4 +31,4 @@ let get_telemetry_data_from_peers (net : Coda_networking.t)
         let%bind peers = Coda_networking.peers net in
         Deferred.List.map peers ~f:(fun {peer_id; _} -> return peer_id)
   in
-  Deferred.List.map peer_ids ~f:run
+  Deferred.List.map ~how:`Parallel peer_ids ~f:run
