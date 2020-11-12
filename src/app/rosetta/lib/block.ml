@@ -320,7 +320,7 @@ WITH RECURSIVE chain AS (
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        {| SELECT DISTINCT ON (i.hash,i.type) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
         INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
         WHERE blocks_internal_commands.block_id = ?

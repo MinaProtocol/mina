@@ -44,7 +44,8 @@ CREATE TABLE internal_commands
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
 , token       bigint                NOT NULL
-, hash        text                  NOT NULL UNIQUE
+, hash        text                  NOT NULL
+, UNIQUE (hash,type)
 );
 
 CREATE TABLE epoch_data
