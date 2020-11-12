@@ -528,13 +528,11 @@ let main ~input_file ~output_file ~archive_uri () =
       let staking_epoch_ledger_hash =
         Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let staking_seed = Snark_params.Tick.Field.of_string staking_seed_str in
+      let staking_seed = Epoch_seed.of_string staking_seed_str in
       let next_epoch_ledger_hash =
         Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let next_seed = Snark_params.Tick.Field.of_string next_seed_str in
+      let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_info_of_state_hash ~logger pool fork_state_hash
