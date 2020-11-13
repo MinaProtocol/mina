@@ -49,7 +49,7 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
         [("reason", `String "invalid delta transition chain proof")]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", `String (Error.to_string_hum err)) ]
+        ; ("error", Error_json.error_to_yojson err) ]
     | `Mismatched_protocol_version ->
         [("reason", `String "protocol version mismatch")]
     | `Invalid_protocol_version ->
@@ -61,7 +61,7 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [("error", `String (Error.to_string_hum err))] in
+      let error_metadata = [("error", Error_json.error_to_yojson err)] in
       [%log error]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
