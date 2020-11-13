@@ -27,6 +27,7 @@ CREATE TABLE user_commands
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
+, valid_until    bigint              NOT NULL
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
 , status         user_command_status

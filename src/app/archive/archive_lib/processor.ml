@@ -1,3 +1,5 @@
+(* processor.ml -- database processing for archive node *)
+
 module Archive_rpc = Rpc
 open Async
 open Core
@@ -159,6 +161,7 @@ module User_command = struct
       ; nonce: int
       ; amount: int option
       ; fee: int
+      ; valid_until: int64
       ; memo: string
       ; hash: string
       ; status: string option
@@ -178,6 +181,7 @@ module User_command = struct
           ; int
           ; option int
           ; int
+          ; int64
           ; string
           ; string
           ; option string
@@ -223,9 +227,9 @@ module User_command = struct
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-                receiver_id, fee_token, token, nonce, amount, fee, memo, \
-                hash, status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \
-                ?, ?, ?, ?, ?) RETURNING id")
+                receiver_id, fee_token, token, nonce, amount, fee, \
+                valid_until, memo, hash, status, failure_reason) VALUES (?, \
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
             { typ=
                 ( match via with
                 | `Ident ->
@@ -246,6 +250,10 @@ module User_command = struct
                 Signed_command.amount t
                 |> Core.Option.map ~f:Currency.Amount.to_int
             ; fee= Signed_command.fee t |> Currency.Fee.to_int
+            ; valid_until=
+                Signed_command.valid_until t
+                |> Coda_numbers.Global_slot.to_uint32
+                |> Unsigned.UInt32.to_int64
             ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
@@ -512,52 +520,7 @@ module Block = struct
     ; height: int64
     ; global_slot: int64
     ; timestamp: int64 }
-
-  let to_hlist
-      { state_hash
-      ; parent_id
-      ; creator_id
-      ; snarked_ledger_hash_id
-      ; staking_epoch_data_id
-      ; next_epoch_data_id
-      ; ledger_hash
-      ; height
-      ; global_slot
-      ; timestamp } =
-    H_list.
-      [ state_hash
-      ; parent_id
-      ; creator_id
-      ; snarked_ledger_hash_id
-      ; staking_epoch_data_id
-      ; next_epoch_data_id
-      ; ledger_hash
-      ; height
-      ; global_slot
-      ; timestamp ]
-
-  let of_hlist
-      ([ state_hash
-       ; parent_id
-       ; creator_id
-       ; snarked_ledger_hash_id
-       ; staking_epoch_data_id
-       ; next_epoch_data_id
-       ; ledger_hash
-       ; height
-       ; global_slot
-       ; timestamp ] :
-        (unit, _) H_list.t) =
-    { state_hash
-    ; parent_id
-    ; creator_id
-    ; snarked_ledger_hash_id
-    ; staking_epoch_data_id
-    ; next_epoch_data_id
-    ; ledger_hash
-    ; height
-    ; global_slot
-    ; timestamp }
+  [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
@@ -633,8 +596,9 @@ module Block = struct
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                ( if
-                 External_transition.blockchain_length t
-                 = Unsigned.UInt32.of_int 1
+                 Unsigned.UInt32.equal
+                   (External_transition.blockchain_length t)
+                   Unsigned.UInt32.one
                then
                  "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
                   snarked_ledger_hash_id, staking_epoch_data_id, \
