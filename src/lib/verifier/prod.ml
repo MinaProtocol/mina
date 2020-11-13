@@ -196,12 +196,13 @@ module Worker = struct
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
+          let num_rotate = 1 in
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"coda-verifier.log" ~max_size) ) ;
+                 ~log_filename:"coda-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create {conf_dir; logger; proof_level}
 
