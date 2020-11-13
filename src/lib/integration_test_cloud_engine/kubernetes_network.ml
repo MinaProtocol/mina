@@ -163,7 +163,7 @@ module Node = struct
         ()
     | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
         [%log fatal] "Error running k8s port forwarding"
-          ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
+          ~metadata:[("error", Error_json.error_to_yojson err.error)] ;
         failwith "Could not run k8s port forwarding"
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)

@@ -16,7 +16,7 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 set +u
 PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
-PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
+PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
@@ -36,6 +36,50 @@ fi
 
 BUILDDIR="deb_build"
 
+##################################### GENERATE KEYPAIR PACKAGE #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-generate-keypair
+Version: ${GENERATE_KEYPAIR_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size: 
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility to generate mina private/public keys in new format
+ Utility to regenerate mina private public keys in new format
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
+ls -lh mina*.deb
+
+# Remove generate-keypair binary before other builds with the same dir
+rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+
+##################################### END GENERATE KEYPAIR PACKAGE #######################################
+
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}
@@ -44,12 +88,12 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: coda-discovery
+Conflicts: mina-discovery
 License: Apache-2.0
-Homepage: https://codaprotocol.com/
+Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
-Description: Coda Client and Daemon
- Coda Protocol Client and Daemon
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
@@ -120,14 +164,14 @@ do
 done
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
-# Genesis Ledger/proof Copy
+# Genesis Ledger/proof/epoch ledger Copy
 for f in /tmp/coda_cache_dir/genesis*; do
     if [ -e "$f" ]; then
         mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
     fi
 done
 
-# Copy genesis Ledger/proof if they were downloaded from s3
+# Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
 for f in /tmp/s3_cache_dir/genesis*; do
     if [ -e "$f" ]; then
         mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
@@ -153,7 +197,7 @@ find "${BUILDDIR}"
 # Build the package
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 
 # second deb without the proving keys -- FIXME: DRY
@@ -168,10 +212,10 @@ Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
-Homepage: https://codaprotocol.com/
+Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
-Description: Coda Client and Daemon
- Coda Protocol Client and Daemon
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
  Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
@@ -181,7 +225,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 #remove build dir
 rm -rf "${BUILDDIR}"

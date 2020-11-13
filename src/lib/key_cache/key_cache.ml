@@ -52,8 +52,8 @@ module type S = sig
 
     val simple :
          ('k -> string)
-      -> ('k -> path:string -> 'v)
-      -> ('v -> string -> unit)
+      -> ('k -> path:string -> 'v M.t)
+      -> ('v -> string -> unit M.t)
       -> ('k, 'v) t
   end
 
@@ -113,7 +113,7 @@ module Sync : S with module M := Or_error = struct
                  ~metadata:
                    [ ("url", `String uri_string)
                    ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("err", Error_json.error_to_yojson err) ] ;
                err )
       in
       [%log debug] "Downloaded key to key cache"
@@ -141,8 +141,8 @@ module Sync : S with module M := Or_error = struct
 
     let simple to_string read write =
       { to_string
-      ; read= (fun k ~path -> Or_error.return (read k ~path))
-      ; write= (fun v s -> Or_error.return (write v s)) }
+      ; read= (fun k ~path -> read k ~path)
+      ; write= (fun v s -> write v s) }
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =
@@ -223,7 +223,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
                  ~metadata:
                    [ ("url", `String uri_string)
                    ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("err", Error_json.error_to_yojson err) ] ;
                err )
       in
       [%log debug] "Downloaded key to key cache"
@@ -250,8 +250,8 @@ module Async : S with module M := Async.Deferred.Or_error = struct
 
     let simple to_string read write =
       { to_string
-      ; read= (fun k ~path -> Deferred.Or_error.return (read k ~path))
-      ; write= (fun v s -> Deferred.Or_error.return (write v s)) }
+      ; read= (fun k ~path -> read k ~path)
+      ; write= (fun v s -> write v s) }
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =

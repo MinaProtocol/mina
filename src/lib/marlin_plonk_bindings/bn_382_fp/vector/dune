@@ -4,4 +4,5 @@
  (libraries
    marlin_plonk_bindings_stubs
    marlin_plonk_bindings_bn_382_fp)
- (preprocess (pps ppx_version bisect_ppx)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

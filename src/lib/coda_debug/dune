@@ -4,4 +4,5 @@
  (libraries core_kernel)
  (flags :standard -short-paths)
  (preprocess
-  (pps ppx_version ppx_jane bisect_ppx -- --conditional)))
+  (pps ppx_version ppx_jane))
+ (instrumentation (backend bisect_ppx)))

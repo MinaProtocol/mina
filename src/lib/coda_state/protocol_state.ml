@@ -278,7 +278,8 @@ let hash s =
 
 [%%endif]
 
-let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
+let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
+    ~consensus_constants =
   { Poly.Stable.Latest.previous_state_hash=
       State_hash.of_hash Outside_hash_image.t
   ; body=
@@ -292,6 +293,7 @@ let negative_one ~genesis_ledger ~constraint_constants ~consensus_constants =
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
-            ~constants:consensus_constants ~constraint_constants
+            ~genesis_epoch_data ~constants:consensus_constants
+            ~constraint_constants
       ; constants=
           Consensus.Constants.to_protocol_constants consensus_constants } }
