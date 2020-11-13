@@ -1206,6 +1206,7 @@ let list_peers net =
   | Error _ ->
       []
 
+(* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
     ~seed_peers ~initial_gating_config =
