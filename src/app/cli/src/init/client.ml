@@ -54,7 +54,7 @@ let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
     flag "public-key"
-      ~doc:"KEY Public key for which you want to check the balance"
+      ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
@@ -86,7 +86,8 @@ let get_balance_graphql =
 let get_tokens_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key for which you want to find accounts"
+    flag "public-key"
+      ~doc:"PUBLICKEY Public key for which you want to find accounts"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Get all token IDs that a public key has accounts for"
@@ -1177,7 +1178,7 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"KEY Public key of account to be exported"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1324,7 +1325,7 @@ let create_hd_account =
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key to be unlocked"
+    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1358,7 +1359,7 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key of account to be locked"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1405,7 +1406,7 @@ let generate_libp2p_keypair =
               printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:[("error", Error_json.error_to_yojson e)] ;
               exit 20 )))
 
 let trustlist_ip_flag =

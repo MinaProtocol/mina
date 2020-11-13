@@ -145,7 +145,7 @@ val start_with_precomputed_blocks :
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
