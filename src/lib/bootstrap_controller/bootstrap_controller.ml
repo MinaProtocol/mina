@@ -66,7 +66,7 @@ let received_bad_proof t host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [("error", `String (Error.to_string_hum e))] ) ))
+            , [("error", Error_json.error_to_yojson e)] ) ))
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
@@ -127,7 +127,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     with
     | Error e ->
         [%log' error t.logger]
-          ~metadata:[("error", `String (Error.to_string_hum e))]
+          ~metadata:[("error", Error_json.error_to_yojson e)]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
         Deferred.return `Ignored
@@ -364,7 +364,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         in
         [%log error]
           ~metadata:
-            [ ("error", `String (Error.to_string_hum e))
+            [ ("error", Error_json.error_to_yojson e)
             ; ("state_hash", State_hash.to_yojson hash)
             ; ( "expected_staged_ledger_hash"
               , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
@@ -439,7 +439,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match local_state_sync_result with
         | Error e ->
             [%log error]
-              ~metadata:[("error", `String (Error.to_string_hum e))]
+              ~metadata:[("error", Error_json.error_to_yojson e)]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
             let this_cycle =
