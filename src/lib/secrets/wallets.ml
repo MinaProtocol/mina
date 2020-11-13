@@ -38,7 +38,7 @@ let decode_public_key key file path logger =
         ~metadata:
           [ ("file", `String file)
           ; ("path", `String path)
-          ; ("error", `String (Error.to_string_hum e)) ] ;
+          ; ("error", Error_json.error_to_yojson e) ] ;
       None
 
 let reload ~logger {cache; path} : unit Deferred.t =

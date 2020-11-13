@@ -51,9 +51,10 @@ let log t =
   | Some data ->
       data
   | None ->
-      failwithf "log: did not find matching logger for %s"
-        (Obj.extension_name (Obj.extension_constructor t))
-        ()
+      let[@warning "-3"] name =
+        Obj.extension_name (Obj.extension_constructor t)
+      in
+      failwithf "log: did not find matching logger for %s" name ()
 
 let register_constructor = Registry.register_constructor
 

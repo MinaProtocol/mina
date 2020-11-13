@@ -4,17 +4,18 @@
  (action (run %{bin:ocaml-crunch} -m plain assets -o assets.ml)))
 
 (library
-  (name init)
-  (public_name init)
-  (libraries
-    ; opam deps
-    async cohttp core
-    ; libs
-    snarky_log
-    cli_lib
-    coda_base coda_graphql coda_lib coda_state
-    consensus coda_transition coda_version
-    o1trace protocol_version telemetry transition_frontier web_client_pipe
-    web_request graphql_lib genesis_ledger_helper)
-  (preprocessor_deps ../../../../config.mlh)
-  (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (name init)
+ (public_name init)
+ (libraries
+   ; opam deps
+   async cohttp core
+   ; libs
+   snarky_log
+   cli_lib
+   coda_base coda_graphql coda_lib coda_state
+   consensus coda_transition coda_version
+   o1trace protocol_version telemetry transition_frontier web_client_pipe
+   web_request graphql_lib genesis_ledger_helper)
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../../../config.mlh)
+ (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))

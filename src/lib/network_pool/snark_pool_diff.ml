@@ -29,6 +29,8 @@ module Make
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
 
+  type verified = t [@@deriving compare, sexp, to_yojson]
+
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
   type compact =
@@ -42,6 +44,11 @@ module Make
         {work; fee; prover}
 
   let compact_json t = compact_to_yojson (to_compact t)
+
+  (* snark pool diffs are not bundled, so size is always 1 *)
+  let size _ = 1
+
+  let verified_size _ = 1
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
@@ -87,10 +94,14 @@ module Make
       | _ ->
           failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({data; sender} : t Envelope.Incoming.t) =
+  let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
     let (Add_solved_work (work, ({Priced_proof.fee; _} as p))) = data in
     let is_local = match sender with Local -> true | _ -> false in
-    let verify () = Pool.verify_and_act pool ~work:(work, p) ~sender in
+    let verify () =
+      if%map Pool.verify_and_act pool ~work:(work, p) ~sender then
+        Or_error.return t
+      else Or_error.error_string "failed to verify snark pool diff"
+    in
     (*reject higher priced gossiped proofs*)
     if is_local then verify ()
     else
@@ -98,7 +109,9 @@ module Make
       | Ok () ->
           verify ()
       | _ ->
-          return false
+          Deferred.Or_error.error_string
+            "snark pool diff fee is not high enough to be included in snark \
+             pool"
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =

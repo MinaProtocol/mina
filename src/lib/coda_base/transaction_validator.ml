@@ -89,7 +89,7 @@ let create = Hashless_ledger.create
 
 let apply_user_command ~constraint_constants ~txn_global_slot l uc =
   Result.map
-    ~f:(fun undo -> undo.Undo.User_command_undo.common.user_command.status)
+    ~f:(fun undo -> undo.Undo.Signed_command_undo.common.user_command.status)
     (apply_user_command l ~constraint_constants ~txn_global_slot uc)
 
 let apply_transaction ~constraint_constants ~txn_state_view l txn =

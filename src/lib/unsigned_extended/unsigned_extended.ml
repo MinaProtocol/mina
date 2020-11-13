@@ -117,6 +117,8 @@ module UInt64 = struct
 
   include M
 
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   let to_uint64 : t -> uint64 = Fn.id
 
   let of_uint64 : uint64 -> t = Fn.id

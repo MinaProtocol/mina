@@ -1,0 +1,18 @@
+leaderboard:
+  name: "leaderboard-cron"
+  containerName: "leaderboard"
+  image: "gcr.io/o1labs-192920/leaderboard"
+  schedule: "@hourly"
+
+volume:
+  name: "credentials"
+  secretName: "sheets-credentials"
+  mountPath: "/code/google_sheets_credentials.json"
+  subPath: "google_sheets_credentials.json"
+
+postgresql:
+  postgresqlPassword: "foobar"
+  postgresqlUsername: "postgres"
+  postgresHost: "postgresql"
+  postgresPort: "5432"
+  postgresDB: "archive"

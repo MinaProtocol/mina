@@ -8,4 +8,5 @@
    genesis_constants
    runtime_config
    with_hash)
+ (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

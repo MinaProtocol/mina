@@ -77,8 +77,15 @@ module Gen = struct
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
     let open Quickcheck.Let_syntax in
     let%bind receiver = Public_key.Compressed.gen in
+    let%bind supercharged_coinbase = Quickcheck.Generator.bool in
     let%bind amount =
-      Currency.Amount.(gen_incl zero constraint_constants.coinbase_amount)
+      let max_amount = constraint_constants.coinbase_amount in
+      let%map amount = Currency.Amount.(gen_incl zero max_amount) in
+      if supercharged_coinbase then
+        Option.value_exn
+          (Currency.Amount.scale amount
+             constraint_constants.supercharged_coinbase_factor)
+      else amount
     in
     let max_fee = Currency.Amount.to_fee amount in
     let%map fee_transfer =
@@ -93,7 +100,8 @@ module Gen = struct
       | _ ->
           fee_transfer
     in
-    {receiver; amount; fee_transfer}
+    ( {receiver; amount; fee_transfer}
+    , `Supercharged_coinbase supercharged_coinbase )
 
   let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
     let open Quickcheck.Let_syntax in

@@ -1,10 +1,9 @@
 open Core
 
 module Sender = struct
-  type t = Local | Remote of (Unix.Inet_addr.Blocking_sexp.t * Peer.Id.t)
-  [@@deriving sexp, compare]
+  type t = Local | Remote of Peer.t [@@deriving sexp, compare]
 
-  let of_peer (p : Peer.t) = Remote (p.host, p.peer_id)
+  let of_peer (p : Peer.t) = Remote p
 
   let equal sender1 sender2 = Int.equal (compare sender1 sender2) 0
 
@@ -12,24 +11,17 @@ module Sender = struct
     match t with
     | Local ->
         `String "Local"
-    | Remote (inet_addr, peer_id) ->
-        `Assoc
-          [ ( "Remote"
-            , `Assoc
-                [ ("host", `String (Unix.Inet_addr.to_string inet_addr))
-                ; ("peer_id", `String (Peer.Id.to_string peer_id)) ] ) ]
+    | Remote p ->
+        `Assoc [("Remote", Peer.to_yojson p)]
 
   let of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local
-    | `Assoc
-        [ ( "Remote"
-          , `Assoc [("host", `String addr); ("peer_id", `String peer_id)] ) ]
-      ->
-        Ok
-          (Remote
-             (Unix.Inet_addr.of_string addr, Peer.Id.unsafe_of_string peer_id))
+    | `Assoc [("Remote", peer_json)] ->
+        let open Result.Let_syntax in
+        let%map peer = Peer.of_yojson peer_json in
+        Remote peer
     | _ ->
         Error "Expected JSON representing envelope sender"
 
@@ -55,8 +47,9 @@ module Sender = struct
     in
     let remote =
       let inet = Unix.Inet_addr.of_string ip in
-      let%map peerid = String.gen_nonempty in
-      (inet, peerid)
+      let%bind peer_id = String.gen_nonempty in
+      let%map libp2p_port = Int.gen_uniform_incl 1025 49151 in
+      Peer.create inet ~peer_id ~libp2p_port
     in
     match%map Option.quickcheck_generator remote with
     | None ->

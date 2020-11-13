@@ -21,14 +21,16 @@ let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
 let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
-let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
+let build ?skip_staged_ledger_verification ~logger ~precomputed_values
+    ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender =
+                  External_transition.Almost_validated.t) ~sender () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
+        .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+          ~precomputed_values ~verifier
           ~parent_staged_ledger:parent.staged_ledger
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
@@ -59,9 +61,9 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 Trust_system.(
-                  record trust_system logger inet_addr
+                  record trust_system logger peer
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
           in
           Error (`Invalid_staged_ledger_hash (Error.of_string message))
@@ -74,7 +76,7 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
+            | Some (Envelope.Sender.Remote peer) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -88,20 +90,25 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                 let open Trust_system.Actions in
                 (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
-                let action =
-                  match staged_ledger_error with
-                  | Invalid_proofs _ ->
-                      make_actions Sent_invalid_proof
-                  | Pre_diff (Bad_signature _) ->
-                      make_actions Sent_invalid_signature
-                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
-                      make_actions Gossiped_invalid_transition
-                  | Unexpected _ ->
-                      failwith
-                        "build: Unexpected staged ledger error should have \
-                         been caught in another pattern"
-                in
-                Trust_system.record trust_system logger inet_addr action
+                with_return (fun {return} ->
+                    let action =
+                      match staged_ledger_error with
+                      | Couldn't_reach_verifier _ ->
+                          return Deferred.unit
+                      | Invalid_proofs _ ->
+                          make_actions Sent_invalid_proof
+                      | Pre_diff (Verification_failed _) ->
+                          make_actions Sent_invalid_signature_or_proof
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger peer action )
           in
           Error
             (`Invalid_staged_ledger_diff
@@ -124,7 +131,7 @@ let blockchain_length = lift External_transition.Validated.blockchain_length
 
 let block_producer = lift External_transition.Validated.block_producer
 
-let user_commands = lift External_transition.Validated.user_commands
+let commands = lift External_transition.Validated.commands
 
 let payments = lift External_transition.Validated.payments
 
@@ -162,11 +169,16 @@ let display t =
   ; parent }
 
 let all_user_commands breadcrumbs =
-  Sequence.fold (Sequence.of_list breadcrumbs) ~init:User_command.Set.empty
+  Sequence.fold (Sequence.of_list breadcrumbs) ~init:Signed_command.Set.empty
     ~f:(fun acc_set breadcrumb ->
-      breadcrumb |> user_commands
-      |> List.map ~f:(fun {data; _} -> data)
-      |> User_command.Set.of_list |> Set.union acc_set )
+      breadcrumb |> commands
+      |> List.filter_map ~f:(fun {data; _} ->
+             match data with
+             | Snapp_command _ ->
+                 None
+             | Signed_command c ->
+                 Some (Signed_command.forget_check c) )
+      |> Signed_command.Set.of_list |> Set.union acc_set )
 
 module For_tests = struct
   open Currency
@@ -176,7 +188,7 @@ module For_tests = struct
      each user send a payment of one coin to another random
      user if they have at least one coin*)
   let gen_payments staged_ledger accounts_with_secret_keys :
-      User_command.With_valid_signature.t Sequence.t =
+      Signed_command.With_valid_signature.t Sequence.t =
     let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.identifier account )
@@ -210,10 +222,10 @@ module For_tests = struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
-        let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~fee_payer_pk:sender_pk ~nonce ~valid_until:None
-            ~memo:User_command_memo.dummy
+        let payload : Signed_command.Payload.t =
+          Signed_command.Payload.create ~fee:Fee.zero
+            ~fee_token:Token_id.default ~fee_payer_pk:sender_pk ~nonce
+            ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:
               (Payment
                  { source_pk= sender_pk
@@ -221,7 +233,7 @@ module For_tests = struct
                  ; token_id= token
                  ; amount= send_amount })
         in
-        User_command.sign sender_keypair payload )
+        Signed_command.sign sender_keypair payload )
 
   let gen ?(logger = Logger.null ())
       ~(precomputed_values : Precomputed_values.t) ?verifier
@@ -250,6 +262,7 @@ module For_tests = struct
       let parent_staged_ledger = parent_breadcrumb.staged_ledger in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
+        |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
       in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
@@ -288,13 +301,13 @@ module For_tests = struct
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_state_view ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~current_state_view ~supercharge_coinbase:true
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_data _ ) =
+               , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
             staged_ledger_diff
@@ -328,11 +341,15 @@ module For_tests = struct
             previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.snarked_next_available_token
       in
+      let genesis_ledger_hash =
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.genesis_ledger_hash
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
-          ~staged_ledger_hash:next_staged_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
@@ -369,7 +386,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None
+          ~sender:None ~skip_staged_ledger_verification:true ()
       with
       | Ok new_breadcrumb ->
           [%log info]

@@ -4,4 +4,5 @@
  (libraries snark_params)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp)))
+  (pps ppx_version ppx_optcomp))
+ (instrumentation (backend bisect_ppx)))

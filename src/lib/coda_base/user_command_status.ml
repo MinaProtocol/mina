@@ -1,5 +1,9 @@
 open Core_kernel
 
+(* if these items change, please also change
+   Transaction_snark.Base.User_command_failure.t
+   and update the code following it
+*)
 module Failure = struct
   [%%versioned
   module Stable = struct
@@ -11,11 +15,12 @@ module Failure = struct
         | Amount_insufficient_to_create_account
         | Cannot_pay_creation_fee_in_token
         | Source_insufficient_balance
+        | Source_minimum_balance_violation
         | Receiver_already_exists
         | Not_token_owner
         | Mismatched_token_permissions
         | Overflow
-        | User_command_on_snapp_account
+        | Signed_command_on_snapp_account
         | Snapp_account_not_present
         | Update_not_permitted
         | Incorrect_nonce
@@ -40,6 +45,8 @@ module Failure = struct
         "Cannot_pay_creation_fee_in_token"
     | Source_insufficient_balance ->
         "Source_insufficient_balance"
+    | Source_minimum_balance_violation ->
+        "Source_minimum_balance_violation"
     | Receiver_already_exists ->
         "Receiver_already_exists"
     | Not_token_owner ->
@@ -48,8 +55,8 @@ module Failure = struct
         "Mismatched_token_permissions"
     | Overflow ->
         "Overflow"
-    | User_command_on_snapp_account ->
-        "User_command_on_snapp_account"
+    | Signed_command_on_snapp_account ->
+        "Signed_command_on_snapp_account"
     | Snapp_account_not_present ->
         "Snapp_account_not_present"
     | Update_not_permitted ->
@@ -83,7 +90,7 @@ module Failure = struct
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | _ ->
-        Error "User_command_status.Failure.of_string: Unknown value"
+        Error "Signed_command_status.Failure.of_string: Unknown value"
 
   let describe = function
     | Predicate ->
@@ -100,6 +107,8 @@ module Failure = struct
          non-default tokens"
     | Source_insufficient_balance ->
         "The source account has an insufficient balance"
+    | Source_minimum_balance_violation ->
+        "The source account requires a minimum balance"
     | Receiver_already_exists ->
         "Attempted to create an account that already exists"
     | Not_token_owner ->
@@ -108,8 +117,8 @@ module Failure = struct
         "The permissions for this token do not match those in the command"
     | Overflow ->
         "The resulting balance is too large to store"
-    | User_command_on_snapp_account ->
-        "The source of a user command cannot be a snapp account"
+    | Signed_command_on_snapp_account ->
+        "The source of a signed command cannot be a snapp account"
     | Snapp_account_not_present ->
         "A snapp account does not exist"
     | Update_not_permitted ->

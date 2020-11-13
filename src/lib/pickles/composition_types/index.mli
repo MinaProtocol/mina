@@ -1,6 +1,11 @@
 open Pickles_types
 
-type t [@@deriving sexp, bin_io, sexp, compare, yojson, hash, eq]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving sexp, sexp, compare, yojson, hash, eq]
+  end
+end]
 
 val of_int : int -> t option
 

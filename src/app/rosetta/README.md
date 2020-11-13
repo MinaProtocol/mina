@@ -10,6 +10,15 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Coda.
 - Handles case where there are multiple blocks at the same height
 - "Failed transactions" decode into operations and reconcile properly
 
+## How to build your own docker image
+
+Checkout the "rosetta-stable" branch of the mina repository and then run the following:
+
+`cat dockerfiles/Dockerfile-rosetta | docker build -t mina-rosetta:stable --build-arg "MINA_BRANCH=rosetta-stable" -`
+
+This creates an image (mina-rosetta:stable) based on the most up-to-date changes that support rosetta. This image
+can be used as a drop-in replacement for `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1` in any of the below commands for testing.
+
 ## How to Run
 
 As there is not currently a live network, the best way to run Rosetta is to run it against a sandbox node. Rosetta is best run using the official docker images provided here that run the Coda daemon, an archive node, and the rosetta process for you. See [Reproduce agent and rosetta-cli Validation](#reproduce-agent-and-rosetta-cli-validation) below for details.
@@ -72,7 +81,7 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1`
+`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1`
 and
 [`rosetta-cli` @ 4bb48b24a794deb3635973e32d1ea806e5b30729](https://github.com/coinbase/rosetta-cli/commit/4bb48b24a794deb3635973e32d1ea806e5b30729)
 using this [`rosetta.conf`](https://github.com/CodaProtocol/coda/blob/e02605429e9a490c14994087ce954e19fc321edc/src/app/rosetta/rosetta.conf)

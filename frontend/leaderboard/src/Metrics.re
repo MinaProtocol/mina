@@ -236,8 +236,7 @@ let calculateAllUsers = metrics => {
 };
 
 let echoBotPublicKeys = [
-  "4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x",
-  "4vsRCViQQRxXfkgEspR9vPWLypuSEGkZtHxjYF7srq5M1mZN4LSoX7wWCFZGitJLmdoozDXmrCugvBBKsePd6hfBAp9P3eTCHs5HwdC763A1FbjzskfrCvWMq9KXXsmFxWhYpG9nnhWzqSC1",
+  "B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9",
 ];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);

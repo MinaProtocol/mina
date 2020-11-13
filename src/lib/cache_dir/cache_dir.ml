@@ -38,8 +38,12 @@ let env_path =
       manual_install_path
 
 let possible_paths base =
-  List.map [env_path; brew_install_path; s3_install_path; autogen_path]
-    ~f:(fun d -> d ^/ base)
+  List.map
+    [ env_path
+    ; brew_install_path
+    ; s3_install_path
+    ; autogen_path
+    ; manual_install_path ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   Deferred.map ~f:Result.join

@@ -12,6 +12,8 @@ let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Coda_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
       in
       let net = Or_error.ok_exn net in
       let ips =
@@ -96,7 +98,7 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 240000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in
-      List.length peers = List.length nodes - 1
+      List.length peers >= List.length nodes - 1
     in
     let rec go () =
       if%bind Deferred.List.for_all nodes ~f:check_ready then return ()

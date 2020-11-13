@@ -182,7 +182,7 @@ let create_expected_statement ~constraint_constants
   let next_available_token_before =
     Sparse_ledger.next_available_token ledger_witness
   in
-  let%bind {data= transaction; status= _} =
+  let {With_status.data= transaction; status= _} =
     Ledger.Undo.transaction transaction_with_info
   in
   let%bind after =
@@ -285,15 +285,74 @@ module Make_statement_scanner
     (M : Monad_with_Or_error_intf) (Verifier : sig
         type t
 
-        val verify : verifier:t -> P.t list -> sexp_bool M.t
+        val verify : verifier:t -> P.t list -> sexp_bool M.Or_error.t
     end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
+
+  let logger = lazy (Logger.create ())
+
+  let time label f =
+    let logger = Lazy.force logger in
+    let open M.Let_syntax in
+    let start = Core.Time.now () in
+    let%map x = f () in
+    [%log debug]
+      ~metadata:
+        [("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))]
+      "%s took $time_elapsed" label ;
+    x
+
+  module Timer = struct
+    module Info = struct
+      module Time_span = struct
+        type t = Time.Span.t
+
+        let to_yojson t = `Float (Time.Span.to_ms t)
+      end
+
+      type t =
+        {total: Time_span.t; count: int; min: Time_span.t; max: Time_span.t}
+      [@@deriving to_yojson]
+
+      let singleton time = {total= time; count= 1; max= time; min= time}
+
+      let update (t : t) time =
+        { total= Time.Span.( + ) t.total time
+        ; count= t.count + 1
+        ; min= Time.Span.min t.min time
+        ; max= Time.Span.max t.max time }
+    end
+
+    type t = Info.t String.Table.t
+
+    let create () : t = String.Table.create ()
+
+    let time (t : t) label f =
+      let start = Time.now () in
+      let x = f () in
+      let elapsed = Time.(diff (now ()) start) in
+      Hashtbl.update t label ~f:(function
+        | None ->
+            Info.singleton elapsed
+        | Some acc ->
+            Info.update acc elapsed ) ;
+      x
+
+    let log label (t : t) =
+      let logger = Lazy.force logger in
+      [%log debug]
+        ~metadata:
+          (List.map (Hashtbl.to_alist t) ~f:(fun (k, info) ->
+               (k, Info.to_yojson info) ))
+        "%s timing" label
+  end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants tree ~verifier :
       (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
       M.t =
+    let timer = Timer.create () in
     let module Acc = struct
       type t = (Transaction_snark.Statement.t * P.t list) option
     end in
@@ -307,15 +366,16 @@ struct
     in
     let merge_acc ~proofs (acc : Acc.t) s2 : Acc.t Or_error.t =
       let open Or_error.Let_syntax in
-      with_error "Bad merge proof" ~f:(fun () ->
-          match acc with
-          | None ->
-              Ok (Some (s2, proofs))
-          | Some (s1, ps) ->
-              let%map merged_statement =
-                Transaction_snark.Statement.merge s1 s2
-              in
-              Some (merged_statement, proofs @ ps) )
+      Timer.time timer (sprintf "merge_acc:%s" __LOC__) (fun () ->
+          with_error "Bad merge proof" ~f:(fun () ->
+              match acc with
+              | None ->
+                  Ok (Some (s2, proofs))
+              | Some (s1, ps) ->
+                  let%map merged_statement =
+                    Transaction_snark.Statement.merge s1 s2
+                  in
+                  Some (merged_statement, proofs @ ps) ) )
     in
     let fold_step_a acc_statement job =
       match job with
@@ -327,9 +387,10 @@ struct
       | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
           let open Or_error.Let_syntax in
           let%bind merged_statement =
-            Transaction_snark.Statement.merge
-              (Ledger_proof.statement proof_1)
-              (Ledger_proof.statement proof_2)
+            Timer.time timer (sprintf "merge:%s" __LOC__) (fun () ->
+                Transaction_snark.Statement.merge
+                  (Ledger_proof.statement proof_1)
+                  (Ledger_proof.statement proof_2) )
           in
           merge_acc acc_statement merged_statement
             ~proofs:[(proof_1, message_1); (proof_2, message_2)]
@@ -343,7 +404,10 @@ struct
           with_error "Bad base statement" ~f:(fun () ->
               let open Or_error.Let_syntax in
               let%bind expected_statement =
-                create_expected_statement ~constraint_constants transaction
+                Timer.time timer
+                  (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
+                    create_expected_statement ~constraint_constants transaction
+                )
               in
               if
                 Transaction_snark.Statement.equal transaction.statement
@@ -375,13 +439,22 @@ struct
               Stop e )
         ~finish:Result.return
     in
+    Timer.log "scan_statement" timer ;
     match res with
     | Ok None ->
         M.return (Error `Empty)
-    | Ok (Some (res, proofs)) ->
+    | Ok (Some (res, proofs)) -> (
         let open M.Let_syntax in
-        if%map Verifier.verify ~verifier proofs then Ok res
-        else Error (`Error (Error.of_string "Bad proofs"))
+        match%map
+          ksprintf time "verify:%s" __LOC__ (fun () ->
+              Verifier.verify ~verifier proofs )
+        with
+        | Ok true ->
+            Ok res
+        | Ok false ->
+            Error (`Error (Error.of_string "Bad proofs"))
+        | Error e ->
+            Error (`Error e) )
     | Error e ->
         M.return (Error (`Error e))
 
@@ -394,7 +467,10 @@ struct
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
     in
     let open M.Let_syntax in
-    match%map scan_statement ~constraint_constants ~verifier t with
+    match%map
+      time "scan_statement" (fun () ->
+          scan_statement ~constraint_constants ~verifier t )
+    with
     | Error (`Error e) ->
         Error e
     | Error `Empty ->
@@ -516,7 +592,6 @@ let extract_txns txns_with_witnesses =
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
         Ledger.Undo.transaction txn_with_witness.transaction_with_info
-        |> Or_error.ok_exn
       in
       let state_hash = fst txn_with_witness.state_hash in
       (txn, state_hash) )
@@ -547,13 +622,12 @@ let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       t.transaction_with_info |> Ledger.Undo.transaction )
   @@ Parallel_scan.pending_data t
-  |> Or_error.all
 
 let staged_transactions_with_protocol_states t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      let%bind txn = t.transaction_with_info |> Ledger.Undo.transaction in
+      let txn = t.transaction_with_info |> Ledger.Undo.transaction in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state) )
   @@ Parallel_scan.pending_data t
@@ -653,7 +727,7 @@ let all_work_pairs t
         , state_hash
         , ledger_witness
         , init_stack ) ->
-        let%bind {data= transaction; status} =
+        let {With_status.data= transaction; status} =
           Ledger.Undo.transaction transaction_with_info
         in
         let%bind protocol_state_body =

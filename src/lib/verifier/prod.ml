@@ -10,7 +10,19 @@ type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
-    val verify_blockchain_snark : Protocol_state.Value.t -> Proof.t -> bool
+    val verify_blockchain_snarks :
+      (Protocol_state.Value.t * Proof.t) list -> bool
+
+    val verify_commands :
+         Coda_base.User_command.Verifiable.t list
+      -> [ `Valid of Coda_base.User_command.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+           ( Pickles.Side_loaded.Verification_key.t
+           * Coda_base.Snapp_statement.t
+           * Pickles.Side_loaded.Proof.t )
+           list ]
+         list
 
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> bool
@@ -33,9 +45,33 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_blockchain_snark state proof =
-               Blockchain_snark.Blockchain_snark_state.verify state proof
-                 ~key:bc_vk
+             let verify_commands (cs : User_command.Verifiable.t list) : _ list
+                 =
+               let cs = List.map cs ~f:Common.check in
+               let to_verify =
+                 List.concat_map cs ~f:(function
+                   | `Valid _ ->
+                       []
+                   | `Invalid ->
+                       []
+                   | `Valid_assuming (_, xs) ->
+                       xs )
+               in
+               let all_verified =
+                 Pickles.Side_loaded.verify
+                   ~value_to_field_elements:Snapp_statement.to_field_elements
+                   to_verify
+               in
+               List.map cs ~f:(function
+                 | `Valid c ->
+                     `Valid c
+                 | `Invalid ->
+                     `Invalid
+                 | `Valid_assuming (c, xs) ->
+                     if all_verified then `Valid c else `Valid_assuming xs )
+
+             let verify_blockchain_snarks ts =
+               Blockchain_snark.Blockchain_snark_state.verify ts ~key:bc_vk
 
              let verify_transaction_snarks ts =
                match
@@ -46,7 +82,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     ~metadata:[("error", Error_json.error_to_yojson e)]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -55,7 +91,17 @@ module Worker_state = struct
     | Check | None ->
         Deferred.return
         @@ ( module struct
-             let verify_blockchain_snark _ _ = true
+             let verify_commands cs =
+               List.map cs ~f:(fun c ->
+                   match Common.check c with
+                   | `Valid c ->
+                       `Valid c
+                   | `Invalid ->
+                       `Invalid
+                   | `Valid_assuming (c, _) ->
+                       `Valid c )
+
+             let verify_blockchain_snarks _ = true
 
              let verify_transaction_snarks _ = true
            end
@@ -69,9 +115,21 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { verify_blockchain: ('w, Blockchain.t, bool) F.t
+      { verify_blockchains: ('w, Blockchain.t list, bool) F.t
       ; verify_transaction_snarks:
-          ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t }
+          ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
+      ; verify_commands:
+          ( 'w
+          , User_command.Verifiable.t list
+          , [ `Valid of User_command.Valid.t
+            | `Invalid
+            | `Valid_assuming of
+              ( Pickles.Side_loaded.Verification_key.t
+              * Coda_base.Snapp_statement.t
+              * Pickles.Side_loaded.Proof.t )
+              list ]
+            list )
+          F.t }
 
     module Worker_state = Worker_state
 
@@ -87,13 +145,20 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
+      let verify_blockchains (w : Worker_state.t) (chains : Blockchain.t list)
+          =
         let (module M) = Worker_state.get w in
-        Deferred.return (M.verify_blockchain_snark chain.state chain.proof)
+        Deferred.return
+          (M.verify_blockchain_snarks
+             (List.map chains ~f:(fun {state; proof} -> (state, proof))))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
         Deferred.return (M.verify_transaction_snarks ts)
+
+      let verify_commands (w : Worker_state.t) ts =
+        let (module M) = Worker_state.get w in
+        Deferred.return (M.verify_commands ts)
 
       let functions =
         let f (i, o, f) =
@@ -101,8 +166,11 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain=
-            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchains=
+            f
+              ( [%bin_type_class: Blockchain.Stable.Latest.t list]
+              , Bool.bin_t
+              , verify_blockchains )
         ; verify_transaction_snarks=
             f
               ( [%bin_type_class:
@@ -110,7 +178,20 @@ module Worker = struct
                   * Sok_message.Stable.Latest.t )
                   list]
               , Bool.bin_t
-              , verify_transaction_snarks ) }
+              , verify_transaction_snarks )
+        ; verify_commands=
+            f
+              ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
+              , [%bin_type_class:
+                  [ `Valid of User_command.Valid.Stable.Latest.t
+                  | `Invalid
+                  | `Valid_assuming of
+                    ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
+                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Pickles.Side_loaded.Proof.Stable.Latest.t )
+                    list ]
+                  list]
+              , verify_commands ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
@@ -143,7 +224,7 @@ let plus_or_minus initial ~delta =
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let create_worker () =
@@ -225,11 +306,11 @@ let with_retry ~logger f =
   in
   go 4
 
-let verify_blockchain_snark {worker; logger} chain =
+let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-        ~arg:chain )
+      Worker.Connection.run connection ~f:Worker.functions.verify_blockchains
+        ~arg:chains )
 
 module Id = Unique_id.Int ()
 
@@ -254,3 +335,9 @@ let verify_transaction_snarks {worker; logger} ts =
           ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
           :: metadata () ) ) ;
   res
+
+let verify_commands {worker; logger} ts =
+  with_retry ~logger (fun () ->
+      let%bind {connection; _} = !worker in
+      Worker.Connection.run connection ~f:Worker.functions.verify_commands
+        ~arg:ts )

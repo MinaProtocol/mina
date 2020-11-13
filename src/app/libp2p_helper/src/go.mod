@@ -26,11 +26,8 @@ require (
 	github.com/libp2p/go-maddr-filter v0.1.0
 	github.com/libp2p/go-mplex v0.1.3 // indirect
 	github.com/libp2p/go-stream-muxer v0.1.0
-	github.com/libp2p/go-tcp-transport v0.2.1 // indirect
 	github.com/libp2p/go-yamux v1.3.8 // indirect
-	github.com/miekg/dns v1.1.31 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/multiformats/go-multiaddr-net v0.2.0 // indirect
 	github.com/multiformats/go-varint v0.0.6
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect

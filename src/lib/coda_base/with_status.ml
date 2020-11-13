@@ -4,7 +4,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'a t = {data: 'a; status: User_command_status.Stable.V1.t}
-    [@@deriving sexp, yojson, eq, compare]
+    [@@deriving sexp, yojson, eq, compare, fields]
   end
 end]
 

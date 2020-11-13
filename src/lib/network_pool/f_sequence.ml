@@ -533,6 +533,8 @@ let length = C.length
 
 let iter = C.iter
 
+let find = C.find
+
 let to_seq : 'e t -> 'e Sequence.t = fun t -> Sequence.unfold ~init:t ~f:uncons
 
 let sexp_of_t : ('e -> Sexp.t) -> 'e t -> Sexp.t =
@@ -546,7 +548,7 @@ let rec equal : ('e -> 'e -> bool) -> 'e t -> 'e t -> bool =
   | _ ->
       false
 
-let to_list : 'e t -> 'e list = Fn.compose Sequence.to_list to_seq
+let to_list : 'e t -> 'e list = fun fseq -> Sequence.to_list (to_seq fseq)
 
 let of_list : 'e list -> 'e t = List.fold_left ~init:empty ~f:snoc
 

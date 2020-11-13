@@ -21,7 +21,11 @@ let create_reader ~close_on_exception f =
   let r = Pipe.create_reader ~close_on_exception f in
   {Reader.pipe= r; has_reader= false}
 
-let write = Pipe.write
+let write w x =
+  ( if Pipe.is_closed w then
+    let logger = Logger.create () in
+    [%log warn] "writing to closed linear pipe" ~metadata:[] ) ;
+  Pipe.write w x
 
 let write_if_open = Pipe.write_if_open
 

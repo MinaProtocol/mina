@@ -3,6 +3,7 @@
  (public_name integers_stubs_js)
  (js_of_ocaml
   (javascript_files ./runtime.js)
-  )
+ )
  (libraries zarith_stubs_js)
+ (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

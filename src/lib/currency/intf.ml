@@ -90,6 +90,8 @@ module type Arithmetic_intf = sig
   val ( + ) : t -> t -> t option
 
   val ( - ) : t -> t -> t option
+
+  val scale : t -> int -> t option
 end
 
 module type Signed_intf = sig

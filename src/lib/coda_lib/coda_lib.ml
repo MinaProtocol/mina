@@ -70,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -474,7 +474,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     let nonces =
       List.map pooled_transactions
         ~f:
-          (Fn.compose User_command.nonce
+          (Fn.compose User_command.nonce_exn
              Transaction_hash.User_command_with_valid_signature.command)
     in
     (* The last nonce gives us the maximum nonce in the transaction pool *)
@@ -537,7 +537,7 @@ module Root_diff = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { user_commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
         ; root_length: int }
 
       let to_latest = Fn.id
@@ -569,7 +569,10 @@ let root_diff t =
         | Some frontier ->
             let root = Transition_frontier.root frontier in
             Strict_pipe.Writer.write root_diff_writer
-              { user_commands= Transition_frontier.Breadcrumb.user_commands root
+              { commands=
+                  List.map
+                    (Transition_frontier.Breadcrumb.commands root)
+                    ~f:(With_status.map ~f:User_command.forget_check)
               ; root_length= length_of_breadcrumb root } ;
             Broadcast_pipe.Reader.iter
               Transition_frontier.(
@@ -591,9 +594,13 @@ let root_diff t =
                         Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
-                        { user_commands=
-                            Transition_frontier.Breadcrumb.user_commands
+                        { commands=
+                            Transition_frontier.Breadcrumb.commands
                               new_root_breadcrumb
+                            |> List.map
+                                 ~f:
+                                   (With_status.map
+                                      ~f:User_command.forget_check)
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -648,10 +655,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  Work_selection_method.remove t.snark_job_state spec ;
+  let cb _ =
+    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+    Work_selection_method.remove t.snark_job_state spec
+  in
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
@@ -737,7 +749,19 @@ let start t =
     ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
-let create (config : Config.t) =
+let start_with_precomputed_blocks t blocks =
+  let%bind () =
+    Block_producer.run_precomputed ~logger:t.config.logger
+      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~time_controller:t.config.time_controller
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~precomputed_values:t.config.precomputed_values
+      ~precomputed_blocks:blocks
+  in
+  start t
+
+let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -893,8 +917,18 @@ let create (config : Config.t) =
                         ; ban_statuses
                         ; k_block_hashes } )
           in
+          let get_some_initial_peers _ =
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                [%log' error config.logger]
+                  "Network not instantiated when initial peers requested" ;
+                Deferred.return []
+            | Some net ->
+                Coda_networking.peers net
+          in
           let%bind net =
-            Coda_networking.create config.net_config
+            Coda_networking.create config.net_config ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring
@@ -979,14 +1013,15 @@ let create (config : Config.t) =
             Strict_pipe.(create ~name:"local snark work" Synchronous)
           in
           let txn_pool_config =
-            Network_pool.Transaction_pool.Resource_pool.make_config
+            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~constraint_constants ~logger:config.logger
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1006,11 +1041,13 @@ let create (config : Config.t) =
                   else
                     (*callback for the result from transaction_pool.apply_diff*)
                     Strict_pipe.Writer.write local_txns_writer
-                      (user_commands, result_cb)
+                      ( List.map user_commands ~f:(fun c ->
+                            User_command.Signed_command c )
+                      , result_cb )
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
@@ -1072,7 +1109,7 @@ let create (config : Config.t) =
                          in
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
-                             if v then
+                             if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
                                   .forget_validation_with_hash et ) ;
@@ -1179,11 +1216,12 @@ let create (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~constraint_constants ~logger:config.logger
-              ~disk_location:config.snark_pool_disk_location
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1195,8 +1233,12 @@ let create (config : Config.t) =
               ~logger:config.logger
           in
           let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
+            match wallets with
+            | Some wallets ->
+                return wallets
+            | None ->
+                Secrets.Wallets.load ~logger:config.logger
+                  ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)

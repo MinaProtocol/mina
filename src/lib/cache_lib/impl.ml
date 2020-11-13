@@ -8,7 +8,8 @@ end
 
 module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
   module rec Cache : sig
-    include Intf.Cache.S with module Cached := Cached
+    include
+      Intf.Cache.S with type ('t, 'cache_t) cached := ('t, 'cache_t) Cached.t
 
     val logger : _ t -> Logger.t
 

@@ -30,7 +30,7 @@ in Pipeline.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker ([] : List Text) (
             "./buildkite/scripts/lint-check-format.sh && " ++
-            "./scripts/require-ppx-version.py"),
+            "./scripts/require-ppxs.py"),
           label = "OCaml Lints; Check-format, Require-ppx-version",
           key = "check",
           target = Size.Large,

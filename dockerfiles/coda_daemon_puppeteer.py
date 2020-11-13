@@ -91,10 +91,11 @@ if __name__ == '__main__':
   Path('coda.log').touch()
   Path('.coda-config/coda-prover.log').touch()
   Path('.coda-config/coda-verifier.log').touch()
+  Path('.coda-config/mina-best-tip.log').touch()
 
   # currently does not handle tail process dying
   tail_process = subprocess.Popen(
-      ['tail', '-q', '-f', 'coda.log', '-f', '.coda-config/coda-prover.log', '-f', '.coda-config/coda-verifier.log']
+      ['tail', '-q', '-f', 'coda.log', '-f', '.coda-config/coda-prover.log', '-f', '.coda-config/coda-verifier.log', '-f' , '.coda-config/mina-best-tip.log']
   )
 
   start_daemon()

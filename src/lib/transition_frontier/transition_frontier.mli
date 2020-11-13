@@ -10,13 +10,18 @@ open Coda_base
 open Frontier_base
 module Breadcrumb = Breadcrumb
 module Diff = Diff
-module Hash = Frontier_hash
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
 
 include Frontier_intf.S
+
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event]
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition

@@ -234,7 +234,7 @@ let%snarkydef eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
     let%bind fee_excess_zero =
       Field.(Checked.equal (Var.constant zero)) fee_excess
     in
-    let%bind may_move = Boolean.(fee_token_equal || fee_excess_zero) in
+    let%bind may_move = Boolean.(fee_token_equal ||| fee_excess_zero) in
     let%bind fee_token =
       Token_id.Checked.if_ fee_excess_zero ~then_:fee_token_m ~else_:fee_token
     in

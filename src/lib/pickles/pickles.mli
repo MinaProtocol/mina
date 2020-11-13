@@ -1,11 +1,15 @@
 open Core_kernel
 open Pickles_types
 open Hlist
+module Tick_field_sponge = Tick_field_sponge
+module Util = Util
+module Step_main_inputs = Step_main_inputs
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Pairing_main = Pairing_main
 
 module type Statement_intf = sig
   type field
@@ -22,7 +26,12 @@ module type Statement_value_intf =
   Statement_intf with type field := Impls.Step.field
 
 module Verification_key : sig
-  include Binable.S
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
 
   val dummy : t Lazy.t
 
@@ -131,6 +140,7 @@ module Side_loaded : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
+        (* TODO: This should really be able to be any width up to the max width... *)
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         [@@deriving sexp, eq, yojson, hash, compare]
@@ -145,6 +155,11 @@ module Side_loaded : sig
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+
+  val verify :
+       value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
+    -> (Verification_key.t * 'value * Proof.t) list
+    -> bool
 
   (* Must be called in the inductive rule snarky function defining a
    rule for which this tag is used as a predecessor. *)
