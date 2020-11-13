@@ -886,8 +886,7 @@ module Genesis_proof = struct
         | Ok () ->
             file_exists filename Cache_dir.s3_install_path
         | Error e ->
-            [%log info]
-              "Could not download genesis proof file from $uri: $error"
+            [%log info] "Could not download genesis proof file from $uri"
               ~metadata:
                 [ ("uri", `String s3_path)
                 ; ("error", `String (Error.to_string_hum e)) ] ;

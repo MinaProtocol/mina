@@ -182,7 +182,7 @@ module Snark_worker = struct
               non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            [%log info]
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
               signal ;
             raise (Snark_worker_signal_interrupt signal) )
