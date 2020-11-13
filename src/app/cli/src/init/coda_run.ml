@@ -634,7 +634,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | _ ->
+           | exn ->
                handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
