@@ -967,7 +967,7 @@ let wait_for :
   with
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e.error))] ;
+        ~metadata:[("error", Error_json.error_to_yojson e.error)] ;
       Deferred.return
         (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
   | res ->

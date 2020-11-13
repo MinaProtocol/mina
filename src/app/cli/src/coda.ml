@@ -255,7 +255,7 @@ let setup_daemon logger =
   and config_files =
     flag "config-file"
       ~doc:
-        "PATH path a the configuration file (overrides CODA_CONFIG_FILE, \
+        "PATH path to a configuration file (overrides CODA_CONFIG_FILE, \
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
@@ -328,6 +328,13 @@ let setup_daemon logger =
           Core.exit 0 )
         () ) ;
     [%log info] "Booting may take several seconds, please wait" ;
+    let wallets_disk_location = conf_dir ^/ "wallets" in
+    let%bind wallets =
+      (* Load wallets early, to give user errors before expensive
+         initialization starts.
+      *)
+      Secrets.Wallets.load ~logger ~disk_location:wallets_disk_location
+    in
     let%bind libp2p_keypair =
       let libp2p_keypair_old_format =
         Option.bind libp2p_keypair ~f:(fun s ->
@@ -349,7 +356,7 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn s
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -462,14 +469,14 @@ let setup_daemon logger =
                     "Failed reading configuration from $config_file: $error"
                     ~metadata:
                       [ ("config_file", `String config_file)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   Error.raise err
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
                     ~metadata:
                       [ ("config_file", `String config_file)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   return None ) )
       in
       let config =
@@ -502,7 +509,7 @@ let setup_daemon logger =
               "Failed initializing with configuration $config: $error"
               ~metadata:
                 [ ("config", Runtime_config.to_yojson config)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             Error.raise err
       in
       let rev_daemon_configs =
@@ -613,7 +620,7 @@ let setup_daemon logger =
                    [%log error] "Error decoding public key ($key): $error"
                      ~metadata:
                        [ ("key", `String pk_str)
-                       ; ("error", `String (Error.to_string_hum e)) ] ;
+                       ; ("error", Error_json.error_to_yojson e) ] ;
                    None )
       in
       let run_snark_worker_flag =
@@ -678,7 +685,9 @@ let setup_daemon logger =
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
-            let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+            let%map kp =
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+            in
             Some kp
         | _, Some tracked_pubkey ->
             let%bind wallets =
@@ -686,7 +695,9 @@ let setup_daemon logger =
                 ~disk_location:(conf_dir ^/ "wallets")
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
-            let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+            let%map kp =
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+            in
             Some kp
       in
       let%bind client_trustlist =
@@ -929,7 +940,7 @@ let setup_daemon logger =
           proposed_protocol_version
       in
       let%map coda =
-        Coda_lib.create
+        Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
              ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
              ~net_config ~gossip_net_params
@@ -1045,7 +1056,7 @@ let rec ensure_testnet_id_still_good logger =
         "Exception while trying to fetch testnet_id: $error. Trying again in \
          $retry_minutes minutes"
         ~metadata:
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
