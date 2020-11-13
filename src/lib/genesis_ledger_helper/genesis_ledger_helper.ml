@@ -486,7 +486,7 @@ module Ledger = struct
             ~metadata:
               [ ("ledger", `String ledger_name_prefix)
               ; ("uri", `String s3_path)
-              ; ("error", `String (Error.to_string_hum e)) ] ;
+              ; ("error", Error_json.error_to_yojson e) ] ;
           return None
     in
     let%bind hash_filename =
@@ -691,7 +691,7 @@ module Ledger = struct
                 [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
                     [ ("path", `String tar_path)
-                    ; ("error", `String (Error.to_string_hum err)) ] ;
+                    ; ("error", Error_json.error_to_yojson err) ] ;
                 Error err )
         | None -> (
           match padded_accounts_opt with
@@ -782,7 +782,7 @@ module Ledger = struct
                     ~metadata:
                       [ ("ledger", `String ledger_name_prefix)
                       ; ("path", `String tar_path)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   return (Error err) ) ) )
 end
 
@@ -889,7 +889,7 @@ module Genesis_proof = struct
             [%log info] "Could not download genesis proof file from $uri"
               ~metadata:
                 [ ("uri", `String s3_path)
-                ; ("error", `String (Error.to_string_hum e)) ] ;
+                ; ("error", Error_json.error_to_yojson e) ] ;
             return None )
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
@@ -1017,7 +1017,7 @@ module Genesis_proof = struct
             [%log error] "Could not load genesis proof from $path: $error"
               ~metadata:
                 [ ("path", `String file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             Error err )
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
@@ -1051,7 +1051,7 @@ module Genesis_proof = struct
                  $error"
                 ~metadata:
                   [ ("path", `String filename)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
         in
         Ok (values, filename)
     | None when may_generate ->
@@ -1070,7 +1070,7 @@ module Genesis_proof = struct
               [%log warn] "Genesis proof could not be written to $path: $error"
                 ~metadata:
                   [ ("path", `String filename)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
         in
         Ok (values, filename)
     | None ->

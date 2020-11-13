@@ -660,8 +660,7 @@ module Helper = struct
                 [%log' error net.logger]
                   "error sending message on stream $idx: $error"
                   ~metadata:
-                    [ ("idx", `Int idx)
-                    ; ("error", `String (Error.to_string_hum e)) ] ;
+                    [("idx", `Int idx); ("error", Error_json.error_to_yojson e)] ;
                 Pipe.close outgoing_w )
       in
       advance_stream_state net stream `Us
@@ -834,7 +833,7 @@ module Helper = struct
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                      ; ("error", Error_json.error_to_yojson e) ] ;
                   ()
               (* TODO: add sender to Publish.t and include it here. *)
               (* TODO: think about exposing the PeerID of the originator as well? *) )
@@ -873,7 +872,7 @@ module Helper = struct
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                      ; ("error", Error_json.error_to_yojson e) ] ;
                   return `Reject
             in
             match%map
@@ -898,7 +897,7 @@ module Helper = struct
                 [%log' error t.logger]
                   "error during validationComplete, ignoring and continuing: \
                    $error"
-                  ~metadata:[("error", `String (Error.to_string_hum e))])
+                  ~metadata:[("error", Error_json.error_to_yojson e)])
             |> don't_wait_for ;
             Ok ()
         | None ->
@@ -1072,7 +1071,7 @@ module Pubsub = struct
         [%log' error net.logger]
           "error while publishing message on $topic: $err"
           ~metadata:
-            [("topic", `String topic); ("err", `String (Error.to_string_hum e))]
+            [("topic", `String topic); ("err", Error_json.error_to_yojson e)]
 
   module Subscription = struct
     type 'a t = 'a Helper.subscription =
@@ -1207,6 +1206,7 @@ let list_peers net =
   | Error _ ->
       []
 
+(* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
     ~seed_peers ~initial_gating_config =
@@ -1321,7 +1321,7 @@ module Protocol_handler = struct
            anyway: $err"
           ~metadata:
             [ ("protocol", `String protocol_name)
-            ; ("err", `String (Error.to_string_hum e)) ] ;
+            ; ("err", Error_json.error_to_yojson e) ] ;
         close_connections net protocol_name
 end
 
@@ -1492,7 +1492,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               [%log error]
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error err) ->
               [%log debug]
@@ -1515,13 +1515,13 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               [%log error]
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error e) ->
               [%log error] "handling line from helper failed! $err"
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("err", `String (Error.to_string_hum e)) ] ) ;
+                  ; ("err", Error_json.error_to_yojson e) ] ) ;
           Deferred.unit )
       |> don't_wait_for ;
       Deferred.Or_error.return t

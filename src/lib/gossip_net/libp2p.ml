@@ -254,8 +254,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           [%log' warn config.logger]
                             "failed to reset stream (this means it was \
                              probably closed successfully): $error"
-                            ~metadata:
-                              [("error", `String (Error.to_string_hum e))]
+                            ~metadata:[("error", Error_json.error_to_yojson e)]
                       | Ok () ->
                           () ) )
             in
@@ -295,7 +294,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       let metadata =
                         [ ("sender_peer_id", `String peer.peer_id)
-                        ; ("error", `String (Error.to_string_hum err)) ]
+                        ; ("error", Error_json.error_to_yojson err) ]
                       in
                       Trust_system.(
                         record config.trust_system config.logger peer
@@ -349,8 +348,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    | Error e ->
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
-                         ~metadata:[("error", `String (Error.to_string_hum e))]
-                   )) ;
+                         ~metadata:[("error", Error_json.error_to_yojson e)] )) ;
             (subscription, message_reader)
           in
           match%map initializing_libp2p_result with
@@ -516,7 +514,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             [%log' warn t.config.logger] "RPC call error for $rpc"
               ~metadata:
                 [ ("rpc", `String rpc_name)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             match (Error.to_exn err, Error.sexp_of_t err) with
             | ( _
               , Sexp.List
@@ -542,7 +540,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         ( Outgoing_connection_error
                         , Some
                             ( "RPC call failed, reason: $exn"
-                            , [("exn", `String (Error.to_string_hum err))] ) ))
+                            , [("exn", Error_json.error_to_yojson err)] ) ))
                 in
                 Error err )
         | Error monitor_exn ->
