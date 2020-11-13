@@ -526,9 +526,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          [%log error]
-                            "Exception while handling RPC server request from \
-                             $address: $error"
+                          [%log warn]
+                            "Handshake error while handling RPC server \
+                             request from $address"
                             ~metadata:
                               [ ("error", `String (Exn.to_string_mach exn))
                               ; ("context", `String "rpc_server")

@@ -482,7 +482,7 @@ module Ledger = struct
       | Ok () ->
           file_exists filename Cache_dir.s3_install_path
       | Error e ->
-          [%log info] "Could not download $ledger from $uri: $error"
+          [%log info] "Could not download $ledger from $uri"
             ~metadata:
               [ ("ledger", `String ledger_name_prefix)
               ; ("uri", `String s3_path)
