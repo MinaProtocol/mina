@@ -328,6 +328,13 @@ let setup_daemon logger =
           Core.exit 0 )
         () ) ;
     [%log info] "Booting may take several seconds, please wait" ;
+    let wallets_disk_location = conf_dir ^/ "wallets" in
+    let%bind wallets =
+      (* Load wallets early, to give user errors before expensive
+         initialization starts.
+      *)
+      Secrets.Wallets.load ~logger ~disk_location:wallets_disk_location
+    in
     let%bind libp2p_keypair =
       let libp2p_keypair_old_format =
         Option.bind libp2p_keypair ~f:(fun s ->
@@ -929,7 +936,7 @@ let setup_daemon logger =
           proposed_protocol_version
       in
       let%map coda =
-        Coda_lib.create
+        Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
              ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
              ~net_config ~gossip_net_params
