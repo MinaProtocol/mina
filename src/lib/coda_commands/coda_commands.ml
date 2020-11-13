@@ -314,10 +314,10 @@ let get_status ~flag t =
           `Active `Listening
       | `Offline ->
           `Active `Offline
-      | `Synced | `Catchup ->
-          if abs (highest_block_length_received - blockchain_length) < 5 then
-            `Active `Sync
-          else `Active `Catchup
+      | `Synced ->
+          `Active `Synced
+      | `Catchup ->
+          `Active `Catchup
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.consensus_time consensus_state

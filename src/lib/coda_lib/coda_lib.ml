@@ -394,10 +394,10 @@ let create_sync_status_observer ~logger ~demo_mode
             | Some (_, catchup_jobs) ->
                 let logger = Logger.create () in
                 if catchup_jobs > 0 then (
-                  [str_log info] Ledger_catchup ;
+                  [%str_log info] Ledger_catchup ;
                   `Catchup )
                 else (
-                  [str_log info] Synced ;
+                  [%str_log info] Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
