@@ -6,6 +6,8 @@ ARG deb_repo=stable
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
+COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \

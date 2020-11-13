@@ -113,7 +113,7 @@ module Sync : S with module M := Or_error = struct
                  ~metadata:
                    [ ("url", `String uri_string)
                    ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("err", Error_json.error_to_yojson err) ] ;
                err )
       in
       [%log debug] "Downloaded key to key cache"
@@ -223,7 +223,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
                  ~metadata:
                    [ ("url", `String uri_string)
                    ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("err", Error_json.error_to_yojson err) ] ;
                err )
       in
       [%log debug] "Downloaded key to key cache"
