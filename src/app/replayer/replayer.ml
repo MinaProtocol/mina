@@ -412,9 +412,11 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
   let valid_until =
-    Some
-      ( Coda_numbers.Global_slot.of_uint32
-      @@ Unsigned.UInt32.of_int64 cmd.valid_until )
+    let open Coda_numbers in
+    let slot =
+      Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 cmd.valid_until
+    in
+    if Global_slot.equal slot Global_slot.max_value then None else Some slot
   in
   let payload =
     Signed_command_payload.create

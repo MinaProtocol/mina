@@ -223,13 +223,21 @@ module User_command = struct
               (module Conn)
               (Signed_command.receiver_pk t)
           in
+          (* insert a NULL if valid_until is max global slot *)
+          let valid_until_param =
+            sprintf "NULLIF ($10,%d)"
+              Coda_numbers.Global_slot.(max_value |> to_int)
+          in
           (* TODO: Converting these uint64s to int can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-                receiver_id, fee_token, token, nonce, amount, fee, \
-                valid_until, memo, hash, status, failure_reason) VALUES (?, \
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+               (sprintf
+                  "INSERT INTO user_commands (type, fee_payer_id, source_id, \
+                   receiver_id, fee_token, token, nonce, amount, fee, \
+                   valid_until, memo, hash, status, failure_reason) VALUES \
+                   ($1, $2, $3, $4, $5, $6, $7, $8, $9, %s, $11, $12, $13, \
+                   $14) RETURNING id"
+                  valid_until_param))
             { typ=
                 ( match via with
                 | `Ident ->

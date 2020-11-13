@@ -126,9 +126,15 @@ module User_command = struct
     Caqti_type.custom ~encode ~decode rep
 
   let query =
+    (* if valid_until is NULL, return max global slot *)
+    let valid_until_field =
+      sprintf "COALESCE(valid_until,%d)"
+        Coda_numbers.Global_slot.(max_value |> to_int)
+    in
     Caqti_request.collect Caqti_type.int typ
-      {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status
+      (sprintf
+         {|
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,%s,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status
 
          FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
 
@@ -153,6 +159,7 @@ module User_command = struct
          parent.id = blocks.parent_id
 
        |}
+         valid_until_field)
 
   let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
     Conn.collect_list query user_cmd_id
