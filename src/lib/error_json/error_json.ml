@@ -86,6 +86,7 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
     | None ->
         []
     | Some backtrace ->
+        (* Split backtrace at lines so that it prints nicely in errors *)
         [ ( "backtrace"
           , `List
               (List.map ~f:(fun s -> `String s) (String.split_lines backtrace))

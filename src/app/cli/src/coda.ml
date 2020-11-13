@@ -462,14 +462,14 @@ let setup_daemon logger =
                     "Failed reading configuration from $config_file: $error"
                     ~metadata:
                       [ ("config_file", `String config_file)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   Error.raise err
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
                     ~metadata:
                       [ ("config_file", `String config_file)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   return None ) )
       in
       let config =
@@ -502,7 +502,7 @@ let setup_daemon logger =
               "Failed initializing with configuration $config: $error"
               ~metadata:
                 [ ("config", Runtime_config.to_yojson config)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             Error.raise err
       in
       let rev_daemon_configs =
@@ -613,7 +613,7 @@ let setup_daemon logger =
                    [%log error] "Error decoding public key ($key): $error"
                      ~metadata:
                        [ ("key", `String pk_str)
-                       ; ("error", `String (Error.to_string_hum e)) ] ;
+                       ; ("error", Error_json.error_to_yojson e) ] ;
                    None )
       in
       let run_snark_worker_flag =
@@ -1045,7 +1045,7 @@ let rec ensure_testnet_id_still_good logger =
         "Exception while trying to fetch testnet_id: $error. Trying again in \
          $retry_minutes minutes"
         ~metadata:
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
