@@ -78,6 +78,7 @@ module User_command = struct
     ; fee_token: int64
     ; token: int64
     ; amount: int64 option
+    ; valid_until: int64 option
     ; memo: string
     ; nonce: int64
     ; block_id: int
@@ -91,13 +92,13 @@ module User_command = struct
       Ok
         ( (t.type_, t.fee_payer_id, t.source_id, t.receiver_id)
         , (t.fee, t.fee_token, t.token, t.amount)
-        , (t.memo, t.nonce)
+        , (t.valid_until, t.memo, t.nonce)
         , (t.block_id, t.global_slot, t.txn_global_slot, t.sequence_no) )
     in
     let decode
         ( (type_, fee_payer_id, source_id, receiver_id)
         , (fee, fee_token, token, amount)
-        , (memo, nonce)
+        , (valid_until, memo, nonce)
         , (block_id, global_slot, txn_global_slot, sequence_no) ) =
       Ok
         { type_
@@ -108,6 +109,7 @@ module User_command = struct
         ; fee_token
         ; token
         ; amount
+        ; valid_until
         ; memo
         ; nonce
         ; block_id
@@ -119,16 +121,17 @@ module User_command = struct
       Caqti_type.(
         tup4 (tup4 string int int int)
           (tup4 int64 int64 int64 (option int64))
-          (tup2 string int64) (tup4 int int64 int64 int))
+          (tup3 (option int64) string int64)
+          (tup4 int int64 int64 int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status
 
-         (SELECT * FROM user_commands WHERE id = ?) AS uc
+         FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
 
          INNER JOIN
 
@@ -209,6 +212,9 @@ module Internal_command = struct
     in
     Caqti_type.custom ~encode ~decode rep
 
+  (* the transaction global slot is taken from the user command's parent block, mirroring
+     the call to Staged_ledger.apply in Block_producer
+  *)
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
