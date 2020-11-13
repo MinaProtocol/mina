@@ -294,15 +294,9 @@ WITH RECURSIVE chain AS (
           Extras.typ)
 
     let query =
-      (* if valid_until is NULL, return max global slot *)
-      let valid_until_field =
-        sprintf "COALESCE(u.valid_until,%d)"
-          Coda_numbers.Global_slot.(max_value |> to_int)
-      in
       Caqti_request.collect Caqti_type.int typ
-        (sprintf
-           {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
-        %s, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token,
+        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
+        u.valid_until, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token,
         pk1.value as fee_payer, pk2.value as source, pk3.value as receiver
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
@@ -311,7 +305,6 @@ WITH RECURSIVE chain AS (
         INNER JOIN public_keys pk3 ON pk3.id = u.receiver_id
         WHERE blocks_user_commands.block_id = ?
       |}
-           valid_until_field)
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query id

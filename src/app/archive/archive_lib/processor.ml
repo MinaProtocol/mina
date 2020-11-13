@@ -161,7 +161,7 @@ module User_command = struct
       ; nonce: int
       ; amount: int option
       ; fee: int
-      ; valid_until: int64
+      ; valid_until: int64 option
       ; memo: string
       ; hash: string
       ; status: string option
@@ -181,7 +181,7 @@ module User_command = struct
           ; int
           ; option int
           ; int
-          ; int64
+          ; option int64
           ; string
           ; string
           ; option string
@@ -223,21 +223,22 @@ module User_command = struct
               (module Conn)
               (Signed_command.receiver_pk t)
           in
-          (* insert a NULL if valid_until is max global slot *)
-          let valid_until_param =
-            sprintf "NULLIF ($10,%d)"
-              Coda_numbers.Global_slot.(max_value |> to_int)
+          let valid_until =
+            let open Coda_numbers in
+            let slot = Signed_command.valid_until t in
+            if Global_slot.equal slot Global_slot.max_value then None
+            else
+              Some
+                ( slot |> Coda_numbers.Global_slot.to_uint32
+                |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               (sprintf
-                  "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-                   receiver_id, fee_token, token, nonce, amount, fee, \
-                   valid_until, memo, hash, status, failure_reason) VALUES \
-                   ($1, $2, $3, $4, $5, $6, $7, $8, $9, %s, $11, $12, $13, \
-                   $14) RETURNING id"
-                  valid_until_param))
+               "INSERT INTO user_commands (type, fee_payer_id, source_id, \
+                receiver_id, fee_token, token, nonce, amount, fee, \
+                valid_until, memo, hash, status, failure_reason) VALUES (?, \
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
             { typ=
                 ( match via with
                 | `Ident ->
@@ -258,10 +259,7 @@ module User_command = struct
                 Signed_command.amount t
                 |> Core.Option.map ~f:Currency.Amount.to_int
             ; fee= Signed_command.fee t |> Currency.Fee.to_int
-            ; valid_until=
-                Signed_command.valid_until t
-                |> Coda_numbers.Global_slot.to_uint32
-                |> Unsigned.UInt32.to_int64
+            ; valid_until
             ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
