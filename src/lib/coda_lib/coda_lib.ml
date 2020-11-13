@@ -761,7 +761,7 @@ let start_with_precomputed_blocks t blocks =
   in
   start t
 
-let create (config : Config.t) =
+let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1233,8 +1233,12 @@ let create (config : Config.t) =
               ~logger:config.logger
           in
           let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
+            match wallets with
+            | Some wallets ->
+                return wallets
+            | None ->
+                Secrets.Wallets.load ~logger:config.logger
+                  ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
