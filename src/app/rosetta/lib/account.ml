@@ -64,7 +64,7 @@ module Balance = struct
             @@ object
                  method genesisBlock =
                    object
-                     method stateHash = "STATE_HASH_GENISIS"
+                     method stateHash = "STATE_HASH_GENESIS"
                    end
 
                  method bestChain =
