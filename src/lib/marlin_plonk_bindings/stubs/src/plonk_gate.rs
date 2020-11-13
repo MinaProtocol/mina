@@ -183,8 +183,8 @@ impl From<CamlPlonkWires> for Wires {
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlPlonkGate {
-    pub typ: CamlPlonkGateType,        // type of the gate
-    pub wires: CamlPlonkWires,         // gate wires
-    pub c: ocaml::Array<ocaml::Value>, // constraints vector
+pub struct CamlPlonkGate<T> {
+    pub typ: CamlPlonkGateType, // type of the gate
+    pub wires: CamlPlonkWires,  // gate wires
+    pub c: T,                   // constraints vector
 }
