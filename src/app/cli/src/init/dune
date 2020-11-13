@@ -14,6 +14,7 @@
    cli_lib
    coda_base coda_graphql coda_lib coda_state
    consensus coda_transition coda_version
+   mina_user_error
    o1trace protocol_version telemetry transition_frontier web_client_pipe
    web_request graphql_lib genesis_ledger_helper)
  (instrumentation (backend bisect_ppx))
