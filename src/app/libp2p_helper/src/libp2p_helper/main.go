@@ -1100,6 +1100,9 @@ func main() {
 	// All subsystems that have been considered are explicitly listed. Any that
 	// are added when modifying this code should be considered and added to
 	// this list.
+    // The levels below set the **minimum** log level for each subsystem.
+    // Messages emitted at lower levels than the given level will not be
+    // emitted.
 	logging.SetLogLevel("mplex", "debug")
 	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
 	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
