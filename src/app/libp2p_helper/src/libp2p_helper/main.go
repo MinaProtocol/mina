@@ -1115,7 +1115,6 @@ func main() {
 	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
 	logging.SetLogLevel("providers", "debug")
 	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
-	logging.SetLogLevel("dht", "debug")                 // Logs every operation to debug
 	logging.SetLogLevel("peerstore", "debug")
 	logging.SetLogLevel("diversityFilter", "debug")
 	logging.SetLogLevel("table", "debug")
