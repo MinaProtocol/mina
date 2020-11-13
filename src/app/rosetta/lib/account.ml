@@ -142,7 +142,6 @@ module Balance = struct
             | Some token_id ->
                 Amount_of.token token_id )
               (account#balance)#total ]
-      ; coins= []
       ; metadata=
           Option.map
             ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
@@ -172,7 +171,6 @@ module Balance = struct
                      ; currency=
                          {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
                      ; metadata= None } ]
-               ; coins= []
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
 end

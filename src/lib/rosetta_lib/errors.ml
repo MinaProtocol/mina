@@ -189,6 +189,41 @@ end = struct
     | `Exception _ ->
         false
 
+  (* Unlike message above, description can be updated whenever we see fit *)
+  let description = function
+    | `Sql _ ->
+        "SQL failure"
+    | `Json_parse _ ->
+        "JSON parse error"
+    | `Graphql_coda_query _ ->
+        "GraphQL query failed"
+    | `Network_doesn't_exist _ ->
+        "Network doesn't exist"
+    | `Chain_info_missing ->
+        "Chain info missing"
+    | `Account_not_found _ ->
+        "Account not found"
+    | `Invariant_violation ->
+        "Internal invariant violation (you found a bug)"
+    | `Transaction_not_found _ ->
+        "Transaction not found"
+    | `Block_missing ->
+        "Block not found"
+    | `Malformed_public_key ->
+        "Malformed public key"
+    | `Operations_not_valid _ ->
+        "Cannot convert operations to valid transaction"
+    | `Public_key_format_not_valid ->
+        "Invalid public key format"
+    | `Unsupported_operation_for_construction ->
+        "Unsupported operation for construction"
+    | `Signature_missing ->
+        "Signature missing"
+    | `No_options_provided ->
+        "No options provided"
+    | `Exception _ ->
+        "Exception"
+
   let create ?context kind = {extra_context= context; kind}
 
   let erase (t : t) =
@@ -208,7 +243,8 @@ end = struct
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context1)
-                ; ("extra", `String context2) ]) ) }
+                ; ("extra", `String context2) ]) )
+    ; description= Some (description t.kind) }
 
   (* The most recent rosetta-cli denies errors that have details in them. When
    * future versions of the spec allow for more detailed descriptions we can
