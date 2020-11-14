@@ -1476,7 +1476,12 @@ let get_peers_graphql =
              graphql_endpoint
          in
          printf "Peers:\n" ;
-         Array.iter ~f:(printf "%s\n") response#getPeers ))
+         Array.iter response#getPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
 
 let compile_time_constants =
   Command.async

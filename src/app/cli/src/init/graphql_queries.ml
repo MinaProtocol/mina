@@ -287,8 +287,14 @@ query time_offset {
 }
 |}]
 
-module Get_peers = [%graphql {|
+module Get_peers =
+[%graphql
+{|
 query get_peers {
-  getPeers
+  getPeers {
+    host
+    libp2pPort
+    peerId
+  }
 }
 |}]

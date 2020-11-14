@@ -2764,10 +2764,10 @@ module Queries = struct
     io_field "getPeers"
       ~doc:"List of peers that the daemon is currently connected to"
       ~args:Arg.[]
-      ~typ:(non_null @@ list @@ non_null string)
+      ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
       ~resolve:(fun {ctx= coda; _} () ->
         let%map peers = Coda_networking.peers (Coda_lib.net coda) in
-        Ok (List.map ~f:Network_peer.Peer.to_multiaddr_string peers) )
+        Ok (List.map ~f:Network_peer.Peer.to_display peers) )
 
   let snark_pool =
     field "snarkPool"
