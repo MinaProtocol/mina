@@ -526,9 +526,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          [%log error]
-                            "Exception while handling RPC server request from \
-                             $address: $error"
+                          [%log warn]
+                            "Handshake error while handling RPC server \
+                             request from $address"
                             ~metadata:
                               [ ("error", `String (Exn.to_string_mach exn))
                               ; ("context", `String "rpc_server")
@@ -632,6 +632,20 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~action:
                      "include the last 50 lines from .coda-config/coda.log"
                    ~log_issue:true
+               in
+               Core.print_string message ; Deferred.unit
+           | Mina_user_error.Mina_user_error {message; where} ->
+               Core.print_string "\nFATAL ERROR" ;
+               let error =
+                 match where with
+                 | None ->
+                     "encountered a configuration error"
+                 | Some where ->
+                     sprintf "encountered a configuration error %s" where
+               in
+               let message =
+                 coda_crash_message ~error ~action:("\n" ^ message)
+                   ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
            | exn ->

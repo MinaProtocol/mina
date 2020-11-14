@@ -182,7 +182,7 @@ module Snark_worker = struct
               non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            [%log info]
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
               signal ;
             raise (Snark_worker_signal_interrupt signal) )
@@ -393,11 +393,11 @@ let create_sync_status_observer ~logger ~demo_mode
                 `Bootstrap
             | Some (_, catchup_jobs) ->
                 let logger = Logger.create () in
-                if catchup_jobs > 0 then
-                  [%str_log info] Ledger_catchup ;  
-                  `Catchup )  
-                else (  
-                  [%str_log info] Synced ;  
+                if catchup_jobs > 0 then (
+                  [%str_log info] Ledger_catchup ;
+                  `Catchup )
+                else (
+                  [%str_log info] Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
