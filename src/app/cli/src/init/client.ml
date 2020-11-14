@@ -1465,6 +1465,70 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let get_peers_graphql =
+  Command.async ~summary:"List the peers currently connected to the daemon"
+    (Cli_lib.Background_daemon.graphql_init
+       Command.Param.(return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_peers.make ())
+             graphql_endpoint
+         in
+         Array.iter response#getPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
+let add_peers_graphql =
+  let open Command in
+  let peers =
+    Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
+  in
+  Command.async
+    ~summary:
+      "Add peers to the daemon\n\n\
+       Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+    (Cli_lib.Background_daemon.graphql_init peers
+       ~f:(fun graphql_endpoint input_peers ->
+         let open Deferred.Let_syntax in
+         let peers =
+           Array.of_list_map input_peers ~f:(fun peer ->
+               match
+                 Coda_net2.Multiaddr.of_string peer
+                 |> Coda_net2.Multiaddr.to_peer
+                 |> Option.map ~f:Network_peer.Peer.to_display
+               with
+               | Some peer ->
+                   object
+                     method host = peer.host
+
+                     method libp2p_port = peer.libp2p_port
+
+                     method peer_id = peer.peer_id
+                   end
+               | None ->
+                   eprintf
+                     "Could not parse %s as a peer address. It should use the \
+                      format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+                     peer ;
+                   Core.exit 1 )
+         in
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Add_peers.make ~peers ())
+             graphql_endpoint
+         in
+         printf "Requested to add peers:\n" ;
+         Array.iter response#addPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
 let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
@@ -1703,4 +1767,6 @@ let advanced =
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("next-available-token", next_available_token_cmd)
-    ; ("time-offset", get_time_offset_graphql) ]
+    ; ("time-offset", get_time_offset_graphql)
+    ; ("get-peers", get_peers_graphql)
+    ; ("add-peers", add_peers_graphql) ]
