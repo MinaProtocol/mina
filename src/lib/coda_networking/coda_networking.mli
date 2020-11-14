@@ -170,6 +170,8 @@ val states :
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
+val add_peer : t -> Network_peer.Peer.t -> unit Deferred.Or_error.t
+
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
 val fill_first_received_message_signal : t -> unit
