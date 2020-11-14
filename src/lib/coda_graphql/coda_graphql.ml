@@ -2176,7 +2176,7 @@ module Mutations = struct
     { With_hash.data= cmd
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
-  let export_logs basename_opt =
+  let export_logs ~coda:_ basename_opt =
     let open Deferred.Result.Let_syntax in
     ( match basename_opt with
     | None ->
@@ -2345,8 +2345,8 @@ module Mutations = struct
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.export_logs)]
       ~typ:(non_null Types.Payload.export_logs)
-      ~resolve:(fun {ctx: Coda_lib.t = _coda; _} () basename_opt ->
-        export_logs basename_opt )
+      ~resolve:(fun {ctx: Coda_lib.t = coda; _} () basename_opt ->
+        export_logs ~coda basename_opt )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
