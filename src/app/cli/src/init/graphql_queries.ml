@@ -238,6 +238,18 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
+module Export_logs =
+[%graphql
+{|
+mutation ($basename: String) {
+  exportLogs(input: { basename: $basename }) {
+    exportLogs {
+      tarFile
+    }
+  }
+}
+|}]
+
 module Get_token_owner =
 [%graphql
 {|
