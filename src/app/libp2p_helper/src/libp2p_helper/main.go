@@ -23,7 +23,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	coredisc "github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -898,21 +897,15 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
-	bus := app.P2p.Host.EventBus()
-	// report new peers we find peers
-	go func() {
-		sub, err := bus.Subscribe(new(event.EvtPeerConnectednessChanged))
-		if err != nil {
-			panic(err)
-		}
-
-		for evt := range sub.Out() {
-			e := evt.(event.EvtPeerConnectednessChanged)
-			if validPeer(e.Peer) {
-				foundPeer(e.Peer)
-			}
-		}
-	}()
+	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
+	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		logger.Infof("new connection: %+v", c)
+		foundPeer(c.RemotePeer())
+	}
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		logger.Infof("dropped connection: %+v", c)
+		foundPeer(c.RemotePeer())
+	}
 
 	go func() {
 		for {
@@ -1107,6 +1100,9 @@ func main() {
 	// All subsystems that have been considered are explicitly listed. Any that
 	// are added when modifying this code should be considered and added to
 	// this list.
+    // The levels below set the **minimum** log level for each subsystem.
+    // Messages emitted at lower levels than the given level will not be
+    // emitted.
 	logging.SetLogLevel("mplex", "debug")
 	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
 	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
