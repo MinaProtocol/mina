@@ -286,3 +286,9 @@ query time_offset {
   timeOffset
 }
 |}]
+
+module Get_peers = [%graphql {|
+query get_peers {
+  getPeers
+}
+|}]

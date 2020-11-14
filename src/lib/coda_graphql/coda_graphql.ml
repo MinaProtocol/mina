@@ -2760,6 +2760,15 @@ module Queries = struct
         List.map (Coda_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
         )
 
+  let get_peers =
+    io_field "getPeers"
+      ~doc:"List of peers that the daemon is currently connected to"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null string)
+      ~resolve:(fun {ctx= coda; _} () ->
+        let%map peers = Coda_networking.peers (Coda_lib.net coda) in
+        Ok (List.map ~f:Network_peer.Peer.to_multiaddr_string peers) )
+
   let snark_pool =
     field "snarkPool"
       ~doc:"List of completed snark works that have the lowest fee so far"
@@ -2847,6 +2856,7 @@ module Queries = struct
     ; block
     ; genesis_block
     ; initial_peers
+    ; get_peers
     ; pooled_user_commands
     ; transaction_status
     ; trust_status

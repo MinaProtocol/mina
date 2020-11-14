@@ -1465,6 +1465,19 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let get_peers_graphql =
+  Command.async ~summary:"Get balance associated with a public key"
+    (Cli_lib.Background_daemon.graphql_init
+       Command.Param.(return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_peers.make ())
+             graphql_endpoint
+         in
+         printf "Peers:\n" ;
+         Array.iter ~f:(printf "%s\n") response#getPeers ))
+
 let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
@@ -1703,4 +1716,5 @@ let advanced =
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("next-available-token", next_available_token_cmd)
-    ; ("time-offset", get_time_offset_graphql) ]
+    ; ("time-offset", get_time_offset_graphql)
+    ; ("get-peers", get_peers_graphql) ]
