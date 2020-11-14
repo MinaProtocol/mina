@@ -482,7 +482,7 @@ module Ledger = struct
       | Ok () ->
           file_exists filename Cache_dir.s3_install_path
       | Error e ->
-          [%log info] "Could not download $ledger from $uri"
+          [%log info] "Could not download $ledger from $uri: $error"
             ~metadata:
               [ ("ledger", `String ledger_name_prefix)
               ; ("uri", `String s3_path)
@@ -886,7 +886,8 @@ module Genesis_proof = struct
         | Ok () ->
             file_exists filename Cache_dir.s3_install_path
         | Error e ->
-            [%log info] "Could not download genesis proof file from $uri"
+            [%log info]
+              "Could not download genesis proof file from $uri: $error"
               ~metadata:
                 [ ("uri", `String s3_path)
                 ; ("error", Error_json.error_to_yojson e) ] ;
