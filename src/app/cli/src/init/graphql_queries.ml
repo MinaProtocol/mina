@@ -298,3 +298,15 @@ query get_peers {
   }
 }
 |}]
+
+module Add_peers =
+[%graphql
+{|
+mutation ($peers: [NetworkPeer!]!) {
+  addPeers(peers: $peers) {
+    host
+    libp2pPort
+    peerId
+  }
+}
+|}]

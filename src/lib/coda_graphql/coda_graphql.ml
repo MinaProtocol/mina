@@ -2409,6 +2409,40 @@ module Mutations = struct
         Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
         >>| Result.return )
 
+  let add_peer =
+    io_field "addPeers"
+      ~args:
+        Arg.
+          [arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)]
+      ~doc:"Connect to the given peers"
+      ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
+      ~resolve:(fun {ctx= coda; _} () peers ->
+        let open Deferred.Result.Let_syntax in
+        let%bind peers =
+          Result.combine_errors peers
+          |> Result.map_error ~f:(fun errs ->
+                 Option.value ~default:"Empty peers list" (List.hd errs) )
+          |> Deferred.return
+        in
+        let net = Coda_lib.net coda in
+        let%bind.Async maybe_failure =
+          (* Add peers until we find an error *)
+          Deferred.List.find_map peers ~f:(fun peer ->
+              match%map.Async Coda_networking.add_peer net peer with
+              | Ok () ->
+                  None
+              | Error err ->
+                  Some (Error (Error.to_string_hum err)) )
+        in
+        let%map () =
+          match maybe_failure with
+          | None ->
+              return ()
+          | Some err ->
+              Deferred.return err
+        in
+        List.map ~f:Network_peer.Peer.to_display peers )
+
   let commands =
     [ add_wallet
     ; create_account
@@ -2430,7 +2464,8 @@ module Mutations = struct
     ; set_staking
     ; set_snark_worker
     ; set_snark_work_fee
-    ; set_connection_gating_config ]
+    ; set_connection_gating_config
+    ; add_peer ]
 end
 
 module Queries = struct
