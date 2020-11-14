@@ -1475,7 +1475,6 @@ let get_peers_graphql =
              (Graphql_queries.Get_peers.make ())
              graphql_endpoint
          in
-         printf "Peers:\n" ;
          Array.iter response#getPeers ~f:(fun peer ->
              printf "%s\n"
                (Network_peer.Peer.to_multiaddr_string
