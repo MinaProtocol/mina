@@ -634,6 +634,20 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
+           | Mina_user_error.Mina_user_error {message; where} ->
+               Core.print_string "\nFATAL ERROR" ;
+               let error =
+                 match where with
+                 | None ->
+                     "encountered a configuration error"
+                 | Some where ->
+                     sprintf "encountered a configuration error %s" where
+               in
+               let message =
+                 coda_crash_message ~error ~action:("\n" ^ message)
+                   ~log_issue:false
+               in
+               Core.print_string message ; Deferred.unit
            | exn ->
                handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
          in
