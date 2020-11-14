@@ -112,5 +112,5 @@ let run () =
   else
     let name = Sys.argv.(1) in
     let count = int_of_string Sys.argv.(2) in
-    Format.printf "Running %s for %i iterations@." name count;
+    Format.printf "Running %s for %i iterations@." name count ;
     run_simple_exercise name count
