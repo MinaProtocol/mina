@@ -1522,7 +1522,7 @@ let add_peers_graphql =
              (Graphql_queries.Add_peers.make ~peers ())
              graphql_endpoint
          in
-         printf "Requested to add peers:" ;
+         printf "Requested to add peers:\n" ;
          Array.iter response#addPeers ~f:(fun peer ->
              printf "%s\n"
                (Network_peer.Peer.to_multiaddr_string
