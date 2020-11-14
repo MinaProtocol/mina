@@ -282,7 +282,7 @@ let signed_command_common : signed_command_common Command.Param.t =
   let%map_open sender =
     flag "sender"
       (required public_key_compressed)
-      ~doc:"KEY Public key from which you want to send the transaction"
+      ~doc:"PUBLICKEY Public key from which you want to send the transaction"
   and fee =
     flag "fee"
       ~doc:

@@ -82,7 +82,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     ~metadata:[("error", Error_json.error_to_yojson e)]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -225,7 +225,7 @@ let plus_or_minus initial ~delta =
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let create_worker () =
