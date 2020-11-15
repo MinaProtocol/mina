@@ -58,6 +58,9 @@ struct
 
       let to_bits_unsafe =
         Wrap_main_inputs.Unsafe.unpack_unboolean ~length:Field.size_in_bits
+
+      let absorb_shifted sponge (x : t Shifted_value.t) =
+        match x with Shifted_value x -> Sponge.absorb sponge x
     end
 
     module Unpacked = struct
@@ -352,7 +355,8 @@ struct
   let scale_fast p (Shifted_value.Shifted_value bits) =
     Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
 
-  let check_bulletproof ~pcs_batch ~sponge ~xi ~combined_inner_product
+  let check_bulletproof ~pcs_batch ~sponge ~xi
+      ~(combined_inner_product : Other_field.Packed.t Shifted_value.t)
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
@@ -366,6 +370,7 @@ struct
       scale_fast p (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe s)
     in
     with_label __LOC__ (fun () ->
+        Other_field.Packed.absorb_shifted sponge combined_inner_product ;
         (* a_hat should be equal to
       sum_i < t, r^i pows(beta_i) >
       = sum_i r^i < t, pows(beta_i) > *)
