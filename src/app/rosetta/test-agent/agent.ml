@@ -61,7 +61,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
         | Ok (Some _) ->
             `Succeeded () )
       ~retry_count:5 ~initial_delay:(Span.of_ms 100.0)
-      ~each_delay:(Span.of_sec 1.0)
+      ~each_delay:(Span.of_sec 3.0)
       ~failure_reason:"Took too long to appear in mempool"
   in
   (* Pull specific account out of mempool *)
