@@ -286,7 +286,14 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
     evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<CamlTweedleFpPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFqPtr>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(max_poly_size, max_quot_size, log_size_of_group, urs, evals, shifts)
+    of_ocaml(
+        max_poly_size,
+        max_quot_size,
+        log_size_of_group,
+        urs,
+        evals,
+        shifts,
+    )
 }
 
 #[ocaml::func]

@@ -1157,6 +1157,8 @@ include struct
 
   let peers = lift peers
 
+  let add_peer = lift add_peer
+
   let initial_peers = lift initial_peers
 
   let ban_notification_reader = lift ban_notification_reader
