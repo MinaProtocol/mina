@@ -148,7 +148,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.Valid.t list) _ =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_state_view = Lazy.force curr_state_view in
-  let (base_proof_time, _, _), base_proofs =
+  let (_base_proof_time, _, _), _base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
@@ -194,14 +194,15 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
               let pair_time, proof =
                 time (fun () ->
                     T.merge ~sok_digest:Sok_message.Digest.default x y
-                    |> Or_error.ok_exn )
+                    |> ignore ;
+                    assert false )
               in
               (Time.Span.max max_time pair_time, proof) )
         in
         merge_all (Time.Span.( + ) serial_time layer_time) new_proofs
   in
-  let total_time = merge_all base_proof_time base_proofs in
-  Printf.sprintf !"Total time was: %{Time.Span}" total_time
+  let _ = merge_all in
+  assert false
 
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =
