@@ -521,13 +521,7 @@ let create account_id balance =
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~vesting_period ~vesting_increment =
-  if Balance.(initial_minimum_balance > balance) then
-    Or_error.errorf
-      !"Error creating timed account for account id %{sexp: Account_id.t}: \
-        initial minimum balance %{sexp: Balance.t} greater than balance \
-        %{sexp: Balance.t} for account "
-      account_id initial_minimum_balance balance
-  else if Global_slot.(equal vesting_period zero) then
+  if Global_slot.(equal vesting_period zero) then
     Or_error.errorf
       !"Error creating timed account for account id %{sexp: Account_id.t}: \
         vesting period must be greater than zero"
