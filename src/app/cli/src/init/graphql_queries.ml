@@ -242,7 +242,7 @@ module Export_logs =
 [%graphql
 {|
 mutation ($basename: String) {
-  exportLogs(input: { basename: $basename }) {
+  exportLogs(basename: $basename) {
     exportLogs {
       tarFile
     }
