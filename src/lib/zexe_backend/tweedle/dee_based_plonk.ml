@@ -91,6 +91,26 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify = with_lagranges batch_verify
 
+    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+      let external_values i =
+        let open Field.Vector in
+        if i = 0 then Field.one
+        else if i - 1 < length primary then get primary (i - 1)
+        else get auxiliary (i - 1 - length primary)
+      in
+      let w = R1CS_constraint_system.compute_witness pk.cs external_values in
+      let n = Tweedle_fp_index.domain_d1_size pk.index in
+      let witness = Field.Vector.create () in
+      for i = 0 to Array.length w.(0) - 1 do
+        for j = 0 to n - 1 do
+          Field.Vector.emplace_back witness
+            (if j < Array.length w then w.(j).(i) else Field.zero)
+        done
+      done ;
+      Async.In_thread.run (fun () ->
+          create pk.index (Field.Vector.create ()) witness prev_chals
+            prev_comms )
+
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       let external_values i =
         let open Field.Vector in

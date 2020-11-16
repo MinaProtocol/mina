@@ -308,20 +308,23 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   let me_only_prepared =
     P.Base.Me_only.Dlog_based.prepare next_statement.proof_state.me_only
   in
-  let next_proof =
+  let%map.Async next_proof =
     let (T (input, conv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
-        Impls.Wrap.prove pk
-          ~message:
-            ( Vector.map2
-                (Vector.extend_exn prev_statement.proof_state.me_only.sg
-                   max_branching
-                   (Lazy.force Dummy.Ipa.Wrap.sg))
-                me_only_prepared.old_bulletproof_challenges
-                ~f:(fun sg chals ->
-                  { Tock.Proof.Challenge_polynomial.commitment= sg
-                  ; challenges= Vector.to_array chals } )
-            |> Vector.to_list )
+        Impls.Wrap.generate_witness_conv
+          ~f:(fun {Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs} ->
+            Zexe_backend.Tweedle.Dee_based_plonk.Proof.create_async
+              ~primary:public_inputs ~auxiliary:auxiliary_inputs pk
+              ~message:
+                ( Vector.map2
+                    (Vector.extend_exn prev_statement.proof_state.me_only.sg
+                       max_branching
+                       (Lazy.force Dummy.Ipa.Wrap.sg))
+                    me_only_prepared.old_bulletproof_challenges
+                    ~f:(fun sg chals ->
+                      { Tock.Proof.Challenge_polynomial.commitment= sg
+                      ; challenges= Vector.to_array chals } )
+                |> Vector.to_list ) )
           [input]
           (fun x () ->
             ( Impls.Wrap.handle (fun () -> (wrap_main (conv x) : unit)) handler
