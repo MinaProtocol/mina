@@ -804,24 +804,6 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
-let export_logs_graphql =
-  let open Command.Param in
-  let tarfile_flag =
-    flag "tarfile"
-      ~doc:"STRING Basename of the tar archive (default: date-time)"
-      (optional string)
-  in
-  let args = tarfile_flag in
-  Command.async ~summary:"Send payment to an address"
-    (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun graphql_endpoint basename ->
-         let%map _response =
-           Graphql_client.query_exn
-             (Graphql_queries.Export_logs.make ?basename ())
-             graphql_endpoint
-         in
-         printf "HELLO" ))
-
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.rpc_init
@@ -1747,7 +1729,6 @@ let client =
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
-    ; ("export-logs", export_logs_graphql)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 

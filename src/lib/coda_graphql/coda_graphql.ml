@@ -1132,12 +1132,6 @@ module Types = struct
 
   let user_command = UserCommand.user_command_interface
 
-  let tar_file =
-    obj "TarFile" ~fields:(fun _ ->
-        [ field "tarFile" ~typ:(non_null string) ~args:[]
-            ~doc:"The tar file containing daemon logs" ~resolve:(fun _ _ ->
-              "foo" ) ] )
-
   let transactions =
     let open Auxiliary_database.Filtered_external_transition.Transactions in
     obj "Transactions" ~doc:"Different types of transactions in a block"
@@ -1372,12 +1366,6 @@ module Types = struct
           [ field "mintTokens"
               ~typ:(non_null UserCommand.mint_tokens)
               ~doc:"Token minting command that was sent"
-              ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
-
-    let export_logs =
-      obj "ExportLogsPayload" ~fields:(fun _ ->
-          [ field "exportLogs" ~typ:tar_file ~doc:"Tar archive containing logs"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
@@ -1685,12 +1673,6 @@ module Types = struct
           ; valid_until
           ; memo
           ; nonce ]
-
-    let export_logs =
-      obj "exportLogs" ~doc:"Export daemon logs" ~coerce:Fn.id
-        ~fields:
-          [ arg "basename" ~doc:"Basename of the tar archive to be created"
-              ~typ:string ]
 
     let create_account =
       obj "AddAccountInput" ~coerce:Fn.id
@@ -2176,15 +2158,6 @@ module Mutations = struct
     { With_hash.data= cmd
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
-  let export_logs ~coda:_ basename_opt =
-    let open Deferred.Result.Let_syntax in
-    ( match basename_opt with
-    | None ->
-        eprintf "NO BASENAME"
-    | Some s ->
-        eprintf "BASENAME: %s\n!" s ) ;
-    return (Some "foo")
-
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
@@ -2341,13 +2314,6 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
-  let export_logs =
-    io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.export_logs)]
-      ~typ:(non_null Types.Payload.export_logs)
-      ~resolve:(fun {ctx: Coda_lib.t = coda; _} () basename_opt ->
-        export_logs ~coda basename_opt )
-
   let add_payment_receipt =
     result_field "addPaymentReceipt"
       ~doc:"Add payment into transaction database"
@@ -2494,7 +2460,6 @@ module Mutations = struct
     ; create_token
     ; create_token_account
     ; mint_tokens
-    ; export_logs
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
