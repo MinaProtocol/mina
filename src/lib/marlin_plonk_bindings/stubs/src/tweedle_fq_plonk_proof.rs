@@ -46,8 +46,8 @@ unsafe impl ocaml::FromValue for CamlTweedleFqVec {
 
 unsafe impl ocaml::ToValue for CamlTweedleFqVec {
     fn to_value(self: Self) -> ocaml::Value {
-        let array = caml_vector::to_array_(self.0, |x| ocaml::ToValue::to_value(CamlTweedleFq(x)));
-        array.to_value()
+        let vec: Vec<CamlTweedleFq> = self.0.iter().map(|x| CamlTweedleFq(*x)).collect();
+        vec.to_value()
     }
 }
 
@@ -105,16 +105,15 @@ unsafe impl ocaml::FromValue for CamlTweedleFqPrevChallenges {
 
 unsafe impl ocaml::ToValue for CamlTweedleFqPrevChallenges {
     fn to_value(self: Self) -> ocaml::Value {
-        let array = caml_vector::to_array_(self.0, |(vec, polycomm)| {
-            ocaml::frame!((array_value) {
-                let polycomm: CamlTweedleDumPolyComm<CamlTweedleFp> = polycomm.into();
-                let array_inner =
-                    caml_vector::to_array_(vec, |x| ocaml::ToValue::to_value(CamlTweedleFq(x)));
-                array_value = array_inner.to_value().clone();
-                ocaml::ToValue::to_value((array_inner, polycomm))
+        let vec: Vec<(Vec<CamlTweedleFq>, CamlTweedleDumPolyComm<CamlTweedleFp>)> = self
+            .0
+            .into_iter()
+            .map(|(vec, polycomm)| {
+                let vec = vec.into_iter().map(|x| CamlTweedleFq(x)).collect();
+                (vec, polycomm.into())
             })
-        });
-        array.to_value()
+            .collect();
+        vec.to_value()
     }
 }
 

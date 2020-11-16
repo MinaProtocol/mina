@@ -84,9 +84,8 @@ unsafe impl ocaml::FromValue for CamlTweedleFqScalarChallengeVec {
 
 unsafe impl ocaml::ToValue for CamlTweedleFqScalarChallengeVec {
     fn to_value(self: Self) -> ocaml::Value {
-        let array =
-            caml_vector::to_array_(self.0, |x| ocaml::ToValue::to_value(CamlTweedleFq(x.0)));
-        array.to_value()
+        let vec: Vec<CamlTweedleFq> = self.0.iter().map(|x| CamlTweedleFq(x.0)).collect();
+        vec.to_value()
     }
 }
 
