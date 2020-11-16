@@ -1369,6 +1369,18 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let export_logs =
+      obj "ExportLogsPayload" ~fields:(fun _ ->
+          [ field "exportLogs"
+              ~typ:
+                (non_null
+                   (obj "TarFile" ~fields:(fun _ ->
+                        [ field "tarfile" ~typ:(non_null string) ~args:[]
+                            ~resolve:(fun _ basename -> basename) ] )))
+              ~doc:"Tar archive containing logs"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let add_payment_receipt =
       obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
@@ -2158,6 +2170,42 @@ module Mutations = struct
     { With_hash.data= cmd
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
+  let export_logs ~coda basename_opt =
+    let open Deferred.Result.Let_syntax in
+    let basename =
+      match basename_opt with
+      | None ->
+          let date, day = Time.(now () |> to_date_ofday ~zone:Zone.utc) in
+          let Time.Span.Parts.{hr; min; sec; _} = Time.Ofday.to_parts day in
+          sprintf "%s_%02d-%02d-%02d" (Date.to_string date) hr min sec
+      | Some basename ->
+          basename
+    in
+    let Coda_lib.Config.{conf_dir; _} = Coda_lib.config coda in
+    let export_dir = conf_dir ^/ "exported_logs" in
+    ( match Core.Sys.file_exists export_dir with
+    | `No ->
+        Core.Unix.mkdir export_dir
+    | _ ->
+        () ) ;
+    let tarfile = export_dir ^/ basename ^ ".tgz" in
+    let log_files =
+      Core.Sys.ls_dir conf_dir
+      |> List.filter ~f:(String.is_suffix ~suffix:".log")
+    in
+    let%map _result =
+      Process.run ~prog:"tar"
+        ~args:
+          ( [ "-C"
+            ; conf_dir
+            ; (* Create gzipped tar file [file]. *)
+              "-czf"
+            ; tarfile ]
+          @ log_files )
+        ()
+    in
+    tarfile
+
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
@@ -2314,6 +2362,15 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
+  let export_logs =
+    io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
+      ~args:Arg.[arg "basename" ~typ:string]
+      ~typ:(non_null Types.Payload.export_logs)
+      ~resolve:(fun {ctx= coda; _} () basename_opt ->
+        let%map result = export_logs ~coda basename_opt in
+        Result.map_error result
+          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
+
   let add_payment_receipt =
     result_field "addPaymentReceipt"
       ~doc:"Add payment into transaction database"
@@ -2460,6 +2517,7 @@ module Mutations = struct
     ; create_token
     ; create_token_account
     ; mint_tokens
+    ; export_logs
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
