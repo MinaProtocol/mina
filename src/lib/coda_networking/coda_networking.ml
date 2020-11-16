@@ -1049,12 +1049,9 @@ let create (config : Config.t)
            (let%map initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers )
-           )
-    ) );
-
-            (* Temporarily disabling the extra RPC call until we switch to the proper: dht.Bootstrap and resolve why "failed when refreshing routing table" is occurring. *)
-           (*
+              raise No_initial_peers )) )) ;
+  (* Temporarily disabling the extra RPC call until we switch to the proper: dht.Bootstrap and resolve why "failed when refreshing routing table" is occurring. *)
+  (*
             else (
               [%log info] "Getting some extra initial peers to start" ;
               (* 1. Get some peers
