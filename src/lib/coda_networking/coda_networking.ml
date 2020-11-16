@@ -1046,7 +1046,7 @@ let create (config : Config.t)
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
-           (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
+           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
               raise No_initial_peers )
