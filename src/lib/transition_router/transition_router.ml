@@ -119,7 +119,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", `String (Error.to_string_hum e)) ]
+                ; ("error", Error_json.error_to_yojson e) ]
               "Couldn't get best tip from peer: $error" ;
             return None
         | Ok peer_best_tip -> (
@@ -135,7 +135,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 [%log warn]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", `String (Error.to_string_hum e)) ]
+                    ; ("error", Error_json.error_to_yojson e) ]
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(

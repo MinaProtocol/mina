@@ -141,7 +141,9 @@ unsafe impl ocaml::FromValue for CamlTweedleDumAffineVector {
 
 unsafe impl ocaml::ToValue for CamlTweedleDumAffineVector {
     fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array::<CamlTweedleDumAffine<CamlTweedleFp>, _>(self.0).to_value()
+        let vec: Vec<CamlTweedleDumAffine<CamlTweedleFp>> =
+            self.0.iter().map(|x| (*x).into()).collect();
+        vec.to_value()
     }
 }
 
@@ -162,13 +164,20 @@ unsafe impl ocaml::FromValue for CamlTweedleDumAffinePairVector {
 
 unsafe impl ocaml::ToValue for CamlTweedleDumAffinePairVector {
     fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array_(self.0, |x| {
-            let (x1, x2) = x;
-            let x1: CamlTweedleDumAffine<CamlTweedleFp> = x1.into();
-            let x2: CamlTweedleDumAffine<CamlTweedleFp> = x2.into();
-            ocaml::ToValue::to_value((x1, x2))
-        })
-        .to_value()
+        let vec: Vec<(
+            CamlTweedleDumAffine<CamlTweedleFp>,
+            CamlTweedleDumAffine<CamlTweedleFp>,
+        )> = self
+            .0
+            .iter()
+            .map(|x| {
+                let (x1, x2) = x;
+                let x1: CamlTweedleDumAffine<CamlTweedleFp> = (*x1).into();
+                let x2: CamlTweedleDumAffine<CamlTweedleFp> = (*x2).into();
+                (x1, x2)
+            })
+            .collect();
+        vec.to_value()
     }
 }
 
@@ -218,6 +227,8 @@ unsafe impl ocaml::FromValue for CamlTweedleDumPolyCommVector {
 
 unsafe impl ocaml::ToValue for CamlTweedleDumPolyCommVector {
     fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array::<CamlTweedleDumPolyComm<CamlTweedleFp>, _>(self.0).to_value()
+        let vec: Vec<CamlTweedleDumPolyComm<CamlTweedleFp>> =
+            self.0.into_iter().map(|x| x.into()).collect();
+        vec.to_value()
     }
 }

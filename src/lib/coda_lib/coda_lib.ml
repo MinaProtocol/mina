@@ -182,7 +182,7 @@ module Snark_worker = struct
               non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            [%log info]
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
               signal ;
             raise (Snark_worker_signal_interrupt signal) )
@@ -1047,7 +1047,7 @@ let create ?wallets (config : Config.t) =
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
