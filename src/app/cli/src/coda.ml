@@ -296,18 +296,21 @@ let setup_daemon logger =
     in
     Stdout_log.setup log_json log_level ;
     (* 512MB logrotate max size = 1GB max filesystem usage *)
-    let logrotate_max_size = 1024 * 1024 * 512 in
+    let logrotate_max_size = 1024 * 1024 * 10 in
+    let logrotate_num_rotate = 50 in
     Logger.Consumer_registry.register ~id:"default"
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+           ~log_filename:"coda.log" ~max_size:logrotate_max_size
+           ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:"best_tip_diff"
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
+           ~num_rotate:1) ;
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
@@ -817,7 +820,10 @@ let setup_daemon logger =
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
-        failwith "no seed or initial peer flags passed" ;
+        Mina_user_error.raise
+          {|No peers were given.
+
+Pass one of -peer, -peer-list-file, -seed.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants

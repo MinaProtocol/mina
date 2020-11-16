@@ -491,7 +491,8 @@ let main () =
       ~transport:
         (Transport.File_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
-           ~max_size:(500 * 1024 * 1024))) ;
+           ~max_size:(500 * 1024 * 1024)
+           ~num_rotate:1)) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()
