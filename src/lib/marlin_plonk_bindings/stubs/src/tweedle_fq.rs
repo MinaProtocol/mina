@@ -6,6 +6,7 @@ use algebra::{
 };
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use num_bigint::BigUint;
+use oracle::sponge::ScalarChallenge;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
@@ -46,6 +47,18 @@ impl From<Fq> for CamlTweedleFq {
 impl From<CamlTweedleFq> for Fq {
     fn from(x: CamlTweedleFq) -> Self {
         x.0
+    }
+}
+
+impl From<ScalarChallenge<Fq>> for CamlTweedleFq {
+    fn from(x: ScalarChallenge<Fq>) -> Self {
+        CamlTweedleFq(x.0)
+    }
+}
+
+impl From<CamlTweedleFq> for ScalarChallenge<Fq> {
+    fn from(x: CamlTweedleFq) -> Self {
+        ScalarChallenge(x.0)
     }
 }
 
