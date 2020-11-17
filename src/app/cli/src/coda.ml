@@ -796,13 +796,13 @@ let setup_daemon logger =
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
                 |> List.map ~f:Coda_net2.Multiaddr.of_string
                 |> return
-            | Error e ->
-                [%log fatal]
-                  ~metadata:[("error", `String (Error.to_string_mach e))]
-                  "Unable to read peer-list file properly. It must be a \
-                   newline separated series of libp2p multiaddrs (ex: \
-                   /ip4/IPADDR/tcp/PORT/p2p/PEERID)" ;
-                exit 15 )
+            | Error _ ->
+                Mina_user_error.raisef
+                  ~where:"reading libp2p peer address file"
+                  "The file %s could not be read.\n\n\
+                   It must be a newline-separated list of libp2p multiaddrs \
+                   (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                  file )
       in
       let initial_peers =
         List.concat
