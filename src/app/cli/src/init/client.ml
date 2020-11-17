@@ -804,24 +804,44 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
-let export_logs_graphql =
-  let open Command.Param in
+module Export_logs = struct
+  let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
+
   let tarfile_flag =
+    let open Command.Param in
     flag "tarfile"
       ~doc:"STRING Basename of the tar archive (default: date_time)"
       (optional string)
-  in
-  let args = tarfile_flag in
-  Command.async ~summary:"Send payment to an address"
-    (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun graphql_endpoint basename ->
-         let%map response =
-           Graphql_client.query_exn
-             (Graphql_queries.Export_logs.make ?basename ())
-             graphql_endpoint
-         in
-         printf "Exported logs to %s\n%!"
-           ((response#exportLogs)#exportLogs)#tarfile ))
+
+  let export_via_graphql =
+    Command.async ~summary:"Export daemon logs to tar archive"
+      (Cli_lib.Background_daemon.graphql_init tarfile_flag
+         ~f:(fun graphql_endpoint basename ->
+           let%map response =
+             Graphql_client.query_exn
+               (Graphql_queries.Export_logs.make ?basename ())
+               graphql_endpoint
+           in
+           pp_export_result ((response#exportLogs)#exportLogs)#tarfile ))
+
+  let export_locally =
+    let run ~tarfile ~conf_dir =
+      let open Coda_lib in
+      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      fun () ->
+        match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
+        | Ok result ->
+            pp_export_result result
+        | Error err ->
+            failwithf "Error when exporting logs: %s"
+              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              ()
+    in
+    let open Command.Let_syntax in
+    Command.async ~summary:"Export local logs (no daemon) to tar archive"
+      (let%map tarfile = tarfile_flag and conf_dir = Cli_lib.Flag.conf_dir in
+       run ~tarfile ~conf_dir)
+end
 
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
@@ -1748,7 +1768,8 @@ let client =
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
-    ; ("export-logs", export_logs_graphql)
+    ; ("export-logs", Export_logs.export_via_graphql)
+    ; ("export-local-logs", Export_logs.export_locally)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
