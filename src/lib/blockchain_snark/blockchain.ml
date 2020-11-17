@@ -6,7 +6,7 @@ open Coda_state
 module Stable = struct
   module V1 = struct
     type t = {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving fields, sexp]
+    [@@deriving fields, sexp, yojson]
 
     let to_latest = Fn.id
   end
