@@ -570,7 +570,12 @@ let no_report exn_json status =
     (Yojson.Safe.to_string status)
     (Yojson.Safe.to_string (summary exn_json))
 
-let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
+    =
+  (* attempt to free up some memory before handling crash *)
+  (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
+  Hashtbl.keys child_pids
+  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
@@ -608,7 +613,8 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -649,7 +655,8 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                in
                Core.print_string message ; Deferred.unit
            | exn ->
-               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
+               handle_crash exn ~time_controller ~conf_dir ~child_pids
+                 ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(

@@ -2171,40 +2171,9 @@ module Mutations = struct
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
   let export_logs ~coda basename_opt =
-    let open Deferred.Result.Let_syntax in
-    let basename =
-      match basename_opt with
-      | None ->
-          let date, day = Time.(now () |> to_date_ofday ~zone:Zone.utc) in
-          let Time.Span.Parts.{hr; min; sec; _} = Time.Ofday.to_parts day in
-          sprintf "%s_%02d-%02d-%02d" (Date.to_string date) hr min sec
-      | Some basename ->
-          basename
-    in
-    let Coda_lib.Config.{conf_dir; _} = Coda_lib.config coda in
-    let export_dir = conf_dir ^/ "exported_logs" in
-    ( match Core.Sys.file_exists export_dir with
-    | `No ->
-        Core.Unix.mkdir export_dir
-    | _ ->
-        () ) ;
-    let tarfile = export_dir ^/ basename ^ ".tgz" in
-    let log_files =
-      Core.Sys.ls_dir conf_dir
-      |> List.filter ~f:(String.is_suffix ~suffix:".log")
-    in
-    let%map _result =
-      Process.run ~prog:"tar"
-        ~args:
-          ( [ "-C"
-            ; conf_dir
-            ; (* Create gzipped tar file [file]. *)
-              "-czf"
-            ; tarfile ]
-          @ log_files )
-        ()
-    in
-    tarfile
+    let open Coda_lib in
+    let Config.{conf_dir; _} = Coda_lib.config coda in
+    Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
 
   let send_delegation =
     io_field "sendDelegation"

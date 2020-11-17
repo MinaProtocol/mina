@@ -586,7 +586,7 @@ module T = struct
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~top_logger:logger coda_ref ;
+            ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->
