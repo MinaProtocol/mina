@@ -1151,6 +1151,117 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" )) )
+  ; ( "run-verifier"
+    , Command.async
+        ~summary:"Run verifier on a proof provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open mode =
+          flag "-mode" (required string)
+            ~doc:"transaction/blockchain the snark to verify. Defaults to json"
+        and format =
+          flag "-format" (optional string)
+            ~doc:"sexp/json the format to parse input in"
+        in
+        fun () ->
+          let open Async in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          let%bind conf_dir = Unix.mkdtemp "/tmp/coda-verifier" in
+          let mode =
+            match mode with
+            | "transaction" ->
+                `Transaction
+            | "blockchain" ->
+                `Blockchain
+            | mode ->
+                failwithf
+                  "Expected mode flag to be one of transaction, blockchain, \
+                   got '%s'"
+                  mode ()
+          in
+          let format =
+            match format with
+            | Some "sexp" ->
+                `Sexp
+            | Some "json" | None ->
+                `Json
+            | Some format ->
+                failwithf
+                  "Expected format flag to be one of sexp, json, got '%s'"
+                  format ()
+          in
+          let%bind input =
+            match format with
+            | `Sexp -> (
+                let%map input_sexp =
+                  match%map Reader.read_sexp (Lazy.force Reader.stdin) with
+                  | `Ok input_sexp ->
+                      input_sexp
+                  | `Eof ->
+                      failwith "early EOF while reading sexp"
+                in
+                match mode with
+                | `Transaction ->
+                    `Transaction
+                      (List.t_of_sexp
+                         (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
+                            Sok_message.t_of_sexp)
+                         input_sexp)
+                | `Blockchain ->
+                    `Blockchain
+                      (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
+                         input_sexp) )
+            | `Json -> (
+                let%map input_line =
+                  match%map Reader.read_line (Lazy.force Reader.stdin) with
+                  | `Ok input_line ->
+                      input_line
+                  | `Eof ->
+                      failwith "early EOF while reading json"
+                in
+                match mode with
+                | `Transaction -> (
+                  match
+                    [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Transaction input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () )
+                | `Blockchain -> (
+                  match
+                    [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Blockchain input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () ) )
+          in
+          let%bind verifier =
+            Verifier.create ~logger
+              ~proof_level:Genesis_constants.Proof_level.compiled
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+          in
+          let%bind result =
+            match input with
+            | `Transaction input ->
+                Verifier.verify_transaction_snarks verifier input
+            | `Blockchain input ->
+                Verifier.verify_blockchain_snarks verifier input
+          in
+          match result with
+          | Ok true ->
+              printf "Proofs verified successfully" ;
+              exit 0
+          | Ok false ->
+              printf "Proofs failed to verify" ;
+              exit 1
+          | Error err ->
+              printf "Failed while verifying proofs:\n%s"
+                (Error.to_string_hum err) ;
+              exit 2) )
   ; ( "dump-structured-events"
     , Command.async ~summary:"Dump the registered structured events"
         (let open Command.Let_syntax in
