@@ -90,23 +90,6 @@ module Message = struct
     ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
 
-  let escape_chars = ['"'; '\\']
-
-  let to_yojson =
-    let escape =
-      Staged.unstage
-      @@ String.Escaping.escape ~escapeworthy:escape_chars ~escape_char:'\\'
-    in
-    fun t -> to_yojson {t with message= escape t.message}
-
-  let of_yojson =
-    let unescape =
-      Staged.unstage @@ String.Escaping.unescape ~escape_char:'\\'
-    in
-    fun json ->
-      Result.map (of_yojson json) ~f:(fun t ->
-          {t with message= unescape t.message} )
-
   let check_invariants (t : t) =
     match Logproc_lib.Interpolator.parse t.message with
     | Error _ ->
