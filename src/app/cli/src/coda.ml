@@ -705,7 +705,15 @@ let setup_daemon logger =
         match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
-              String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+              String.split ~on:',' envstr
+              |> List.filter_map ~f:(fun str ->
+                     try Some (Unix.Cidr.of_string str)
+                     with _ ->
+                       [%log warn]
+                         "Could not parse address $address in \
+                          CODA_CLIENT_TRUSTLIST"
+                         ~metadata:[("address", `String str)] ;
+                       None )
             in
             Some
               (List.append cidrs (Option.value ~default:[] client_trustlist))
