@@ -401,6 +401,52 @@ let setup_daemon logger =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
     let may_generate = Option.value ~default:false may_generate in
+    (* FIXME adapt to new system, move into child_processes lib *)
+    let pids = Child_processes.Termination.create_pid_table () in
+    let rec terminated_child_loop () =
+      match
+        try Unix.wait_nohang `Any
+        with
+        | Unix.Unix_error (errno, _, _)
+        when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+             (* no child processes exist *)
+        ->
+          None
+      with
+      | None ->
+          (* no children have terminated, wait to check again *)
+          let%bind () = Async.after (Time.Span.of_min 1.) in
+          terminated_child_loop ()
+      | Some (child_pid, exit_or_signal) ->
+          let child_pid_metadata =
+            [("child_pid", `Int (Pid.to_int child_pid))]
+          in
+          ( match exit_or_signal with
+          | Ok () ->
+              [%log info]
+                "Daemon child process $child_pid terminated with exit code 0"
+                ~metadata:child_pid_metadata
+          | Error err -> (
+            match err with
+            | `Signal signal ->
+                [%log info]
+                  "Daemon child process $child_pid terminated after receiving \
+                   signal $signal"
+                  ~metadata:
+                    ( ("signal", `String (Signal.to_string signal))
+                    :: child_pid_metadata )
+            | `Exit_non_zero exit_code ->
+                [%log info]
+                  "Daemon child process $child_pid terminated with nonzero \
+                   exit code $exit_code"
+                  ~metadata:
+                    (("exit_code", `Int exit_code) :: child_pid_metadata) ) ) ;
+          (* terminate daemon if children registered *)
+          Child_processes.Termination.check_terminated_child pids child_pid
+            logger ;
+          (* check for other terminated children, without waiting *)
+          terminated_child_loop ()
+    in
     let coda_initialization_deferred () =
       let config_file_installed =
         (* Search for config files installed as part of a deb/brew package.
@@ -875,53 +921,6 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;
       (* log terminated child processes *)
-      (* FIXME adapt to new system, move into child_processes lib *)
-      let pids = Child_processes.Termination.create_pid_table () in
-      let rec terminated_child_loop () =
-        match
-          try Unix.wait_nohang `Any
-          with
-          | Unix.Unix_error (errno, _, _)
-          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-               (* no child processes exist *)
-          ->
-            None
-        with
-        | None ->
-            (* no children have terminated, wait to check again *)
-            let%bind () = Async.after (Time.Span.of_min 1.) in
-            terminated_child_loop ()
-        | Some (child_pid, exit_or_signal) ->
-            let child_pid_metadata =
-              [("child_pid", `Int (Pid.to_int child_pid))]
-            in
-            ( match exit_or_signal with
-            | Ok () ->
-                [%log info]
-                  "Daemon child process $child_pid terminated with exit code 0"
-                  ~metadata:child_pid_metadata
-            | Error err -> (
-              match err with
-              | `Signal signal ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated after \
-                     receiving signal $signal"
-                    ~metadata:
-                      ( ("signal", `String (Signal.to_string signal))
-                      :: child_pid_metadata )
-              | `Exit_non_zero exit_code ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated with nonzero \
-                     exit code $exit_code"
-                    ~metadata:
-                      (("exit_code", `Int exit_code) :: child_pid_metadata) )
-            ) ;
-            (* terminate daemon if children registered *)
-            Child_processes.Termination.check_terminated_child pids child_pid
-              logger ;
-            (* check for other terminated children, without waiting *)
-            terminated_child_loop ()
-      in
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver =
         Option.value_map coinbase_receiver_flag ~default:`Producer
@@ -969,7 +968,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Coda_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind {Coda_initialization.coda; client_trustlist; rest_server_port} =
