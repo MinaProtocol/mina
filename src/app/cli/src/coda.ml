@@ -602,25 +602,25 @@ let setup_daemon logger =
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= log_received_blocks }
       in
-      let json_to_publickey_compressed_option json =
+      let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
                | Ok key ->
                    Some key
-               | Error e ->
-                   [%log error] "Error decoding public key ($key): $error"
-                     ~metadata:
-                       [ ("key", `String pk_str)
-                       ; ("error", Error_json.error_to_yojson e) ] ;
-                   None )
+               | Error _e ->
+                   Mina_user_error.raisef ~where:"decoding a public key"
+                     "The %s public key %s could not be decoded." which pk_str
+           )
       in
       let run_snark_worker_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark worker")
           "run-snark-worker" run_snark_worker_flag
       in
       let run_snark_coordinator_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark coordinator")
           "run-snark-coordinator" run_snark_coordinator_flag
       in
       let snark_worker_parallelism_flag =
@@ -628,7 +628,8 @@ let setup_daemon logger =
           snark_worker_parallelism_flag
       in
       let coinbase_receiver_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "coinbase receiver")
           "coinbase-receiver" coinbase_receiver_flag
       in
       let%bind external_ip =
@@ -649,7 +650,8 @@ let setup_daemon logger =
           block_production_key
       in
       let block_production_pubkey =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "block producer")
           "block-producer-pubkey" block_production_pubkey
       in
       let block_production_password =
