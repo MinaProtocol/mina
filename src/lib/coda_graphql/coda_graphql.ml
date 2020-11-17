@@ -1369,6 +1369,18 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let export_logs =
+      obj "ExportLogsPayload" ~fields:(fun _ ->
+          [ field "exportLogs"
+              ~typ:
+                (non_null
+                   (obj "TarFile" ~fields:(fun _ ->
+                        [ field "tarfile" ~typ:(non_null string) ~args:[]
+                            ~resolve:(fun _ basename -> basename) ] )))
+              ~doc:"Tar archive containing logs"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let add_payment_receipt =
       obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
@@ -2158,6 +2170,11 @@ module Mutations = struct
     { With_hash.data= cmd
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
+  let export_logs ~coda basename_opt =
+    let open Coda_lib in
+    let Config.{conf_dir; _} = Coda_lib.config coda in
+    Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
+
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
@@ -2314,6 +2331,15 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
+  let export_logs =
+    io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
+      ~args:Arg.[arg "basename" ~typ:string]
+      ~typ:(non_null Types.Payload.export_logs)
+      ~resolve:(fun {ctx= coda; _} () basename_opt ->
+        let%map result = export_logs ~coda basename_opt in
+        Result.map_error result
+          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
+
   let add_payment_receipt =
     result_field "addPaymentReceipt"
       ~doc:"Add payment into transaction database"
@@ -2460,6 +2486,7 @@ module Mutations = struct
     ; create_token
     ; create_token_account
     ; mint_tokens
+    ; export_logs
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker

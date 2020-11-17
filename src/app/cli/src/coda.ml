@@ -275,16 +275,7 @@ let setup_daemon logger =
   and plugins = plugin_flag in
   fun () ->
     let open Deferred.Let_syntax in
-    let compute_conf_dir home =
-      Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-    in
-    let%bind conf_dir =
-      if is_background then
-        let home = Core.Sys.home_directory () in
-        let conf_dir = compute_conf_dir home in
-        Deferred.return conf_dir
-      else Sys.home_directory () >>| compute_conf_dir
-    in
+    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (

@@ -13,23 +13,24 @@ open O1trace
 open Otp_lib
 open Network_peer
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is now connecting"}]
+  [@@deriving register_event {msg= "Coda daemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is now listening"}]
+  [@@deriving register_event {msg= "Coda daemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is now bootstrapping"}]
+  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is now doing ledger catchup"}]
+  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is now synced"}]
+  [@@deriving register_event {msg= "Coda daemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}
