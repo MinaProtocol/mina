@@ -31,12 +31,19 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   | `Ok pwd ->
       Bytes.of_string pwd
   | `Eof ->
-      failwith "got EOF while reading password"
+      Mina_user_error.raise "No password was provided."
 
 let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.t =
   let open Async.Deferred.Let_syntax in
   match Sys.getenv env with
   | Some p ->
       return (Bytes.of_string p)
-  | _ ->
-      read_hidden_line prompt
+  | _ -> (
+    try read_hidden_line prompt
+    with Mina_user_error.Mina_user_error _ ->
+      (* Expand the error message to include the environment variable *)
+      Mina_user_error.raisef
+        {|No password was provided.
+
+The password should be set in the %s environment variable|}
+    )
