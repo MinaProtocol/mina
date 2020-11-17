@@ -460,12 +460,9 @@ let setup_daemon logger =
             | Error err -> (
               match handle_missing with
               | `Must_exist ->
-                  [%log fatal]
-                    "Failed reading configuration from $config_file: $error"
-                    ~metadata:
-                      [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
-                  Error.raise err
+                  Mina_user_error.raisef ~where:"reading configuration file"
+                    "The configuration file %s could not be read:\n%s"
+                    config_file (Error.to_string_hum err)
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
