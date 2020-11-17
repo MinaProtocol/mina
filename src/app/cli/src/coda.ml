@@ -672,10 +672,9 @@ let setup_daemon logger =
       let%bind block_production_keypair =
         match (block_production_key, block_production_pubkey) with
         | Some _, Some _ ->
-            eprintf
-              "Error: You cannot provide both `block-producer-key` and \
-               `block_production_pubkey`\n" ;
-            exit 11
+            Mina_user_error.raise
+              "You cannot provide both `block-producer-key` and \
+               `block_production_pubkey`"
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
