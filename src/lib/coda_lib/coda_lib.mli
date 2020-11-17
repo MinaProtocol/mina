@@ -6,6 +6,7 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 
 type t
