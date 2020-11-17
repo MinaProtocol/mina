@@ -9,15 +9,21 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let proof_level = precomputed_values.proof_level
+
+    let time_controller = Block_time.Controller.basic ~logger
 
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+        ~disk_location:"/tmp/snark-pool"
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -49,7 +55,8 @@ let%test_module "network pool test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let command =
@@ -58,7 +65,8 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command, Fn.const (), Fn.const ())) ;
+               (Envelope.Incoming.local command)
+               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ()))) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -118,7 +126,8 @@ let%test_module "network pool test" =
         let config = config verifier in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~incoming_diffs:pool_reader ~local_diffs:local_reader
+            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
+            ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for

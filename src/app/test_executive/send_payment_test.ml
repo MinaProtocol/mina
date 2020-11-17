@@ -11,8 +11,11 @@ module Make (Engine : Engine_intf) = struct
   let config =
     let open Test_config in
     { default with
-      block_producers= [{balance= "4000"}; {balance= "3000"}]
+      block_producers=
+        [{balance= "4000"; timing= Untimed}; {balance= "3000"; timing= Untimed}]
     ; num_snark_workers= 0 }
+
+  let expected_error_event_reprs = []
 
   let run network log_engine =
     let open Malleable_error.Let_syntax in
@@ -23,6 +26,9 @@ module Make (Engine : Engine_intf) = struct
     (* wait for initialization *)
     let%bind () = Log_engine.wait_for_init node log_engine in
     [%log info] "send_payment_test: done waiting for initialization" ;
+    let graphql_port = 3085 in
+    Async_kernel.Deferred.don't_wait_for
+      (Node.set_port_forwarding_exn ~logger block_producer graphql_port) ;
     (* same keypairs used by Coda_automation to populate the ledger *)
     let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs in
     (* send the payment *)

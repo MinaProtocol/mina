@@ -2,63 +2,78 @@
 
 set -eou pipefail
 
-echo "--- Generating change DIFF"
+
 diff=$(
   ./buildkite/scripts/generate-diff.sh
 )
+echo "--- Generated change DIFF: ${diff}"
 
-# Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
+# Identify modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
-    find $(dirname ${val:-""}) -name 'Chart.yaml';
+    find $(dirname ${val}) -name 'Chart.yaml' || true; # failures occur when value is undefined due to empty diff
   done
 )
 
-# filter duplicates
-charts=$(echo $charts | xargs -n1 | sort -u | xargs)
-dirs=$(dirname $charts | xargs -n1 | sort -u | xargs)
-
-if [ -n "${HELM_LINT+x}" ]; then
-  for dir in $dirs; do
-    echo "--- Linting: ${dir}"
-    helm lint $dir
-
-    echo "--- Executing dry-run: ${dir}"
-    helm install test $dir --dry-run --namespace default
-  done
+if [[ "$diff" =~ .*"helm-ci".* ]]; then
+  echo "--- Change to Helm CI script found. Executing against ALL repo charts!"
+  charts=$(find '.' -name 'Chart.yaml' || true)
 fi
 
-if [ -n "${HELM_RELEASE+x}" ]; then
-  syncDir="sync_dir"
-  stageDir="updates"
-  mkdir -p $stageDir $syncDir
+if [ -n "$charts" ]; then
+  # filter duplicates
+  charts=$(echo $charts | xargs -n1 | sort -u | xargs)
+  dirs=$(dirname $charts | xargs -n1 | sort -u | xargs)
 
-  echo "--- Syncing with remote GCS Helm chart repository"
-  gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
+  if [ -n "${HELM_LINT+x}" ]; then
+    for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not lint charts contained within the coda-automation submodule
+        continue
+      fi
 
-  for dir in $dirs; do
-    echo "--- Preparing chart for Release: ${dir}"
-    helm package $dir --destination $stageDir
+      echo "--- Linting: ${dir}"
+      helm lint $dir
 
-    if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
-      echo "--- Helm experimental OCI activated - deploying to GCR registry"
-      helm chart save $(basename $dir)
-
-      echo "--- Configuring Docker auth"
-      gcloud auth configure-docker
-      docker login "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
-
-      echo "--- Pushing chart"
-      helm chart push "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
-    fi
-  done
-
-  cp --force --recursive "${stageDir}" "${syncDir}"
-
-  helm repo index $syncDir
-
-  if [ -n "${AUTO_DEPLOY+x}" ]; then
-      echo "--- Deploying/Syncing with remote repository"
-      gsutil -m rsync $syncDir ${CODA_CHART_REPO:-"gs://coda-charts/"}
+      echo "--- Executing dry-run: ${dir}"
+      helm install test $dir --dry-run --namespace test
+    done
   fi
+
+  if [ -n "${HELM_RELEASE+x}" ]; then
+    syncDir="sync_dir"
+    stageDir="updates"
+    mkdir -p $stageDir $syncDir
+
+    gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
+
+    for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not release charts contained within the coda-automation submodule
+        continue
+      fi
+
+      echo "--- Preparing chart for Release: ${dir}"
+      helm package $dir --destination $stageDir
+
+      if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
+        echo "--- Helm experimental OCI activated - deploying to GCR registry"
+        helm chart save "${dir}" "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
+
+        helm chart push "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
+      fi
+    done
+
+    echo "--- Syncing staging and release dirs"
+    cp --force --recursive --verbose ${stageDir}/* ${syncDir}/
+
+    helm repo index $syncDir
+
+    if [ -n "${AUTO_DEPLOY+x}" ]; then
+        echo "--- Deploying/Syncing with remote repository"
+        gsutil -m rsync $syncDir ${CODA_CHART_REPO:-"gs://coda-charts/"}
+    fi
+  fi
+else
+  echo "No Helm chart changes found in DIFF."
 fi

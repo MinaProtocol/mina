@@ -257,7 +257,7 @@ let%test_module "Pagination" =
           list
           @@ Signed_command.Gen.payment_with_random_participants
                ~keys:(Array.of_list [keypair1; keypair2])
-               ~max_amount:10000 ~max_fee:1000 ())
+               ~max_amount:10000 ~fee_range:1000 ())
         ~f:(fun user_commands ->
           let t = Pagination.create () in
           add_all_transactions t
@@ -290,12 +290,12 @@ let%test_module "Pagination" =
       module Payment = struct
         let same_sender_same_receiver =
           Signed_command.Gen.payment ~key_gen:key ~max_amount:10000
-            ~max_fee:1000 ()
+            ~fee_range:1000 ()
 
         let different_participants =
           let keys = Array.init 10 ~f:(fun _ -> Keypair.create ()) in
           Signed_command.Gen.payment_with_random_participants ~keys
-            ~max_amount:10000 ~max_fee:1000 ()
+            ~max_amount:10000 ~fee_range:1000 ()
       end
 
       let payment_with_time ~payment_gen lower_bound_incl upper_bound_incl =

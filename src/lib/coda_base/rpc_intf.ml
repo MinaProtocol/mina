@@ -16,6 +16,8 @@ module type Rpc_implementation_intf = sig
 
   type response
 
+  val name : string
+
   val versions : unit -> Int.Set.t
 
   val implement_multi :

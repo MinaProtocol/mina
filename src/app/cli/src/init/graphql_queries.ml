@@ -238,6 +238,18 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
+module Export_logs =
+[%graphql
+{|
+mutation ($basename: String) {
+  exportLogs(basename: $basename) {
+    exportLogs {
+      tarfile
+    }
+  }
+}
+|}]
+
 module Get_token_owner =
 [%graphql
 {|
@@ -278,5 +290,35 @@ module Next_available_token =
 {|
 query next_available_token {
   nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
+}
+|}]
+
+module Get_peers =
+[%graphql
+{|
+query get_peers {
+  getPeers {
+    host
+    libp2pPort
+    peerId
+  }
+}
+|}]
+
+module Add_peers =
+[%graphql
+{|
+mutation ($peers: [NetworkPeer!]!) {
+  addPeers(peers: $peers) {
+    host
+    libp2pPort
+    peerId
+  }
 }
 |}]

@@ -72,6 +72,8 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let time_controller = Block_time.Controller.basic ~logger
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
@@ -94,7 +96,7 @@ let%test_module "transaction_status" =
         ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
-      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
+      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
     let proof_level = Genesis_constants.Proof_level.for_unit_tests
@@ -119,8 +121,9 @@ let%test_module "transaction_status" =
       let transaction_pool =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
-          ~incoming_diffs:pool_reader ~logger ~local_diffs:local_reader
-          ~frontier_broadcast_pipe
+          ~consensus_constants:precomputed_values.consensus_constants
+          ~time_controller ~incoming_diffs:pool_reader ~logger
+          ~local_diffs:local_reader ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -140,6 +143,7 @@ let%test_module "transaction_status" =
     let%test_unit "If the transition frontier currently doesn't exist, the \
                    status of a sent transaction will be unknown" =
       Quickcheck.test ~trials:1 gen_user_command ~f:(fun user_command ->
+          Backtrace.elide := false ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
               let%bind transaction_pool, local_diffs_writer =

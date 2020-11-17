@@ -61,6 +61,7 @@ module Staged_ledger_error : sig
         * Transaction_snark.Statement.t
         * Coda_base.Sok_message.t )
         list
+    | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
     | Unexpected of Error.t
@@ -112,7 +113,8 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     ?skip_verification:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.t
   -> logger:Logger.t

@@ -93,7 +93,7 @@ module Rpcs : sig
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash: State_hash.Stable.V1.t
             ; ban_statuses:
-                ( Core.Unix.Inet_addr.Stable.V1.t
+                ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes: State_hash.Stable.V1.t list }
@@ -106,7 +106,15 @@ module Rpcs : sig
     type response = Telemetry_data.t Or_error.t [@@deriving to_yojson]
   end
 
+  module Get_some_initial_peers : sig
+    type query = unit [@@deriving sexp, to_yojson]
+
+    type response = Network_peer.Peer.t list [@@deriving to_yojson]
+  end
+
   type ('query, 'response) rpc =
+    | Get_some_initial_peers
+        : (Get_some_initial_peers.query, Get_some_initial_peers.response) rpc
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
           , Get_staged_ledger_aux_and_pending_coinbases_at_hash.response )
@@ -155,10 +163,14 @@ type t
 
 val states :
      t
-  -> (External_transition.t Envelope.Incoming.t * Block_time.t * (bool -> unit))
+  -> ( External_transition.t Envelope.Incoming.t
+     * Block_time.t
+     * (Coda_net2.validation_result -> unit) )
      Strict_pipe.Reader.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
+
+val add_peer : t -> Network_peer.Peer.t -> unit Deferred.Or_error.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -183,7 +195,8 @@ val get_ancestry :
      Deferred.Or_error.t
 
 val get_best_tip :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
@@ -216,13 +229,14 @@ val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val snark_pool_diffs :
      t
-  -> (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+  -> ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
+     * (Coda_net2.validation_result -> unit) )
      Strict_pipe.Reader.t
 
 val transaction_pool_diffs :
      t
   -> ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * (bool -> unit) )
+     * (Coda_net2.validation_result -> unit) )
      Strict_pipe.Reader.t
 
 val broadcast_state :
@@ -243,7 +257,8 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
@@ -254,11 +269,19 @@ val ip_for_peer :
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
 
+val connection_gating_config : t -> Coda_net2.connection_gating Deferred.t
+
+val set_connection_gating_config :
+  t -> Coda_net2.connection_gating -> Coda_net2.connection_gating Deferred.t
+
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t
 
 val create :
      Config.t
+  -> get_some_initial_peers:(   Rpcs.Get_some_initial_peers.query
+                                Envelope.Incoming.t
+                             -> Rpcs.Get_some_initial_peers.response Deferred.t)
   -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   Rpcs
                                                              .Get_staged_ledger_aux_and_pending_coinbases_at_hash
                                                              .query

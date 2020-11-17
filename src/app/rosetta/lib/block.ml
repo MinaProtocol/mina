@@ -207,16 +207,16 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
   INNER JOIN chain
-  ON b.id = chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
+  ON b.id = chain.parent_id AND chain.id <> chain.parent_id
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   WHERE c.height = ?
@@ -224,7 +224,7 @@ WITH RECURSIVE chain AS (
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? |}
@@ -233,28 +233,26 @@ WITH RECURSIVE chain AS (
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
 
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
-        {|
-SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
-      INNER JOIN public_keys pk
-      ON pk.id = b.creator_id
-      WHERE b.height = (select MAX(b.height) from blocks b)
-      ORDER BY timestamp ASC
-      LIMIT 1
-        |}
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+           INNER JOIN public_keys pk
+           ON pk.id = b.creator_id
+           WHERE b.height = (select MAX(b.height) from blocks b)
+           ORDER BY timestamp ASC
+           LIMIT 1 |}
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -297,7 +295,10 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token, pk1.value as fee_payer, pk2.value as source, pk3.value as receiver FROM user_commands u
+        {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
+        u.valid_until, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token,
+        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver
+        FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
         INNER JOIN public_keys pk2 ON pk2.id = u.source_id
@@ -322,7 +323,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
 
     let query =
       Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
+        {| SELECT DISTINCT ON (i.hash,i.type) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash, pk.value as receiver FROM internal_commands i
         INNER JOIN blocks_internal_commands ON blocks_internal_commands.internal_command_id = i.id
         INNER JOIN public_keys pk ON pk.id = i.receiver_id
         WHERE blocks_internal_commands.block_id = ?
@@ -356,15 +357,7 @@ SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, 
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
-    let%bind parent_id =
-      match raw_block.parent_id with
-      | None ->
-          M.fail
-            (Errors.create ~context:"Parent block is null because genesis"
-               `Block_missing)
-      | Some id ->
-          M.return id
-    in
+    let parent_id = raw_block.parent_id in
     let%bind raw_parent_block, _parent_block_extras =
       match%bind
         Block.run_by_id (module Conn) parent_id
