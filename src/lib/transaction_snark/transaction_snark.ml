@@ -220,7 +220,7 @@ module Statement = struct
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -419,7 +419,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, to_yojson]
+    [@@deriving compare, fields, sexp, version, yojson]
 
     let to_latest = Fn.id
   end

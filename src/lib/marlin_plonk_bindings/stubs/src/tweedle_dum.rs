@@ -1,4 +1,3 @@
-use crate::caml_vector;
 use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
@@ -128,70 +127,17 @@ impl From<CamlTweedleDumAffine<CamlTweedleFpPtr>> for GAffine {
     }
 }
 
-pub struct CamlTweedleDumAffineVector(pub Vec<GAffine>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDumAffineVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_value_array::<CamlTweedleDumAffine<CamlTweedleFpPtr>, _>(
-            ocaml::FromValue::from_value(value),
-        );
-        CamlTweedleDumAffineVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDumAffineVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        let vec: Vec<CamlTweedleDumAffine<CamlTweedleFp>> =
-            self.0.iter().map(|x| (*x).into()).collect();
-        vec.to_value()
-    }
-}
-
-pub struct CamlTweedleDumAffinePairVector(pub Vec<(GAffine, GAffine)>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDumAffinePairVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_array_(ocaml::FromValue::from_value(value), |value| {
-            let (x1, x2): (
-                CamlTweedleDumAffine<CamlTweedleFpPtr>,
-                CamlTweedleDumAffine<CamlTweedleFpPtr>,
-            ) = ocaml::FromValue::from_value(value);
-            (x1.into(), x2.into())
-        });
-        CamlTweedleDumAffinePairVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDumAffinePairVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        let vec: Vec<(
-            CamlTweedleDumAffine<CamlTweedleFp>,
-            CamlTweedleDumAffine<CamlTweedleFp>,
-        )> = self
-            .0
-            .iter()
-            .map(|x| {
-                let (x1, x2) = x;
-                let x1: CamlTweedleDumAffine<CamlTweedleFp> = (*x1).into();
-                let x2: CamlTweedleDumAffine<CamlTweedleFp> = (*x2).into();
-                (x1, x2)
-            })
-            .collect();
-        vec.to_value()
-    }
-}
-
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDumPolyComm<T> {
     shifted: Option<CamlTweedleDumAffine<T>>,
-    unshifted: CamlTweedleDumAffineVector,
+    unshifted: Vec<CamlTweedleDumAffine<CamlTweedleFp>>,
 }
 
 impl From<PolyComm<GAffine>> for CamlTweedleDumPolyComm<CamlTweedleFp> {
     fn from(c: PolyComm<GAffine>) -> Self {
         CamlTweedleDumPolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: CamlTweedleDumAffineVector(c.unshifted),
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
     }
 }
@@ -200,7 +146,7 @@ impl From<CamlTweedleDumPolyComm<CamlTweedleFp>> for PolyComm<GAffine> {
     fn from(c: CamlTweedleDumPolyComm<CamlTweedleFp>) -> Self {
         PolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.0,
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
     }
 }
@@ -209,26 +155,7 @@ impl From<CamlTweedleDumPolyComm<CamlTweedleFpPtr>> for PolyComm<GAffine> {
     fn from(c: CamlTweedleDumPolyComm<CamlTweedleFpPtr>) -> Self {
         PolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.0,
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
-    }
-}
-
-pub struct CamlTweedleDumPolyCommVector(pub Vec<PolyComm<GAffine>>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDumPolyCommVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_value_array::<CamlTweedleDumPolyComm<CamlTweedleFpPtr>, _>(
-            ocaml::FromValue::from_value(value),
-        );
-        CamlTweedleDumPolyCommVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDumPolyCommVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        let vec: Vec<CamlTweedleDumPolyComm<CamlTweedleFp>> =
-            self.0.into_iter().map(|x| x.into()).collect();
-        vec.to_value()
     }
 }
