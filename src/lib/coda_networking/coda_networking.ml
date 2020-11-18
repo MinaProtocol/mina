@@ -1087,7 +1087,7 @@ let create (config : Config.t)
                       ()
                   | Error e ->
                       [%log warn] ~metadata:(metadata p e)
-                        "failed to add peer $peer with $error" ) ) *) )) ;
+                        "failed to add peer $peer with $error" ) ) *) ))) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
