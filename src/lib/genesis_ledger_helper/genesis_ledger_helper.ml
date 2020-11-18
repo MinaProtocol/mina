@@ -1145,12 +1145,13 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some {previous_state_hash; previous_length} ->
+      | Some {previous_state_hash; previous_length; previous_global_slot} ->
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length } )
-  }
+            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_global_slot=
+                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =

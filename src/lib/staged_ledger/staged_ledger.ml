@@ -1843,7 +1843,7 @@ let%test_module "test" =
       let open Deferred.Let_syntax in
       let supercharge_coinbase =
         supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner
-          ~global_slot:current_state_view.curr_global_slot
+          ~global_slot:current_state_view.global_slot_since_genesis
       in
       let diff =
         Sl.create_diff ~constraint_constants !sl ~self ~logger
@@ -1889,7 +1889,8 @@ let%test_module "test" =
         compile_time_genesis.data |> Coda_state.Protocol_state.body
       in
       { (Coda_state.Protocol_state.Body.view state_body) with
-        curr_global_slot= slot }
+        curr_global_slot= slot
+      ; global_slot_since_genesis= slot }
 
     let create_and_apply ?(self = self_pk)
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk) sl logger

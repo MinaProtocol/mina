@@ -1655,7 +1655,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let root = s.source in
         let ( (root as root_after_fee_payer)
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
@@ -1778,7 +1778,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -1918,7 +1918,7 @@ module Base = struct
               (Zero_proved (Zero_proved.Checked.digested payload)))
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -2110,7 +2110,7 @@ module Base = struct
     in
     let current_global_slot =
       Coda_state.Protocol_state.Body.consensus_state state_body
-      |> Consensus.Data.Consensus_state.curr_global_slot_var
+      |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
     let%bind creating_new_token =
       Boolean.(is_create_account &&& token_invalid)

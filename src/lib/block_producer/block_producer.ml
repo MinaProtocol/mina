@@ -127,7 +127,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       (let open Deferred.Let_syntax in
       let supercharge_coinbase =
         let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-        let global_slot = Consensus.Data.Block_data.global_slot block_data in
+        let global_slot =
+          Consensus.Data.Block_data.global_slot_since_genesis block_data
+        in
         Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
           ~epoch_ledger ~global_slot
       in

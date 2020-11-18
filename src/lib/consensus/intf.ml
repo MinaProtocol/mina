@@ -516,6 +516,11 @@ module type S = sig
 
       val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
+      val global_slot_since_genesis : Value.t -> Coda_numbers.Global_slot.t
+
+      val global_slot_since_genesis_var :
+        var -> Coda_numbers.Global_slot.Checked.t
+
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
@@ -529,6 +534,8 @@ module type S = sig
       val global_slot : t -> Coda_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
+
+      val global_slot_since_genesis : t -> Coda_numbers.Global_slot.t
     end
   end
 

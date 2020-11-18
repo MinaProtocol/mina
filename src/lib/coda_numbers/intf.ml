@@ -41,6 +41,8 @@ module type S_unchecked = sig
 
   val add : t -> t -> t
 
+  val sub : t -> t -> t option
+
   val of_int : int -> t
 
   val to_int : t -> int
@@ -85,6 +87,8 @@ module type S_checked = sig
   val succ : t -> (t, _) Checked.t
 
   val add : t -> t -> (t, _) Checked.t
+
+  val sub : t -> t -> ([`Underflow of Boolean.var] * t, _) Checked.t
 
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 

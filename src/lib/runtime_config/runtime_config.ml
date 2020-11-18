@@ -1,7 +1,10 @@
 open Core_kernel
 
 module Fork_config = struct
-  type t = {previous_state_hash: string; previous_length: int}
+  type t =
+    { previous_state_hash: string
+    ; previous_length: int
+    ; previous_global_slot: int }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
 end
 

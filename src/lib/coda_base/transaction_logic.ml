@@ -1058,7 +1058,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Ok a.timing
       | Neg ->
           validate_timing ~txn_amount:delta.magnitude
-            ~txn_global_slot:state_view.curr_global_slot ~account:a
+            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
@@ -1104,7 +1104,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t)
       (c : Snapp_command.t) =
     let open Snapp_command in
-    let current_global_slot = state_view.curr_global_slot in
+    let current_global_slot = state_view.global_slot_since_genesis in
     let open Result.Let_syntax in
     with_return (fun ({return} : _ Result.t return) ->
         let ok_or_reject = function
@@ -1860,7 +1860,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
-        let txn_global_slot = txn_state_view.curr_global_slot in
+        let txn_global_slot = txn_state_view.global_slot_since_genesis in
         Or_error.map
           ( match t with
           | Command (Signed_command txn) ->

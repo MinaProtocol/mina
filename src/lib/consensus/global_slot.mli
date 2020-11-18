@@ -33,6 +33,8 @@ val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
 val ( + ) : t -> int -> t
 
+val ( - ) : t -> t -> Coda_numbers.Global_slot.t option
+
 val ( < ) : t -> t -> bool
 
 val succ : t -> t
@@ -86,6 +88,13 @@ module Checked : sig
        Checked.t
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
+
+  val sub :
+       t
+    -> t
+    -> ( [`Underflow of Boolean.var] * Coda_numbers.Global_slot.Checked.t
+       , _ )
+       Checked.t
 end
 
 val typ : (Checked.t, t) Typ.t
