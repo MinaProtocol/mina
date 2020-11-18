@@ -113,11 +113,6 @@ let run_test () : unit Deferred.t =
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
       let%bind transaction_database_dir =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
       in
@@ -224,8 +219,8 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
-             ~epoch_ledger_location ~time_controller ~receipt_chain_database
-             ~snark_work_fee ~consensus_local_state ~transaction_database
+             ~epoch_ledger_location ~time_controller ~snark_work_fee
+             ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~precomputed_values ())
       in
@@ -330,7 +325,7 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res = send_payment payment in
         assert_ok p1_res ;
-        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
+        let user_cmd = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =

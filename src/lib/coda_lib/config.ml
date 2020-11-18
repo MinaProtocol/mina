@@ -40,7 +40,6 @@ type t =
   ; epoch_ledger_location: string
   ; staged_ledger_transition_backup_capacity: int [@default 10]
   ; time_controller: Block_time.Controller.t
-  ; receipt_chain_database: Receipt_chain_database.t
   ; transaction_database: Transaction_database.t
   ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t

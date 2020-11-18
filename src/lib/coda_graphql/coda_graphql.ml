@@ -2092,7 +2092,7 @@ module Mutations = struct
     with
     | `Active f -> (
         match%map f with
-        | Ok (user_command, _receipt) ->
+        | Ok user_command ->
             Ok user_command
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
