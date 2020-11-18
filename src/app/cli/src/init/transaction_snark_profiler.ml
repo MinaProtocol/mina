@@ -148,7 +148,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.Valid.t list) _ =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
   let txn_state_view = Lazy.force curr_state_view in
-  let (_base_proof_time, _, _), _base_proofs =
+  let (base_proof_time, _, _), base_proofs =
     List.fold_map transitions
       ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
       ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
@@ -168,17 +168,19 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ~sok_digest:Sok_message.Digest.default
-                ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~init_stack:coinbase_stack_source ~next_available_token_before
-                ~next_available_token_after
-                ~pending_coinbase_stack_state:
-                  {source= coinbase_stack_source; target= coinbase_stack_target}
-                ~snapp_account1:None ~snapp_account2:None
-                { Transaction_protocol_state.Poly.transaction= t
-                ; block_data= Lazy.force state_body }
-                (unstage (Sparse_ledger.handler sparse_ledger)) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  T.of_transaction ~sok_digest:Sok_message.Digest.default
+                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
+                    ~init_stack:coinbase_stack_source
+                    ~next_available_token_before ~next_available_token_after
+                    ~pending_coinbase_stack_state:
+                      { source= coinbase_stack_source
+                      ; target= coinbase_stack_target }
+                    ~snapp_account1:None ~snapp_account2:None
+                    { Transaction_protocol_state.Poly.transaction= t
+                    ; block_data= Lazy.force state_body }
+                    (unstage (Sparse_ledger.handler sparse_ledger)) ) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
         , proof ) )
@@ -193,16 +195,16 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
             ~f:(fun max_time (x, y) ->
               let pair_time, proof =
                 time (fun () ->
-                    T.merge ~sok_digest:Sok_message.Digest.default x y
-                    |> ignore ;
-                    assert false )
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        T.merge ~sok_digest:Sok_message.Digest.default x y )
+                    |> Or_error.ok_exn )
               in
               (Time.Span.max max_time pair_time, proof) )
         in
         merge_all (Time.Span.( + ) serial_time layer_time) new_proofs
   in
-  let _ = merge_all in
-  assert false
+  let total_time = merge_all base_proof_time base_proofs in
+  Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =

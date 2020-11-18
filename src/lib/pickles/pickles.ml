@@ -898,7 +898,6 @@ let compile
 module Provers = H3_2.T (Prover)
 module Proof0 = Proof
 
-(*
 let%test_module "test no side-loaded" =
   ( module struct
     let () =
@@ -962,15 +961,17 @@ let%test_module "test no side-loaded" =
       in
       let b0 =
         Common.time "b0" (fun () ->
-            Blockchain_snark.step
-              [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
-              Field.Constant.zero )
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Blockchain_snark.step
+                  [(s_neg_one, b_neg_one); (s_neg_one, b_neg_one)]
+                  Field.Constant.zero ) )
       in
       let b1 =
         Common.time "b1" (fun () ->
-            Blockchain_snark.step
-              [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
-              Field.Constant.one )
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                Blockchain_snark.step
+                  [(Field.Constant.zero, b0); (Field.Constant.zero, b0)]
+                  Field.Constant.one ) )
       in
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
@@ -1237,4 +1238,4 @@ let%test_module "test" =
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
     let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
-  end ) *)*)
+  end ) *)
