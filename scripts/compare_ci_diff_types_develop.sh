@@ -7,3 +7,4 @@ if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
 fi
 
 ./scripts/compare_ci_diff_types.sh
+./scripts/compare_ci_diff_binables.sh
