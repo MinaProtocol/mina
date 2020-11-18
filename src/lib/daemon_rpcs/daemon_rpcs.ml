@@ -281,3 +281,13 @@ module Get_telemetry_data = struct
     Rpc.Rpc.create ~name:"Get_telemetry_data" ~version:0 ~bin_query
       ~bin_response
 end
+
+module Get_object_lifetime_statistics = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = string [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
+      ~bin_response
+end
