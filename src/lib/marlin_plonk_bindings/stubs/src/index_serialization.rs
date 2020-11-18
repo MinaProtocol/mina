@@ -11,7 +11,7 @@ use commitment_dlog::{
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
 use plonk_circuits::{
-    constraints::ConstraintSystem as PlonkConstraintSystem,
+    constraints::{zk_w, zk_polynomial, ConstraintSystem as PlonkConstraintSystem},
     domains::EvaluationDomains as PlonkEvaluationDomains,
 };
 use plonk_protocol_dlog::index::{
@@ -236,6 +236,8 @@ where
     let srs = PlonkSRSValue::Ref(unsafe { &(*srs) });
     let vk = PlonkVerifierIndex {
         domain,
+        w: zk_w(domain),
+        zkpm: zk_polynomial(domain),
         max_poly_size,
         max_quot_size,
         srs,
@@ -318,14 +320,14 @@ where
 
     write_plonk_evaluations(&c.ps4, &mut w)?;
     write_plonk_evaluations(&c.ps8, &mut w)?;
-    write_plonk_evaluations(&c.addl3, &mut w)?;
     write_plonk_evaluations(&c.addl4, &mut w)?;
     write_plonk_evaluations(&c.mul1l, &mut w)?;
     write_plonk_evaluations(&c.mul2l, &mut w)?;
     write_plonk_evaluations(&c.emul1l, &mut w)?;
     write_plonk_evaluations(&c.emul2l, &mut w)?;
     write_plonk_evaluations(&c.emul3l, &mut w)?;
-    write_plonk_evaluations(&c.l0, &mut w)?;
+    write_plonk_evaluations(&c.l04, &mut w)?;
+    write_plonk_evaluations(&c.l08, &mut w)?;
     write_plonk_evaluations(&c.l1, &mut w)?;
 
     c.r.write(&mut w)?;
@@ -404,7 +406,6 @@ where
     let ps4 = read_plonk_evaluations(&mut r)?;
     let ps8 = read_plonk_evaluations(&mut r)?;
 
-    let addl3 = read_plonk_evaluations(&mut r)?;
     let addl4 = read_plonk_evaluations(&mut r)?;
     let mul1l = read_plonk_evaluations(&mut r)?;
     let mul2l = read_plonk_evaluations(&mut r)?;
@@ -412,14 +413,19 @@ where
     let emul2l = read_plonk_evaluations(&mut r)?;
     let emul3l = read_plonk_evaluations(&mut r)?;
 
-    let l0 = read_plonk_evaluations(&mut r)?;
+    let l04 = read_plonk_evaluations(&mut r)?;
+    let l08 = read_plonk_evaluations(&mut r)?;
     let l1 = read_plonk_evaluations(&mut r)?;
 
     let r_value = G::ScalarField::read(&mut r)?;
     let o = G::ScalarField::read(&mut r)?;
     let endo = G::ScalarField::read(&mut r)?;
 
+    let zkpm = zk_polynomial(domain.d1);
+    let zkpl = zkpm.evaluate_over_domain_by_ref(domain.d8);
     Ok(PlonkConstraintSystem {
+        zkpm,
+        zkpl,
         public,
         domain,
         gates,
@@ -446,16 +452,16 @@ where
         sid,
         ps4,
         ps8,
-        addl3,
         addl4,
         mul1l,
         mul2l,
         emul1l,
         emul2l,
         emul3l,
-        l0,
+        l04,
+        l08,
         l1,
-        r: r_value,
+        r:r_value,
         o,
         endo,
         fr_sponge_params,
