@@ -9,7 +9,7 @@ const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
 
 const runCircleBuild = async (github) => {
   const postData = JSON.stringify({
-    branch: github.pull_request.head.ref,
+    branch: `pull/${github.pull_request.number}/head`,
     parameters: {
       "run-ci": true,
     },
