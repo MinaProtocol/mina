@@ -277,35 +277,6 @@ let get_public_keys =
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
-let generate_receipt =
-  let open Daemon_rpcs in
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receipt_hash_flag =
-    flag "receipt-chain-hash"
-      ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
-        \        generate a receipt for"
-      (required receipt_chain_hash)
-  in
-  let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key_compressed)
-  in
-  let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
-  in
-  Command.async ~summary:"Generate a receipt for a sent payment"
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 receipt_hash_flag address_flag token_flag)
-       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
-         let account_id = Account_id.create pk token_id in
-         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, account_id)
-           port ~success:Cli_lib.Render.Prove_receipt.to_text
-           ~error:Error.to_string_hum ~join_error:Or_error.join ))
-
 let read_json filepath ~flag =
   let%map res =
     Deferred.Or_error.try_with (fun () ->
@@ -1810,7 +1781,6 @@ let advanced =
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
-    ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("next-available-token", next_available_token_cmd)

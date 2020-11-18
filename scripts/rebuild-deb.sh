@@ -115,7 +115,7 @@ chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
-
+mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
 cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
 
 # Build Config
