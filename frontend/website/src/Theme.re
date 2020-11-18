@@ -76,6 +76,12 @@ module Colors = {
   let jungle = jungleAlpha(1.);
 
   let tan = `hex("F1EFEA");
+
+  let minaBlack = `hex("2D2D2D");
+
+  let minaOrange = `hex("FF603B");
+
+  let minaGrey = `hex("D9D9D9");
 };
 
 module Typeface = {
@@ -95,6 +101,13 @@ module Typeface = {
   let pragmataPro = fontFamily("PragmataPro, monospace");
 
   let ddinexp = fontFamily("D-Din-Exp,Helvetica Neue, Arial, sans-serif");
+
+  let monumentGrotesk =
+    fontFamily("Monument Grotesk, Helvetica Neue, Arial, sans-serif");
+
+  let monumentGroteskMono =
+    fontFamily("Monument Grotesk mono, Helvetica Neue, Arial, sans-serif");
+
 };
 
 module MediaQuery = {

@@ -134,6 +134,7 @@ let make =
       ~route=?,
       ~children,
       ~footerColor=Theme.Colors.white,
+      ~showFooter=true,
     ) => {
   let router = Next.Router.useRouter();
   let route = Option.value(route, ~default=router.route);
@@ -174,7 +175,7 @@ let make =
     </Next.Head>
     <Nav />
     <div> children </div>
-    <Footer bgcolor=footerColor />
+    {showFooter ? <Footer bgcolor=footerColor /> : React.null}
     <CookieWarning />
   </>;
 };

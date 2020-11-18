@@ -223,6 +223,24 @@ module Styles = {
     merge([Theme.Body.small, style([color(Theme.Colors.midnight)])]);
 
   let leaderboardLink = style([textDecoration(`none)]);
+
+  let signUpContainer =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`spaceBetween),
+      marginTop(`rem(1.)),
+      media(Theme.MediaQuery.notMobile, [flexDirection(`row)]),
+      selector(
+        "a",
+        [
+          important(maxWidth(`rem(10.))),
+          important(height(`percent(100.))),
+          media(Theme.MediaQuery.tablet, [marginTop(`rem(0.5))]),
+        ],
+      ),
+    ]);
 };
 
 module Section = {
@@ -263,22 +281,36 @@ let make = (~challenges as _, ~testnetName as _) => {
             </h1>
             <p className=Theme.Body.basic>
               {React.string(
-                 "Coda's public testnet is live! There are weekly challenges for the community \
-                  to interact with the testnet and contribute to Coda's development. Each week \
-                  features a new competition to recognize and reward top contributors with testnet \
-                  points.",
+                 "Coda's public testnet is live! During testnet releases, there are challenges for the community to interact with the testnet and contribute to Coda's development. Top contributors will be recognized and rewarded with testnet points.",
                )}
             </p>
             <br />
             <p className=Theme.Body.basic>
               {React.string(
-                 "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
+                 "Later this year Coda will begin its adversarial testnet, 'Testworld', where users can earn Coda tokens, USD, and token delegations for participating.",
                )}
             </p>
-            <p className=Theme.Body.basic>
-              {React.string("Testnet Status: ")}
-              <StatusBadge service=`Network />
-            </p>
+            <div className=Styles.signUpContainer>
+              <Button
+                link="/adversarial"
+                label="Sign Up Now"
+                bgColor=Theme.Colors.jungle
+                bgColorHover={Theme.Colors.hyperlinkAlpha(1.)}
+              />
+              <span
+                className=Css.(
+                  style([
+                    display(`flex),
+                    alignItems(`center),
+                    justifyContent(`center),
+                  ])
+                )>
+                <p className=Theme.Body.basic>
+                  {React.string("Testnet Status: ")}
+                  <StatusBadge service=`Network />
+                </p>
+              </span>
+            </div>
           </div>
           <Terminal.Wrapper lineDelay=2000>
             <Terminal.Line prompt=">" value="coda daemon -peer ..." />

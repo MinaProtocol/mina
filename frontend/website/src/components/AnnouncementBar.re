@@ -56,7 +56,7 @@ let make = () => {
     </style>
     <a
       name="announcementbar"
-      href="/genesis"
+      href="/adversarial"
       className=Css.(
         style(
           Theme.paddingX(`rem(1.25))
@@ -87,7 +87,7 @@ let make = () => {
               ]),
             ])
           )>
-          {React.string("Token Program is live")}
+          {React.string("Adversarial Testnet is coming!")}
         </p>
       </div>
       <p
@@ -101,7 +101,7 @@ let make = () => {
             ]),
           ])
         )>
-        {React.string({j|Apply Now\u00A0→|j})}
+        {React.string({j|Sign up \u00A0→|j})}
       </p>
     </a>
   </>;
