@@ -40,6 +40,7 @@ const runBuild = async (github) => {
     },
     pull_request_base_branch: github.pull_request.base.ref,
     pull_request_id: github.pull_request.number,
+    pull_request_repository: github.pull_request.head.repo.clone_url,
   });
 
   const options = {
