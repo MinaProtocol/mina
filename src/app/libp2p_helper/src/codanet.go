@@ -101,10 +101,6 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
-// Intended to break the p2pconnmgr.Decayer interface so that it no longer tries to decay topics and p2pconnmgr.SupportsDecay(cm) returns false
-func (cm *CodaConnectionManager) RegisterDecayingTag() {
-}
-
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
