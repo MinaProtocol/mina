@@ -5,11 +5,12 @@ use algebra::tweedle::{
 
 use oracle::{
     self,
+    FqSponge,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
 };
 
-use commitment_dlog::commitment::PolyComm;
+use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
 use crate::tweedle_dum::CamlTweedleDumPolyComm;
@@ -95,8 +96,10 @@ pub fn caml_tweedle_fq_plonk_oracles_create_raw(
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
+    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
+
+    sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
     CamlTweedleFqPlonkOracles {
         o: o.into(),
@@ -129,8 +132,10 @@ pub fn caml_tweedle_fq_plonk_oracles_create(
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
+    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
+
+    sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
     CamlTweedleFqPlonkOracles {
         o: o.into(),
