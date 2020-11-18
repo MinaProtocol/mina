@@ -21,12 +21,11 @@ module Keys = struct
 
   let of_private_key_box secret_box_string =
     let json = Yojson.Safe.from_string secret_box_string in
-    let which = Secrets.Keypair.T.which in
     let sb : Secrets.Secret_box.t =
       Secrets.Secret_box.of_yojson json |> Result.ok |> Option.value_exn
     in
     let output : Bytes.t =
-      Secrets.Secret_box.decrypt ~password:(Bytes.of_string "") ~which sb
+      Secrets.Secret_box.decrypt ~password:(Bytes.of_string "") sb
       |> Result.ok |> Option.value_exn
     in
     let sk = output |> Bigstring.of_bytes |> Private_key.of_bigstring_exn in
