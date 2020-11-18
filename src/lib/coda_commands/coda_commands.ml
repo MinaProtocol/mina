@@ -123,13 +123,6 @@ let setup_and_submit_user_commands t user_command_list =
       [("coda_command", `String "scheduling a batch of user transactions")] ;
   Coda_lib.add_transactions t user_command_list
 
-module Receipt_chain_hash = struct
-  type t = Receipt.Chain_hash.t [@@deriving yojson]
-
-  [%%define_locally
-  Receipt.Chain_hash.(cons, empty)]
-end
-
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
 
