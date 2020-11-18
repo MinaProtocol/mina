@@ -1390,9 +1390,12 @@ let upgrade_old_config ~logger filename json =
           `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
         in
         let%map () =
-          Writer.with_file filename ~f:(fun w ->
-              Deferred.return
-              @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) )
+          Deferred.Or_error.try_with (fun () ->
+              Writer.with_file filename ~f:(fun w ->
+                  Deferred.return
+                  @@ Writer.write w
+                       (Yojson.Safe.pretty_to_string upgraded_json) ) )
+          |> Deferred.ignore_m
         in
         upgraded_json )
   | _ ->
