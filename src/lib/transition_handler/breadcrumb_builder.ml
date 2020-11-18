@@ -92,14 +92,18 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                              to current external transition's parent hash"))
                 in
                 let open Deferred.Let_syntax in
-                try
-                  match%bind
-                    O1trace.trace_recurring "Breadcrumb.build" (fun () ->
-                        Transition_frontier.Breadcrumb.build ~logger
-                          ~precomputed_values ~verifier ~trust_system ~parent
-                          ~transition:mostly_validated_transition
-                          ~sender:(Some sender) () )
-                  with
+                match%bind
+                  O1trace.trace_recurring "Breadcrumb.build" (fun () ->
+                      Deferred.Or_error.try_with (fun () ->
+                          Transition_frontier.Breadcrumb.build ~logger
+                            ~precomputed_values ~verifier ~trust_system ~parent
+                            ~transition:mostly_validated_transition
+                            ~sender:(Some sender) () ) )
+                with
+                | Error _ ->
+                    Deferred.return @@ Or_error.error_string missing_parent_msg
+                | Ok result -> (
+                  match result with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
                       Coda_metrics.(
@@ -150,10 +154,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                           trust_system_record_invalid
                             "invalid staged ledger diff" error
                       | `Fatal_error exn ->
-                          Deferred.return (Or_error.of_exn exn) )
-                with
-                | Coda_base.Ledger.Mask.Attached.Dangling_parent_reference _ ->
-                  Deferred.return (Or_error.error_string missing_parent_msg) )
+                          Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred
           in
           Cached.sequence_result cached_result ) )
