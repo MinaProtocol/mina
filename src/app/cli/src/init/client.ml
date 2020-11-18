@@ -277,35 +277,6 @@ let get_public_keys =
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
-let generate_receipt =
-  let open Daemon_rpcs in
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receipt_hash_flag =
-    flag "receipt-chain-hash"
-      ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
-        \        generate a receipt for"
-      (required receipt_chain_hash)
-  in
-  let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key_compressed)
-  in
-  let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
-  in
-  Command.async ~summary:"Generate a receipt for a sent payment"
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 receipt_hash_flag address_flag token_flag)
-       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
-         let account_id = Account_id.create pk token_id in
-         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, account_id)
-           port ~success:Cli_lib.Render.Prove_receipt.to_text
-           ~error:Error.to_string_hum ~join_error:Or_error.join ))
-
 let read_json filepath ~flag =
   let%map res =
     Deferred.Or_error.try_with (fun () ->
@@ -803,6 +774,45 @@ let cancel_transaction_graphql =
          in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
+
+module Export_logs = struct
+  let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
+
+  let tarfile_flag =
+    let open Command.Param in
+    flag "tarfile"
+      ~doc:"STRING Basename of the tar archive (default: date_time)"
+      (optional string)
+
+  let export_via_graphql =
+    Command.async ~summary:"Export daemon logs to tar archive"
+      (Cli_lib.Background_daemon.graphql_init tarfile_flag
+         ~f:(fun graphql_endpoint basename ->
+           let%map response =
+             Graphql_client.query_exn
+               (Graphql_queries.Export_logs.make ?basename ())
+               graphql_endpoint
+           in
+           pp_export_result ((response#exportLogs)#exportLogs)#tarfile ))
+
+  let export_locally =
+    let run ~tarfile ~conf_dir =
+      let open Coda_lib in
+      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      fun () ->
+        match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
+        | Ok result ->
+            pp_export_result result
+        | Error err ->
+            failwithf "Error when exporting logs: %s"
+              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              ()
+    in
+    let open Command.Let_syntax in
+    Command.async ~summary:"Export local logs (no daemon) to tar archive"
+      (let%map tarfile = tarfile_flag and conf_dir = Cli_lib.Flag.conf_dir in
+       run ~tarfile ~conf_dir)
+end
 
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
@@ -1729,6 +1739,8 @@ let client =
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("export-logs", Export_logs.export_via_graphql)
+    ; ("export-local-logs", Export_logs.export_locally)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
@@ -1763,7 +1775,6 @@ let advanced =
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
-    ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("next-available-token", next_available_token_cmd)
