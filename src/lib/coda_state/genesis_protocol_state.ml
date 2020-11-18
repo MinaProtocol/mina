@@ -1,7 +1,8 @@
 open Core_kernel
 open Coda_base
 
-let t ~genesis_ledger ~constraint_constants ~consensus_constants =
+let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
+    ~consensus_constants =
   let genesis_ledger_hash = Ledger.merkle_root (Lazy.force genesis_ledger) in
   let snarked_next_available_token =
     Ledger.next_available_token (Lazy.force genesis_ledger)
@@ -12,13 +13,13 @@ let t ~genesis_ledger ~constraint_constants ~consensus_constants =
   let negative_one_protocol_state_hash =
     Protocol_state.(
       hash
-        (negative_one ~genesis_ledger ~constraint_constants
+        (negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
            ~consensus_constants))
   in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis
-      ~negative_one_protocol_state_hash ~genesis_ledger ~constraint_constants
-      ~constants:consensus_constants
+      ~negative_one_protocol_state_hash ~genesis_ledger ~genesis_epoch_data
+      ~constraint_constants ~constants:consensus_constants
   in
   let state =
     Protocol_state.create_value

@@ -1,15 +1,19 @@
 testnetName: "coda-testnet"
 
 coda:
-  runtimeConfig: ""
-  logLevel: "Trace"
+  logLevel: "Debug"
   logReceivedBlocks: false
   logSnarkWorkGossip: false
-  image: codaprotocol/coda-daemon:0.0.12-beta-new-genesis-01eca9b
+  image: codaprotocol/coda-daemon:0.0.16-beta7-develop
   privkeyPass: "naughty blue worm"
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
     - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+  ports:
+    p2p: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    external: "10909"
 
 userAgent:
   image: ""
@@ -19,12 +23,16 @@ userAgent:
   maxTx: ""
   txBatchSize: ""
   sendEveryMins: ""
+  ports:
+    metrics: 10000
 
 bots:
   image: ""
   faucet:
     amount: "10000000000"
     fee: "100000000"
+  ports:
+    graphql: 3085
 
 # for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
 blockProducerConfigs:
@@ -60,3 +68,8 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+
+healthcheck:
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

@@ -64,6 +64,21 @@ struct
     | Error e ->
         Privkey_error.raise e
 
+  let read_from_env_exn path =
+    let read_privkey password = read ~privkey_path:path ~password in
+    let%bind result =
+      match Sys.getenv env with
+      | Some password ->
+          read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
+      | None ->
+          Privkey_error.raise (`Password_not_in_environment env)
+    in
+    match result with
+    | Ok result ->
+        return result
+    | Error e ->
+        Privkey_error.raise e
+
   let write_exn kp ~privkey_path =
     write_exn kp ~privkey_path
       ~password:(lazy (prompt_password "Password for new private key file: "))
