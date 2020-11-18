@@ -47,7 +47,7 @@ func newCodaConnectionManager() *CodaConnectionManager {
 	}
 }
 
-// proxy p2pconnmgr.ConnManager interface to p2pconnmgr.BasicConnMgr
+// proxy connmgr.ConnManager interface to p2pconnmgr.BasicConnMgr
 func (cm *CodaConnectionManager) TagPeer(p peer.ID, tag string, weight int) {
 	cm.p2pManager.TagPeer(p, tag, weight)
 }
@@ -67,6 +67,14 @@ func (cm *CodaConnectionManager) IsProtected(p peer.ID, tag string) bool {
 	return cm.p2pManager.IsProtected(p, tag)
 }
 func (cm *CodaConnectionManager) Close() error { return cm.p2pManager.Close() }
+
+// proxy connmgr.Decayer interface to p2pconnmgr.BasicConnMgr (which implements connmgr.Decayer via struct inheritance)
+func (cm *CodaConnectionManager) RegisterDecayingTag(name string, interval time.Duration, decayFn connmgr.DecayFn, bumpFn connmgr.BumpFn) (connmgr.DecayingTag, error) {
+	// casting to Decayer here should always succeed
+	decayer, _ := interface{}(cm.p2pManager).(connmgr.Decayer)
+	tag, err := decayer.RegisterDecayingTag(name, interval, decayFn, bumpFn)
+	return tag, err
+}
 
 // redirect Notifee() to self for notification interception
 func (cm *CodaConnectionManager) Notifee() network.Notifiee { return cm }

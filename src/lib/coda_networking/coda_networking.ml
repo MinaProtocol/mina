@@ -1050,6 +1050,9 @@ let create (config : Config.t)
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
               raise No_initial_peers )
+
+            (* Temporarily disabling the extra RPC call until we switch to the proper: dht.Bootstrap and resolve why "failed when refreshing routing table" is occurring. *)
+           (*
             else (
               [%log info] "Getting some extra initial peers to start" ;
               (* 1. Get some peers
@@ -1084,7 +1087,7 @@ let create (config : Config.t)
                       ()
                   | Error e ->
                       [%log warn] ~metadata:(metadata p e)
-                        "failed to add peer $peer with $error" ) )) )) ;
+                        "failed to add peer $peer with $error" ) ) *) )) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
