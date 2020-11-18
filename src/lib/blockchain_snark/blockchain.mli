@@ -6,7 +6,7 @@ open Coda_state
 module Stable : sig
   module V1 : sig
     type t = {state: Protocol_state.Value.t; proof: Proof.Stable.V1.t}
-    [@@deriving bin_io, fields, sexp, version]
+    [@@deriving bin_io, fields, sexp, version, yojson]
   end
 
   module Latest = V1
@@ -14,6 +14,6 @@ end
 
 type t = Stable.Latest.t =
   {state: Protocol_state.Value.t; proof: Proof.Stable.V1.t}
-[@@deriving fields, sexp]
+[@@deriving fields, sexp, yojson]
 
 val create : state:Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t
