@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -304,24 +303,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             ( Coda_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, aid) ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind acc_opt =
-            Coda_commands.get_account coda aid
-            |> Participating_state.active_error |> Deferred.return
-          in
-          let%bind account =
-            Result.of_option acc_opt
-              ~error:
-                (Error.of_string
-                   (sprintf
-                      !"Could not find account of public key %{sexp: \
-                        Account_id.t}"
-                      aid))
-            |> Deferred.return
-          in
-          Coda_commands.prove_receipt coda ~proving_receipt
-            ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
             ( Coda_commands.get_keys_with_details coda

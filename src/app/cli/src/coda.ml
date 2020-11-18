@@ -897,11 +897,6 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
       let transaction_database_dir = conf_dir ^/ "transaction" in
       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
       let transaction_database =
@@ -956,12 +951,11 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~receipt_chain_database ~time_controller
-             ~initial_block_production_keypairs ~monitor ~consensus_local_state
-             ~transaction_database ~external_transition_database
-             ~is_archive_rocksdb ~work_reassignment_wait
-             ~archive_process_location ~log_block_creation ~precomputed_values
-             ())
+             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ~is_archive_rocksdb
+             ~work_reassignment_wait ~archive_process_location
+             ~log_block_creation ~precomputed_values ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
@@ -1320,7 +1314,6 @@ let coda_commands logger =
         ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
-        ; (module Coda_receipt_chain_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
