@@ -520,8 +520,6 @@ let set_snark_work_fee t new_fee =
      | `Off _ ->
          `Off new_fee )
 
-let receipt_chain_database t = t.config.receipt_chain_database
-
 let top_level_logger t = t.config.logger
 
 let most_recent_valid_transition t = t.components.most_recent_valid_block
