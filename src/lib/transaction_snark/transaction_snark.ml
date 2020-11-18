@@ -3483,7 +3483,6 @@ struct
     Ok {statement= s; proof}
 end
 
-(*
 let%test_module "transaction_snark" =
   ( module struct
     let constraint_constants =
@@ -3623,9 +3622,10 @@ let%test_module "transaction_snark" =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
-      of_user_command ~sok_digest ~source ~target ~init_stack
-        ~pending_coinbase_stack_state ~next_available_token_before
-        ~next_available_token_after user_command_in_block handler
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          of_user_command ~sok_digest ~source ~target ~init_stack
+            ~pending_coinbase_stack_state ~next_available_token_before
+            ~next_available_token_after user_command_in_block handler )
 
     (*
                 ~proposer:
@@ -4264,7 +4264,9 @@ let%test_module "transaction_snark" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
-                merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    merge ~sok_digest proof12 proof23 )
+                |> Or_error.ok_exn
               in
               Proof.verify [(proof13.statement, proof13.proof)] ) )
 
@@ -6003,7 +6005,7 @@ let%test_module "account timing check" =
             unchecked_timing unchecked_min_balance
       | _ ->
           false
-  end )*)
+  end )
 
 let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
