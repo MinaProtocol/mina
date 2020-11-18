@@ -116,6 +116,7 @@ const handler = async (event, req) => {
         return [buildkite, circle];
       } else {
         console.info("Build for this commit on this branch was already found");
+        return ["build already found for this commit", "build already found for this commit"];
       }
     }
   } else if (event == "issue_comment") {
@@ -142,6 +143,9 @@ const handler = async (event, req) => {
           pull_request: prData.data,
         });
         return [buildkite, circle];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return ["comment author is not (publically) a member of the core team", "comment author is not (publically) a member of the core team"];
       }
     }
   }
