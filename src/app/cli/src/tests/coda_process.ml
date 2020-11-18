@@ -101,10 +101,6 @@ let process_user_command_exn (conn, _, _) cmd =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.process_user_command ~arg:cmd
 
-let prove_receipt_exn (conn, _, _) proving_receipt resulting_receipt =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
-    ~arg:(proving_receipt, resulting_receipt)
-
 let sync_status_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.sync_status
