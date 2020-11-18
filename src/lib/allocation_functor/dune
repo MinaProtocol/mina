@@ -1,0 +1,6 @@
+(library
+  (name allocation_functor)
+  (public_name allocation_functor)
+  (libraries core_kernel coda_metrics)
+  (instrumentation (backend bisect_ppx))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version)))
