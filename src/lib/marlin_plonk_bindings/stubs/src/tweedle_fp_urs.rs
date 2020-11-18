@@ -90,7 +90,7 @@ pub fn caml_tweedle_fp_urs_lagrange_commitment(
                 .map(|j| if i == j { Fp::one() } else { Fp::zero() })
                 .collect();
             let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit(&p, None).into())
+            Ok(urs.0.commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -110,7 +110,7 @@ pub fn caml_tweedle_fp_urs_commit_evaluations(
         Some(x_domain) => {
             let evals = evals.into_iter().map(From::from).collect();
             let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit(&p, None).into())
+            Ok(urs.0.commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -123,7 +123,7 @@ pub fn caml_tweedle_fp_urs_b_poly_commitment(
     let chals: Vec<Fp> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fp>::from_coefficients_vec(coeffs);
-    Ok(urs.0.commit(&p, None).into())
+    Ok(urs.0.commit_non_hiding(&p, None).into())
 }
 
 #[ocaml::func]
