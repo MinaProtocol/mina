@@ -1,0 +1,1 @@
+../../common/templates/_healthchecks.tpl

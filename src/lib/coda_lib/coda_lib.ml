@@ -13,23 +13,24 @@ open O1trace
 open Otp_lib
 open Network_peer
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is now connecting"}]
+  [@@deriving register_event {msg= "Coda daemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is now listening"}]
+  [@@deriving register_event {msg= "Coda daemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is now bootstrapping"}]
+  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is now doing ledger catchup"}]
+  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is now synced"}]
+  [@@deriving register_event {msg= "Coda daemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}
@@ -70,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -182,7 +183,7 @@ module Snark_worker = struct
               non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            [%log info]
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
               signal ;
             raise (Snark_worker_signal_interrupt signal) )
@@ -519,8 +520,6 @@ let set_snark_work_fee t new_fee =
      | `Off _ ->
          `Off new_fee )
 
-let receipt_chain_database t = t.config.receipt_chain_database
-
 let top_level_logger t = t.config.logger
 
 let most_recent_valid_transition t = t.components.most_recent_valid_block
@@ -655,10 +654,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  Work_selection_method.remove t.snark_job_state spec ;
+  let cb _ =
+    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+    Work_selection_method.remove t.snark_job_state spec
+  in
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
@@ -744,7 +748,19 @@ let start t =
     ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
-let create (config : Config.t) =
+let start_with_precomputed_blocks t blocks =
+  let%bind () =
+    Block_producer.run_precomputed ~logger:t.config.logger
+      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~time_controller:t.config.time_controller
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~precomputed_values:t.config.precomputed_values
+      ~precomputed_blocks:blocks
+  in
+  start t
+
+let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -900,8 +916,18 @@ let create (config : Config.t) =
                         ; ban_statuses
                         ; k_block_hashes } )
           in
+          let get_some_initial_peers _ =
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                [%log' error config.logger]
+                  "Network not instantiated when initial peers requested" ;
+                Deferred.return []
+            | Some net ->
+                Coda_networking.peers net
+          in
           let%bind net =
-            Coda_networking.create config.net_config
+            Coda_networking.create config.net_config ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring
@@ -993,7 +1019,8 @@ let create (config : Config.t) =
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~constraint_constants ~logger:config.logger
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1019,7 +1046,7 @@ let create (config : Config.t) =
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
@@ -1081,7 +1108,7 @@ let create (config : Config.t) =
                          in
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
-                             if v then
+                             if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
                                   .forget_validation_with_hash et ) ;
@@ -1188,11 +1215,12 @@ let create (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~constraint_constants ~logger:config.logger
-              ~disk_location:config.snark_pool_disk_location
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1204,8 +1232,12 @@ let create (config : Config.t) =
               ~logger:config.logger
           in
           let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
+            match wallets with
+            | Some wallets ->
+                return wallets
+            | None ->
+                Secrets.Wallets.load ~logger:config.logger
+                  ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)

@@ -148,7 +148,7 @@ module Api = struct
              (Keypair.of_private_key_exn sk))
         ()
     in
-    let%map user_cmd, _receipt =
+    let%map user_cmd =
       Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
@@ -173,18 +173,6 @@ module Api = struct
       t i sender_sk fee valid_until
       ~body:
         (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
-
-  (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
-     merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
-     However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
-     the merkle list that we are looking for *)
-
-  let prove_receipt t i proving_receipt resulting_receipt =
-    run_online_worker
-      ~f:(fun worker ->
-        Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
-        )
-      t i
 
   let new_block t i key =
     run_online_worker
@@ -302,7 +290,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ( (testnet.precomputed_values.constraint_constants.c - 1)
+                     ( (8 - 1)
                      * testnet.precomputed_values.constraint_constants
                          .block_window_duration_ms )
                    /. 1000. )
@@ -347,8 +335,9 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                      + 2
                        * Unsigned.UInt32.to_int
                            testnet.precomputed_values.consensus_constants.k
-                     + Unsigned.UInt32.to_int
-                         testnet.precomputed_values.consensus_constants.delta
+                     + ( Unsigned.UInt32.to_int
+                           testnet.precomputed_values.consensus_constants.delta
+                       + 1 )
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -425,8 +414,9 @@ let events ~(precomputed_values : Precomputed_values.t) workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 Unsigned.UInt32.to_int
-                   precomputed_values.consensus_constants.delta
+                 ( Unsigned.UInt32.to_int
+                     precomputed_values.consensus_constants.delta
+                 + 1 )
                  * precomputed_values.constraint_constants
                      .block_window_duration_ms
                  + 6_000
@@ -475,7 +465,8 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
   let acceptable_delay =
     Time.Span.of_ms
       ( block_production_interval
-        * Unsigned.UInt32.to_int precomputed_values.consensus_constants.delta
+        * ( Unsigned.UInt32.to_int precomputed_values.consensus_constants.delta
+          + 1 )
       |> Float.of_int )
   in
   let%bind program_dir = Unix.getcwd () in

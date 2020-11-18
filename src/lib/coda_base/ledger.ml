@@ -243,14 +243,14 @@ module Ledger_inner = struct
     let accounts = to_list t in
     List.fold_until accounts ~init ~f ~finish
 
-  let create_new_account_exn t pk account =
-    let action, _ = get_or_create_account_exn t pk account in
+  let create_new_account_exn t account_id account =
+    let action, _ = get_or_create_account_exn t account_id account in
     if action = `Existed then
       failwith
         (sprintf
            !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key pk))
+           (Account_id.public_key account_id))
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =

@@ -23,25 +23,25 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
   open C.Gen
 
   let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-      ~max_fee () =
+      ~fee_range () =
     f
       (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~max_fee ())
+         ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-      ?fee_token ?payment_token ~max_fee () =
+      ?fee_token ?payment_token ~fee_range () =
     f
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~max_fee ())
+         ?fee_token ?payment_token ~fee_range ())
 
-  let stake_delegation ~key_gen ?nonce ?fee_token ~max_fee () =
-    f (stake_delegation ~key_gen ?nonce ?fee_token ~max_fee ())
+  let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
+    f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
 
   let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
-      ~max_fee () =
+      ~fee_range () =
     f
       (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
-         ~max_fee ())
+         ~fee_range ())
 
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
@@ -204,6 +204,13 @@ let fee_token (t : t) =
       Signed_command.fee_token x
   | Snapp_command x ->
       Snapp_command.fee_token x
+
+let valid_until (t : t) =
+  match t with
+  | Signed_command x ->
+      Signed_command.valid_until x
+  | Snapp_command _ ->
+      Coda_numbers.Global_slot.max_value
 
 let forget_check (t : Valid.t) : t = (t :> t)
 

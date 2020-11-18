@@ -89,9 +89,17 @@ module Worker_state = struct
          match proof_level with
          | Genesis_constants.Proof_level.Full ->
              ( module struct
-               module T = Transaction_snark.Make ()
+               module T = Transaction_snark.Make (struct
+                 let constraint_constants = constraint_constants
+               end)
 
-               module B = Blockchain_snark.Blockchain_snark_state.Make (T)
+               module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+                 let tag = T.tag
+
+                 let constraint_constants = constraint_constants
+
+                 let proof_level = proof_level
+               end)
 
                let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
 
@@ -116,7 +124,7 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", `String (Error.to_string_hum e))]
+                       ~metadata:[("error", Error_json.error_to_yojson e)]
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
@@ -147,7 +155,7 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", `String (Error.to_string_hum e))]
+                       ~metadata:[("error", Error_json.error_to_yojson e)]
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
@@ -243,11 +251,12 @@ module Worker = struct
       let init_worker_state
           Worker_state.{conf_dir; logger; proof_level; constraint_constants} =
         let max_size = 256 * 1024 * 512 in
+        let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"coda-prover.log" ~max_size) ;
+               ~log_filename:"coda-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create
           {conf_dir; logger; proof_level; constraint_constants}
@@ -265,7 +274,7 @@ type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
     [%log error] "Prover process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let%map connection, process =
@@ -313,7 +322,7 @@ let prove_from_input_sexp {connection; logger; _} sexp =
       true
   | Error e ->
       [%log error] "prover errored :("
-        ~metadata:[("error", `String (Error.to_string_hum e))] ;
+        ~metadata:[("error", Error_json.error_to_yojson e)] ;
       false
 
 let extend_blockchain {connection; logger; _} chain next_state block
@@ -345,7 +354,7 @@ let extend_blockchain {connection; logger; _} chain next_state block
                    (Binable.to_string
                       (module Extend_blockchain_input.Stable.Latest)
                       input)) )
-          ; ("error", `String (Error.to_string_hum e)) ]
+          ; ("error", Error_json.error_to_yojson e) ]
         "Prover failed: $error" ;
       Error e
 

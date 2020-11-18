@@ -1,5 +1,6 @@
 (library
  (name coda_version)
+ (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (public_name coda_version))
 

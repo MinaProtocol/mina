@@ -7,12 +7,7 @@ module Data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { public_inputs: int
-        ; variables: int
-        ; constraints: int
-        ; nonzero_entries: int
-        ; max_degree: int }
+      type t = {constraints: int}
 
       let to_latest = Fn.id
     end
@@ -25,8 +20,8 @@ module Repr = struct
     module V1 = struct
       type t =
         { commitments:
-            Dee.Affine.Stable.V1.t array Abc.Stable.V1.t
-            Matrix_evals.Stable.V1.t
+            Dee.Affine.Stable.V1.t array
+            Plonk_verification_key_evals.Stable.V1.t
         ; step_domains: Domains.Stable.V1.t array
         ; data: Data.Stable.V1.t }
 
@@ -35,53 +30,82 @@ module Repr = struct
   end]
 end
 
-type t =
-  { commitments: Dee.Affine.t array Abc.t Matrix_evals.t
-  ; step_domains: Domains.t array
-  ; index: Impls.Wrap.Verification_key.t
-  ; data: Data.t }
-[@@deriving fields]
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t =
+      { commitments: Dee.Affine.t array Plonk_verification_key_evals.t
+      ; step_domains: Domains.t array
+      ; index: Impls.Wrap.Verification_key.t
+      ; data: Data.t }
+    [@@deriving fields]
 
-let of_repr urs {Repr.commitments= c; step_domains; data= d} =
-  let u = Unsigned.Size_t.of_int in
-  let g = Zexe_backend.Tweedle.Fp_poly_comm.without_degree_bound_to_backend in
-  let t =
-    Snarky_bn382.Tweedle.Dee.Field_verifier_index.make (u d.public_inputs)
-      (u d.variables) (u d.constraints) (u d.nonzero_entries) (u d.max_degree)
-      urs (g c.row.a) (g c.col.a) (g c.value.a) (g c.rc.a) (g c.row.b)
-      (g c.col.b) (g c.value.b) (g c.rc.b) (g c.row.c) (g c.col.c)
-      (g c.value.c) (g c.rc.c)
-  in
-  {commitments= c; step_domains; data= d; index= t}
+    let to_latest = Fn.id
 
-include Binable.Of_binable
-          (Repr.Stable.Latest)
-          (struct
-            type nonrec t = t
+    let of_repr urs {Repr.commitments= c; step_domains; data= d} =
+      let t : Impls.Wrap.Verification_key.t =
+        let log2_size = Int.ceil_log2 d.constraints in
+        let d = Domain.Pow_2_roots_of_unity log2_size in
+        let max_quot_size = Common.max_quot_size_int (Domain.size d) in
+        { domain=
+            { log_size_of_group= log2_size
+            ; group_gen= Backend.Tock.Field.domain_generator log2_size }
+        ; max_poly_size= 1 lsl Nat.to_int Rounds.Wrap.n
+        ; max_quot_size
+        ; urs
+        ; evals=
+            Plonk_verification_key_evals.map c ~f:(fun unshifted ->
+                { Marlin_plonk_bindings.Types.Poly_comm.shifted= None
+                ; unshifted=
+                    Array.map unshifted ~f:(fun x -> Or_infinity.Finite x) } )
+        ; shifts= Common.tock_shifts ~log2_size }
+      in
+      {commitments= c; step_domains; data= d; index= t}
 
-            let to_binable {commitments; step_domains; data; index= _} =
-              {Repr.commitments; data; step_domains}
+    include Binable.Of_binable
+              (Repr.Stable.V1)
+              (struct
+                type nonrec t = t
 
-            let of_binable r =
-              of_repr (Zexe_backend.Tweedle.Dee_based.Keypair.load_urs ()) r
-          end)
+                let to_binable {commitments; step_domains; data; index= _} =
+                  {Repr.commitments; data; step_domains}
+
+                let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
+              end)
+  end
+end]
+
+let dummy_commitments g =
+  { Plonk_verification_key_evals.sigma_comm_0= g
+  ; sigma_comm_1= g
+  ; sigma_comm_2= g
+  ; ql_comm= g
+  ; qr_comm= g
+  ; qo_comm= g
+  ; qm_comm= g
+  ; qc_comm= g
+  ; rcm_comm_0= g
+  ; rcm_comm_1= g
+  ; rcm_comm_2= g
+  ; psm_comm= g
+  ; add_comm= g
+  ; mul1_comm= g
+  ; mul2_comm= g
+  ; emul1_comm= g
+  ; emul2_comm= g
+  ; emul3_comm= g }
 
 let dummy =
   lazy
-    (let lengths =
-       Commitment_lengths.of_domains Common.wrap_domains
-         ~max_degree:Common.Max_degree.wrap
+    (let rows = Domain.size Common.wrap_domains.h in
+     let g =
+       let len =
+         let max_degree = Common.Max_degree.wrap in
+         Int.round_up rows ~to_multiple_of:max_degree / max_degree
+       in
+       Array.create ~len Dee.(to_affine_exn one)
      in
-     let g = Dee.(to_affine_exn one) in
-     let e = Abc.map lengths.row ~f:(fun len -> Array.create ~len g) in
-     { Repr.commitments= {row= e; col= e; value= e; rc= e}
+     { Repr.commitments= dummy_commitments g
      ; step_domains= [||]
-     ; data=
-         { public_inputs= 0
-         ; variables= 0
-         ; constraints= 0
-         ; nonzero_entries= 0
-         ; max_degree= 0 } }
-     |> of_repr
-          (Snarky_bn382.Tweedle.Dee.Field_urs.create Unsigned.Size_t.one
-             Unsigned.Size_t.one Unsigned.Size_t.one))
+     ; data= {constraints= rows} }
+     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Tweedle_fp_urs.create 1))

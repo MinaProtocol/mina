@@ -10,7 +10,8 @@ type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
-    val verify_blockchain_snark : Protocol_state.Value.t -> Proof.t -> bool
+    val verify_blockchain_snarks :
+      (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
          Coda_base.User_command.Verifiable.t list
@@ -69,9 +70,8 @@ module Worker_state = struct
                  | `Valid_assuming (c, xs) ->
                      if all_verified then `Valid c else `Valid_assuming xs )
 
-             let verify_blockchain_snark state proof =
-               Blockchain_snark.Blockchain_snark_state.verify state proof
-                 ~key:bc_vk
+             let verify_blockchain_snarks ts =
+               Blockchain_snark.Blockchain_snark_state.verify ts ~key:bc_vk
 
              let verify_transaction_snarks ts =
                match
@@ -82,7 +82,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     ~metadata:[("error", Error_json.error_to_yojson e)]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -101,7 +101,7 @@ module Worker_state = struct
                    | `Valid_assuming (c, _) ->
                        `Valid c )
 
-             let verify_blockchain_snark _ _ = true
+             let verify_blockchain_snarks _ = true
 
              let verify_transaction_snarks _ = true
            end
@@ -115,7 +115,7 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { verify_blockchain: ('w, Blockchain.t, bool) F.t
+      { verify_blockchains: ('w, Blockchain.t list, bool) F.t
       ; verify_transaction_snarks:
           ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
       ; verify_commands:
@@ -145,9 +145,12 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
+      let verify_blockchains (w : Worker_state.t) (chains : Blockchain.t list)
+          =
         let (module M) = Worker_state.get w in
-        Deferred.return (M.verify_blockchain_snark chain.state chain.proof)
+        Deferred.return
+          (M.verify_blockchain_snarks
+             (List.map chains ~f:(fun {state; proof} -> (state, proof))))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
@@ -163,8 +166,11 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain=
-            f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
+        { verify_blockchains=
+            f
+              ( [%bin_type_class: Blockchain.Stable.Latest.t list]
+              , Bool.bin_t
+              , verify_blockchains )
         ; verify_transaction_snarks=
             f
               ( [%bin_type_class:
@@ -190,12 +196,13 @@ module Worker = struct
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
+          let num_rotate = 1 in
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"coda-verifier.log" ~max_size) ) ;
+                 ~log_filename:"coda-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create {conf_dir; logger; proof_level}
 
@@ -218,7 +225,7 @@ let plus_or_minus initial ~delta =
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let create_worker () =
@@ -300,11 +307,11 @@ let with_retry ~logger f =
   in
   go 4
 
-let verify_blockchain_snark {worker; logger} chain =
+let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-        ~arg:chain )
+      Worker.Connection.run connection ~f:Worker.functions.verify_blockchains
+        ~arg:chains )
 
 module Id = Unique_id.Int ()
 

@@ -55,7 +55,8 @@ end
 module Get_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = Trust_system.Peer_status.Stable.Latest.t
+  type response =
+    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -66,7 +67,7 @@ module Get_trust_status_all = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    (Unix.Inet_addr.t * Trust_system.Peer_status.Stable.Latest.t) list
+    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -77,7 +78,8 @@ end
 module Reset_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = Trust_system.Peer_status.Stable.Latest.t
+  type response =
+    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -96,19 +98,6 @@ module Verify_proof = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
-end
-
-module Prove_receipt = struct
-  type query = Receipt.Chain_hash.Stable.Latest.t * Account_id.Stable.Latest.t
-  [@@deriving bin_io_unversioned]
-
-  type response =
-    (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
-    Or_error.t
-  [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
 end
 
 module Get_inferred_nonce = struct

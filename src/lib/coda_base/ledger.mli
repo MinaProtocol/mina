@@ -184,6 +184,20 @@ val apply_user_command :
   -> Signed_command.With_valid_signature.t
   -> Undo.Signed_command_undo.t Or_error.t
 
+val apply_fee_transfer :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> t
+  -> Fee_transfer.t
+  -> Undo.Fee_transfer_undo.t Or_error.t
+
+val apply_coinbase :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> t
+  -> Coinbase.t
+  -> Undo.Coinbase_undo.t Or_error.t
+
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t

@@ -1,3 +1,5 @@
+(* processor.ml -- database processing for archive node *)
+
 module Archive_rpc = Rpc
 open Async
 open Core
@@ -88,6 +90,13 @@ module Public_key = struct
 end
 
 module Snarked_ledger_hash = struct
+  let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
+    let hash = Frozen_ledger_hash.to_string t in
+    Conn.find
+      (Caqti_request.find Caqti_type.string Caqti_type.int
+         "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
+      hash
+
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Frozen_ledger_hash.t) =
     let open Deferred.Result.Let_syntax in
@@ -107,6 +116,39 @@ module Snarked_ledger_hash = struct
           hash
 end
 
+module Epoch_data = struct
+  type t = {seed: string; ledger_hash_id: int}
+
+  let typ =
+    let encode t = Ok (t.seed, t.ledger_hash_id) in
+    let decode (seed, ledger_hash_id) = Ok {seed; ledger_hash_id} in
+    let rep = Caqti_type.(tup2 string int) in
+    Caqti_type.custom ~encode ~decode rep
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (t : Coda_base.Epoch_data.Value.t) =
+    let open Deferred.Result.Let_syntax in
+    let Coda_base.Epoch_ledger.Poly.{hash; _} =
+      Coda_base.Epoch_data.Poly.ledger t
+    in
+    let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
+    let seed = Coda_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt typ Caqti_type.int
+           "SELECT id FROM epoch_data WHERE seed = ? AND ledger_hash_id = ?")
+        {seed; ledger_hash_id}
+    with
+    | Some id ->
+        return id
+    | None ->
+        Conn.find
+          (Caqti_request.find typ Caqti_type.int
+             "INSERT INTO epoch_data (seed, ledger_hash_id) VALUES (?, ?) \
+              RETURNING id")
+          {seed; ledger_hash_id}
+end
+
 module User_command = struct
   module Signed_command = struct
     type t =
@@ -119,6 +161,7 @@ module User_command = struct
       ; nonce: int
       ; amount: int option
       ; fee: int
+      ; valid_until: int64 option
       ; memo: string
       ; hash: string
       ; status: string option
@@ -138,6 +181,7 @@ module User_command = struct
           ; int
           ; option int
           ; int
+          ; option int64
           ; string
           ; string
           ; option string
@@ -179,13 +223,22 @@ module User_command = struct
               (module Conn)
               (Signed_command.receiver_pk t)
           in
+          let valid_until =
+            let open Coda_numbers in
+            let slot = Signed_command.valid_until t in
+            if Global_slot.equal slot Global_slot.max_value then None
+            else
+              Some
+                ( slot |> Coda_numbers.Global_slot.to_uint32
+                |> Unsigned.UInt32.to_int64 )
+          in
           (* TODO: Converting these uint64s to int can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-                receiver_id, fee_token, token, nonce, amount, fee, memo, \
-                hash, status, failure_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, \
-                ?, ?, ?, ?, ?) RETURNING id")
+                receiver_id, fee_token, token, nonce, amount, fee, \
+                valid_until, memo, hash, status, failure_reason) VALUES (?, \
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
             { typ=
                 ( match via with
                 | `Ident ->
@@ -206,6 +259,7 @@ module User_command = struct
                 Signed_command.amount t
                 |> Core.Option.map ~f:Currency.Amount.to_int
             ; fee= Signed_command.fee t |> Currency.Fee.to_int
+            ; valid_until
             ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
@@ -323,30 +377,32 @@ module Internal_command = struct
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-      =
+      ~(typ : string) =
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = ?")
-      (Transaction_hash.to_base58_check transaction_hash)
+      (Caqti_request.find_opt
+         Caqti_type.(tup2 string string)
+         Caqti_type.int
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
+      (Transaction_hash.to_base58_check transaction_hash, typ)
 end
 
 module Fee_transfer = struct
+  module Kind = struct
+    type t = [`Normal | `Via_coinbase]
+
+    let to_string : t -> string = function
+      | `Normal ->
+          "fee_transfer"
+      | `Via_coinbase ->
+          "fee_transfer_via_coinbase"
+  end
+
   type t =
-    { kind: [`Normal | `Via_coinbase]
-    ; receiver_id: int
-    ; fee: int
-    ; token: int64
-    ; hash: string }
+    {kind: Kind.t; receiver_id: int; fee: int; token: int64; hash: string}
 
   let typ =
     let encode t =
-      let kind =
-        match t.kind with
-        | `Normal ->
-            "fee_transfer"
-        | `Via_coinbase ->
-            "fee_transfer_via_coinbase"
-      in
+      let kind = Kind.to_string t.kind in
       Ok ((kind, t.receiver_id, t.fee, t.token), t.hash)
     in
     let decode ((kind, receiver_id, fee, token), hash) =
@@ -369,7 +425,11 @@ module Fee_transfer = struct
       (t : Fee_transfer.Single.t) (kind : [`Normal | `Via_coinbase]) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_fee_transfer t in
-    match%bind Internal_command.find (module Conn) ~transaction_hash with
+    match%bind
+      Internal_command.find
+        (module Conn)
+        ~transaction_hash ~typ:(Kind.to_string kind)
+    with
     | Some internal_command_id ->
         return internal_command_id
     | None ->
@@ -392,10 +452,12 @@ end
 module Coinbase = struct
   type t = {receiver_id: int; amount: int; hash: string}
 
+  let coinbase_typ = "coinbase"
+
   let typ =
     let encode t =
       Ok
-        ( ( "coinbase"
+        ( ( coinbase_typ
           , t.receiver_id
           , t.amount
           , Token_id.(to_string default) |> Int64.of_string )
@@ -410,7 +472,9 @@ module Coinbase = struct
   let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
     let open Deferred.Result.Let_syntax in
     let transaction_hash = Transaction_hash.hash_coinbase t in
-    match%bind Internal_command.find (module Conn) ~transaction_hash with
+    match%bind
+      Internal_command.find (module Conn) ~transaction_hash ~typ:coinbase_typ
+    with
     | Some internal_command_id ->
         return internal_command_id
     | None ->
@@ -429,84 +493,57 @@ module Coinbase = struct
 end
 
 module Block_and_Internal_command = struct
-  let add (module Conn : CONNECTION) ~block_id ~internal_command_id =
+  let add (module Conn : CONNECTION) ~block_id ~internal_command_id
+      ~sequence_no ~secondary_sequence_no =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup2 int int)
+         Caqti_type.(tup4 int int int int)
          "INSERT INTO blocks_internal_commands (block_id, \
-          internal_command_id) VALUES (?, ?)")
-      (block_id, internal_command_id)
+          internal_command_id, sequence_no, secondary_sequence_no) VALUES (?, \
+          ?, ?, ?)")
+      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 end
 
 module Block_and_signed_command = struct
-  let add (module Conn : CONNECTION) ~block_id ~user_command_id =
+  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup2 int int)
-         "INSERT INTO blocks_user_commands (block_id, user_command_id) VALUES \
-          (?, ?)")
-      (block_id, user_command_id)
+         Caqti_type.(tup3 int int int)
+         "INSERT INTO blocks_user_commands (block_id, user_command_id, \
+          sequence_no) VALUES (?, ?, ?)")
+      (block_id, user_command_id, sequence_no)
 end
 
 module Block = struct
   type t =
     { state_hash: string
-    ; parent_id: int option
+    ; parent_id: int
     ; creator_id: int
     ; snarked_ledger_hash_id: int
+    ; staking_epoch_data_id: int
+    ; next_epoch_data_id: int
     ; ledger_hash: string
-    ; height: int
-    ; timestamp: int64
-    ; coinbase_id: int option }
-
-  let to_hlist
-      { state_hash
-      ; parent_id
-      ; creator_id
-      ; snarked_ledger_hash_id
-      ; ledger_hash
-      ; height
-      ; timestamp
-      ; coinbase_id } =
-    H_list.
-      [ state_hash
-      ; parent_id
-      ; creator_id
-      ; snarked_ledger_hash_id
-      ; ledger_hash
-      ; height
-      ; timestamp
-      ; coinbase_id ]
-
-  let of_hlist
-      ([ state_hash
-       ; parent_id
-       ; creator_id
-       ; snarked_ledger_hash_id
-       ; ledger_hash
-       ; height
-       ; timestamp
-       ; coinbase_id ] :
-        (unit, _) H_list.t) =
-    { state_hash
-    ; parent_id
-    ; creator_id
-    ; snarked_ledger_hash_id
-    ; ledger_hash
-    ; height
-    ; timestamp
-    ; coinbase_id }
+    ; height: int64
+    ; global_slot: int64
+    ; timestamp: int64 }
+  [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
     let spec =
-      Caqti_type.[string; option int; int; int; string; int; int64; option int]
+      Caqti_type.[string; int; int; int; int; int; string; int64; int64; int64]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let find (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
+    Conn.find
+      (Caqti_request.find Caqti_type.string Caqti_type.int
+         "SELECT id FROM blocks WHERE state_hash = ?")
+      (State_hash.to_string state_hash)
+
+  let find_opt (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
          "SELECT id FROM blocks WHERE state_hash = ?")
@@ -516,18 +553,27 @@ module Block = struct
     Conn.find
       (Caqti_request.find Caqti_type.int typ
          "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
-          ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
+          staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, \
+          global_slot, timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
-    match%bind find (module Conn) ~state_hash:hash with
+    match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
         return block_id
     | None ->
         let%bind parent_id =
-          find (module Conn) ~state_hash:(External_transition.parent_hash t)
+          if
+            External_transition.blockchain_length t <> Unsigned.UInt32.of_int 1
+          then
+            find (module Conn) ~state_hash:(External_transition.parent_hash t)
+          else
+            Conn.find
+              (Caqti_request.find Caqti_type.unit Caqti_type.int
+                 "SELECT count(id) + 1 FROM blocks")
+              ()
         in
         let%bind creator_id =
           Public_key.add_if_doesn't_exist
@@ -540,129 +586,144 @@ module Block = struct
             ( External_transition.blockchain_state t
             |> Blockchain_state.snarked_ledger_hash )
         in
+        let%bind staking_epoch_data_id =
+          Epoch_data.add_if_doesn't_exist
+            (module Conn)
+            ( External_transition.consensus_state t
+            |> Consensus.Data.Consensus_state.staking_epoch_data )
+        in
+        let%bind next_epoch_data_id =
+          Epoch_data.add_if_doesn't_exist
+            (module Conn)
+            ( External_transition.consensus_state t
+            |> Consensus.Data.Consensus_state.next_epoch_data )
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               "INSERT INTO blocks (state_hash, parent_id, creator_id, \
-                snarked_ledger_hash_id, ledger_hash, height, timestamp, \
-                coinbase_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+               ( if
+                 Unsigned.UInt32.equal
+                   (External_transition.blockchain_length t)
+                   Unsigned.UInt32.one
+               then
+                 "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
+                  snarked_ledger_hash_id, staking_epoch_data_id, \
+                  next_epoch_data_id, ledger_hash, height, global_slot, \
+                  timestamp) VALUES (" ^ string_of_int parent_id
+                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+               else
+                 "INSERT INTO blocks (state_hash, parent_id, creator_id, \
+                  snarked_ledger_hash_id, staking_epoch_data_id, \
+                  next_epoch_data_id, ledger_hash, height, global_slot, \
+                  timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \
+                  id" ))
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; creator_id
             ; snarked_ledger_hash_id
+            ; staking_epoch_data_id
+            ; next_epoch_data_id
             ; ledger_hash=
                 External_transition.blockchain_state t
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
             ; height=
                 External_transition.blockchain_length t
-                |> Unsigned.UInt32.to_int
+                |> Unsigned.UInt32.to_int64
+            ; global_slot=
+                External_transition.global_slot t |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
-            ; coinbase_id= None }
+            }
+        in
+        let%bind () =
+          if External_transition.blockchain_length t = Unsigned.UInt32.of_int 1
+          then
+            Conn.exec
+              (Caqti_request.exec Caqti_type.unit
+                 ( "ALTER SEQUENCE blocks_id_seq RESTART WITH "
+                 ^ string_of_int (block_id + 1) ))
+              ()
+          else return ()
         in
         let transactions =
           External_transition.transactions ~constraint_constants t
         in
-        let commands, fee_transfers, coinbases =
-          Core.List.fold transactions ~init:([], [], [])
-            ~f:(fun (acc_commands, acc_fee_transfers, acc_coinbases) ->
+        let%bind (_ : int) =
+          deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
             function
             | { Coda_base.With_status.status
               ; data= Coda_base.Transaction.Command command } ->
-                let command = {Coda_base.With_status.status; data= command} in
-                (command :: acc_commands, acc_fee_transfers, acc_coinbases)
+                let user_command =
+                  {Coda_base.With_status.status; data= command}
+                in
+                let%bind id =
+                  User_command.add_with_status
+                    (module Conn)
+                    user_command.data user_command.status
+                in
+                let%map () =
+                  Block_and_signed_command.add
+                    (module Conn)
+                    ~block_id ~user_command_id:id ~sequence_no
+                  >>| ignore
+                in
+                sequence_no + 1
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
-                  Coda_base.Fee_transfer.to_list fee_transfer_bundled
-                  |> List.map ~f:(fun x -> (`Normal, x))
+                  Coda_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
-                (acc_commands, fee_transfers @ acc_fee_transfers, acc_coinbases)
-            | {data= Coinbase coinbase; status= _} -> (
-              match Coda_base.Coinbase.fee_transfer coinbase with
-              | None ->
-                  (acc_commands, acc_fee_transfers, coinbase :: acc_coinbases)
-              | Some {receiver_pk; fee} ->
-                  ( acc_commands
-                  , ( `Via_coinbase
-                    , Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
-                        ~fee_token:Token_id.default )
-                    :: acc_fee_transfers
-                  , coinbase :: acc_coinbases ) ) )
-        in
-        let%bind command_ids =
-          deferred_result_list_fold commands ~init:[] ~f:(fun acc command ->
-              let%map id =
-                User_command.add_with_status
-                  (module Conn)
-                  command.data command.status
-              in
-              id :: acc )
-        in
-        let%bind () =
-          deferred_result_list_fold command_ids ~init:()
-            ~f:(fun () user_command_id ->
-              Block_and_signed_command.add
-                (module Conn)
-                ~block_id ~user_command_id
-              >>| ignore )
-        in
-        let%bind fee_transfer_ids =
-          deferred_result_list_fold fee_transfers ~init:[]
-            ~f:(fun acc (kind, fee_transfer) ->
-              let%map id =
-                Fee_transfer.add_if_doesn't_exist
-                  (module Conn)
-                  fee_transfer kind
-              in
-              id :: acc )
-        in
-        let%bind () =
-          deferred_result_list_fold fee_transfer_ids ~init:()
-            ~f:(fun () fee_transfer_id ->
-              Block_and_Internal_command.add
-                (module Conn)
-                ~block_id ~internal_command_id:fee_transfer_id
-              >>| ignore )
-        in
-        (* For technical reasons, each block might have up to 2 coinbases.
-         I would combine the coinbases if there are 2 of them.
-      *)
-        let%bind () =
-          if List.length coinbases = 0 then return ()
-          else
-            let%bind combined_coinbase =
-              match coinbases with
-              | [coinbase] ->
-                  return coinbase
-              | [coinbase1; coinbase2] ->
-                  let open Coda_base in
-                  Coinbase.create
-                    ~amount:
-                      ( Currency.Amount.add
-                          (Coinbase.amount coinbase1)
-                          (Coinbase.amount coinbase2)
-                      |> Core.Option.value_exn )
-                    ~receiver:(Coinbase.receiver_pk coinbase1)
-                    ~fee_transfer:None
-                  |> Core.Result.map_error ~f:(fun _ ->
-                         failwith "Coinbase_combination_failed" )
-                  |> Deferred.return
-              | _ ->
-                  failwith "There_can't_be_more_than_2_coinbases"
-            in
-            let%bind coinbase_id =
-              Coinbase.add_if_doesn't_exist (module Conn) combined_coinbase
-            in
-            let%bind () =
-              Block_and_Internal_command.add
-                (module Conn)
-                ~block_id ~internal_command_id:coinbase_id
-            in
-            Conn.exec
-              (Caqti_request.exec
-                 Caqti_type.(tup2 int int)
-                 "UPDATE blocks SET coinbase_id = ? WHERE id = ?")
-              (coinbase_id, block_id)
+                let%bind fee_transfer_ids =
+                  deferred_result_list_fold fee_transfers ~init:[]
+                    ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
+                      let%map id =
+                        Fee_transfer.add_if_doesn't_exist
+                          (module Conn)
+                          fee_transfer `Normal
+                      in
+                      (id, secondary_sequence_no) :: acc )
+                in
+                let%map () =
+                  deferred_result_list_fold fee_transfer_ids ~init:()
+                    ~f:(fun () (fee_transfer_id, secondary_sequence_no) ->
+                      Block_and_Internal_command.add
+                        (module Conn)
+                        ~block_id ~internal_command_id:fee_transfer_id
+                        ~sequence_no ~secondary_sequence_no
+                      >>| ignore )
+                in
+                sequence_no + 1
+            | {data= Coinbase coinbase; status= _} ->
+                let%bind () =
+                  match Coda_base.Coinbase.fee_transfer coinbase with
+                  | None ->
+                      return ()
+                  | Some {receiver_pk; fee} ->
+                      let fee_transfer =
+                        Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                          ~fee_token:Token_id.default
+                      in
+                      let%bind id =
+                        Fee_transfer.add_if_doesn't_exist
+                          (module Conn)
+                          fee_transfer `Via_coinbase
+                      in
+                      Block_and_Internal_command.add
+                        (module Conn)
+                        ~block_id ~internal_command_id:id ~sequence_no
+                        ~secondary_sequence_no:0
+                      >>| ignore
+                in
+                let%bind id =
+                  Coinbase.add_if_doesn't_exist (module Conn) coinbase
+                in
+                let%map () =
+                  Block_and_Internal_command.add
+                    (module Conn)
+                    ~block_id ~internal_command_id:id ~sequence_no
+                    ~secondary_sequence_no:0
+                  >>| ignore
+                in
+                sequence_no + 1 )
         in
         return block_id
 
@@ -836,12 +897,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
 module For_test = struct
   let assert_parent_exist ~parent_id ~parent_hash conn =
     let open Deferred.Result.Let_syntax in
-    match parent_id with
-    | Some id ->
-        let%map Block.{state_hash= actual; _} = Block.load conn ~id in
-        [%test_result: string]
-          ~expect:(parent_hash |> State_hash.to_base58_check)
-          actual
-    | None ->
-        failwith "Failed to find parent block in database"
+    let%map Block.{state_hash= actual; _} = Block.load conn ~id:parent_id in
+    [%test_result: string]
+      ~expect:(parent_hash |> State_hash.to_base58_check)
+      actual
 end

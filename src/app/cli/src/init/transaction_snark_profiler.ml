@@ -316,7 +316,10 @@ let run profiler num_transactions repeats preeval =
 
 let main num_transactions repeats preeval () =
   Test_util.with_randomness 123456789 (fun () ->
-      let module T = Transaction_snark.Make () in
+      let module T = Transaction_snark.Make (struct
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.compiled
+      end) in
       run (profile (module T)) num_transactions repeats preeval )
 
 let dry num_transactions repeats preeval () =

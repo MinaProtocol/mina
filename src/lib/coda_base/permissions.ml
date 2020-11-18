@@ -21,7 +21,7 @@ module Frozen_ledger_hash = Frozen_ledger_hash0
 module Ledger_hash = Ledger_hash0
 
 (* Semantically this type represents a function
-     { has_valid_signature: bool; has_valid_proof: bool } -> bool 
+     { has_valid_signature: bool; has_valid_proof: bool } -> bool
 
      These are all of them:
      00 01 10 11 | intuitive definition       | Make sense
@@ -79,7 +79,7 @@ module Auth_required = struct
       let spec_eval t ~signature_verifies =
         let impossible = (constant t && not (signature_sufficient t)) in
         let result =
-          not impossible && 
+          not impossible &&
           ( (signature_verifies && signature_sufficient t)
             || not (signature_necessary t) )
         in
@@ -208,21 +208,22 @@ module Auth_required = struct
       *)
       let open Pickles.Impls.Step.Boolean in
       signature_sufficient
-      && (constant || ((not constant) && signature_verifies))
+      &&& (constant ||| ((not constant) &&& signature_verifies))
 
     let spec_eval ({constant; signature_necessary; signature_sufficient} : t)
         ~signature_verifies =
       let open Pickles.Impls.Step.Boolean in
-      let impossible = constant && not signature_sufficient in
+      let impossible = constant &&& not signature_sufficient in
       let result =
         (not impossible)
-        && ( (signature_verifies && signature_sufficient)
-           || not signature_necessary )
+        &&& ( signature_verifies &&& signature_sufficient
+            ||| not signature_necessary )
       in
       let didn't_fail_yet = result in
       (* If the transaction already failed to verify, we don't need to assert
          that the proof should verify. *)
-      (result, `proof_must_verify (didn't_fail_yet && not signature_sufficient))
+      ( result
+      , `proof_must_verify (didn't_fail_yet &&& not signature_sufficient) )
   end
 
   let typ =
