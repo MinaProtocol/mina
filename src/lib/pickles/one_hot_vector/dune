@@ -1,9 +1,10 @@
 (library
-  (name one_hot_vector)
-  (public_name pickles.one_hot_vector)
-  (preprocess (pps ppx_version ppx_jane bisect_ppx -- --conditional))
-  (libraries
-    zexe_backend
-    pickles_types
-    snarky.backendless
-    core_kernel ))
+ (name one_hot_vector)
+ (public_name pickles.one_hot_vector)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane))
+ (libraries
+   zexe_backend
+   pickles_types
+   snarky.backendless
+   core_kernel))

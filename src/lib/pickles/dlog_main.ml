@@ -114,9 +114,10 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark %s: %s\n%!" lab
-              (Field.Constant.to_string
-                 (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
+            Core.printf "in-snark %s:%!" lab ;
+            Field.Constant.print
+              (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
+            Core.printf "\n%!")
 
   let print_bool lab x =
     if debug then
@@ -335,12 +336,12 @@ struct
                   ~else_:acc.point)
             in
             let non_zero =
-              Boolean.((keep && Point.finite p) || acc.non_zero)
+              Boolean.(keep &&& Point.finite p ||| acc.non_zero)
             in
             {Curve_opt.non_zero; point} )
           ~xi
           ~init:(fun (keep, p) ->
-            { non_zero= Boolean.(keep && Point.finite p)
+            { non_zero= Boolean.(keep &&& Point.finite p)
             ; point= Point.underlying p } )
           without_bound with_bound
       in
@@ -599,13 +600,13 @@ struct
           in
           let poseidon =
             let ( * ) = Fn.flip Scalar_challenge.endo in
-            (* alpha^3 rcm_comm[0] + alpha^4 rcm_comm[1] + alpha^5 rcm_comm[2]
+            (* alpha^2 rcm_comm[0] + alpha^3 rcm_comm[1] + alpha^4 rcm_comm[2]
                 =
-                alpha^3 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
+                alpha^2 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
             *)
             let a = alpha in
             m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
-            |> ( * ) a |> ( * ) a |> ( * ) a
+            |> ( * ) a |> ( * ) a
           in
           let g =
             List.reduce_exn ~f:( + )

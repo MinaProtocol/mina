@@ -220,7 +220,7 @@ module Statement = struct
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -419,7 +419,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, to_yojson]
+    [@@deriving compare, fields, sexp, version, yojson]
 
     let to_latest = Fn.id
   end
@@ -3576,6 +3576,7 @@ let%test_module "transaction_snark" =
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
         Coda_state.Genesis_protocol_state.t
           ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
@@ -4283,6 +4284,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
@@ -4304,6 +4306,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in

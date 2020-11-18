@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -176,7 +175,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
 let remove_prev_crash_reports ~conf_dir =
   Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
 
-let summary exn_str =
+let summary exn_json =
   let uname = Core.Unix.uname () in
   let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
   `Assoc
@@ -184,7 +183,7 @@ let summary exn_str =
     ; ("Release", `String (Core.Unix.Utsname.release uname))
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
-    ; ("Exception", `String exn_str)
+    ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
     ; ("Coda_branch", `String Coda_version.branch)
     ; ("Coda_commit", `String Coda_version.commit_id) ]
@@ -197,7 +196,7 @@ let coda_status coda_ref =
       Coda_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
-let make_report exn_str ~conf_dir ~top_logger coda_ref =
+let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
@@ -233,8 +232,8 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
         ()
   in
   (*System info/crash summary*)
-  let summary = summary exn_str in
-  Yojson.to_file (temp_config ^/ "crash_summary.json") summary ;
+  let summary = summary exn_json in
+  Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
   let _ =
@@ -304,24 +303,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             ( Coda_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, aid) ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind acc_opt =
-            Coda_commands.get_account coda aid
-            |> Participating_state.active_error |> Deferred.return
-          in
-          let%bind account =
-            Result.of_option acc_opt
-              ~error:
-                (Error.of_string
-                   (sprintf
-                      !"Could not find account of public key %{sexp: \
-                        Account_id.t}"
-                      aid))
-            |> Deferred.return
-          in
-          Coda_commands.prove_receipt coda ~proving_receipt
-            ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
             ( Coda_commands.get_keys_with_details coda
@@ -526,9 +507,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          [%log error]
-                            "Exception while handling RPC server request from \
-                             $address: $error"
+                          [%log warn]
+                            "Handshake error while handling RPC server \
+                             request from $address"
                             ~metadata:
                               [ ("error", `String (Exn.to_string_mach exn))
                               ; ("context", `String "rpc_server")
@@ -559,7 +540,7 @@ let coda_crash_message ~log_issue ~action ~error =
   %s
 %!|err} error followup
 
-let no_report exn_str status =
+let no_report exn_json status =
   sprintf
     "include the last 20 lines from .coda-config/coda.log and then paste the \
      following:\n\
@@ -568,13 +549,18 @@ let no_report exn_str status =
      Status:\n\
      %s\n"
     (Yojson.Safe.to_string status)
-    (Yojson.Safe.to_string (summary exn_str))
+    (Yojson.Safe.to_string (summary exn_json))
 
-let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
-  let exn_str = Exn.to_string e in
+let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
+    =
+  (* attempt to free up some memory before handling crash *)
+  (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
+  Hashtbl.keys child_pids
+  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
+  let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
-    ~metadata:[("exn", `String exn_str)] ;
+    ~metadata:[("exn", exn_json)] ;
   let%bind status = coda_status !coda_ref in
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "handle_crash: acquired coda status" ;
@@ -584,7 +570,7 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
         ~timeout_duration:(Block_time.Span.of_ms 30_000L)
         time_controller
         ( try
-            make_report exn_str ~conf_dir coda_ref ~top_logger
+            make_report exn_json ~conf_dir coda_ref ~top_logger
             >>| fun k -> Ok k
           with exn -> return (Error (Error.of_exn exn)) )
     with
@@ -594,21 +580,22 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | `Ok (Ok None) ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report exn_str status
+        no_report exn_json status
     | `Ok (Error e) ->
         [%log' fatal top_logger] "Exception when generating crash report: $exn"
-          ~metadata:[("exn", `String (Error.to_string_hum e))] ;
-        no_report exn_str status
+          ~metadata:[("exn", Error_json.error_to_yojson e)] ;
+        no_report exn_json status
     | `Timeout ->
         [%log' fatal top_logger] "Timed out while generated crash report" ;
-        no_report exn_str status
+        no_report exn_json status
   in
   let message =
     coda_crash_message ~error:"crashed" ~action:action_string ~log_issue:true
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -634,8 +621,23 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | _ ->
-               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
+           | Mina_user_error.Mina_user_error {message; where} ->
+               Core.print_string "\nFATAL ERROR" ;
+               let error =
+                 match where with
+                 | None ->
+                     "encountered a configuration error"
+                 | Some where ->
+                     sprintf "encountered a configuration error %s" where
+               in
+               let message =
+                 coda_crash_message ~error ~action:("\n" ^ message)
+                   ~log_issue:false
+               in
+               Core.print_string message ; Deferred.unit
+           | exn ->
+               handle_crash exn ~time_controller ~conf_dir ~child_pids
+                 ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(

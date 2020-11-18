@@ -350,6 +350,10 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+  let genesis_ledger_hash =
+    Breadcrumb.blockchain_state old_root_node.breadcrumb
+    |> Blockchain_state.genesis_ledger_hash
+  in
   (* STEP 0 *)
   let () =
     match enable_epoch_ledger_sync with
@@ -359,7 +363,8 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state old_root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
-              ~local_state:t.consensus_local_state ~snarked_ledger )
+              ~local_state:t.consensus_local_state ~snarked_ledger
+              ~genesis_ledger_hash )
     | `Disabled ->
         ()
   in

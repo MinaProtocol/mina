@@ -713,7 +713,7 @@ module Block_latency = struct
       ()
 
   module Gossip_time =
-    Moving_time_sec_average (struct
+    Moving_time_average (struct
         include Latency_time_spec
 
         let subsystem = subsystem
@@ -726,7 +726,7 @@ module Block_latency = struct
       ()
 
   module Inclusion_time =
-    Moving_time_sec_average (struct
+    Moving_time_average (struct
         include Latency_time_spec
 
         let subsystem = subsystem

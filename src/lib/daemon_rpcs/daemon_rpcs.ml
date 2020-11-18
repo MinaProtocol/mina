@@ -100,19 +100,6 @@ module Verify_proof = struct
     Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
 end
 
-module Prove_receipt = struct
-  type query = Receipt.Chain_hash.Stable.Latest.t * Account_id.Stable.Latest.t
-  [@@deriving bin_io_unversioned]
-
-  type response =
-    (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
-    Or_error.t
-  [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
-end
-
 module Get_inferred_nonce = struct
   type query = Account_id.Stable.Latest.t [@@deriving bin_io_unversioned]
 

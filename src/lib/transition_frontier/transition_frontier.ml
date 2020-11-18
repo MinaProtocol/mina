@@ -582,6 +582,7 @@ module For_tests = struct
           (Consensus.Data.Local_state.create
              ~genesis_ledger:
                (Precomputed_values.genesis_ledger precomputed_values)
+             ~genesis_epoch_data:precomputed_values.genesis_epoch_data
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
              ~genesis_state_hash:

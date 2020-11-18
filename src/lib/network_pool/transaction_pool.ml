@@ -758,7 +758,7 @@ struct
         in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("sender", Envelope.Sender.to_yojson sender) ]
         in
         [%log' error t.logger] ~metadata
