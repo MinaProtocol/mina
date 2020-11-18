@@ -15,7 +15,14 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
         stdin
   in
   Writer.write (Lazy.force Writer.stdout) prompt ;
-  let%map pwd = Reader.read_line (Lazy.force Reader.stdin) in
+  let%map pwd =
+    if isatty then Reader.read_line (Lazy.force Reader.stdin)
+    else
+      (* Don't attempt to read the password if stdin isn't a tty, to avoid a
+         hang waiting for input.
+      *)
+      return `Eof
+  in
   if isatty then
     Terminal_io.tcsetattr ~mode:Terminal_io.TCSANOW
       (Option.value_exn old_termios)

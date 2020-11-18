@@ -219,7 +219,7 @@ struct
                     match p with
                     | `Maybe_finite (p_is_finite, p) ->
                         let is_finite =
-                          Boolean.(p_is_finite || acc_is_finite)
+                          Boolean.(p_is_finite ||| acc_is_finite)
                         in
                         let xi_acc = Scalar_challenge.endo acc xi in
                         `Maybe_finite

@@ -686,7 +686,7 @@ module Types = struct
                    let open Option.Let_syntax in
                    let account_id = account_id account in
                    match%bind Coda_lib.staking_ledger coda with
-                   | Genesis_ledger staking_ledger -> (
+                   | Genesis_epoch_ledger staking_ledger -> (
                      match
                        let open Option.Let_syntax in
                        account_id
@@ -1366,6 +1366,18 @@ module Types = struct
           [ field "mintTokens"
               ~typ:(non_null UserCommand.mint_tokens)
               ~doc:"Token minting command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let export_logs =
+      obj "ExportLogsPayload" ~fields:(fun _ ->
+          [ field "exportLogs"
+              ~typ:
+                (non_null
+                   (obj "TarFile" ~fields:(fun _ ->
+                        [ field "tarfile" ~typ:(non_null string) ~args:[]
+                            ~resolve:(fun _ basename -> basename) ] )))
+              ~doc:"Tar archive containing logs"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
@@ -2158,6 +2170,11 @@ module Mutations = struct
     { With_hash.data= cmd
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
+  let export_logs ~coda basename_opt =
+    let open Coda_lib in
+    let Config.{conf_dir; _} = Coda_lib.config coda in
+    Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
+
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
@@ -2314,6 +2331,15 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
+  let export_logs =
+    io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
+      ~args:Arg.[arg "basename" ~typ:string]
+      ~typ:(non_null Types.Payload.export_logs)
+      ~resolve:(fun {ctx= coda; _} () basename_opt ->
+        let%map result = export_logs ~coda basename_opt in
+        Result.map_error result
+          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
+
   let add_payment_receipt =
     result_field "addPaymentReceipt"
       ~doc:"Add payment into transaction database"
@@ -2409,6 +2435,40 @@ module Mutations = struct
         Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
         >>| Result.return )
 
+  let add_peer =
+    io_field "addPeers"
+      ~args:
+        Arg.
+          [arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)]
+      ~doc:"Connect to the given peers"
+      ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
+      ~resolve:(fun {ctx= coda; _} () peers ->
+        let open Deferred.Result.Let_syntax in
+        let%bind peers =
+          Result.combine_errors peers
+          |> Result.map_error ~f:(fun errs ->
+                 Option.value ~default:"Empty peers list" (List.hd errs) )
+          |> Deferred.return
+        in
+        let net = Coda_lib.net coda in
+        let%bind.Async maybe_failure =
+          (* Add peers until we find an error *)
+          Deferred.List.find_map peers ~f:(fun peer ->
+              match%map.Async Coda_networking.add_peer net peer with
+              | Ok () ->
+                  None
+              | Error err ->
+                  Some (Error (Error.to_string_hum err)) )
+        in
+        let%map () =
+          match maybe_failure with
+          | None ->
+              return ()
+          | Some err ->
+              Deferred.return err
+        in
+        List.map ~f:Network_peer.Peer.to_display peers )
+
   let commands =
     [ add_wallet
     ; create_account
@@ -2426,11 +2486,13 @@ module Mutations = struct
     ; create_token
     ; create_token_account
     ; mint_tokens
+    ; export_logs
     ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
     ; set_snark_work_fee
-    ; set_connection_gating_config ]
+    ; set_connection_gating_config
+    ; add_peer ]
 end
 
 module Queries = struct
@@ -2695,13 +2757,14 @@ module Queries = struct
             ; constraint_constants
             ; consensus_constants
             ; genesis_proof
+            ; genesis_epoch_data
             ; _ } =
           (Coda_lib.config coda).precomputed_values
         in
         let {With_hash.data= genesis_state; hash} =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-            ~constraint_constants ~consensus_constants
+            ~genesis_epoch_data ~constraint_constants ~consensus_constants
         in
         { With_hash.data=
             { Auxiliary_database.Filtered_external_transition.creator=
@@ -2758,6 +2821,15 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} () ->
         List.map (Coda_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
         )
+
+  let get_peers =
+    io_field "getPeers"
+      ~doc:"List of peers that the daemon is currently connected to"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
+      ~resolve:(fun {ctx= coda; _} () ->
+        let%map peers = Coda_networking.peers (Coda_lib.net coda) in
+        Ok (List.map ~f:Network_peer.Peer.to_display peers) )
 
   let snark_pool =
     field "snarkPool"
@@ -2846,6 +2918,7 @@ module Queries = struct
     ; block
     ; genesis_block
     ; initial_peers
+    ; get_peers
     ; pooled_user_commands
     ; transaction_status
     ; trust_status

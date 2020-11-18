@@ -505,7 +505,9 @@ module T = struct
           let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
-              ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
+              ~genesis_ledger:Genesis_ledger.t
+              ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+              ~epoch_ledger_location
               ~ledger_depth:constraint_constants.ledger_depth
               ~genesis_state_hash:
                 (With_hash.hash precomputed_values.protocol_state_with_hash)
@@ -584,7 +586,7 @@ module T = struct
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-            ~top_logger:logger coda_ref ;
+            ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->

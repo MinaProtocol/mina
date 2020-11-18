@@ -1,3 +1,6 @@
+(* prevent stack overflow during coverage file generation *)
+[@@@coverage exclude_file]
+
 module Lagrange_precomputations = struct
   let index_of_domain_log2 d = d - 1
 

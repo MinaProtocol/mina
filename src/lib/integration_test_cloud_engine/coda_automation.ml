@@ -167,7 +167,8 @@ module Network_config = struct
             ; num_accounts= None
             ; balances= []
             ; hash= None
-            ; name= None } }
+            ; name= None }
+      ; epoch_data= None }
     in
     let genesis_constants =
       Or_error.ok_exn

@@ -339,12 +339,12 @@ struct
                   ~else_:acc.point)
             in
             let non_zero =
-              Boolean.((keep && Point.finite p) || acc.non_zero)
+              Boolean.(keep &&& Point.finite p ||| acc.non_zero)
             in
             {Curve_opt.non_zero; point} )
           ~xi
           ~init:(fun (keep, p) ->
-            { non_zero= Boolean.(keep && Point.finite p)
+            { non_zero= Boolean.(keep &&& Point.finite p)
             ; point= Point.underlying p } )
           without_bound with_bound
       in
