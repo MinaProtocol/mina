@@ -92,8 +92,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~on_unexpected_termination =
-      let fail m =
-        failwithf "Failed to connect to libp2p_helper process: %s" m ()
+      let fail err =
+        Error.tag err ~tag:"Failed to connect to libp2p_helper process"
+        |> Error.raise
       in
       let conf_dir = config.conf_dir ^/ "coda_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -355,11 +356,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           | Ok (subscription, message_reader) ->
               (net2, subscription, message_reader)
           | Error e ->
-              fail (Error.to_string_hum e) )
+              fail e )
       | Ok (Error e) ->
-          fail (Error.to_string_hum e)
+          fail e
       | Error e ->
-          fail (Exn.to_string e)
+          fail (Error.of_exn e)
 
     let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in

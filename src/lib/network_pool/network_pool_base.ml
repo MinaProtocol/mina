@@ -97,8 +97,8 @@ end)
         rebroadcast res
     | Error (`Other e) ->
         [%log' trace t.logger]
-          "Refusing to rebroadcast. Pool diff apply feedback: %s"
-          (Error.to_string_hum e) ;
+          "Refusing to rebroadcast. Pool diff apply feedback: $error"
+          ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
 
   let filter_verified pipe t ~f =
@@ -118,9 +118,13 @@ end)
           ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
           | Error err ->
               [%log' trace t.logger]
-                "Refusing to rebroadcast %s. Verification error: %s"
-                (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
-                (Error.to_string_hum err) ;
+                "Refusing to rebroadcast $diff. Verification error: $error"
+                ~metadata:
+                  [ ( "diff"
+                    , `String
+                        ( Resource_pool.Diff.summary
+                        @@ Envelope.Incoming.data diff ) )
+                  ; ("error", Error_json.error_to_yojson err) ] ;
               (*reject incoming messages*)
               Broadcast_callback.error err cb
           | Ok verified_diff ->

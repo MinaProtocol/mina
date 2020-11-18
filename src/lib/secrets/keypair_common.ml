@@ -2,10 +2,7 @@ open Core
 open Async
 open Async.Deferred.Let_syntax
 
-let error_raise e ~error_ctx =
-  raise
-    Error.(
-      to_exn (of_string (sprintf !"%s\n%s" error_ctx (Error.to_string_hum e))))
+let error_raise e ~error_ctx = Error.tag ~tag:error_ctx e |> Error.raise
 
 module Make_terminal_stdin (KP : sig
   type t
