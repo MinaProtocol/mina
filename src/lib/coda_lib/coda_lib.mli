@@ -6,6 +6,7 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 
 type t
@@ -154,8 +155,6 @@ val transition_frontier :
 
 val get_ledger :
   t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
-
-val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 
