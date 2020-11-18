@@ -68,7 +68,7 @@ module Go_log = struct
     | "error" | "panic" | "fatal" ->
         Error
     | "warn" ->
-        Warn
+        Debug
     | "info" ->
         (* this is intentionally debug, because the go info logs are too verbose for our info *)
         Debug
