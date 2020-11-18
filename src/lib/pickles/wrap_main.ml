@@ -180,8 +180,7 @@ let wrap_main
                ; combined_inner_product
                ; b
                ; which_branch
-               ; bulletproof_challenges
-                   (* TODO: MUST ASSERT EQUALITY WITH ACTUAL *) }
+               ; bulletproof_challenges }
            ; sponge_digest_before_evaluations
            ; me_only= me_only_digest
            ; was_base_case }

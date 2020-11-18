@@ -195,6 +195,10 @@ struct
       scale_fast p (Shifted_value.map ~f:Other_field.to_bits_unsafe s)
     in
     with_label __LOC__ (fun () ->
+        absorb sponge Scalar
+          ( match combined_inner_product with
+          | Shifted_value.Shifted_value x ->
+              x ) ;
         (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
