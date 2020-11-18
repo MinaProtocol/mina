@@ -1,0 +1,21 @@
+[Unit]
+Description=Mina Daemon Service
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+EnvironmentFile=%h/.mina-env
+Type=simple
+Restart=always
+RestartSec=15
+ExecStart=/usr/local/bin/coda daemon \
+  -peer-list-file %h/peers.txt \
+  -block-producer-key %h/keys/my-wallet \
+  -generate-genesis-proof true \
+  -log-level Info \
+  $EXTRA_FLAGS
+ExecStop=/usr/local/bin/coda client stop-daemon
+
+[Install]
+WantedBy=multi-user.target
