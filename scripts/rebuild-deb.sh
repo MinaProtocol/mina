@@ -115,6 +115,9 @@ chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
+
+cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
+
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
