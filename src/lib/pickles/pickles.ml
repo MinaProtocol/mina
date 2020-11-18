@@ -806,7 +806,7 @@ module Side_loaded = struct
                             (Width.to_int vk.max_width))
                       in
                       { Domains.x=
-                          Pow_2_roots_of_unity (Int.ceil_log2 (1 + input_size))
+                          Pow_2_roots_of_unity (Int.ceil_log2 input_size)
                       ; h= d.h } )
               ; index=
                   (match vk.wrap_vk with None -> return false | Some x -> x)

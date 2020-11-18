@@ -157,7 +157,7 @@ module Statement : sig
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
 
@@ -201,7 +201,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson]
+    type t [@@deriving compare, sexp, yojson]
   end
 end]
 
