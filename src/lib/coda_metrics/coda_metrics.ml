@@ -740,6 +740,25 @@ module Block_latency = struct
       ()
 end
 
+module Object_lifetime_statistics = struct
+  let subsystem = "Object_lifetime_statistics"
+
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
+
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end)
+
+  let object_count_table = Gauge_map.of_alist_exn []
+
+  let object_count ~name : Gauge.t =
+    let help = "number of objects currently allocated" in
+    let name = "object_count_" ^ name in
+    Gauge_map.add object_count_table ~name ~help
+end
+
 let server ~port ~logger =
   let open Cohttp in
   let open Cohttp_async in
