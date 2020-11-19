@@ -22,9 +22,8 @@ val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 (** Decrypt some bytes with a password *)
 val decrypt :
      password:Bytes.t
-  -> which:string
   -> t
   -> ( Bytes.t
-     , [> `Corrupted_privkey of Error.t * string
+     , [> `Corrupted_privkey of Error.t
        | `Incorrect_password_or_corrupted_privkey ] )
      Result.t

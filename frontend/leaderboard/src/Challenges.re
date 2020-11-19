@@ -49,7 +49,7 @@ let bonusBlocksChallenge = metricsMap => {
       (1, 4000), // 2nd place: 4000 pts
       (2, 3000), // 3rd place: 3000 pts
       (11, 2000), // Top 10: 2000 pts.
-      (26, 1500), // Top 25: 1500 pts
+      (51, 1500), // Top 50: 1500 pts
       (101, 1000), // Top 100: 1000 pts
       (201, 500) // Top 200: 500 pts
     |],
@@ -120,7 +120,6 @@ let sendCodaChallenge = metricsMap => {
       1000,
       metricsMap,
     ),
-    bonusSendCodaChallenge(metricsMap),
   ]
   |> Points.sumPointsMaps;
 };

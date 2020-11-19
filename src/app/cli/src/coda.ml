@@ -350,7 +350,8 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn s
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+              ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -505,12 +506,9 @@ let setup_daemon logger =
             | Error err -> (
               match handle_missing with
               | `Must_exist ->
-                  [%log fatal]
-                    "Failed reading configuration from $config_file: $error"
-                    ~metadata:
-                      [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
-                  Error.raise err
+                  Mina_user_error.raisef ~where:"reading configuration file"
+                    "The configuration file %s could not be read:\n%s"
+                    config_file (Error.to_string_hum err)
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
@@ -650,25 +648,25 @@ let setup_daemon logger =
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= log_received_blocks }
       in
-      let json_to_publickey_compressed_option json =
+      let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
                | Ok key ->
                    Some key
-               | Error e ->
-                   [%log error] "Error decoding public key ($key): $error"
-                     ~metadata:
-                       [ ("key", `String pk_str)
-                       ; ("error", Error_json.error_to_yojson e) ] ;
-                   None )
+               | Error _e ->
+                   Mina_user_error.raisef ~where:"decoding a public key"
+                     "The %s public key %s could not be decoded." which pk_str
+           )
       in
       let run_snark_worker_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark worker")
           "run-snark-worker" run_snark_worker_flag
       in
       let run_snark_coordinator_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark coordinator")
           "run-snark-coordinator" run_snark_coordinator_flag
       in
       let snark_worker_parallelism_flag =
@@ -676,7 +674,8 @@ let setup_daemon logger =
           snark_worker_parallelism_flag
       in
       let coinbase_receiver_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "coinbase receiver")
           "coinbase-receiver" coinbase_receiver_flag
       in
       let%bind external_ip =
@@ -697,7 +696,8 @@ let setup_daemon logger =
           block_production_key
       in
       let block_production_pubkey =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "block producer")
           "block-producer-pubkey" block_production_pubkey
       in
       let block_production_password =
@@ -718,15 +718,15 @@ let setup_daemon logger =
       let%bind block_production_keypair =
         match (block_production_key, block_production_pubkey) with
         | Some _, Some _ ->
-            eprintf
-              "Error: You cannot provide both `block-producer-key` and \
-               `block_production_pubkey`\n" ;
-            exit 11
+            Mina_user_error.raise
+              "You cannot provide both `block-producer-key` and \
+               `block_production_pubkey`"
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
         | _, Some tracked_pubkey ->
@@ -736,7 +736,8 @@ let setup_daemon logger =
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
       in
@@ -750,7 +751,15 @@ let setup_daemon logger =
         match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
-              String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+              String.split ~on:',' envstr
+              |> List.filter_map ~f:(fun str ->
+                     try Some (Unix.Cidr.of_string str)
+                     with _ ->
+                       [%log warn]
+                         "Could not parse address $address in \
+                          CODA_CLIENT_TRUSTLIST"
+                         ~metadata:[("address", `String str)] ;
+                       None )
             in
             Some
               (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -833,13 +842,13 @@ let setup_daemon logger =
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
                 |> List.map ~f:Coda_net2.Multiaddr.of_string
                 |> return
-            | Error e ->
-                [%log fatal]
-                  ~metadata:[("error", `String (Error.to_string_mach e))]
-                  "Unable to read peer-list file properly. It must be a \
-                   newline separated series of libp2p multiaddrs (ex: \
-                   /ip4/IPADDR/tcp/PORT/p2p/PEERID)" ;
-                exit 15 )
+            | Error _ ->
+                Mina_user_error.raisef
+                  ~where:"reading libp2p peer address file"
+                  "The file %s could not be read.\n\n\
+                   It must be a newline-separated list of libp2p multiaddrs \
+                   (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                  file )
       in
       let initial_peers =
         List.concat
