@@ -66,8 +66,8 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let perform (s : Worker_state.t) public_key
       ({instances; fee} as spec : Work.Spec.t) =
-    One_or_two.Or_error.map instances ~f:(fun w ->
-        let open Or_error.Let_syntax in
+    One_or_two.Deferred_result.map instances ~f:(fun w ->
+        let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
           perform_single s
             ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
@@ -76,7 +76,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         ( proof
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
         ) )
-    |> Or_error.map ~f:(function
+    |> Deferred.Or_error.map ~f:(function
          | `One (proof1, metrics1) ->
              { Snark_work_lib.Work.Result.proofs= `One proof1
              ; metrics= `One metrics1
@@ -209,7 +209,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                        ~f:Work.Single.Spec.statement) ) ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
-          match perform state public_key work with
+          match%bind perform state public_key work with
           | Error e ->
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
