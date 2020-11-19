@@ -11,7 +11,7 @@ use commitment_dlog::{
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
 use plonk_circuits::{
-    constraints::{zk_w, zk_polynomial, ConstraintSystem as PlonkConstraintSystem},
+    constraints::{zk_polynomial, zk_w, ConstraintSystem as PlonkConstraintSystem},
     domains::EvaluationDomains as PlonkEvaluationDomains,
 };
 use plonk_protocol_dlog::index::{
@@ -461,7 +461,7 @@ where
         l04,
         l08,
         l1,
-        r:r_value,
+        r: r_value,
         o,
         endo,
         fr_sponge_params,
