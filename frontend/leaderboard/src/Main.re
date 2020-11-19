@@ -30,12 +30,18 @@ let main = () => {
     | Ok(blocks) =>
       Types.Block.parseBlocks(blocks)
       |> Metrics.calculateMetrics
-      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
+      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId)
 
+    | Error(error) => Js.log(error)
+    }
+  });
+  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
+    switch (result) {
+    | Ok(lateBlocks) =>
       UploadLeaderboardData.uploadData(
         spreadsheetId,
-        blocks |> Array.length |> string_of_int,
-      );
+        lateBlocks |> Array.length |> string_of_int,
+      )
     | Error(error) => Js.log(error)
     }
   });
