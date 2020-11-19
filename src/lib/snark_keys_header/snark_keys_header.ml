@@ -103,7 +103,7 @@ type t =
   ; identifying_hash: string }
 [@@deriving yojson]
 
-let prefix = "MINA_SNARK_KEYS"
+let prefix = "MINA_SNARK_KEYS\n"
 
 let prefix_len = String.length prefix
 
