@@ -94,7 +94,8 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let batch_verify = with_lagranges batch_verify
 
-    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
+        prev_comms =
       let external_values i =
         let open Field.Vector in
         if i = 0 then Field.one
@@ -110,7 +111,24 @@ module Proof = Plonk_dlog_proof.Make (struct
             (if j < Array.length w then w.(j).(i) else Field.zero)
         done
       done ;
-      create pk.index (Field.Vector.create ()) witness prev_chals prev_comms
+      create pk.index ~primary_input:(Field.Vector.create ())
+        ~auxiliary_input:witness ~prev_challenges:prev_chals
+        ~prev_sgs:prev_comms
+
+    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+      create_aux pk primary auxiliary prev_chals prev_comms
+        ~f:(fun pk
+           ~primary_input
+           ~auxiliary_input
+           ~prev_challenges
+           ~prev_sgs
+           ->
+          Async.In_thread.run (fun () ->
+              create pk ~primary_input ~auxiliary_input ~prev_challenges
+                ~prev_sgs ) )
+
+    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
   end
 
   module Verifier_index = Tweedle_fq_verifier_index

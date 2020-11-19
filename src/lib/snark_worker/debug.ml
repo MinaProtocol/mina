@@ -18,7 +18,7 @@ module Inputs = struct
   end
 
   let perform_single () ~message s =
-    Ok
+    Deferred.Or_error.return
       ( ( Snark_work_lib.Work.Single.Spec.statement s
         , Coda_base.Sok_message.digest message )
       , Time.Span.zero )

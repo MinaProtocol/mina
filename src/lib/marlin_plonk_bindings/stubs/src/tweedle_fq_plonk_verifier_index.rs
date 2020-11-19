@@ -13,12 +13,12 @@ use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fq::
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use commitment_dlog::srs::SRS;
-use plonk_circuits::constraints::{zk_w, zk_polynomial, ConstraintSystem};
+use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
     fs::File,
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
 use std::rc::Rc;
@@ -205,6 +205,7 @@ impl From<CamlTweedleFqPlonkVerifierIndexPtr> for DlogVerifierIndex<'_, GAffine>
 }
 
 pub fn read_raw<'a>(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'a>, ocaml::Error> {
@@ -216,6 +217,12 @@ pub fn read_raw<'a>(
         .unwrap()),
         Ok(file) => {
             let mut r = BufReader::new(file);
+            match offset {
+                Some(offset) => {
+                    r.seek(Start(offset as u64))?;
+                }
+                None => (),
+            };
             let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
             let urs_copy = Rc::clone(&urs.0);
             let t = index_serialization::read_plonk_verifier_index(
@@ -232,18 +239,20 @@ pub fn read_raw<'a>(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_read(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'static>, ocaml::Error> {
-    read_raw(urs, path)
+    read_raw(offset, urs, path)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_read(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndex, ocaml::Error> {
-    let t = read_raw(urs, path)?;
+    let t = read_raw(offset, urs, path)?;
     Ok(to_ocaml(&t.1, t.0))
 }
 

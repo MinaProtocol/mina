@@ -10,7 +10,7 @@ external create : int -> t = "caml_tweedle_fq_urs_create"
 
 external write : t -> string -> unit = "caml_tweedle_fq_urs_write"
 
-external read : string -> t option = "caml_tweedle_fq_urs_read"
+external read : ?offset:int -> string -> t option = "caml_tweedle_fq_urs_read"
 
 external lagrange_commitment :
   t -> domain_size:int -> int -> Poly_comm.t
