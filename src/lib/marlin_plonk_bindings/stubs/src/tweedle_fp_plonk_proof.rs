@@ -219,12 +219,16 @@ pub fn caml_tweedle_fp_plonk_proof_create(
         }
     };
 
+    ocaml::runtime::release_lock();
+
     let map = GroupMap::<Fq>::setup();
     let proof = DlogProof::create::<
         DefaultFqSponge<TweedledeeParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fp, PlonkSpongeConstants>,
     >(&map, &auxiliary_input.as_ref().0, &index.as_ref().0, prev)
     .unwrap();
+
+    ocaml::runtime::acquire_lock();
 
     proof.into()
 }

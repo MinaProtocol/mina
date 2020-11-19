@@ -743,6 +743,14 @@ end
 module Object_lifetime_statistics = struct
   let subsystem = "Object_lifetime_statistics"
 
+  module Counter_map = Metric_map (struct
+    type t = Counter.t
+
+    let subsystem = subsystem
+
+    let v = Counter.v
+  end)
+
   module Gauge_map = Metric_map (struct
     type t = Gauge.t
 
@@ -751,12 +759,49 @@ module Object_lifetime_statistics = struct
     let v = Gauge.v
   end)
 
-  let object_count_table = Gauge_map.of_alist_exn []
+  let allocated_count_table = Counter_map.of_alist_exn []
 
-  let object_count ~name : Gauge.t =
-    let help = "number of objects currently allocated" in
-    let name = "object_count_" ^ name in
-    Gauge_map.add object_count_table ~name ~help
+  let allocated_count ~name : Counter.t =
+    let help =
+      "total number of objects allocated (including previously collected \
+       objects)"
+    in
+    let name = "allocated_count_" ^ name in
+    Counter_map.add allocated_count_table ~name ~help
+
+  let collected_count_table = Counter_map.of_alist_exn []
+
+  let collected_count ~name : Counter.t =
+    let help = "total number of objects collected" in
+    let name = "collected_count_" ^ name in
+    Counter_map.add collected_count_table ~name ~help
+
+  let lifetime_quartile_ms_table = Gauge_map.of_alist_exn []
+
+  let live_count_table = Gauge_map.of_alist_exn []
+
+  let live_count ~name : Gauge.t =
+    let help = "total number of objects currently allocated" in
+    let name = "live_count_" ^ name in
+    Gauge_map.add live_count_table ~name ~help
+
+  let lifetime_quartile_ms ~name ~quartile : Gauge.t =
+    let q =
+      match quartile with
+      | `Q1 ->
+          "q1"
+      | `Q2 ->
+          "q2"
+      | `Q3 ->
+          "q3"
+      | `Q4 ->
+          "q4"
+    in
+    let help =
+      "quartile of active object lifetimes, expressed in milliseconds"
+    in
+    let name = "lifetime_" ^ name ^ "_" ^ q ^ "_ms" in
+    Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
 let server ~port ~logger =
