@@ -1206,6 +1206,7 @@ let list_peers net =
   | Error _ ->
       []
 
+(* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
     ~seed_peers ~initial_gating_config =
@@ -1473,12 +1474,6 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
             with
           | Ok (Ok record) -> (
               let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
               try Logger.raw logger r
               with _exn ->
                 Logger.raw logger

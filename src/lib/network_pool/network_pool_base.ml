@@ -71,7 +71,7 @@ end)
     let rebroadcast (diff', rejected) =
       let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
-        [%log' debug t.logger]
+        [%log' trace t.logger]
           "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
           ~metadata:
             [ ( "diff"
@@ -96,7 +96,7 @@ end)
     | Error (`Locally_generated res) ->
         rebroadcast res
     | Error (`Other e) ->
-        [%log' debug t.logger]
+        [%log' trace t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: %s"
           (Error.to_string_hum e) ;
         Broadcast_callback.error e cb
@@ -117,7 +117,7 @@ end)
         don't_wait_for
           ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
           | Error err ->
-              [%log' info t.logger]
+              [%log' trace t.logger]
                 "Refusing to rebroadcast %s. Verification error: %s"
                 (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
                 (Error.to_string_hum err) ;

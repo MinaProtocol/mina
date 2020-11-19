@@ -1,7 +1,5 @@
-use crate::tweedle_dee::{
-    CamlTweedleDeeAffine, CamlTweedleDeeAffineVector, CamlTweedleDeePolyComm,
-};
-use crate::tweedle_fp::CamlTweedleFpPtr;
+use crate::tweedle_dee::{CamlTweedleDeeAffine, CamlTweedleDeePolyComm};
+use crate::tweedle_fp::CamlTweedleFp;
 use crate::tweedle_fq::CamlTweedleFq;
 use algebra::{
     tweedle::{dee::Affine as GAffine, fp::Fp},
@@ -92,7 +90,7 @@ pub fn caml_tweedle_fp_urs_lagrange_commitment(
                 .map(|j| if i == j { Fp::one() } else { Fp::zero() })
                 .collect();
             let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit(&p, None).into())
+            Ok(urs.0.commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -101,7 +99,7 @@ pub fn caml_tweedle_fp_urs_lagrange_commitment(
 pub fn caml_tweedle_fp_urs_commit_evaluations(
     urs: CamlTweedleFpUrs,
     domain_size: ocaml::Int,
-    evals: ocaml::Array<CamlTweedleFpPtr>,
+    evals: Vec<CamlTweedleFp>,
 ) -> Result<CamlTweedleDeePolyComm<CamlTweedleFq>, ocaml::Error> {
     match EvaluationDomain::<Fp>::new(domain_size as usize) {
         None => Err(
@@ -110,18 +108,9 @@ pub fn caml_tweedle_fp_urs_commit_evaluations(
                 .unwrap(),
         ),
         Some(x_domain) => {
-            let evals = {
-                let len = evals.len();
-                let mut v = Vec::with_capacity(len);
-                for i in 0..len {
-                    unsafe {
-                        v.push(evals.get_unchecked(i).as_ref().0);
-                    }
-                }
-                v
-            };
+            let evals = evals.into_iter().map(From::from).collect();
             let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit(&p, None).into())
+            Ok(urs.0.commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -129,40 +118,25 @@ pub fn caml_tweedle_fp_urs_commit_evaluations(
 #[ocaml::func]
 pub fn caml_tweedle_fp_urs_b_poly_commitment(
     urs: CamlTweedleFpUrs,
-    chals: ocaml::Array<CamlTweedleFpPtr>,
+    chals: Vec<CamlTweedleFp>,
 ) -> Result<CamlTweedleDeePolyComm<CamlTweedleFq>, ocaml::Error> {
-    let chals = {
-        let len = chals.len();
-        let mut v = Vec::with_capacity(len);
-        for i in 0..len {
-            unsafe {
-                v.push(chals.get_unchecked(i).as_ref().0);
-            }
-        }
-        v
-    };
+    let chals: Vec<Fp> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fp>::from_coefficients_vec(coeffs);
-    Ok(urs.0.commit(&p, None).into())
+    Ok(urs.0.commit_non_hiding(&p, None).into())
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_urs_batch_accumulator_check(
     urs: CamlTweedleFpUrs,
-    comms: CamlTweedleDeeAffineVector,
-    chals: ocaml::Array<CamlTweedleFpPtr>,
+    comms: Vec<CamlTweedleDeeAffine<CamlTweedleFq>>,
+    chals: Vec<CamlTweedleFp>,
 ) -> bool {
-    let chals = {
-        let len = chals.len();
-        let mut v = Vec::with_capacity(len);
-        for i in 0..len {
-            unsafe {
-                v.push(chals.get_unchecked(i).as_ref().0);
-            }
-        }
-        v
-    };
-    crate::urs_utils::batch_dlog_accumulator_check(&urs.0, &comms.0, &chals)
+    crate::urs_utils::batch_dlog_accumulator_check(
+        &urs.0,
+        &comms.into_iter().map(From::from).collect(),
+        &chals.into_iter().map(From::from).collect(),
+    )
 }
 
 #[ocaml::func]

@@ -255,7 +255,7 @@ let setup_daemon logger =
   and config_files =
     flag "config-file"
       ~doc:
-        "PATH path a the configuration file (overrides CODA_CONFIG_FILE, \
+        "PATH path to a configuration file (overrides CODA_CONFIG_FILE, \
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
@@ -275,16 +275,7 @@ let setup_daemon logger =
   and plugins = plugin_flag in
   fun () ->
     let open Deferred.Let_syntax in
-    let compute_conf_dir home =
-      Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-    in
-    let%bind conf_dir =
-      if is_background then
-        let home = Core.Sys.home_directory () in
-        let conf_dir = compute_conf_dir home in
-        Deferred.return conf_dir
-      else Sys.home_directory () >>| compute_conf_dir
-    in
+    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
@@ -296,18 +287,21 @@ let setup_daemon logger =
     in
     Stdout_log.setup log_json log_level ;
     (* 512MB logrotate max size = 1GB max filesystem usage *)
-    let logrotate_max_size = 1024 * 1024 * 512 in
+    let logrotate_max_size = 1024 * 1024 * 10 in
+    let logrotate_num_rotate = 50 in
     Logger.Consumer_registry.register ~id:"default"
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+           ~log_filename:"coda.log" ~max_size:logrotate_max_size
+           ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:"best_tip_diff"
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
+           ~num_rotate:1) ;
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
@@ -407,6 +401,52 @@ let setup_daemon logger =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
     let may_generate = Option.value ~default:false may_generate in
+    (* FIXME adapt to new system, move into child_processes lib *)
+    let pids = Child_processes.Termination.create_pid_table () in
+    let rec terminated_child_loop () =
+      match
+        try Unix.wait_nohang `Any
+        with
+        | Unix.Unix_error (errno, _, _)
+        when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+             (* no child processes exist *)
+        ->
+          None
+      with
+      | None ->
+          (* no children have terminated, wait to check again *)
+          let%bind () = Async.after (Time.Span.of_min 1.) in
+          terminated_child_loop ()
+      | Some (child_pid, exit_or_signal) ->
+          let child_pid_metadata =
+            [("child_pid", `Int (Pid.to_int child_pid))]
+          in
+          ( match exit_or_signal with
+          | Ok () ->
+              [%log info]
+                "Daemon child process $child_pid terminated with exit code 0"
+                ~metadata:child_pid_metadata
+          | Error err -> (
+            match err with
+            | `Signal signal ->
+                [%log info]
+                  "Daemon child process $child_pid terminated after receiving \
+                   signal $signal"
+                  ~metadata:
+                    ( ("signal", `String (Signal.to_string signal))
+                    :: child_pid_metadata )
+            | `Exit_non_zero exit_code ->
+                [%log info]
+                  "Daemon child process $child_pid terminated with nonzero \
+                   exit code $exit_code"
+                  ~metadata:
+                    (("exit_code", `Int exit_code) :: child_pid_metadata) ) ) ;
+          (* terminate daemon if children registered *)
+          Child_processes.Termination.check_terminated_child pids child_pid
+            logger ;
+          (* check for other terminated children, without waiting *)
+          terminated_child_loop ()
+    in
     let coda_initialization_deferred () =
       let config_file_installed =
         (* Search for config files installed as part of a deb/brew package.
@@ -817,7 +857,10 @@ let setup_daemon logger =
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
-        failwith "no seed or initial peer flags passed" ;
+        Mina_user_error.raise
+          {|No peers were given.
+
+Pass one of -peer, -peer-list-file, -seed.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants
@@ -854,11 +897,6 @@ let setup_daemon logger =
       in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
       let transaction_database_dir = conf_dir ^/ "transaction" in
       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
       let transaction_database =
@@ -878,53 +916,6 @@ let setup_daemon logger =
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;
       (* log terminated child processes *)
-      (* FIXME adapt to new system, move into child_processes lib *)
-      let pids = Child_processes.Termination.create_pid_table () in
-      let rec terminated_child_loop () =
-        match
-          try Unix.wait_nohang `Any
-          with
-          | Unix.Unix_error (errno, _, _)
-          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-               (* no child processes exist *)
-          ->
-            None
-        with
-        | None ->
-            (* no children have terminated, wait to check again *)
-            let%bind () = Async.after (Time.Span.of_min 1.) in
-            terminated_child_loop ()
-        | Some (child_pid, exit_or_signal) ->
-            let child_pid_metadata =
-              [("child_pid", `Int (Pid.to_int child_pid))]
-            in
-            ( match exit_or_signal with
-            | Ok () ->
-                [%log info]
-                  "Daemon child process $child_pid terminated with exit code 0"
-                  ~metadata:child_pid_metadata
-            | Error err -> (
-              match err with
-              | `Signal signal ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated after \
-                     receiving signal $signal"
-                    ~metadata:
-                      ( ("signal", `String (Signal.to_string signal))
-                      :: child_pid_metadata )
-              | `Exit_non_zero exit_code ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated with nonzero \
-                     exit code $exit_code"
-                    ~metadata:
-                      (("exit_code", `Int exit_code) :: child_pid_metadata) )
-            ) ;
-            (* terminate daemon if children registered *)
-            Child_processes.Termination.check_terminated_child pids child_pid
-              logger ;
-            (* check for other terminated children, without waiting *)
-            terminated_child_loop ()
-      in
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver =
         Option.value_map coinbase_receiver_flag ~default:`Producer
@@ -960,19 +951,18 @@ let setup_daemon logger =
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~receipt_chain_database ~time_controller
-             ~initial_block_production_keypairs ~monitor ~consensus_local_state
-             ~transaction_database ~external_transition_database
-             ~is_archive_rocksdb ~work_reassignment_wait
-             ~archive_process_location ~log_block_creation ~precomputed_values
-             ())
+             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ~is_archive_rocksdb
+             ~work_reassignment_wait ~archive_process_location
+             ~log_block_creation ~precomputed_values ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Coda_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind {Coda_initialization.coda; client_trustlist; rest_server_port} =
@@ -1146,6 +1136,117 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" )) )
+  ; ( "run-verifier"
+    , Command.async
+        ~summary:"Run verifier on a proof provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open mode =
+          flag "-mode" (required string)
+            ~doc:"transaction/blockchain the snark to verify. Defaults to json"
+        and format =
+          flag "-format" (optional string)
+            ~doc:"sexp/json the format to parse input in"
+        in
+        fun () ->
+          let open Async in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          let%bind conf_dir = Unix.mkdtemp "/tmp/coda-verifier" in
+          let mode =
+            match mode with
+            | "transaction" ->
+                `Transaction
+            | "blockchain" ->
+                `Blockchain
+            | mode ->
+                failwithf
+                  "Expected mode flag to be one of transaction, blockchain, \
+                   got '%s'"
+                  mode ()
+          in
+          let format =
+            match format with
+            | Some "sexp" ->
+                `Sexp
+            | Some "json" | None ->
+                `Json
+            | Some format ->
+                failwithf
+                  "Expected format flag to be one of sexp, json, got '%s'"
+                  format ()
+          in
+          let%bind input =
+            match format with
+            | `Sexp -> (
+                let%map input_sexp =
+                  match%map Reader.read_sexp (Lazy.force Reader.stdin) with
+                  | `Ok input_sexp ->
+                      input_sexp
+                  | `Eof ->
+                      failwith "early EOF while reading sexp"
+                in
+                match mode with
+                | `Transaction ->
+                    `Transaction
+                      (List.t_of_sexp
+                         (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
+                            Sok_message.t_of_sexp)
+                         input_sexp)
+                | `Blockchain ->
+                    `Blockchain
+                      (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
+                         input_sexp) )
+            | `Json -> (
+                let%map input_line =
+                  match%map Reader.read_line (Lazy.force Reader.stdin) with
+                  | `Ok input_line ->
+                      input_line
+                  | `Eof ->
+                      failwith "early EOF while reading json"
+                in
+                match mode with
+                | `Transaction -> (
+                  match
+                    [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Transaction input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () )
+                | `Blockchain -> (
+                  match
+                    [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Blockchain input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () ) )
+          in
+          let%bind verifier =
+            Verifier.create ~logger
+              ~proof_level:Genesis_constants.Proof_level.compiled
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+          in
+          let%bind result =
+            match input with
+            | `Transaction input ->
+                Verifier.verify_transaction_snarks verifier input
+            | `Blockchain input ->
+                Verifier.verify_blockchain_snarks verifier input
+          in
+          match result with
+          | Ok true ->
+              printf "Proofs verified successfully" ;
+              exit 0
+          | Ok false ->
+              printf "Proofs failed to verify" ;
+              exit 1
+          | Error err ->
+              printf "Failed while verifying proofs:\n%s"
+                (Error.to_string_hum err) ;
+              exit 2) )
   ; ( "dump-structured-events"
     , Command.async ~summary:"Dump the registered structured events"
         (let open Command.Let_syntax in
@@ -1213,7 +1314,6 @@ let coda_commands logger =
         ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
-        ; (module Coda_receipt_chain_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)

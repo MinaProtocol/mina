@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -304,24 +303,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             ( Coda_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, aid) ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind acc_opt =
-            Coda_commands.get_account coda aid
-            |> Participating_state.active_error |> Deferred.return
-          in
-          let%bind account =
-            Result.of_option acc_opt
-              ~error:
-                (Error.of_string
-                   (sprintf
-                      !"Could not find account of public key %{sexp: \
-                        Account_id.t}"
-                      aid))
-            |> Deferred.return
-          in
-          Coda_commands.prove_receipt coda ~proving_receipt
-            ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
             ( Coda_commands.get_keys_with_details coda
@@ -392,7 +373,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
           Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
-    ]
+    ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
+          return
+            (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
+      ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
@@ -526,9 +510,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          [%log error]
-                            "Exception while handling RPC server request from \
-                             $address: $error"
+                          [%log warn]
+                            "Handshake error while handling RPC server \
+                             request from $address"
                             ~metadata:
                               [ ("error", `String (Exn.to_string_mach exn))
                               ; ("context", `String "rpc_server")
@@ -570,7 +554,12 @@ let no_report exn_json status =
     (Yojson.Safe.to_string status)
     (Yojson.Safe.to_string (summary exn_json))
 
-let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
+    =
+  (* attempt to free up some memory before handling crash *)
+  (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
+  Hashtbl.keys child_pids
+  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
@@ -608,7 +597,8 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -634,8 +624,23 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
+           | Mina_user_error.Mina_user_error {message; where} ->
+               Core.print_string "\nFATAL ERROR" ;
+               let error =
+                 match where with
+                 | None ->
+                     "encountered a configuration error"
+                 | Some where ->
+                     sprintf "encountered a configuration error %s" where
+               in
+               let message =
+                 coda_crash_message ~error ~action:("\n" ^ message)
+                   ~log_issue:false
+               in
+               Core.print_string message ; Deferred.unit
            | exn ->
-               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
+               handle_crash exn ~time_controller ~conf_dir ~child_pids
+                 ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(
