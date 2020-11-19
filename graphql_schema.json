@@ -3071,10 +3071,11 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetConnectionGatingConfigPayload",
-                  "ofType": null}
-                },
-                "isDeprecated": false,
-                "deprecationReason": null
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
               "name": "addPeers",
@@ -6201,7 +6202,7 @@
               "deprecationReason": null
             },
             {
-              "name": "slot",
+              "name": "slot since genesis",
               "description": "Slot since genesis (across all hard-forks)",
               "args": [],
               "type": {
