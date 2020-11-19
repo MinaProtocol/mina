@@ -5,9 +5,9 @@ use algebra::tweedle::{
 
 use oracle::{
     self,
-    FqSponge,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    FqSponge,
 };
 
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
