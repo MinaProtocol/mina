@@ -311,7 +311,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -345,7 +345,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -491,7 +491,8 @@ let main () =
       ~transport:
         (Transport.File_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
-           ~max_size:(500 * 1024 * 1024))) ;
+           ~max_size:(500 * 1024 * 1024)
+           ~num_rotate:1)) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()

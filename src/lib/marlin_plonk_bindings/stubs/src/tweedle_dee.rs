@@ -1,4 +1,3 @@
-use crate::caml_vector;
 use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
@@ -128,61 +127,17 @@ impl From<CamlTweedleDeeAffine<CamlTweedleFqPtr>> for GAffine {
     }
 }
 
-pub struct CamlTweedleDeeAffineVector(pub Vec<GAffine>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDeeAffineVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_value_array::<CamlTweedleDeeAffine<CamlTweedleFqPtr>, _>(
-            ocaml::FromValue::from_value(value),
-        );
-        CamlTweedleDeeAffineVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDeeAffineVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array::<CamlTweedleDeeAffine<CamlTweedleFq>, _>(self.0).to_value()
-    }
-}
-
-pub struct CamlTweedleDeeAffinePairVector(pub Vec<(GAffine, GAffine)>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDeeAffinePairVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_array_(ocaml::FromValue::from_value(value), |value| {
-            let (x1, x2): (
-                CamlTweedleDeeAffine<CamlTweedleFqPtr>,
-                CamlTweedleDeeAffine<CamlTweedleFqPtr>,
-            ) = ocaml::FromValue::from_value(value);
-            (x1.into(), x2.into())
-        });
-        CamlTweedleDeeAffinePairVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDeeAffinePairVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array_(self.0, |x| {
-            let (x1, x2) = x;
-            let x1: CamlTweedleDeeAffine<CamlTweedleFq> = x1.into();
-            let x2: CamlTweedleDeeAffine<CamlTweedleFq> = x2.into();
-            ocaml::ToValue::to_value((x1, x2))
-        })
-        .to_value()
-    }
-}
-
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDeePolyComm<T> {
     shifted: Option<CamlTweedleDeeAffine<T>>,
-    unshifted: CamlTweedleDeeAffineVector,
+    unshifted: Vec<CamlTweedleDeeAffine<CamlTweedleFq>>,
 }
 
 impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<CamlTweedleFq> {
     fn from(c: PolyComm<GAffine>) -> Self {
         CamlTweedleDeePolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: CamlTweedleDeeAffineVector(c.unshifted),
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
     }
 }
@@ -191,7 +146,7 @@ impl From<CamlTweedleDeePolyComm<CamlTweedleFq>> for PolyComm<GAffine> {
     fn from(c: CamlTweedleDeePolyComm<CamlTweedleFq>) -> Self {
         PolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.0,
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
     }
 }
@@ -200,24 +155,7 @@ impl From<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> for PolyComm<GAffine> {
     fn from(c: CamlTweedleDeePolyComm<CamlTweedleFqPtr>) -> Self {
         PolyComm {
             shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.0,
+            unshifted: c.unshifted.into_iter().map(From::from).collect(),
         }
-    }
-}
-
-pub struct CamlTweedleDeePolyCommVector(pub Vec<PolyComm<GAffine>>);
-
-unsafe impl ocaml::FromValue for CamlTweedleDeePolyCommVector {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec = caml_vector::from_value_array::<CamlTweedleDeePolyComm<CamlTweedleFqPtr>, _>(
-            ocaml::FromValue::from_value(value),
-        );
-        CamlTweedleDeePolyCommVector(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleDeePolyCommVector {
-    fn to_value(self: Self) -> ocaml::Value {
-        caml_vector::to_array::<CamlTweedleDeePolyComm<CamlTweedleFq>, _>(self.0).to_value()
     }
 }

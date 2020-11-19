@@ -411,13 +411,17 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
+  let valid_until =
+    Option.map cmd.valid_until ~f:(fun slot ->
+        Coda_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+  in
   let payload =
     Signed_command_payload.create
       ~fee:(Currency.Fee.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee)
       ~fee_token:(Token_id.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee_token)
       ~fee_payer_pk
       ~nonce:(Unsigned.UInt32.of_int64 cmd.nonce)
-      ~valid_until:None ~memo ~body
+      ~valid_until ~memo ~body
   in
   (* when applying the transaction, there's a check that the fee payer and
      signer keys are the same; since this transaction was accepted, we know

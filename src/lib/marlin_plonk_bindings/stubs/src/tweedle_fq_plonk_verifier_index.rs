@@ -13,7 +13,7 @@ use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fq::
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use commitment_dlog::srs::SRS;
-use plonk_circuits::constraints::ConstraintSystem;
+use plonk_circuits::constraints::{zk_w, zk_polynomial, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
@@ -146,8 +146,11 @@ pub fn of_ocaml<'a>(
         SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
     };
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let domain = Domain::<Fq>::new(1 << log_size_of_group).unwrap();
     let index = DlogVerifierIndex::<GAffine> {
-        domain: Domain::<Fq>::new(1 << log_size_of_group).unwrap(),
+        domain,
+        w: zk_w(domain),
+        zkpm: zk_polynomial(domain),
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
@@ -286,7 +289,14 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
     evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<CamlTweedleFpPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFqPtr>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(max_poly_size, max_quot_size, log_size_of_group, urs, evals, shifts)
+    of_ocaml(
+        max_poly_size,
+        max_quot_size,
+        log_size_of_group,
+        urs,
+        evals,
+        shifts,
+    )
 }
 
 #[ocaml::func]

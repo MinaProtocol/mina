@@ -2859,7 +2859,7 @@ module Hooks = struct
                   [%log faulty_peer_without_punishment]
                     ~metadata:
                       [ ("peer", Network_peer.Peer.to_yojson peer)
-                      ; ("error", `String (Error.to_string_hum e)) ]
+                      ; ("error", Error_json.error_to_yojson e) ]
                     "Peer $peer failed to serve requested epoch ledger: $error" ;
                   return false )
             | Connected {data= Ok (Error err); _} ->
@@ -2881,7 +2881,7 @@ module Hooks = struct
                 [%log faulty_peer_without_punishment]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", `String (Error.to_string_hum err)) ]
+                    ; ("error", Error_json.error_to_yojson err) ]
                   "Failed to connect to $peer to retrieve epoch ledger: $error" ;
                 return false )
     in
