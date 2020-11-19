@@ -206,7 +206,7 @@ let uploadUserProfileData = spreadsheetId => {
     | Ok(mainResult) =>
       let mainData = mainResult |> decodeGoogleSheets;
       let data = computeMemberProfileData(mainData);
-      Js.log(data);
+
       updateRange(
         client,
         initSheetsUpdate(
