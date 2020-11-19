@@ -14,7 +14,7 @@ module Raw = struct
     = "caml_tweedle_fq_plonk_verifier_index_raw_create"
 
   external read :
-    Marlin_plonk_bindings_tweedle_fq_urs.t -> string -> t
+    ?offset:int -> Marlin_plonk_bindings_tweedle_fq_urs.t -> string -> t
     = "caml_tweedle_fq_plonk_verifier_index_raw_read"
 
   external write :
@@ -37,7 +37,7 @@ external create :
   = "caml_tweedle_fq_plonk_verifier_index_create"
 
 external read :
-  Marlin_plonk_bindings_tweedle_fq_urs.t -> string -> t
+  ?offset:int -> Marlin_plonk_bindings_tweedle_fq_urs.t -> string -> t
   = "caml_tweedle_fq_plonk_verifier_index_read"
 
 external write :
