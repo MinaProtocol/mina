@@ -44,4 +44,6 @@ external read :
   ?offset:int -> Marlin_plonk_bindings_tweedle_fq_urs.t -> string -> t
   = "caml_tweedle_fq_plonk_index_read"
 
-external write : t -> string -> unit = "caml_tweedle_fq_plonk_index_write"
+external write :
+  ?append:bool -> t -> string -> unit
+  = "caml_tweedle_fq_plonk_index_write"

@@ -17,7 +17,7 @@ use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
@@ -256,8 +256,12 @@ pub fn caml_tweedle_fp_plonk_verifier_index_read(
     Ok(to_ocaml(&t.1, t.0))
 }
 
-pub fn write_raw(index: &DlogVerifierIndex<GAffine>, path: String) -> Result<(), ocaml::Error> {
-    match File::create(path) {
+pub fn write_raw(
+    append: Option<bool>,
+    index: &DlogVerifierIndex<GAffine>,
+    path: String,
+) -> Result<(), ocaml::Error> {
+    match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument(
             "caml_tweedle_fp_plonk_verifier_index_raw_read",
         )
@@ -275,18 +279,24 @@ pub fn write_raw(index: &DlogVerifierIndex<GAffine>, path: String) -> Result<(),
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_raw_write(
+    append: Option<bool>,
     index: CamlTweedleFpPlonkVerifierIndexRawPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(&index.as_ref().0, path)
+    write_raw(append, &index.as_ref().0, path)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_write(
+    append: Option<bool>,
     index: CamlTweedleFpPlonkVerifierIndexPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(&CamlTweedleFpPlonkVerifierIndexRaw::from(index).0, path)
+    write_raw(
+        append,
+        &CamlTweedleFpPlonkVerifierIndexRaw::from(index).0,
+        path,
+    )
 }
 
 #[ocaml::func]
