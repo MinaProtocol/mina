@@ -236,7 +236,7 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  ${MINA_REPO} ${HOME}/${MINA_DIR}
+  ${MINA_REPO:-https://github.com/MinaProtocol/mina} ${HOME}/${MINA_DIR}
 
 WORKDIR $HOME/${MINA_DIR}
 
