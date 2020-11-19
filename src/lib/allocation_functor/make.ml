@@ -3,6 +3,8 @@ open Core_kernel
 module Partial = struct
   module Bin_io (M : Intf.Input.Bin_io_intf) :
     Intf.Partial.Bin_io_intf with type t := M.t = struct
+    open Bin_prot.Type_class
+
     let bin_size_t = M.bin_size_t
 
     let bin_write_t = M.bin_write_t
@@ -17,10 +19,9 @@ module Partial = struct
 
     let bin_writer_t = M.bin_writer_t
 
-    (* TODO: does these last two need wrapped as well? *)
-    let bin_reader_t = M.bin_reader_t
+    let bin_reader_t = {read= bin_read_t; vtag_read= __bin_read_t__}
 
-    let bin_t = M.bin_t
+    let bin_t = {shape= bin_shape_t; writer= bin_writer_t; reader= bin_reader_t}
   end
 
   module Sexp (M : Intf.Input.Sexp_intf) :

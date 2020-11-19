@@ -82,7 +82,6 @@ module Input = struct
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          (* TODO: bug *)
           type t
 
           include Higher_order_creatable_intf with type t := t
