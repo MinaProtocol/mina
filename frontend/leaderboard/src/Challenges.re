@@ -140,11 +140,10 @@ let createAndSendTokenChallenge = metricsMap => {
 
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
-  | "stake your coda and produce blocks" => Some(blocksChallenge(metricsMap))
-  | "send coda tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
-  | "connect to testnet and send coda to the echo service" =>
+  | "stake your mina and produce blocks" => Some(blocksChallenge(metricsMap))
+  | "send mina tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
+  | "connect to testnet and send mina to the echo service" =>
     Some(echoServiceChallenge(metricsMap))
-  | "tokens on coda" => Some(createAndSendTokenChallenge(metricsMap))
   | _ => None
   };
 };
