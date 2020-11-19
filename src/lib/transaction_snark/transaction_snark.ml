@@ -3485,6 +3485,8 @@ end
 
 let%test_module "transaction_snark" =
   ( module struct
+    let () = Backtrace.elide := false
+
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
@@ -5753,6 +5755,8 @@ let%test_module "account timing check" =
     open Coda_numbers
     open Currency
     open Transaction_validator.For_tests
+
+    let () = Backtrace.elide := false
 
     (* test that unchecked and checked calculations for timing agree *)
 

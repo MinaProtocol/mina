@@ -900,6 +900,8 @@ module Proof0 = Proof
 
 let%test_module "test no side-loaded" =
   ( module struct
+    let () = Backtrace.elide := false
+
     let () =
       Tock.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
@@ -981,6 +983,8 @@ let%test_module "test no side-loaded" =
 (*
 let%test_module "test" =
   ( module struct
+    let () = Backtrace.elide := false
+
     let () =
       Tock.Keypair.set_urs_info
         [On_disk {directory= "/tmp/"; should_write= true}]
