@@ -2472,7 +2472,7 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.curr_global_slot; _} ->
                 Global_slot.slot curr_global_slot )
-          ; field "slot since genesis"
+          ; field "slotSinceGenesis"
               ~doc:"Slot since genesis (across all hard-forks)"
               ~typ:(non_null uint32)
               ~args:Arg.[]

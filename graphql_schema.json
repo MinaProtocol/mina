@@ -6202,7 +6202,7 @@
               "deprecationReason": null
             },
             {
-              "name": "slot since genesis",
+              "name": "slotSinceGenesis",
               "description": "Slot since genesis (across all hard-forks)",
               "args": [],
               "type": {
