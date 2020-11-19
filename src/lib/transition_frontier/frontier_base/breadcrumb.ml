@@ -39,7 +39,7 @@ end
 [%%define_locally
 T.(validated_transition, staged_ledger, just_emitted_a_proof, to_yojson)]
 
-include Allocation_functor.Functor.Sexp (T)
+include Allocation_functor.Make.Sexp (T)
 
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values
     ~verifier ~trust_system ~parent

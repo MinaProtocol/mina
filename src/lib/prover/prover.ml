@@ -71,12 +71,13 @@ module Worker_state = struct
         let bs = Protocol_state.blockchain_state in
         let lh x = Blockchain_state.snarked_ledger_hash (bs x) in
         let tok x = Blockchain_state.snarked_next_available_token (bs x) in
-        ( { source= lh chain.state
+        let chain_state = Blockchain_snark.Blockchain.state chain in
+        ( { source= lh chain_state
           ; target= lh next_state
           ; supply_increase= Currency.Amount.zero
           ; fee_excess= Fee_excess.zero
           ; sok_digest= Sok_message.Digest.default
-          ; next_available_token_before= tok chain.state
+          ; next_available_token_before= tok chain_state
           ; next_available_token_after= tok next_state
           ; pending_coinbase_stack_state=
               { source= Pending_coinbase.Stack.empty
@@ -116,11 +117,16 @@ module Worker_state = struct
                              (Consensus.Data.Prover_state.handler
                                 ~constraint_constants state_for_handler
                                 ~pending_coinbase)
-                           {transition= block; prev_state= chain.state}
-                           [(chain.state, chain.proof); t]
+                           { transition= block
+                           ; prev_state=
+                               Blockchain_snark.Blockchain.state chain }
+                           [ ( Blockchain_snark.Blockchain.state chain
+                             , Blockchain_snark.Blockchain.proof chain )
+                           ; t ]
                            next_state
                        in
-                       {Blockchain.state= next_state; proof} )
+                       Blockchain_snark.Blockchain.create ~state:next_state
+                         ~proof )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -143,15 +149,16 @@ module Worker_state = struct
                  let res =
                    Blockchain_snark.Blockchain_snark_state.check ~proof_level
                      ~constraint_constants
-                     {transition= block; prev_state= chain.state}
+                     { transition= block
+                     ; prev_state= Blockchain_snark.Blockchain.state chain }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
                           ~constraint_constants ~pending_coinbase)
                      t
                      (Protocol_state.hash next_state)
                    |> Or_error.map ~f:(fun () ->
-                          { Blockchain.state= next_state
-                          ; proof= Precomputed_values.compiled_base_proof } )
+                          Blockchain_snark.Blockchain.create ~state:next_state
+                            ~proof:Precomputed_values.compiled_base_proof )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -169,8 +176,8 @@ module Worker_state = struct
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
                  Ok
-                   { Blockchain.proof= Coda_base.Proof.blockchain_dummy
-                   ; state= next_state }
+                   (Blockchain_snark.Blockchain.create
+                      ~proof:Coda_base.Proof.blockchain_dummy ~state:next_state)
 
                let verify _ _ = true
              end
@@ -207,10 +214,12 @@ module Functions = struct
         |> Deferred.return )
 
   let verify_blockchain =
-    create Blockchain.Stable.Latest.bin_t bin_bool
-      (fun w {Blockchain.state; proof} ->
+    create Blockchain.Stable.Latest.bin_t bin_bool (fun w chain ->
         let (module W) = Worker_state.get w in
-        W.verify state proof |> Deferred.return )
+        W.verify
+          (Blockchain_snark.Blockchain.state chain)
+          (Blockchain_snark.Blockchain.proof chain)
+        |> Deferred.return )
 end
 
 module Worker = struct
@@ -362,7 +371,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
   let open Deferred.Or_error.Let_syntax in
   let start_time = Core.Time.now () in
-  let%map {Blockchain.proof; _} =
+  let%map chain =
     extend_blockchain t
       (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
       next_state
@@ -374,4 +383,4 @@ let prove t ~prev_state ~prev_state_proof ~next_state
   Coda_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
-  proof
+  Blockchain_snark.Blockchain.proof chain

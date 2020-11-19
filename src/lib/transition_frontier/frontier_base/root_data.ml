@@ -76,8 +76,7 @@ module Limited = struct
 
       let to_yojson {transition; protocol_states= _; common} =
         `Assoc
-          [ ( "transition"
-            , External_transition.Validated.Stable.V1.to_yojson transition )
+          [ ("transition", External_transition.Validated.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
           ; ("common", Common.Stable.V1.to_yojson common) ]
 
