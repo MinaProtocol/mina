@@ -168,17 +168,19 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ~sok_digest:Sok_message.Digest.default
-                ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~init_stack:coinbase_stack_source ~next_available_token_before
-                ~next_available_token_after
-                ~pending_coinbase_stack_state:
-                  {source= coinbase_stack_source; target= coinbase_stack_target}
-                ~snapp_account1:None ~snapp_account2:None
-                { Transaction_protocol_state.Poly.transaction= t
-                ; block_data= Lazy.force state_body }
-                (unstage (Sparse_ledger.handler sparse_ledger)) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  T.of_transaction ~sok_digest:Sok_message.Digest.default
+                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
+                    ~init_stack:coinbase_stack_source
+                    ~next_available_token_before ~next_available_token_after
+                    ~pending_coinbase_stack_state:
+                      { source= coinbase_stack_source
+                      ; target= coinbase_stack_target }
+                    ~snapp_account1:None ~snapp_account2:None
+                    { Transaction_protocol_state.Poly.transaction= t
+                    ; block_data= Lazy.force state_body }
+                    (unstage (Sparse_ledger.handler sparse_ledger)) ) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
         , proof ) )
@@ -193,7 +195,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
             ~f:(fun max_time (x, y) ->
               let pair_time, proof =
                 time (fun () ->
-                    T.merge ~sok_digest:Sok_message.Digest.default x y
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        T.merge ~sok_digest:Sok_message.Digest.default x y )
                     |> Or_error.ok_exn )
               in
               (Time.Span.max max_time pair_time, proof) )
