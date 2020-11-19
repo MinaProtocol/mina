@@ -2098,6 +2098,8 @@ module Data = struct
         | None ->
             (Length.zero, Coda_numbers.Global_slot.zero)
         | Some {previous_length; previous_global_slot; _} ->
+            (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
+            For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
             (previous_length, previous_global_slot)
       in
       let default_epoch_data =
@@ -3493,7 +3495,7 @@ let%test_module "Proof of stake tests" =
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
-    let%test_unit "update, update_var agree starting from same genesis state" =
+    let test_update constraint_constants =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
@@ -3506,6 +3508,20 @@ let%test_module "Proof of stake tests" =
           ~genesis_ledger:Genesis_ledger.t ~genesis_epoch_data
           ~constraint_constants ~constants
       in
+      (*If this is a fork then check blockchain length and global_slot_since_genesis have been set correctly*)
+      ( match constraint_constants.fork with
+      | None ->
+          ()
+      | Some fork ->
+          assert (
+            Coda_numbers.Global_slot.(
+              equal fork.previous_global_slot
+                previous_consensus_state.global_slot_since_genesis) ) ;
+          assert (
+            Coda_numbers.Length.(
+              equal
+                (succ fork.previous_length)
+                previous_consensus_state.blockchain_length) ) ) ;
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time
         |> Epoch_and_slot.of_time_exn ~constants
@@ -3558,6 +3574,26 @@ let%test_module "Proof of stake tests" =
           ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
         |> Or_error.ok_exn
       in
+      (*If this is a fork then check blockchain length and global_slot_since_genesis have increased correctly*)
+      ( match constraint_constants.fork with
+      | None ->
+          ()
+      | Some fork ->
+          let slot_diff =
+            Option.value_exn
+              Global_slot.(
+                global_slot - previous_consensus_state.curr_global_slot)
+          in
+          assert (
+            Coda_numbers.Global_slot.(
+              equal
+                (add fork.previous_global_slot slot_diff)
+                next_consensus_state.global_slot_since_genesis) ) ;
+          assert (
+            Coda_numbers.Length.(
+              equal
+                (succ (succ fork.previous_length))
+                next_consensus_state.blockchain_length) ) ) ;
       (* build pieces needed to apply "update_var" *)
       let checked_computation =
         let open Snark_params.Tick in
@@ -3632,6 +3668,26 @@ let%test_module "Proof of stake tests" =
                   ~collapse_threshold:1000 ())
              diff) ;
         failwith "Test failed" )
+
+    let%test_unit "update, update_var agree starting from same genesis state" =
+      test_update constraint_constants
+
+    let%test_unit "update, update_var agree starting from same genesis state \
+                   after fork" =
+      let constraint_constants_with_fork =
+        let fork_constants =
+          Some
+            { Genesis_constants.Fork_constants.previous_state_hash=
+                Result.ok_or_failwith
+                  (State_hash.of_yojson
+                     (`String
+                       "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"))
+            ; previous_length= Coda_numbers.Length.of_int 100
+            ; previous_global_slot= Coda_numbers.Global_slot.of_int 200 }
+        in
+        {constraint_constants with fork= fork_constants}
+      in
+      test_update constraint_constants_with_fork
 
     let%test_unit "vrf win rate" =
       let constants = Lazy.force Constants.for_unit_tests in
