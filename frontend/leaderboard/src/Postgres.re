@@ -34,7 +34,9 @@ LEFT JOIN public_keys AS pk3 ON uc.fee_payer_id = pk3.id
 LEFT JOIN public_keys AS pk4 ON uc.source_id = pk4.id
 LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id
 
-WHERE height >= 335";
+WHERE height >= 110";
+
+let getBlockHeight = "SELECT * FROM blocks";
 
 let createPool = pgConn => {
   makePool({connectionString: pgConn, connectionTimeoutMillis: 5000});
