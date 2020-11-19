@@ -1021,11 +1021,11 @@ module Genesis_proof = struct
                   ; ("error", Error_json.error_to_yojson err) ] ;
               None )
       | None ->
-          None
+          return None
     in
     match found_proof with
     | Some found_proof ->
-        Ok found_proof
+        return (Ok found_proof)
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
         let compiled = Lazy.force compiled in
