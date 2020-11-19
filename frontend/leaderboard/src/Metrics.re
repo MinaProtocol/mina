@@ -236,7 +236,7 @@ let calculateAllUsers = metrics => {
 };
 
 let echoBotPublicKeys = [
-  "B62qk5jqp4nYPwDDdd9XJAV8bYQ5cSzaZ9Me7ccaMdSSJpqKasDqMx9",
+  "B62qndJi5mnRoBZ8SAYDM1oR2SgAk5WpZC8hGpJUZ4e64kDHGbFMeLJ",
 ];
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
