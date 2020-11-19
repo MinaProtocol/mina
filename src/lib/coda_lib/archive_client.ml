@@ -31,7 +31,7 @@ let transfer ~logger ~archive_location
           | Error e ->
               [%log warn]
                 ~metadata:
-                  [ ("error", `String (Error.to_string_hum e))
+                  [ ("error", Error_json.error_to_yojson e)
                   ; ( "breadcrumb"
                     , Transition_frontier.Breadcrumb.to_yojson breadcrumb ) ]
                 "Could not send breadcrumb to archive: $error" ) )

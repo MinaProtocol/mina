@@ -351,7 +351,7 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N2.n * unit)
        , Protocol_state.Value.t
-       , Proof.t )
+       , Proof.t Async.Deferred.t )
        Pickles.Prover.t
 end
 

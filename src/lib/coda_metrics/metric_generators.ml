@@ -76,16 +76,12 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
     tick ()
 end
 
-module Moving_time_average (Spec : sig
-  include Time_average_spec_intf
-
-  val render_time_average : Core.Time.Span.t -> float
-end)
-() : Moving_average_metric_intf with type datum := Core.Time.Span.t = struct
+module Moving_time_average (Spec : Time_average_spec_intf) () :
+  Moving_average_metric_intf with type datum := Core.Time.Span.t = struct
   open Spec
-  open Time.Span
 
   let () =
+    let open Time.Span in
     let ( = ) = Float.equal in
     let ( mod ) = Float.mod_float in
     if not (to_ns rolling_interval mod to_ns tick_interval = 0.0) then
@@ -99,26 +95,19 @@ end)
               let bucket_interval = tick_interval
 
               let num_buckets =
-                Float.to_int (to_ns rolling_interval /. to_ns tick_interval)
+                Float.to_int
+                  ( Time.Span.to_ns rolling_interval
+                  /. Time.Span.to_ns tick_interval )
 
               let render_average buckets =
-                let sum =
-                  List.fold buckets ~init:0.0 ~f:(fun sum (bucket_total, _) ->
-                      sum +. bucket_total )
+                let total_sum, count_sum =
+                  List.fold buckets ~init:(0.0, 0)
+                    ~f:(fun (total_sum, count_sum) (total, count) ->
+                      (total_sum +. total, count_sum + count) )
                 in
-                render_time_average (Core.Time.Span.of_ns sum)
+                total_sum /. Float.of_int count_sum
             end)
             ()
 
-  let update span = update (Core.Time.Span.to_ns span)
+  let update span = update (Core.Time.Span.to_sec span)
 end
-
-module Moving_time_sec_average (Spec : Time_average_spec_intf) () :
-  Moving_average_metric_intf with type datum := Core.Time.Span.t =
-  Moving_time_average (struct
-      include Spec
-
-      let render_time_average span =
-        Core.Time.Span.(to_sec span /. to_sec rolling_interval)
-    end)
-    ()

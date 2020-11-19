@@ -466,12 +466,12 @@ module Ledger = struct
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
-        [%log info] "Found $ledger file at $path"
+        [%log trace] "Found $ledger file at $path"
           ~metadata:
             [("ledger", `String ledger_name_prefix); ("path", `String filename)] ;
         Some filename )
       else (
-        [%log info] "Ledger file $path does not exist"
+        [%log trace] "Ledger file $path does not exist"
           ~metadata:[("path", `String filename)] ;
         None )
     in
@@ -481,12 +481,10 @@ module Ledger = struct
       match%bind Cache_dir.load_from_s3 [s3_path] [local_path] ~logger with
       | Ok () ->
           file_exists filename Cache_dir.s3_install_path
-      | Error e ->
-          [%log info] "Could not download $ledger from $uri: $error"
+      | Error _ ->
+          [%log trace] "Could not download $ledger from $uri"
             ~metadata:
-              [ ("ledger", `String ledger_name_prefix)
-              ; ("uri", `String s3_path)
-              ; ("error", `String (Error.to_string_hum e)) ] ;
+              [("ledger", `String ledger_name_prefix); ("uri", `String s3_path)] ;
           return None
     in
     let%bind hash_filename =
@@ -540,7 +538,7 @@ module Ledger = struct
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?accounts ~ledger_name_prefix filename =
-    [%log info] "Loading $ledger from $path"
+    [%log trace] "Loading $ledger from $path"
       ~metadata:
         [("ledger", `String ledger_name_prefix); ("path", `String filename)] ;
     let dirname = Uuid.to_string (Uuid_unix.create ()) in
@@ -581,7 +579,7 @@ module Ledger = struct
     let tar_path =
       genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
     in
-    [%log info]
+    [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix)
@@ -633,13 +631,13 @@ module Ledger = struct
       | Named name -> (
         match Genesis_ledger.fetch_ledger name with
         | Some (module M) ->
-            [%log info] "Found $ledger with name $ledger_name"
+            [%log trace] "Found $ledger with name $ledger_name"
               ~metadata:
                 [ ("ledger", `String ledger_name_prefix)
                 ; ("ledger_name", `String name) ] ;
             Some (Lazy.map ~f:add_genesis_winner_account M.accounts)
         | None ->
-            [%log warn] "Could not find a built-in $ledger named $ledger_name"
+            [%log trace] "Could not find a built-in $ledger named $ledger_name"
               ~metadata:
                 [ ("ledger", `String ledger_name_prefix)
                 ; ("ledger_name", `String name) ] ;
@@ -691,7 +689,7 @@ module Ledger = struct
                 [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
                     [ ("path", `String tar_path)
-                    ; ("error", `String (Error.to_string_hum err)) ] ;
+                    ; ("error", Error_json.error_to_yojson err) ] ;
                 Error err )
         | None -> (
           match padded_accounts_opt with
@@ -762,7 +760,7 @@ module Ledger = struct
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
-                  [%log info]
+                  [%log trace]
                     "Linking ledger file $tar_path to $named_tar_path"
                     ~metadata:
                       [ ("tar_path", `String tar_path)
@@ -782,7 +780,7 @@ module Ledger = struct
                     ~metadata:
                       [ ("ledger", `String ledger_name_prefix)
                       ; ("path", `String tar_path)
-                      ; ("error", `String (Error.to_string_hum err)) ] ;
+                      ; ("error", Error_json.error_to_yojson err) ] ;
                   return (Error err) ) ) )
 end
 
@@ -803,7 +801,7 @@ module Epoch_data = struct
           let%map staking_ledger, config', ledger_file =
             load_ledger config.staking.ledger
           in
-          [%log info] "Loaded staking epoch ledger from $ledger_file"
+          [%log trace] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[("ledger_file", `String ledger_file)] ;
           ( { Consensus.Genesis_epoch_data.Data.ledger=
                 Genesis_ledger.Packed.t staking_ledger
@@ -813,7 +811,7 @@ module Epoch_data = struct
         let%map next, config'' =
           match config.next with
           | None ->
-              [%log info]
+              [%log trace]
                 "Configured next epoch ledger to be the same as the staking \
                  epoch ledger" ;
               Deferred.Or_error.return (None, None)
@@ -821,7 +819,7 @@ module Epoch_data = struct
               let%map next_ledger, config'', ledger_file =
                 load_ledger ledger
               in
-              [%log info] "Loaded next epoch ledger from $ledger_file"
+              [%log trace] "Loaded next epoch ledger from $ledger_file"
                 ~metadata:[("ledger_file", `String ledger_file)] ;
               ( Some
                   { Consensus.Genesis_epoch_data.Data.ledger=
@@ -890,7 +888,7 @@ module Genesis_proof = struct
               "Could not download genesis proof file from $uri: $error"
               ~metadata:
                 [ ("uri", `String s3_path)
-                ; ("error", `String (Error.to_string_hum e)) ] ;
+                ; ("error", Error_json.error_to_yojson e) ] ;
             return None )
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
@@ -949,15 +947,16 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
-        { Genesis_proof.runtime_config= inputs.runtime_config
-        ; constraint_constants= inputs.constraint_constants
-        ; proof_level= inputs.proof_level
-        ; genesis_constants= inputs.genesis_constants
-        ; genesis_ledger= inputs.genesis_ledger
-        ; genesis_epoch_data= inputs.genesis_epoch_data
-        ; consensus_constants= inputs.consensus_constants
-        ; protocol_state_with_hash= inputs.protocol_state_with_hash
-        ; genesis_proof= Coda_base.Proof.blockchain_dummy }
+        Deferred.return
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
+          ; genesis_constants= inputs.genesis_constants
+          ; genesis_ledger= inputs.genesis_ledger
+          ; genesis_epoch_data= inputs.genesis_epoch_data
+          ; consensus_constants= inputs.consensus_constants
+          ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; genesis_proof= Coda_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -1018,7 +1017,7 @@ module Genesis_proof = struct
             [%log error] "Could not load genesis proof from $path: $error"
               ~metadata:
                 [ ("path", `String file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             Error err )
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
@@ -1052,7 +1051,7 @@ module Genesis_proof = struct
                  $error"
                 ~metadata:
                   [ ("path", `String filename)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
         in
         Ok (values, filename)
     | None when may_generate ->
@@ -1060,7 +1059,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        let values = generate b inputs in
+        let%bind values = generate b inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -1071,7 +1070,7 @@ module Genesis_proof = struct
               [%log warn] "Genesis proof could not be written to $path: $error"
                 ~metadata:
                   [ ("path", `String filename)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
         in
         Ok (values, filename)
     | None ->
@@ -1391,9 +1390,12 @@ let upgrade_old_config ~logger filename json =
           `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
         in
         let%map () =
-          Writer.with_file filename ~f:(fun w ->
-              Deferred.return
-              @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) )
+          Deferred.Or_error.try_with (fun () ->
+              Writer.with_file filename ~f:(fun w ->
+                  Deferred.return
+                  @@ Writer.write w
+                       (Yojson.Safe.pretty_to_string upgraded_json) ) )
+          |> Deferred.ignore_m
         in
         upgraded_json )
   | _ ->

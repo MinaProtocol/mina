@@ -47,7 +47,7 @@ module Worker_state = struct
       -> Ledger_proof.t option
       -> Consensus.Data.Prover_state.t
       -> Pending_coinbase_witness.t
-      -> Blockchain.t Or_error.t
+      -> Blockchain.t Async.Deferred.Or_error.t
 
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
@@ -107,10 +107,10 @@ module Worker_state = struct
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
                    state_for_handler pending_coinbase =
-                 let res =
-                   Or_error.try_with (fun () ->
+                 let%map.Async res =
+                   Deferred.Or_error.try_with (fun () ->
                        let t = ledger_proof_opt chain next_state t in
-                       let proof =
+                       let%map.Async proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler
@@ -124,7 +124,7 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", `String (Error.to_string_hum e))]
+                       ~metadata:[("error", Error_json.error_to_yojson e)]
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
@@ -155,9 +155,9 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", `String (Error.to_string_hum e))]
+                       ~metadata:[("error", Error_json.error_to_yojson e)]
                        "Prover threw an error while extending block: $error" ) ;
-                 res
+                 Async.Deferred.return res
 
                let verify _state _proof = true
              end
@@ -168,9 +168,10 @@ module Worker_state = struct
 
                let extend_blockchain _chain next_state _block _ledger_proof
                    _state_for_handler _pending_coinbase =
-                 Ok
-                   { Blockchain.proof= Coda_base.Proof.blockchain_dummy
-                   ; state= next_state }
+                 Deferred.return
+                 @@ Ok
+                      { Blockchain.proof= Coda_base.Proof.blockchain_dummy
+                      ; state= next_state }
 
                let verify _ _ = true
              end
@@ -203,8 +204,7 @@ module Functions = struct
       ->
         let (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state block ledger_proof prover_state
-          pending_coinbase
-        |> Deferred.return )
+          pending_coinbase )
 
   let verify_blockchain =
     create Blockchain.Stable.Latest.bin_t bin_bool
@@ -251,11 +251,12 @@ module Worker = struct
       let init_worker_state
           Worker_state.{conf_dir; logger; proof_level; constraint_constants} =
         let max_size = 256 * 1024 * 512 in
+        let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"coda-prover.log" ~max_size) ;
+               ~log_filename:"coda-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create
           {conf_dir; logger; proof_level; constraint_constants}
@@ -273,7 +274,7 @@ type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
     [%log error] "Prover process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let%map connection, process =
@@ -321,7 +322,7 @@ let prove_from_input_sexp {connection; logger; _} sexp =
       true
   | Error e ->
       [%log error] "prover errored :("
-        ~metadata:[("error", `String (Error.to_string_hum e))] ;
+        ~metadata:[("error", Error_json.error_to_yojson e)] ;
       false
 
 let extend_blockchain {connection; logger; _} chain next_state block
@@ -353,7 +354,7 @@ let extend_blockchain {connection; logger; _} chain next_state block
                    (Binable.to_string
                       (module Extend_blockchain_input.Stable.Latest)
                       input)) )
-          ; ("error", `String (Error.to_string_hum e)) ]
+          ; ("error", Error_json.error_to_yojson e) ]
         "Prover failed: $error" ;
       Error e
 

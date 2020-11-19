@@ -115,9 +115,8 @@ let max_domains_with_x =
   let x =
     Plonk_checks.Domain.Pow_2_roots_of_unity
       (Int.ceil_log2
-         ( 1
-         + input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-             (Nat.to_int Width.Max.n) ))
+         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
+            (Nat.to_int Width.Max.n)))
   in
   {Ds.h= conv max_domains.h; x}
 
@@ -146,7 +145,9 @@ include Make
                 Impls.Wrap.Verification_key.t =
               let d = Common.wrap_domains.h in
               let log2_size = Import.Domain.log2_size d in
-              let max_quot_size = (5 * (Import.Domain.size d + 2)) - 5 in
+              let max_quot_size =
+                Common.max_quot_size_int (Import.Domain.size d)
+              in
               { domain=
                   { log_size_of_group= log2_size
                   ; group_gen= Backend.Tock.Field.domain_generator log2_size }
