@@ -271,6 +271,9 @@ module Make (Inputs : Inputs_intf) = struct
     of_backend res
 
   let create_async ?message pk ~primary ~auxiliary =
+    (* The backtraces from here are valuable in tests, don't elide them. *)
+    let old_elide = !Backtrace.elide in
+    Backtrace.elide := false ;
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -287,6 +290,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%map.Async res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
+    Backtrace.elide := old_elide ;
     of_backend res
 
   let batch_verify' (conv : 'a -> Fq.t array)
