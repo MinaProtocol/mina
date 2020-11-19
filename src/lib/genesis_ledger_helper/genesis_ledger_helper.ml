@@ -947,15 +947,16 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
-        { Genesis_proof.runtime_config= inputs.runtime_config
-        ; constraint_constants= inputs.constraint_constants
-        ; proof_level= inputs.proof_level
-        ; genesis_constants= inputs.genesis_constants
-        ; genesis_ledger= inputs.genesis_ledger
-        ; genesis_epoch_data= inputs.genesis_epoch_data
-        ; consensus_constants= inputs.consensus_constants
-        ; protocol_state_with_hash= inputs.protocol_state_with_hash
-        ; genesis_proof= Coda_base.Proof.blockchain_dummy }
+        Deferred.return
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
+          ; genesis_constants= inputs.genesis_constants
+          ; genesis_ledger= inputs.genesis_ledger
+          ; genesis_epoch_data= inputs.genesis_epoch_data
+          ; consensus_constants= inputs.consensus_constants
+          ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; genesis_proof= Coda_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -1058,7 +1059,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        let values = generate b inputs in
+        let%bind values = generate b inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with

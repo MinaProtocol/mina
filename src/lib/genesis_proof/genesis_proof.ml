@@ -133,6 +133,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     t.protocol_state_with_hash.data
 
 let create_values b (t : Inputs.t) =
+  let%map.Async genesis_proof = base_proof b t in
   { runtime_config= t.runtime_config
   ; constraint_constants= t.constraint_constants
   ; proof_level= t.proof_level
@@ -141,4 +142,4 @@ let create_values b (t : Inputs.t) =
   ; genesis_epoch_data= t.genesis_epoch_data
   ; consensus_constants= t.consensus_constants
   ; protocol_state_with_hash= t.protocol_state_with_hash
-  ; genesis_proof= base_proof b t }
+  ; genesis_proof }
