@@ -126,7 +126,7 @@ module User_command = struct
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot_since_genesis,sequence_no,status FROM
 
          (SELECT * FROM user_commands WHERE id = ?) AS uc
 

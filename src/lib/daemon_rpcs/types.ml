@@ -255,6 +255,9 @@ module Status = struct
       option_entry "Best tip consensus time"
         ~f:Consensus.Data.Consensus_time.to_string_hum
 
+    let global_slot_since_genesis_best_tip =
+      int_option_entry "Best tip global slot (across all hard-forks)"
+
     let consensus_time_now =
       map_entry "Consensus time now"
         ~f:Consensus.Data.Consensus_time.to_string_hum
@@ -325,6 +328,7 @@ module Status = struct
     ; histograms: Histograms.t option
     ; consensus_time_best_tip:
         Consensus.Data.Consensus_time.Stable.Latest.t option
+    ; global_slot_since_genesis_best_tip: int option
     ; next_block_production:
         [ `Check_again of Block_time.Stable.Latest.t
         | `Produce of Block_time.Stable.Latest.t
@@ -347,8 +351,9 @@ module Status = struct
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
       ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
       ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
-      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-      ~next_block_production ~snark_work_fee ~addrs_and_ports
+      ~global_slot_since_genesis_best_tip ~consensus_time_now
+      ~consensus_mechanism ~consensus_configuration ~next_block_production
+      ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

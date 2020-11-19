@@ -2472,6 +2472,12 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.curr_global_slot; _} ->
                 Global_slot.slot curr_global_slot )
+          ; field "slot since genesis"
+              ~doc:"Slot since genesis (across all hard-forks)"
+              ~typ:(non_null uint32)
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.global_slot_since_genesis; _} ->
+                global_slot_since_genesis )
           ; field "epoch" ~doc:"Epoch in which this block was created"
               ~typ:(non_null uint32)
               ~args:Arg.[]

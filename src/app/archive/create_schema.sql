@@ -65,6 +65,7 @@ CREATE TABLE blocks
 , ledger_hash             text   NOT NULL
 , height                  bigint NOT NULL
 , global_slot             bigint NOT NULL
+, global_slot_since_genesis bigint NOT NULL
 , timestamp               bigint NOT NULL
 );
 

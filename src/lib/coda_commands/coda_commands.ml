@@ -206,7 +206,8 @@ type active_state_fields =
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; state_hash: string option
-  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option }
+  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option
+  ; global_slot_since_genesis_best_tip: int option }
 
 let get_status ~flag t =
   let open Coda_lib.Config in
@@ -322,19 +323,26 @@ let get_status ~flag t =
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.consensus_time consensus_state
     in
+    let global_slot_since_genesis =
+      Coda_numbers.Global_slot.to_int
+      @@ Consensus.Data.Consensus_state.global_slot_since_genesis
+           consensus_state
+    in
     ( sync_status
     , { num_accounts= Some num_accounts
       ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
       ; state_hash= Some state_hash
-      ; consensus_time_best_tip= Some consensus_time_best_tip } )
+      ; consensus_time_best_tip= Some consensus_time_best_tip
+      ; global_slot_since_genesis_best_tip= Some global_slot_since_genesis } )
   in
   let ( sync_status
       , { num_accounts
         ; blockchain_length
         ; ledger_merkle_root
         ; state_hash
-        ; consensus_time_best_tip } ) =
+        ; consensus_time_best_tip
+        ; global_slot_since_genesis_best_tip } ) =
     match active_status () with
     | `Active result ->
         result
@@ -344,7 +352,8 @@ let get_status ~flag t =
           ; blockchain_length= None
           ; ledger_merkle_root= None
           ; state_hash= None
-          ; consensus_time_best_tip= None } )
+          ; consensus_time_best_tip= None
+          ; global_slot_since_genesis_best_tip= None } )
   in
   let next_block_production =
     let open Block_time in
@@ -368,6 +377,7 @@ let get_status ~flag t =
   ; state_hash
   ; chain_id= config.chain_id
   ; consensus_time_best_tip
+  ; global_slot_since_genesis_best_tip
   ; commit_id
   ; conf_dir
   ; peers

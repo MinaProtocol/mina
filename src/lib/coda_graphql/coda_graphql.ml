@@ -272,6 +272,7 @@ module Types = struct
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~global_slot_since_genesis_best_tip:int
                ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
