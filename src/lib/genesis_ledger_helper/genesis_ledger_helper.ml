@@ -26,9 +26,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error generating tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error generating tar file")
 
   let extract ~root ~file () =
     match%map
@@ -45,9 +43,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error extracting tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error extracting tar file")
 end
 
 let file_exists ?follow_symlinks filename =
