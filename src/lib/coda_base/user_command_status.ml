@@ -35,6 +35,10 @@ module Failure = struct
 
   type failure = t
 
+  let failure_min = min
+
+  let failure_max = max
+
   let to_latest = Fn.id
 
   let to_string = function
@@ -104,7 +108,7 @@ module Failure = struct
         Error "Signed_command_status.Failure.of_string: Unknown value"
 
   let%test_unit "of_string(to_string) roundtrip" =
-    for i = min to max do
+    for i = failure_min to failure_max do
       let failure = Option.value_exn (of_enum i) in
       [%test_eq: (t, string) Result.t]
         (of_string (to_string failure))
@@ -622,12 +626,12 @@ module Failure = struct
 
   let%test_unit "Minimum bound matches" =
     (* NB: +1 is for the [user_command_failure] accumulator. *)
-    [%test_eq: int] min (As_record.min + 1)
+    [%test_eq: int] failure_min (As_record.min + 1)
 
   let%test_unit "Maximum bound matches" = [%test_eq: int] max As_record.max
 
   let%test_unit "of_record_opt(to_record) roundtrip" =
-    for i = min to max do
+    for i = failure_min to failure_max do
       let failure = Option.value_exn (of_enum i) in
       [%test_eq: t option] (of_record_opt (to_record failure)) (Some failure)
     done
@@ -639,10 +643,10 @@ module Failure = struct
     done
 
   let%test_unit "As_record.get is consistent" =
-    for i = min to max do
+    for i = failure_min to failure_max do
       let failure = Option.value_exn (of_enum i) in
       let record = to_record failure in
-      for j = min to max do
+      for j = failure_min to failure_max do
         let get_failure = Option.value_exn (of_enum j) in
         [%test_eq: bool]
           (As_record.get record get_failure)
