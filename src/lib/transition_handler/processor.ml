@@ -304,8 +304,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                              () ) ) ;
                      [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
-                        transition frontier: %s"
-                       (Error.to_string_hum err) )
+                        transition frontier: $error"
+                       ~metadata:[("error", Error_json.error_to_yojson err)] )
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
