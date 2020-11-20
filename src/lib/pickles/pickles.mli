@@ -202,5 +202,5 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t )
+       , ('max_branching, 'max_branching) Proof.t Async.Deferred.t )
        H3_2.T(Prover).t

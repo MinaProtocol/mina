@@ -13,12 +13,12 @@ use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fq::
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
 use commitment_dlog::srs::SRS;
-use plonk_circuits::constraints::ConstraintSystem;
+use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
 use std::rc::Rc;
@@ -146,8 +146,11 @@ pub fn of_ocaml<'a>(
         SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
     };
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let domain = Domain::<Fq>::new(1 << log_size_of_group).unwrap();
     let index = DlogVerifierIndex::<GAffine> {
-        domain: Domain::<Fq>::new(1 << log_size_of_group).unwrap(),
+        domain,
+        w: zk_w(domain),
+        zkpm: zk_polynomial(domain),
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
@@ -202,6 +205,7 @@ impl From<CamlTweedleFqPlonkVerifierIndexPtr> for DlogVerifierIndex<'_, GAffine>
 }
 
 pub fn read_raw<'a>(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'a>, ocaml::Error> {
@@ -213,6 +217,12 @@ pub fn read_raw<'a>(
         .unwrap()),
         Ok(file) => {
             let mut r = BufReader::new(file);
+            match offset {
+                Some(offset) => {
+                    r.seek(Start(offset as u64))?;
+                }
+                None => (),
+            };
             let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
             let urs_copy = Rc::clone(&urs.0);
             let t = index_serialization::read_plonk_verifier_index(
@@ -229,23 +239,29 @@ pub fn read_raw<'a>(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_read(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'static>, ocaml::Error> {
-    read_raw(urs, path)
+    read_raw(offset, urs, path)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_read(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndex, ocaml::Error> {
-    let t = read_raw(urs, path)?;
+    let t = read_raw(offset, urs, path)?;
     Ok(to_ocaml(&t.1, t.0))
 }
 
-pub fn write_raw(index: &DlogVerifierIndex<GAffine>, path: String) -> Result<(), ocaml::Error> {
-    match File::create(path) {
+pub fn write_raw(
+    append: Option<bool>,
+    index: &DlogVerifierIndex<GAffine>,
+    path: String,
+) -> Result<(), ocaml::Error> {
+    match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument(
             "caml_tweedle_fq_plonk_verifier_index_raw_read",
         )
@@ -263,18 +279,24 @@ pub fn write_raw(index: &DlogVerifierIndex<GAffine>, path: String) -> Result<(),
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_raw_write(
+    append: Option<bool>,
     index: CamlTweedleFqPlonkVerifierIndexRawPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(&index.as_ref().0, path)
+    write_raw(append, &index.as_ref().0, path)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_write(
+    append: Option<bool>,
     index: CamlTweedleFqPlonkVerifierIndexPtr,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(&CamlTweedleFqPlonkVerifierIndexRaw::from(index).0, path)
+    write_raw(
+        append,
+        &CamlTweedleFqPlonkVerifierIndexRaw::from(index).0,
+        path,
+    )
 }
 
 #[ocaml::func]
@@ -286,7 +308,14 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
     evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<CamlTweedleFpPtr>>,
     shifts: CamlPlonkVerificationShifts<CamlTweedleFqPtr>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(max_poly_size, max_quot_size, log_size_of_group, urs, evals, shifts)
+    of_ocaml(
+        max_poly_size,
+        max_quot_size,
+        log_size_of_group,
+        urs,
+        evals,
+        shifts,
+    )
 }
 
 #[ocaml::func]

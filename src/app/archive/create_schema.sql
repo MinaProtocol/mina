@@ -27,6 +27,7 @@ CREATE TABLE user_commands
 , nonce          bigint              NOT NULL
 , amount         bigint
 , fee            bigint              NOT NULL
+, valid_until    bigint
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
 , status         user_command_status
@@ -44,7 +45,8 @@ CREATE TABLE internal_commands
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
 , token       bigint                NOT NULL
-, hash        text                  NOT NULL UNIQUE
+, hash        text                  NOT NULL
+, UNIQUE (hash,type)
 );
 
 CREATE TABLE epoch_data

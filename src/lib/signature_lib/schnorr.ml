@@ -414,8 +414,6 @@ module Message = struct
 
   type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
-  let challenge_length = 128
-
   let derive t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
@@ -437,7 +435,7 @@ module Message = struct
     in
     let open Random_oracle in
     hash ~init:Hash_prefix_states.signature (pack_input input)
-    |> Digest.to_bits ~length:challenge_length
+    |> Digest.to_bits ~length:Field.size_in_bits
     |> Inner_curve.Scalar.of_bits
 
   [%%ifdef
@@ -454,7 +452,7 @@ module Message = struct
     make_checked (fun () ->
         let open Random_oracle.Checked in
         hash ~init:Hash_prefix_states.signature (pack_input input)
-        |> Digest.to_bits ~length:challenge_length
+        |> Digest.to_bits ~length:Field.size_in_bits
         |> Bitstring_lib.Bitstring.Lsb_first.of_list )
 
   [%%endif]

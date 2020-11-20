@@ -183,7 +183,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Error (`Invalid_staged_ledger_diff error) ->
               [%log error]
                 ~metadata:
-                  (metadata @ [("error", `String (Error.to_string_hum error))])
+                  (metadata @ [("error", Error_json.error_to_yojson error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
               let (_
@@ -304,8 +304,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                              () ) ) ;
                      [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
-                        transition frontier: %s"
-                       (Error.to_string_hum err) )
+                        transition frontier: $error"
+                       ~metadata:[("error", Error_json.error_to_yojson err)] )
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
@@ -334,8 +334,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        ()
                    | Error err ->
                        [%log error]
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
+                         ~metadata:[("error", Error_json.error_to_yojson err)]
                          "Error, failed to attach produced breadcrumb to \
                           transition frontier: $error" ;
                        let (_ : Transition_frontier.Breadcrumb.t) =

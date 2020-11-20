@@ -3,8 +3,8 @@ open Async
 
 type password = Bytes.t Async.Deferred.t Lazy.t
 
-let handle_open ~mkdir ~(f : string -> 'a Deferred.t) ~which path =
-  let corrupted_privkey e = Privkey_error.corrupted_privkey e which in
+let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
+  let corrupted_privkey = Privkey_error.corrupted_privkey in
   let open Unix.Error in
   let open Deferred.Result.Let_syntax in
   let dn = Filename.dirname path in
@@ -69,11 +69,10 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) ~which path =
 
 let lift (t : 'a Deferred.t) : ('a, 'b) Deferred.Result.t = t >>| fun x -> Ok x
 
-let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext
-    ~which =
+let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext =
   let open Deferred.Result.Let_syntax in
   let%bind privkey_f =
-    handle_open ~mkdir ~f:(fun path -> Writer.open_file path) path ~which
+    handle_open ~mkdir ~f:(fun path -> Writer.open_file path) path
   in
   let%bind password = lift @@ Lazy.force password in
   let sb = Secret_box.encrypt ~plaintext ~password in
@@ -84,11 +83,11 @@ let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext
   let%bind () = lift (Unix.chmod path ~perm:0o600) in
   lift (Writer.close privkey_f)
 
-let read ~path ~(password : Bytes.t Deferred.t Lazy.t) ~which =
+let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
   let to_corrupt_privkey =
-    Deferred.Result.map_error ~f:(fun e -> `Corrupted_privkey (e, which))
+    Deferred.Result.map_error ~f:(fun e -> `Corrupted_privkey e)
   in
-  let handle_open ~mkdir ~f p = handle_open ~mkdir ~f ~which p in
+  let handle_open ~mkdir ~f p = handle_open ~mkdir ~f p in
   let open Deferred.Result.Let_syntax in
   let read_all r =
     lift (Pipe.to_list (Reader.lines r))
@@ -133,8 +132,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) ~which =
     | Error e ->
         Deferred.return
           (Privkey_error.corrupted_privkey
-             (Error.createf "couldn't parse %s: %s" path e)
-             which)
+             (Error.createf "couldn't parse %s: %s" path e))
   in
   let%bind password = lift (Lazy.force password) in
-  Deferred.return (Secret_box.decrypt ~password ~which sb)
+  Deferred.return (Secret_box.decrypt ~password sb)

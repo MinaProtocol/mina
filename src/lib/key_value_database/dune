@@ -1,7 +1,8 @@
 (library
  (name key_value_database)
-  (public_name key_value_database)
-  (library_flags (-linkall))
-  (libraries core_kernel)
-  (preprocess (pps ppx_version ppx_jane bisect_ppx -- --conditional))
-  (synopsis "Collection of key-value databases used in Coda"))
+ (public_name key_value_database)
+ (library_flags (-linkall))
+ (libraries core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane))
+ (synopsis "Collection of key-value databases used in Coda"))
