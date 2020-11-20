@@ -618,13 +618,17 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
-let best_chain t =
+let best_chain ?max_length t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  Transition_frontier.root frontier
-  :: Transition_frontier.best_tip_path frontier
+  let best_tip_path = Transition_frontier.best_tip_path frontier in
+  match max_length with
+  | Some max_length when max_length <= List.length best_tip_path ->
+      best_tip_path
+  | _ ->
+      Transition_frontier.root frontier :: best_tip_path
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
