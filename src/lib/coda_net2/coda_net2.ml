@@ -1035,7 +1035,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string
+  type t = string [@@deriving compare]
 
   let to_string t = t
 

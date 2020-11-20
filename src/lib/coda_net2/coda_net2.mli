@@ -89,7 +89,7 @@ end
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
-  type t
+  type t [@@deriving compare]
 
   val to_string : t -> string
 
