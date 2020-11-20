@@ -24,7 +24,6 @@ pull_request_rules:
               method: merge
               strict: smart
           delete_head_branch: {}
-pull_request_rules:
     - name: automatically merge approved PRs into develop-until-4.1-hardfork with the ready-to-merge-into-develop label
       conditions:
           {%- for status in required_status | sort %}
@@ -36,5 +35,5 @@ pull_request_rules:
       actions:
           merge:
               method: merge
-              strict: smart
+              strict: false
           delete_head_branch: {}
