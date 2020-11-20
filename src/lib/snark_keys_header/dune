@@ -1,0 +1,6 @@
+(library
+ (name snark_keys_header)
+ (public_name snark_keys_header)
+ (libraries core_kernel runtime_config unsigned_extended)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_deriving_yojson)))
