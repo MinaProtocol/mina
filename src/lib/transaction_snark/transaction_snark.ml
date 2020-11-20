@@ -6032,13 +6032,11 @@ let%test_module "account timing check" =
         @@ Account.create_timed account_id balance ~initial_minimum_balance
              ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
-      (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
-      (* current slot is cliff time *)
       let txn_global_slot = Global_slot.of_int slot in
       (txn_amount, txn_global_slot, account)
 
-    let%test "before cliff, cliff amount disallows spending" =
+    let%test "before cliff, cliff_amount doesn't affect min balance" =
       let txn_amount, txn_global_slot, account = make_cliff_amount_test 999 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
