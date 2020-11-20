@@ -340,7 +340,11 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
   *)
   Out_channel.with_file ~binary:true filename ~f:(fun out_channel ->
       Out_channel.output_string out_channel prefix ;
-      Out_channel.output_string out_channel header_string ) ;
+      Out_channel.output_string out_channel header_string ;
+      (* Newline, to allow [head -n 2 path/to/file | tail -n 1] to easily
+         extract the header.
+      *)
+      Out_channel.output_char out_channel '\n' ) ;
   append_data filename ;
   (* Core doesn't let us open a file without appending or truncating, so we use
      stdlib instead.
@@ -369,24 +373,41 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
 
 let read_with_header ~read_data filename =
   let open Or_error.Let_syntax in
-  (* We use [binary=true] to ensure that line endings aren't converted. *)
-  let in_channel = In_channel.create ~binary:true filename in
-  let file_length = In_channel.length in_channel |> Int.of_int64_exn in
-  let lexbuf = Lexing.from_channel in_channel in
-  let%bind header_json = parse_lexbuf lexbuf in
-  let%bind header =
-    of_yojson header_json |> Result.map_error ~f:Error.of_string
-  in
-  In_channel.close in_channel ;
-  let offset = lexbuf.lex_curr_pos in
-  let%bind () =
-    if header.length = file_length then Ok ()
-    else
-      Or_error.error
-        "Header length didn't match file length. Was the file only partially \
-         downloaded?"
-        (("header length", header.length), ("file length", file_length))
-        [%sexp_of: (string * int) * (string * int)]
-  in
-  let%map data = Or_error.try_with (fun () -> read_data ~offset filename) in
-  (header, data)
+  Or_error.try_with_join (fun () ->
+      (* We use [binary=true] to ensure that line endings aren't converted. *)
+      let in_channel = In_channel.create ~binary:true filename in
+      let file_length = In_channel.length in_channel |> Int.of_int64_exn in
+      let lexbuf = Lexing.from_channel in_channel in
+      let%bind header_json = parse_lexbuf lexbuf in
+      let%bind header =
+        of_yojson header_json |> Result.map_error ~f:Error.of_string
+      in
+      let offset = lexbuf.lex_curr_pos in
+      let%bind () =
+        In_channel.seek in_channel (Int64.of_int offset) ;
+        match In_channel.input_char in_channel with
+        | Some '\n' ->
+            Ok ()
+        | None ->
+            Or_error.error_string
+              "Incomplete header: the newline terminator is missing"
+        | Some c ->
+            Or_error.error "Header was not terminated by a newline character"
+              ("character", c) [%sexp_of: string * char]
+      in
+      (* Bump offset for the newline terminator *)
+      let offset = offset + 1 in
+      In_channel.close in_channel ;
+      let%bind () =
+        if header.length = file_length then Ok ()
+        else
+          Or_error.error
+            "Header length didn't match file length. Was the file only \
+             partially downloaded?"
+            (("header length", header.length), ("file length", file_length))
+            [%sexp_of: (string * int) * (string * int)]
+      in
+      let%map data =
+        Or_error.try_with (fun () -> read_data ~offset filename)
+      in
+      (header, data) )
