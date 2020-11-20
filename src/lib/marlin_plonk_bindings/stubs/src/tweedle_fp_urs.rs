@@ -10,8 +10,8 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
 use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
 
@@ -43,8 +43,12 @@ pub fn caml_tweedle_fp_urs_create(depth: ocaml::Int) -> CamlTweedleFpUrs {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_urs_write(urs: CamlTweedleFpUrs, path: String) -> Result<(), ocaml::Error> {
-    match File::create(path) {
+pub fn caml_tweedle_fp_urs_write(
+    append: Option<bool>,
+    urs: CamlTweedleFpUrs,
+    path: String,
+) -> Result<(), ocaml::Error> {
+    match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_urs_write")
             .err()
             .unwrap()),
@@ -58,13 +62,22 @@ pub fn caml_tweedle_fp_urs_write(urs: CamlTweedleFpUrs, path: String) -> Result<
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_urs_read(path: String) -> Result<Option<CamlTweedleFpUrs>, ocaml::Error> {
+pub fn caml_tweedle_fp_urs_read(
+    offset: Option<ocaml::Int>,
+    path: String,
+) -> Result<Option<CamlTweedleFpUrs>, ocaml::Error> {
     match File::open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_urs_read")
             .err()
             .unwrap()),
         Ok(file) => {
-            let file = BufReader::new(file);
+            let mut file = BufReader::new(file);
+            match offset {
+                Some(offset) => {
+                    file.seek(Start(offset as u64))?;
+                }
+                None => (),
+            };
             match SRS::<GAffine>::read(file) {
                 Err(_) => Ok(None),
                 Ok(urs) => Ok(Some(CamlTweedleFpUrs(Rc::new(urs)))),

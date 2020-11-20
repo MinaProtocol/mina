@@ -25,17 +25,22 @@ let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
   let pool = Postgres.createPool(pgConnection);
-  Postgres.makeQuery(pool, Postgres.getBlocks, result => {
+  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
     switch (result) {
     | Ok(blocks) =>
       Types.Block.parseBlocks(blocks)
       |> Metrics.calculateMetrics
-      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
-
+      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId)
+    | Error(error) => Js.log(error)
+    }
+  });
+  Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
+    switch (result) {
+    | Ok(height) =>
       UploadLeaderboardData.uploadData(
         spreadsheetId,
-        blocks |> Array.length |> string_of_int,
-      );
+        height |> Array.length |> string_of_int,
+      )
     | Error(error) => Js.log(error)
     }
   });
