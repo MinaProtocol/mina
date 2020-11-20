@@ -51,10 +51,7 @@ val replace_snark_worker_key :
 val add_block_subscriber :
      t
   -> Public_key.Compressed.t option
-  -> ( Auxiliary_database.Filtered_external_transition.t
-     , State_hash.t )
-     With_hash.t
-     Pipe.Reader.t
+  -> (Filtered_external_transition.t, State_hash.t) With_hash.t Pipe.Reader.t
 
 val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
@@ -131,11 +128,6 @@ val best_path : t -> State_hash.t list option
 val best_chain : t -> Transition_frontier.Breadcrumb.t list option
 
 val transaction_pool : t -> Network_pool.Transaction_pool.t
-
-val transaction_database : t -> Auxiliary_database.Transaction_database.t
-
-val external_transition_database :
-  t -> Auxiliary_database.External_transition_database.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
