@@ -623,7 +623,7 @@ let best_chain ?max_length t =
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let best_tip_path = Transition_frontier.best_tip_path frontier in
+  let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length when max_length <= List.length best_tip_path ->
       best_tip_path
