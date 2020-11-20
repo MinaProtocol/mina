@@ -32,9 +32,9 @@ module type Inputs_intf = sig
   module Urs : sig
     type t
 
-    val read : string -> t option
+    val read : ?offset:int -> string -> t option
 
-    val write : t -> string -> unit
+    val write : ?append:bool -> t -> string -> unit
 
     val create : int -> t
   end
