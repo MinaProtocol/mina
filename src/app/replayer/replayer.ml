@@ -100,9 +100,10 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
             Hashtbl.add_exn pk_tbl ~key:pk_id ~data:pk ;
             pk
         | Error err ->
-            failwithf
-              "Error decoding retrieved public key \"%s\" with id %d, error: %s"
-              pk pk_id (Error.to_string_hum err) () )
+            Error.tag_arg err "Error decoding public key"
+              (("public_key", pk), ("id", pk_id))
+              [%sexp_of: (string * string) * (string * int)]
+            |> Error.raise )
       | Ok None ->
           failwithf "Could not find public key with id %d" pk_id ()
       | Error msg ->
@@ -214,11 +215,13 @@ let update_epoch_ledger ~logger ~name ledger epoch_ledger_opt epoch_ledger_hash
                   (Signature_lib.Public_key.Compressed.to_string pk)
                   (Token_id.to_string token) ()
             | Error err ->
-                failwithf
-                  "When creating epoch ledger, error when adding account with \
-                   public key %s and token %s: %s"
-                  (Signature_lib.Public_key.Compressed.to_string pk)
-                  (Token_id.to_string token) (Error.to_string_hum err) () ) ;
+                Error.tag_arg err
+                  "When creating epoch ledger, error when adding account"
+                  (("public_key", pk), ("token", token))
+                  [%sexp_of:
+                    (string * Signature_lib.Public_key.Compressed.t)
+                    * (string * Token_id.t)]
+                |> Error.raise ) ;
         Some epoch_ledger )
       else None
 
@@ -268,10 +271,10 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
     |> Coda_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
-    failwithf
-      "Could not apply internal command with global slot %Ld and sequence \
-       number %d, error: %s"
-      cmd.global_slot cmd.sequence_no (Error.to_string_hum err) ()
+    Error.tag_arg err "Could not apply internal command"
+      (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+      [%sexp_of: (string * int64) * (string * int)]
+    |> Error.raise
   in
   let open Coda_base.Ledger in
   match cmd.type_ with
@@ -300,8 +303,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
         | Ok cb ->
             cb
         | Error err ->
-            failwithf "Error creating coinbase for internal command, error: %s"
-              (Error.to_string_hum err) ()
+            Error.tag err ~tag:"Error creating coinbase for internal command"
+            |> Error.raise
       in
       let undo_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
@@ -336,8 +339,8 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
     | Ok ft ->
         ft
     | Error err ->
-        failwithf "Could not create combined fee transfer, error: %s"
-          (Error.to_string_hum err) ()
+        Error.tag err ~tag:"Could not create combined fee transfer"
+        |> Error.raise
   in
   let txn_global_slot =
     cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
@@ -351,10 +354,10 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   | Ok _undo ->
       Deferred.unit
   | Error err ->
-      failwithf
-        "Error applying combined fee transfer with sequence number %d, error: \
-         %s"
-        cmd1.sequence_no (Error.to_string_hum err) ()
+      Error.tag_arg err "Error applying combined fee transfer"
+        ("sequence number", cmd1.sequence_no)
+        [%sexp_of: string * int]
+      |> Error.raise
 
 let body_of_sql_user_cmd pool
     ({type_; source_id; receiver_id; token= tok; amount; global_slot; _} :
@@ -446,10 +449,10 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   | Ok _undo ->
       ()
   | Error err ->
-      failwithf
-        "User command with global slot %Ld and sequence number %d failed on \
-         replay, error: %s"
-        cmd.global_slot cmd.sequence_no (Error.to_string_hum err) ()
+      Error.tag_arg err "User command failed on replace"
+        (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+        [%sexp_of: (string * int64) * (string * int)]
+      |> Error.raise
 
 let unquoted_string_of_yojson json =
   (* Yojson.Safe.to_string produces double-quoted strings
