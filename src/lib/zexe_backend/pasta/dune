@@ -1,14 +1,12 @@
 (library
   (inline_tests)
-  (name zexe_backend)
-  (public_name zexe_backend)
+  (name pasta)
+  (public_name zexe_backend.pasta)
   (flags -warn-error -27)
   (instrumentation (backend bisect_ppx))
   (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
   (libraries
-    ;;zexe_backend.common
-    zexe_backend.tweedle
-    zexe_backend.pasta
+    zexe_backend_common
     hex
     pickles_types
     marlin_plonk_bindings
@@ -17,5 +15,4 @@
     snarky.backendless
     sponge
     snarkette
-    core
-    integers ))
+    core))
