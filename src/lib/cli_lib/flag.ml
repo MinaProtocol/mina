@@ -269,10 +269,10 @@ module Log = struct
       (optional_with_default Logger.Level.Info log_level)
       ~doc:"Set log level (default: Info)"
 
-  let file_level =
+  let file_log_level =
     let log_level = Arg_type.log_level in
     let open Command.Param in
-    flag "log-level-file"
+    flag "file-log-level"
       (optional_with_default Logger.Level.Trace log_level)
       ~doc:"Set log level for the log file (default: Trace)"
 end
