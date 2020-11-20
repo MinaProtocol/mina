@@ -18,7 +18,7 @@ let check_and_set_lockfile ~logger conf_dir =
             close fd )
       with
       | Ok () ->
-          [%log info] "Created lockfile $lockfile"
+          [%log info] "Created daemon lockfile $lockfile"
             ~metadata:[("lockfile", `String lockfile)] ;
           Exit_handlers.register_async_shutdown_handler ~logger
             ~description:"Remove daemon lockfile" (fun () ->
