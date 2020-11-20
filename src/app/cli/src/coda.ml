@@ -275,16 +275,7 @@ let setup_daemon logger =
   and plugins = plugin_flag in
   fun () ->
     let open Deferred.Let_syntax in
-    let compute_conf_dir home =
-      Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-    in
-    let%bind conf_dir =
-      if is_background then
-        let home = Core.Sys.home_directory () in
-        let conf_dir = compute_conf_dir home in
-        Deferred.return conf_dir
-      else Sys.home_directory () >>| compute_conf_dir
-    in
+    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
@@ -359,7 +350,8 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn s
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+              ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -410,6 +402,52 @@ let setup_daemon logger =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
     let may_generate = Option.value ~default:false may_generate in
+    (* FIXME adapt to new system, move into child_processes lib *)
+    let pids = Child_processes.Termination.create_pid_table () in
+    let rec terminated_child_loop () =
+      match
+        try Unix.wait_nohang `Any
+        with
+        | Unix.Unix_error (errno, _, _)
+        when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+             (* no child processes exist *)
+        ->
+          None
+      with
+      | None ->
+          (* no children have terminated, wait to check again *)
+          let%bind () = Async.after (Time.Span.of_min 1.) in
+          terminated_child_loop ()
+      | Some (child_pid, exit_or_signal) ->
+          let child_pid_metadata =
+            [("child_pid", `Int (Pid.to_int child_pid))]
+          in
+          ( match exit_or_signal with
+          | Ok () ->
+              [%log info]
+                "Daemon child process $child_pid terminated with exit code 0"
+                ~metadata:child_pid_metadata
+          | Error err -> (
+            match err with
+            | `Signal signal ->
+                [%log info]
+                  "Daemon child process $child_pid terminated after receiving \
+                   signal $signal"
+                  ~metadata:
+                    ( ("signal", `String (Signal.to_string signal))
+                    :: child_pid_metadata )
+            | `Exit_non_zero exit_code ->
+                [%log info]
+                  "Daemon child process $child_pid terminated with nonzero \
+                   exit code $exit_code"
+                  ~metadata:
+                    (("exit_code", `Int exit_code) :: child_pid_metadata) ) ) ;
+          (* terminate daemon if children registered *)
+          Child_processes.Termination.check_terminated_child pids child_pid
+            logger ;
+          (* check for other terminated children, without waiting *)
+          terminated_child_loop ()
+    in
     let coda_initialization_deferred () =
       let config_file_installed =
         (* Search for config files installed as part of a deb/brew package.
@@ -468,12 +506,9 @@ let setup_daemon logger =
             | Error err -> (
               match handle_missing with
               | `Must_exist ->
-                  [%log fatal]
-                    "Failed reading configuration from $config_file: $error"
-                    ~metadata:
-                      [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
-                  Error.raise err
+                  Mina_user_error.raisef ~where:"reading configuration file"
+                    "The configuration file %s could not be read:\n%s"
+                    config_file (Error.to_string_hum err)
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
@@ -613,25 +648,25 @@ let setup_daemon logger =
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= log_received_blocks }
       in
-      let json_to_publickey_compressed_option json =
+      let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
                | Ok key ->
                    Some key
-               | Error e ->
-                   [%log error] "Error decoding public key ($key): $error"
-                     ~metadata:
-                       [ ("key", `String pk_str)
-                       ; ("error", Error_json.error_to_yojson e) ] ;
-                   None )
+               | Error _e ->
+                   Mina_user_error.raisef ~where:"decoding a public key"
+                     "The %s public key %s could not be decoded." which pk_str
+           )
       in
       let run_snark_worker_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark worker")
           "run-snark-worker" run_snark_worker_flag
       in
       let run_snark_coordinator_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark coordinator")
           "run-snark-coordinator" run_snark_coordinator_flag
       in
       let snark_worker_parallelism_flag =
@@ -639,7 +674,8 @@ let setup_daemon logger =
           snark_worker_parallelism_flag
       in
       let coinbase_receiver_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "coinbase receiver")
           "coinbase-receiver" coinbase_receiver_flag
       in
       let%bind external_ip =
@@ -660,7 +696,8 @@ let setup_daemon logger =
           block_production_key
       in
       let block_production_pubkey =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "block producer")
           "block-producer-pubkey" block_production_pubkey
       in
       let block_production_password =
@@ -681,15 +718,15 @@ let setup_daemon logger =
       let%bind block_production_keypair =
         match (block_production_key, block_production_pubkey) with
         | Some _, Some _ ->
-            eprintf
-              "Error: You cannot provide both `block-producer-key` and \
-               `block_production_pubkey`\n" ;
-            exit 11
+            Mina_user_error.raise
+              "You cannot provide both `block-producer-key` and \
+               `block_production_pubkey`"
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
         | _, Some tracked_pubkey ->
@@ -699,7 +736,8 @@ let setup_daemon logger =
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
       in
@@ -713,7 +751,15 @@ let setup_daemon logger =
         match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
-              String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+              String.split ~on:',' envstr
+              |> List.filter_map ~f:(fun str ->
+                     try Some (Unix.Cidr.of_string str)
+                     with _ ->
+                       [%log warn]
+                         "Could not parse address $address in \
+                          CODA_CLIENT_TRUSTLIST"
+                         ~metadata:[("address", `String str)] ;
+                       None )
             in
             Some
               (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -796,13 +842,13 @@ let setup_daemon logger =
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
                 |> List.map ~f:Coda_net2.Multiaddr.of_string
                 |> return
-            | Error e ->
-                [%log fatal]
-                  ~metadata:[("error", `String (Error.to_string_mach e))]
-                  "Unable to read peer-list file properly. It must be a \
-                   newline separated series of libp2p multiaddrs (ex: \
-                   /ip4/IPADDR/tcp/PORT/p2p/PEERID)" ;
-                exit 15 )
+            | Error _ ->
+                Mina_user_error.raisef
+                  ~where:"reading libp2p peer address file"
+                  "The file %s could not be read.\n\n\
+                   It must be a newline-separated list of libp2p multiaddrs \
+                   (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                  file )
       in
       let initial_peers =
         List.concat
@@ -860,11 +906,6 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
       let transaction_database_dir = conf_dir ^/ "transaction" in
       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
       let transaction_database =
@@ -884,53 +925,6 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;
       (* log terminated child processes *)
-      (* FIXME adapt to new system, move into child_processes lib *)
-      let pids = Child_processes.Termination.create_pid_table () in
-      let rec terminated_child_loop () =
-        match
-          try Unix.wait_nohang `Any
-          with
-          | Unix.Unix_error (errno, _, _)
-          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-               (* no child processes exist *)
-          ->
-            None
-        with
-        | None ->
-            (* no children have terminated, wait to check again *)
-            let%bind () = Async.after (Time.Span.of_min 1.) in
-            terminated_child_loop ()
-        | Some (child_pid, exit_or_signal) ->
-            let child_pid_metadata =
-              [("child_pid", `Int (Pid.to_int child_pid))]
-            in
-            ( match exit_or_signal with
-            | Ok () ->
-                [%log info]
-                  "Daemon child process $child_pid terminated with exit code 0"
-                  ~metadata:child_pid_metadata
-            | Error err -> (
-              match err with
-              | `Signal signal ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated after \
-                     receiving signal $signal"
-                    ~metadata:
-                      ( ("signal", `String (Signal.to_string signal))
-                      :: child_pid_metadata )
-              | `Exit_non_zero exit_code ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated with nonzero \
-                     exit code $exit_code"
-                    ~metadata:
-                      (("exit_code", `Int exit_code) :: child_pid_metadata) )
-            ) ;
-            (* terminate daemon if children registered *)
-            Child_processes.Termination.check_terminated_child pids child_pid
-              logger ;
-            (* check for other terminated children, without waiting *)
-            terminated_child_loop ()
-      in
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver =
         Option.value_map coinbase_receiver_flag ~default:`Producer
@@ -966,19 +960,18 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~receipt_chain_database ~time_controller
-             ~initial_block_production_keypairs ~monitor ~consensus_local_state
-             ~transaction_database ~external_transition_database
-             ~is_archive_rocksdb ~work_reassignment_wait
-             ~archive_process_location ~log_block_creation ~precomputed_values
-             ())
+             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ~is_archive_rocksdb
+             ~work_reassignment_wait ~archive_process_location
+             ~log_block_creation ~precomputed_values ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Coda_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind {Coda_initialization.coda; client_trustlist; rest_server_port} =
@@ -1330,7 +1323,6 @@ let coda_commands logger =
         ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
-        ; (module Coda_receipt_chain_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)

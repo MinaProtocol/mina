@@ -68,7 +68,7 @@ module Go_log = struct
     | "error" | "panic" | "fatal" ->
         Error
     | "warn" ->
-        Warn
+        Debug
     | "info" ->
         (* this is intentionally debug, because the go info logs are too verbose for our info *)
         Debug
@@ -1474,12 +1474,6 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
             with
           | Ok (Ok record) -> (
               let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
               try Logger.raw logger r
               with _exn ->
                 Logger.raw logger

@@ -23,7 +23,7 @@ let use_dummy_values = true
 module type S = sig
   val blockchain_proof_system_id : Parsetree.expression
 
-  val base_proof_expr : Parsetree.expression
+  val base_proof_expr : Parsetree.expression Async.Deferred.t
 
   val transaction_verification : Parsetree.expression
 
@@ -52,7 +52,7 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = [%expr Coda_base.Proof.blockchain_dummy]
+  let base_proof_expr = Async.return [%expr Coda_base.Proof.blockchain_dummy]
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -159,6 +159,7 @@ module Make_real () = struct
       fun () -> Lazy.force t]
 
   let base_proof_expr =
+    let%map.Async compiled_values = compiled_values in
     [%expr
       Core.Binable.of_string
         (module Coda_base.Proof.Stable.Latest)
@@ -178,6 +179,7 @@ let main () =
   let (module M) =
     if use_dummy_values then (module Dummy : S) else (module Make_real () : S)
   in
+  let%bind base_proof_expr = M.base_proof_expr in
   let structure =
     [%str
       module T = Genesis_proof.T
@@ -185,7 +187,7 @@ let main () =
 
       let blockchain_proof_system_id = [%e M.blockchain_proof_system_id]
 
-      let compiled_base_proof = [%e M.base_proof_expr]
+      let compiled_base_proof = [%e base_proof_expr]
 
       let for_unit_tests =
         lazy
