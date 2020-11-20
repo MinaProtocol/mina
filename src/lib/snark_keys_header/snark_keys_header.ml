@@ -366,3 +366,27 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
   (* Output the true length *)
   Out_channel.output_string out_channel true_length_string ;
   Out_channel.close out_channel
+
+let read_with_header ~read_data filename =
+  let open Or_error.Let_syntax in
+  (* We use [binary=true] to ensure that line endings aren't converted. *)
+  let in_channel = In_channel.create ~binary:true filename in
+  let file_length = In_channel.length in_channel |> Int.of_int64_exn in
+  let lexbuf = Lexing.from_channel in_channel in
+  let%bind header_json = parse_lexbuf lexbuf in
+  let%bind header =
+    of_yojson header_json |> Result.map_error ~f:Error.of_string
+  in
+  In_channel.close in_channel ;
+  let offset = lexbuf.lex_curr_pos in
+  let%bind () =
+    if header.length = file_length then Ok ()
+    else
+      Or_error.error
+        "Header length didn't match file length. Was the file only partially \
+         downloaded?"
+        (("header length", header.length), ("file length", file_length))
+        [%sexp_of: (string * int) * (string * int)]
+  in
+  let%map data = Or_error.try_with (fun () -> read_data ~offset filename) in
+  (header, data)
