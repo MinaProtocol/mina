@@ -65,7 +65,7 @@ module type External_transition_base_intf = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, to_yojson]
+      type nonrec t = t [@@deriving sexp]
     end
   end]
 
