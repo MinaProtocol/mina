@@ -998,27 +998,34 @@ module Genesis_proof = struct
         ~id:(Precomputed_values.blockchain_proof_system_id ())
         ~state_hash:(Lazy.force compiled).protocol_state_with_hash.hash
     in
-    match%bind find_file ~logger ~base_hash ~genesis_dir with
-    | Some file -> (
-        match%map load file with
-        | Ok genesis_proof ->
-            Ok
-              ( { Genesis_proof.runtime_config= inputs.runtime_config
-                ; constraint_constants= inputs.constraint_constants
-                ; proof_level= inputs.proof_level
-                ; genesis_constants= inputs.genesis_constants
-                ; genesis_ledger= inputs.genesis_ledger
-                ; genesis_epoch_data= inputs.genesis_epoch_data
-                ; consensus_constants= inputs.consensus_constants
-                ; protocol_state_with_hash= inputs.protocol_state_with_hash
-                ; genesis_proof }
-              , file )
-        | Error err ->
-            [%log error] "Could not load genesis proof from $path: $error"
-              ~metadata:
-                [ ("path", `String file)
-                ; ("error", Error_json.error_to_yojson err) ] ;
-            Error err )
+    let%bind found_proof =
+      match%bind find_file ~logger ~base_hash ~genesis_dir with
+      | Some file -> (
+          match%map load file with
+          | Ok genesis_proof ->
+              Some
+                ( { Genesis_proof.runtime_config= inputs.runtime_config
+                  ; constraint_constants= inputs.constraint_constants
+                  ; proof_level= inputs.proof_level
+                  ; genesis_constants= inputs.genesis_constants
+                  ; genesis_ledger= inputs.genesis_ledger
+                  ; genesis_epoch_data= inputs.genesis_epoch_data
+                  ; consensus_constants= inputs.consensus_constants
+                  ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                  ; genesis_proof }
+                , file )
+          | Error err ->
+              [%log error] "Could not load genesis proof from $path: $error"
+                ~metadata:
+                  [ ("path", `String file)
+                  ; ("error", Error_json.error_to_yojson err) ] ;
+              None )
+      | None ->
+          return None
+    in
+    match found_proof with
+    | Some found_proof ->
+        return (Ok found_proof)
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
         let compiled = Lazy.force compiled in

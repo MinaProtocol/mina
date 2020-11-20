@@ -4,6 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
+   allocation_functor
    async
    async_extra
    base58_check
