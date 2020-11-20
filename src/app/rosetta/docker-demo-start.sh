@@ -57,6 +57,7 @@ echo "========================= STARTING DAEMON ==========================="
   -block-producer-key "$MINA_CONFIG_DIR/wallets/store/$PK" \
   -config-dir "$MINA_CONFIG_DIR" \
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
+  -genesis-ledger-dir "$MINA_CONFIG_DIR/demo-genesis" \
   -demo-mode \
   -disable-telemetry \
   -external-ip 127.0.0.1 \
