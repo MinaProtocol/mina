@@ -626,6 +626,9 @@ let best_chain ?max_length t =
   let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length when max_length <= List.length best_tip_path ->
+      (* The [best_tip_path] has already been truncated to the correct length,
+         we skip adding the root to stay below the maximum.
+      *)
       best_tip_path
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
