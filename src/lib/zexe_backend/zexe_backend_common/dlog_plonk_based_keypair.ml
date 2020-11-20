@@ -34,7 +34,7 @@ module type Inputs_intf = sig
 
     val read : ?offset:int -> string -> t option
 
-    val write : t -> string -> unit
+    val write : ?append:bool -> t -> string -> unit
 
     val create : int -> t
   end
