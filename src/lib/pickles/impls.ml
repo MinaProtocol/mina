@@ -6,26 +6,24 @@ open Backend
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
-  module Fp = Field
 
   module Other_field = struct
-    let size_in_bits = Fp.size_in_bits
+    (* Tick.Field.t = p < q = Tock.Field.t *)
+    let size_in_bits = Tock.Field.size_in_bits
 
-    module Constant = struct
-      type t = Tock.Field.t
-    end
+    module Constant = Tock.Field
 
     type t = (* Low bits, high bit *)
-      Fp.t * Boolean.var
+      Field.t * Boolean.var
 
-    let typ =
+    let typ : (t, Constant.t) Typ.t =
       Typ.transport
-        (Typ.tuple2 Fp.typ Boolean.typ)
+        (Typ.tuple2 Field.typ Boolean.typ)
         ~there:(fun x ->
           let low, high = Util.split_last (Tock.Field.to_bits x) in
-          (Fp.Constant.project low, high) )
+          (Field.Constant.project low, high) )
         ~back:(fun (low, high) ->
-          let low, _ = Util.split_last (Fp.Constant.unpack low) in
+          let low, _ = Util.split_last (Field.Constant.unpack low) in
           Tock.Field.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
@@ -55,14 +53,22 @@ module Wrap = struct
   module Wrap_field = Tock.Field
   module Step_field = Tick.Field
 
+  module Other_field = struct
+    module Constant = Tick.Field
+    open Impl
+
+    type t = Field.t
+
+    let typ =
+      Typ.transport Field.typ
+        ~there:(Fn.compose Tock.Field.of_bits Tick.Field.to_bits)
+        ~back:(Fn.compose Tick.Field.of_bits Tock.Field.to_bits)
+
+    let to_bits x = Field.unpack x ~length:Field.size_in_bits
+  end
+
   let input () =
-    let fp_as_fq (x : Step_field.t) =
-      Wrap_field.of_bigint (Step_field.to_bigint x)
-    in
-    let fp =
-      Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Wrap_field.t) ->
-          Step_field.of_bigint (Wrap_field.to_bigint x) )
-    in
+    let fp : ('a, Other_field.Constant.t) Typ.t = Other_field.typ in
     let open Types.Dlog_based.Statement in
     let (T (typ, f)) =
       Spec.packed_typ

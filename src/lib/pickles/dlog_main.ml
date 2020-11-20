@@ -43,21 +43,14 @@ struct
   open Impl
 
   module Other_field = struct
-    (* For us, p > q, so one Field.t = fp can represent an fq *)
     module Packed = struct
       module Constant = Other_field
 
-      type t = Field.t
+      type t = Impls.Wrap.Other_field.t
 
-      let typ =
-        Typ.transport Field.typ
-          ~there:(fun (x : Constant.t) ->
-            Bigint.to_field (Other_field.to_bigint x) )
-          ~back:(fun (x : Field.Constant.t) ->
-            Other_field.of_bigint (Bigint.of_field x) )
+      let typ = Impls.Wrap.Other_field.typ
 
-      let to_bits_unsafe =
-        Wrap_main_inputs.Unsafe.unpack_unboolean ~length:Field.size_in_bits
+      let to_bits_unsafe (x : t) = Wrap_main_inputs.Unsafe.unpack_unboolean x
 
       let absorb_shifted sponge (x : t Shifted_value.t) =
         match x with Shifted_value x -> Sponge.absorb sponge x
@@ -89,8 +82,6 @@ struct
 
       let assert_equal t1 t2 = Field.(Assert.equal (project t1) (project t2))
     end
-
-    let pack : Unpacked.t -> Packed.t = Field.project
   end
 
   let print_g lab (x, y) =
@@ -129,7 +120,8 @@ struct
 
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
-  module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dum)
+  module Scalar_challenge =
+    SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Wrap_inner_curve)
   module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
@@ -223,7 +215,7 @@ struct
           Precomputed.Lagrange_precomputations.index_of_domain_log2
             (Domain.log2_size d.h)
         in
-        match Precomputed.Lagrange_precomputations.dum.(d).(i) with
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
         | [|g|] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.constant g
@@ -245,7 +237,7 @@ struct
           Precomputed.Lagrange_precomputations.index_of_domain_log2
             (Domain.log2_size d.h)
         in
-        match Precomputed.Lagrange_precomputations.dum.(d).(i) with
+        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
         | [|g|] ->
             let g = Inner_curve.Constant.of_affine g in
             ( Inner_curve.constant g
@@ -531,7 +523,8 @@ struct
               let terms =
                 Array.mapi public_input ~f:(fun i x ->
                     match Array.of_list x with
-                    | [|b|] ->
+                    | [|(b : Boolean.var)|] ->
+                        assert_ (Constraint.boolean (b :> Field.t)) ;
                         `Cond_add (b, lagrange ~domain i)
                     | x ->
                         `Add_with_correction
@@ -756,7 +749,8 @@ struct
     Shifted_value.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" = SC.test (module Impl) ~endo:Endo.Dee.scalar
+  let%test_unit "endo scalar" =
+    SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
    It
@@ -805,7 +799,9 @@ struct
           (* Sample new sg challenge point here *)
           Field.equal xi_actual (pack_scalar_challenge xi) )
     in
-    let scalar = SC.to_field_checked (module Impl) ~endo:Endo.Dee.scalar in
+    let scalar =
+      SC.to_field_checked (module Impl) ~endo:Endo.Step_inner_curve.scalar
+    in
     let plonk =
       with_label __LOC__ (fun () ->
           Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
@@ -873,7 +869,7 @@ struct
           let e = Fn.flip actual_evaluation in
           Plonk_checks.checked
             (module Impl)
-            ~endo:(Impl.Field.constant Endo.Dum.base)
+            ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
             ~domain ~shift plonk ~mds:sponge_params.mds
             ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
             , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 ) )

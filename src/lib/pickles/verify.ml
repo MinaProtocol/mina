@@ -53,7 +53,9 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let open Pairing_marlin_types in
         let open Types.Dlog_based.Proof_state in
-        let sc = SC.to_field_constant tick_field ~endo:Endo.Dum.scalar in
+        let sc =
+          SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
+        in
         Timer.clock __LOC__ ;
         let { Deferred_values.xi
             ; plonk= plonk0
@@ -76,7 +78,7 @@ let verify_heterogenous (ts : Instance.t list) =
           let p =
             Plonk_checks.derive_plonk
               (module Tick.Field)
-              ~endo:Endo.Dee.base ~shift:Shifts.tick
+              ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
               ~mds:Tick_field_sponge.params.mds
               ~domain:
                 (* TODO: Cache the shifts and domain_generator *)

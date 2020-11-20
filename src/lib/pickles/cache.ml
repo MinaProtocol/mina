@@ -29,25 +29,25 @@ module Step = struct
       (fun (_, _, _, cs) ~path ->
         Or_error.try_with (fun () ->
             let index =
-              Marlin_plonk_bindings.Tweedle_fq_index.read
+              Marlin_plonk_bindings.Pasta_fp_index.read
                 (Backend.Tick.Keypair.load_urs ())
                 path
             in
-            {Tweedle.Dum_based_plonk.Keypair.index; cs} ) )
+            {Backend.Tick.Keypair.index; cs} ) )
       (fun t path ->
         Or_error.try_with (fun () ->
-            Marlin_plonk_bindings.Tweedle_fq_index.write t.index path ) )
+            Marlin_plonk_bindings.Pasta_fp_index.write t.index path ) )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
         Or_error.try_with (fun () ->
-            Marlin_plonk_bindings.Tweedle_fq_verifier_index.read
+            Marlin_plonk_bindings.Pasta_fp_verifier_index.read
               (Backend.Tick.Keypair.load_urs ())
               path ) )
       (fun x s ->
         Or_error.try_with (fun () ->
-            Marlin_plonk_bindings.Tweedle_fq_verifier_index.write x s ) )
+            Marlin_plonk_bindings.Pasta_fp_verifier_index.write x s ) )
 
   let read_or_generate cache k_p k_v typ main =
     let s_p = storable in
@@ -120,14 +120,14 @@ module Wrap = struct
       (fun (_, _, cs) ~path ->
         Or_error.try_with (fun () ->
             let index =
-              Marlin_plonk_bindings.Tweedle_fp_index.read
+              Marlin_plonk_bindings.Pasta_fq_index.read
                 (Backend.Tock.Keypair.load_urs ())
                 path
             in
-            {Tweedle.Dee_based_plonk.Keypair.index; cs} ) )
+            {Backend.Tock.Keypair.index; cs} ) )
       (fun t path ->
         Or_error.try_with (fun () ->
-            Marlin_plonk_bindings.Tweedle_fp_index.write t.index path ) )
+            Marlin_plonk_bindings.Pasta_fq_index.write t.index path ) )
 
   let read_or_generate step_domains cache k_p k_v typ main =
     let module Vk = Verification_key in
@@ -176,7 +176,7 @@ module Wrap = struct
                              x ) )
                ; step_domains
                ; data=
-                   (let open Marlin_plonk_bindings.Tweedle_fp_index in
+                   (let open Marlin_plonk_bindings.Pasta_fq_index in
                    {constraints= domain_d1_size pk.index}) }
              in
              let _ = Key_cache.Sync.write cache s_v k_v vk in

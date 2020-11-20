@@ -109,8 +109,8 @@ end
 let pack_statement max_branching =
   let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
     with_label __LOC__ (fun () ->
-        let low_bits, high_bit = Util.split_last (Unsafe.unpack_unboolean x) in
-        [|low_bits; [high_bit]|] )
+        let lo, hi = Util.split_last (Unsafe.unpack_unboolean x) in
+        [|lo; [hi]|] )
   in
   fun t ->
     with_label __LOC__ (fun () ->

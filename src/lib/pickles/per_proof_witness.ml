@@ -62,7 +62,8 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     (Types.Dlog_based.Proof_state.In_circuit.typ
        ~challenge:(Challenge.typ' `Constrained)
        ~scalar_challenge:(Challenge.typ' `Unconstrained)
-       (Shifted_value.typ Fp.typ) Boolean.typ Other_field.typ
+       (Shifted_value.typ Field.typ)
+       Boolean.typ Other_field.typ
        (Snarky_backendless.Typ.unit ())
        Digest.typ index)
     (let lengths =
