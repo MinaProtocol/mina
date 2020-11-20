@@ -32,9 +32,9 @@ module type Inputs_intf = sig
   module Urs : sig
     type t
 
-    val read : string -> t option
+    val read : ?offset:int -> string -> t option
 
-    val write : t -> string -> unit
+    val write : ?append:bool -> t -> string -> unit
 
     val create : int -> t
   end
@@ -89,7 +89,7 @@ module Make (Inputs : Inputs_intf) = struct
     { index: Index.t
     ; cs: (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t }
 
-  let name = sprintf "%s_%d_v2" name (Pickles_types.Nat.to_int Rounds.n)
+  let name = sprintf "%s_%d_v3" name (Pickles_types.Nat.to_int Rounds.n)
 
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in

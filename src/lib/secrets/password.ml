@@ -1,6 +1,6 @@
 open Core
 
-let read_hidden_line prompt : Bytes.t Async.Deferred.t =
+let read_hidden_line ~error_help_message prompt : Bytes.t Async.Deferred.t =
   let open Unix in
   let open Async_unix in
   let open Async.Deferred.Let_syntax in
@@ -31,12 +31,23 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   | `Ok pwd ->
       Bytes.of_string pwd
   | `Eof ->
-      failwith "got EOF while reading password"
+      Mina_user_error.raisef {|No password was provided.
 
-let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.t =
+%s|}
+        error_help_message
+
+let hidden_line_or_env ?error_help_message prompt ~env :
+    Bytes.t Async.Deferred.t =
   let open Async.Deferred.Let_syntax in
   match Sys.getenv env with
   | Some p ->
       return (Bytes.of_string p)
   | _ ->
-      read_hidden_line prompt
+      let error_help_message =
+        match error_help_message with
+        | None ->
+            sprintf "Set the %s environment variable to the password" env
+        | Some s ->
+            s
+      in
+      read_hidden_line ~error_help_message prompt

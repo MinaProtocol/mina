@@ -7,13 +7,14 @@ use oracle::{
     self,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    FqSponge,
 };
 
-use commitment_dlog::commitment::PolyComm;
+use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
-use crate::caml_vector;
-use crate::tweedle_dum::CamlTweedleDumPolyCommVector;
+use crate::tweedle_dum::CamlTweedleDumPolyComm;
+use crate::tweedle_fp::CamlTweedleFp;
 use crate::tweedle_fq::CamlTweedleFq;
 use crate::tweedle_fq_plonk_proof::CamlTweedleFqPlonkProof;
 use crate::tweedle_fq_plonk_verifier_index::{
@@ -69,92 +70,82 @@ impl From<plonk_circuits::scalars::RandomOracles<Fq>> for CamlTweedleFqPlonkRand
     }
 }
 
-/* This exposes an `Fq.t array` in OCaml. */
-pub struct CamlTweedleFqScalarChallengeVec(pub Vec<ScalarChallenge<Fq>>);
-
-unsafe impl ocaml::FromValue for CamlTweedleFqScalarChallengeVec {
-    fn from_value(value: ocaml::Value) -> Self {
-        let vec: Vec<ScalarChallenge<Fq>> = caml_vector::from_array_(
-            ocaml::FromValue::from_value(value),
-            |value: ocaml::Value| ScalarChallenge(CamlTweedleFq::from_value(value).0.clone()),
-        );
-        CamlTweedleFqScalarChallengeVec(vec)
-    }
-}
-
-unsafe impl ocaml::ToValue for CamlTweedleFqScalarChallengeVec {
-    fn to_value(self: Self) -> ocaml::Value {
-        let vec: Vec<CamlTweedleFq> = self.0.iter().map(|x| CamlTweedleFq(x.0)).collect();
-        vec.to_value()
-    }
-}
-
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFqPlonkOracles {
     pub o: CamlTweedleFqPlonkRandomOracles,
     pub p_eval: (CamlTweedleFq, CamlTweedleFq),
-    pub opening_prechallenges: CamlTweedleFqScalarChallengeVec,
+    pub opening_prechallenges: Vec<CamlTweedleFq>,
     pub digest_before_evaluations: CamlTweedleFq,
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_oracles_create_raw(
-    lgr_comm: CamlTweedleDumPolyCommVector,
+    lgr_comm: Vec<CamlTweedleDumPolyComm<CamlTweedleFp>>,
     index: CamlTweedleFqPlonkVerifierIndexRawPtr<'static>,
     proof: CamlTweedleFqPlonkProof,
 ) -> CamlTweedleFqPlonkOracles {
     let index = index.as_ref();
     let proof: DlogProof<GAffine> = proof.into();
+    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(From::from).collect();
 
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
         &lgr_comm
-            .0
             .iter()
             .take(proof.public.len())
-            .map(|l| l)
+            .map(|x| x)
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
+    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
+
+    sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
     CamlTweedleFqPlonkOracles {
         o: o.into(),
         p_eval: (CamlTweedleFq(p_eval[0][0]), CamlTweedleFq(p_eval[1][0])),
-        opening_prechallenges: CamlTweedleFqScalarChallengeVec(
-            proof.proof.prechallenges(&mut sponge),
-        ),
+        opening_prechallenges: proof
+            .proof
+            .prechallenges(&mut sponge)
+            .into_iter()
+            .map(From::from)
+            .collect(),
         digest_before_evaluations: CamlTweedleFq(digest_before_evaluations),
     }
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_oracles_create(
-    lgr_comm: CamlTweedleDumPolyCommVector,
+    lgr_comm: Vec<CamlTweedleDumPolyComm<CamlTweedleFp>>,
     index: CamlTweedleFqPlonkVerifierIndexPtr,
     proof: CamlTweedleFqPlonkProof,
 ) -> CamlTweedleFqPlonkOracles {
     let index: CamlTweedleFqPlonkVerifierIndexRaw = index.into();
     let proof: DlogProof<GAffine> = proof.into();
+    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(From::from).collect();
 
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
         &lgr_comm
-            .0
             .iter()
             .take(proof.public.len())
-            .map(|l| l)
+            .map(|x| x)
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _) =
+    let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
+
+    sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
     CamlTweedleFqPlonkOracles {
         o: o.into(),
         p_eval: (CamlTweedleFq(p_eval[0][0]), CamlTweedleFq(p_eval[1][0])),
-        opening_prechallenges: CamlTweedleFqScalarChallengeVec(
-            proof.proof.prechallenges(&mut sponge),
-        ),
+        opening_prechallenges: proof
+            .proof
+            .prechallenges(&mut sponge)
+            .into_iter()
+            .map(From::from)
+            .collect(),
         digest_before_evaluations: CamlTweedleFq(digest_before_evaluations),
     }
 }

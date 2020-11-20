@@ -16,6 +16,8 @@ end
 module type Inputs_intf = sig
   open Intf
 
+  val id : string
+
   module Scalar_field : sig
     include Stable_v1
 
@@ -91,6 +93,14 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.t array
       -> t
 
+    val create_async :
+         Index.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.t array
+      -> Curve.Affine.Backend.t array
+      -> t Async.Deferred.t
+
     val batch_verify : Verifier_index.t array -> t array -> bool
   end
 end
@@ -133,24 +143,50 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+  include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
+    let id = "plong_dlog_proof_" ^ Inputs.id
 
-    module V1 = struct
-      type t =
-        ( G.Affine.Stable.V1.t
-        , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
-        , Fq.Stable.V1.t
-        , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
-        Dlog_plonk_types.Proof.Stable.V1.t
-      [@@deriving compare, sexp, yojson, hash, eq]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( G.Affine.Stable.V1.t
+          , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
+          , Fq.Stable.V1.t
+          , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
+          Dlog_plonk_types.Proof.Stable.V1.t
+        [@@deriving compare, sexp, yojson, hash, eq]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
 
-  include Stable.Latest
+        type 'a creator =
+             messages:( G.Affine.t
+                      , G.Affine.t Or_infinity.t )
+                      Dlog_plonk_types.Messages.Stable.V1.t
+          -> openings:( G.Affine.t
+                      , Fq.t
+                      , Fq.t Dlog_plonk_types.Pc_array.t )
+                      Dlog_plonk_types.Openings.Stable.V1.t
+          -> 'a
+
+        let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
+
+        let create ~messages ~openings =
+          let open Dlog_plonk_types.Proof in
+          {messages; openings}
+      end
+    end]
+  end)
+
+  include (
+    Stable.Latest :
+      sig
+        type t [@@deriving compare, sexp, yojson, hash, eq, bin_io]
+      end
+      with type t := t )
+
+  [%%define_locally
+  Stable.Latest.(create)]
 
   let g t f = G.Affine.of_backend (f t)
 
@@ -172,7 +208,6 @@ module Make (Inputs : Inputs_intf) = struct
     ; sg= g t.sg }
 
   let of_backend (t : Backend.t) : t =
-    let open Backend in
     let proof = opening_proof_of_backend t.proof in
     let evals =
       (fst t.evals, snd t.evals)
@@ -201,13 +236,14 @@ module Make (Inputs : Inputs_intf) = struct
       | _ ->
           assert false
     in
-    { messages=
+    create
+      ~messages:
         { l_comm= wo t.messages.l_comm
         ; r_comm= wo t.messages.r_comm
         ; o_comm= wo t.messages.o_comm
         ; z_comm= wo t.messages.z_comm
         ; t_comm= w t.messages.t_comm }
-    ; openings= {proof; evals} }
+      ~openings:{proof; evals}
 
   let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2}
       : Evaluations_backend.t =
@@ -260,6 +296,25 @@ module Make (Inputs : Inputs_intf) = struct
           G.Affine.to_backend (Finite commitment) )
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
+    of_backend res
+
+  let create_async ?message pk ~primary ~auxiliary =
+    let chal_polys =
+      match (message : message option) with Some s -> s | None -> []
+    in
+    let challenges =
+      List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
+          challenges )
+      |> Array.concat
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun {Challenge_polynomial.commitment; _} ->
+          G.Affine.to_backend (Finite commitment) )
+    in
+    let%map.Async res =
+      Backend.create_async pk primary auxiliary challenges commitments
+    in
     of_backend res
 
   let batch_verify' (conv : 'a -> Fq.t array)

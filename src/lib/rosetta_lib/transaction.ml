@@ -98,8 +98,7 @@ module Unsigned = struct
     end
 
     type t =
-      { random_oracle_input: string (* serialize |> to_hex *)
-            [@key "randomOracleInput"]
+      { random_oracle_input: string (* hex *) [@key "randomOracleInput"]
       ; payment: Payment.t option
       ; stake_delegation: Delegation.t option [@key "stakeDelegation"]
       ; create_token: Create_token.t option [@key "createToken"]
@@ -200,6 +199,7 @@ module Unsigned = struct
     let random_oracle_input =
       Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
         ~of_bool:Fn.id t.random_oracle_input
+      |> Hex.Safe.to_hex
     in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
@@ -297,7 +297,8 @@ module Unsigned = struct
     let open Result.Let_syntax in
     let%bind random_oracle_input =
       Random_oracle_input.Coding.deserialize ~field_of_string ~of_bool:Fn.id
-        (String.to_list r.random_oracle_input)
+        (String.to_list
+           (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)))
       |> Result.map_error ~f:(fun e ->
              let parse_context =
                match e with
