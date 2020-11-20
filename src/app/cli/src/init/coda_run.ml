@@ -373,7 +373,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
           Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
-    ]
+    ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
+          return
+            (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
+      ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->

@@ -1677,6 +1677,20 @@ let next_available_token_cmd =
          printf "Next available token ID: %s\n"
            (Token_id.to_string response#nextAvailableToken) ))
 
+let object_lifetime_statistics =
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Dump internal object lifetime statistics to JSON"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Client.dispatch Get_object_lifetime_statistics.rpc () port
+         with
+         | Ok stats ->
+             print_endline stats
+         | Error err ->
+             printf "Failed to get object lifetime statistics: %s\n%!"
+               (Error.to_string_hum err) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1786,4 +1800,5 @@ let advanced =
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
-    ; ("add-peers", add_peers_graphql) ]
+    ; ("add-peers", add_peers_graphql)
+    ; ("object-lifetime-statistics", object_lifetime_statistics) ]
