@@ -36,7 +36,7 @@ LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id
 
 WHERE height >= 110";
 
-let getBlockHeight = "SELECT * FROM blocks";
+let getBlockHeight = "SELECT MAX(height) FROM blocks";
 
 let createPool = pgConn => {
   makePool({connectionString: pgConn, connectionTimeoutMillis: 5000});
