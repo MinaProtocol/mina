@@ -2989,6 +2989,7 @@ let%test_module "test" =
         Account.create_timed account_id balance
           ~initial_minimum_balance:balance
           ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+          ~cliff_amount:Amount.zero
           ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
           ~vesting_increment:(Amount.of_int 50_000_000_000)
         |> Or_error.ok_exn
