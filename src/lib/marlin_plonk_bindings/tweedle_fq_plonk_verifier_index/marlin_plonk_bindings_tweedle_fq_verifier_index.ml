@@ -18,7 +18,7 @@ module Raw = struct
     = "caml_tweedle_fq_plonk_verifier_index_raw_read"
 
   external write :
-    t -> string -> unit
+    ?append:bool -> t -> string -> unit
     = "caml_tweedle_fq_plonk_verifier_index_raw_write"
 
   external of_parts :
@@ -41,7 +41,7 @@ external read :
   = "caml_tweedle_fq_plonk_verifier_index_read"
 
 external write :
-  t -> string -> unit
+  ?append:bool -> t -> string -> unit
   = "caml_tweedle_fq_plonk_verifier_index_write"
 
 external to_raw :

@@ -10,7 +10,7 @@ use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
 use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
 
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
@@ -43,8 +43,12 @@ pub fn caml_tweedle_fq_urs_create(depth: ocaml::Int) -> CamlTweedleFqUrs {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_urs_write(urs: CamlTweedleFqUrs, path: String) -> Result<(), ocaml::Error> {
-    match File::create(path) {
+pub fn caml_tweedle_fq_urs_write(
+    append: Option<bool>,
+    urs: CamlTweedleFqUrs,
+    path: String,
+) -> Result<(), ocaml::Error> {
+    match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument("caml_tweedle_fq_urs_write")
             .err()
             .unwrap()),
