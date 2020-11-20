@@ -33,6 +33,7 @@ module Variant = struct
     | `Unsupported_operation_for_construction
     | `Signature_missing
     | `Public_key_format_not_valid
+    | `No_options_provided
     | `Exception of string ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
@@ -93,6 +94,8 @@ end = struct
         "Unsupported operation for construction"
     | `Signature_missing ->
         "Signature missing"
+    | `No_options_provided ->
+        "No options provided"
     | `Exception _ ->
         "Exception"
 
@@ -147,6 +150,8 @@ end = struct
         None
     | `Signature_missing ->
         None
+    | `No_options_provided ->
+        None
     | `Exception s ->
         Some (sprintf "Exception when processing request: %s" s)
 
@@ -178,6 +183,8 @@ end = struct
     | `Unsupported_operation_for_construction ->
         false
     | `Signature_missing ->
+        false
+    | `No_options_provided ->
         false
     | `Exception _ ->
         false
