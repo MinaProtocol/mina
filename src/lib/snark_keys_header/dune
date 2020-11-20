@@ -2,5 +2,6 @@
  (name snark_keys_header)
  (public_name snark_keys_header)
  (libraries core_kernel runtime_config unsigned_extended)
+ (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_deriving_yojson)))
+ (preprocess (pps ppx_version ppx_deriving_yojson ppx_sexp_conv ppx_inline_test ppx_let)))

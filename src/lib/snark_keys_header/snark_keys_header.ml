@@ -102,3 +102,201 @@ type t =
   ; constraint_system_hash: string
   ; identifying_hash: string }
 [@@deriving yojson]
+
+let prefix = "MINA_SNARK_KEYS\n"
+
+let prefix_len = String.length prefix
+
+let parse_prefix (lexbuf : Lexing.lexbuf) =
+  let open Or_error.Let_syntax in
+  Result.map_error ~f:(fun err ->
+      Error.tag_arg err "Could not read prefix" ("prefix", prefix)
+        [%sexp_of: string * string] )
+  @@ Or_error.try_with_join (fun () ->
+         (* This roughly mirrors the behavior of [Yojson.Safe.read_ident],
+            except that we have a known fixed length to parse, and that it is a
+            failure to read any string except the prefix. We manually update
+            the lexbuf to be consistent with the output of this function.
+         *)
+         (* Manually step the lexbuffer forward to the [lex_curr_pos], so that
+            [refill_buf] will know that we're only interested in buffer
+            contents from that position onwards.
+         *)
+         lexbuf.lex_start_pos <- lexbuf.lex_curr_pos ;
+         lexbuf.lex_last_pos <- lexbuf.lex_curr_pos ;
+         lexbuf.lex_start_p <- lexbuf.lex_curr_p ;
+         let%bind () =
+           (* Read more if the buffer doesn't contain the whole prefix. *)
+           if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
+             return ()
+           else if lexbuf.lex_eof_reached then
+             Or_error.error_string "Unexpected end-of-file"
+           else (
+             lexbuf.refill_buff lexbuf ;
+             if lexbuf.lex_buffer_len - lexbuf.lex_curr_pos >= prefix_len then
+               return ()
+             else if lexbuf.lex_eof_reached then
+               Or_error.error_string "Unexpected end-of-file"
+             else
+               Or_error.error_string
+                 "Unexpected short read: broken lexbuffer or end-of-file" )
+         in
+         let read_prefix =
+           Lexing.sub_lexeme lexbuf lexbuf.lex_curr_pos
+             (lexbuf.lex_curr_pos + prefix_len)
+         in
+         let%map () =
+           if String.equal prefix read_prefix then return ()
+           else
+             Or_error.error "Incorrect prefix"
+               ("read prefix", read_prefix)
+               [%sexp_of: string * string]
+         in
+         (* Update the positions to match our end state *)
+         lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos + prefix_len ;
+         lexbuf.lex_last_pos <- lexbuf.lex_last_pos ;
+         lexbuf.lex_curr_p
+         <- { lexbuf.lex_curr_p with
+              pos_bol= lexbuf.lex_curr_p.pos_bol + prefix_len
+            ; pos_cnum= lexbuf.lex_curr_p.pos_cnum + prefix_len } ;
+         (* This matches the action given by [Yojson.Safe.read_ident]. *)
+         lexbuf.lex_last_action <- 1 )
+
+let parse_lexbuf (lexbuf : Lexing.lexbuf) =
+  let open Or_error.Let_syntax in
+  Result.map_error ~f:(Error.tag ~tag:"Failed to read snark key header")
+  @@ let%bind () = parse_prefix lexbuf in
+     Or_error.try_with (fun () ->
+         let yojson_parsebuffer = Yojson.init_lexer () in
+         (* We use [read_t] here rather than one of the alternatives to avoid
+            'greedy' parsing that will attempt to continue and read the file's
+            contents beyond the header.
+         *)
+         Yojson.Safe.read_t yojson_parsebuffer lexbuf )
+
+let%test_module "Check parsing of header" =
+  ( module struct
+    let valid_header =
+      { header_version= 1
+      ; kind= {type_= "type"; identifier= "identifier"}
+      ; constraint_constants=
+          { sub_windows_per_window= 4
+          ; ledger_depth= 8
+          ; work_delay= 1000
+          ; block_window_duration_ms= 1000
+          ; transaction_capacity= Log_2 3
+          ; coinbase_amount= Unsigned_extended.UInt64.of_int 1
+          ; supercharged_coinbase_factor= 1
+          ; account_creation_fee= Unsigned_extended.UInt64.of_int 1
+          ; fork= None }
+      ; commits=
+          { mina= "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
+          ; marlin= "75836c41fc4947acce9c938da1b2f506843e90ed" }
+      ; length= 4096
+      ; commit_date= "2020-01-01 00:00:00.000000Z"
+      ; constraint_system_hash= "ABCDEF1234567890"
+      ; identifying_hash= "ABCDEF1234567890" }
+
+    let valid_header_string = Yojson.Safe.to_string (to_yojson valid_header)
+
+    let valid_header_with_prefix = prefix ^ valid_header_string
+
+    module Tests (Lexing : sig
+      val from_string : string -> Lexing.lexbuf
+    end) =
+    struct
+      let%test "doesn't parse without prefix" =
+        parse_lexbuf (Lexing.from_string valid_header_string)
+        |> Or_error.is_error
+
+      let%test "doesn't parse with incorrect prefix" =
+        parse_lexbuf (Lexing.from_string ("BLAH" ^ valid_header_string))
+        |> Or_error.is_error
+
+      let%test "doesn't parse with matching-length prefix" =
+        let fake_prefix = String.init prefix_len ~f:(fun _ -> 'a') in
+        parse_lexbuf (Lexing.from_string (fake_prefix ^ valid_header_string))
+        |> Or_error.is_error
+
+      let%test "doesn't parse with partial matching prefix" =
+        let partial_prefix =
+          String.sub prefix ~pos:0 ~len:(prefix_len - 1) ^ " "
+        in
+        parse_lexbuf
+          (Lexing.from_string (partial_prefix ^ valid_header_string))
+        |> Or_error.is_error
+
+      let%test "doesn't parse with short file" =
+        parse_lexbuf (Lexing.from_string "BLAH") |> Or_error.is_error
+
+      let%test "doesn't parse with prefix only" =
+        parse_lexbuf (Lexing.from_string prefix) |> Or_error.is_error
+
+      let%test_unit "parses valid header with prefix" =
+        parse_lexbuf (Lexing.from_string valid_header_with_prefix)
+        |> Or_error.ok_exn |> ignore
+
+      let%test_unit "parses valid header with prefix and data" =
+        parse_lexbuf
+          (Lexing.from_string (valid_header_with_prefix ^ "DATADATADATA"))
+        |> Or_error.ok_exn |> ignore
+    end
+
+    let%test_module "Parsing from the start of the lexbuf" =
+      (module Tests (Lexing))
+
+    let%test_module "Parsing from part-way through a lexbuf" =
+      ( module struct
+        include Tests (struct
+          let from_string str =
+            let prefix = "AAAAAAAAAA" in
+            let prefix_len = String.length prefix in
+            let lexbuf = Lexing.from_string (prefix ^ str) in
+            lexbuf.lex_start_pos <- 0 ;
+            lexbuf.lex_curr_pos <- prefix_len ;
+            lexbuf.lex_last_pos <- prefix_len ;
+            lexbuf
+        end)
+      end )
+
+    let%test_module "Parsing with refill" =
+      ( module struct
+        include Tests (struct
+          let from_string str =
+            let init = ref true in
+            let initial_prefix = "AAAAAAAAAA" in
+            let initial_prefix_len = String.length initial_prefix in
+            let offset = ref 0 in
+            let str_len = String.length str in
+            let lexbuf =
+              Lexing.from_function (fun buffer length ->
+                  match !init with
+                  | true ->
+                      init := false ;
+                      (* Initial read: fill with junk up to the first character
+                         of the actual prefix
+                      *)
+                      Bytes.From_string.blit ~src:initial_prefix ~src_pos:0
+                        ~dst:buffer ~dst_pos:0 ~len:initial_prefix_len ;
+                      Bytes.set buffer initial_prefix_len str.[0] ;
+                      offset := 1 ;
+                      initial_prefix_len + 1
+                  | false ->
+                      (* Subsequent read: fill the rest of the buffer. *)
+                      let len = Int.min length (str_len - !offset) in
+                      if len = 0 then 0
+                      else (
+                        Bytes.From_string.blit ~src:str ~src_pos:!offset
+                          ~dst:buffer ~dst_pos:0 ~len ;
+                        offset := !offset + len ;
+                        len ) )
+            in
+            (* Load the initial content into the buffer *)
+            lexbuf.refill_buff lexbuf ;
+            lexbuf.lex_start_pos <- 0 ;
+            lexbuf.lex_curr_pos <- initial_prefix_len ;
+            lexbuf.lex_last_pos <- initial_prefix_len ;
+            lexbuf
+        end)
+      end )
+  end )
