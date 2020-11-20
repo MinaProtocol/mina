@@ -300,3 +300,69 @@ let%test_module "Check parsing of header" =
         end)
       end )
   end )
+
+let write_with_header ~expected_max_size_log2 ~append_data header filename =
+  (* In order to write the correct length here, we provide the maximum expected
+     size and store that in the initial header. Once the data has been written,
+     we record the length and then modify the 'length' field to hold the
+     correct data.
+     Happily, since the header is JSON-encoded, we can pad the calculated
+     length with spaces and the header will still form a valid JSON-encoded
+     object.
+     This intuitively feels hacky, but the only way this can fail are if we are
+     not able to write all of our data to the filesystem, or if the file is
+     modified during the writing process. In either of these cases, we would
+     have the same issue even if we were to pre-compute the length and do the
+     write atomically.
+  *)
+  let length = 1 lsl expected_max_size_log2 in
+  if length <= 0 then
+    failwith
+      "Snark_keys_header.write_header: expected_max_size_log2 is too large, \
+       the resulting length underflows" ;
+  let header_string = Yojson.Safe.to_string (to_yojson {header with length}) in
+  (* We look for the "length" field first, to ensure that we find our length
+     and not some other data that happens to match it. Due to the
+     JSON-encoding, we will only find the first field named "length", which is
+     the one that we want to modify.
+  *)
+  let length_offset =
+    String.substr_index_exn header_string ~pattern:"\"length\":"
+  in
+  let length_string = string_of_int length in
+  let length_data_offset =
+    prefix_len
+    + String.substr_index_exn ~pos:length_offset header_string
+        ~pattern:length_string
+  in
+  (* We use [binary=true] to ensure that line endings aren't converted, so that
+     files can be used regardless of the operating system that generated them.
+  *)
+  Out_channel.with_file ~binary:true filename ~f:(fun out_channel ->
+      Out_channel.output_string out_channel prefix ;
+      Out_channel.output_string out_channel header_string ) ;
+  append_data filename ;
+  (* Core doesn't let us open a file without appending or truncating, so we use
+     stdlib instead.
+  *)
+  let out_channel =
+    Stdlib.open_out_gen [Open_wronly; Open_binary] 0 filename
+  in
+  let true_length = Out_channel.length out_channel |> Int.of_int64_exn in
+  if true_length > length then
+    failwith
+      "Snark_keys_header.write_header: 2^expected_max_size_log2 is less than \
+       the true length of the file" ;
+  let true_length_string = string_of_int true_length in
+  let true_length_padding =
+    String.init
+      (String.length length_string - String.length true_length_string)
+      ~f:(fun _ -> ' ')
+  in
+  (* Go to where we wrote the data *)
+  Out_channel.seek out_channel (Int64.of_int length_data_offset) ;
+  (* Pad with spaces *)
+  Out_channel.output_string out_channel true_length_padding ;
+  (* Output the true length *)
+  Out_channel.output_string out_channel true_length_string ;
+  Out_channel.close out_channel
