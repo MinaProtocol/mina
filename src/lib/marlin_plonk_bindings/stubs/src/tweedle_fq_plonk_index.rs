@@ -15,7 +15,7 @@ use commitment_dlog::srs::SRS;
 use plonk_protocol_dlog::index::{Index as DlogIndex, SRSSpec};
 
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
@@ -245,10 +245,11 @@ pub fn caml_tweedle_fq_plonk_index_read(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_index_write(
+    append: Option<bool>,
     index: CamlTweedleFqPlonkIndexPtr<'static>,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let file = match File::create(path) {
+    let file = match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_plonk_index_write")
                 .err()
