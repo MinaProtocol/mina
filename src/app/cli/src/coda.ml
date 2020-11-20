@@ -306,7 +306,10 @@ let setup_daemon logger =
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
         [ ("commit", `String Coda_version.commit_id)
-        ; ("branch", `String Coda_version.branch) ] ;
+        ; ("branch", `String Coda_version.branch)
+        ; ("commit_date", `String Coda_version.commit_date)
+        ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+        ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
     let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
