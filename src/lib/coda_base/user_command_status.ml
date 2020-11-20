@@ -557,53 +557,45 @@ module Failure = struct
               let%bind () = typ.check data in
               Accumulators.check accumulators) }
 
-    let none = of_record @@ As_record.var_of_t As_record.none
+    let mk_var = Fn.compose of_record As_record.var_of_t
 
-    let predicate = of_record @@ As_record.var_of_t As_record.predicate
+    let none = mk_var As_record.none
 
-    let source_not_present =
-      of_record @@ As_record.var_of_t As_record.source_not_present
+    let predicate = mk_var As_record.predicate
 
-    let receiver_not_present =
-      of_record @@ As_record.var_of_t As_record.receiver_not_present
+    let source_not_present = mk_var As_record.source_not_present
+
+    let receiver_not_present = mk_var As_record.receiver_not_present
 
     let amount_insufficient_to_create_account =
-      of_record
-      @@ As_record.var_of_t As_record.amount_insufficient_to_create_account
+      mk_var As_record.amount_insufficient_to_create_account
 
     let cannot_pay_creation_fee_in_token =
-      of_record
-      @@ As_record.var_of_t As_record.cannot_pay_creation_fee_in_token
+      mk_var As_record.cannot_pay_creation_fee_in_token
 
     let source_insufficient_balance =
-      of_record @@ As_record.var_of_t As_record.source_insufficient_balance
+      mk_var As_record.source_insufficient_balance
 
     let source_minimum_balance_violation =
-      of_record
-      @@ As_record.var_of_t As_record.source_minimum_balance_violation
+      mk_var As_record.source_minimum_balance_violation
 
-    let receiver_already_exists =
-      of_record @@ As_record.var_of_t As_record.receiver_already_exists
+    let receiver_already_exists = mk_var As_record.receiver_already_exists
 
-    let not_token_owner =
-      of_record @@ As_record.var_of_t As_record.not_token_owner
+    let not_token_owner = mk_var As_record.not_token_owner
 
     let mismatched_token_permissions =
-      of_record @@ As_record.var_of_t As_record.mismatched_token_permissions
+      mk_var As_record.mismatched_token_permissions
 
-    let overflow = of_record @@ As_record.var_of_t As_record.overflow
+    let overflow = mk_var As_record.overflow
 
     let signed_command_on_snapp_account =
-      of_record @@ As_record.var_of_t As_record.signed_command_on_snapp_account
+      mk_var As_record.signed_command_on_snapp_account
 
-    let snapp_account_not_present =
-      of_record @@ As_record.var_of_t As_record.snapp_account_not_present
+    let snapp_account_not_present = mk_var As_record.snapp_account_not_present
 
-    let update_not_permitted =
-      of_record @@ As_record.var_of_t As_record.update_not_permitted
+    let update_not_permitted = mk_var As_record.update_not_permitted
 
-    let incorrect_nonce =
-      of_record @@ As_record.var_of_t As_record.incorrect_nonce
+    let incorrect_nonce = mk_var As_record.incorrect_nonce
 
     let get {data; _} failure = As_record.get data failure
 
@@ -611,10 +603,7 @@ module Failure = struct
 
     let max = As_record.max
 
-    let of_enum i =
-      Option.map
-        ~f:(fun t -> of_record (As_record.var_of_t t))
-        (As_record.of_enum i)
+    let of_enum i = Option.map ~f:mk_var (As_record.of_enum i)
   end
 
   let to_record t =
