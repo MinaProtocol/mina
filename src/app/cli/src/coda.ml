@@ -127,6 +127,12 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
+  and libp2p_metrics_port =
+    flag "libp2p-metrics-port"
+      ~doc:
+        "PORT libp2p metrics server for scraping via Prometheus (default no \
+         libp2p-metrics-server)"
+      (optional int16)
   and external_ip_opt =
     flag "external-ip"
       ~doc:
@@ -883,6 +889,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; unsafe_no_trust_ip= false
           ; initial_peers
           ; addrs_and_ports
+          ; metrics_port= Option.map libp2p_metrics_port ~f:Int.to_string
           ; trust_system
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
