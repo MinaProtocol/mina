@@ -33,12 +33,10 @@ let check_and_set_lockfile ~logger conf_dir =
             [%sexp_of: string * string]
           |> Error.raise )
   | `Yes ->
-      Error.create
-        "A daemon is already running with the current configuration \
-         directory, or you may need to remove the lockfile"
-        (("conf_dir", conf_dir), ("lockfile", lockfile))
-        [%sexp_of: (string * string) * (string * string)]
-      |> Error.raise
+      Mina_user_error.raisef
+        "A daemon is already running with the current configuration directory \
+         (%s), or you may need to remove the lockfile (%s)"
+        conf_dir lockfile
   | `Unknown ->
       Error.create "Could not determine whether the daemon lockfile exists"
         ("lockfile", lockfile) [%sexp_of: string * string]
