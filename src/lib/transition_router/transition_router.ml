@@ -340,7 +340,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                   sync_jobs
               with
               | Error e ->
-                  failwith ("Local state sync failed: " ^ Error.to_string_hum e)
+                  Error.tag e ~tag:"Local state sync failed" |> Error.raise
               | Ok () ->
                   () )
         in
