@@ -396,6 +396,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                     Option.value_map ~f:Float.of_string
                       (Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA")
                       ~default:2.5
+                    |> Float.min (base_time /. 2.)
                   in
                   Time.Span.(of_min (base_time |> plus_or_minus ~delta))
                 in
