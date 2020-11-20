@@ -1009,8 +1009,7 @@ module Keypair = struct
         ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
-        failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
-          ()
+        Error.tag e ~tag:"Other RPC error generateKeypair" |> Error.raise
 
   let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
@@ -1396,8 +1395,7 @@ let set_connection_gating_config net (config : connection_gating) =
   | Ok v ->
       failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      failwithf "unexpected error doing setGatingConfig: %s"
-        (Error.to_string_hum e) ()
+      Error.tag e ~tag:"Unexpected error doing setGatingConfig" |> Error.raise
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1444,11 +1442,12 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               Deferred.unit ) ))
   with
   | Error e ->
-      Deferred.Or_error.error_string
-        ( "Could not start libp2p_helper. If you are a dev, did you forget to \
-           `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-           CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-        ^ Error.to_string_hum e )
+      Deferred.Or_error.fail
+        (Error.tag e
+           ~tag:
+             "Could not start libp2p_helper. If you are a dev, did you forget \
+              to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
       let t : Helper.t =
         { subprocess
