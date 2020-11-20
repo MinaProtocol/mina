@@ -308,8 +308,8 @@ let setup_daemon logger =
         [ ("commit", `String Coda_version.commit_id)
         ; ("branch", `String Coda_version.branch)
         ; ("commit_date", `String Coda_version.commit_date)
-        ; ("marlin_commit", `String Coda_version.marlin_commit)
-        ; ("zexe_commit", `String Coda_version.zexe_commit) ] ;
+        ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+        ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
