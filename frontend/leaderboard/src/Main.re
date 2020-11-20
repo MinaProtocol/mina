@@ -13,7 +13,9 @@ let getEnvOrFail = name =>
   | None => failwith({j|Couldn't find env var: `$name`|j})
   };
 
-/* The Google Sheets API expects the credentials to be a local file instead of a parameter */
+/* The Google Sheets API expects the credentials to be a local file instead of a parameter
+       Thus, we set an environment variable indicating it's path.
+   */
 Node.Process.putEnvVar(
   "GOOGLE_APPLICATION_CREDENTIALS",
   "./google_sheets_credentials.json",
@@ -36,10 +38,17 @@ let main = () => {
   });
   Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
     switch (result) {
-    | Ok(height) =>
-      UploadLeaderboardData.uploadData(
-        spreadsheetId,
-        height |> Array.length |> string_of_int,
+    | Ok(blockHeightQuery) =>
+      Belt.Option.(
+        Js.Json.(
+          blockHeightQuery[0]
+          ->decodeObject
+          ->flatMap(__x => Js.Dict.get(__x, "max"))
+          ->flatMap(decodeString)
+          ->mapWithDefault((), height => {
+              UploadLeaderboardData.uploadData(spreadsheetId, height)
+            })
+        )
       )
     | Error(error) => Js.log(error)
     }
