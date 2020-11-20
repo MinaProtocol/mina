@@ -43,8 +43,24 @@ module Input = struct
     include Partial.Sexp_intf with type t := t
   end
 
+  module type Bin_io_and_sexp_intf = sig
+    include Basic_intf
+
+    include Partial.Bin_io_intf with type t := t
+
+    include Partial.Sexp_intf with type t := t
+  end
+
   module type Yojson_intf = sig
     include Basic_intf
+
+    include Partial.Yojson_intf with type t := t
+  end
+
+  module type Bin_io_and_yojson_intf = sig
+    include Basic_intf
+
+    include Partial.Bin_io_intf with type t := t
 
     include Partial.Yojson_intf with type t := t
   end
@@ -57,6 +73,85 @@ module Input = struct
     include Partial.Sexp_intf with type t := t
 
     include Partial.Yojson_intf with type t := t
+  end
+
+  module Versioned_v1 = struct
+    module type Basic_intf = sig
+      val id : string
+
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Higher_order_creatable_intf with type t := t
+        end
+      end]
+    end
+
+    module type Sexp_intf = sig
+      val id : string
+
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Higher_order_creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+        end
+      end]
+    end
+
+    module type Yojson_intf = sig
+      val id : string
+
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Higher_order_creatable_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
+
+    module type Full_compare_eq_hash_intf = sig
+      val id : string
+
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving compare, eq, hash]
+
+          include Higher_order_creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
+
+    module type Full_intf = sig
+      val id : string
+
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Higher_order_creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
   end
 end
 
@@ -75,6 +170,22 @@ module Output = struct
     include Partial.Sexp_intf with type t := t
   end
 
+  module type Bin_io_and_sexp_intf = sig
+    include Basic_intf
+
+    include Partial.Bin_io_intf with type t := t
+
+    include Partial.Sexp_intf with type t := t
+  end
+
+  module type Bin_io_and_yojson_intf = sig
+    include Basic_intf
+
+    include Partial.Bin_io_intf with type t := t
+
+    include Partial.Yojson_intf with type t := t
+  end
+
   module type Yojson_intf = sig
     include Basic_intf
 
@@ -89,5 +200,74 @@ module Output = struct
     include Partial.Sexp_intf with type t := t
 
     include Partial.Yojson_intf with type t := t
+  end
+
+  module Versioned_v1 = struct
+    module type Basic_intf = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Creatable_intf with type t := t
+        end
+      end]
+    end
+
+    module type Sexp_intf = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+        end
+      end]
+    end
+
+    module type Yojson_intf = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Creatable_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
+
+    module type Full_compare_eq_hash_intf = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving compare, eq, hash]
+
+          include Creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
+
+    module type Full_intf = sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t
+
+          include Creatable_intf with type t := t
+
+          include Partial.Sexp_intf with type t := t
+
+          include Partial.Yojson_intf with type t := t
+        end
+      end]
+    end
   end
 end

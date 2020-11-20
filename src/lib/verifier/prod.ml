@@ -150,7 +150,9 @@ module Worker = struct
         let (module M) = Worker_state.get w in
         Deferred.return
           (M.verify_blockchain_snarks
-             (List.map chains ~f:(fun {state; proof} -> (state, proof))))
+             (List.map chains ~f:(fun snark ->
+                  ( Blockchain_snark.Blockchain.state snark
+                  , Blockchain_snark.Blockchain.proof snark ) )))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
