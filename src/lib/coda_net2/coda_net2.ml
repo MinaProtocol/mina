@@ -688,6 +688,7 @@ module Helper = struct
       in
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
+          (* This fill should be okay because we "found and removed" the request *)
           Ivar.fill ivar fill_result ; Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
@@ -1233,7 +1234,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
           Helper.gating_config_to_helper_format initial_gating_config }
   with
   | Ok "configure success" ->
-      Ivar.fill net.me_keypair me ;
+      Ivar.fill_if_empty net.me_keypair me ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1413,7 +1414,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         (`Handler
           (fun ~killed e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
+                Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
             if
