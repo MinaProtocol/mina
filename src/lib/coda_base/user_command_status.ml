@@ -398,41 +398,47 @@ module Failure = struct
       | _ ->
           0
 
-    let of_enum = function
+    let of_enum enum =
+      match enum with
       | 0 ->
           Some none
-      | 1 ->
-          Some predicate
-      | 2 ->
-          Some source_not_present
-      | 3 ->
-          Some receiver_not_present
-      | 4 ->
-          Some amount_insufficient_to_create_account
-      | 5 ->
-          Some cannot_pay_creation_fee_in_token
-      | 6 ->
-          Some source_insufficient_balance
-      | 7 ->
-          Some source_minimum_balance_violation
-      | 8 ->
-          Some receiver_already_exists
-      | 9 ->
-          Some not_token_owner
-      | 10 ->
-          Some mismatched_token_permissions
-      | 11 ->
-          Some overflow
-      | 12 ->
-          Some signed_command_on_snapp_account
-      | 13 ->
-          Some snapp_account_not_present
-      | 14 ->
-          Some update_not_permitted
-      | 15 ->
-          Some incorrect_nonce
-      | _ ->
-          None
+      | _ -> (
+        match of_enum enum with
+        | Some failure ->
+            Some
+              ( match failure with
+              | Predicate ->
+                  predicate
+              | Source_not_present ->
+                  source_not_present
+              | Receiver_not_present ->
+                  receiver_not_present
+              | Amount_insufficient_to_create_account ->
+                  amount_insufficient_to_create_account
+              | Cannot_pay_creation_fee_in_token ->
+                  cannot_pay_creation_fee_in_token
+              | Source_insufficient_balance ->
+                  source_insufficient_balance
+              | Source_minimum_balance_violation ->
+                  source_minimum_balance_violation
+              | Receiver_already_exists ->
+                  receiver_already_exists
+              | Not_token_owner ->
+                  not_token_owner
+              | Mismatched_token_permissions ->
+                  mismatched_token_permissions
+              | Overflow ->
+                  overflow
+              | Signed_command_on_snapp_account ->
+                  signed_command_on_snapp_account
+              | Snapp_account_not_present ->
+                  snapp_account_not_present
+              | Update_not_permitted ->
+                  update_not_permitted
+              | Incorrect_nonce ->
+                  incorrect_nonce )
+        | None ->
+            None )
 
     let min = 0
 
