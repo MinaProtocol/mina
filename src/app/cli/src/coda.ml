@@ -155,6 +155,7 @@ let setup_daemon logger =
     flag "archive-rocksdb" no_arg ~doc:"Stores all the blocks heard in RocksDB"
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
+  and file_log_level = Flag.Log.file_log_level
   and snark_work_fee =
     flag "snark-worker-fee"
       ~doc:
@@ -296,7 +297,7 @@ let setup_daemon logger =
     let logrotate_max_size = 1024 * 1024 * 10 in
     let logrotate_num_rotate = 50 in
     Logger.Consumer_registry.register ~id:"default"
-      ~processor:(Logger.Processor.raw ())
+      ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size
@@ -316,6 +317,7 @@ let setup_daemon logger =
         ; ("commit_date", `String Coda_version.commit_date)
         ; ("marlin_commit", `String Coda_version.marlin_commit_id)
         ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
+    let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
