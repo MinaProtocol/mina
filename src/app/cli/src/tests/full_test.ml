@@ -153,6 +153,7 @@ let run_test () : unit Deferred.t =
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
           ; isolate= false
+          ; metrics_port= None
           ; conf_dir= temp_conf_dir
           ; chain_id
           ; flooding= false
