@@ -148,9 +148,6 @@ let rec start_verifier : type proof partial r.
     t.state <- Waiting ;
     Ivar.fill finished (Ok Outcome.empty) )
   else (
-    [%log' debug (Logger.create ())]
-      "Verifying proofs in batch of size $num_proofs"
-      ~metadata:[("num_proofs", `Int (Queue.length t.queue))] ;
     let out_for_verification =
       let proofs =
         (* TODO: Make this a proper config detail once we have data on what a
