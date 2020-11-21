@@ -158,12 +158,14 @@ end
 
 module Gen = struct
   let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-      ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~max_fee
+      ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~fee_range
       create_body =
     let open Quickcheck.Generator.Let_syntax in
+    let min_fee = Fee.to_int Coda_compile_config.minimum_user_command_fee in
+    let max_fee = min_fee + fee_range in
     let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t) =
       key_gen
-    and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
+    and fee = Int.gen_incl min_fee max_fee >>| Currency.Fee.of_int
     and memo = String.quickcheck_generator in
     let%map body = create_body signer receiver in
     let payload : Payload.t =
@@ -182,8 +184,8 @@ module Gen = struct
   module Payment = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
         ?nonce ~max_amount ?fee_token ?(payment_token = Token_id.default)
-        ~max_fee () =
-      gen_inner sign' ~key_gen ?nonce ?fee_token ~max_fee
+        ~fee_range () =
+      gen_inner sign' ~key_gen ?nonce ?fee_token ~fee_range
       @@ fun {public_key= signer; _} {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
       let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
@@ -201,15 +203,15 @@ module Gen = struct
           gen_inner sign
 
     let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-        ?fee_token ?payment_token ~max_fee =
+        ?fee_token ?payment_token ~fee_range =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
           gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-            ~max_fee )
+            ~fee_range )
   end
 
   module Stake_delegation = struct
-    let gen ~key_gen ?nonce ?fee_token ~max_fee () =
-      gen_inner For_tests.fake_sign ~key_gen ?nonce ?fee_token ~max_fee
+    let gen ~key_gen ?nonce ?fee_token ~fee_range () =
+      gen_inner For_tests.fake_sign ~key_gen ?nonce ?fee_token ~fee_range
         (fun {public_key= signer; _} {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
           @@ Signed_command_payload.Body.Stake_delegation
@@ -217,8 +219,8 @@ module Gen = struct
                   { delegator= Public_key.compress signer
                   ; new_delegate= Public_key.compress new_delegate }) )
 
-    let gen_with_random_participants ~keys ?nonce ?fee_token ~max_fee =
-      with_random_participants ~keys ~gen:(gen ?nonce ?fee_token ~max_fee)
+    let gen_with_random_participants ~keys ?nonce ?fee_token ~fee_range =
+      with_random_participants ~keys ~gen:(gen ?nonce ?fee_token ~fee_range)
   end
 
   let payment = Payment.gen
@@ -397,7 +399,7 @@ let gen_test =
     Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
   in
   Gen.payment_with_random_participants ~sign_type:`Real
-    ~keys:(Array.of_list keys) ~max_amount:10000 ~max_fee:1000 ()
+    ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))

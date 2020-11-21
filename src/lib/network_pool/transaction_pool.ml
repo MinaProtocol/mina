@@ -112,6 +112,13 @@ module Diff_versioned = struct
   let is_empty t = List.is_empty t
 end
 
+type Structured_log_events.t +=
+  | Rejecting_command_for_reason of
+      { command: User_command.t
+      ; reason: Diff_versioned.Diff_error.t
+      ; error_extra: (string * Yojson.Safe.t) list }
+  [@@deriving register_event {msg= "Rejecting command because: $reason"}]
+
 module type S = sig
   open Intf
 
@@ -309,6 +316,21 @@ struct
             ; ( "current_global_slot"
               , Coda_numbers.Global_slot.to_yojson current_global_slot ) ] )
 
+    let balance_of_account ~global_slot (account : Account.t) =
+      match account.timing with
+      | Untimed ->
+          account.balance
+      | Timed
+          { initial_minimum_balance
+          ; cliff_time
+          ; vesting_period
+          ; vesting_increment } ->
+          Currency.Balance.sub_amount account.balance
+            (Currency.Balance.to_amount
+               (Account.min_balance_at_slot ~global_slot ~cliff_time
+                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+          |> Option.value ~default:Currency.Balance.zero
+
     let handle_transition_frontier_diff
         ( ({new_commands; removed_commands; reorg_best_tip= _} :
             Transition_frontier.best_tip_diff)
@@ -327,6 +349,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
+      let global_slot = Indexed_pool.current_global_slot t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
@@ -413,7 +436,7 @@ struct
                       ~message:"public key has location but no account"
                       (Base_ledger.get best_tip_ledger loc)
                   in
-                  acc.balance
+                  balance_of_account ~global_slot acc
             in
             let fee_payer = User_command.(fee_payer (forget_check cmd.data)) in
             let fee_payer_balance =
@@ -527,7 +550,8 @@ struct
               | Some acct -> (
                 match
                   Indexed_pool.add_from_gossip_exn t.pool cmd acct.nonce
-                    (Currency.Balance.to_amount acct.balance)
+                    ( balance_of_account ~global_slot acct
+                    |> Currency.Balance.to_amount )
                 with
                 | Error e ->
                     let error_str, metadata = of_indexed_pool_error e in
@@ -614,6 +638,7 @@ struct
                  t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
+                 let global_slot = Indexed_pool.current_global_slot t.pool in
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
@@ -630,8 +655,9 @@ struct
                                   account"
                                (Base_ledger.get validation_ledger loc)
                            in
-                           (acc.nonce, Currency.Balance.to_amount acc.balance)
-                   )
+                           ( acc.nonce
+                           , balance_of_account ~global_slot acc
+                             |> Currency.Balance.to_amount ) )
                  in
                  let dropped_locally_generated =
                    Sequence.filter dropped ~f:(fun cmd ->
@@ -715,6 +741,10 @@ struct
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
 
+      let size = List.length
+
+      let verified_size = List.length
+
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
 
@@ -728,7 +758,7 @@ struct
         in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("sender", Envelope.Sender.to_yojson sender) ]
         in
         [%log' error t.logger] ~metadata
@@ -742,49 +772,75 @@ struct
         else Deferred.return ()
 
       (* Transaction verification currently happens in apply. In the future we could batch it. *)
-      let verify (t : pool) (d : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t option Deferred.t =
-        match
-          Option.try_with (fun () ->
-              let open Base_ledger in
-              let ledger = Option.value_exn t.best_tip_ledger in
-              Envelope.Incoming.map d
-                ~f:
-                  (List.map
-                     ~f:
-                       (User_command.to_verifiable_exn ~ledger ~get
-                          ~location_of_account)) )
-        with
-        | None ->
-            Deferred.return None
-        | Some v -> (
-            let open Deferred.Let_syntax in
-            match%bind Batcher.verify t.batcher v with
-            | Error e ->
-                (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                let%map () = log_and_punish ~punish:false t d e in
-                None
-            | Ok (Ok valid) ->
-                Deferred.return
-                  (Some {Envelope.Incoming.sender= d.sender; data= valid})
-            | Ok (Error ()) ->
-                let trust_record =
-                  Trust_system.record_envelope_sender t.config.trust_system
-                    t.logger d.sender
-                in
-                let%map () =
-                  (* that's an insta-ban *)
-                  trust_record
-                    ( Trust_system.Actions.Sent_invalid_signature
-                    , Some ("diff was: $diff", [("diff", to_yojson d.data)]) )
-                in
-                None )
+      let verify (t : pool) (diffs : t Envelope.Incoming.t) :
+          verified Envelope.Incoming.t Deferred.Or_error.t =
+        let open Deferred.Let_syntax in
+        let sender = Envelope.Incoming.sender diffs in
+        let diffs_are_valid =
+          List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
+              let is_valid = not (User_command.has_insufficient_fee cmd) in
+              if not is_valid then
+                [%log' debug t.logger]
+                  "Filtering user command with insufficient fee from \
+                   transaction-pool diff $cmd from $sender"
+                  ~metadata:
+                    [ ("cmd", User_command.to_yojson cmd)
+                    ; ( "sender"
+                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
+                    ] ;
+              is_valid )
+        in
+        if not diffs_are_valid then
+          Deferred.Or_error.error_string
+            "at least one user command had an insufficient fee"
+        else
+          match t.best_tip_ledger with
+          | None ->
+              Deferred.Or_error.error_string
+                "We don't have a transition frontier at the moment, so we're \
+                 unable to verify any transactions."
+          | Some ledger -> (
+              let diffs' =
+                Envelope.Incoming.map diffs
+                  ~f:
+                    (List.map
+                       ~f:
+                         (User_command.to_verifiable_exn ~ledger
+                            ~get:Base_ledger.get
+                            ~location_of_account:
+                              Base_ledger.location_of_account))
+              in
+              match%bind Batcher.verify t.batcher diffs' with
+              | Error e ->
+                  (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                  let%map () = log_and_punish ~punish:false t diffs e in
+                  Error e
+              | Ok (Ok valid) ->
+                  Deferred.Or_error.return
+                    (Envelope.Incoming.wrap ~data:valid ~sender)
+              | Ok (Error ()) ->
+                  let trust_record =
+                    Trust_system.record_envelope_sender t.config.trust_system
+                      t.logger sender
+                  in
+                  let%map () =
+                    (* that's an insta-ban *)
+                    trust_record
+                      ( Trust_system.Actions.Sent_invalid_signature
+                      , Some
+                          ( "diff was: $diff"
+                          , [("diff", to_yojson (Envelope.Incoming.data diffs))]
+                          ) )
+                  in
+                  Or_error.error_string
+                    "at least one user command had an invalid signature" )
 
       let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
         let pool_max_size = t.config.pool_max_size in
+        let global_slot = Indexed_pool.current_global_slot t.pool in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -842,7 +898,7 @@ struct
                             Indexed_pool.add_from_gossip_exn pool tx'
                               sender_account.nonce
                             @@ Currency.Balance.to_amount
-                                 sender_account.balance
+                            @@ balance_of_account ~global_slot sender_account
                           in
                           let of_indexed_pool_error = function
                             | Indexed_pool.Command_error.Invalid_nonce
@@ -1018,19 +1074,15 @@ struct
                                     .Unwanted_fee_token )
                                   :: rejected )
                           | Error err ->
-                              let diff_err, err_extra =
+                              let diff_err, error_extra =
                                 of_indexed_pool_error err
                               in
                               if is_sender_local then
-                                [%log' error t.logger]
-                                  "rejecting $cmd because of $reason. \
-                                   ($error_extra)"
-                                  ~metadata:
-                                    [ ("cmd", User_command.to_yojson tx)
-                                    ; ( "reason"
-                                      , Diff_versioned.Diff_error.to_yojson
-                                          diff_err )
-                                    ; ("error_extra", `Assoc err_extra) ] ;
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra }) ;
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useless_gossip
@@ -1039,8 +1091,8 @@ struct
                                          ($error_extra)"
                                       , [ ("cmd", User_command.to_yojson tx)
                                         ; ("reason", yojson_fail_reason err)
-                                        ; ("error_extra", `Assoc err_extra) ]
-                                      ) )
+                                        ; ("error_extra", `Assoc error_extra)
+                                        ] ) )
                               in
                               go txs'' pool
                                 (accepted, (tx, diff_err) :: rejected) )
@@ -1061,8 +1113,12 @@ struct
             in
             go txs t.pool ([], [])
 
-      let unsafe_apply t env =
-        match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
+      let unsafe_apply t diff =
+        match%map apply t diff with
+        | Ok e ->
+            Ok e
+        | Error e ->
+            Error (`Other e)
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1292,7 +1348,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys))
-              ~max_amount:100_000_000_000 ~max_fee:10_000_000_000 ()
+              ~max_amount:100_000_000_000 ~fee_range:10_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
@@ -1485,7 +1541,7 @@ let%test_module _ =
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
                  ~nonce:(Account.Nonce.of_int 1) ~max_amount:100_000_000_000
-                 ~max_fee:10_000_000_000 ())
+                 ~fee_range:10_000_000_000 ())
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool

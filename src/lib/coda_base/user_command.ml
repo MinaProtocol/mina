@@ -23,25 +23,25 @@ module Gen_make (C : Signed_command_intf.Gen_intf) = struct
   open C.Gen
 
   let payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-      ~max_fee () =
+      ~fee_range () =
     f
       (payment ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
-         ~max_fee ())
+         ~fee_range ())
 
   let payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-      ?fee_token ?payment_token ~max_fee () =
+      ?fee_token ?payment_token ~fee_range () =
     f
       (payment_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-         ?fee_token ?payment_token ~max_fee ())
+         ?fee_token ?payment_token ~fee_range ())
 
-  let stake_delegation ~key_gen ?nonce ?fee_token ~max_fee () =
-    f (stake_delegation ~key_gen ?nonce ?fee_token ~max_fee ())
+  let stake_delegation ~key_gen ?nonce ?fee_token ~fee_range () =
+    f (stake_delegation ~key_gen ?nonce ?fee_token ~fee_range ())
 
   let stake_delegation_with_random_participants ~keys ?nonce ?fee_token
-      ~max_fee () =
+      ~fee_range () =
     f
       (stake_delegation_with_random_participants ~keys ?nonce ?fee_token
-         ~max_fee ())
+         ~fee_range ())
 
   let sequence ?length ?sign_type a =
     Quickcheck.Generator.map
@@ -78,6 +78,27 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+(*
+include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
+  let id = "user_command"
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving sexp, compare, eq, hash, yojson]
+
+      let to_latest = Fn.id
+
+      type 'a creator : Signed_command.t -> Snapp_command.t -> 'a
+
+      let create cmd1 cmd2 = (cmd1, cmd2)
+    end
+  end]
+end)
+*)
 
 module Zero_one_or_two = struct
   [%%versioned

@@ -70,7 +70,7 @@ let main () =
   *)
   let delegatee_has_produced = ref false in
   let delegator_production_count = ref 0 in
-  let delegator_production_goal = 30 in
+  let delegator_production_goal = 20 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegator_transition_reader
        ~f:(fun {With_hash.data= transition; _} ->
@@ -95,7 +95,7 @@ let main () =
   (* delegatee's transition reader will fill this ivar when it has seen a few blocks *)
   let delegatee_ivar : unit Ivar.t = Ivar.create () in
   (* how many blocks we should wait for from the delegatee *)
-  let delegatee_production_goal = 10 in
+  let delegatee_production_goal = 5 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegatee_transition_reader
        ~f:(fun {With_hash.data= transition; _} ->

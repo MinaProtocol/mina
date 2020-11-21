@@ -5,31 +5,53 @@ open Coda_state
 open Coda_transition
 open Network_peer
 
-type t =
-  { validated_transition: External_transition.Validated.t
-  ; staged_ledger: Staged_ledger.t sexp_opaque
-  ; just_emitted_a_proof: bool }
-[@@deriving sexp, fields]
+module T = struct
+  let id = "breadcrumb"
 
-let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof} =
-  `Assoc
-    [ ( "validated_transition"
-      , External_transition.Validated.to_yojson validated_transition )
-    ; ("staged_ledger", `String "<opaque>")
-    ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
+  type t =
+    { validated_transition: External_transition.Validated.t
+    ; staged_ledger: Staged_ledger.t sexp_opaque
+    ; just_emitted_a_proof: bool }
+  [@@deriving sexp, fields]
 
-let create validated_transition staged_ledger =
-  {validated_transition; staged_ledger; just_emitted_a_proof= false}
+  type 'a creator =
+       validated_transition:External_transition.Validated.t
+    -> staged_ledger:Staged_ledger.t
+    -> just_emitted_a_proof:bool
+    -> 'a
 
-let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
+  let map_creator creator ~f ~validated_transition ~staged_ledger
+      ~just_emitted_a_proof =
+    f (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof)
+
+  let create ~validated_transition ~staged_ledger ~just_emitted_a_proof =
+    {validated_transition; staged_ledger; just_emitted_a_proof}
+
+  let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof}
+      =
+    `Assoc
+      [ ( "validated_transition"
+        , External_transition.Validated.to_yojson validated_transition )
+      ; ("staged_ledger", `String "<opaque>")
+      ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
+end
+
+[%%define_locally
+T.(validated_transition, staged_ledger, just_emitted_a_proof, to_yojson)]
+
+include Allocation_functor.Make.Sexp (T)
+
+let build ?skip_staged_ledger_verification ~logger ~precomputed_values
+    ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender =
+                  External_transition.Almost_validated.t) ~sender () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
         External_transition.Staged_ledger_validation
-        .validate_staged_ledger_diff ~logger ~precomputed_values ~verifier
-          ~parent_staged_ledger:parent.staged_ledger
+        .validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+          ~precomputed_values ~verifier
+          ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             (External_transition.Validated.protocol_state
                parent.validated_transition)
@@ -41,10 +63,10 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
               fully_valid_external_transition
           , `Staged_ledger transitioned_staged_ledger ) ->
           return
-            (Ok
-               { validated_transition= fully_valid_external_transition
-               ; staged_ledger= transitioned_staged_ledger
-               ; just_emitted_a_proof })
+          @@ Ok
+               (create ~validated_transition:fully_valid_external_transition
+                  ~staged_ledger:transitioned_staged_ledger
+                  ~just_emitted_a_proof)
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -88,27 +110,32 @@ let build ~logger ~precomputed_values ~verifier ~trust_system ~parent
                 let open Trust_system.Actions in
                 (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
-                let action =
-                  match staged_ledger_error with
-                  | Invalid_proofs _ ->
-                      make_actions Sent_invalid_proof
-                  | Pre_diff (Verification_failed _) ->
-                      make_actions Sent_invalid_signature_or_proof
-                  | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
-                      make_actions Gossiped_invalid_transition
-                  | Unexpected _ ->
-                      failwith
-                        "build: Unexpected staged ledger error should have \
-                         been caught in another pattern"
-                in
-                Trust_system.record trust_system logger peer action
+                with_return (fun {return} ->
+                    let action =
+                      match staged_ledger_error with
+                      | Couldn't_reach_verifier _ ->
+                          return Deferred.unit
+                      | Invalid_proofs _ ->
+                          make_actions Sent_invalid_proof
+                      | Pre_diff (Verification_failed _) ->
+                          make_actions Sent_invalid_signature_or_proof
+                      | Pre_diff _
+                      | Non_zero_fee_excess _
+                      | Insufficient_work _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger peer action )
           in
           Error
             (`Invalid_staged_ledger_diff
               (Staged_ledger.Staged_ledger_error.to_error staged_ledger_error))
   )
 
-let lift f {validated_transition; _} = f validated_transition
+let lift f breadcrumb = f (validated_transition breadcrumb)
 
 let state_hash = lift External_transition.Validated.state_hash
 
@@ -252,7 +279,7 @@ module For_tests = struct
     in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
-      let parent_staged_ledger = parent_breadcrumb.staged_ledger in
+      let parent_staged_ledger = staged_ledger parent_breadcrumb in
       let transactions =
         gen_payments parent_staged_ledger accounts_with_secret_keys
         |> Sequence.map ~f:(fun x -> User_command.Signed_command x)
@@ -334,11 +361,15 @@ module For_tests = struct
             previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.snarked_next_available_token
       in
+      let genesis_ledger_hash =
+        previous_protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.genesis_ledger_hash
+      in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~snarked_ledger_hash:next_ledger_hash ~snarked_next_available_token
-          ~staged_ledger_hash:next_staged_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
       in
       let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
@@ -375,7 +406,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None
+          ~sender:None ~skip_staged_ledger_verification:true ()
       with
       | Ok new_breadcrumb ->
           [%log info]

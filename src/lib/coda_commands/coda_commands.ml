@@ -8,42 +8,6 @@ open Coda_state
 (** For status *)
 let txn_count = ref 0
 
-let record_payment t (txn : User_command.t) account =
-  let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
-      [("coda_command", `String "Recording payment")]
-  in
-  let previous = account.Account.Poly.receipt_chain_hash in
-  let receipt_chain_database = Coda_lib.receipt_chain_database t in
-  match Receipt_chain_database.add receipt_chain_database ~previous txn with
-  | `Ok hash ->
-      [%log debug]
-        ~metadata:
-          [ ("command", User_command.to_yojson txn)
-          ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
-        "Added  payment $command into receipt_chain database. You should wait \
-         for a bit to see your account's receipt chain hash update as \
-         $receipt_chain_hash" ;
-      hash
-  | `Duplicate hash ->
-      [%log warn]
-        ~metadata:[("command", User_command.to_yojson txn)]
-        "Already sent transaction $user_command" ;
-      hash
-  | `Error_multiple_previous_receipts parent_hash ->
-      [%log fatal]
-        ~metadata:
-          [ ( "parent_receipt_chain_hash"
-            , Receipt.Chain_hash.to_yojson parent_hash )
-          ; ( "previous_receipt_chain_hash"
-            , Receipt.Chain_hash.to_yojson previous ) ]
-        "A payment is derived from two different blockchain states \
-         ($parent_receipt_chain_hash, $previous_receipt_chain_hash). \
-         Receipt.Chain_hash is supposed to be collision resistant. This \
-         collision should not happen." ;
-      Core.exit 1
-
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
@@ -113,8 +77,8 @@ let replace_block_production_keys keys pks =
 let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in
-  let fee_payer = User_command_input.fee_payer user_command_input in
-  let%map account_opt = get_account t fee_payer in
+  (* hack to get types to work out *)
+  let%map () = return () in
   let open Deferred.Let_syntax in
   let%map result = Coda_lib.add_transactions t [user_command_input] in
   txn_count := !txn_count + 1 ;
@@ -130,12 +94,23 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
       [%log' info (Coda_lib.top_level_logger t)]
         ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
         "Scheduled payment $command" ;
-      Ok
-        ( txn
-        , record_payment t (Signed_command txn) (Option.value_exn account_opt)
-        )
-  | Ok _ ->
-      Error (Error.of_string "Invalid result from scheduling a payment")
+      Ok txn
+  | Ok (valid_commands, invalid_commands) ->
+      [%log' info (Coda_lib.top_level_logger t)]
+        ~metadata:
+          [ ( "valid_commands"
+            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+          ; ( "invalid_commands"
+            , `List
+                (List.map
+                   ~f:
+                     (Fn.compose
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .Diff_error
+                        .to_yojson snd)
+                   invalid_commands) ) ]
+        "Invalid result from scheduling a payment" ;
+      Error (Error.of_string "Internal error while scheduling a payment")
   | Error e ->
       Error e
 
@@ -148,13 +123,22 @@ let setup_and_submit_user_commands t user_command_list =
       [("coda_command", `String "scheduling a batch of user transactions")] ;
   Coda_lib.add_transactions t user_command_list
 
-module Receipt_chain_hash = struct
-  (* Receipt.Chain_hash does not have bin_io *)
-  include Receipt.Chain_hash.Stable.V1
+module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
+  type proof_elem = User_command.t
 
-  [%%define_locally
-  Receipt.Chain_hash.(cons, empty)]
-end
+  type hash = Receipt.Chain_hash.t [@@deriving eq]
+
+  let hash parent_hash (proof_elem : User_command.t) =
+    let p =
+      match proof_elem with
+      | Signed_command c ->
+          Receipt.Elt.Signed_command (Signed_command.payload c)
+      | Snapp_command x ->
+          Receipt.Elt.Snapp_command
+            Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
+    in
+    Receipt.Chain_hash.cons p parent_hash
+end)
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
@@ -165,7 +149,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
   let open Or_error.Let_syntax in
   let%bind (_ : Receipt.Chain_hash.t Non_empty_list.t) =
     Result.of_option
-      (Receipt_chain_database.verify ~init:init_receipt proof resulting_receipt)
+      (Receipt_chain_verifier.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
   if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn)
@@ -174,16 +158,6 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     Or_error.errorf
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
-
-let prove_receipt t ~proving_receipt ~resulting_receipt =
-  let receipt_chain_database = Coda_lib.receipt_chain_database t in
-  (* TODO: since we are making so many reads to `receipt_chain_database`,
-     reads should be async to not get IO-blocked. See #1125 *)
-  let result =
-    Receipt_chain_database.prove receipt_chain_database ~proving_receipt
-      ~resulting_receipt
-  in
-  Deferred.return result
 
 let start_time = Time_ns.now ()
 
@@ -300,10 +274,10 @@ let get_status ~flag t =
           `Active `Listening
       | `Offline ->
           `Active `Offline
-      | `Synced ->
-          `Active `Synced
-      | `Catchup ->
-          `Active `Catchup
+      | `Synced | `Catchup ->
+          if abs (highest_block_length_received - blockchain_length) < 5 then
+            `Active `Synced
+          else `Active `Catchup
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.consensus_time consensus_state

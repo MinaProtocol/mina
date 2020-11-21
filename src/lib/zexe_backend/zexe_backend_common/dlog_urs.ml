@@ -5,10 +5,6 @@ module type Inputs_intf = sig
 
   val name : string
 
-  val public_inputs : Unsigned.Size_t.t Lazy.t
-
-  val size : Unsigned.Size_t.t Lazy.t
-
   module Rounds : Pickles_types.Nat.Intf
 
   module Urs : sig
@@ -18,8 +14,7 @@ module type Inputs_intf = sig
 
     val write : t -> string -> unit
 
-    val create :
-      Unsigned.Size_t.t -> Unsigned.Size_t.t -> Unsigned.Size_t.t -> t
+    val create : Unsigned.Size_t.t -> t
   end
 end
 
@@ -27,7 +22,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   let name =
-    sprintf "%s_%d_%s_v2" name
+    sprintf "%s_%d_%s_v3" name
       (Pickles_types.Nat.to_int Rounds.n)
       Version.marlin_repo_sha
 
@@ -35,8 +30,6 @@ module Make (Inputs : Inputs_intf) = struct
     let urs_info = Set_once.create () in
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-    let public_inputs = Inputs.public_inputs in
-    let size = Inputs.size in
     let set_urs_info specs =
       Set_once.set_exn urs_info Lexing.dummy_pos specs
     in
@@ -55,19 +48,15 @@ module Make (Inputs : Inputs_intf) = struct
           let store =
             Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
-              (fun () ~path -> Urs.read path)
-              Urs.write
+              (fun () ~path -> Or_error.try_with (fun () -> Urs.read path))
+              (fun urs path -> Or_error.try_with (fun () -> Urs.write urs path))
           in
           let u =
             match Key_cache.Sync.read specs store () with
             | Ok (u, _) ->
                 u
             | Error _e ->
-                let urs =
-                  Urs.create
-                    (Unsigned.Size_t.of_int degree)
-                    (Lazy.force public_inputs) (Lazy.force size)
-                in
+                let urs = Urs.create (Unsigned.Size_t.of_int degree) in
                 let _ =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function

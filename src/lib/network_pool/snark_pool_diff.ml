@@ -45,6 +45,11 @@ module Make
 
   let compact_json t = compact_to_yojson (to_compact t)
 
+  (* snark pool diffs are not bundled, so size is always 1 *)
+  let size _ = 1
+
+  let verified_size _ = 1
+
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
         Printf.sprintf
@@ -92,18 +97,21 @@ module Make
   let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
     let (Add_solved_work (work, ({Priced_proof.fee; _} as p))) = data in
     let is_local = match sender with Local -> true | _ -> false in
-    let verify () = Pool.verify_and_act pool ~work:(work, p) ~sender in
-    (*reject higher priced gossiped proofs*)
-    let res =
-      if is_local then verify ()
-      else
-        match has_lower_fee pool work ~fee:fee.fee ~sender with
-        | Ok () ->
-            verify ()
-        | _ ->
-            return false
+    let verify () =
+      if%map Pool.verify_and_act pool ~work:(work, p) ~sender then
+        Or_error.return t
+      else Or_error.error_string "failed to verify snark pool diff"
     in
-    match%map res with false -> None | true -> Some t
+    (*reject higher priced gossiped proofs*)
+    if is_local then verify ()
+    else
+      match has_lower_fee pool work ~fee:fee.fee ~sender with
+      | Ok () ->
+          verify ()
+      | _ ->
+          Deferred.Or_error.error_string
+            "snark pool diff fee is not high enough to be included in snark \
+             pool"
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =

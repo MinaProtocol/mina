@@ -1,5 +1,8 @@
 .bazel
+bazel-*
 user.bazelrc
+.cpcache/
+
 _build*
 *.pdf
 *.install

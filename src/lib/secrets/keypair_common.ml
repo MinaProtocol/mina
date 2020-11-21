@@ -2,10 +2,7 @@ open Core
 open Async
 open Async.Deferred.Let_syntax
 
-let error_raise e ~error_ctx =
-  raise
-    Error.(
-      to_exn (of_string (sprintf !"%s\n%s" error_ctx (Error.to_string_hum e))))
+let error_raise e ~error_ctx = Error.tag ~tag:error_ctx e |> Error.raise
 
 module Make_terminal_stdin (KP : sig
   type t
@@ -35,7 +32,7 @@ struct
       prompt_password prompt )
     else return pw2
 
-  let read_exn ?(should_reask = true) path =
+  let read_exn ?(should_reask = true) ~which path =
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
       match Sys.getenv env with
@@ -44,7 +41,9 @@ struct
       | None ->
           let read_file () =
             read_privkey
-              (lazy (Password.read_hidden_line "Secret key password: "))
+              ( lazy
+                (Password.read_hidden_line ~error_help_message:""
+                   "Secret key password: ") )
           in
           let rec read_until_correct () =
             match%bind read_file () with
@@ -54,7 +53,7 @@ struct
                 eprintf "Wrong password! Please try again\n" ;
                 read_until_correct ()
             | Error exn ->
-                Privkey_error.raise exn
+                Deferred.Result.fail exn
           in
           if should_reask then read_until_correct () else read_file ()
     in
@@ -62,7 +61,22 @@ struct
     | Ok result ->
         return result
     | Error e ->
-        Privkey_error.raise e
+        Privkey_error.raise ~which e
+
+  let read_from_env_exn ~which path =
+    let read_privkey password = read ~privkey_path:path ~password in
+    let%bind result =
+      match Sys.getenv env with
+      | Some password ->
+          read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
+      | None ->
+          Deferred.Result.fail (`Password_not_in_environment env)
+    in
+    match result with
+    | Ok result ->
+        return result
+    | Error e ->
+        Privkey_error.raise ~which e
 
   let write_exn kp ~privkey_path =
     write_exn kp ~privkey_path

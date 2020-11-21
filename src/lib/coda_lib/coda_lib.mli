@@ -6,6 +6,7 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 
 type t
@@ -35,7 +36,8 @@ val replace_block_production_keypairs :
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
-val staking_ledger : t -> Sparse_ledger.t option
+val staking_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
@@ -139,9 +141,12 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 
 val start : t -> unit Deferred.t
 
+val start_with_precomputed_blocks :
+  t -> Block_producer.Precomputed_block.t Sequence.t -> unit Deferred.t
+
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -150,8 +155,6 @@ val transition_frontier :
 
 val get_ledger :
   t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
-
-val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 

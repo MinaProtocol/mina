@@ -20,18 +20,24 @@ type display =
   ; parent: string }
 [@@deriving yojson]
 
-val create : External_transition.Validated.t -> Staged_ledger.t -> t
+val create :
+     validated_transition:External_transition.Validated.t
+  -> staged_ledger:Staged_ledger.t
+  -> just_emitted_a_proof:bool
+  -> t
 
 val build :
-     logger:Logger.t
+     ?skip_staged_ledger_verification:bool
+  -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
   -> parent:t
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
+  -> unit
   -> ( t
-     , [ `Invalid_staged_ledger_diff of Error.t
+     , [> `Invalid_staged_ledger_diff of Error.t
        | `Invalid_staged_ledger_hash of Error.t
        | `Fatal_error of exn ] )
      Result.t

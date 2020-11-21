@@ -42,8 +42,8 @@ module type S = sig
 
     val simple :
          ('k -> string)
-      -> ('k -> path:string -> 'v)
-      -> ('v -> string -> unit)
+      -> ('k -> path:string -> 'v M.t)
+      -> ('v -> string -> unit M.t)
       -> ('k, 'v) t
   end
 

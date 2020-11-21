@@ -173,6 +173,7 @@ module type Best_tip_prover_intf = sig
   val verify :
        verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -202,6 +203,7 @@ module type Consensus_best_tip_prover_intf = sig
     -> verifier:Verifier.t
     -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
@@ -318,7 +320,8 @@ module type Initial_validator_intf = sig
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t]
-                         * [`Valid_cb of bool -> unit] )
+                         * [`Valid_cb of Coda_net2.validation_result -> unit]
+                         )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -362,7 +365,8 @@ module type Transition_router_intf = sig
                                      External_transition.t Envelope.Incoming.t
                                    ]
                                  * [`Time_received of Block_time.t]
-                                 * [`Valid_cb of bool -> unit] )
+                                 * [ `Valid_cb of
+                                     Coda_net2.validation_result -> unit ] )
                                  Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t

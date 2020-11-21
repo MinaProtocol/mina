@@ -1130,9 +1130,9 @@ let add_merge_jobs :
                     , scan_result'
                     , List.drop jobs (Tree.required_job_count tree) )
               | Error e ->
-                  Or_error.errorf
-                    "Error while adding merge jobs to tree# %d: %s" i
-                    (Error.to_string_hum e)
+                  Error
+                    (Error.tag_arg e "Error while adding merge jobs to tree"
+                       ("tree_number", i) [%sexp_of: string * int])
             else Ok (tree :: trees, scan_result, jobs) )
       in
       match res with
@@ -1192,9 +1192,7 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
           State_or_error.return res
       | Error e ->
           return_error
-            (Error.of_string
-               (sprintf "Error while adding base jobs to the tree: %s"
-                  (Error.to_string_hum e)))
+            (Error.tag ~tag:"Error while adding base jobs to the tree" e)
             (tree, None)
     in
     let updated_trees =
@@ -1728,11 +1726,11 @@ let%test_module "scans" =
               in
               let buf = Bin_prot.Common.create_buf sz in
               ignore
-                (State.Stable.V1.bin_write_t Int64.bin_write_t
+                (State.Stable.Latest.bin_write_t Int64.bin_write_t
                    Int64.bin_write_t buf ~pos:0 s) ;
               let deserialized =
-                State.Stable.V1.bin_read_t Int64.bin_read_t Int64.bin_read_t
-                  ~pos_ref:(ref 0) buf
+                State.Stable.Latest.bin_read_t Int64.bin_read_t
+                  Int64.bin_read_t ~pos_ref:(ref 0) buf
               in
               let new_hash =
                 State.hash deserialized Int64.to_string Int64.to_string

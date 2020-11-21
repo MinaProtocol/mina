@@ -49,7 +49,7 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
         [("reason", `String "invalid delta transition chain proof")]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", `String (Error.to_string_hum err)) ]
+        ; ("error", Error_json.error_to_yojson err) ]
     | `Mismatched_protocol_version ->
         [("reason", `String "protocol version mismatch")]
     | `Invalid_protocol_version ->
@@ -61,12 +61,12 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      [%log fatal]
+      let error_metadata = [("error", Error_json.error_to_yojson err)] in
+      [%log error]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
-      exit 21
+      Deferred.unit
   | `Invalid_proof ->
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
@@ -203,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                |> defer
                     (validate_time_received ~precomputed_values ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= validate_proof ~verifier
+               >>= (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
                >>= defer validate_delta_transition_chain
                >>= defer validate_protocol_versions)
            with
@@ -223,7 +223,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  blockchain_length ;
                return ()
            | Error error ->
-               is_valid_cb false ;
+               is_valid_cb `Reject ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  ~delta:genesis_constants.protocol.delta error )

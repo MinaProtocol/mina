@@ -54,7 +54,7 @@ let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
     flag "public-key"
-      ~doc:"KEY Public key for which you want to check the balance"
+      ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
@@ -86,7 +86,8 @@ let get_balance_graphql =
 let get_tokens_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key for which you want to find accounts"
+    flag "public-key"
+      ~doc:"PUBLICKEY Public key for which you want to find accounts"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Get all token IDs that a public key has accounts for"
@@ -102,6 +103,28 @@ let get_tokens_graphql =
          printf "Accounts are held for token IDs:\n" ;
          Array.iter response#accounts ~f:(fun account ->
              printf "%s " (Token_id.to_string account#token) ) ))
+
+let get_time_offset_graphql =
+  Command.async
+    ~summary:
+      "Get the time offset in seconds used by the daemon to convert real time \
+       into blockchain time"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Time_offset.make ())
+             graphql_endpoint
+         in
+         let time_offset = response#timeOffset in
+         printf
+           "Current time offset:\n\
+            %i\n\n\
+            Start other daemons with this offset by setting the \
+            CODA_TIME_OFFSET environment variable in the shell before \
+            executing them:\n\
+            export CODA_TIME_OFFSET=%i\n"
+           time_offset time_offset ))
 
 let print_trust_statuses statuses json =
   if json then
@@ -253,35 +276,6 @@ let get_public_keys =
              ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
-
-let generate_receipt =
-  let open Daemon_rpcs in
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receipt_hash_flag =
-    flag "receipt-chain-hash"
-      ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
-        \        generate a receipt for"
-      (required receipt_chain_hash)
-  in
-  let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key_compressed)
-  in
-  let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
-  in
-  Command.async ~summary:"Generate a receipt for a sent payment"
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 receipt_hash_flag address_flag token_flag)
-       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
-         let account_id = Account_id.create pk token_id in
-         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, account_id)
-           port ~success:Cli_lib.Render.Prove_receipt.to_text
-           ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
 let read_json filepath ~flag =
   let%map res =
@@ -476,7 +470,9 @@ let batch_send_payments =
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+    let%bind keypair =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
@@ -781,6 +777,45 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+module Export_logs = struct
+  let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
+
+  let tarfile_flag =
+    let open Command.Param in
+    flag "tarfile"
+      ~doc:"STRING Basename of the tar archive (default: date_time)"
+      (optional string)
+
+  let export_via_graphql =
+    Command.async ~summary:"Export daemon logs to tar archive"
+      (Cli_lib.Background_daemon.graphql_init tarfile_flag
+         ~f:(fun graphql_endpoint basename ->
+           let%map response =
+             Graphql_client.query_exn
+               (Graphql_queries.Export_logs.make ?basename ())
+               graphql_endpoint
+           in
+           pp_export_result ((response#exportLogs)#exportLogs)#tarfile ))
+
+  let export_locally =
+    let run ~tarfile ~conf_dir =
+      let open Coda_lib in
+      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      fun () ->
+        match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
+        | Ok result ->
+            pp_export_result result
+        | Error err ->
+            failwithf "Error when exporting logs: %s"
+              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              ()
+    in
+    let open Command.Let_syntax in
+    Command.async ~summary:"Export local logs (no daemon) to tar archive"
+      (let%map tarfile = tarfile_flag and conf_dir = Cli_lib.Flag.conf_dir in
+       run ~tarfile ~conf_dir)
+end
+
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.rpc_init
@@ -822,7 +857,10 @@ let dump_keypair =
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
+    let%map kp =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
+    in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
@@ -862,10 +900,15 @@ let dump_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         (* TODO: Allow these to be configurable. *)
+         let proof_level = Genesis_constants.Proof_level.compiled in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
          let all =
-           Transaction_snark.constraint_system_digests ()
+           Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ()
+               ~proof_level ~constraint_constants ()
          in
          let all =
            List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
@@ -987,7 +1030,8 @@ let pending_snark_work =
 let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
+  Command.async
+    ~summary:"Start async tracing to $config-directory/trace/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
@@ -1114,7 +1158,8 @@ let import_key =
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+             privkey_path
          in
          let pk = Public_key.compress public_key in
          let%bind wallets =
@@ -1149,7 +1194,7 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"KEY Public key of account to be exported"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1296,7 +1341,7 @@ let create_hd_account =
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key to be unlocked"
+    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1330,7 +1375,7 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key of account to be locked"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1377,7 +1422,7 @@ let generate_libp2p_keypair =
               printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:[("error", Error_json.error_to_yojson e)] ;
               exit 20 )))
 
 let trustlist_ip_flag =
@@ -1436,6 +1481,70 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let get_peers_graphql =
+  Command.async ~summary:"List the peers currently connected to the daemon"
+    (Cli_lib.Background_daemon.graphql_init
+       Command.Param.(return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_peers.make ())
+             graphql_endpoint
+         in
+         Array.iter response#getPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
+let add_peers_graphql =
+  let open Command in
+  let peers =
+    Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
+  in
+  Command.async
+    ~summary:
+      "Add peers to the daemon\n\n\
+       Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+    (Cli_lib.Background_daemon.graphql_init peers
+       ~f:(fun graphql_endpoint input_peers ->
+         let open Deferred.Let_syntax in
+         let peers =
+           Array.of_list_map input_peers ~f:(fun peer ->
+               match
+                 Coda_net2.Multiaddr.of_string peer
+                 |> Coda_net2.Multiaddr.to_peer
+                 |> Option.map ~f:Network_peer.Peer.to_display
+               with
+               | Some peer ->
+                   object
+                     method host = peer.host
+
+                     method libp2p_port = peer.libp2p_port
+
+                     method peer_id = peer.peer_id
+                   end
+               | None ->
+                   eprintf
+                     "Could not parse %s as a peer address. It should use the \
+                      format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+                     peer ;
+                   Core.exit 1 )
+         in
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Add_peers.make ~peers ())
+             graphql_endpoint
+         in
+         printf "Requested to add peers:\n" ;
+         Array.iter response#addPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
 let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
@@ -1484,7 +1593,6 @@ let compile_time_constants =
                      .block_window_duration_ms )
              ; ( "delta"
                , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
-             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
              ; ( "sub_windows_per_window"
                , `Int
                    (Unsigned.UInt32.to_int
@@ -1569,6 +1677,20 @@ let next_available_token_cmd =
          printf "Next available token ID: %s\n"
            (Token_id.to_string response#nextAvailableToken) ))
 
+let object_lifetime_statistics =
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Dump internal object lifetime statistics to JSON"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Client.dispatch Get_object_lifetime_statistics.rpc () port
+         with
+         | Ok stats ->
+             print_endline stats
+         | Error err ->
+             printf "Failed to get object lifetime statistics: %s\n%!"
+               (Error.to_string_hum err) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1637,6 +1759,8 @@ let client =
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("export-logs", Export_logs.export_via_graphql)
+    ; ("export-local-logs", Export_logs.export_locally)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
@@ -1671,7 +1795,10 @@ let advanced =
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
-    ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("next-available-token", next_available_token_cmd) ]
+    ; ("next-available-token", next_available_token_cmd)
+    ; ("time-offset", get_time_offset_graphql)
+    ; ("get-peers", get_peers_graphql)
+    ; ("add-peers", add_peers_graphql)
+    ; ("object-lifetime-statistics", object_lifetime_statistics) ]

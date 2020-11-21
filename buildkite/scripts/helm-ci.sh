@@ -8,12 +8,17 @@ diff=$(
 )
 echo "--- Generated change DIFF: ${diff}"
 
-# Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
+# Identify modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
     find $(dirname ${val}) -name 'Chart.yaml' || true; # failures occur when value is undefined due to empty diff
   done
 )
+
+if [[ "$diff" =~ .*"helm-ci".* ]]; then
+  echo "--- Change to Helm CI script found. Executing against ALL repo charts!"
+  charts=$(find '.' -name 'Chart.yaml' || true)
+fi
 
 if [ -n "$charts" ]; then
   # filter duplicates
@@ -22,11 +27,16 @@ if [ -n "$charts" ]; then
 
   if [ -n "${HELM_LINT+x}" ]; then
     for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not lint charts contained within the coda-automation submodule
+        continue
+      fi
+
       echo "--- Linting: ${dir}"
       helm lint $dir
 
       echo "--- Executing dry-run: ${dir}"
-      helm install test $dir --dry-run --namespace default
+      helm install test $dir --dry-run --namespace test
     done
   fi
 
@@ -38,21 +48,24 @@ if [ -n "$charts" ]; then
     gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
 
     for dir in $dirs; do
+      if [[ "$dir" =~ .*"coda-automation".* ]]; then
+        # do not release charts contained within the coda-automation submodule
+        continue
+      fi
+
       echo "--- Preparing chart for Release: ${dir}"
       helm package $dir --destination $stageDir
 
       if [ -n "${HELM_EXPERIMENTAL_OCI+x}" ]; then
         echo "--- Helm experimental OCI activated - deploying to GCR registry"
-        helm chart save $(basename $dir)
-
-        gcloud auth configure-docker
-        docker login "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
+        helm chart save "${dir}" "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
 
         helm chart push "gcr.io/o1labs-192920/coda-charts/$(basename ${dir})"
       fi
     done
 
-    cp --force --recursive "${stageDir}" "${syncDir}"
+    echo "--- Syncing staging and release dirs"
+    cp --force --recursive --verbose ${stageDir}/* ${syncDir}/
 
     helm repo index $syncDir
 

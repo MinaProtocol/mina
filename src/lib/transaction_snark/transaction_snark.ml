@@ -220,7 +220,7 @@ module Statement = struct
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -419,7 +419,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, to_yojson]
+    [@@deriving compare, fields, sexp, version, yojson]
 
     let to_latest = Fn.id
   end
@@ -467,12 +467,13 @@ module Base = struct
       ; amount_insufficient_to_create: 'bool (* Payment only *)
       ; token_cannot_create: 'bool (* Payment only, token<>default *)
       ; source_insufficient_balance: 'bool (* Payment only *)
+      ; source_minimum_balance_violation: 'bool (* Payment only *)
       ; source_bad_timing: 'bool (* Payment only *)
       ; receiver_exists: 'bool (* Create_account only *)
       ; not_token_owner: 'bool (* Create_account, Mint_tokens *)
       ; token_auth: 'bool (* Create_account *) }
 
-    let num_fields = 10
+    let num_fields = 11
 
     let to_list
         { predicate_failed
@@ -481,6 +482,7 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
+        ; source_minimum_balance_violation
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
@@ -491,6 +493,7 @@ module Base = struct
       ; amount_insufficient_to_create
       ; token_cannot_create
       ; source_insufficient_balance
+      ; source_minimum_balance_violation
       ; source_bad_timing
       ; receiver_exists
       ; not_token_owner
@@ -503,6 +506,7 @@ module Base = struct
         ; amount_insufficient_to_create
         ; token_cannot_create
         ; source_insufficient_balance
+        ; source_minimum_balance_violation
         ; source_bad_timing
         ; receiver_exists
         ; not_token_owner
@@ -513,6 +517,7 @@ module Base = struct
           ; amount_insufficient_to_create
           ; token_cannot_create
           ; source_insufficient_balance
+          ; source_minimum_balance_violation
           ; source_bad_timing
           ; receiver_exists
           ; not_token_owner
@@ -626,6 +631,7 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
+              ; source_minimum_balance_violation= false
               ; source_bad_timing= false
               ; receiver_exists= false
               ; not_token_owner= false
@@ -678,16 +684,30 @@ module Base = struct
                     Balance.to_amount source_account.balance
                     < payload.body.amount)
               in
+              let timing_or_error =
+                Transaction_logic.validate_timing
+                  ~txn_amount:payload.body.amount ~txn_global_slot
+                  ~account:source_account
+              in
+              let source_minimum_balance_violation =
+                match timing_or_error with
+                | Ok _ ->
+                    false
+                | Error err ->
+                    let open Coda_base in
+                    User_command_status.Failure.equal
+                      (Transaction_logic.timing_error_to_user_command_status
+                         err)
+                      User_command_status.Failure
+                      .Source_minimum_balance_violation
+              in
               let source_bad_timing =
                 (* This failure is fatal if fee-payer and source account are
                    the same. This is checked in the transaction pool.
                 *)
                 (not fee_payer_is_source)
-                && ( source_insufficient_balance
-                   || Or_error.is_error
-                        (Transaction_logic.validate_timing
-                           ~txn_amount:payload.body.amount ~txn_global_slot
-                           ~account:source_account) )
+                && (not source_insufficient_balance)
+                && Or_error.is_error timing_or_error
               in
               { predicate_failed
               ; source_not_present
@@ -695,6 +715,7 @@ module Base = struct
               ; amount_insufficient_to_create
               ; token_cannot_create
               ; source_insufficient_balance
+              ; source_minimum_balance_violation
               ; source_bad_timing
               ; receiver_exists= false
               ; not_token_owner= false
@@ -765,6 +786,7 @@ module Base = struct
                 ; amount_insufficient_to_create= false
                 ; token_cannot_create= false
                 ; source_insufficient_balance= false
+                ; source_minimum_balance_violation= false
                 ; source_bad_timing= false
                 ; receiver_exists
                 ; not_token_owner
@@ -823,6 +845,7 @@ module Base = struct
               ; amount_insufficient_to_create= false
               ; token_cannot_create= false
               ; source_insufficient_balance= false
+              ; source_minimum_balance_violation= false
               ; source_bad_timing= false
               ; receiver_exists= false
               ; not_token_owner
@@ -927,6 +950,22 @@ module Base = struct
               ~creating_new_token ~fee_payer_account ~source_account
               ~receiver_account txn)
   end
+
+  (* Currently, a circuit must have at least 1 of every type of constraint. *)
+  let dummy_constraints () =
+    make_checked
+      Impl.(
+        fun () ->
+          let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+          let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
+          let _ =
+            Pickles.Step_main_inputs.Ops.scale_fast g
+              (`Plus_two_to_len [|b; b|])
+          in
+          let _ =
+            Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+          in
+          ())
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
@@ -2606,15 +2645,15 @@ module Base = struct
                   let timed_balance_check ok =
                     [%with_label
                       "Check source timed balance failure matches predicted"]
-                      (let%bind ok =
+                      (let%bind not_ok =
                          Boolean.(
-                           ok
+                           (not ok)
                            &&& not
                                  user_command_failure
                                    .source_insufficient_balance)
                        in
-                       Boolean.Assert.( = ) ok
-                         (Boolean.not user_command_failure.source_bad_timing))
+                       Boolean.Assert.( = ) not_ok
+                         user_command_failure.source_bad_timing)
                   in
                   check_timing ~balance_check ~timed_balance_check ~account
                     ~txn_amount:amount ~txn_global_slot)
@@ -2756,6 +2795,7 @@ module Base = struct
   *)
   let%snarkydef main ~constraint_constants
       (statement : Statement.With_sok.Checked.t) =
+    let%bind () = dummy_constraints () in
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind t =
       with_label __LOC__
@@ -2963,7 +3003,7 @@ module type S = sig
     -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_user_command :
        sok_digest:Sok_message.Digest.t
@@ -2975,7 +3015,7 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
@@ -2987,9 +3027,10 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
-  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
+  val merge :
+    t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
@@ -3273,10 +3314,14 @@ let verify (ts : (t * _) list) ~key =
        key
        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
-module Make () = struct
+module Make (Inputs : sig
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+end) =
+struct
+  open Inputs
+
   let tag, cache_handle, p, Pickles.Provers.[base; merge] =
-    system
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+    system ~constraint_constants
 
   module Proof = (val p)
 
@@ -3307,13 +3352,14 @@ module Make () = struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state }
     in
-    { statement= s
-    ; proof=
-        base []
-          ~handler:
-            (Base.transaction_union_handler handler transaction state_body
-               init_stack)
-          s }
+    let%map.Async proof =
+      base []
+        ~handler:
+          (Base.transaction_union_handler handler transaction state_body
+             init_stack)
+        s
+    in
+    {statement= s; proof}
 
   let of_snapp_command ~sok_digest ~source ~target ~init_stack:_
       ~pending_coinbase_stack_state ~next_available_token_before
@@ -3353,10 +3399,11 @@ module Make () = struct
     in
     match to_preunion transaction with
     | `Snapp_command t ->
-        of_snapp_command ~sok_digest ~source ~target ~init_stack
-          ~pending_coinbase_stack_state ~next_available_token_before
-          ~next_available_token_after ~snapp_account1 ~snapp_account2
-          ~state_body t handler
+        Async.Deferred.return
+        @@ of_snapp_command ~sok_digest ~source ~target ~init_stack
+             ~pending_coinbase_stack_state ~next_available_token_before
+             ~next_available_token_after ~snapp_account1 ~snapp_account2
+             ~state_body t handler
     | `Transaction t ->
         of_transaction_union sok_digest source target ~init_stack
           ~pending_coinbase_stack_state ~next_available_token_before
@@ -3407,14 +3454,16 @@ module Make () = struct
           t23.next_available_token_after (%{sexp:Token_id.t} vs \
           %{sexp:Token_id.t})"
         t12.next_available_token_after t23.next_available_token_before () ;
-    let open Or_error.Let_syntax in
-    let%map fee_excess = Fee_excess.combine t12.fee_excess t23.fee_excess
+    let open Async.Deferred.Or_error.Let_syntax in
+    let%bind fee_excess =
+      Async.return @@ Fee_excess.combine t12.fee_excess t23.fee_excess
     and supply_increase =
       Amount.add t12.supply_increase t23.supply_increase
       |> Option.value_map ~f:Or_error.return
            ~default:
              (Or_error.errorf
                 "Transaction_snark.merge: Supply change amount overflow")
+      |> Async.return
     in
     let s : Statement.With_sok.t =
       { Statement.source= t12.source
@@ -3428,9 +3477,10 @@ module Make () = struct
           ; target= t23.pending_coinbase_stack_state.target }
       ; sok_digest }
     in
-    { statement= s
-    ; proof= merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
-    }
+    let%map.Async proof =
+      merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
+    in
+    Ok {statement= s; proof}
 end
 
 let%test_module "transaction_snark" =
@@ -3523,13 +3573,16 @@ let%test_module "transaction_snark" =
         ~receiver_pk:(Account.public_key receiver.account)
         ~fee_token ~token amt fee nonce memo
 
-    include Make ()
+    include Make (struct
+      let constraint_constants = constraint_constants
+    end)
 
     let state_body =
       let compile_time_genesis =
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
         Coda_state.Genesis_protocol_state.t
           ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
@@ -3569,9 +3622,10 @@ let%test_module "transaction_snark" =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
-      of_user_command ~sok_digest ~source ~target ~init_stack
-        ~pending_coinbase_stack_state ~next_available_token_before
-        ~next_available_token_after user_command_in_block handler
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          of_user_command ~sok_digest ~source ~target ~init_stack
+            ~pending_coinbase_stack_state ~next_available_token_before
+            ~next_available_token_after user_command_in_block handler )
 
     (*
                 ~proposer:
@@ -4210,7 +4264,9 @@ let%test_module "transaction_snark" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
-                merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    merge ~sok_digest proof12 proof23 )
+                |> Or_error.ok_exn
               in
               Proof.verify [(proof13.statement, proof13.proof)] ) )
 
@@ -4237,6 +4293,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
@@ -4258,6 +4315,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
@@ -5698,36 +5756,88 @@ let%test_module "account timing check" =
 
     (* test that unchecked and checked calculations for timing agree *)
 
-    let make_checked_computation account txn_amount txn_global_slot =
+    let checked_min_balance_and_timing account txn_amount txn_global_slot =
       let account = Account.var_of_t account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
-      let open Snarky_backendless.Checked.Let_syntax in
-      let%map _, timing =
+      let%map `Min_balance min_balance, timing =
         Base.check_timing ~balance_check:Tick.Boolean.Assert.is_true
           ~timed_balance_check:Tick.Boolean.Assert.is_true ~account ~txn_amount
           ~txn_global_slot
       in
-      Snarky_backendless.As_prover.read Account.Timing.typ timing
+      (min_balance, timing)
+
+    let make_checked_timing_computation account txn_amount txn_global_slot =
+      let%map _min_balance, timing =
+        checked_min_balance_and_timing account txn_amount txn_global_slot
+      in
+      timing
+
+    let make_checked_min_balance_computation account txn_amount txn_global_slot
+        =
+      let%map min_balance, _timing =
+        checked_min_balance_and_timing account txn_amount txn_global_slot
+      in
+      min_balance
+
+    let snarky_integer_of_bools bools =
+      let snarky_bools =
+        List.map bools ~f:(fun b ->
+            let open Tick.Boolean in
+            if b then true_ else false_ )
+      in
+      let bitstring_lsb =
+        Bitstring_lib.Bitstring.Lsb_first.of_list snarky_bools
+      in
+      Snarky_integer.Integer.of_bits ~m:Tick.m bitstring_lsb
 
     let run_checked_timing_and_compare account txn_amount txn_global_slot
-        unchecked_timing =
-      let checked_computation =
-        make_checked_computation account txn_amount txn_global_slot
+        unchecked_timing unchecked_min_balance =
+      let equal_balances_computation =
+        let open Snarky_backendless.Checked in
+        let%bind checked_timing =
+          make_checked_timing_computation account txn_amount txn_global_slot
+        in
+        (* check agreement of timings produced by checked, unchecked validations *)
+        let%bind () =
+          as_prover
+            As_prover.(
+              let%map checked_timing =
+                read Account.Timing.typ checked_timing
+              in
+              assert (Account.Timing.equal checked_timing unchecked_timing))
+        in
+        let%bind checked_min_balance =
+          make_checked_min_balance_computation account txn_amount
+            txn_global_slot
+        in
+        let%bind unchecked_min_balance_as_snarky_integer =
+          Run.make_checked (fun () ->
+              snarky_integer_of_bools (Balance.to_bits unchecked_min_balance)
+          )
+        in
+        let%map equal_balances_checked =
+          Run.make_checked (fun () ->
+              Snarky_integer.Integer.equal ~m checked_min_balance
+                unchecked_min_balance_as_snarky_integer )
+        in
+        Snarky_backendless.As_prover.read Tick.Boolean.typ
+          equal_balances_checked
       in
-      let (), checked_timing =
-        Or_error.ok_exn
-        @@ Snark_params.Tick.run_and_check checked_computation ()
+      let (), equal_balances =
+        Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation ()
       in
-      Account.Timing.equal checked_timing unchecked_timing
+      equal_balances
 
     (* confirm the checked computation fails *)
     let checked_timing_should_fail account txn_amount txn_global_slot =
-      let checked_computation =
-        make_checked_computation account txn_amount txn_global_slot
+      let checked_timing_computation =
+        let%map checked_timing =
+          make_checked_timing_computation account txn_amount txn_global_slot
+        in
+        As_prover.read Account.Timing.typ checked_timing
       in
-      Or_error.is_error
-      @@ Snark_params.Tick.run_and_check checked_computation ()
+      Or_error.is_error @@ Tick.run_and_check checked_timing_computation ()
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
@@ -5744,11 +5854,14 @@ let%test_module "account timing check" =
         @@ Account.create_timed account_id balance ~initial_minimum_balance
              ~cliff_time ~vesting_period ~vesting_increment
       in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
-      match timing with
-      | Ok (Timed _ as unchecked_timing) ->
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
+      match timing_with_min_balance with
+      | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5767,8 +5880,8 @@ let%test_module "account timing check" =
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_900 in
-      let timing =
-        validate_timing ~account
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~account
           ~txn_amount:(Currency.Amount.of_int 100_000_000_000)
           ~txn_global_slot:(Coda_numbers.Global_slot.of_int 1_900)
       in
@@ -5776,10 +5889,11 @@ let%test_module "account timing check" =
           subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
           so we should still be timed
         *)
-      match timing with
-      | Ok (Timed _ as unchecked_timing) ->
+      match timing_with_min_balance with
+      | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5798,15 +5912,18 @@ let%test_module "account timing check" =
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Global_slot.of_int 2_000 in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
       (* we're 2_000 - 1_000 = 1_000 slots past the cliff, which is 100 vesting periods
           subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance
           of 10_000_000_000 to get zero, so we should be untimed now
         *)
-      match timing with
-      | Ok (Untimed as unchecked_timing) ->
+      match timing_with_min_balance with
+      | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
 
@@ -5827,7 +5944,11 @@ let%test_module "account timing check" =
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
-      | Error _ ->
+      | Error err ->
+          assert (
+            User_command_status.Failure.equal
+              (Transaction_logic.timing_error_to_user_command_status err)
+              User_command_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -5849,7 +5970,11 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.of_int 2000_000_000_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
-      | Error _ ->
+      | Error err ->
+          assert (
+            User_command_status.Failure.equal
+              (Transaction_logic.timing_error_to_user_command_status err)
+              User_command_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -5870,16 +5995,19 @@ let%test_module "account timing check" =
       (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
       let txn_global_slot = Global_slot.of_int 3000 in
-      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
-      match timing with
-      | Ok (Untimed as unchecked_timing) ->
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
+      match timing_with_min_balance with
+      | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
           run_checked_timing_and_compare account txn_amount txn_global_slot
-            unchecked_timing
+            unchecked_timing unchecked_min_balance
       | _ ->
           false
   end )
 
-let constraint_system_digests () =
+let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
     , digest
@@ -5893,6 +6021,4 @@ let constraint_system_digests () =
     , digest
         Base.(
           Tick.constraint_system ~exposing:[Statement.With_sok.typ]
-            (main
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled)) ) ]
+            (main ~constraint_constants)) ) ]
