@@ -23,6 +23,7 @@ module Config = struct
     { timeout: Time.Span.t
     ; initial_peers: Coda_net2.Multiaddr.t list
     ; addrs_and_ports: Node_addrs_and_ports.t
+    ; metrics_port: string option
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
@@ -92,8 +93,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~on_unexpected_termination =
-      let fail m =
-        failwithf "Failed to connect to libp2p_helper process: %s" m ()
+      let fail err =
+        Error.tag err ~tag:"Failed to connect to libp2p_helper process"
+        |> Error.raise
       in
       let conf_dir = config.conf_dir ^/ "coda_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -141,6 +143,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
               configure net2 ~me ~logger:config.logger
+                ~metrics_port:config.metrics_port
                 ~maddrs:
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
@@ -355,11 +358,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           | Ok (subscription, message_reader) ->
               (net2, subscription, message_reader)
           | Error e ->
-              fail (Error.to_string_hum e) )
+              fail e )
       | Ok (Error e) ->
-          fail (Error.to_string_hum e)
+          fail e
       | Error e ->
-          fail (Exn.to_string e)
+          fail (Error.of_exn e)
 
     let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in
