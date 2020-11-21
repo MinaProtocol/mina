@@ -356,6 +356,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; metrics_port: string
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
@@ -1208,8 +1209,8 @@ let list_peers net =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~seed_peers ~initial_gating_config =
+    ~metrics_port ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers
+    ~peer_exchange ~seed_peers ~initial_gating_config =
   net.Helper.new_peer_callback
   <- Some
        (fun peer_id peer_addrs ->
@@ -1222,6 +1223,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; metrics_port= Option.value metrics_port ~default:""
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
@@ -1554,7 +1556,7 @@ let%test_module "coda network tests" =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
@@ -1562,7 +1564,7 @@ let%test_module "coda network tests" =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
