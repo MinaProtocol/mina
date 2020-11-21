@@ -1,6 +1,6 @@
 module codanet
 
-go 1.12
+go 1.13
 
 require (
 	github.com/campoy/jsonenums v0.0.0-20180221195324-eec6d38da64e
