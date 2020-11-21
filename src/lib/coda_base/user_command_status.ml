@@ -384,17 +384,17 @@ module Failure = struct
       | {not_token_owner= true; _} ->
           to_enum Not_token_owner
       | {mismatched_token_permissions= true; _} ->
-          to_enum mismatched_token_permissions
+          to_enum Mismatched_token_permissions
       | {overflow= true; _} ->
-          to_enum overflow
+          to_enum Overflow
       | {signed_command_on_snapp_account= true; _} ->
-          to_enum signed_command_on_snapp_account
+          to_enum Signed_command_on_snapp_account
       | {snapp_account_not_present= true; _} ->
-          to_enum snapp_account_not_present
+          to_enum Snapp_account_not_present
       | {update_not_permitted= true; _} ->
-          to_enum update_not_permitted
+          to_enum Update_not_permitted
       | {incorrect_nonce= true; _} ->
-          to_enum incorrect_nonce
+          to_enum Incorrect_nonce
       | _ ->
           0
 
