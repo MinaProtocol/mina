@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	gonet "net"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -32,6 +33,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type subscription struct {
@@ -190,11 +192,52 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	return maybePeer, nil
 }
 
+type codaMetricsServer struct {
+	port   string
+	server *http.Server
+	done   *sync.WaitGroup
+}
+
+func startMetricsServer(port string) *codaMetricsServer {
+	log := logging.Logger("metrics server")
+	done := &sync.WaitGroup{}
+	done.Add(1)
+	server := &http.Server{Addr: ":" + port}
+
+	// does this need re-registered every time?
+	// http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		defer done.Done()
+
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("http server error: %v", err)
+		}
+	}()
+
+	return &codaMetricsServer{
+		port:   port,
+		server: server,
+		done:   done,
+	}
+}
+
+func (ms *codaMetricsServer) Shutdown() {
+	if err := ms.server.Shutdown(context.Background()); err != nil {
+		panic(err)
+	}
+
+	ms.done.Wait()
+}
+
+var metricsServer *codaMetricsServer = nil
+
 type configureMsg struct {
 	Statedir        string             `json:"statedir"`
 	Privk           string             `json:"privk"`
 	NetworkID       string             `json:"network_id"`
 	ListenOn        []string           `json:"ifaces"`
+	MetricsPort     string             `json:"metrics_port"`
 	External        string             `json:"external_maddr"`
 	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
 	Flood           bool               `json:"flood"`
@@ -285,6 +328,13 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	app.P2p = helper
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+
+	if metricsServer != nil && metricsServer.port != m.MetricsPort {
+		metricsServer.Shutdown()
+	}
+	if len(m.MetricsPort) > 0 {
+		metricsServer = startMetricsServer(m.MetricsPort)
+	}
 
 	return "configure success", nil
 }
@@ -1082,6 +1132,12 @@ type successResult struct {
 	Seqno    int             `json:"seqno"`
 	Success  json.RawMessage `json:"success"`
 	Duration string          `json:"duration"`
+}
+
+func init() {
+	// === Register metrics collectors here ===
+	// currently, we only register the default go collector (which promhttp does automatically for us)
+	http.Handle("/metrics", promhttp.Handler())
 }
 
 func main() {
