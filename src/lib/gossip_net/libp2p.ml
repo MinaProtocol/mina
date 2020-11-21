@@ -23,6 +23,7 @@ module Config = struct
     { timeout: Time.Span.t
     ; initial_peers: Coda_net2.Multiaddr.t list
     ; addrs_and_ports: Node_addrs_and_ports.t
+    ; metrics_port: string option
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
@@ -148,6 +149,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
               configure net2 ~me ~logger:config.logger
+                ~metrics_port:config.metrics_port
                 ~maddrs:
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
