@@ -127,6 +127,12 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
+  and libp2p_metrics_port =
+    flag "libp2p-metrics-port"
+      ~doc:
+        "PORT libp2p metrics server for scraping via Prometheus (default no \
+         libp2p-metrics-server)"
+      (optional int16)
   and external_ip_opt =
     flag "external-ip"
       ~doc:
@@ -306,7 +312,10 @@ let setup_daemon logger =
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
         [ ("commit", `String Coda_version.commit_id)
-        ; ("branch", `String Coda_version.branch) ] ;
+        ; ("branch", `String Coda_version.branch)
+        ; ("commit_date", `String Coda_version.commit_date)
+        ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+        ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
@@ -883,6 +892,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; unsafe_no_trust_ip= false
           ; initial_peers
           ; addrs_and_ports
+          ; metrics_port= Option.map libp2p_metrics_port ~f:Int.to_string
           ; trust_system
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
