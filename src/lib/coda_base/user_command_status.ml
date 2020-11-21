@@ -442,7 +442,7 @@ module Failure = struct
 
     let min = 0
 
-    let max = 15
+    let max = failure_max
 
     let%test_unit "of_enum obeys invariants" =
       for i = min to max do
