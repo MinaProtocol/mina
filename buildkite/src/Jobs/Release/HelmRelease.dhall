@@ -1,4 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -17,18 +20,24 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.contains "helm", S.strictly (S.contains "Chart.yaml") ],
+      dirtyWhen = [
+        S.contains "helm",
+        S.strictly (S.contains "Chart.yaml"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
+        S.exactly "buildkite/scripts/helm-ci" "sh"
+      ],
       path = "Release",
       name = "HelmRelease"
     },
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "HELM_RELEASE=true buildkite/scripts/helm-ci.sh" ]
+          commands = [ Cmd.run "HELM_RELEASE=true AUTO_DEPLOY=true buildkite/scripts/helm-ci.sh" ]
           , label = "Helm chart release"
           , key = "release-helm-chart"
           , target = Size.Medium
           , docker = None Docker.Type
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , artifact_paths = [ S.contains "updates/*" ]
           , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]
         }

@@ -1,0 +1,4 @@
+healthcheck:
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

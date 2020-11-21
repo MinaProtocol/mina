@@ -2,11 +2,11 @@
 
 open Core_kernel
 
-module Global_slots_and_ledger_hashes = struct
-  (* find all global slots in blocks, working back from block with given state hash *)
+module Block_info = struct
+  (* find all blocks, working back from block with given state hash *)
   let query =
     Caqti_request.collect Caqti_type.string
-      Caqti_type.(tup2 int64 string)
+      Caqti_type.(tup3 int int64 string)
       {|
          WITH RECURSIVE chain AS (
 
@@ -18,10 +18,10 @@ module Global_slots_and_ledger_hashes = struct
 
            INNER JOIN chain
 
-           ON b.id = chain.parent_id
+           ON b.id = chain.parent_id AND chain.id <> chain.parent_id
         )
 
-        SELECT global_slot,ledger_hash FROM chain c
+        SELECT id,global_slot,ledger_hash FROM chain c
    |}
 
   let run (module Conn : Caqti_async.CONNECTION) state_hash =
@@ -45,7 +45,7 @@ let find_command_ids_query s =
 
         INNER JOIN chain
 
-        ON b.id = chain.parent_id
+        ON b.id = chain.parent_id AND chain.id <> chain.parent_id
       )
 
       SELECT DISTINCT %s_command_id FROM chain c
@@ -78,9 +78,12 @@ module User_command = struct
     ; fee_token: int64
     ; token: int64
     ; amount: int64 option
+    ; valid_until: int64 option
     ; memo: string
     ; nonce: int64
+    ; block_id: int
     ; global_slot: int64
+    ; txn_global_slot: int64
     ; sequence_no: int }
 
   let typ =
@@ -89,12 +92,14 @@ module User_command = struct
       Ok
         ( (t.type_, t.fee_payer_id, t.source_id, t.receiver_id)
         , (t.fee, t.fee_token, t.token, t.amount)
-        , (t.memo, t.nonce, t.global_slot, t.sequence_no) )
+        , (t.valid_until, t.memo, t.nonce)
+        , (t.block_id, t.global_slot, t.txn_global_slot, t.sequence_no) )
     in
     let decode
         ( (type_, fee_payer_id, source_id, receiver_id)
         , (fee, fee_token, token, amount)
-        , (memo, nonce, global_slot, sequence_no) ) =
+        , (valid_until, memo, nonce)
+        , (block_id, global_slot, txn_global_slot, sequence_no) ) =
       Ok
         { type_
         ; fee_payer_id
@@ -104,25 +109,29 @@ module User_command = struct
         ; fee_token
         ; token
         ; amount
+        ; valid_until
         ; memo
         ; nonce
+        ; block_id
         ; global_slot
+        ; txn_global_slot
         ; sequence_no }
     in
     let rep =
       Caqti_type.(
-        tup3 (tup4 string int int int)
+        tup4 (tup4 string int int int)
           (tup4 int64 int64 int64 (option int64))
-          (tup4 string int64 int64 int))
+          (tup3 (option int64) string int64)
+          (tup4 int int64 int64 int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status
 
-         (SELECT * FROM user_commands WHERE id = ?) AS uc
+         FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
 
          INNER JOIN
 
@@ -137,6 +146,12 @@ module User_command = struct
          ON
 
          blocks.id = buc.block_id
+
+         INNER JOIN blocks as parent
+
+         ON
+
+         parent.id = blocks.parent_id
 
        |}
 
@@ -159,7 +174,9 @@ module Internal_command = struct
     ; receiver_id: int
     ; fee: int64
     ; token: int64
+    ; block_id: int
     ; global_slot: int64
+    ; txn_global_slot: int64
     ; sequence_no: int
     ; secondary_sequence_no: int }
 
@@ -169,31 +186,39 @@ module Internal_command = struct
       Ok
         ( (t.type_, t.receiver_id)
         , (t.fee, t.token)
-        , (t.global_slot, t.sequence_no, t.secondary_sequence_no) )
+        , (t.block_id, t.global_slot)
+        , (t.txn_global_slot, t.sequence_no, t.secondary_sequence_no) )
     in
     let decode
         ( (type_, receiver_id)
         , (fee, token)
-        , (global_slot, sequence_no, secondary_sequence_no) ) =
+        , (block_id, global_slot)
+        , (txn_global_slot, sequence_no, secondary_sequence_no) ) =
       Ok
         { type_
         ; receiver_id
         ; fee
         ; token
+        ; block_id
         ; global_slot
+        ; txn_global_slot
         ; sequence_no
         ; secondary_sequence_no }
     in
     let rep =
       Caqti_type.(
-        tup3 (tup2 string int) (tup2 int64 int64) (tup3 int64 int int))
+        tup4 (tup2 string int) (tup2 int64 int64) (tup2 int int64)
+          (tup3 int64 int int))
     in
     Caqti_type.custom ~encode ~decode rep
 
+  (* the transaction global slot is taken from the user command's parent block, mirroring
+     the call to Staged_ledger.apply in Block_producer
+  *)
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,receiver_id,fee,token,global_slot,sequence_no,secondary_sequence_no FROM
+         SELECT type,receiver_id,fee,token,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,secondary_sequence_no FROM
 
          (SELECT * FROM internal_commands WHERE id = ?) AS ic
 
@@ -211,6 +236,12 @@ module Internal_command = struct
 
          ON blocks.id = bic.block_id
 
+         INNER JOIN blocks as parent
+
+         ON
+
+         parent.id = blocks.parent_id
+
        |}
 
   let run (module Conn : Caqti_async.CONNECTION) internal_cmd_id =
@@ -226,4 +257,74 @@ module Public_key = struct
 
   let run (module Conn : Caqti_async.CONNECTION) pk_id =
     Conn.find_opt query pk_id
+end
+
+module Epoch_data = struct
+  type epoch_data = {epoch_ledger_hash: string; epoch_data_seed: string}
+
+  let epoch_data_typ =
+    let encode t = Ok (t.epoch_ledger_hash, t.epoch_data_seed) in
+    let decode (epoch_ledger_hash, epoch_data_seed) =
+      Ok {epoch_ledger_hash; epoch_data_seed}
+    in
+    let rep = Caqti_type.(tup2 string string) in
+    Caqti_type.custom ~encode ~decode rep
+
+  let query_epoch_data =
+    Caqti_request.find Caqti_type.int epoch_data_typ
+      {| SELECT slh.value, ed.seed FROM snarked_ledger_hashes AS slh
+
+       INNER JOIN
+
+       epoch_data AS ed
+
+       ON slh.id = ed.ledger_hash_id
+
+       WHERE ed.id = ?
+    |}
+
+  let get_epoch_data (module Conn : Caqti_async.CONNECTION) epoch_ledger_id =
+    Conn.find query_epoch_data epoch_ledger_id
+
+  let query_staking_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT staking_epoch_data_id FROM blocks
+
+         WHERE state_hash = ?
+    |}
+
+  let get_staking_epoch_data_id (module Conn : Caqti_async.CONNECTION)
+      state_hash =
+    Conn.find query_staking_epoch_data_id state_hash
+
+  let query_next_epoch_data_id =
+    Caqti_request.find Caqti_type.string Caqti_type.int
+      {| SELECT next_epoch_data_id FROM blocks
+
+         WHERE state_hash = ?
+    |}
+
+  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash
+      =
+    Conn.find query_next_epoch_data_id state_hash
+end
+
+module Fork_block = struct
+  (* fork block is parent of block with the given state hash *)
+  let query_state_hash =
+    Caqti_request.find Caqti_type.string Caqti_type.string
+      {| SELECT parent.state_hash FROM blocks AS parent
+
+         INNER JOIN
+
+         (SELECT parent_id FROM blocks
+
+          WHERE state_hash = ?) AS epoch_ledgers_block
+
+         ON epoch_ledgers_block.parent_id = parent.id
+    |}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION)
+      epoch_ledgers_state_hash =
+    Conn.find query_state_hash epoch_ledgers_state_hash
 end

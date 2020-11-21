@@ -54,7 +54,9 @@ let main () =
     ~f:(fun With_hash.{hash; data= transition} ->
       match%map
         let open Deferred.Result.Let_syntax in
-        match%bind Archive_lib.Processor.Block.find conn ~state_hash:hash with
+        match%bind
+          Archive_lib.Processor.Block.find_opt conn ~state_hash:hash
+        with
         | Some id ->
             let%bind Archive_lib.Processor.Block.{parent_id; _} =
               Archive_lib.Processor.Block.load conn ~id

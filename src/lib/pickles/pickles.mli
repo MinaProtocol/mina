@@ -1,11 +1,15 @@
 open Core_kernel
 open Pickles_types
 open Hlist
+module Tick_field_sponge = Tick_field_sponge
+module Util = Util
+module Step_main_inputs = Step_main_inputs
 module Backend = Backend
 module Sponge_inputs = Sponge_inputs
 module Impls = Impls
 module Inductive_rule = Inductive_rule
 module Tag = Tag
+module Pairing_main = Pairing_main
 
 module type Statement_intf = sig
   type field
@@ -22,7 +26,12 @@ module type Statement_value_intf =
   Statement_intf with type field := Impls.Step.field
 
 module Verification_key : sig
-  include Binable.S
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
 
   val dummy : t Lazy.t
 
@@ -193,5 +202,5 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t )
+       , ('max_branching, 'max_branching) Proof.t Async.Deferred.t )
        H3_2.T(Prover).t

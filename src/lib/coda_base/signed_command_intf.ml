@@ -24,9 +24,10 @@ module type Gen_intf = sig
   type t
 
   module Gen : sig
-    (* Generate a single transaction between
+    (** Generate a single transaction between
     * Generate random keys for sender and receiver
-    * for fee $\in [0,max_fee]$
+    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
+    * Coda_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment :
@@ -37,13 +38,14 @@ module type Gen_intf = sig
       -> max_amount:int
       -> ?fee_token:Token_id.t
       -> ?payment_token:Token_id.t
-      -> max_fee:int
+      -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
 
-    (* Generate a single transaction between
+    (** Generate a single transaction between
     * $a, b \in keys$
-    * for fee $\in [0,max_fee]$
+    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
+    * Coda_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
@@ -53,7 +55,7 @@ module type Gen_intf = sig
       -> max_amount:int
       -> ?fee_token:Token_id.t
       -> ?payment_token:Token_id.t
-      -> max_fee:int
+      -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
 
@@ -62,7 +64,7 @@ module type Gen_intf = sig
                  Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> ?fee_token:Token_id.t
-      -> max_fee:int
+      -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
 
@@ -70,7 +72,7 @@ module type Gen_intf = sig
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> ?fee_token:Token_id.t
-      -> max_fee:int
+      -> fee_range:int
       -> unit
       -> t Quickcheck.Generator.t
 

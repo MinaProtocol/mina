@@ -24,12 +24,17 @@ module T = struct
           * Transaction_snark.Statement.t
           * Coda_base.Sok_message.t )
           list
+      | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Unexpected of Error.t
     [@@deriving sexp]
 
     let to_string = function
+      | Couldn't_reach_verifier e ->
+          Format.asprintf
+            !"The verifier could not be reached: %{sexp:Error.t}"
+            e
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
@@ -83,7 +88,7 @@ module T = struct
               ) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
-      Deferred.return false
+      Deferred.return (Or_error.error_string err_str)
     in
     if
       List.exists proofs ~f:(fun (proof, statement, _msg) ->
@@ -101,7 +106,7 @@ module T = struct
                        (Ledger_proof.statement p) )) ) ]
     else
       let start = Time.now () in
-      match%bind
+      match%map
         Verifier.verify_transaction_snarks verifier
           (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
       with
@@ -115,7 +120,7 @@ module T = struct
                          `Int (Transaction_snark.Statement.hash s) )) )
               ; ("time", `Float time_ms) ]
             "Verification in apply_diff for work $work_id took $time ms" ;
-          Deferred.return b
+          Ok b
       | Error e ->
           [%log fatal]
             ~metadata:
@@ -123,10 +128,10 @@ module T = struct
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
                          Transaction_snark.Statement.to_yojson s )) )
-              ; ("error", `String (Error.to_string_hum e)) ]
+              ; ("error", Error_json.error_to_yojson e) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
-          exit 21
+          Error e
 
   let map_opt xs ~f =
     with_return (fun {return} ->
@@ -149,10 +154,12 @@ module T = struct
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | true ->
+        | Ok true ->
             Ok ()
-        | _ ->
-            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs) )
+        | Ok false ->
+            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs)
+        | Error e ->
+            Error (Couldn't_reach_verifier e) )
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
@@ -160,7 +167,7 @@ module T = struct
               (struct
                 type t = unit
 
-                let verify ~verifier:() _proofs = Deferred.return true
+                let verify ~verifier:() _proofs = Deferred.return (Ok true)
               end)
   end
 
@@ -484,7 +491,6 @@ module T = struct
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
       pending_coinbase_stack_state s txn_state_view state_and_body_hash =
-    let open Deferred.Let_syntax in
     let account_ids : Transaction.t -> _ = function
       | Fee_transfer t ->
           Fee_transfer.receivers t
@@ -503,13 +509,11 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
             pending_coinbase_stack_state s txn_state_view )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_pending_coinbase_stack_state = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
@@ -519,6 +523,13 @@ module T = struct
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
+
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
 
   let update_ledger_and_get_statements ~constraint_constants ledger
       current_stack ts current_state_view state_and_body_hash =
@@ -533,18 +544,23 @@ module T = struct
       in
       let exception Exit of Staged_ledger_error.t in
       try
+        let tss = partition 10 ts in
         let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_state_view state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
+              let%map () = Async.Scheduler.yield () in
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      current_state_view state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) )
         in
         return ret
       with Exit err -> Deferred.Result.fail err
@@ -606,6 +622,15 @@ module T = struct
     Option.value_map ~default:(Result.return ())
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
+
+  let time ~logger label f =
+    let start = Core.Time.now () in
+    let%map x = f () in
+    [%log debug]
+      ~metadata:
+        [("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))]
+      "%s took $time_elapsed" label ;
+    x
 
   let update_coinbase_stack_and_get_data ~constraint_constants scan_state
       ledger pending_coinbase_collection transactions current_state_view
@@ -761,8 +786,9 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  let apply_diff ~logger ~constraint_constants t pre_diff_info
-      ~current_state_view ~state_and_body_hash ~log_prefix ~coinbase_receiver =
+  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants t
+      pre_diff_info ~current_state_view ~state_and_body_hash ~log_prefix
+      ~coinbase_receiver =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -776,9 +802,10 @@ module T = struct
     let new_ledger = Ledger.register_mask t.ledger new_mask in
     let transactions, works, commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
-      update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
-        new_ledger t.pending_coinbase_collection transactions
-        current_state_view state_and_body_hash
+      time ~logger "update_coinbase_stack_start_time" (fun () ->
+          update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
+            new_ledger t.pending_coinbase_collection transactions
+            current_state_view state_and_body_hash )
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -786,61 +813,71 @@ module T = struct
       Scan_state.work_statements_for_new_diff t.scan_state
     in
     let%bind () =
-      let required = List.length required_pairs in
-      if
-        work_count < required
-        && List.length data
-           > Scan_state.free_space t.scan_state - required + work_count
-      then
-        Deferred.return
-          (Error
-             (Staged_ledger_error.Insufficient_work
-                (sprintf
-                   !"Insufficient number of transaction snark work (slots \
-                     occupying: %d)  required %d, got %d"
-                   slots required work_count)))
-      else Deferred.return (Ok ())
+      time ~logger "sufficient work check" (fun () ->
+          let required = List.length required_pairs in
+          if
+            work_count < required
+            && List.length data
+               > Scan_state.free_space t.scan_state - required + work_count
+          then
+            Deferred.return
+              (Error
+                 (Staged_ledger_error.Insufficient_work
+                    (sprintf
+                       !"Insufficient number of transaction snark work (slots \
+                         occupying: %d)  required %d, got %d"
+                       slots required work_count)))
+          else Deferred.return (Ok ()) )
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
-      let r =
-        Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
-      in
-      Or_error.iter_error r ~f:(fun e ->
-          let data_json =
-            `List
-              (List.map data
-                 ~f:(fun {Scan_state.Transaction_with_witness.statement; _} ->
-                   Transaction_snark.Statement.to_yojson statement ))
+      time ~logger "fill_work_and_enqueue_transactions" (fun () ->
+          let r =
+            Scan_state.fill_work_and_enqueue_transactions t.scan_state data
+              works
           in
-          [%log error]
-            ~metadata:
-              [ ( "scan_state"
-                , `String (Scan_state.snark_job_list_json t.scan_state) )
-              ; ("data", data_json)
-              ; ("error", `String (Error.to_string_hum e))
-              ; ("prefix", `String log_prefix) ]
-            !"$prefix: Unexpected error when applying diff data $data to the \
-              scan_state $scan_state: $error" ) ;
-      Deferred.return (to_staged_ledger_or_error r)
+          Or_error.iter_error r ~f:(fun e ->
+              let data_json =
+                `List
+                  (List.map data
+                     ~f:(fun {Scan_state.Transaction_with_witness.statement; _}
+                        -> Transaction_snark.Statement.to_yojson statement ))
+              in
+              [%log error]
+                ~metadata:
+                  [ ( "scan_state"
+                    , `String (Scan_state.snark_job_list_json t.scan_state) )
+                  ; ("data", data_json)
+                  ; ("error", Error_json.error_to_yojson e)
+                  ; ("prefix", `String log_prefix) ]
+                !"$prefix: Unexpected error when applying diff data $data to \
+                  the scan_state $scan_state: $error" ) ;
+          Deferred.return (to_staged_ledger_or_error r) )
     in
     let%bind updated_pending_coinbase_collection' =
-      update_pending_coinbase_collection
-        ~depth:t.constraint_constants.pending_coinbase_depth
-        t.pending_coinbase_collection stack_update ~is_new_stack
-        ~ledger_proof:res_opt
-      |> Deferred.return
+      time ~logger "update_pending_coinbase_collection" (fun () ->
+          update_pending_coinbase_collection
+            ~depth:t.constraint_constants.pending_coinbase_depth
+            t.pending_coinbase_collection stack_update ~is_new_stack
+            ~ledger_proof:res_opt
+          |> Deferred.return )
     in
     let%bind coinbase_amount =
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.(
-        verify_scan_state_after_apply ~constraint_constants
-          ~next_available_token:(Ledger.next_available_token new_ledger)
-          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-          scan_state'
-        >>| to_staged_ledger_or_error)
+      time ~logger
+        (sprintf "verify_scan_state_after_apply (skip=%b)" skip_verification)
+        (fun () ->
+          if skip_verification then Deferred.return (Ok ())
+          else
+            Deferred.(
+              verify_scan_state_after_apply ~constraint_constants
+                ~next_available_token:(Ledger.next_available_token new_ledger)
+                (Frozen_ledger_hash.of_ledger_hash
+                   (Ledger.merkle_root new_ledger))
+                scan_state'
+              >>| to_staged_ledger_or_error) )
     in
     [%log debug]
       ~metadata:
@@ -922,11 +959,19 @@ module T = struct
                   (Verifier.Failure.Verification_failed
                      (Error.of_string "batch verification failed")) ))
 
-  let apply ~constraint_constants t (witness : Staged_ledger_diff.t) ~logger
-      ~verifier ~current_state_view ~state_and_body_hash =
+  let apply ?skip_verification ~constraint_constants t
+      (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
+      ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind () =
+      time ~logger "check_completed_works" (fun () ->
+          match skip_verification with
+          | Some true ->
+              return ()
+          | Some false | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
+    in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants
         ~check:(check_commands t.ledger ~verifier)
@@ -935,17 +980,25 @@ module T = struct
              (Result.map_error ~f:(fun error ->
                   Staged_ledger_error.Pre_diff error ))
     in
+    let apply_diff_start_time = Core.Time.now () in
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff ~constraint_constants t
+      apply_diff ?skip_verification ~constraint_constants t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
         ~log_prefix:"apply_diff" ~coinbase_receiver:witness.coinbase_receiver
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time) )
+        ]
+      "Staged_ledger.apply_diff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
           [%log error]
-            ~metadata:[("error", `String (Error.to_string_hum e))]
+            ~metadata:[("error", Error_json.error_to_yojson e)]
             !"Error updating metrics after applying staged_ledger diff: $error"
       )
     in
@@ -1420,7 +1473,7 @@ module T = struct
             res''
         | Error e ->
             [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[("error", `String (Error.to_string_hum e))] ;
+              ~metadata:[("error", Error_json.error_to_yojson e)] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1718,7 +1771,7 @@ module T = struct
               [%log error]
                 ~metadata:
                   [ ("user_command", User_command.Valid.to_yojson txn)
-                  ; ("error", `String (Error.to_string_hum e)) ]
+                  ; ("error", Error_json.error_to_yojson e) ]
                 "Staged_ledger_diff creation: Skipping user command: \
                  $user_command due to error: $error" ;
               Continue (seq, count)
@@ -1834,6 +1887,7 @@ let%test_module "test" =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Coda_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
         in
         compile_time_genesis.data |> Coda_state.Protocol_state.body

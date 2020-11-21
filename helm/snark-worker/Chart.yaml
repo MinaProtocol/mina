@@ -1,14 +1,16 @@
 apiVersion: v2
 name: snark-worker
-description: A Helm chart for Coda Protocol's SNARK worker nodes
+description: A Helm chart for Mina Protocol's SNARK worker nodes
 type: application
-version: 0.1.4
+version: 0.2.0
 appVersion: 1.16.0
 dependencies:
-icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+icon: https://github.com/MinaProtocol/mina/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
 keywords:
 - snarks
 - zero-knowledge
-home: https://codaprotocol.com/
+- mina
+- testnet
+home: https://minaprotocol.com/
 sources:
-- https://github.com/CodaProtocol/coda/tree/develop/src/lib/snark_worker
+- https://github.com/MinaProtocol/mina/tree/develop/src/lib/snark_worker

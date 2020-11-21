@@ -1,6 +1,7 @@
 (library
-  (inline_tests)
-  (name hex)
-  (public_name hex)
-  (preprocess (pps ppx_jane ppx_version ppx_inline_test bisect_ppx -- --conditional))
-  (libraries core_kernel ))
+ (inline_tests)
+ (name hex)
+ (public_name hex)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version ppx_inline_test))
+ (libraries core_kernel))

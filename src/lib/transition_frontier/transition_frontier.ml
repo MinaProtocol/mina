@@ -2,13 +2,12 @@
 *  the transition frontier, wrapping high-level initialization
 *  logic as well as gluing together the logic for adding items
 *  to the frontier *)
+open Core
 
-open Core_kernel
 open Async_kernel
 open Coda_base
 open Coda_transition
 include Frontier_base
-module Hash = Frontier_hash
 module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
@@ -74,15 +73,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
             persistent_frontier_instance root_identifier
         with
       | Ok () ->
-          Ok ()
-      | Error `Frontier_hash_does_not_match ->
-          [%log warn]
-            ~metadata:
-              [("frontier_hash", Hash.to_yojson root_identifier.frontier_hash)]
-            "Persistent frontier hash did not match persistent root frontier \
-             hash (resetting frontier hash)" ;
-          Persistent_frontier.Instance.set_frontier_hash
-            persistent_frontier_instance root_identifier.frontier_hash ;
+          [%log info] "Fast forward successful" ;
           Ok ()
       | Error `Sync_cannot_be_running ->
           Error (`Failure "sync job is already running on persistent frontier")
@@ -110,6 +101,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
           | `Failure _ as err ->
               err ))
   in
+  [%log info] "Loaded full frontier and extensions" ;
   let%map () =
     Deferred.return
       ( Persistent_frontier.Instance.start_sync
@@ -184,6 +176,7 @@ let rec load_with_max_length :
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
         ~root_data:(genesis_root_data ~precomputed_values)
+        ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
@@ -193,7 +186,9 @@ let rec load_with_max_length :
       ~ignore_consensus_local_state:false
   in
   match
-    Persistent_frontier.Instance.check_database persistent_frontier_instance
+    Persistent_frontier.Instance.check_database
+      ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
+      persistent_frontier_instance
   with
   | Error `Not_initialized ->
       (* TODO: this case can be optimized to not create the
@@ -203,6 +198,17 @@ let rec load_with_max_length :
       reset_and_continue ()
   | Error `Invalid_version ->
       [%log info] "persistent frontier database out of date" ;
+      reset_and_continue ()
+  | Error (`Genesis_state_mismatch persisted_genesis_state_hash) ->
+      [%log info]
+        "Genesis state in persisted frontier $persisted_state_hash differs \
+         from the current genesis state $precomputed_state_hash"
+        ~metadata:
+          [ ( "persisted_state_hash"
+            , State_hash.to_yojson persisted_genesis_state_hash )
+          ; ( "precomputed_state_hash"
+            , State_hash.to_yojson
+                precomputed_values.protocol_state_with_hash.hash ) ] ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
       [%log error] "Persistent frontier database is corrupt: %s"
@@ -273,7 +279,6 @@ let root_snarked_ledger {persistent_root_instance; _} =
 
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
-  let old_hash = Full_frontier.hash t.full_frontier in
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
   [%log' trace t.logger]
     ~metadata:
@@ -288,8 +293,9 @@ let add_breadcrumb_exn t breadcrumb =
     (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
+    (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
-      ~ignore_consensus_local_state:false
+      ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   Option.iter new_root_identifier
     ~f:
@@ -319,10 +325,9 @@ let add_breadcrumb_exn t breadcrumb =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
   let%bind sync_result =
+    (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
       ~diffs:lite_diffs
-      ~hash_transition:
-        {source= old_hash; target= Full_frontier.hash t.full_frontier}
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
@@ -381,15 +386,15 @@ include struct
   let root_length = proxy1 root_length
 
   (* TODO: probably shouldn't be an `_exn` function *)
-  let best_tip_path = proxy1 best_tip_path
+  let best_tip_path ?max_length = proxy1 (best_tip_path ?max_length)
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
   let find_protocol_state = proxy1 find_protocol_state
 
   (* why can't this one be proxied? *)
-  let path_map {full_frontier; _} breadcrumb ~f =
-    path_map full_frontier breadcrumb ~f
+  let path_map ?max_length {full_frontier; _} breadcrumb ~f =
+    path_map ?max_length full_frontier breadcrumb ~f
 end
 
 module For_tests = struct
@@ -476,7 +481,8 @@ module For_tests = struct
                    ~snarked_ledger:genesis_ledger
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
-        Breadcrumb.create genesis_transition genesis_staged_ledger )
+        Breadcrumb.create ~validated_transition:genesis_transition
+          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false )
 
   let gen_persistence ?(logger = Logger.null ()) ?verifier
       ~(precomputed_values : Precomputed_values.t) () =
@@ -530,6 +536,8 @@ module For_tests = struct
               persistent_frontier.Persistent_frontier.Factory_type.instance
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
+            Option.iter persistent_root.Persistent_root.Factory_type.instance
+              ~f:(fun instance -> Ledger.Db.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -552,9 +560,6 @@ module For_tests = struct
         gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier
           ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
-    let genesis_state_hash =
-      Precomputed_values.genesis_state_hash precomputed_values
-    in
     let verifier =
       match verifier with
       | Some x ->
@@ -568,13 +573,21 @@ module For_tests = struct
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
     in
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let consensus_local_state =
       Option.value consensus_local_state
         ~default:
           (Consensus.Data.Local_state.create
              ~genesis_ledger:
                (Precomputed_values.genesis_ledger precomputed_values)
-             Public_key.Compressed.Set.empty)
+             ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+             ~epoch_ledger_location Public_key.Compressed.Set.empty
+             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+             ~genesis_state_hash:
+               (With_hash.hash precomputed_values.protocol_state_with_hash))
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
@@ -604,10 +617,10 @@ module For_tests = struct
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
+          ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
-          ~genesis_state_hash
           (External_transition.Validated.state_hash
              (Root_data.Limited.transition root_data)) ;
         ignore
@@ -634,6 +647,14 @@ module For_tests = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter ~how:`Sequential branches
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
+    Core.Gc.Expert.add_finalizer_exn consensus_local_state
+      (fun consensus_local_state ->
+        Consensus.Data.Local_state.(
+          Snapshot.Ledger_snapshot.close
+          @@ staking_epoch_ledger consensus_local_state) ;
+        Consensus.Data.Local_state.(
+          Snapshot.Ledger_snapshot.close
+          @@ next_epoch_ledger consensus_local_state) ) ;
     frontier
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state

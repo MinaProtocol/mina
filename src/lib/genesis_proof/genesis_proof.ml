@@ -8,10 +8,17 @@ module Inputs = struct
     ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_constants: Genesis_constants.t
     ; genesis_ledger: Genesis_ledger.Packed.t
+    ; genesis_epoch_data: Consensus.Genesis_epoch_data.t
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
-    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t }
+    ; blockchain_proof_system_id:
+        (* This is only used for calculating the hash to lookup the genesis
+           proof with. It is re-calculated when building the blockchain prover,
+           so it is always okay -- if less efficient at startup -- to pass
+           [None] here.
+        *)
+        Pickles.Verification_key.Id.t option }
 end
 
 module T = struct
@@ -21,6 +28,7 @@ module T = struct
     ; genesis_constants: Genesis_constants.t
     ; proof_level: Genesis_constants.Proof_level.t
     ; genesis_ledger: Genesis_ledger.Packed.t
+    ; genesis_epoch_data: Consensus.Genesis_epoch_data.t
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
@@ -43,6 +51,8 @@ module T = struct
 
   let genesis_ledger {genesis_ledger; _} =
     Genesis_ledger.Packed.t genesis_ledger
+
+  let genesis_epoch_data {genesis_epoch_data; _} = genesis_epoch_data
 
   let accounts {genesis_ledger; _} =
     Genesis_ledger.Packed.accounts genesis_ledger
@@ -82,7 +92,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   let constraint_constants = t.constraint_constants in
   let consensus_constants = t.consensus_constants in
   let prev_state =
-    Protocol_state.negative_one ~genesis_ledger ~constraint_constants
+    Protocol_state.negative_one ~genesis_ledger
+      ~genesis_epoch_data:t.genesis_epoch_data ~constraint_constants
       ~consensus_constants
   in
   let curr = t.protocol_state_with_hash.data in
@@ -102,24 +113,33 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         { source= Coda_base.Pending_coinbase.Stack.empty
         ; target= Coda_base.Pending_coinbase.Stack.empty } }
   in
+  let genesis_epoch_ledger =
+    match t.genesis_epoch_data with
+    | None ->
+        genesis_ledger
+    | Some data ->
+        data.staking.ledger
+  in
   let open Pickles_types in
   let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
   let txn_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n in
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
-         ~genesis_ledger)
+         ~genesis_epoch_ledger)
     { transition= Snark_transition.genesis ~constraint_constants ~genesis_ledger
     ; prev_state }
     [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]
     t.protocol_state_with_hash.data
 
 let create_values b (t : Inputs.t) =
+  let%map.Async genesis_proof = base_proof b t in
   { runtime_config= t.runtime_config
   ; constraint_constants= t.constraint_constants
   ; proof_level= t.proof_level
   ; genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
+  ; genesis_epoch_data= t.genesis_epoch_data
   ; consensus_constants= t.consensus_constants
   ; protocol_state_with_hash= t.protocol_state_with_hash
-  ; genesis_proof= base_proof b t }
+  ; genesis_proof }

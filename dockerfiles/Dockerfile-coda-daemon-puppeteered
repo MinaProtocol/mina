@@ -3,8 +3,9 @@
 # for more details.
 
 ARG CODA_VERSION
-ARG CODA_BRANCH
 FROM codaprotocol/coda-daemon:${CODA_VERSION}
+
+ARG CODA_BRANCH
 
 RUN echo '#!/bin/bash\n\
 pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\

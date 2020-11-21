@@ -14,6 +14,7 @@ type t =
   ; trust_system: Trust_system.t
   ; consensus_constants: Consensus.Constants.t
   ; verifier: Verifier.t
+  ; precomputed_values: Precomputed_values.t
   ; mutable best_seen_transition: External_transition.Initial_validated.t
   ; mutable current_root: External_transition.Initial_validated.t
   ; network: Coda_networking.t }
@@ -44,7 +45,7 @@ let time_deferred deferred =
   let start_time = Time.now () in
   let%map result = deferred in
   let end_time = Time.now () in
-  (Time.diff start_time end_time, result)
+  (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
   `Take
@@ -65,7 +66,7 @@ let received_bad_proof t host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [("error", `String (Error.to_string_hum e))] ) ))
+            , [("error", Error_json.error_to_yojson e)] ) ))
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
@@ -126,7 +127,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     with
     | Error e ->
         [%log' error t.logger]
-          ~metadata:[("error", `String (Error.to_string_hum e))]
+          ~metadata:[("error", Error_json.error_to_yojson e)]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
         Deferred.return `Ignored
@@ -134,7 +135,8 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
             ~consensus_constants:t.consensus_constants ~genesis_constants
-            candidate_state peer_root_with_proof.data
+            ~precomputed_values:t.precomputed_values candidate_state
+            peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -215,6 +217,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       ; logger
       ; trust_system
       ; verifier
+      ; precomputed_values
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition }
     in
@@ -361,7 +364,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         in
         [%log error]
           ~metadata:
-            [ ("error", `String (Error.to_string_hum e))
+            [ ("error", Error_json.error_to_yojson e)
             ; ("state_hash", State_hash.to_yojson hash)
             ; ( "expected_staged_ledger_hash"
               , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
@@ -427,6 +430,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                             Coda_networking.(
                               query_peer t.network peer.peer_id
                                 (Rpcs.Consensus_rpc rpc) query) ) }
+                    ~ledger_depth:
+                      precomputed_values.constraint_constants.ledger_depth
                     sync_jobs
                 in
                 (true, result) )
@@ -434,7 +439,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match local_state_sync_result with
         | Error e ->
             [%log error]
-              ~metadata:[("error", `String (Error.to_string_hum e))]
+              ~metadata:[("error", Error_json.error_to_yojson e)]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
             let this_cycle =
@@ -455,13 +460,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn
                 persistent_frontier ~root_data:new_root_data
+                ~genesis_state_hash:
+                  precomputed_values.protocol_state_with_hash.hash
             in
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
                   Instance.set_root_state_hash instance
-                    ~genesis_state_hash:
-                      (Precomputed_values.genesis_state_hash precomputed_values)
                     (External_transition.Validated.state_hash new_root) )) ;
             let%map new_frontier =
               let fail msg =
@@ -594,6 +599,7 @@ let%test_module "Bootstrap_controller tests" =
           Precomputed_values.consensus_constants precomputed_values
       ; trust_system
       ; verifier
+      ; precomputed_values
       ; best_seen_transition= transition
       ; current_root= transition
       ; network }

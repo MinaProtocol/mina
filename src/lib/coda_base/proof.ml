@@ -33,7 +33,7 @@ let%test_module "proof-tests" =
 
     let%test "proof serialization v1" =
       let proof = blockchain_dummy in
-      let known_good_digest = "a2cc37635999ac4a0e87e4b6d01a79e8" in
+      let known_good_digest = "48907559d134ea1a0f88edbd9e1e046a" in
       Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         proof known_good_digest
