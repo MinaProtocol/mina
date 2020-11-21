@@ -9,6 +9,11 @@ coda:
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
     - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+  ports:
+    p2p: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    external: "10909"
 
 archive:
   hostPort: "10909"
@@ -20,8 +25,15 @@ archive:
   postgresPort: "5432"
   postgresDB: "archive"
   postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
-
+  ports:
+    server: 3086
+    postgres: "5432"
 
 postgresql:
   postgresqlPassword: "foobar"
   postgresqlUsername: "postgres"
+
+healthcheck:
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

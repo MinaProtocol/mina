@@ -100,14 +100,10 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[("error", `String (Error.to_string_hum error))]
+        ~metadata:[("error", Error_json.error_to_yojson error)]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
-      return
-        (Error
-           (Error.of_string
-              (sprintf "verifier threw an error: %s"
-                 (Error.to_string_hum error))))
+      Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
@@ -304,14 +300,11 @@ let verify_transitions_and_build_breadcrumbs ~logger
                (List.map2_exn transitions tvs ~f:(fun e data -> {e with data})))
       | Error (`Verifier_error error) ->
           [%log warn]
-            ~metadata:[("error", `String (Error.to_string_hum error))]
+            ~metadata:[("error", Error_json.error_to_yojson error)]
             "verifier threw an error while verifying transition queried \
              during ledger catchup: $error" ;
-          return
-            (Error
-               (Error.of_string
-                  (sprintf "verifier threw an error: %s"
-                     (Error.to_string_hum error))))
+          Deferred.Or_error.fail
+            (Error.tag ~tag:"verifier threw an error" error)
       | Error `Invalid_proof ->
           let%map () =
             (* TODO: Isolate and punish all the evil sender *)
@@ -456,7 +449,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     [%log info]
                       "Could not download state hashes using peers from \
                        subtrees; trying again with random peers"
-                      ~metadata:[("error", `String (Error.to_string_hum err))] ;
+                      ~metadata:[("error", Error_json.error_to_yojson err)] ;
                     let%bind random_peers =
                       Coda_networking.random_peers network num_peers
                     in
@@ -469,8 +462,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     | Error err ->
                         [%log info]
                           "Could not download state hashes using random peers"
-                          ~metadata:
-                            [("error", `String (Error.to_string_hum err))] ;
+                          ~metadata:[("error", Error_json.error_to_yojson err)] ;
                         return (Error err) )
               in
               let num_of_missing_transitions =
@@ -534,7 +526,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   Catchup_jobs.decr ()
             | Error e ->
                 [%log warn]
-                  ~metadata:[("error", `String (Error.to_string_hum e))]
+                  ~metadata:[("error", Error_json.error_to_yojson e)]
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;

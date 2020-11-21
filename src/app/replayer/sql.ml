@@ -78,10 +78,12 @@ module User_command = struct
     ; fee_token: int64
     ; token: int64
     ; amount: int64 option
+    ; valid_until: int64 option
     ; memo: string
     ; nonce: int64
     ; block_id: int
     ; global_slot: int64
+    ; txn_global_slot: int64
     ; sequence_no: int }
 
   let typ =
@@ -90,14 +92,14 @@ module User_command = struct
       Ok
         ( (t.type_, t.fee_payer_id, t.source_id, t.receiver_id)
         , (t.fee, t.fee_token, t.token, t.amount)
-        , (t.memo, t.nonce)
-        , (t.block_id, t.global_slot, t.sequence_no) )
+        , (t.valid_until, t.memo, t.nonce)
+        , (t.block_id, t.global_slot, t.txn_global_slot, t.sequence_no) )
     in
     let decode
         ( (type_, fee_payer_id, source_id, receiver_id)
         , (fee, fee_token, token, amount)
-        , (memo, nonce)
-        , (block_id, global_slot, sequence_no) ) =
+        , (valid_until, memo, nonce)
+        , (block_id, global_slot, txn_global_slot, sequence_no) ) =
       Ok
         { type_
         ; fee_payer_id
@@ -107,26 +109,29 @@ module User_command = struct
         ; fee_token
         ; token
         ; amount
+        ; valid_until
         ; memo
         ; nonce
         ; block_id
         ; global_slot
+        ; txn_global_slot
         ; sequence_no }
     in
     let rep =
       Caqti_type.(
         tup4 (tup4 string int int int)
           (tup4 int64 int64 int64 (option int64))
-          (tup2 string int64) (tup3 int int64 int))
+          (tup3 (option int64) string int64)
+          (tup4 int int64 int64 int))
     in
     Caqti_type.custom ~encode ~decode rep
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,memo,nonce,blocks.id,global_slot,sequence_no,status FROM
+         SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,status
 
-         (SELECT * FROM user_commands WHERE id = ?) AS uc
+         FROM (SELECT * FROM user_commands WHERE id = ?) AS uc
 
          INNER JOIN
 
@@ -141,6 +146,12 @@ module User_command = struct
          ON
 
          blocks.id = buc.block_id
+
+         INNER JOIN blocks as parent
+
+         ON
+
+         parent.id = blocks.parent_id
 
        |}
 
@@ -165,6 +176,7 @@ module Internal_command = struct
     ; token: int64
     ; block_id: int
     ; global_slot: int64
+    ; txn_global_slot: int64
     ; sequence_no: int
     ; secondary_sequence_no: int }
 
@@ -175,13 +187,13 @@ module Internal_command = struct
         ( (t.type_, t.receiver_id)
         , (t.fee, t.token)
         , (t.block_id, t.global_slot)
-        , (t.sequence_no, t.secondary_sequence_no) )
+        , (t.txn_global_slot, t.sequence_no, t.secondary_sequence_no) )
     in
     let decode
         ( (type_, receiver_id)
         , (fee, token)
         , (block_id, global_slot)
-        , (sequence_no, secondary_sequence_no) ) =
+        , (txn_global_slot, sequence_no, secondary_sequence_no) ) =
       Ok
         { type_
         ; receiver_id
@@ -189,20 +201,24 @@ module Internal_command = struct
         ; token
         ; block_id
         ; global_slot
+        ; txn_global_slot
         ; sequence_no
         ; secondary_sequence_no }
     in
     let rep =
       Caqti_type.(
         tup4 (tup2 string int) (tup2 int64 int64) (tup2 int int64)
-          (tup2 int int))
+          (tup3 int64 int int))
     in
     Caqti_type.custom ~encode ~decode rep
 
+  (* the transaction global slot is taken from the user command's parent block, mirroring
+     the call to Staged_ledger.apply in Block_producer
+  *)
   let query =
     Caqti_request.collect Caqti_type.int typ
       {|
-         SELECT type,receiver_id,fee,token,blocks.id,global_slot,sequence_no,secondary_sequence_no FROM
+         SELECT type,receiver_id,fee,token,blocks.id,blocks.global_slot,parent.global_slot,sequence_no,secondary_sequence_no FROM
 
          (SELECT * FROM internal_commands WHERE id = ?) AS ic
 
@@ -219,6 +235,12 @@ module Internal_command = struct
          blocks
 
          ON blocks.id = bic.block_id
+
+         INNER JOIN blocks as parent
+
+         ON
+
+         parent.id = blocks.parent_id
 
        |}
 

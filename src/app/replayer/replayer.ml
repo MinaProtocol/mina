@@ -100,9 +100,10 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
             Hashtbl.add_exn pk_tbl ~key:pk_id ~data:pk ;
             pk
         | Error err ->
-            failwithf
-              "Error decoding retrieved public key \"%s\" with id %d, error: %s"
-              pk pk_id (Error.to_string_hum err) () )
+            Error.tag_arg err "Error decoding public key"
+              (("public_key", pk), ("id", pk_id))
+              [%sexp_of: (string * string) * (string * int)]
+            |> Error.raise )
       | Ok None ->
           failwithf "Could not find public key with id %d" pk_id ()
       | Error msg ->
@@ -214,11 +215,13 @@ let update_epoch_ledger ~logger ~name ledger epoch_ledger_opt epoch_ledger_hash
                   (Signature_lib.Public_key.Compressed.to_string pk)
                   (Token_id.to_string token) ()
             | Error err ->
-                failwithf
-                  "When creating epoch ledger, error when adding account with \
-                   public key %s and token %s: %s"
-                  (Signature_lib.Public_key.Compressed.to_string pk)
-                  (Token_id.to_string token) (Error.to_string_hum err) () ) ;
+                Error.tag_arg err
+                  "When creating epoch ledger, error when adding account"
+                  (("public_key", pk), ("token", token))
+                  [%sexp_of:
+                    (string * Signature_lib.Public_key.Compressed.t)
+                    * (string * Token_id.t)]
+                |> Error.raise ) ;
         Some epoch_ledger )
       else None
 
@@ -264,14 +267,14 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
   let txn_global_slot =
-    cmd.global_slot |> Unsigned.UInt32.of_int64
+    cmd.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Coda_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
-    failwithf
-      "Could not apply internal command with global slot %Ld and sequence \
-       number %d, error: %s"
-      cmd.global_slot cmd.sequence_no (Error.to_string_hum err) ()
+    Error.tag_arg err "Could not apply internal command"
+      (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+      [%sexp_of: (string * int64) * (string * int)]
+    |> Error.raise
   in
   let open Coda_base.Ledger in
   match cmd.type_ with
@@ -300,8 +303,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
         | Ok cb ->
             cb
         | Error err ->
-            failwithf "Error creating coinbase for internal command, error: %s"
-              (Error.to_string_hum err) ()
+            Error.tag err ~tag:"Error creating coinbase for internal command"
+            |> Error.raise
       in
       let undo_or_error =
         apply_coinbase ~constraint_constants ~txn_global_slot ledger coinbase
@@ -336,11 +339,11 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
     | Ok ft ->
         ft
     | Error err ->
-        failwithf "Could not create combined fee transfer, error: %s"
-          (Error.to_string_hum err) ()
+        Error.tag err ~tag:"Could not create combined fee transfer"
+        |> Error.raise
   in
   let txn_global_slot =
-    cmd2.global_slot |> Unsigned.UInt32.of_int64
+    cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Coda_numbers.Global_slot.of_uint32
   in
   let undo_or_error =
@@ -351,10 +354,10 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   | Ok _undo ->
       Deferred.unit
   | Error err ->
-      failwithf
-        "Error applying combined fee transfer with sequence number %d, error: \
-         %s"
-        cmd1.sequence_no (Error.to_string_hum err) ()
+      Error.tag_arg err "Error applying combined fee transfer"
+        ("sequence number", cmd1.sequence_no)
+        [%sexp_of: string * int]
+      |> Error.raise
 
 let body_of_sql_user_cmd pool
     ({type_; source_id; receiver_id; token= tok; amount; global_slot; _} :
@@ -411,13 +414,17 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let%bind body = body_of_sql_user_cmd pool cmd in
   let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
+  let valid_until =
+    Option.map cmd.valid_until ~f:(fun slot ->
+        Coda_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+  in
   let payload =
     Signed_command_payload.create
       ~fee:(Currency.Fee.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee)
       ~fee_token:(Token_id.of_uint64 @@ Unsigned.UInt64.of_int64 cmd.fee_token)
       ~fee_payer_pk
       ~nonce:(Unsigned.UInt32.of_int64 cmd.nonce)
-      ~valid_until:None ~memo ~body
+      ~valid_until ~memo ~body
   in
   (* when applying the transaction, there's a check that the fee payer and
      signer keys are the same; since this transaction was accepted, we know
@@ -434,7 +441,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
         valid_signed_cmd) =
     Signed_command.to_valid_unsafe signed_cmd
   in
-  let txn_global_slot = Unsigned.UInt32.of_int64 cmd.global_slot in
+  let txn_global_slot = Unsigned.UInt32.of_int64 cmd.txn_global_slot in
   match
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
       valid_signed_cmd
@@ -442,10 +449,10 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   | Ok _undo ->
       ()
   | Error err ->
-      failwithf
-        "User command with global slot %Ld and sequence number %d failed on \
-         replay, error: %s"
-        cmd.global_slot cmd.sequence_no (Error.to_string_hum err) ()
+      Error.tag_arg err "User command failed on replace"
+        (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
+        [%sexp_of: (string * int64) * (string * int)]
+      |> Error.raise
 
 let unquoted_string_of_yojson json =
   (* Yojson.Safe.to_string produces double-quoted strings
@@ -528,13 +535,11 @@ let main ~input_file ~output_file ~archive_uri () =
       let staking_epoch_ledger_hash =
         Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let staking_seed = Snark_params.Tick.Field.of_string staking_seed_str in
+      let staking_seed = Epoch_seed.of_string staking_seed_str in
       let next_epoch_ledger_hash =
         Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
       in
-      (* TODO : Epoch_seed.of_string *)
-      let next_seed = Snark_params.Tick.Field.of_string next_seed_str in
+      let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_info_of_state_hash ~logger pool fork_state_hash

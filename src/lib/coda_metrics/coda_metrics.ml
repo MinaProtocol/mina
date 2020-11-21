@@ -713,7 +713,7 @@ module Block_latency = struct
       ()
 
   module Gossip_time =
-    Moving_time_sec_average (struct
+    Moving_time_average (struct
         include Latency_time_spec
 
         let subsystem = subsystem
@@ -726,7 +726,7 @@ module Block_latency = struct
       ()
 
   module Inclusion_time =
-    Moving_time_sec_average (struct
+    Moving_time_average (struct
         include Latency_time_spec
 
         let subsystem = subsystem
@@ -738,6 +738,70 @@ module Block_latency = struct
            included into our frontier"
       end)
       ()
+end
+
+module Object_lifetime_statistics = struct
+  let subsystem = "Object_lifetime_statistics"
+
+  module Counter_map = Metric_map (struct
+    type t = Counter.t
+
+    let subsystem = subsystem
+
+    let v = Counter.v
+  end)
+
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
+
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end)
+
+  let allocated_count_table = Counter_map.of_alist_exn []
+
+  let allocated_count ~name : Counter.t =
+    let help =
+      "total number of objects allocated (including previously collected \
+       objects)"
+    in
+    let name = "allocated_count_" ^ name in
+    Counter_map.add allocated_count_table ~name ~help
+
+  let collected_count_table = Counter_map.of_alist_exn []
+
+  let collected_count ~name : Counter.t =
+    let help = "total number of objects collected" in
+    let name = "collected_count_" ^ name in
+    Counter_map.add collected_count_table ~name ~help
+
+  let lifetime_quartile_ms_table = Gauge_map.of_alist_exn []
+
+  let live_count_table = Gauge_map.of_alist_exn []
+
+  let live_count ~name : Gauge.t =
+    let help = "total number of objects currently allocated" in
+    let name = "live_count_" ^ name in
+    Gauge_map.add live_count_table ~name ~help
+
+  let lifetime_quartile_ms ~name ~quartile : Gauge.t =
+    let q =
+      match quartile with
+      | `Q1 ->
+          "q1"
+      | `Q2 ->
+          "q2"
+      | `Q3 ->
+          "q3"
+      | `Q4 ->
+          "q4"
+    in
+    let help =
+      "quartile of active object lifetimes, expressed in milliseconds"
+    in
+    let name = "lifetime_" ^ name ^ "_" ^ q ^ "_ms" in
+    Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
 let server ~port ~logger =
