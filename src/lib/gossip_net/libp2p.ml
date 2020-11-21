@@ -23,6 +23,7 @@ module Config = struct
     { timeout: Time.Span.t
     ; initial_peers: Coda_net2.Multiaddr.t list
     ; addrs_and_ports: Node_addrs_and_ports.t
+    ; metrics_port: string option
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
@@ -88,6 +89,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       in
       transport
 
+    let peers_snapshot = ref []
+
     (* Creates just the helper, making sure to register everything
       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
@@ -137,11 +140,16 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let throttle =
             Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
           in
+          let initial_peers =
+            List.dedup_and_sort ~compare:Coda_net2.Multiaddr.compare
+              (List.rev_append config.initial_peers !peers_snapshot)
+          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
               configure net2 ~me ~logger:config.logger
+                ~metrics_port:config.metrics_port
                 ~maddrs:
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
@@ -156,8 +164,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           .libp2p_port))
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
-                ~seed_peers:config.initial_peers
-                ~direct_peers:config.direct_peers
+                ~seed_peers:initial_peers ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange ~flooding:config.flooding
                 ~initial_gating_config:
                   Coda_net2.
@@ -183,6 +190,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (Throttle.enqueue throttle (fun () ->
                            let open Deferred.Let_syntax in
                            let%bind peers = peers net2 in
+                           peers_snapshot :=
+                             List.map peers
+                               ~f:
+                                 (Fn.compose Coda_net2.Multiaddr.of_string
+                                    Peer.to_multiaddr_string) ;
                            Coda_metrics.(
                              Gauge.set Network.peers
                                (List.length peers |> Int.to_float)) ;
@@ -327,8 +339,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 [ ( "peers"
                   , `String
                       (sprintf !"%{sexp: string list}"
-                         (List.map config.initial_peers ~f:Multiaddr.to_string))
-                  ) ] ;
+                         (List.map initial_peers ~f:Multiaddr.to_string)) ) ] ;
             don't_wait_for
               (Deferred.map
                  (let%bind () = Coda_net2.begin_advertising net2 in
@@ -339,7 +350,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                             ~f:(fun x ->
                               let open Deferred.Let_syntax in
                               Coda_net2.add_peer net2 x >>| ignore )
-                            config.initial_peers))
+                            initial_peers))
                       ~f:(fun () -> Ok ())
                   in
                   return ())
@@ -371,16 +382,38 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let net2_ref = ref (Deferred.never ()) in
       let subscription_ref = ref (Deferred.never ()) in
       let%bind () =
-        let on_libp2p_create res =
-          net2_ref := Deferred.map res ~f:(fun (n, _, _) -> n) ;
+        let rec on_libp2p_create res =
+          net2_ref :=
+            Deferred.map res ~f:(fun (n, _, _) ->
+                let restart_after =
+                  let plus_or_minus initial ~delta =
+                    initial +. (Random.float (2. *. delta) -. delta)
+                  in
+                  let base_time =
+                    Option.value_map ~f:Float.of_string
+                      (Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE")
+                      ~default:7.
+                  in
+                  let delta =
+                    Option.value_map ~f:Float.of_string
+                      (Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA")
+                      ~default:2.5
+                    |> Float.min (base_time /. 2.)
+                  in
+                  Time.Span.(of_min (base_time |> plus_or_minus ~delta))
+                in
+                upon (after restart_after) (fun () ->
+                    don't_wait_for
+                      (let%bind () = Coda_net2.shutdown n in
+                       on_unexpected_termination ()) ) ;
+                n ) ;
           subscription_ref := Deferred.map res ~f:(fun (_, s, _) -> s) ;
           upon res (fun (_, _, m) ->
               let logger = config.logger in
               [%log trace] ~metadata:[] "Successfully restarted libp2p" ;
               don't_wait_for (Strict_pipe.transfer m message_writer ~f:Fn.id)
           )
-        in
-        let rec on_unexpected_termination () =
+        and on_unexpected_termination () =
           on_libp2p_create
             (create_libp2p config rpc_handlers first_peer_ivar
                high_connectivity_ivar ~on_unexpected_termination) ;
