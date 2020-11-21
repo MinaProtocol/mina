@@ -366,35 +366,35 @@ module Failure = struct
 
     let to_enum = function
       | {predicate= true; _} ->
-          1
+          to_enum Predicate
       | {source_not_present= true; _} ->
-          2
+          to_enum Source_not_present
       | {receiver_not_present= true; _} ->
-          3
+          to_enum Receiver_not_present
       | {amount_insufficient_to_create_account= true; _} ->
-          4
+          to_enum Amount_insufficient_to_create_account
       | {cannot_pay_creation_fee_in_token= true; _} ->
-          5
+          to_enum Cannot_pay_creation_fee_in_token
       | {source_insufficient_balance= true; _} ->
-          6
+          to_enum Source_insufficient_balance
       | {source_minimum_balance_violation= true; _} ->
-          7
+          to_enum Source_minimum_balance_violation
       | {receiver_already_exists= true; _} ->
-          8
+          to_enum Receiver_already_exists
       | {not_token_owner= true; _} ->
-          9
+          to_enum Not_token_owner
       | {mismatched_token_permissions= true; _} ->
-          10
+          to_enum mismatched_token_permissions
       | {overflow= true; _} ->
-          11
+          to_enum overflow
       | {signed_command_on_snapp_account= true; _} ->
-          12
+          to_enum signed_command_on_snapp_account
       | {snapp_account_not_present= true; _} ->
-          13
+          to_enum snapp_account_not_present
       | {update_not_permitted= true; _} ->
-          14
+          to_enum update_not_permitted
       | {incorrect_nonce= true; _} ->
-          15
+          to_enum incorrect_nonce
       | _ ->
           0
 
