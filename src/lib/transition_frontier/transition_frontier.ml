@@ -13,6 +13,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
+let max_catchup_chunk_length = 20
+
 let global_max_length (genesis_constants : Genesis_constants.t) =
   genesis_constants.protocol.k
 
