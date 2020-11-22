@@ -511,6 +511,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         Monitor.try_with (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
+              ~heartbeat_config:
+                (Async_rpc_kernel.Rpc.Connection.Heartbeat_config.create
+                   ~send_every:(Time_ns.Span.of_sec 10.)
+                   ~timeout:(Time_ns.Span.of_sec 120.))
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
