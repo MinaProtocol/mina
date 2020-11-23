@@ -356,6 +356,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; metrics_port: string
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
@@ -688,6 +689,7 @@ module Helper = struct
       in
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
+          (* This fill should be okay because we "found and removed" the request *)
           Ivar.fill ivar fill_result ; Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
@@ -1008,8 +1010,7 @@ module Keypair = struct
         ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
-        failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
-          ()
+        Error.tag e ~tag:"Other RPC error generateKeypair" |> Error.raise
 
   let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
@@ -1036,7 +1037,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string
+  type t = string [@@deriving compare]
 
   let to_string t = t
 
@@ -1208,8 +1209,8 @@ let list_peers net =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~seed_peers ~initial_gating_config =
+    ~metrics_port ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers
+    ~peer_exchange ~seed_peers ~initial_gating_config =
   net.Helper.new_peer_callback
   <- Some
        (fun peer_id peer_addrs ->
@@ -1222,6 +1223,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; metrics_port= Option.value metrics_port ~default:""
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
@@ -1233,7 +1235,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
           Helper.gating_config_to_helper_format initial_gating_config }
   with
   | Ok "configure success" ->
-      Ivar.fill net.me_keypair me ;
+      Ivar.fill_if_empty net.me_keypair me ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1395,8 +1397,7 @@ let set_connection_gating_config net (config : connection_gating) =
   | Ok v ->
       failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      failwithf "unexpected error doing setGatingConfig: %s"
-        (Error.to_string_hum e) ()
+      Error.tag e ~tag:"Unexpected error doing setGatingConfig" |> Error.raise
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1413,7 +1414,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         (`Handler
           (fun ~killed e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
+                Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
             if
@@ -1443,11 +1444,12 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               Deferred.unit ) ))
   with
   | Error e ->
-      Deferred.Or_error.error_string
-        ( "Could not start libp2p_helper. If you are a dev, did you forget to \
-           `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-           CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-        ^ Error.to_string_hum e )
+      Deferred.Or_error.fail
+        (Error.tag e
+           ~tag:
+             "Could not start libp2p_helper. If you are a dev, did you forget \
+              to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
       let t : Helper.t =
         { subprocess
@@ -1554,7 +1556,7 @@ let%test_module "coda network tests" =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
@@ -1562,7 +1564,7 @@ let%test_module "coda network tests" =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn

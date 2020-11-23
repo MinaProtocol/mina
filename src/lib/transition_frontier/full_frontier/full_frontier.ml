@@ -176,17 +176,22 @@ let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
       succ :: successors_rec t succ )
 
-let path_map t breadcrumb ~f =
-  let rec find_path b =
-    let elem = f b in
-    let parent_hash = Breadcrumb.parent_hash b in
-    if State_hash.equal (Breadcrumb.state_hash b) t.root then []
-    else if State_hash.equal parent_hash t.root then [elem]
-    else elem :: find_path (find_exn t parent_hash)
+let path_map ?max_length t breadcrumb ~f =
+  let rec find_path b count_opt acc =
+    match count_opt with
+    | Some count when count <= 0 ->
+        acc
+    | _ ->
+        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let elem = f b in
+        let parent_hash = Breadcrumb.parent_hash b in
+        if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
+        else if State_hash.equal parent_hash t.root then elem :: acc
+        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
   in
-  List.rev (find_path breadcrumb)
+  find_path breadcrumb max_length []
 
-let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+let best_tip_path ?max_length t = path_map ?max_length t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
