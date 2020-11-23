@@ -54,7 +54,7 @@ Pipeline.build
         },
 
       -- Tests that depend on the debian package
-      ConnectToTestnet.step,
+      ConnectToTestnet.step dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
