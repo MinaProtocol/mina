@@ -126,7 +126,8 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
          (Ledger.Any_ledger.M.merkle_root root_ledger))
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
-    Breadcrumb.create root_data.transition root_data.staged_ledger
+    Breadcrumb.create ~validated_transition:root_data.transition
+      ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
   in
   let root_node =
     {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
@@ -175,17 +176,22 @@ let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
       succ :: successors_rec t succ )
 
-let path_map t breadcrumb ~f =
-  let rec find_path b =
-    let elem = f b in
-    let parent_hash = Breadcrumb.parent_hash b in
-    if State_hash.equal (Breadcrumb.state_hash b) t.root then []
-    else if State_hash.equal parent_hash t.root then [elem]
-    else elem :: find_path (find_exn t parent_hash)
+let path_map ?max_length t breadcrumb ~f =
+  let rec find_path b count_opt acc =
+    match count_opt with
+    | Some count when count <= 0 ->
+        acc
+    | _ ->
+        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let elem = f b in
+        let parent_hash = Breadcrumb.parent_hash b in
+        if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
+        else if State_hash.equal parent_hash t.root then elem :: acc
+        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
   in
-  List.rev (find_path breadcrumb)
+  find_path breadcrumb max_length []
 
-let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+let best_tip_path ?max_length t = path_map ?max_length t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
@@ -440,8 +446,11 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
   (* rewrite the new root breadcrumb to contain the new root mask *)
   let new_root_breadcrumb =
     Breadcrumb.create
-      (Breadcrumb.validated_transition new_root_node.breadcrumb)
-      new_staged_ledger
+      ~validated_transition:
+        (Breadcrumb.validated_transition new_root_node.breadcrumb)
+      ~staged_ledger:new_staged_ledger
+      ~just_emitted_a_proof:
+        (Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
   Note: this should be after applying the transactions to the snarked ledger (Step 5)

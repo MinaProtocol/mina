@@ -52,7 +52,8 @@ struct
       , (_, prevs_length) Vector.t
       , _
       , (_, Max_branching.n) Vector.t )
-      P.Base.Pairing_based.t =
+      P.Base.Pairing_based.t
+      Async.Deferred.t =
     let _, prev_vars_length = branch_data.branching in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -148,22 +149,24 @@ struct
             Tick.Field.(
               zeta * domain_generator ~log2_size:(Domain.log2_size domain))
           in
-          Plonk_checks.derive_plonk
-            (module Tick.Field)
-            ~endo:Endo.Dee.base ~shift:Shifts.tick
-            ~mds:Tick_field_sponge.params.mds
-            ~domain:
-              (Plonk_checks.domain
-                 (module Tick.Field)
-                 domain ~shifts:Common.tick_shifts
-                 ~domain_generator:Backend.Tick.Field.domain_generator)
-            { zeta
-            ; alpha
-            ; beta= Challenge.Constant.to_tick_field plonk0.beta
-            ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
-            (Plonk_checks.evals_of_split_evals
-               (module Tick.Field)
-               t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+          time "plonk_checks" (fun () ->
+              Plonk_checks.derive_plonk
+                (module Tick.Field)
+                ~endo:Endo.Dee.base ~shift:Shifts.tick
+                ~mds:Tick_field_sponge.params.mds
+                ~domain:
+                  (Plonk_checks.domain
+                     (module Tick.Field)
+                     domain ~shifts:Common.tick_shifts
+                     ~domain_generator:Backend.Tick.Field.domain_generator)
+                { zeta
+                ; alpha
+                ; beta= Challenge.Constant.to_tick_field plonk0.beta
+                ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
+                (Plonk_checks.evals_of_split_evals
+                   (module Tick.Field)
+                   t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+          )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
@@ -310,7 +313,8 @@ struct
             Pcs_batch.combine_split_evaluations
               (Common.dlog_pcs_batch
                  (Local_max_branching.add Nat.N8.n)
-                 ~max_quot_size:Int.((5 * Domain.size domains.h) + 5))
+                 ~max_quot_size:
+                   (Common.max_quot_size_int (Domain.size domains.h)))
               ~xi ~init:Fn.id ~mul ~last:Array.last
               ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
               ~evaluation_point:pt
@@ -461,7 +465,7 @@ struct
         | None ->
             Snarky_backendless.Request.unhandled )
     in
-    let (next_proof : Tick.Proof.t) =
+    let%map.Async (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in
@@ -508,16 +512,22 @@ struct
       ksprintf Common.time "step-prover %d (%d, %d)"
         (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
         (fun () ->
-          Impls.Step.prove pk [input]
-            ~message:
-              (* emphatically NOT padded with dummies *)
-              Vector.(
-                map2 to_fold_in
-                  next_me_only_prepared.old_bulletproof_challenges
-                  ~f:(fun commitment chals ->
-                    { Tick.Proof.Challenge_polynomial.commitment
-                    ; challenges= Vector.to_array chals } )
-                |> to_list)
+          Impls.Step.generate_witness_conv
+            ~f:
+              (fun {Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs} ->
+              Zexe_backend.Tweedle.Dum_based_plonk.Proof.create_async
+                ~primary:public_inputs ~auxiliary:auxiliary_inputs
+                ~message:
+                  (* emphatically NOT padded with dummies *)
+                  Vector.(
+                    map2 to_fold_in
+                      next_me_only_prepared.old_bulletproof_challenges
+                      ~f:(fun commitment chals ->
+                        { Tick.Proof.Challenge_polynomial.commitment
+                        ; challenges= Vector.to_array chals } )
+                    |> to_list)
+                pk )
+            [input]
             (fun x () ->
               ( Impls.Step.handle
                   (fun () -> (branch_data.main ~step_domains (conv x) : unit))
@@ -549,7 +559,7 @@ struct
       let module V = H3.To_vector (E) in
       V.f prev_values_length (M.f prev_with_proofs)
     in
-    { proof= next_proof
+    { P.Base.Pairing_based.proof= next_proof
     ; statement= next_statement
     ; index= branch_data.index
     ; prev_evals=

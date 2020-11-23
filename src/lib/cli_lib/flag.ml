@@ -268,6 +268,13 @@ module Log = struct
     flag "log-level"
       (optional_with_default Logger.Level.Info log_level)
       ~doc:"Set log level (default: Info)"
+
+  let file_log_level =
+    let log_level = Arg_type.log_level in
+    let open Command.Param in
+    flag "file-log-level"
+      (optional_with_default Logger.Level.Trace log_level)
+      ~doc:"Set log level for the log file (default: Trace)"
 end
 
 type signed_command_common =
@@ -282,7 +289,7 @@ let signed_command_common : signed_command_common Command.Param.t =
   let%map_open sender =
     flag "sender"
       (required public_key_compressed)
-      ~doc:"KEY Public key from which you want to send the transaction"
+      ~doc:"PUBLICKEY Public key from which you want to send the transaction"
   and fee =
     flag "fee"
       ~doc:

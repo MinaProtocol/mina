@@ -81,7 +81,7 @@ Pipeline.build
         service="coda-rosetta",
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-docker-image"
       }
 
@@ -96,7 +96,7 @@ Pipeline.build
         service="coda-rosetta",
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-dune-docker-image"
       }
 

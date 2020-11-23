@@ -20,7 +20,11 @@ type display =
   ; parent: string }
 [@@deriving yojson]
 
-val create : External_transition.Validated.t -> Staged_ledger.t -> t
+val create :
+     validated_transition:External_transition.Validated.t
+  -> staged_ledger:Staged_ledger.t
+  -> just_emitted_a_proof:bool
+  -> t
 
 val build :
      ?skip_staged_ledger_verification:bool

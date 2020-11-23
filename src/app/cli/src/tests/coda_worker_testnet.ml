@@ -148,7 +148,7 @@ module Api = struct
              (Keypair.of_private_key_exn sk))
         ()
     in
-    let%map user_cmd, _receipt =
+    let%map user_cmd =
       Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
@@ -173,18 +173,6 @@ module Api = struct
       t i sender_sk fee valid_until
       ~body:
         (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
-
-  (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
-     merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
-     However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
-     the merkle list that we are looking for *)
-
-  let prove_receipt t i proving_receipt resulting_receipt =
-    run_online_worker
-      ~f:(fun worker ->
-        Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
-        )
-      t i
 
   let new_block t i key =
     run_online_worker
@@ -236,7 +224,19 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
     let online_chains =
       Array.filteri chains ~f:(fun i el ->
-          Api.synced testnet i && not (List.is_empty el) )
+          match el with
+          | [] ->
+              false
+          | [state_hash]
+            when State_hash.equal state_hash
+                   testnet.Api.precomputed_values.protocol_state_with_hash.hash
+            ->
+              (* Knowing only the genesis transition doesn't indicate an online
+                 chain.
+              *)
+              false
+          | _ ->
+              Api.synced testnet i )
     in
     let chain_sets =
       Array.map online_chains

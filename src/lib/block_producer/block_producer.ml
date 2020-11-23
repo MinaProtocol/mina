@@ -281,12 +281,9 @@ let handle_block_production_errors ~logger ~previous_protocol_state
     " One possible reason could be a ledger-catchup is triggered before we \
      produce a proof for the produced transition."
   in
-  let exn_breadcrumb name =
-    raise
-      (Error.to_exn
-         (Error.of_string
-            (sprintf "Error building breadcrumb from produced transition: %s"
-               name)))
+  let exn_breadcrumb err =
+    Error.tag err ~tag:"Error building breadcrumb from produced transition"
+    |> Error.raise
   in
   match x with
   | Ok x ->
@@ -300,7 +297,7 @@ let handle_block_production_errors ~logger ~previous_protocol_state
       [%log error]
         "Prover failed to prove freshly generated transition: $error"
         ~metadata:
-          [ ("error", `String (Error.to_string_hum err))
+          [ ("error", Error_json.error_to_yojson err)
           ; ( "prev_state"
             , Protocol_state.value_to_yojson previous_protocol_state )
           ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
@@ -339,17 +336,16 @@ let handle_block_production_errors ~logger ~previous_protocol_state
         transition_error_msg_prefix transition_reason_for_failure ;
       return ()
   | Error (`Fatal_error e) ->
-      exn_breadcrumb (sprintf "fatal error -- %s" (Exn.to_string e))
+      exn_breadcrumb (Error.tag ~tag:"Fatal error" (Error.of_exn e))
   | Error (`Invalid_staged_ledger_hash e) ->
-      exn_breadcrumb
-        (sprintf "Invalid staged ledger hash -- %s" (Error.to_string_hum e))
+      exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
       (* Unexpected errors from staged_ledger are captured in
                          `Fatal_error
                       *)
       [%log error]
         ~metadata:
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
         !"Unable to build breadcrumb from produced transition due to invalid \
           staged ledger diff: $error" ;

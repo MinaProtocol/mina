@@ -128,7 +128,7 @@ module T = struct
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
                          Transaction_snark.Statement.to_yojson s )) )
-              ; ("error", `String (Error.to_string_hum e)) ]
+              ; ("error", Error_json.error_to_yojson e) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
           Error e
@@ -848,7 +848,7 @@ module T = struct
                   [ ( "scan_state"
                     , `String (Scan_state.snark_job_list_json t.scan_state) )
                   ; ("data", data_json)
-                  ; ("error", `String (Error.to_string_hum e))
+                  ; ("error", Error_json.error_to_yojson e)
                   ; ("prefix", `String log_prefix) ]
                 !"$prefix: Unexpected error when applying diff data $data to \
                   the scan_state $scan_state: $error" ) ;
@@ -966,7 +966,11 @@ module T = struct
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
       time ~logger "check_completed_works" (fun () ->
-          check_completed_works ~logger ~verifier t.scan_state work )
+          match skip_verification with
+          | Some true ->
+              return ()
+          | Some false | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants
@@ -994,7 +998,7 @@ module T = struct
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
           [%log error]
-            ~metadata:[("error", `String (Error.to_string_hum e))]
+            ~metadata:[("error", Error_json.error_to_yojson e)]
             !"Error updating metrics after applying staged_ledger diff: $error"
       )
     in
@@ -1469,7 +1473,7 @@ module T = struct
             res''
         | Error e ->
             [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[("error", `String (Error.to_string_hum e))] ;
+              ~metadata:[("error", Error_json.error_to_yojson e)] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1767,7 +1771,7 @@ module T = struct
               [%log error]
                 ~metadata:
                   [ ("user_command", User_command.Valid.to_yojson txn)
-                  ; ("error", `String (Error.to_string_hum e)) ]
+                  ; ("error", Error_json.error_to_yojson e) ]
                 "Staged_ledger_diff creation: Skipping user command: \
                  $user_command due to error: $error" ;
               Continue (seq, count)

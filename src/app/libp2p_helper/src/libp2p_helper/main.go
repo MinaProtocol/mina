@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	gonet "net"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -23,7 +24,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	coredisc "github.com/libp2p/go-libp2p-core/discovery"
-	"github.com/libp2p/go-libp2p-core/event"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -33,6 +33,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type subscription struct {
@@ -191,11 +192,52 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	return maybePeer, nil
 }
 
+type codaMetricsServer struct {
+	port   string
+	server *http.Server
+	done   *sync.WaitGroup
+}
+
+func startMetricsServer(port string) *codaMetricsServer {
+	log := logging.Logger("metrics server")
+	done := &sync.WaitGroup{}
+	done.Add(1)
+	server := &http.Server{Addr: ":" + port}
+
+	// does this need re-registered every time?
+	// http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		defer done.Done()
+
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("http server error: %v", err)
+		}
+	}()
+
+	return &codaMetricsServer{
+		port:   port,
+		server: server,
+		done:   done,
+	}
+}
+
+func (ms *codaMetricsServer) Shutdown() {
+	if err := ms.server.Shutdown(context.Background()); err != nil {
+		panic(err)
+	}
+
+	ms.done.Wait()
+}
+
+var metricsServer *codaMetricsServer = nil
+
 type configureMsg struct {
 	Statedir        string             `json:"statedir"`
 	Privk           string             `json:"privk"`
 	NetworkID       string             `json:"network_id"`
 	ListenOn        []string           `json:"ifaces"`
+	MetricsPort     string             `json:"metrics_port"`
 	External        string             `json:"external_maddr"`
 	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
 	Flood           bool               `json:"flood"`
@@ -286,6 +328,13 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	app.P2p = helper
 
 	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+
+	if metricsServer != nil && metricsServer.port != m.MetricsPort {
+		metricsServer.Shutdown()
+	}
+	if len(m.MetricsPort) > 0 {
+		metricsServer = startMetricsServer(m.MetricsPort)
+	}
 
 	return "configure success", nil
 }
@@ -898,21 +947,15 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
-	bus := app.P2p.Host.EventBus()
-	// report new peers we find peers
-	go func() {
-		sub, err := bus.Subscribe(new(event.EvtPeerConnectednessChanged))
-		if err != nil {
-			panic(err)
-		}
-
-		for evt := range sub.Out() {
-			e := evt.(event.EvtPeerConnectednessChanged)
-			if validPeer(e.Peer) {
-				foundPeer(e.Peer)
-			}
-		}
-	}()
+	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
+	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		logger.Infof("new connection: %+v", c)
+		foundPeer(c.RemotePeer())
+	}
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		logger.Infof("dropped connection: %+v", c)
+		foundPeer(c.RemotePeer())
+	}
 
 	go func() {
 		for {
@@ -1091,6 +1134,12 @@ type successResult struct {
 	Duration string          `json:"duration"`
 }
 
+func init() {
+	// === Register metrics collectors here ===
+	// currently, we only register the default go collector (which promhttp does automatically for us)
+	http.Handle("/metrics", promhttp.Handler())
+}
+
 func main() {
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
@@ -1107,6 +1156,9 @@ func main() {
 	// All subsystems that have been considered are explicitly listed. Any that
 	// are added when modifying this code should be considered and added to
 	// this list.
+	// The levels below set the **minimum** log level for each subsystem.
+	// Messages emitted at lower levels than the given level will not be
+	// emitted.
 	logging.SetLogLevel("mplex", "debug")
 	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
 	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
@@ -1122,7 +1174,7 @@ func main() {
 	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
 	logging.SetLogLevel("providers", "debug")
 	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
-	logging.SetLogLevel("dht", "info") // Logs every operation to debug
+	logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
 	logging.SetLogLevel("peerstore", "debug")
 	logging.SetLogLevel("diversityFilter", "debug")
 	logging.SetLogLevel("table", "debug")

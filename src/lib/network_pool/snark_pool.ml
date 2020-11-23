@@ -303,7 +303,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
             ; ("fee", Currency.Fee.to_yojson fee)
-            ; ("error", `String (Error.to_string_hum e))
+            ; ("error", Error_json.error_to_yojson e)
             ; ("sender", Envelope.Sender.to_yojson sender) ]
           in
           [%log' error t.logger] ~metadata
@@ -333,38 +333,47 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                   let%map () = log_and_punish s e in
                   Error e )
           in
-          match statement_check with
-          | Error _ ->
-              return false
-          | Ok _ -> (
-              let log ?punish e =
-                Deferred.List.iter (One_or_two.to_list proofs)
-                  ~f:(fun (_, s) -> log_and_punish ?punish s e)
-              in
-              let proof_env =
-                { Envelope.Incoming.data=
-                    (One_or_two.map proofs ~f:fst, message)
-                ; sender }
-              in
-              match%bind Batcher.Snark_pool.verify t.batcher proof_env with
-              | Ok true ->
-                  return true
-              | Ok false ->
-                  (* if this proof is in the set of invalid proofs*)
-                  let e = Error.of_string "Invalid proof" in
-                  let%map () = log e in
-                  false
-              | Error e ->
-                  (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                  let%map () = log ~punish:false e in
-                  false )
+          let work = One_or_two.map proofs ~f:snd in
+          if not (work_is_referenced t work) then (
+            [%log' debug t.logger] "Work $stmt not referenced"
+              ~metadata:
+                [ ( "stmt"
+                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                      work ) ] ;
+            return false )
+          else
+            match statement_check with
+            | Error _ ->
+                return false
+            | Ok _ -> (
+                let log ?punish e =
+                  Deferred.List.iter (One_or_two.to_list proofs)
+                    ~f:(fun (_, s) -> log_and_punish ?punish s e)
+                in
+                let proof_env =
+                  { Envelope.Incoming.data=
+                      (One_or_two.map proofs ~f:fst, message)
+                  ; sender }
+                in
+                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
+                | Ok true ->
+                    return true
+                | Ok false ->
+                    (* if this proof is in the set of invalid proofs*)
+                    let e = Error.of_string "Invalid proof" in
+                    let%map () = log e in
+                    false
+                | Error e ->
+                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                    let%map () = log ~punish:false e in
+                    false )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->
             verify pairs
         | Error e ->
             [%log' error t.logger]
-              ~metadata:[("error", `String (Error.to_string_hum e))]
+              ~metadata:[("error", Error_json.error_to_yojson e)]
               "One_or_two length mismatch: $error" ;
             Deferred.return false
     end
