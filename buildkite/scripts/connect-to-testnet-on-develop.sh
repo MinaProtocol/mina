@@ -3,6 +3,7 @@
 set -eo pipefail
 
 if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
+  echo "Not pulling against develop, not running the connect test"
   exit 0
 fi
 
