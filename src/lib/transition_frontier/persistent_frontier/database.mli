@@ -22,7 +22,7 @@ module Error : sig
     | `Frontier_hash
     | `Root_transition
     | `Best_tip_transition
-    | `Parent_transition
+    | `Parent_transition of State_hash.t
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
@@ -44,9 +44,11 @@ val close : t -> unit
 
 val check :
      t
+  -> genesis_state_hash:State_hash.t
   -> ( unit
      , [> `Not_initialized
        | `Invalid_version
+       | `Genesis_state_mismatch of State_hash.t
        | `Corrupt of
          [> `Not_found of
             [> `Best_tip
@@ -59,14 +61,14 @@ val check :
             | `Protocol_states_for_root_scan_state ] ] ] )
      Result.t
 
-val initialize :
-  t -> root_data:Root_data.Limited.t -> base_hash:Frontier_hash.t -> unit
+val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
   -> transition:External_transition.Validated.t
   -> ( unit
-     , [> `Not_found of [> `Parent_transition | `Arcs of State_hash.t]] )
+     , [> `Not_found of
+          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
 
 val move_root :
@@ -104,11 +106,6 @@ val get_best_tip :
 
 val set_best_tip :
   t -> State_hash.t -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
-
-val get_frontier_hash :
-  t -> (Frontier_hash.t, [> `Not_found of [> `Frontier_hash]]) Result.t
-
-val set_frontier_hash : t -> Frontier_hash.t -> unit
 
 val crawl_successors :
      t

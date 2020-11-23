@@ -82,6 +82,10 @@ let snapp_account = salt snapp_account
 
 let snapp_payload = salt snapp_payload
 
+let snapp_body = salt snapp_body
+
+let snapp_predicate = salt snapp_predicate
+
 let snapp_predicate_account = salt snapp_predicate_account
 
 let snapp_predicate_protocol_state = salt snapp_predicate_protocol_state

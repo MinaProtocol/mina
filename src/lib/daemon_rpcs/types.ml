@@ -206,6 +206,8 @@ module Status = struct
 
     let state_hash = string_option_entry "Protocol state hash"
 
+    let chain_id = string_entry "Chain id"
+
     let commit_id = string_entry "Git SHA-1"
 
     let conf_dir = string_entry "Configuration directory"
@@ -270,8 +272,6 @@ module Status = struct
         Consensus.Configuration.Fields.to_list
           ~delta:(fmt_field "Delta" string_of_int)
           ~k:(fmt_field "k" string_of_int)
-          ~c:(fmt_field "c" string_of_int)
-          ~c_times_k:(fmt_field "c * k" string_of_int)
           ~slots_per_epoch:(fmt_field "Slots per epoch" string_of_int)
           ~slot_duration:(fmt_field "Slot duration" ms_to_string)
           ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
@@ -313,6 +313,7 @@ module Status = struct
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
+    ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
     ; peers: string list
@@ -344,8 +345,8 @@ module Status = struct
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
-      ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
+      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
       ~consensus_time_now ~consensus_mechanism ~consensus_configuration
       ~next_block_production ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id

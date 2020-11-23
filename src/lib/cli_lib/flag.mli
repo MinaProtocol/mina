@@ -59,17 +59,19 @@ module Log : sig
   val json : bool Command.Spec.param
 
   val level : Logger.Level.t Command.Spec.param
+
+  val file_log_level : Logger.Level.t Command.Spec.param
 end
 
-type user_command_common =
+type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
   ; nonce: Coda_base.Account.Nonce.t option
   ; memo: string option }
 
-val user_command_common : user_command_common Command.Param.t
+val signed_command_common : signed_command_common Command.Param.t
 
-module User_command : sig
+module Signed_command : sig
   val hd_index : Coda_numbers.Hd_index.t Command.Spec.param
 
   val receiver_pk : Signature_lib.Public_key.Compressed.t Command.Spec.param

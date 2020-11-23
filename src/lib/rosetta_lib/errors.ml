@@ -32,7 +32,8 @@ module Variant = struct
     | `Operations_not_valid of Partial_reason.t list
     | `Unsupported_operation_for_construction
     | `Signature_missing
-    | `Public_key_format_not_valid ]
+    | `Public_key_format_not_valid
+    | `Exception of string ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -92,6 +93,8 @@ end = struct
         "Unsupported operation for construction"
     | `Signature_missing ->
         "Signature missing"
+    | `Exception _ ->
+        "Exception"
 
   let context = function
     | `Sql msg ->
@@ -122,10 +125,10 @@ end = struct
     | `Transaction_not_found hash ->
         Some
           (sprintf
-             !"You attempt to lookup %s but it is missing from the mempool. \
-               This may be due to it's inclusion in a block -- try looking \
-               for this transaction in a recent block. It also could be due \
-               to the transaction being evicted from the mempool."
+             "You attempt to lookup %s but it is missing from the mempool. \
+              This may be due to it's inclusion in a block -- try looking for \
+              this transaction in a recent block. It also could be due to the \
+              transaction being evicted from the mempool."
              hash)
     | `Block_missing ->
         (* TODO: Add context around the query made *)
@@ -144,6 +147,8 @@ end = struct
         None
     | `Signature_missing ->
         None
+    | `Exception s ->
+        Some (sprintf "Exception when processing request: %s" s)
 
   let retriable = function
     | `Sql _ ->
@@ -174,6 +179,8 @@ end = struct
         false
     | `Signature_missing ->
         false
+    | `Exception _ ->
+        false
 
   let create ?context kind = {extra_context= context; kind}
 
@@ -196,9 +203,25 @@ end = struct
                 ; ("error", `String context1)
                 ; ("extra", `String context2) ]) ) }
 
+  (* The most recent rosetta-cli denies errors that have details in them. When
+   * future versions of the spec allow for more detailed descriptions we can
+   * remove this filtering. *)
   let all_errors =
+    (* This is n^2, but |input| is small enough that the performance doesn't
+     * matter here. Plus this is likely cheaper than sorting first due to the
+     * small size *)
+    let rec uniq ~eq = function
+      | [] ->
+          []
+      | x :: xs ->
+          x :: (xs |> List.filter ~f:(fun x' -> not (eq x x')) |> uniq ~eq)
+    in
     Variant.to_representatives
     |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
+    |> Lazy.map ~f:(fun es ->
+           List.map es ~f:(fun e -> {e with Rosetta_models.Error.details= None})
+           |> uniq ~eq:(fun {Rosetta_models.Error.code; _} {code= code2; _} ->
+                  Int32.equal code code2 ) )
 
   module Lift = struct
     let parse ?context res =

@@ -87,6 +87,18 @@ module Checked : sig
   module Assert : sig
     val equal : var -> var -> (unit, _) Checked.t
   end
+
+  type t = var
+
+  val ( = ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( > ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( <= ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 end
 
 [%%endif]

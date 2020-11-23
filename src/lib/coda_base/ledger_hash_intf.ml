@@ -30,6 +30,14 @@ module type S = sig
 
   val of_digest : Random_oracle.Digest.t -> t
 
+  val modify_account :
+       depth:int
+    -> var
+    -> Account_id.var
+    -> filter:(Account.var -> ('a, 's) Checked.t)
+    -> f:('a -> Account.var -> (Account.var, 's) Checked.t)
+    -> (var, 's) Checked.t
+
   val modify_account_send :
        depth:int
     -> var

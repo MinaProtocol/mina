@@ -3,7 +3,8 @@
  (public_name rocksdb)
  (library_flags -linkall)
  (inline_tests)
- (libraries core rocks key_value_database file_system)
+ (libraries core rocks key_value_database file_system logger)
  (preprocess
   (pps ppx_version ppx_jane))
+ (instrumentation (backend bisect_ppx))
  (synopsis "RocksDB Database module"))

@@ -8,6 +8,8 @@ let rec to_list : type a n. (a, n) t -> a list = function
   | x :: xs ->
       x :: to_list xs
 
+let to_array v = Array.of_list (to_list v)
+
 let rec length : type a n. (a, n) t -> int = function
   | [] ->
       0

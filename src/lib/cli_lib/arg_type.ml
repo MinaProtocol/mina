@@ -92,11 +92,10 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Coda_base.User_command.of_base58_check_exn s
+      try Coda_base.Signed_command.of_base58_check_exn s
       with e ->
-        failwithf "Couldn't decode transaction id: %s\n"
-          (Error.to_string_hum (Error.of_exn e))
-          () )
+        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
+        |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

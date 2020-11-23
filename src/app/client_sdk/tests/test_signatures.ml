@@ -53,8 +53,8 @@ let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee_token = Token_id.default in
   let nonce = Account.Nonce.of_int nonce in
   let valid_until = Coda_numbers.Global_slot.of_int valid_until in
-  let memo = User_command_memo.create_from_string_exn memo in
-  User_command_payload.Common.Poly.
+  let memo = Signed_command_memo.create_from_string_exn memo in
+  Signed_command_payload.Common.Poly.
     {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
 let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
@@ -63,9 +63,10 @@ let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
   let amount = Currency.Amount.of_int amount in
   let token_id = Token_id.default in
   let body =
-    User_command_payload.Body.Payment {source_pk; receiver_pk; token_id; amount}
+    Signed_command_payload.Body.Payment
+      {source_pk; receiver_pk; token_id; amount}
   in
-  User_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{common; body}
 
 let payments =
   let receiver_pk = receiver in
@@ -82,10 +83,10 @@ let make_stake_delegation ~delegator ~new_delegate ~fee ~fee_payer_pk ~nonce
     ~valid_until memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
   let body =
-    User_command_payload.Body.Stake_delegation
+    Signed_command_payload.Body.Stake_delegation
       (Stake_delegation.Set_delegate {delegator; new_delegate})
   in
-  User_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{common; body}
 
 let delegations =
   let delegator = signer_pk in
@@ -102,7 +103,7 @@ let transactions = payments @ delegations
 type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 
 let get_signature payload =
-  (User_command.sign keypair payload :> User_command.With_valid_signature.t)
+  (Signed_command.sign keypair payload :> Signed_command.With_valid_signature.t)
 
 (* output format matches signatures in client SDK *)
 let print_signature field scalar =
@@ -114,16 +115,16 @@ let main () =
   let signatures = List.map transactions ~f:get_signature in
   (* make sure signatures verify *)
   List.iteri signatures ~f:(fun i signature ->
-      let signature = (signature :> User_command.t) in
-      if not (User_command.check_signature signature) then (
+      let signature = (signature :> Signed_command.t) in
+      if not (Signed_command.check_signature signature) then (
         eprintf
-          !"Signature (%d) failed to verify: %{sexp: User_command.t}\n%!"
+          !"Signature (%d) failed to verify: %{sexp: Signed_command.t}\n%!"
           i signature ;
         exit 1 ) ) ;
   printf "[\n" ;
   List.iter signatures ~f:(fun signature ->
-      let User_command.Poly.{signature= field, scalar; _} =
-        (signature :> User_command.t)
+      let Signed_command.Poly.{signature= field, scalar; _} =
+        (signature :> Signed_command.t)
       in
       print_signature field scalar ) ;
   printf "]\n"

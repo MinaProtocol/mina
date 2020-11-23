@@ -22,6 +22,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Sent_invalid_signature_or_proof
+        (** Peer either sent us a proof or a signature that does not verify. *)
     | Sent_invalid_protocol_version
         (** Peer sent block with invalid protocol version *)
     | Sent_mismatched_protocol_version
@@ -82,6 +84,7 @@ module Actions = struct
          * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
+        (* this delta has not been updated for delta=0. Leaving since this system is off and likely to be replaced*)
         let y = (Float.of_int delta ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
@@ -96,6 +99,8 @@ module Actions = struct
     | Sent_invalid_signature ->
         Insta_ban
     | Sent_invalid_proof ->
+        Insta_ban
+    | Sent_invalid_signature_or_proof ->
         Insta_ban
     | Sent_invalid_protocol_version ->
         Insta_ban
@@ -167,5 +172,5 @@ let record_envelope_sender :
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
-  | Remote (inet_addr, _peer_id) ->
-      record t logger inet_addr action
+  | Remote peer ->
+      record t logger peer action

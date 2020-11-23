@@ -29,11 +29,15 @@ module Inputs = struct
       ; cache: Cache.t
       ; proof_level: Genesis_constants.Proof_level.t }
 
-    let create ~proof_level () =
+    let create ~constraint_constants ~proof_level () =
       let m =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            Some (module Transaction_snark.Make () : S)
+            Some
+              ( module Transaction_snark.Make (struct
+                let constraint_constants = constraint_constants
+              end)
+              : S )
         | Check | None ->
             None
       in
@@ -50,6 +54,7 @@ module Inputs = struct
   [@@deriving sexp]
 
   let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
+    let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->
@@ -59,12 +64,12 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match k () with
+            match%map.Async k () with
             | Error e ->
                 let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
-                    [ ("error", `String (Error.to_string_hum e))
+                    [ ("error", Error_json.error_to_yojson e)
                     ; ( "spec"
                         (* the sexp_opaque in Work.Single.Spec.t means we can't derive yojson,
 		       so we use the less-desirable sexp here
@@ -79,14 +84,39 @@ module Inputs = struct
           in
           match Cache.find cache statement with
           | Some proof ->
-              Or_error.return (proof, Time.Span.zero)
+              Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
             match single with
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
-                    Or_error.try_with (fun () ->
-                        M.of_transaction ~sok_digest
+                    let%bind t =
+                      Deferred.return
+                      @@
+                      (* Validate the received transaction *)
+                      match t with
+                      | Command (Signed_command cmd) -> (
+                        match Signed_command.check cmd with
+                        | Some cmd ->
+                            ( Ok (Command (Signed_command cmd))
+                              : Transaction.Valid.t Or_error.t )
+                        | None ->
+                            Or_error.errorf "Command has an invalid signature"
+                        )
+                      | Command (Snapp_command cmd) ->
+                          Ok (Command (Snapp_command cmd))
+                      | Fee_transfer ft ->
+                          Ok (Fee_transfer ft)
+                      | Coinbase cb ->
+                          Ok (Coinbase cb)
+                    in
+                    let snapp_account1, snapp_account2 =
+                      Sparse_ledger.snapp_accounts w.ledger
+                        (Transaction.forget t)
+                    in
+                    Deferred.Or_error.try_with (fun () ->
+                        M.of_transaction ~sok_digest ~snapp_account1
+                          ~snapp_account2
                           ~source:input.Transaction_snark.Statement.source
                           ~target:input.target
                           { Transaction_protocol_state.Poly.transaction= t
@@ -113,7 +143,7 @@ module Inputs = struct
             | Merge (stmt, _, _) ->
                 stmt
           in
-          Or_error.return
+          Deferred.Or_error.return
           @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
                  ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:

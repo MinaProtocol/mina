@@ -32,6 +32,8 @@ let snapp_account = create "CodaSnappAccount"
 
 let snapp_payload = create "CodaSnappPayload"
 
+let snapp_body = create "CodaSnappBody"
+
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
 let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
@@ -68,6 +70,8 @@ let coinbase = create "Coinbase"
 let checkpoint_list = create "CodaCheckpoints"
 
 let bowe_gabizon_hash = create "CodaTockBGHash"
+
+let snapp_predicate = create "CodaSnappPred"
 
 let snapp_predicate_account = create "CodaSnappPredAcct"
 

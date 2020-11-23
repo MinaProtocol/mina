@@ -89,14 +89,18 @@ end
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
-  type t
+  type t [@@deriving compare]
 
   val to_string : t -> string
 
   val of_string : string -> t
+
+  val to_peer : t -> Network_peer.Peer.t option
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
+
+type validation_result = [`Accept | `Reject | `Ignore]
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
@@ -142,7 +146,8 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(string Envelope.Incoming.t -> bool Deferred.t)
+    -> should_forward_message:(   string Envelope.Incoming.t
+                               -> validation_result Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -159,7 +164,8 @@ module Pubsub : sig
   val subscribe_encode :
        net
     -> string
-    -> should_forward_message:('a Envelope.Incoming.t -> bool Deferred.t)
+    -> should_forward_message:(   'a Envelope.Incoming.t
+                               -> validation_result Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of
@@ -173,27 +179,46 @@ end
   *
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
-val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
+val create :
+     on_unexpected_termination:(unit -> unit Deferred.t)
+  -> logger:Logger.t
+  -> conf_dir:string
+  -> net Deferred.Or_error.t
+
+(** State for the connection gateway. It will disallow connections from IPs
+    or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
+    [isolate] is true, only connections to [trusted_peers] are allowed. *)
+type connection_gating =
+  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
 
 (** Configure the network connection.
   *
   * Listens on each address in [maddrs].
   *
   * This will only connect to peers that share the same [network_id]. [on_new_peer], if present,
-  * will be called for each peer we discover. [unsafe_no_trust_ip], if true, will not attempt to
+  * will be called for each peer we connect to. [unsafe_no_trust_ip], if true, will not attempt to
   * report trust actions for the IPs of observed connections.
+  *
+  * Whenever the connection list gets too small, [seed_peers] will be
+  * candidates for reconnection for peer discovery.
   *
   * This fails if initializing libp2p fails for any reason.
 *)
 val configure :
      net
+  -> logger:Logger.t
   -> me:Keypair.t
   -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
+  -> metrics_port:string option
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
-  -> gossip_type:[`Gossipsub | `Flood | `Random]
+  -> flooding:bool
+  -> direct_peers:Multiaddr.t list
+  -> peer_exchange:bool
+  -> seed_peers:Multiaddr.t list
+  -> initial_gating_config:connection_gating
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.
@@ -318,17 +343,13 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
 
-(** Ban an IP from connecting to the helper.
+(** Configure the connection gateway. 
 
-    This ban is in place until [unban_ip] is called or the helper restarts.
-    After the deferred resolves, no new incoming streams will involve that IP.
-    TODO: does this forbid explicitly dialing them? *)
-val ban_ip :
-  net -> Unix.Inet_addr.t -> [`Ok | `Already_banned] Deferred.Or_error.t
+  This will fail if any of the trusted or banned peers are on IPv6. *)
+val set_connection_gating_config :
+  net -> connection_gating -> connection_gating Deferred.t
 
-(** Unban an IP, allowing connections from it. *)
-val unban_ip :
-  net -> Unix.Inet_addr.t -> [`Ok | `Not_banned] Deferred.Or_error.t
+val connection_gating_config : net -> connection_gating Deferred.t
 
 (** List of currently banned IPs. *)
 val banned_ips : net -> Unix.Inet_addr.t list Deferred.t

@@ -236,6 +236,14 @@ module Writer = struct
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
+    ( if Pipe.is_closed writer.writer then
+      let logger = Logger.create () in
+      [%log warn] "writing to closed pipe $name"
+        ~metadata:
+          [ ( "name"
+            , `String
+                (Sexplib.Sexp.to_string ([%sexp_of: string option] writer.name))
+            ) ] ) ;
     match writer.type_ with
     | Synchronous ->
         Pipe.write writer.writer data

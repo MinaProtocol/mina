@@ -5,7 +5,8 @@
  (libraries crypto_params snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot)))
+  (pps ppx_version ppx_jane ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx)))
 
 (rule
  (targets dummy_values.ml)

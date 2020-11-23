@@ -31,6 +31,8 @@ else
   SWITCH_FOUND=false
 fi
 
+pushd /home/opam/opam-repository && git pull && popd
+
 if [ "$SWITCH_FOUND" = true ]; then
   opam switch set $SWITCH
 else
@@ -42,6 +44,7 @@ else
 fi
 
 # All our ocaml packages
+opam update
 opam switch import src/opam.export
 eval $(opam config env)
 

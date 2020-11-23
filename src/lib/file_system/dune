@@ -5,4 +5,5 @@
  (libraries core async)
  (preprocess
   (pps ppx_version ppx_jane))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Interface to make system calls to the Unix file system"))

@@ -157,7 +157,7 @@ module Statement : sig
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
 
@@ -201,7 +201,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving compare, sexp, to_yojson]
+    type t [@@deriving compare, sexp, yojson]
   end
 end]
 
@@ -258,7 +258,9 @@ val check_transaction :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> Transaction.t Transaction_protocol_state.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -271,7 +273,7 @@ val check_user_command :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> User_command.With_valid_signature.t Transaction_protocol_state.t
+  -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -285,7 +287,9 @@ val generate_transaction_witness :
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
-  -> Transaction.t Transaction_protocol_state.t
+  -> snapp_account1:Snapp_account.t option
+  -> snapp_account2:Snapp_account.t option
+  -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -302,9 +306,11 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> Transaction.t Transaction_protocol_state.t
+    -> snapp_account1:Snapp_account.t option
+    -> snapp_account2:Snapp_account.t option
+    -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_user_command :
        sok_digest:Sok_message.Digest.t
@@ -314,9 +320,9 @@ module type S = sig
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> next_available_token_before:Token_id.t
     -> next_available_token_after:Token_id.t
-    -> User_command.With_valid_signature.t Transaction_protocol_state.t
+    -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
@@ -328,11 +334,17 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
-  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
+  val merge :
+    t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
-module Make () : S
+module Make (Inputs : sig
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+end) : S
 
-val constraint_system_digests : unit -> (string * Md5.t) list
+val constraint_system_digests :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> unit
+  -> (string * Md5.t) list

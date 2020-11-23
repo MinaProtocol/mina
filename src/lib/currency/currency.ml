@@ -413,6 +413,14 @@ end = struct
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
 
+    let add_signed_flagged (t : var) (d : Signed.var) =
+      let%bind d = Signed.Checked.to_field_var d in
+      let%map bits, `Success no_overflow =
+        Field.Var.add (pack_var t) d
+        |> Field.Checked.unpack_flagged ~length:length_in_bits
+      in
+      (bits, `Overflow (Boolean.not no_overflow))
+
     let scale (f : Field.Var.t) (t : var) =
       let%bind x = Field.Checked.mul (pack_var t) f in
       unpack_var x
@@ -669,21 +677,23 @@ module Balance = struct
   consensus_mechanism]
 
   module Checked = struct
-    let add_signed_amount = Amount.Checked.add_signed
+    include Amount.Checked
 
-    let add_amount = Amount.Checked.add
+    let add_signed_amount = add_signed
 
-    let sub_amount = Amount.Checked.sub
+    let add_amount = add
 
-    let add_amount_flagged = Amount.Checked.add_flagged
+    let sub_amount = sub
 
-    let sub_amount_flagged = Amount.Checked.sub_flagged
+    let add_amount_flagged = add_flagged
+
+    let add_signed_amount_flagged = add_signed_flagged
+
+    let sub_amount_flagged = sub_flagged
 
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
-
-    let if_ = Amount.Checked.if_
   end
 
   [%%endif]

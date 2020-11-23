@@ -13,7 +13,27 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
   | Check | None ->
       Deferred.return ()
 
-let verify_blockchain_snark _ _ = Deferred.Or_error.return true
+let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
+
+let verify_commands _ (cs : User_command.Verifiable.t list) :
+    [ `Valid of Coda_base.User_command.Valid.t
+    | `Invalid
+    | `Valid_assuming of
+      ( Pickles.Side_loaded.Verification_key.t
+      * Coda_base.Snapp_statement.t
+      * Pickles.Side_loaded.Proof.t )
+      list ]
+    list
+    Deferred.Or_error.t =
+  List.map cs ~f:(fun c ->
+      match Common.check c with
+      | `Valid c ->
+          `Valid c
+      | `Invalid ->
+          `Invalid
+      | `Valid_assuming (c, _) ->
+          `Valid c )
+  |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =
   (*Don't check if the proof has default sok becasue they were probably not

@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+# gazelle:prefix
+
+go_library(
+    name = "lib",
+    srcs = ["main.go"],
+    importpath = "//src/generate_methodidx",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "generate_methodidx",
+    embed = [":lib"],
+    visibility = ["//visibility:public"],
+)

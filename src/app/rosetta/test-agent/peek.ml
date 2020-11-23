@@ -137,7 +137,10 @@ module Construction = struct
       post ~rosetta_uri ~logger
         ~body:
           Construction_metadata_request.(
-            {network_identifier= net_id network_response; options} |> to_yojson)
+            { network_identifier= net_id network_response
+            ; options
+            ; public_keys= [] }
+            |> to_yojson)
         ~path:"construction/metadata"
     in
     Lift.res ~logger res ~of_yojson:Construction_metadata_response.of_yojson

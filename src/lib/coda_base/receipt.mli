@@ -11,8 +11,15 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
+
+module Elt : sig
+  type t =
+    | Signed_command of Signed_command.Payload.t
+    | Snapp_command of Random_oracle.Digest.t
+end
 
 module Chain_hash : sig
   include Data_hash.Full_size
@@ -25,20 +32,26 @@ module Chain_hash : sig
 
   val empty : t
 
-  val cons : User_command.Payload.t -> t -> t
+  val cons : Elt.t -> t -> t
 
   [%%ifdef consensus_mechanism]
 
   val gen : t Quickcheck.Generator.t
 
   module Checked : sig
+    module Elt : sig
+      type t =
+        | Signed_command of Transaction_union_payload.var
+        | Snapp_command of Random_oracle.Checked.Digest.t
+    end
+
     val constant : t -> var
 
     type t = var
 
     val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
-    val cons : payload:Transaction_union_payload.var -> t -> (t, _) Checked.t
+    val cons : Elt.t -> t -> (t, _) Checked.t
   end
 
   [%%endif]

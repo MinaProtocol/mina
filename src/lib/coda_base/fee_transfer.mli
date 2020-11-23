@@ -93,3 +93,5 @@ val map : t -> f:(Single.t -> 'b) -> 'b One_or_two.t
 val fold : t -> init:'acc -> f:('acc -> Single.t -> 'acc) -> 'acc
 
 val to_list : t -> Single.t list
+
+val to_numbered_list : t -> (int * Single.t) list

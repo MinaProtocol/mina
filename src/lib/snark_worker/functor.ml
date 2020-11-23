@@ -66,8 +66,8 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let perform (s : Worker_state.t) public_key
       ({instances; fee} as spec : Work.Spec.t) =
-    One_or_two.Or_error.map instances ~f:(fun w ->
-        let open Or_error.Let_syntax in
+    One_or_two.Deferred_result.map instances ~f:(fun w ->
+        let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
           perform_single s
             ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
@@ -76,7 +76,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         ( proof
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
         ) )
-    |> Or_error.map ~f:(function
+    |> Deferred.Or_error.map ~f:(function
          | `One (proof1, metrics1) ->
              { Snark_work_lib.Work.Result.proofs= `One proof1
              ; metrics= `One metrics1
@@ -137,7 +137,13 @@ module Make (Inputs : Intf.Inputs_intf) :
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t) ~logger
       ~proof_level daemon_address shutdown_on_disconnect =
-    let%bind state = Worker_state.create ~proof_level () in
+    let constraint_constants =
+      (* TODO: Make this configurable. *)
+      Genesis_constants.Constraint_constants.compiled
+    in
+    let%bind state =
+      Worker_state.create ~constraint_constants ~proof_level ()
+    in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
     let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
@@ -158,6 +164,23 @@ module Make (Inputs : Intf.Inputs_intf) :
       k ()
     in
     let rec go () =
+      let%bind daemon_address =
+        let%bind cwd = Sys.getcwd () in
+        [%log debug]
+          !"Snark worker working directory $dir"
+          ~metadata:[("dir", `String cwd)] ;
+        let path = "snark_coordinator" in
+        match%bind Sys.file_exists path with
+        | `Yes -> (
+            let%map s = Reader.file_contents path in
+            try Host_and_port.of_string (String.strip s)
+            with _ -> daemon_address )
+        | `No | `Unknown ->
+            return daemon_address
+      in
+      [%log debug]
+        !"Snark worker using daemon $addr"
+        ~metadata:[("addr", `String (Host_and_port.to_string daemon_address))] ;
       match%bind
         dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
           daemon_address
@@ -186,7 +209,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                        ~f:Work.Single.Spec.statement) ) ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
-          match perform state public_key work with
+          match%bind perform state public_key work with
           | Error e ->
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->

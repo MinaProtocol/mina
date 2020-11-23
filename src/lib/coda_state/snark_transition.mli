@@ -2,17 +2,10 @@ open Core_kernel
 open Coda_base
 
 module Poly : sig
-  type ( 'blockchain_state
-       , 'consensus_transition
-       , 'amount
-       , 'producer_pk
-       , 'pending_coinbase_action )
-       t =
+  type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t =
     { blockchain_state: 'blockchain_state
     ; consensus_transition: 'consensus_transition
-    ; coinbase_receiver: 'producer_pk
-    ; coinbase_amount: 'amount
-    ; pending_coinbase_action: 'pending_coinbase_action }
+    ; pending_coinbase_update: 'pending_coinbase_update }
   [@@deriving sexp, fields]
 
   module Stable :
@@ -20,9 +13,7 @@ module Poly : sig
       module V1 : sig
         type ( 'blockchain_state
              , 'consensus_transition
-             , 'amount
-             , 'producer_pk
-             , 'pending_coinbase_action )
+             , 'pending_coinbase_update )
              t
         [@@deriving bin_io, sexp, version]
       end
@@ -31,15 +22,11 @@ module Poly : sig
     end
     with type ( 'blockchain_state
               , 'consensus_transition
-              , 'amount
-              , 'producer_pk
-              , 'pending_coinbase_action )
+              , 'pending_coinbase_update )
               V1.t =
                 ( 'blockchain_state
                 , 'consensus_transition
-                , 'amount
-                , 'producer_pk
-                , 'pending_coinbase_action )
+                , 'pending_coinbase_update )
                 t
 end
 
@@ -49,9 +36,7 @@ module Value : sig
       type t =
         ( Blockchain_state.Value.Stable.V1.t
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
-        , Currency.Amount.Stable.V1.t
-        , Signature_lib.Public_key.Compressed.Stable.V1.t
-        , Pending_coinbase.Update.Action.Stable.V1.t )
+        , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, sexp, to_yojson, version]
     end
@@ -67,9 +52,7 @@ type value = Value.t
 type var =
   ( Blockchain_state.var
   , Consensus.Data.Consensus_transition.var
-  , Currency.Amount.var
-  , Signature_lib.Public_key.Compressed.var
-  , Pending_coinbase.Update.Action.var )
+  , Pending_coinbase.Update.var )
   Poly.t
 
 include
@@ -78,9 +61,7 @@ include
 val create_value :
      blockchain_state:Blockchain_state.Value.t
   -> consensus_transition:Consensus.Data.Consensus_transition.Value.Stable.V1.t
-  -> coinbase_receiver:Signature_lib.Public_key.Compressed.t
-  -> coinbase_amount:Currency.Amount.t
-  -> pending_coinbase_action:Pending_coinbase.Update.Action.t
+  -> pending_coinbase_update:Pending_coinbase.Update.t
   -> unit
   -> Value.t
 
@@ -90,14 +71,9 @@ val genesis :
   -> Value.t
 
 val consensus_transition :
-  (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+  (_, 'consensus_transition, _) Poly.t -> 'consensus_transition
 
-val coinbase_amount : (_, _, 'amount, _, _) Poly.t -> 'amount
+val pending_coinbase_update :
+  (_, _, 'pending_coinbase_action) Poly.t -> 'pending_coinbase_action
 
-val coinbase_receiver : (_, _, _, 'producer_pk, _) Poly.t -> 'producer_pk
-
-val pending_coinbase_action :
-  (_, _, _, _, 'pending_coinbase_action) Poly.t -> 'pending_coinbase_action
-
-val blockchain_state :
-  ('blockchain_state, _, _, _, _) Poly.t -> 'blockchain_state
+val blockchain_state : ('blockchain_state, _, _) Poly.t -> 'blockchain_state

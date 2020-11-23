@@ -84,7 +84,7 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let precomputed_values = Lazy.force Precomputed_values.compiled in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants = precomputed_values.constraint_constants in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants = precomputed_values.consensus_constants in
@@ -113,11 +113,6 @@ let run_test () : unit Deferred.t =
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
       let%bind transaction_database_dir =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
       in
@@ -137,22 +132,33 @@ let run_test () : unit Deferred.t =
           external_transition_database_dir
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
+      let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+          ~epoch_ledger_location
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
+          ~ledger_depth:constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let chain_id = "bogus chain id for testing" in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
           ; logger
           ; initial_peers= []
           ; unsafe_no_trust_ip= true
-          ; gossip_type= `Gossipsub
+          ; isolate= false
+          ; metrics_port= None
           ; conf_dir= temp_conf_dir
-          ; chain_id= "bogus chain id for testing"
+          ; chain_id
+          ; flooding= false
+          ; direct_peers= []
+          ; peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
@@ -186,14 +192,17 @@ let run_test () : unit Deferred.t =
       let largest_account_keypair =
         Genesis_ledger.largest_account_keypair_exn ()
       in
-      let fee = Currency.Fee.of_int in
+      let fee n =
+        Currency.Fee.of_int
+          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+      in
       let snark_work_fee, transaction_fee =
-        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
+        if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
+             ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None
@@ -211,7 +220,7 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
-             ~time_controller ~receipt_chain_database ~snark_work_fee
+             ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~precomputed_values ())
@@ -275,7 +284,7 @@ let run_test () : unit Deferred.t =
         trace_recurring "build_payment" (fun () ->
             let signer = pk_of_sk sender_sk in
             let memo =
-              User_command_memo.create_from_string_exn
+              Signed_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
             User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
@@ -291,7 +300,7 @@ let run_test () : unit Deferred.t =
                    (Keypair.of_private_key_exn sender_sk))
               () )
       in
-      let assert_ok x = assert (Or_error.is_ok x) in
+      let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
         Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
@@ -317,12 +326,12 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res = send_payment payment in
         assert_ok p1_res ;
-        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
+        let user_cmd = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
           build_payment
-            ~nonce:(User_command.nonce user_cmd)
+            ~nonce:(Signed_command.nonce user_cmd)
             send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
@@ -372,7 +381,8 @@ let run_test () : unit Deferred.t =
                 (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
-              receiver (f_amount i) acc (Currency.Fee.of_int 0) )
+              receiver (f_amount i) acc
+              Coda_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
         Coda_lib.best_protocol_state t
@@ -470,8 +480,7 @@ let run_test () : unit Deferred.t =
                 blockchain_length t
                 > Length.add blockchain_length' wait_till_length )
               ~timeout_min:
-                ( ( Length.to_int consensus_constants.delta
-                  + Length.to_int consensus_constants.c )
+                ( (Length.to_int consensus_constants.delta + 1 + 8)
                   * ( ( Block_time.Span.to_ms
                           consensus_constants.block_window_duration_ms
                       |> Int64.to_int_exn )

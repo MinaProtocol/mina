@@ -140,10 +140,6 @@ let of_array_and_length_exn : type a n. a array -> n nat -> (a, n) t =
       (Nat.to_int n) () ;
   init n ~f:(Array.get xs)
 
-let reverse t =
-  let (T xs) = of_list (List.rev (to_list t)) in
-  Obj.magic xs
-
 let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
  fun xs n ->
   match (xs, n) with
@@ -163,6 +159,12 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
   | x :: xs ->
       let acc = f init x in
       fold xs ~f ~init:acc
+
+let for_all : type a n. (a, n) t -> f:(a -> bool) -> bool =
+ fun v ~f ->
+  with_return (fun {return} ->
+      iter v ~f:(fun x -> if not (f x) then return false) ;
+      true )
 
 let foldi t ~f ~init =
   snd (fold t ~f:(fun (i, acc) x -> (i + 1, f i acc x)) ~init:(0, init))
@@ -346,6 +348,10 @@ module With_length (N : Nat.Intf) = struct
   include Stable.Latest
 
   let map (t : 'a t) = map t
+
+  let of_list_exn : 'a list -> 'a t = fun ls -> of_list_and_length_exn ls N.n
+
+  let to_list : 'a t -> 'a list = to_list
 end
 
 let rec typ' : type f var value n.

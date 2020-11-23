@@ -10,10 +10,12 @@
 let getEnvOrFail = name =>
   switch (Js.Dict.get(Node.Process.process##env, name)) {
   | Some(value) => value
-  | None => failwith({j|Couldn't find env var: `$name`"|j})
+  | None => failwith({j|Couldn't find env var: `$name`|j})
   };
 
-/* The Google Sheets API expects the credentials to be a local file instead of a parameter */
+/* The Google Sheets API expects the credentials to be a local file instead of a parameter
+       Thus, we set an environment variable indicating it's path.
+   */
 Node.Process.putEnvVar(
   "GOOGLE_APPLICATION_CREDENTIALS",
   "./google_sheets_credentials.json",
@@ -25,22 +27,33 @@ let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
   let pool = Postgres.createPool(pgConnection);
-  Postgres.makeQuery(pool, Postgres.getBlocks, result => {
+  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
     switch (result) {
     | Ok(blocks) =>
       Types.Block.parseBlocks(blocks)
       |> Metrics.calculateMetrics
-      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
-
-      UploadLeaderboardData.uploadData(
-        spreadsheetId,
-        blocks |> Array.length |> string_of_int,
-      );
-
-      UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId)
     | Error(error) => Js.log(error)
     }
   });
+  Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
+    switch (result) {
+    | Ok(blockHeightQuery) =>
+      Belt.Option.(
+        Js.Json.(
+          blockHeightQuery[0]
+          ->decodeObject
+          ->flatMap(__x => Js.Dict.get(__x, "max"))
+          ->flatMap(decodeString)
+          ->mapWithDefault((), height => {
+              UploadLeaderboardData.uploadData(spreadsheetId, height)
+            })
+        )
+      )
+    | Error(error) => Js.log(error)
+    }
+  });
+  UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
   Postgres.endPool(pool);
 };
 

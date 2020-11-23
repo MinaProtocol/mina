@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+# execute pre-processing steps like zexe-standardize.sh if set
+if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
+
 eval `opam config env`
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go
@@ -30,9 +33,12 @@ dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genes
 echo "--- Upload genesis data"
 ./scripts/upload-genesis.sh
 
-echo "--- Build logproc + coda"
+echo "--- Build logproc + coda + rosetta"
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
 dune build --profile=${DUNE_PROFILE} src/app/logproc/logproc.exe src/app/cli/src/coda.exe src/app/rosetta/rosetta.exe 2>&1 | tee /tmp/buildocaml3.log
+
+echo "--- Build replayer"
+dune build --profile=${DUNE_PROFILE} src/app/replayer/replayer.exe 2>&1 | tee /tmp/buildocaml4.log
 
 echo "--- Build deb package with pvkeys"
 make deb
