@@ -14,7 +14,7 @@ use oracle::{
 use groupmap::GroupMap;
 
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
-use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
+use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
 use crate::tweedle_dee::{CamlTweedleDeeAffine, CamlTweedleDeePolyComm};
@@ -23,7 +23,7 @@ use crate::tweedle_fp_plonk_index::CamlTweedleFpPlonkIndexPtr;
 use crate::tweedle_fp_plonk_verifier_index::{
     CamlTweedleFpPlonkVerifierIndexPtr, CamlTweedleFpPlonkVerifierIndexRawPtr,
 };
-use crate::tweedle_fp_vector::CamlTweedleFpVectorPtr;
+use crate::tweedle_fp_vector::CamlTweedleFpVector;
 use crate::tweedle_fq::CamlTweedleFq;
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -187,8 +187,8 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_create(
     index: CamlTweedleFpPlonkIndexPtr<'static>,
-    primary_input: CamlTweedleFpVectorPtr,
-    auxiliary_input: CamlTweedleFpVectorPtr,
+    primary_input: CamlTweedleFpVector,
+    auxiliary_input: CamlTweedleFpVector,
     prev_challenges: Vec<CamlTweedleFp>,
     prev_sgs: Vec<CamlTweedleDeeAffine<CamlTweedleFq>>,
 ) -> CamlTweedleFpPlonkProof {
@@ -219,13 +219,16 @@ pub fn caml_tweedle_fp_plonk_proof_create(
         }
     };
 
+    let auxiliary_input: &Vec<Fp> = auxiliary_input.into();
+    let index: &DlogIndex<GAffine> = &index.as_ref().0;
+
     ocaml::runtime::release_lock();
 
     let map = GroupMap::<Fq>::setup();
     let proof = DlogProof::create::<
         DefaultFqSponge<TweedledeeParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fp, PlonkSpongeConstants>,
-    >(&map, &auxiliary_input.as_ref().0, &index.as_ref().0, prev)
+    >(&map, auxiliary_input, index, prev)
     .unwrap();
 
     ocaml::runtime::acquire_lock();
