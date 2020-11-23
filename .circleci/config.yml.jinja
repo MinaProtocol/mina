@@ -408,6 +408,8 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
+                  environment:
+                    CLOUDSDK_PYTHON: /usr/local/opt/python@3.8/libexec/bin/python
             - store_artifacts:
                   path: package
 
