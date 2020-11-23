@@ -251,13 +251,15 @@ _access mode:_ ReadWriteOnce
 
 #### Labels and Organization
 
-As previously mentioned, each of the referenced storage persistence use-cases would make use of the Kubernetes `PersistentVolumeClaim` resource which represents an individual claim or reservation to a volume specification (e.g. storage capacity, list of mount options, custom identifier/name) from an underlying storage class. Properties of this resource are demonstrated below though we highlight several pertaining to the organization of this testnet(-role):`pvc` binding mapping.
+As previously mentioned, each of the referenced storage persistence use-cases would make use of the Kubernetes `PersistentVolumeClaim` resource which represents an individual claim or reservation to a volume specification (e.g. storage capacity, list of mount options, custom identifier/name) from an underlying storage class. Properties of this resource are demonstrated below though we highlight several pertaining to the organization of this testnet(-role):`pvc` mapping.
 
-`pvc.metadata.name`: <string> - identifier of the persistent volume claim resource. Must be unique within a single namespace and referenced within a pod's `volumes` list. e.g. *pickles-nightly-wallets*
+`pvc.metadata.name`: <string> - identifier of the persistent volume claim resource. Must be unique within a single namespace and referenced within a pod's `volumes` list. e.g. *pickles-nightly-wallets-11232020*
 
-`pvc.metadata.namespace`: <string> - testnet from which a persistent volume claim is requested. e.g. *pickles-nightly*
+`pvc.metadata.namespace`: <string> - testnet from which a persistent volume claim is requested. e.g. *pickles-nightly-11232020*
 
-`pvc.spec.volumeName`: <string> - custom name identifier of the volume to issue a claim to. **Note:** Claims to volumes can be requested across namespaces allowing for shared storage resources between testnets provided the volume's retain policy permits retainment or rebinding. e.g. *pickles-nightly-wallets-volume*
+`pvc.spec.volumeName`: <string> - custom name identifier of the volume to issue a claim to. **Note:** Claims to volumes can be requested across namespaces allowing for shared storage resources between testnets provided the volume's retain policy permits retainment or rebinding. e.g. *pickles-nightly-wallets-11232020-volume*
+
+**Persistent Volume Claim (PVC) Properties:**
 
 ```
 FIELDS:                                                                                                                                                       
@@ -265,33 +267,12 @@ FIELDS:
    kind <string>                                                                                                                                              
    metadata     <Object>                                                                                                                                      
       annotations       <map[string]string>                                                                                                                   
-      clusterName       <string>                                                                                                                              
-      creationTimestamp <string>                                                                                                                              
-      deletionGracePeriodSeconds        <integer>                                                                                                             
-      deletionTimestamp <string>                                                                                                                              
-      finalizers        <[]string>                                                                                                                            
-      generateName      <string>                                                                                                                              
-      generation        <integer>                                                                                                                             
+      clusterName       <string>                                                                                                                           
       labels    <map[string]string>                                                                                                                           
-      managedFields     <[]Object>                                                                                                                            
-         apiVersion     <string>                                                                                                                              
-         fieldsType     <string>                                                                                                                              
-         fieldsV1       <map[string]>                                                                                                                         
-         manager        <string>                                                                                                                              
-         operation      <string>                                                                                                                              
-         time   <string>                                                                                                                                      
+                                                                                                                                    
       name      <string>                                                                                                                                      
       namespace <string>                                                                                                                                      
-      ownerReferences   <[]Object>                                                                                                                            
-         apiVersion     <string>                                                                                                                              
-         blockOwnerDeletion     <boolean>
-         controller     <boolean>
-         kind   <string>
-         name   <string>
-         uid    <string>
-      resourceVersion   <string>
-      selfLink  <string>
-      uid       <string>
+
    spec <Object>
       accessModes       <[]string>
       dataSource        <Object>
@@ -322,21 +303,58 @@ FIELDS:
       phase     <string>
 ```
 
+Within each pod specification, the expectation is that each testnet role/deployment will include additional `volume` entries within the `pod.spec.volumes` listing indicating all `pvcs` generated within a particular testnet to be available to containers within the pod. The additional volume listings generally amount to slight modifications to the current `emptyDir` volumes found throughout certain testnet role charts. So far example, the following `yaml`:
+
+```yaml
+- name: wallet-keys
+  emptyDir: {}
+- name: config-dir
+  emptyDir: {}
+```
+
+would become something like:
+```yaml
+- name: wallet-keys
+  persistentVolumeClaim: pickles-nightly-wallets-11232020
+- name: config-dir
+  persistentVolumeClaim: pickles-nightly-config-11232020
+```
+
+Note that individual container volume mount specifications should not have to change as they are agnostic to the underlying volume type by design.
+
 #### Testing
 
-...
+There currently exists linting and dry-run tests executed on each Helm chart change triggered through the Buildkite CI Mina pipeline. To ensure proper persistence of testnet resources on deployment in practice though, we propose leveraging Protocol's integration test framework to generate minimal Terraform-based test cases involving persistence variable injection (to be consumed by named templates), Helm testnet role releases and ideally Kubernetes job resources for enacting test setup and verification steps. This could amount to an additional configuration object within *mina*'s `integration_test_cloud_engine` library representing job configs. Similar to how Network_configs are defined though significantly lesser in scope, `Job_configs` would basically amount to a pointer to a script (within source or to be downloaded) to execute the setup and verification steps.  
 
 ## Drawbacks
 
 [drawbacks]: #drawbacks
 
-...
+* further dependency on single cloud resource vendor (GCP) 
 
 ## Rationale and alternatives
 
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-...
+Why is this design the best in the space of possible designs?
+
+We believe this to be the best design in the space due to its flexibility in application (due largely to the use of `named templates`) and simplicity of integration into the existing infrastructure setup based on our current affinity for `GCP` as a provider for cloud resources.  
+
+What other designs have been considered and what is the rationale for not choosing them?
+
+### Migration to other Cloud Provider K8s solutions
+
+
+
+### Stateful Sets
+
+The decision away from StatefulSets comes down to flexibility (in both pod naming scheme and persistent-volume claim binding) and avoiding the added overhead of having to create a headless service to associate with each StatefulSet. StatefulSets are considerably bespoke when it comes to provisioned pod names (based on the ordinal naming scheme) and persistent-volume claim names as well as lack the same degree of customizability that we get by merely using templated PVCs and allowing per pod volume mounting scoped to common defaults or overridden if desired with specific values as expressed within Values.yaml. This allows for the scenario involving unique artifacts per testnet in addition to cases where one would want to launch a testnet making use of other artifacts/volumes for troubleshooting/experimentation purposes. Again the goal here is to allow flexibility while providing an out-of-the-box solution that works for most cases.
+
+The overhead of having to manually create "headless" services for each StatefulSet isn't massive though again unnecessary and also requires that we migrate from using Deployments with additional overhead there without much gain and added constraints. It's probably worth noting that StatefulSets also don't automatically clean up storage/volume resources created during provisioning - that cleanup is left as a manual task and again speaks to the lack of reasoning to make the switch. Really what they provide is naming/identifier stickiness across nodes for the pod-pvc relationship though, again, PVCs are just resources that can be bound to without really worrying about which entity is requesting the bind or what the pods name is.
+
+What is the impact of not doing this?
+
+The impact of not implementing a persistent-storage solution such as what's proposed would amount to the continued experience of the aforementioned pain-points which result in considerable inefficiences and limitations when it comes to the robustness of testnets in the event of unexpected or in some cases expected destructive operations in addition to the ability for testnet operations to iterate on deployments in place without losing state.
 
 ## Prior art
 
