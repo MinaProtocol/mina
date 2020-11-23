@@ -1046,12 +1046,10 @@ let create (config : Config.t)
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
-           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
+           (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers ))
-         (* Temporarily disabling the extra RPC call until we switch to the proper: dht.Bootstrap and resolve why "failed when refreshing routing table" is occurring. *)
-         (*
+              raise No_initial_peers )
             else (
               [%log info] "Getting some extra initial peers to start" ;
               (* 1. Get some peers
@@ -1086,8 +1084,7 @@ let create (config : Config.t)
                       ()
                   | Error e ->
                       [%log warn] ~metadata:(metadata p e)
-                        "failed to add peer $peer with $error" ) ) *)
-     )) ;
+                        "failed to add peer $peer with $error" ) )) )) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
