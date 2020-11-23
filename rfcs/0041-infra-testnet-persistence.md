@@ -251,6 +251,77 @@ _access mode:_ ReadWriteOnce
 
 #### Labels and Organization
 
+As previously mentioned, each of the referenced storage persistence use-cases would make use of the Kubernetes `PersistentVolumeClaim` resource which represents an individual claim or reservation to a volume specification (e.g. storage capacity, list of mount options, custom identifier/name) from an underlying storage class. Properties of this resource are demonstrated below though we highlight several pertaining to the organization of this testnet(-role):`pvc` binding mapping.
+
+`pvc.metadata.name`: <string> - identifier of the persistent volume claim resource. Must be unique within a single namespace and referenced within a pod's `volumes` list. e.g. *pickles-nightly-wallets*
+
+`pvc.metadata.namespace`: <string> - testnet from which a persistent volume claim is requested. e.g. *pickles-nightly*
+
+`pvc.spec.volumeName`: <string> - custom name identifier of the volume to issue a claim to. **Note:** Claims to volumes can be requested across namespaces allowing for shared storage resources between testnets provided the volume's retain policy permits retainment or rebinding. e.g. *pickles-nightly-wallets-volume*
+
+```
+FIELDS:                                                                                                                                                       
+   apiVersion   <string>                                                                                                                                      
+   kind <string>                                                                                                                                              
+   metadata     <Object>                                                                                                                                      
+      annotations       <map[string]string>                                                                                                                   
+      clusterName       <string>                                                                                                                              
+      creationTimestamp <string>                                                                                                                              
+      deletionGracePeriodSeconds        <integer>                                                                                                             
+      deletionTimestamp <string>                                                                                                                              
+      finalizers        <[]string>                                                                                                                            
+      generateName      <string>                                                                                                                              
+      generation        <integer>                                                                                                                             
+      labels    <map[string]string>                                                                                                                           
+      managedFields     <[]Object>                                                                                                                            
+         apiVersion     <string>                                                                                                                              
+         fieldsType     <string>                                                                                                                              
+         fieldsV1       <map[string]>                                                                                                                         
+         manager        <string>                                                                                                                              
+         operation      <string>                                                                                                                              
+         time   <string>                                                                                                                                      
+      name      <string>                                                                                                                                      
+      namespace <string>                                                                                                                                      
+      ownerReferences   <[]Object>                                                                                                                            
+         apiVersion     <string>                                                                                                                              
+         blockOwnerDeletion     <boolean>
+         controller     <boolean>
+         kind   <string>
+         name   <string>
+         uid    <string>
+      resourceVersion   <string>
+      selfLink  <string>
+      uid       <string>
+   spec <Object>
+      accessModes       <[]string>
+      dataSource        <Object>
+         apiGroup       <string>
+         kind   <string>         name   <string>
+      resources <Object>
+         limits <map[string]string>
+         requests       <map[string]string>
+      selector  <Object>
+         matchExpressions       <[]Object>
+            key <string>
+            operator    <string>
+            values      <[]string>
+         matchLabels    <map[string]string>
+      storageClassName  <string>
+      volumeMode        <string>
+      volumeName        <string>
+   status       <Object>
+      accessModes       <[]string>
+      capacity  <map[string]string>
+      conditions        <[]Object>
+         lastProbeTime  <string>
+         lastTransitionTime     <string>
+         message        <string>
+         reason <string>
+         status <string>
+         type   <string>
+      phase     <string>
+```
+
 #### Testing
 
 ...
