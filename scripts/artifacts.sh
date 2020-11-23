@@ -26,6 +26,7 @@ do_copy () {
     else
         export HOMEBREW_NO_AUTO_UPDATE=1
         brew cask install google-cloud-sdk
+        source "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
     fi
     set -e
 
