@@ -60,6 +60,8 @@ fixup() {
       [ -z "$APPLE_ID" ] || codesign --remove-signature "$LOCAL_LIB"
       [ -z "$APPLE_ID" ] || codesign -s "$APPLE_ID" "$LOCAL_LIB"
       set -u
+      # Files copied from dune's _build are not writable
+      chmod +w $BIN
       install_name_tool -change "$lib" "@executable_path/$(basename $lib)" "$BIN" || exit 1
       # Add to our seen set, by adding to the array and then filtering dupes
       SEEN+=("$BIN")
