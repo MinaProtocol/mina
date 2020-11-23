@@ -179,7 +179,7 @@ _access mode:_ ReadOnlyMany
 _persistence type:_ common
 _mount path:_ `/root/.coda-config/epoch_ledger.json`
 _expected size:_ xx
-_access mode:_ ReadWriteMany
+_access mode:_ ReadOnlyMany
 
 ##### Daemon Config
 
@@ -193,14 +193,14 @@ _access mode:_ ReadOnlyMany
 _persistence type:_ individual or common (keysets)
 _mount path:_ `/root/wallet-keys`
 _expected size:_ *12Ki*
-_access mode:_ ReadWriteMany
+_access mode:_ ReadOnlyMany
 
 ##### Runtime State
 
 _persistence type:_ individual
 _mount path:_ `/root/.coda-config/*`
 _expected size:_ *2Gi* 
-_access mode:_ ReadWriteMany
+_access mode:_ ReadWriteOnce
 
 ##### Example Runtime (block-producer) Filehandles:
 
@@ -247,11 +247,9 @@ coda     11 root   62w      REG     8,1      370077  656515 /root/.coda-config/r
 _persistence type:_ individual
 _mount path:_ xx
 _expected size:_ xx
-_access mode:_ ReadWriteMany
+_access mode:_ ReadWriteOnce
 
 #### Labels and Organization
-
-...
 
 #### Testing
 
