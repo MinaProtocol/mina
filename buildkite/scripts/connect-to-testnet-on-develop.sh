@@ -7,9 +7,11 @@ if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
   exit 0
 fi
 
+apt-get update
+apt-get install -y git
+
 source buildkite/scripts/export-git-env-vars.sh
 
-apt-get update
 apt-get install -y apt-transport-https ca-certificates
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
