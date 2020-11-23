@@ -9,11 +9,11 @@ fi
 
 source buildkite/scripts/export-git-env-vars.sh
 
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | sudo tee /etc/apt/sources.list.d/coda.list
-sudo apt-get update
-sudo apt-get install --allow-downgrades -y curl ${PROJECT}_${VERSION}.deb
+apt-get update
+apt-get install -y apt-transport-https ca-certificates
+echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
+apt-get update
+apt-get install --allow-downgrades -y curl ${PROJECT}_${VERSION}.deb
 
 TESTNET_NAME="turbo-pickles"
 
