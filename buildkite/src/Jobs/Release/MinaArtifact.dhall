@@ -12,6 +12,7 @@ let OpamInit = ../../Command/OpamInit.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
+let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -51,6 +52,9 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
+
+      -- Tests that depend on the debian package
+      ConnectToTestnet.step,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
