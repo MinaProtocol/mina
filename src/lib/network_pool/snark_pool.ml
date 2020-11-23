@@ -183,12 +183,12 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             {Transaction_snark_work.Info.statements= key; work_ids; fee; prover}
             :: acc )
 
-      (** True when there is no active transition_frontier or
+      (** false when there is no active transition_frontier or
           when the refcount for the given work is 0 *)
       let work_is_referenced t work =
         match t.ref_table with
         | None ->
-            true
+            false
         | Some ref_table -> (
           match Statement_table.find ref_table work with
           | None ->
