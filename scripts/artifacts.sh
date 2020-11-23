@@ -31,7 +31,7 @@ do_copy () {
         # Get the tarball of the most recent working OS X version
         curl --output gcloud-sdk.tar.gz https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-297.0.1-darwin-x86_64.tar.gz
         tar -xz -f gcloud-sdk.tar.gz
-        export PATH=google-cloud-sdk/bin:$PATH
+        export PATH=$PWD/google-cloud-sdk/bin:$PATH
     fi
     set -e
 
