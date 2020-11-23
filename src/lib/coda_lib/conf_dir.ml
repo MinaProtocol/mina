@@ -57,10 +57,14 @@ let check_and_set_lockfile ~logger conf_dir =
                       false
                 in
                 if still_running then
-                  Mina_user_error.raisef
-                    "A daemon (process id %d) is already running with the \
-                     current configuration directory (%s)"
-                    (Pid.to_int pid) conf_dir
+                  if Pid.equal pid (Unix.getpid ()) then
+                    (* can happen when running in Docker *)
+                    return ()
+                  else
+                    Mina_user_error.raisef
+                      "A daemon (process id %d) is already running with the \
+                       current configuration directory (%s)"
+                      (Pid.to_int pid) conf_dir
                 else (
                   [%log info] "Removing lockfile for terminated process"
                     ~metadata:
