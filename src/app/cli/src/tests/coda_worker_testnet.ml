@@ -213,7 +213,19 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
     let online_chains =
       Array.filteri chains ~f:(fun i el ->
-          Api.synced testnet i && not (List.is_empty el) )
+          match el with
+          | [] ->
+              false
+          | [state_hash]
+            when State_hash.equal state_hash
+                   testnet.Api.precomputed_values.protocol_state_with_hash.hash
+            ->
+              (* Knowing only the genesis transition doesn't indicate an online
+                 chain.
+              *)
+              false
+          | _ ->
+              Api.synced testnet i )
     in
     let chain_sets =
       Array.map online_chains

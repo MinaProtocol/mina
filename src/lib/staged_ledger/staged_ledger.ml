@@ -966,7 +966,11 @@ module T = struct
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
       time ~logger "check_completed_works" (fun () ->
-          check_completed_works ~logger ~verifier t.scan_state work )
+          match skip_verification with
+          | Some true ->
+              return ()
+          | Some false | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants

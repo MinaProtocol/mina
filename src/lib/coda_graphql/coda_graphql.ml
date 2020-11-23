@@ -2656,10 +2656,17 @@ module Queries = struct
         "Retrieve a list of blocks from transition frontier's root to the \
          current best tip. Returns null if the system is bootstrapping."
       ~typ:(list @@ non_null Types.block)
-      ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~args:
+        Arg.
+          [ arg "maxLength"
+              ~doc:
+                "The maximum number of blocks to return. If there are more \
+                 blocks in the transition frontier from root to tip, the n \
+                 blocks closest to the best tip will be returned"
+              ~typ:int ]
+      ~resolve:(fun {ctx= coda; _} () max_length ->
         let open Option.Let_syntax in
-        let%map best_chain = Coda_lib.best_chain coda in
+        let%map best_chain = Coda_lib.best_chain ?max_length coda in
         List.map best_chain ~f:(fun breadcrumb ->
             let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
             let transition =

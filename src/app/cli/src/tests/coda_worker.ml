@@ -412,6 +412,7 @@ module T = struct
               ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
               ; addrs_and_ports=
                   Node_addrs_and_ports.of_display addrs_and_ports
+              ; metrics_port= None
               ; conf_dir
               ; chain_id
               ; logger
