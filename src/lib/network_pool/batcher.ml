@@ -147,7 +147,7 @@ let rec start_verifier : type proof partial r.
     (* we looped in the else after verifier finished but no pending work. *)
     t.state <- Waiting ;
     Ivar.fill finished (Ok Outcome.empty) )
-  else (
+  else
     let out_for_verification =
       let proofs =
         (* TODO: Make this a proper config detail once we have data on what a
@@ -187,7 +187,7 @@ let rec start_verifier : type proof partial r.
               determine_outcome out_for_verification res t
         in
         upon outcome (fun y -> Ivar.fill finished y) ) ;
-    start_verifier t next_finished )
+    start_verifier t next_finished
 
 let verify' (type p r partial n) (t : (p, partial, r) t)
     (proofs : (p, n) Vector.t) :
