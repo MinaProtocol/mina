@@ -314,59 +314,62 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
         | `Available peer -> (
             Hash_set.add busy peer ;
             let%bind res =
-              let open Deferred.Or_error.Let_syntax in
-              [%log debug]
-                ~metadata:
-                  [ ("n", `Int (List.length hashes))
-                  ; ("peer", Peer.to_yojson peer)
-                  ; ("target_hash", State_hash.to_yojson target_hash) ]
-                "requesting $n blocks from $peer for catchup to $target_hash" ;
-              let%bind transitions =
-                match%map.Async
-                  Coda_networking.get_transition_chain network peer hashes
-                with
-                | Ok x ->
-                    Ok x
-                | Error e ->
-                    [%log debug]
-                      ~metadata:
-                        [ ("error", `String (Error.to_string_hum e))
-                        ; ("n", `Int (List.length hashes))
-                        ; ("peer", Peer.to_yojson peer) ]
-                      "$error from downloading $n blocks from $peer" ;
-                    Error e
-              in
-              Coda_metrics.(
-                Gauge.set
-                  Transition_frontier_controller
-                  .transitions_downloaded_from_catchup
-                  (Float.of_int (List.length transitions))) ;
-              [%log debug]
-                ~metadata:
-                  [ ("n", `Int (List.length transitions))
-                  ; ("peer", Peer.to_yojson peer) ]
-                "downloaded $n blocks from $peer" ;
-              if not @@ verify_against_hashes transitions hashes then (
-                let error_msg =
-                  sprintf
-                    !"Peer %{sexp:Network_peer.Peer.t} returned a list that \
-                      is different from the one that is requested."
-                    peer
-                in
-                Trust_system.(
-                  record trust_system logger peer
-                    Actions.(Violated_protocol, Some (error_msg, [])))
-                |> don't_wait_for ;
-                Deferred.Or_error.error_string error_msg )
-              else
-                Deferred.Or_error.return
-                @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
-                       let transition_with_hash =
-                         With_hash.of_data transition
-                           ~hash_data:(Fn.const hash)
-                       in
-                       Envelope.Incoming.wrap_peer ~data:transition_with_hash
-                         ~sender:peer )
+              Deferred.Or_error.try_with_join (fun () ->
+                  let open Deferred.Or_error.Let_syntax in
+                  [%log debug]
+                    ~metadata:
+                      [ ("n", `Int (List.length hashes))
+                      ; ("peer", Peer.to_yojson peer)
+                      ; ("target_hash", State_hash.to_yojson target_hash) ]
+                    "requesting $n blocks from $peer for catchup to \
+                     $target_hash" ;
+                  let%bind transitions =
+                    match%map.Async
+                      Coda_networking.get_transition_chain network peer hashes
+                    with
+                    | Ok x ->
+                        Ok x
+                    | Error e ->
+                        [%log debug]
+                          ~metadata:
+                            [ ("error", `String (Error.to_string_hum e))
+                            ; ("n", `Int (List.length hashes))
+                            ; ("peer", Peer.to_yojson peer) ]
+                          "$error from downloading $n blocks from $peer" ;
+                        Error e
+                  in
+                  Coda_metrics.(
+                    Gauge.set
+                      Transition_frontier_controller
+                      .transitions_downloaded_from_catchup
+                      (Float.of_int (List.length transitions))) ;
+                  [%log debug]
+                    ~metadata:
+                      [ ("n", `Int (List.length transitions))
+                      ; ("peer", Peer.to_yojson peer) ]
+                    "downloaded $n blocks from $peer" ;
+                  if not @@ verify_against_hashes transitions hashes then (
+                    let error_msg =
+                      sprintf
+                        !"Peer %{sexp:Network_peer.Peer.t} returned a list \
+                          that is different from the one that is requested."
+                        peer
+                    in
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Violated_protocol, Some (error_msg, [])))
+                    |> don't_wait_for ;
+                    Deferred.Or_error.error_string error_msg )
+                  else
+                    Deferred.Or_error.return
+                    @@ List.map2_exn hashes transitions
+                         ~f:(fun hash transition ->
+                           let transition_with_hash =
+                             With_hash.of_data transition
+                               ~hash_data:(Fn.const hash)
+                           in
+                           Envelope.Incoming.wrap_peer
+                             ~data:transition_with_hash ~sender:peer ) )
             in
             Hash_set.remove busy peer ;
             match res with
