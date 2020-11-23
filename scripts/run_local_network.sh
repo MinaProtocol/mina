@@ -146,7 +146,7 @@ mkdir -p $nodesfolder
 
 mkdir $nodesfolder/seed
 
-$CODA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace &> $nodesfolder/seed/log.txt &
+$CODA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -metrics-port 3003 -libp2p-metrics-port 3004 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace &> $nodesfolder/seed/log.txt &
 seed_pid=$!
 
 echo 'waiting for seed to go up...'
@@ -167,8 +167,10 @@ for i in $(seq 1 $whales); do
   client_port=$(echo $whale_start_port + 0 + $i*5 | bc)
   rest_port=$(echo $whale_start_port + 1 + $i*5 | bc)
   ext_port=$(echo $whale_start_port + 2 + $i*5 | bc)
+  metrics_port=$(echo $whale_start_port + 3 + $i*5 | bc)
+  libp2p_metrics_port=$(echo $whale_start_port + 4 + $i*5 | bc)
 
-  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
   whale_pids[${i}]=$!
   whale_logfiles[${i}]=$logfile
   whale_clientport[${i}]=$client_port
@@ -185,8 +187,10 @@ for i in $(seq 1 $fish); do
   client_port=$(echo $fish_start_port + 0 + $i*5 | bc)
   rest_port=$(echo $fish_start_port + 1 + $i*5 | bc)
   ext_port=$(echo $fish_start_port + 2 + $i*5 | bc)
+  metrics_port=$(echo $fish_start_port + 3 + $i*5 | bc)
+  libp2p_metrics_port=$(echo $fish_start_port + 4 + $i*5 | bc)
 
-  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
   fish_pids[${i}]=$!
   fish_logfiles[${i}]=$logfile
   fish_clientport[${i}]=$client_port
@@ -203,8 +207,10 @@ for i in $(seq 1 $nodes); do
   client_port=$(echo $node_start_port + 0 + $i*5 | bc)
   rest_port=$(echo $node_start_port + 1 + $i*5 | bc)
   ext_port=$(echo $node_start_port + 2 + $i*5 | bc)
+  metrics_port=$(echo $node_start_port + 3 + $i*5 | bc)
+  libp2p_metrics_port=$(echo $node_start_port + 4 + $i*5 | bc)
 
-  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -log-json -log-level Trace &> $logfile &
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -log-json -log-level Trace &> $logfile &
   node_pids[${i}]=$!
   node_logfiles[${i}]=$logfile
   node_clientport[${i}]=$client_port

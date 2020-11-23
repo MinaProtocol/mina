@@ -53,6 +53,7 @@ MINA_CONFIG_DIR=/root/.coda-config
   -run-snark-worker $PK \
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
   -config-dir "$MINA_CONFIG_DIR" \
+  -genesis-ledger-dir "$MINA_CONFIG_DIR/demo-genesis" \
   -insecure-rest-server \
   -external-ip 127.0.0.1 \
   -archive-address 3086 \

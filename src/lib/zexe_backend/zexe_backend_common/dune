@@ -4,7 +4,7 @@
   (public_name zexe_backend.common)
   (flags -warn-error -27)
   (instrumentation (backend bisect_ppx))
-  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
+  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
   (libraries
     hex
     digestif
@@ -16,7 +16,8 @@
     sponge
     snarkette
     core
-    integers ))
+    integers
+    allocation_functor ))
 
 (rule
  (targets version.ml)
