@@ -1,6 +1,9 @@
 dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 8.7.2
-digest: sha256:c6f7c7f032bb756dfb1d21e6190d171a160d8cfd29cb33ceabe208fbad9295f2
-generated: "2020-04-07T15:39:48.931361-07:00"
+  version: 10.1.0
+- name: common-utilities
+  repository: https://coda-charts.storage.googleapis.com
+  version: 0.0.2
+digest: sha256:db3e05bb7d5ae36ba2ac91248b1a43727aa22d2754a1a5e2d27dd7a9535148ea
+generated: "2020-11-23T15:34:07.09326598-05:00"
