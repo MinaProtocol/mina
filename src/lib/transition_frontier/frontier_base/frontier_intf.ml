@@ -20,9 +20,10 @@ module type S = sig
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_path : t -> Breadcrumb.t list
+  val best_tip_path : ?max_length:int -> t -> Breadcrumb.t list
 
-  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
+  val path_map :
+    ?max_length:int -> t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
 
   val hash_path : t -> Breadcrumb.t -> State_hash.t list
 
