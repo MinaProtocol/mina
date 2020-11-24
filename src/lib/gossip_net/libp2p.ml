@@ -33,7 +33,7 @@ module Config = struct
     ; flooding: bool
     ; direct_peers: Coda_net2.Multiaddr.t list
     ; peer_exchange: bool
-    ; keypair: Coda_net2.Keypair.t option }
+    ; mutable keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
 
@@ -365,7 +365,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           in
           match%map initializing_libp2p_result with
           | Ok (subscription, message_reader) ->
-              (net2, subscription, message_reader)
+              (net2, subscription, message_reader, me)
           | Error e ->
               fail e )
       | Ok (Error e) ->
@@ -384,7 +384,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
-            Deferred.map res ~f:(fun (n, _, _) ->
+            Deferred.map res ~f:(fun (n, _, _, _) ->
                 let restart_after =
                   let plus_or_minus initial ~delta =
                     initial +. (Random.float (2. *. delta) -. delta)
@@ -407,8 +407,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       (let%bind () = Coda_net2.shutdown n in
                        on_unexpected_termination ()) ) ;
                 n ) ;
-          subscription_ref := Deferred.map res ~f:(fun (_, s, _) -> s) ;
-          upon res (fun (_, _, m) ->
+          subscription_ref := Deferred.map res ~f:(fun (_, s, _, _) -> s) ;
+          upon res (fun (_, _, m, me) ->
+              (* This is a hack so that we keep the same keypair across restarts. *)
+              config.keypair <- Some me ;
               let logger = config.logger in
               [%log trace] ~metadata:[] "Successfully restarted libp2p" ;
               don't_wait_for (Strict_pipe.transfer m message_writer ~f:Fn.id)
@@ -511,6 +513,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         Monitor.try_with (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
+              ~heartbeat_config:
+                (Async_rpc_kernel.Rpc.Connection.Heartbeat_config.create
+                   ~send_every:(Time_ns.Span.of_sec 10.)
+                   ~timeout:(Time_ns.Span.of_sec 120.))
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
