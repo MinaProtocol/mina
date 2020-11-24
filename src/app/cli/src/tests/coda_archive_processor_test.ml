@@ -63,9 +63,7 @@ let main () =
             in
             Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
               ~parent_hash:
-                transition
-                  .Auxiliary_database.Filtered_external_transition
-                   .protocol_state
+                transition.Filtered_external_transition.protocol_state
                   .previous_state_hash
         | None ->
             failwith "Failed to find saved block in database"

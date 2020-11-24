@@ -83,19 +83,6 @@ module T = struct
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
     ; sync_status:
         ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
-    ; get_all_user_commands:
-        ( 'worker
-        , Public_key.Compressed.t
-        , Signed_command.t list )
-        Rpc_parallel.Function.t
-    ; get_all_transitions:
-        ( 'worker
-        , Account_id.t
-        , ( Auxiliary_database.Filtered_external_transition.t
-          , State_hash.t )
-          With_hash.t
-          list )
-        Rpc_parallel.Function.t
     ; new_user_command:
         ( 'worker
         , Public_key.Compressed.t
@@ -111,9 +98,7 @@ module T = struct
     ; new_block:
         ( 'worker
         , Account.key
-        , ( Auxiliary_database.Filtered_external_transition.t
-          , State_hash.t )
-          With_hash.t
+        , (Filtered_external_transition.t, State_hash.t) With_hash.t
           Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
@@ -146,8 +131,6 @@ module T = struct
     ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
         Public_key.Compressed.t -> Signed_command.t Pipe.Reader.t Deferred.t
-    ; coda_get_all_user_commands:
-        Public_key.Compressed.t -> Signed_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
@@ -155,18 +138,9 @@ module T = struct
         unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
-    ; coda_get_all_transitions:
-           Account_id.t
-        -> ( Auxiliary_database.Filtered_external_transition.t
-           , State_hash.t )
-           With_hash.t
-           list
-           Deferred.t
     ; coda_new_block:
            Account.key
-        -> ( Auxiliary_database.Filtered_external_transition.t
-           , State_hash.t )
-           With_hash.t
+        -> (Filtered_external_transition.t, State_hash.t) With_hash.t
            Pipe.Reader.t
            Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
@@ -199,9 +173,6 @@ module T = struct
 
     let new_user_command_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_new_user_command pk
-
-    let get_all_user_commands_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_get_all_user_commands pk
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -244,19 +215,6 @@ module T = struct
     let validated_transitions_keyswaptest_impl ~worker_state ~conn_state:() =
       worker_state.coda_validated_transitions_keyswaptest
 
-    let get_all_transitions_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_get_all_transitions pk
-
-    let get_all_transitions =
-      C.create_rpc ~f:get_all_transitions_impl ~name:"get_all_transitions"
-        ~bin_input:Account_id.Stable.Latest.bin_t
-        ~bin_output:
-          [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
-            , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t
-            list] ()
-
     let peers =
       C.create_rpc ~f:peers_impl ~name:"peers" ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.Latest.t list]
@@ -288,7 +246,7 @@ module T = struct
         ~bin_input:[%bin_type_class: Account.Key.Stable.Latest.t]
         ~bin_output:
           [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
+            ( Filtered_external_transition.Stable.Latest.t
             , State_hash.Stable.Latest.t )
             With_hash.Stable.Latest.t] ()
 
@@ -326,11 +284,6 @@ module T = struct
       C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
         ~bin_output:Signed_command.Stable.Latest.bin_t ()
-
-    let get_all_user_commands =
-      C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
-        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t list] ()
 
     let dump_tf =
       C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t
@@ -373,11 +326,9 @@ module T = struct
       ; best_path
       ; sync_status
       ; new_user_command
-      ; get_all_user_commands
       ; replace_snark_worker_key
       ; stop_snark_worker
-      ; validated_transitions_keyswaptest
-      ; get_all_transitions }
+      ; validated_transitions_keyswaptest }
 
     let init_worker_state
         { addrs_and_ports
@@ -420,12 +371,6 @@ module T = struct
       let%bind () = File_system.create_dir conf_dir in
       O1trace.trace "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let%bind transaction_database_dir =
-            Unix.mkdtemp @@ conf_dir ^/ "transaction"
-          in
-          let%bind external_transition_database_dir =
-            Unix.mkdtemp @@ conf_dir ^/ "external_transition"
-          in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
@@ -433,18 +378,6 @@ module T = struct
           in
           let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let transaction_database =
-            Auxiliary_database.Transaction_database.create ~logger
-              transaction_database_dir
-          in
-          trace_database_initialization "transaction_database" __LOC__
-            transaction_database_dir ;
-          let external_transition_database =
-            Auxiliary_database.External_transition_database.create ~logger
-              external_transition_database_dir
-          in
-          trace_database_initialization "external_transition_database" __LOC__
-            external_transition_database_dir ;
           let time_controller =
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
@@ -535,8 +468,7 @@ module T = struct
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_block_production_keypairs ~monitor
-                 ~consensus_local_state ~transaction_database
-                 ~external_transition_database ~is_archive_rocksdb
+                 ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~precomputed_values
                  ~archive_process_location:
                    (Option.map archive_process_location
@@ -561,14 +493,6 @@ module T = struct
           [%log info] "Worker finish setting up coda" ;
           let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
-          let coda_get_all_transitions pk =
-            let external_transition_database =
-              Coda_lib.external_transition_database coda
-            in
-            Auxiliary_database.External_transition_database.get_all_values
-              external_transition_database (Some pk)
-            |> Deferred.return
-          in
           let coda_get_balance account_id =
             return
               ( Coda_commands.get_balance coda account_id
@@ -717,15 +641,6 @@ module T = struct
             Fn.compose Deferred.return
             @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
           in
-          let coda_get_all_user_commands t =
-            Deferred.return
-              (List.filter_map
-                 (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
-                | Signed_command c ->
-                    Some c
-                | Snapp_command _ ->
-                    None ))
-          in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
@@ -742,12 +657,10 @@ module T = struct
           ; coda_best_path= with_monitor coda_best_path
           ; coda_sync_status= with_monitor coda_sync_status
           ; coda_new_user_command= with_monitor coda_new_user_command
-          ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
           ; coda_validated_transitions_keyswaptest=
               with_monitor coda_validated_transitions_keyswaptest
           ; coda_replace_snark_worker_key=
               with_monitor coda_replace_snark_worker_key
-          ; coda_get_all_transitions= with_monitor coda_get_all_transitions
           ; coda_stop_snark_worker= with_monitor coda_stop_snark_worker } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
