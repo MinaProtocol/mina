@@ -385,27 +385,30 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         let rec on_libp2p_create res =
           net2_ref :=
             Deferred.map res ~f:(fun (n, _, _, _) ->
-                let restart_after =
-                  let plus_or_minus initial ~delta =
-                    initial +. (Random.float (2. *. delta) -. delta)
-                  in
-                  let base_time =
-                    Option.value_map ~f:Float.of_string
-                      (Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE")
-                      ~default:7.
-                  in
-                  let delta =
-                    Option.value_map ~f:Float.of_string
-                      (Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA")
-                      ~default:2.5
-                    |> Float.min (base_time /. 2.)
-                  in
-                  Time.Span.(of_min (base_time |> plus_or_minus ~delta))
-                in
-                upon (after restart_after) (fun () ->
-                    don't_wait_for
-                      (let%bind () = Coda_net2.shutdown n in
-                       on_unexpected_termination ()) ) ;
+                ( match
+                    Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE"
+                  with
+                | Some base_time ->
+                    let restart_after =
+                      let plus_or_minus initial ~delta =
+                        initial +. (Random.float (2. *. delta) -. delta)
+                      in
+                      let base_time = Float.of_string base_time in
+                      let delta =
+                        Option.value_map ~f:Float.of_string
+                          (Sys.getenv
+                             "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA")
+                          ~default:2.5
+                        |> Float.min (base_time /. 2.)
+                      in
+                      Time.Span.(of_min (base_time |> plus_or_minus ~delta))
+                    in
+                    upon (after restart_after) (fun () ->
+                        don't_wait_for
+                          (let%bind () = Coda_net2.shutdown n in
+                           on_unexpected_termination ()) )
+                | None ->
+                    () ) ;
                 n ) ;
           subscription_ref := Deferred.map res ~f:(fun (_, s, _, _) -> s) ;
           upon res (fun (_, _, m, me) ->
