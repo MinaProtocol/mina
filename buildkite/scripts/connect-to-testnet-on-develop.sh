@@ -42,6 +42,9 @@ coda daemon \
   -generate-genesis-proof true \
 || true
 
+# Remove lockfile if present
+rm ~/.coda-config/.mina-lock ||:
+
 # Restart in the background
 coda daemon \
   -peer-list-file coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
