@@ -53,30 +53,13 @@ coda daemon \
   & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
-(sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status \
-|| (sleep 10s; coda client status))))))))))))))))))))))))
+for i in {1..24}; do
+  sleep 10s
+  status_exit_code=$(coda client status; echo $?)
+  if [ $status_exit_code -eq 0 ]; then
+    break
+  fi
+done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep 2m
