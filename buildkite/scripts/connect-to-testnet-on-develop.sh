@@ -36,7 +36,6 @@ if [ ! -d coda-automation ]; then
   || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/peers.txt  --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt
 fi
 
-
 # Generate genesis proof and then crash due to no peers
 coda daemon \
   -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
@@ -50,9 +49,31 @@ coda daemon \
   -generate-genesis-proof true \
   -background
 
-# Check that the GraphQL client is up within 30s
-sleep 30s
-coda client status
+# Attempt to connect to the GraphQL client every 10s for up to 3 minutes
+(sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status \
+|| (sleep 10s; coda client status))))))))))))))))))))))))
 
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep 2m
