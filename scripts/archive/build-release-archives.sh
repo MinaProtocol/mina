@@ -118,7 +118,7 @@ else
       -t codaprotocol/coda-archive:$DOCKER_TAG \
       -f $SCRIPTPATH/Dockerfile \
       --build-arg coda_deb_version=$VERSION \
-      --build-arg deb_repo=$CODENAME
+      --build-arg deb_repo=$CODENAME \
       docker_build
 
     docker push codaprotocol/coda-archive:$DOCKER_TAG
