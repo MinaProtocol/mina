@@ -848,11 +848,6 @@ let create ?wallets (config : Config.t) =
           in
           (* knot-tying hack so we can pass a get_telemetry function before net created *)
           let net_ref = ref None in
-          let block_producers =
-            config.initial_block_production_keypairs |> Keypair.Set.to_list
-            |> List.map ~f:(fun {Keypair.public_key; _} ->
-                   Public_key.compress public_key )
-          in
           let get_telemetry_data _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -910,6 +905,12 @@ let create ?wallets (config : Config.t) =
                         (protocol_state_hash, k_block_hashes)
                   in
                   let%map peers = Coda_networking.peers net in
+                  let block_producers =
+                    config.initial_block_production_keypairs
+                    |> Keypair.Set.to_list
+                    |> List.map ~f:(fun {Keypair.public_key; _} ->
+                           Public_key.compress public_key )
+                  in
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
