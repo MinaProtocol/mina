@@ -3082,23 +3082,21 @@ module Hooks = struct
                   let slot_diff =
                     match
                       Coda_numbers.Global_slot.sub
-                        (Consensus_state.curr_global_slot state)
                         (Global_slot.slot_number global_slot)
+                        (Consensus_state.curr_global_slot state)
                     with
                     | None ->
                         [%log fatal]
-                          "Global slot $slot at time $curr_time is before the \
-                           slot in the consensus state $state. It should be \
-                           after or the same"
+                          "Checking slot-winner for slot $slot which is older \
+                           than the slot in the latest consensus state $state"
                           ~metadata:
                             [ ("slot", Global_slot.to_yojson global_slot)
-                            ; ("curr_time", `String (Int64.to_string now))
                             ; ("state", Consensus_state.Value.to_yojson state)
                             ] ;
                         failwith
-                          "Global slot at the current time is before global \
-                           slot in the latest consensus state. System time \
-                           might be out-of-sync"
+                          "Checking slot-winner for a slot which is older \
+                           than the slot in the latest consensus state. \
+                           System time might be out-of-sync"
                     | Some diff ->
                         diff
                   in
