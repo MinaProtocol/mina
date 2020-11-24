@@ -22,7 +22,8 @@
    non_zero_curve_point
    yojson
    coda_metrics
-   graphql_lib)
+   graphql_lib
+   inline_test_quiet_logs)
  (preprocessor_deps "../../config.mlh")
  (preprocess
   (pps
