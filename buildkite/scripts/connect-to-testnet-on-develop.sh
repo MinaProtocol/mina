@@ -47,7 +47,7 @@ coda daemon \
   -peer-list-file coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
   -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
-  -background
+  & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 3 minutes
 (sleep 10s; coda client status \
