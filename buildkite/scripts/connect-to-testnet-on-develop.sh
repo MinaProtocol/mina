@@ -53,11 +53,14 @@ coda daemon \
   & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
-for i in {1..24}; do
+num_status_retries=24
+for i in {1..$num_status_retries}; do
   sleep 10s
   status_exit_code=$(coda client status; echo $?)
   if [ $status_exit_code -eq 0 ]; then
     break
+  elif [ $i -eq $num_status_retries ]; then
+    exit $status_exit_code
   fi
 done
 
