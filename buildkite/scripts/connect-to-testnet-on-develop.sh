@@ -10,9 +10,12 @@ fi
 apt-get update
 apt-get install -y git
 
-DUNE_PROFILE=testnet_postake_medium_curves
+export DUNE_PROFILE=testnet_postake_medium_curves
 
 source buildkite/scripts/export-git-env-vars.sh
+
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
 
 apt-get install -y apt-transport-https ca-certificates
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
