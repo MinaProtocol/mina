@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
