@@ -10,6 +10,8 @@ fi
 apt-get update
 apt-get install -y git
 
+DUNE_PROFILE=testnet_postake_medium_curves
+
 source buildkite/scripts/export-git-env-vars.sh
 
 apt-get install -y apt-transport-https ca-certificates
