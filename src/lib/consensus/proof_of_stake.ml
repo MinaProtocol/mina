@@ -539,7 +539,10 @@ module Data = struct
                  Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
                    last_checked_epoch_and_slot (epoch, slot)
                in
-               if i >= 0 then None
+               if i > 0 then None
+               else if i = 0 then
+                 (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
+                 Some pk
                else (
                  Table.set !t.last_checked_slot_and_epoch ~key:pk
                    ~data:(epoch, slot) ;
