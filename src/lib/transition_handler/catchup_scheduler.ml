@@ -9,6 +9,8 @@
     breadcrumbs from those transitions, which will write the breadcrumbs back
     into the processor as if catchup had successfully completed. *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe

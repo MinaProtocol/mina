@@ -50,6 +50,7 @@ let check_and_set_lockfile ~logger conf_dir =
                       rm_and_raise ()
                 in
                 let still_running =
+                  (* using signal 0 does not send a signal; see man page `kill(2)` *)
                   match Signal.(send zero) (`Pid pid) with
                   | `Ok ->
                       true
