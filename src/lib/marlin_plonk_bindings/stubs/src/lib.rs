@@ -1,8 +1,5 @@
 extern crate libc;
 
-/* Vector helper */
-pub mod caml_vector;
-
 /* Bigints */
 pub mod bigint_256;
 pub mod bigint_384;

@@ -239,7 +239,7 @@ module Status = struct
               @@ Block_time.Controller.basic ~logger:(Logger.create ())
             in
             let diff = diff time current_time in
-            if Span.(zero < diff) then
+            if Block_time.(time > current_time) then
               sprintf "in %s" (Span.to_string_hum diff)
             else "Producing a block now..."
           in

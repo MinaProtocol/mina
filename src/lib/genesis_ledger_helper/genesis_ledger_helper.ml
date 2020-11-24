@@ -26,9 +26,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error generating tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error generating tar file")
 
   let extract ~root ~file () =
     match%map
@@ -45,9 +43,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error extracting tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error extracting tar file")
 end
 
 let file_exists ?follow_symlinks filename =
@@ -947,15 +943,16 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
-        { Genesis_proof.runtime_config= inputs.runtime_config
-        ; constraint_constants= inputs.constraint_constants
-        ; proof_level= inputs.proof_level
-        ; genesis_constants= inputs.genesis_constants
-        ; genesis_ledger= inputs.genesis_ledger
-        ; genesis_epoch_data= inputs.genesis_epoch_data
-        ; consensus_constants= inputs.consensus_constants
-        ; protocol_state_with_hash= inputs.protocol_state_with_hash
-        ; genesis_proof= Coda_base.Proof.blockchain_dummy }
+        Deferred.return
+          { Genesis_proof.runtime_config= inputs.runtime_config
+          ; constraint_constants= inputs.constraint_constants
+          ; proof_level= inputs.proof_level
+          ; genesis_constants= inputs.genesis_constants
+          ; genesis_ledger= inputs.genesis_ledger
+          ; genesis_epoch_data= inputs.genesis_epoch_data
+          ; consensus_constants= inputs.consensus_constants
+          ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; genesis_proof= Coda_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -997,27 +994,34 @@ module Genesis_proof = struct
         ~id:(Precomputed_values.blockchain_proof_system_id ())
         ~state_hash:(Lazy.force compiled).protocol_state_with_hash.hash
     in
-    match%bind find_file ~logger ~base_hash ~genesis_dir with
-    | Some file -> (
-        match%map load file with
-        | Ok genesis_proof ->
-            Ok
-              ( { Genesis_proof.runtime_config= inputs.runtime_config
-                ; constraint_constants= inputs.constraint_constants
-                ; proof_level= inputs.proof_level
-                ; genesis_constants= inputs.genesis_constants
-                ; genesis_ledger= inputs.genesis_ledger
-                ; genesis_epoch_data= inputs.genesis_epoch_data
-                ; consensus_constants= inputs.consensus_constants
-                ; protocol_state_with_hash= inputs.protocol_state_with_hash
-                ; genesis_proof }
-              , file )
-        | Error err ->
-            [%log error] "Could not load genesis proof from $path: $error"
-              ~metadata:
-                [ ("path", `String file)
-                ; ("error", Error_json.error_to_yojson err) ] ;
-            Error err )
+    let%bind found_proof =
+      match%bind find_file ~logger ~base_hash ~genesis_dir with
+      | Some file -> (
+          match%map load file with
+          | Ok genesis_proof ->
+              Some
+                ( { Genesis_proof.runtime_config= inputs.runtime_config
+                  ; constraint_constants= inputs.constraint_constants
+                  ; proof_level= inputs.proof_level
+                  ; genesis_constants= inputs.genesis_constants
+                  ; genesis_ledger= inputs.genesis_ledger
+                  ; genesis_epoch_data= inputs.genesis_epoch_data
+                  ; consensus_constants= inputs.consensus_constants
+                  ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                  ; genesis_proof }
+                , file )
+          | Error err ->
+              [%log error] "Could not load genesis proof from $path: $error"
+                ~metadata:
+                  [ ("path", `String file)
+                  ; ("error", Error_json.error_to_yojson err) ] ;
+              None )
+      | None ->
+          return None
+    in
+    match found_proof with
+    | Some found_proof ->
+        return (Ok found_proof)
     | None
       when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
         let compiled = Lazy.force compiled in
@@ -1058,7 +1062,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        let values = generate b inputs in
+        let%bind values = generate b inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match%map store ~filename values.genesis_proof with
@@ -1215,8 +1219,20 @@ let load_config_file filename =
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~may_generate ~proof_level (config : Runtime_config.t) =
-  [%log info] "Initializing with runtime configuration $config"
-    ~metadata:[("config", Runtime_config.to_yojson config)] ;
+  let ledger_name_json =
+    match
+      let open Option.Let_syntax in
+      let%bind ledger = config.ledger in
+      ledger.name
+    with
+    | Some name ->
+        `String name
+    | None ->
+        `Null
+  in
+  [%log info] "Initializing with runtime configuration. Ledger name: $name"
+    ~metadata:
+      [("name", ledger_name_json); ("config", Runtime_config.to_yojson config)] ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =
@@ -1389,9 +1405,12 @@ let upgrade_old_config ~logger filename json =
           `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
         in
         let%map () =
-          Writer.with_file filename ~f:(fun w ->
-              Deferred.return
-              @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) )
+          Deferred.Or_error.try_with (fun () ->
+              Writer.with_file filename ~f:(fun w ->
+                  Deferred.return
+                  @@ Writer.write w
+                       (Yojson.Safe.pretty_to_string upgraded_json) ) )
+          |> Deferred.ignore_m
         in
         upgraded_json )
   | _ ->

@@ -42,7 +42,7 @@ module Make (A : T0) (A_value : T0) = struct
       (let x =
          let (T (typ, conv)) = Impls.Wrap.input () in
          Domain.Pow_2_roots_of_unity
-           (Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ]))
+           (Int.ceil_log2 (Impls.Wrap.Data_spec.size [typ]))
        in
        {Common.wrap_domains with x})
 

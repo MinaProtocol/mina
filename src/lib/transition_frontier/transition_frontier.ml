@@ -13,6 +13,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
+let max_catchup_chunk_length = 20
+
 let global_max_length (genesis_constants : Genesis_constants.t) =
   genesis_constants.protocol.k
 
@@ -386,15 +388,15 @@ include struct
   let root_length = proxy1 root_length
 
   (* TODO: probably shouldn't be an `_exn` function *)
-  let best_tip_path = proxy1 best_tip_path
+  let best_tip_path ?max_length = proxy1 (best_tip_path ?max_length)
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
   let find_protocol_state = proxy1 find_protocol_state
 
   (* why can't this one be proxied? *)
-  let path_map {full_frontier; _} breadcrumb ~f =
-    path_map full_frontier breadcrumb ~f
+  let path_map ?max_length {full_frontier; _} breadcrumb ~f =
+    path_map ?max_length full_frontier breadcrumb ~f
 end
 
 module For_tests = struct
@@ -481,7 +483,8 @@ module For_tests = struct
                    ~snarked_ledger:genesis_ledger
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
-        Breadcrumb.create genesis_transition genesis_staged_ledger )
+        Breadcrumb.create ~validated_transition:genesis_transition
+          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false )
 
   let gen_persistence ?(logger = Logger.null ()) ?verifier
       ~(precomputed_values : Precomputed_values.t) () =
