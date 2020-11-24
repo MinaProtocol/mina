@@ -25,17 +25,8 @@ do_copy () {
         echo "Found gcloud: $path_to_glcoud"
     else
         export HOMEBREW_NO_AUTO_UPDATE=1
-        # Version in brew is currently broken, see https://github.com/GoogleCloudPlatform/gsutil/issues/1052
-        # brew cask install google-cloud-sdk
-        # source "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
-        # Get the tarball of the most recent working OS X version
-        curl --output gcloud-sdk.tar.gz https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-317.0.0-darwin-x86_64.tar.gz
-        tar -xz -f gcloud-sdk.tar.gz
-        pushd google-cloud-sdk
-        chmod +x install.sh
-        ./install.sh --rc-path $PWD/gcloud-rc.sh --path-update true --quiet
-        source $PWD/gcloud-rc.sh
-        popd
+        brew cask install google-cloud-sdk
+        source "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
     fi
     set -e
 
