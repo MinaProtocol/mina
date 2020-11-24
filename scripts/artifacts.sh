@@ -40,7 +40,12 @@ do_copy () {
     do
         set +e
         echo "Copying ${SOURCE} to ${DESTINATION}"
-        gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp ${SOURCE} ${DESTINATION}
+        # Deliberately not using parallel-composite-uploads here, since the
+        # retention policy will prevent the temporary objects from being
+        # deleted!
+        #
+        # DO NOT RE-ENABLE PARALLEL-COMPOSITE-UPLOADS!!
+        gsutil -q cp ${SOURCE} ${DESTINATION}
         gsutil ls ${DESTINATION}
         set -e
     done
