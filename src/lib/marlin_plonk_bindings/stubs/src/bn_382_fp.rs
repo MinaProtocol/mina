@@ -1,4 +1,5 @@
-use crate::bigint_384::{CamlBigint384, CamlBigint384Ptr};
+use crate::bigint_384;
+use algebra::biginteger::{BigInteger384};
 use algebra::{
     bn_382::fp::{Fp, FpParameters as Fp_params},
     fields::{Field, FpParameters, PrimeField, SquareRootField},
@@ -25,21 +26,21 @@ extern "C" fn caml_bn_382_fp_compare_raw(x: ocaml::Value, y: ocaml::Value) -> li
     }
 }
 
-impl From<&CamlBn382Fp> for CamlBigint384 {
-    fn from(x: &CamlBn382Fp) -> CamlBigint384 {
-        CamlBigint384(x.0.into_repr())
+impl From<&CamlBn382Fp> for BigInteger384 {
+    fn from(x: &CamlBn382Fp) -> BigInteger384 {
+        x.0.into_repr()
     }
 }
 
-impl From<&CamlBigint384> for CamlBn382Fp {
-    fn from(x: &CamlBigint384) -> CamlBn382Fp {
-        CamlBn382Fp(Fp::from_repr(x.0))
+impl From<&BigInteger384> for CamlBn382Fp {
+    fn from(x: &BigInteger384) -> CamlBn382Fp {
+        CamlBn382Fp(Fp::from_repr(*x))
     }
 }
 
 impl std::fmt::Display for CamlBn382Fp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        CamlBigint384::from(self).fmt(f)
+        bigint_384::to_biguint(&self.0.into_repr()).fmt(f)
     }
 }
 
@@ -53,8 +54,8 @@ pub fn caml_bn_382_fp_size_in_bits() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fp_size() -> CamlBigint384 {
-    CamlBigint384(Fp_params::MODULUS)
+pub fn caml_bn_382_fp_size() -> BigInteger384 {
+    Fp_params::MODULUS
 }
 
 #[ocaml::func]
@@ -122,7 +123,7 @@ pub fn caml_bn_382_fp_to_string(x: CamlBn382FpPtr) -> String {
 #[ocaml::func]
 pub fn caml_bn_382_fp_of_string(s: &[u8]) -> Result<CamlBn382Fp, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok(CamlBn382Fp::from(&(CamlBigint384::from(&data)))),
+        Some(data) => Ok(CamlBn382Fp::from(&(bigint_384::of_biguint(&data)))),
         None => Err(ocaml::Error::invalid_argument("caml_bn_382_fp_of_string")
             .err()
             .unwrap()),
@@ -187,12 +188,12 @@ pub fn caml_bn_382_fp_rng(i: ocaml::Int) -> CamlBn382Fp {
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fp_to_bigint(x: CamlBn382FpPtr) -> CamlBigint384 {
+pub fn caml_bn_382_fp_to_bigint(x: CamlBn382FpPtr) -> BigInteger384 {
     x.as_ref().into()
 }
 
 #[ocaml::func]
-pub fn caml_bn_382_fp_of_bigint(x: CamlBigint384Ptr) -> CamlBn382Fp {
+pub fn caml_bn_382_fp_of_bigint(x: ocaml::Pointer<BigInteger384>) -> CamlBn382Fp {
     x.as_ref().into()
 }
 

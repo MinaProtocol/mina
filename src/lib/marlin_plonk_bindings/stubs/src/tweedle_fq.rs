@@ -1,4 +1,5 @@
-use crate::bigint_256::{CamlBigint256, CamlBigint256Ptr};
+use crate::bigint_256;
+use algebra::biginteger::{BigInteger256};
 use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     tweedle::fq::{Fq, FqParameters as Fq_params},
@@ -26,15 +27,15 @@ extern "C" fn caml_tweedle_fq_compare_raw(x: ocaml::Value, y: ocaml::Value) -> l
     }
 }
 
-impl From<&CamlTweedleFq> for CamlBigint256 {
-    fn from(x: &CamlTweedleFq) -> CamlBigint256 {
-        CamlBigint256(x.0.into_repr())
+impl From<&CamlTweedleFq> for BigInteger256 {
+    fn from(x: &CamlTweedleFq) -> BigInteger256 {
+        x.0.into_repr()
     }
 }
 
-impl From<&CamlBigint256> for CamlTweedleFq {
-    fn from(x: &CamlBigint256) -> CamlTweedleFq {
-        CamlTweedleFq(Fq::from_repr(x.0))
+impl From<&BigInteger256> for CamlTweedleFq {
+    fn from(x: &BigInteger256) -> CamlTweedleFq {
+        CamlTweedleFq(Fq::from_repr(*x))
     }
 }
 
@@ -64,7 +65,7 @@ impl From<CamlTweedleFq> for ScalarChallenge<Fq> {
 
 impl std::fmt::Display for CamlTweedleFq {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        CamlBigint256::from(self).fmt(f)
+        bigint_256::to_biguint(&self.0.into_repr()).fmt(f)
     }
 }
 
@@ -84,8 +85,8 @@ pub fn caml_tweedle_fq_size_in_bits() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_size() -> CamlBigint256 {
-    CamlBigint256(Fq_params::MODULUS)
+pub fn caml_tweedle_fq_size() -> BigInteger256 {
+    Fq_params::MODULUS
 }
 
 #[ocaml::func]
@@ -153,7 +154,7 @@ pub fn caml_tweedle_fq_to_string(x: CamlTweedleFqPtr) -> String {
 #[ocaml::func]
 pub fn caml_tweedle_fq_of_string(s: &[u8]) -> Result<CamlTweedleFq, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok(CamlTweedleFq::from(&(CamlBigint256::from(&data)))),
+        Some(data) => Ok(CamlTweedleFq::from(&(bigint_256::of_biguint(&data)))),
         None => Err(ocaml::Error::invalid_argument("caml_tweedle_fq_of_string")
             .err()
             .unwrap()),
@@ -218,12 +219,12 @@ pub fn caml_tweedle_fq_rng(i: ocaml::Int) -> CamlTweedleFq {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_to_bigint(x: CamlTweedleFqPtr) -> CamlBigint256 {
+pub fn caml_tweedle_fq_to_bigint(x: CamlTweedleFqPtr) -> BigInteger256 {
     x.as_ref().into()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_of_bigint(x: CamlBigint256Ptr) -> CamlTweedleFq {
+pub fn caml_tweedle_fq_of_bigint(x: ocaml::Pointer<BigInteger256>) -> CamlTweedleFq {
     x.as_ref().into()
 }
 
