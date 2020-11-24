@@ -52,7 +52,7 @@ coda daemon \
   -generate-genesis-proof true \
   & # -background
 
-# Attempt to connect to the GraphQL client every 10s for up to 3 minutes
+# Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 (sleep 10s; coda client status \
 || (sleep 10s; coda client status \
 || (sleep 10s; coda client status \
@@ -81,7 +81,7 @@ coda daemon \
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep 2m
 coda client status
-if [ $(coda client get-peers | wc -l) -gt 0 ]; then
+if [ $(coda advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
 else
     echo "No peers found"
