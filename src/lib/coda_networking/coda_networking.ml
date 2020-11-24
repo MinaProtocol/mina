@@ -939,12 +939,12 @@ let create (config : Config.t)
     in
     result
   in
-  let get_best_tip_rpc conn ~version:_ query =
+  let get_best_tip_rpc conn ~version:_ (() : unit) =
     [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
-    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
+    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson ())] in
     let%bind result, sender =
-      run_for_rpc_result conn query ~f:get_best_tip action_msg msg_args
+      run_for_rpc_result conn () ~f:get_best_tip action_msg msg_args
     in
     match result with
     | None ->
@@ -1046,12 +1046,10 @@ let create (config : Config.t)
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
-           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
+           (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers ))
-         (* Temporarily disabling the extra RPC call until we switch to the proper: dht.Bootstrap and resolve why "failed when refreshing routing table" is occurring. *)
-         (*
+              raise No_initial_peers )
             else (
               [%log info] "Getting some extra initial peers to start" ;
               (* 1. Get some peers
@@ -1086,8 +1084,7 @@ let create (config : Config.t)
                       ()
                   | Error e ->
                       [%log warn] ~metadata:(metadata p e)
-                        "failed to add peer $peer with $error" ) ) *)
-     )) ;
+                        "failed to add peer $peer with $error" ) )) )) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
@@ -1255,11 +1252,14 @@ let make_rpc_request ?timeout ~rpc ~label t peer input =
       Or_error.errorf
         !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
         peer.peer_id label
-  | Connected {data= Error e; _} | Failed_to_connect e ->
+  | Connected {data= Error e; _} ->
       Error e
+  | Failed_to_connect e ->
+      Error (Error.tag e ~tag:"failed-to-connect")
 
 let get_transition_chain_proof t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition" t
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof
+    ~label:"transition chain proof" t
 
 let get_transition_chain t =
   make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
