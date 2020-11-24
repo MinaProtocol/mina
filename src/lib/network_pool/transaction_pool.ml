@@ -323,12 +323,14 @@ struct
       | Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
             (Currency.Balance.to_amount
                (Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
     let handle_transition_frontier_diff

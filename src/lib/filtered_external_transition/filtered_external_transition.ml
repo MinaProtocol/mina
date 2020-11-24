@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Coda_base
 open Coda_transition
 open Signature_lib

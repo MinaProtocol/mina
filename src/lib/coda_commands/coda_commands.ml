@@ -357,24 +357,6 @@ module Subscriptions = struct
 end
 
 module For_tests = struct
-  let get_all_commands coda public_key =
-    let account_id = Account_id.create public_key Token_id.default in
-    let external_transition_database =
-      Coda_lib.external_transition_database coda
-    in
-    let commands =
-      List.concat_map ~f:(fun transition ->
-          transition |> With_hash.data
-          |> Auxiliary_database.Filtered_external_transition.commands
-          |> List.map ~f:With_hash.data )
-      @@ Auxiliary_database.External_transition_database.get_all_values
-           external_transition_database (Some account_id)
-    in
-    let participants_commands =
-      User_command.filter_by_participant commands public_key
-    in
-    List.dedup_and_sort participants_commands ~compare:User_command.compare
-
   module Subscriptions = struct
     let new_user_commands coda public_key =
       Coda_lib.add_payment_subscriber coda public_key
