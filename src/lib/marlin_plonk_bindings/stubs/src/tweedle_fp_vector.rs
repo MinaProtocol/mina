@@ -2,7 +2,7 @@ use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use algebra::tweedle::fp::Fp;
 use std::ops::{Deref, DerefMut};
 
-#[derive (Clone)]
+#[derive(Clone)]
 pub struct CamlTweedleFpVector(pub *mut Vec<Fp>);
 
 /* Note: The vector header is allocated in the OCaml heap, but the data held in

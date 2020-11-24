@@ -1,5 +1,5 @@
 use crate::bigint_256;
-use algebra::biginteger::{BigInteger256};
+use algebra::biginteger::BigInteger256;
 use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     tweedle::fp::{Fp, FpParameters as Fp_params},

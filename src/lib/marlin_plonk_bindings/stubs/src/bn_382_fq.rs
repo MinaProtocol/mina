@@ -1,5 +1,5 @@
 use crate::bigint_384;
-use algebra::biginteger::{BigInteger384};
+use algebra::biginteger::BigInteger384;
 use algebra::{
     bn_382::fq::{Fq, FqParameters as Fq_params},
     fields::{Field, FpParameters, PrimeField, SquareRootField},

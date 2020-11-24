@@ -62,13 +62,19 @@ pub fn caml_bigint_384_bytes_per_limb() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_div(x: ocaml::Pointer<BigInteger384>, y: ocaml::Pointer<BigInteger384>) -> BigInteger384 {
+pub fn caml_bigint_384_div(
+    x: ocaml::Pointer<BigInteger384>,
+    y: ocaml::Pointer<BigInteger384>,
+) -> BigInteger384 {
     let res: BigUint = to_biguint(x.as_ref()) / to_biguint(y.as_ref());
     of_biguint(&res)
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_compare(x: ocaml::Pointer<BigInteger384>, y: ocaml::Pointer<BigInteger384>) -> ocaml::Int {
+pub fn caml_bigint_384_compare(
+    x: ocaml::Pointer<BigInteger384>,
+    y: ocaml::Pointer<BigInteger384>,
+) -> ocaml::Int {
     match x.as_ref().cmp(y.as_ref()) {
         Less => -1,
         Equal => 0,
@@ -87,7 +93,10 @@ pub fn caml_bigint_384_to_string(x: ocaml::Pointer<BigInteger384>) -> String {
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_test_bit(x: ocaml::Pointer<BigInteger384>, i: ocaml::Int) -> Result<bool, ocaml::Error> {
+pub fn caml_bigint_384_test_bit(
+    x: ocaml::Pointer<BigInteger384>,
+    i: ocaml::Int,
+) -> Result<bool, ocaml::Error> {
     match i.try_into() {
         Ok(i) => Ok(x.as_ref().get_bit(i)),
         Err(_) => Err(ocaml::Error::invalid_argument("caml_bigint_384_test_bit")
