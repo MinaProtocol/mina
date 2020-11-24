@@ -228,6 +228,7 @@ spec:
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
       volumes:
       - name: private-keys
         secret:
