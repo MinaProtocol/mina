@@ -907,7 +907,7 @@ let create ?wallets (config : Config.t) =
                             :: Transition_frontier.best_tip_path frontier )
                             ~f:Transition_frontier.Breadcrumb.state_hash
                         in
-                        (frontier, k_block_hashes)
+                        (protocol_state_hash, k_block_hashes)
                   in
                   let%map peers = Coda_networking.peers net in
                   let ban_statuses =
