@@ -96,10 +96,10 @@ spec:
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
-{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
       volumes:
       - name: daemon-config
         configMap:
           name: {{ tpl .Values.seed.fullname . }}-daemon-config
       {{- end -}}
+{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
 {{- end }}
