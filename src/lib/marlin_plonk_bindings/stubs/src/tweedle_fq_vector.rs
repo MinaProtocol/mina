@@ -1,4 +1,3 @@
-use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::tweedle::fq::Fq;
 use std::ops::{Deref, DerefMut};
 
@@ -59,17 +58,17 @@ pub fn caml_tweedle_fq_vector_length(v: CamlTweedleFqVector) -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_vector_emplace_back(mut v: CamlTweedleFqVector, x: CamlTweedleFqPtr) {
-    v.push(x.as_ref().0);
+pub fn caml_tweedle_fq_vector_emplace_back(mut v: CamlTweedleFqVector, x: Fq) {
+    v.push(x);
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_vector_get(
     v: CamlTweedleFqVector,
     i: ocaml::Int,
-) -> Result<CamlTweedleFq, ocaml::Error> {
+) -> Result<Fq, ocaml::Error> {
     match v.get(i as usize) {
-        Some(x) => Ok(CamlTweedleFq(*x)),
+        Some(x) => Ok(*x),
         None => Err(ocaml::Error::invalid_argument("caml_tweedle_fq_vector_get")
             .err()
             .unwrap()),
