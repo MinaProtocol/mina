@@ -1203,7 +1203,7 @@ let%test_module _ =
         in
         (init_nonce, init_balance, setup_cmds, replace_cmd)
       in
-      Quickcheck.test gen
+      Quickcheck.test ~trials:20 gen
         ~sexp_of:
           [%sexp_of:
             Account_nonce.t
