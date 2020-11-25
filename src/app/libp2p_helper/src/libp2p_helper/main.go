@@ -1271,9 +1271,9 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		start := time.Now()
 
-		runMsg := func() {
+		go func() {
+			start := time.Now()
 			res, err := msg.run(app)
 			if err == nil {
 				res, err := json.Marshal(res)
@@ -1285,15 +1285,7 @@ func main() {
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		}
-
-		// should we switch on message type instead?
-		switch msg.(type) {
-		case *openStreamMsg:
-			go runMsg()
-		default:
-			runMsg()
-		}
+		}()
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully
