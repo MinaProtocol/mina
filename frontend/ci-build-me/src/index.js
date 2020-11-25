@@ -9,7 +9,7 @@ const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
 
 const runCircleBuild = async (github) => {
   const postData = JSON.stringify({
-    branch: github.pull_request.head.ref,
+    branch: `pull/${github.pull_request.number}/head`,
     parameters: {
       "run-ci": true,
     },
@@ -40,6 +40,7 @@ const runBuild = async (github) => {
     },
     pull_request_base_branch: github.pull_request.base.ref,
     pull_request_id: github.pull_request.number,
+    pull_request_repository: github.pull_request.head.repo.clone_url,
   });
 
   const options = {
@@ -115,6 +116,7 @@ const handler = async (event, req) => {
         return [buildkite, circle];
       } else {
         console.info("Build for this commit on this branch was already found");
+        return ["build already found for this commit", "build already found for this commit"];
       }
     }
   } else if (event == "issue_comment") {
@@ -141,6 +143,9 @@ const handler = async (event, req) => {
           pull_request: prData.data,
         });
         return [buildkite, circle];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return ["comment author is not (publically) a member of the core team", "comment author is not (publically) a member of the core team"];
       }
     }
   }
