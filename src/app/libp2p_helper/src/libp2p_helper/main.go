@@ -692,7 +692,8 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
+	ctx, _ := context.WithTimeout(app.Ctx, 30*time.Second)
+	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
 		return nil, badp2p(err)
