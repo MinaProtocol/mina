@@ -26,6 +26,7 @@ do_copy () {
     else
         export HOMEBREW_NO_AUTO_UPDATE=1
         brew cask install google-cloud-sdk
+        source "/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
     fi
     set -e
 
@@ -39,7 +40,12 @@ do_copy () {
     do
         set +e
         echo "Copying ${SOURCE} to ${DESTINATION}"
-        gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp ${SOURCE} ${DESTINATION}
+        # Deliberately not using parallel-composite-uploads here, since the
+        # retention policy will prevent the temporary objects from being
+        # deleted!
+        #
+        # DO NOT RE-ENABLE PARALLEL-COMPOSITE-UPLOADS!!
+        gsutil -q cp ${SOURCE} ${DESTINATION}
         gsutil ls ${DESTINATION}
         set -e
     done
