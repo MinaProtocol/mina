@@ -111,7 +111,7 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
 {{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
-{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
       - name: config-dir
         emptyDir: {}
