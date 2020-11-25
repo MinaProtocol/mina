@@ -1272,16 +1272,27 @@ func main() {
 			log.Panic(err)
 		}
 		start := time.Now()
-		res, err := msg.run(app)
-		if err == nil {
-			res, err := json.Marshal(res)
+
+		runMsg := func() {
+			res, err := msg.run(app)
 			if err == nil {
-				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				res, err := json.Marshal(res)
+				if err == nil {
+					app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				} else {
+					app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				}
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		} else {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+		}
+
+		// should we switch on message type instead?
+		switch msg.(type) {
+		case *openStreamMsg:
+			go runMsg()
+		default:
+			runMsg()
 		}
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
