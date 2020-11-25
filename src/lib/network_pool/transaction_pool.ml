@@ -67,6 +67,7 @@ module Diff_versioned = struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -85,6 +86,7 @@ module Diff_versioned = struct
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -730,6 +732,7 @@ struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
       end
 
@@ -740,6 +743,12 @@ struct
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
+
+      let reject_overloaded_diff diffs =
+        List.map diffs ~f:(fun cmd ->
+            (User_command.forget_check cmd, Diff_error.Overloaded) )
+
+      let empty = []
 
       let size = List.length
 
