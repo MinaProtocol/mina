@@ -234,11 +234,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
 
 	// custom validator to omit the ipns validation.
-
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
-	// gross hack to exfiltrate the DHT from the side effect of option evaluation
-	//kadch := make(chan *dual.DHT)
 	var kad *dual.DHT
 
 	mplex.MaxMessageSize = 1 << 30
@@ -261,7 +258,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
 				kad, err = dual.New(ctx, host, dual.WanDHTOption(dht.Datastore(dsDht)), dual.DHTOption(dht.Validator(rv)), dual.WanDHTOption(dht.BootstrapPeers(seeds...)), dual.DHTOption(dht.ProtocolPrefix("/coda")))
-				//go func() { kadch <- kad }()
 				return kad, err
 			})),
 		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),
@@ -271,8 +267,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	if err != nil {
 		return nil, err
 	}
-
-	//kad := <-kadch
 
 	// nil fields are initialized by beginAdvertising
 	return &Helper{

@@ -24,7 +24,6 @@ require (
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/libp2p/go-libp2p-pubsub v0.3.4
 	github.com/libp2p/go-libp2p-record v0.1.3
-	github.com/libp2p/go-maddr-filter v0.1.0
 	github.com/libp2p/go-mplex v0.1.2
 	github.com/libp2p/go-stream-muxer v0.1.0
 	github.com/libp2p/go-yamux v1.3.8 // indirect

@@ -642,6 +642,10 @@ type incomingMsgUpcall struct {
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
 	go func() {
+		defer func() {
+			_ = stream.Close()
+		}()
+
 		buf := make([]byte, 4096)
 		for {
 			len, err := stream.Read(buf)
@@ -692,13 +696,11 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	}
 
 	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
-
 	if err != nil {
 		return nil, badp2p(err)
 	}
 
 	maybePeer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
-
 	if err != nil {
 		stream.Reset()
 		return nil, badp2p(err)
@@ -707,11 +709,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
-	go func() {
-		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
-		time.Sleep(250 * time.Millisecond)
-		handleStreamReads(app, stream, streamIdx)
-	}()
+
 	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
 }
 
@@ -726,6 +724,7 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
+		delete(app.Streams, cs.StreamIdx)
 		err := stream.Close()
 		if err != nil {
 			return nil, badp2p(err)
