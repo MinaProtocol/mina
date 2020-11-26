@@ -208,6 +208,7 @@ struct
         if not (Q.mem t h) then (
           if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
           Q.enqueue_back_exn t h () )
+        else Q.lookup_and_move_to_back t h |> ignore
     end
 
     type t =
@@ -624,6 +625,7 @@ struct
         ; logger
         ; batcher= Batcher.create config.verifier
         ; best_tip_diff_relay= None
+        ; recently_seen= Lru_cache.Q.create ()
         ; best_tip_ledger= None }
       in
       don't_wait_for
