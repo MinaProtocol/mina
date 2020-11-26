@@ -28,6 +28,9 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
+
+	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
+	mplex "github.com/libp2p/go-mplex"
 )
 
 // Helper contains all the daemon state
@@ -128,7 +131,7 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState CodaGatingState) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
 
 	me, err := peer.IDFromPrivateKey(pk)
@@ -163,14 +166,17 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	rv := customValidator{Base: record.NamespacedValidator{"pk": record.PublicKeyValidator{}}}
 
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
-	kadch := make(chan *dual.DHT)
+	//kadch := make(chan *dual.DHT)
+	var kad *dual.DHT
+
+	mplex.MaxMessageSize = 1 << 30
 
 	host, err := p2p.New(ctx,
-		p2p.Muxer("/coda/mplex/1.0.0", DefaultMplexTransport),
+		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
-		p2p.ConnectionGater(&gatingState),
+		p2p.ConnectionGater(gatingState),
 		p2p.ConnectionManager(connmgr.NewConnManager(25, 250, time.Duration(30*time.Second))),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
@@ -180,18 +186,19 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
-				kad, err := dual.New(ctx, host, dual.WanDHTOption(dht.Datastore(dsDht)), dual.DHTOption(dht.Validator(rv)), dual.WanDHTOption(dht.BootstrapPeers(seeds...)), dual.DHTOption(dht.ProtocolPrefix("/coda")))
-				go func() { kadch <- kad }()
+				kad, err = dual.New(ctx, host, dual.WanDHTOption(dht.Datastore(dsDht)), dual.DHTOption(dht.Validator(rv)), dual.WanDHTOption(dht.BootstrapPeers(seeds...)), dual.DHTOption(dht.ProtocolPrefix("/coda")))
+				//go func() { kadch <- kad }()
 				return kad, err
 			})),
 		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),
-		p2p.PrivateNetwork(pnetKey[:]))
+		p2p.PrivateNetwork(pnetKey[:]),
+	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	kad := <-kadch
+	//kad := <-kadch
 
 	// nil fields are initialized by beginAdvertising
 	return &Helper{
@@ -205,6 +212,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:      rendezvousString,
 		Discovery:       nil,
 		Me:              me,
-		GatingState:     &gatingState,
+		GatingState:     gatingState,
 	}, nil
 }

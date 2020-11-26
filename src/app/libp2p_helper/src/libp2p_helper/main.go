@@ -259,13 +259,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&m.GatingConfig)
-
+	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig))
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, *gatingConfig)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig)
 
 	if err != nil {
 		return nil, badHelper(err)
@@ -383,7 +382,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		ch := make(chan string, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
-		(*app.Validators[seqno]).Completion = ch
+		app.Validators[seqno].Completion = ch
 		app.ValidatorMutex.Unlock()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
@@ -417,8 +416,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			app.ValidatorMutex.Lock()
 
-			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
-			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
+			now := time.Now()
+			app.Validators[seqno].TimedOutAt = &now
 
 			app.ValidatorMutex.Unlock()
 

@@ -20,11 +20,12 @@ require (
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.10.0
+	github.com/libp2p/go-libp2p-mplex v0.2.4
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/libp2p/go-libp2p-pubsub v0.3.4
 	github.com/libp2p/go-libp2p-record v0.1.3
 	github.com/libp2p/go-maddr-filter v0.1.0
-	github.com/libp2p/go-mplex v0.1.3 // indirect
+	github.com/libp2p/go-mplex v0.1.2
 	github.com/libp2p/go-stream-muxer v0.1.0
 	github.com/libp2p/go-yamux v1.3.8 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
