@@ -55,7 +55,8 @@ module Make (Inputs : Inputs_intf) :
            staking_epoch_ledger)
     then
       match staking_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
@@ -65,7 +66,8 @@ module Make (Inputs : Inputs_intf) :
            next_epoch_ledger)
     then
       match next_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+        .Genesis_epoch_ledger _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
@@ -138,6 +140,16 @@ module Make (Inputs : Inputs_intf) :
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
+    let%bind () =
+      let requested = List.length hashes in
+      if requested <= Transition_frontier.max_catchup_chunk_length then Some ()
+      else (
+        [%log' trace (Logger.create ())]
+          ~metadata:[("n", `Int requested)]
+          "get_transition_chain requested $n > %d hashes"
+          Transition_frontier.max_catchup_chunk_length ;
+        None )
+    in
     Option.all
     @@ List.map hashes ~f:(fun hash ->
            let%map validated_transition =

@@ -13,23 +13,24 @@ open O1trace
 open Otp_lib
 open Network_peer
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is now connecting"}]
+  [@@deriving register_event {msg= "Coda daemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is now listening"}]
+  [@@deriving register_event {msg= "Coda daemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is now bootstrapping"}]
+  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is now doing ledger catchup"}]
+  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is now synced"}]
+  [@@deriving register_event {msg= "Coda daemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}
@@ -182,7 +183,7 @@ module Snark_worker = struct
               non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            [%log info]
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
               signal ;
             raise (Snark_worker_signal_interrupt signal) )
@@ -519,8 +520,6 @@ let set_snark_work_fee t new_fee =
      | `Off _ ->
          `Off new_fee )
 
-let receipt_chain_database t = t.config.receipt_chain_database
-
 let top_level_logger t = t.config.logger
 
 let most_recent_valid_transition t = t.components.most_recent_valid_block
@@ -619,13 +618,20 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
-let best_chain t =
+let best_chain ?max_length t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  Transition_frontier.root frontier
-  :: Transition_frontier.best_tip_path frontier
+  let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
+  match max_length with
+  | Some max_length when max_length <= List.length best_tip_path ->
+      (* The [best_tip_path] has already been truncated to the correct length,
+         we skip adding the root to stay below the maximum.
+      *)
+      best_tip_path
+  | _ ->
+      Transition_frontier.root frontier :: best_tip_path
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
@@ -761,7 +767,7 @@ let start_with_precomputed_blocks t blocks =
   in
   start t
 
-let create (config : Config.t) =
+let create ?wallets (config : Config.t) =
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -842,11 +848,6 @@ let create (config : Config.t) =
           in
           (* knot-tying hack so we can pass a get_telemetry function before net created *)
           let net_ref = ref None in
-          let block_producers =
-            config.initial_block_production_keypairs |> Keypair.Set.to_list
-            |> List.map ~f:(fun {Keypair.public_key; _} ->
-                   Public_key.compress public_key )
-          in
           let get_telemetry_data _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -878,44 +879,50 @@ let create (config : Config.t) =
                                Unix.Inet_addr.t}, peer ID=%s, network not \
                                instantiated when telemetry data requested"
                              node_ip_addr node_peer_id))
-              | Some net -> (
-                match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
-                | None ->
-                    Deferred.return
-                    @@ Error
-                         (Error.of_string
-                            (sprintf
-                               !"Node with IP address=%{sexp: \
-                                 Unix.Inet_addr.t}, peer ID=%s, could not get \
-                                 transition frontier for telemetry data"
-                               node_ip_addr node_peer_id))
-                | Some frontier ->
-                    let%map peers = Coda_networking.peers net in
-                    let protocol_state_hash =
-                      let tip = Transition_frontier.best_tip frontier in
-                      let state =
-                        Transition_frontier.Breadcrumb.protocol_state tip
-                      in
-                      Coda_state.Protocol_state.hash state
-                    in
-                    let ban_statuses =
-                      Trust_system.Peer_trust.peer_statuses config.trust_system
-                    in
-                    let k_block_hashes =
-                      List.map
-                        ( Transition_frontier.root frontier
-                        :: Transition_frontier.best_tip_path frontier )
-                        ~f:Transition_frontier.Breadcrumb.state_hash
-                    in
-                    Ok
-                      Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                        { node_ip_addr
-                        ; node_peer_id
-                        ; peers
-                        ; block_producers
-                        ; protocol_state_hash
-                        ; ban_statuses
-                        ; k_block_hashes } )
+              | Some net ->
+                  let protocol_state_hash, k_block_hashes =
+                    match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                    | None ->
+                        ( config.precomputed_values.protocol_state_with_hash
+                            .hash
+                        , [] )
+                    | Some frontier ->
+                        let protocol_state_hash =
+                          let tip = Transition_frontier.best_tip frontier in
+                          let state =
+                            Transition_frontier.Breadcrumb.protocol_state tip
+                          in
+                          Coda_state.Protocol_state.hash state
+                        in
+                        let k_block_hashes =
+                          List.map
+                            ( Transition_frontier.root frontier
+                            :: Transition_frontier.best_tip_path frontier )
+                            ~f:Transition_frontier.Breadcrumb.state_hash
+                        in
+                        (protocol_state_hash, k_block_hashes)
+                  in
+                  let%map peers = Coda_networking.peers net in
+                  let block_producers =
+                    config.initial_block_production_keypairs
+                    |> Keypair.Set.to_list
+                    |> List.map ~f:(fun {Keypair.public_key; _} ->
+                           Public_key.compress public_key )
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node_ip_addr
+                      ; node_peer_id
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1047,7 +1054,7 @@ let create (config : Config.t) =
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
@@ -1233,8 +1240,12 @@ let create (config : Config.t) =
               ~logger:config.logger
           in
           let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
+            match wallets with
+            | Some wallets ->
+                return wallets
+            | None ->
+                Secrets.Wallets.load ~logger:config.logger
+                  ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)

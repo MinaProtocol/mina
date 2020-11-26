@@ -23,7 +23,7 @@ let use_dummy_values = true
 module type S = sig
   val blockchain_proof_system_id : Parsetree.expression
 
-  val base_proof_expr : Parsetree.expression
+  val base_proof_expr : Parsetree.expression Async.Deferred.t
 
   val transaction_verification : Parsetree.expression
 
@@ -52,7 +52,7 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = [%expr Coda_base.Proof.blockchain_dummy]
+  let base_proof_expr = Async.return [%expr Coda_base.Proof.blockchain_dummy]
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -93,13 +93,15 @@ module Make_real () = struct
 
   let genesis_constants = Genesis_constants.compiled
 
+  let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled
+
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol
 
   let protocol_state_with_hash =
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
-      ~constraint_constants ~consensus_constants
+      ~genesis_epoch_data ~constraint_constants ~consensus_constants
 
   let compiled_values =
     Genesis_proof.create_values
@@ -109,6 +111,7 @@ module Make_real () = struct
       ; proof_level= Full
       ; genesis_constants
       ; genesis_ledger= (module Test_genesis_ledger)
+      ; genesis_epoch_data
       ; consensus_constants
       ; protocol_state_with_hash
       ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
@@ -156,6 +159,7 @@ module Make_real () = struct
       fun () -> Lazy.force t]
 
   let base_proof_expr =
+    let%map.Async compiled_values = compiled_values in
     [%expr
       Core.Binable.of_string
         (module Coda_base.Proof.Stable.Latest)
@@ -175,6 +179,7 @@ let main () =
   let (module M) =
     if use_dummy_values then (module Dummy : S) else (module Make_real () : S)
   in
+  let%bind base_proof_expr = M.base_proof_expr in
   let structure =
     [%str
       module T = Genesis_proof.T
@@ -182,13 +187,14 @@ let main () =
 
       let blockchain_proof_system_id = [%e M.blockchain_proof_system_id]
 
-      let compiled_base_proof = [%e M.base_proof_expr]
+      let compiled_base_proof = [%e base_proof_expr]
 
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
              Coda_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+               ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
                ~constraint_constants:
                  Genesis_constants.Constraint_constants.for_unit_tests
                ~consensus_constants:
@@ -200,6 +206,7 @@ let main () =
            ; proof_level= Genesis_constants.Proof_level.for_unit_tests
            ; genesis_constants= Genesis_constants.for_unit_tests
            ; genesis_ledger= Genesis_ledger.for_unit_tests
+           ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
            ; genesis_proof= Coda_base.Proof.blockchain_dummy })
@@ -216,20 +223,22 @@ let main () =
              Genesis_constants.Constraint_constants.compiled
            in
            let genesis_constants = Genesis_constants.compiled in
+           let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
            let consensus_constants =
              Consensus.Constants.create ~constraint_constants
                ~protocol_constants:genesis_constants.protocol
            in
            let protocol_state_with_hash =
              Coda_state.Genesis_protocol_state.t
-               ~genesis_ledger:Test_genesis_ledger.t ~constraint_constants
-               ~consensus_constants
+               ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
+               ~constraint_constants ~consensus_constants
            in
            { runtime_config= Runtime_config.default
            ; constraint_constants
            ; proof_level= Genesis_constants.Proof_level.compiled
            ; genesis_constants
            ; genesis_ledger= (module Test_genesis_ledger)
+           ; genesis_epoch_data
            ; consensus_constants
            ; protocol_state_with_hash
            ; genesis_proof= compiled_base_proof })]

@@ -204,6 +204,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   previous_protocol_state |> Protocol_state.blockchain_state
                   |> Blockchain_state.snarked_next_available_token
             in
+            let genesis_ledger_hash =
+              previous_protocol_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.genesis_ledger_hash
+            in
             let supply_increase =
               Option.value_map ledger_proof_opt
                 ~f:(fun (proof, _) ->
@@ -220,7 +224,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~snarked_ledger_hash:next_ledger_hash
+                ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
                 ~snarked_next_available_token
                 ~staged_ledger_hash:next_staged_ledger_hash
             in
@@ -232,7 +236,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
                   ~block_data ~snarked_ledger_hash:previous_ledger_hash
-                  ~supply_increase ~logger ~constraint_constants ) )
+                  ~genesis_ledger_hash ~supply_increase ~logger
+                  ~constraint_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -276,12 +281,9 @@ let handle_block_production_errors ~logger ~previous_protocol_state
     " One possible reason could be a ledger-catchup is triggered before we \
      produce a proof for the produced transition."
   in
-  let exn_breadcrumb name =
-    raise
-      (Error.to_exn
-         (Error.of_string
-            (sprintf "Error building breadcrumb from produced transition: %s"
-               name)))
+  let exn_breadcrumb err =
+    Error.tag err ~tag:"Error building breadcrumb from produced transition"
+    |> Error.raise
   in
   match x with
   | Ok x ->
@@ -295,7 +297,7 @@ let handle_block_production_errors ~logger ~previous_protocol_state
       [%log error]
         "Prover failed to prove freshly generated transition: $error"
         ~metadata:
-          [ ("error", `String (Error.to_string_hum err))
+          [ ("error", Error_json.error_to_yojson err)
           ; ( "prev_state"
             , Protocol_state.value_to_yojson previous_protocol_state )
           ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
@@ -334,21 +336,30 @@ let handle_block_production_errors ~logger ~previous_protocol_state
         transition_error_msg_prefix transition_reason_for_failure ;
       return ()
   | Error (`Fatal_error e) ->
-      exn_breadcrumb (sprintf "fatal error -- %s" (Exn.to_string e))
+      exn_breadcrumb (Error.tag ~tag:"Fatal error" (Error.of_exn e))
   | Error (`Invalid_staged_ledger_hash e) ->
-      exn_breadcrumb
-        (sprintf "Invalid staged ledger hash -- %s" (Error.to_string_hum e))
+      exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
       (* Unexpected errors from staged_ledger are captured in
                          `Fatal_error
                       *)
       [%log error]
         ~metadata:
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
         !"Unable to build breadcrumb from produced transition due to invalid \
           staged ledger diff: $error" ;
       return ()
+
+let time ~logger ~time_controller label f =
+  let open Deferred.Result.Let_syntax in
+  let t0 = Time.now time_controller in
+  let%map x = f () in
+  let span = Time.diff (Time.now time_controller) t0 in
+  [%log info]
+    ~metadata:[("time", `Int (Time.Span.to_ms span |> Int64.to_int_exn))]
+    !"%s%!" label ;
+  x
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
@@ -442,28 +453,22 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   (let open Deferred.Let_syntax in
                   let emit_breadcrumb () =
                     let open Deferred.Result.Let_syntax in
-                    let t0 = Time.now time_controller in
                     let%bind protocol_state_proof =
-                      measure "proving state transition valid" (fun () ->
-                          Prover.prove prover
-                            ~prev_state:previous_protocol_state
-                            ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition
-                            pending_coinbase_witness )
-                      |> Deferred.Result.map_error ~f:(fun err ->
-                             `Prover_error
-                               ( err
-                               , ( previous_protocol_state_proof
-                                 , internal_transition
-                                 , pending_coinbase_witness ) ) )
+                      time ~logger ~time_controller
+                        "Protocol_state_proof proving time(ms)" (fun () ->
+                          measure "proving state transition valid" (fun () ->
+                              Prover.prove prover
+                                ~prev_state:previous_protocol_state
+                                ~prev_state_proof:previous_protocol_state_proof
+                                ~next_state:protocol_state internal_transition
+                                pending_coinbase_witness )
+                          |> Deferred.Result.map_error ~f:(fun err ->
+                                 `Prover_error
+                                   ( err
+                                   , ( previous_protocol_state_proof
+                                     , internal_transition
+                                     , pending_coinbase_witness ) ) ) )
                     in
-                    let span = Time.diff (Time.now time_controller) t0 in
-                    [%log info]
-                      ~metadata:
-                        [ ( "proving_time"
-                          , `Int (Time.Span.to_ms span |> Int64.to_int_exn) )
-                        ]
-                      !"Protocol_state_proof proving time(ms): $proving_time%!" ;
                     let staged_ledger_diff =
                       Internal_transition.staged_ledger_diff
                         internal_transition
@@ -508,8 +513,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       |> Deferred.return
                     in
                     let%bind breadcrumb =
-                      Breadcrumb.build ~logger ~precomputed_values ~verifier
-                        ~trust_system ~parent:crumb ~transition ~sender:None
+                      time ~logger ~time_controller
+                        "Build breadcrumb on produced block" (fun () ->
+                          Breadcrumb.build ~logger ~precomputed_values
+                            ~verifier ~trust_system ~parent:crumb ~transition
+                            ~sender:None (* Consider skipping here *)
+                            ~skip_staged_ledger_verification:false () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
                                `Invalid_staged_ledger_diff
@@ -775,17 +784,20 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             |> Deferred.return
           in
           let%bind breadcrumb =
-            Breadcrumb.build ~logger ~precomputed_values ~verifier
-              ~trust_system ~parent:crumb ~transition ~sender:None
-            |> Deferred.Result.map_error ~f:(function
-                 | `Invalid_staged_ledger_diff e ->
-                     `Invalid_staged_ledger_diff (e, staged_ledger_diff)
-                 | ( `Fatal_error _
-                   | `Invalid_genesis_protocol_state
-                   | `Invalid_staged_ledger_hash _
-                   | `Not_selected_over_frontier_root
-                   | `Parent_missing_from_frontier ) as err ->
-                     err )
+            time ~logger ~time_controller
+              "Build breadcrumb on produced block (precomputed)" (fun () ->
+                Breadcrumb.build ~logger ~precomputed_values ~verifier
+                  ~trust_system ~parent:crumb ~transition ~sender:None
+                  ~skip_staged_ledger_verification:false ()
+                |> Deferred.Result.map_error ~f:(function
+                     | `Invalid_staged_ledger_diff e ->
+                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                     | ( `Fatal_error _
+                       | `Invalid_genesis_protocol_state
+                       | `Invalid_staged_ledger_hash _
+                       | `Not_selected_over_frontier_root
+                       | `Parent_missing_from_frontier ) as err ->
+                         err ) )
           in
           [%str_log trace]
             ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
@@ -841,8 +853,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         in
         emit_next_block precomputed_blocks
     | Some _transition_frontier -> (
-      match precomputed_blocks with
-      | precomputed_block :: precomputed_blocks ->
+      match Sequence.next precomputed_blocks with
+      | Some (precomputed_block, precomputed_blocks) ->
           let new_time_offset =
             Core_kernel.Time.diff (Core_kernel.Time.now ())
               (Block_time.to_time
@@ -861,7 +873,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Block_time.Controller.set_time_offset new_time_offset ;
           let%bind () = produce precomputed_block in
           emit_next_block precomputed_blocks
-      | [] ->
+      | None ->
           return () )
   in
   emit_next_block precomputed_blocks

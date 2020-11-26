@@ -1,27 +1,19 @@
+open Marlin_plonk_bindings.Types
 open Sponge
 open Unsigned.Size_t
 
 module type Gate_vector_intf = sig
   open Unsigned
 
-  type field_vector
+  type field
 
   type t
 
   val create : unit -> t
 
-  val add_raw :
-       t
-    -> gate_enum:int
-    -> row:Unsigned.size_t
-    -> lrow:Unsigned.size_t
-    -> lcol:int
-    -> rrow:Unsigned.size_t
-    -> rcol:int
-    -> orow:Unsigned.size_t
-    -> ocol:int
-    -> field_vector
-    -> unit
+  val add : t -> field Plonk_gate.t -> unit
+
+  val get : t -> int -> field Plonk_gate.t
 end
 
 module Row = struct
@@ -29,21 +21,21 @@ module Row = struct
 
   let to_absolute ~public_input_size = function
     | Public_input i ->
-        Unsigned.Size_t.of_int i
+        i
     | After_public_input i ->
-        Unsigned.Size_t.of_int (i + public_input_size)
+        i + public_input_size
 end
 
 module Gate_spec = struct
   type ('row, 'f) t =
-    { gate_enum: int
+    { kind: Plonk_gate.Kind.t
     ; row: 'row
     ; lrow: 'row
-    ; lcol: int
+    ; lcol: Plonk_gate.Col.t
     ; rrow: 'row
-    ; rcol: int
+    ; rcol: Plonk_gate.Col.t
     ; orow: 'row
-    ; ocol: int
+    ; ocol: Plonk_gate.Col.t
     ; coeffs: 'f array }
 
   let map_rows t ~f =
@@ -58,7 +50,7 @@ module Hash_state = struct
 
   let digest t = Md5.digest_string H.(to_raw_string (get t))
 
-  let empty = H.feed_string H.empty "plonk_constraint_system"
+  let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
 module Plonk_constraint = struct
@@ -125,7 +117,7 @@ module Plonk_constraint = struct
 end
 
 module Position = struct
-  type t = {row: Row.t; col: int}
+  type t = {row: Row.t; col: Plonk_gate.Col.t}
 end
 
 module Internal_var = Core_kernel.Unique_id.Int ()
@@ -173,14 +165,13 @@ module Hash = Core.Md5
 
 let digest (t : _ t) = Hash_state.digest t.hash
 
-module Make (Fp : sig
-  include Field.S
+let zk_rows = 2
 
-  val to_bigint_raw_noalloc : t -> Bigint.t
-end)
-(Gates : Gate_vector_intf with type field_vector := Fp.Vector.t) (Params : sig
-    val params : Fp.t Params.t
-end) =
+module Make
+    (Fp : Field.S)
+    (Gates : Gate_vector_intf with type field := Fp.t) (Params : sig
+        val params : Fp.t Params.t
+    end) =
 struct
   open Core
   open Pickles_types
@@ -190,16 +181,7 @@ struct
   module H = Digestif.SHA256
 
   let feed_constraint t constr =
-    let fp =
-      let n = Fp.Bigint.length_in_bytes in
-      let fp_buf = Bytes.init n ~f:(fun _ -> '\000') in
-      fun x acc ->
-        let limbs = Fp.Bigint.to_ptr (Fp.to_bigint_raw_noalloc x) in
-        for i = 0 to n - 1 do
-          Bytes.set fp_buf i Ctypes.(!@(limbs +@ i))
-        done ;
-        H.feed_bytes acc fp_buf
-    in
+    let fp x acc = H.feed_bytes acc (Fp.to_bytes x) in
     let lc =
       let int_buf = Bytes.init 8 ~f:(fun _ -> '\000') in
       fun x t ->
@@ -266,7 +248,7 @@ struct
       Internal_var.Table.create ()
     in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
-    let num_rows = public_input_size + sys.next_row in
+    let num_rows = zk_rows + public_input_size + sys.next_row in
     let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
     for i = 0 to public_input_size - 1 do
       res.(i).(0) <- external_values (i + 1)
@@ -303,6 +285,11 @@ struct
                 let value = compute lc in
                 res.(i).(j) <- value ;
                 Hashtbl.set internal_values ~key:v ~data:value ) ) ;
+    for r = 0 to zk_rows - 1 do
+      for c = 0 to 2 do
+        res.(num_rows - 1 - r).(c) <- Fp.random ()
+      done
+    done ;
     res
 
   let create_internal ?constant sys lc : V.t =
@@ -361,32 +348,55 @@ struct
         let pub = [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|] in
         let pub_input_gate_specs_rev = ref [] in
         for row = 0 to n - 1 do
-          let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) 0 in
+          let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) L in
           let lp_row = Row.to_absolute ~public_input_size:n lp.row in
           (* Add to the gate vector *)
-          let row = Unsigned.Size_t.of_int row in
           pub_input_gate_specs_rev :=
-            { Gate_spec.gate_enum= 1
+            { Gate_spec.kind= Generic
             ; row
             ; lrow= lp_row
             ; lcol= lp.col
             ; rrow= row
-            ; rcol= 1
+            ; rcol= R
             ; orow= row
-            ; ocol= 2
+            ; ocol= O
             ; coeffs= pub }
             :: !pub_input_gate_specs_rev
         done ;
         let offset_row = Row.to_absolute ~public_input_size:n in
         let all_gates =
+          let rev_map_append xs tl ~f =
+            List.fold xs ~init:tl ~f:(fun acc x -> f x :: acc)
+          in
+          let offset = Gate_spec.map_rows ~f:offset_row in
+          let random_rows =
+            let zeroes = Array.init 5 ~f:(fun _ -> Fp.zero) in
+            List.init zk_rows ~f:(fun i ->
+                let row = Row.After_public_input (n + sys.next_row + i) in
+                offset
+                  { kind= Generic
+                  ; row
+                  ; lrow= row
+                  ; lcol= L
+                  ; rrow= row
+                  ; rcol= R
+                  ; orow= row
+                  ; ocol= O
+                  ; coeffs= zeroes } )
+          in
           List.rev_append !pub_input_gate_specs_rev
-            (List.rev_map ~f:(Gate_spec.map_rows ~f:offset_row) gates)
+            (rev_map_append gates random_rows ~f:offset)
         in
         List.iter all_gates
-          ~f:(fun {gate_enum; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs}
-             ->
-            Gates.add_raw g ~gate_enum ~row ~lrow ~lcol ~rrow ~rcol ~orow ~ocol
-              (Fp.Vector.of_array coeffs) ) ;
+          ~f:(fun {kind; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
+            Gates.add g
+              { kind
+              ; wires=
+                  { row
+                  ; l= {row= lrow; col= lcol}
+                  ; r= {row= rrow; col= rcol}
+                  ; o= {row= orow; col= ocol} }
+              ; c= coeffs } ) ;
         g
 
   let finalize t = ignore (finalize_and_get_gates t)
@@ -425,7 +435,7 @@ struct
     | `Unfinalized_rev gates ->
         sys.gates
         <- `Unfinalized_rev
-             ( { gate_enum= t
+             ( { kind= t
                ; row= After_public_input sys.next_row
                ; lrow= l.row
                ; lcol= l.col
@@ -443,25 +453,25 @@ struct
     let lp =
       match l with
       | Some lx ->
-          wire sys lx next_row 0
+          wire sys lx next_row L
       | None ->
-          {row= After_public_input next_row; col= 0}
+          {row= After_public_input next_row; col= L}
     in
     let rp =
       match r with
       | Some rx ->
-          wire sys rx next_row 1
+          wire sys rx next_row R
       | None ->
-          {row= After_public_input next_row; col= 1}
+          {row= After_public_input next_row; col= R}
     in
     let op =
       match o with
       | Some ox ->
-          wire sys ox next_row 2
+          wire sys ox next_row O
       | None ->
-          {row= After_public_input next_row; col= 2}
+          {row= After_public_input next_row; col= O}
     in
-    add_row sys [|l; r; o|] 1 lp rp op c
+    add_row sys [|l; r; o|] Generic lp rp op c
 
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -537,6 +547,16 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
+    let index_to_col = function
+      | 0 ->
+          Plonk_gate.Col.L
+      | 1 ->
+          Plonk_gate.Col.R
+      | 2 ->
+          Plonk_gate.Col.O
+      | _ ->
+          assert false
+    in
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -721,22 +741,24 @@ struct
         let state = reduce_state sys state in
         let add_round_state array ind =
           let prev =
-            Array.mapi array ~f:(fun i x -> wire sys x sys.next_row i)
+            Array.mapi array ~f:(fun i x ->
+                wire sys x sys.next_row (index_to_col i) )
           in
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
-            2 prev.(0) prev.(1) prev.(2)
+            Poseidon prev.(0) prev.(1) prev.(2)
             Params.params.round_constants.(ind + 1)
         in
         Array.iteri
           ~f:(fun i perm ->
             if i = Array.length state - 1 then
               let prev =
-                Array.mapi perm ~f:(fun i x -> wire sys x sys.next_row i)
+                Array.mapi perm ~f:(fun i x ->
+                    wire sys x sys.next_row (index_to_col i) )
               in
               add_row sys
                 (Array.map perm ~f:(fun x -> Some x))
-                0 prev.(0) prev.(1) prev.(2)
+                Zero prev.(0) prev.(1) prev.(2)
                 [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
             else add_round_state perm i )
           state
@@ -746,39 +768,43 @@ struct
               (reduce_to_v x, reduce_to_v y) )
         in
         let y =
-          Array.mapi ~f:(fun i (x, y) -> wire sys y sys.next_row i) red
+          Array.mapi
+            ~f:(fun i (x, y) -> wire sys y sys.next_row (index_to_col i))
+            red
         in
         add_row sys
           (Array.map red ~f:(fun (_, y) -> Some y))
-          3 y.(0) y.(1) y.(2) [||] ;
+          Add1 y.(0) y.(1) y.(2) [||] ;
         let x =
-          Array.mapi ~f:(fun i (x, y) -> wire sys x sys.next_row i) red
+          Array.mapi
+            ~f:(fun i (x, y) -> wire sys x sys.next_row (index_to_col i))
+            red
         in
         add_row sys
           (Array.map red ~f:(fun (x, _) -> Some x))
-          4 x.(0) x.(1) x.(2) [||] ;
+          Add2 x.(0) x.(1) x.(2) [||] ;
         ()
     | Plonk_constraint.T (EC_scale {state}) ->
         let i = ref 0 in
         let add_ecscale_round (round : V.t Scale_round.t) =
-          let xt = wire sys round.xt sys.next_row 0 in
-          let b = wire sys round.b sys.next_row 1 in
-          let yt = wire sys round.yt sys.next_row 2 in
-          let xp = wire sys round.xp (sys.next_row + 1) 0 in
-          let l1 = wire sys round.l1 (sys.next_row + 1) 1 in
-          let yp = wire sys round.yp (sys.next_row + 1) 2 in
-          let xs = wire sys round.xs (sys.next_row + 2) 0 in
-          let xt1 = wire sys round.xt (sys.next_row + 2) 1 in
-          let ys = wire sys round.ys (sys.next_row + 2) 2 in
+          let xt = wire sys round.xt sys.next_row L in
+          let b = wire sys round.b sys.next_row R in
+          let yt = wire sys round.yt sys.next_row O in
+          let xp = wire sys round.xp (sys.next_row + 1) L in
+          let l1 = wire sys round.l1 (sys.next_row + 1) R in
+          let yp = wire sys round.yp (sys.next_row + 1) O in
+          let xs = wire sys round.xs (sys.next_row + 2) L in
+          let xt1 = wire sys round.xt (sys.next_row + 2) R in
+          let ys = wire sys round.ys (sys.next_row + 2) O in
           add_row sys
             [|Some round.xt; Some round.b; Some round.yt|]
-            5 xt b yt [||] ;
+            Vbmul1 xt b yt [||] ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
-            6 xp l1 yp [||] ;
+            Vbmul2 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xt; Some round.ys|]
-            7 xs xt1 ys [||]
+            Vbmul3 xs xt1 ys [||]
         in
         Array.iter
           ~f:(fun round -> add_ecscale_round round ; incr i)
@@ -786,31 +812,31 @@ struct
         ()
     | Plonk_constraint.T (EC_endoscale {state}) ->
         let add_endoscale_round (round : V.t Endoscale_round.t) =
-          let b2i1 = wire sys round.b2i1 sys.next_row 0 in
-          let xt = wire sys round.xt sys.next_row 1 in
-          let b2i = wire sys round.b2i (sys.next_row + 1) 0 in
-          let xq = wire sys round.xq (sys.next_row + 1) 1 in
-          let yt = wire sys round.yt (sys.next_row + 1) 2 in
-          let xp = wire sys round.xp (sys.next_row + 2) 0 in
-          let l1 = wire sys round.l1 (sys.next_row + 2) 1 in
-          let yp = wire sys round.yp (sys.next_row + 2) 2 in
-          let xs = wire sys round.xs (sys.next_row + 3) 0 in
-          let xq1 = wire sys round.xq (sys.next_row + 3) 1 in
-          let ys = wire sys round.ys (sys.next_row + 3) 2 in
+          let b2i1 = wire sys round.b2i1 sys.next_row L in
+          let xt = wire sys round.xt sys.next_row R in
+          let b2i = wire sys round.b2i (sys.next_row + 1) L in
+          let xq = wire sys round.xq (sys.next_row + 1) R in
+          let yt = wire sys round.yt (sys.next_row + 1) O in
+          let xp = wire sys round.xp (sys.next_row + 2) L in
+          let l1 = wire sys round.l1 (sys.next_row + 2) R in
+          let yp = wire sys round.yp (sys.next_row + 2) O in
+          let xs = wire sys round.xs (sys.next_row + 3) L in
+          let xq1 = wire sys round.xq (sys.next_row + 3) R in
+          let ys = wire sys round.ys (sys.next_row + 3) O in
           add_row sys
             [|Some round.b2i1; Some round.xt; None|]
-            8 b2i1 xt
-            {row= After_public_input sys.next_row; col= 3}
+            Endomul1 b2i1 xt
+            {row= After_public_input sys.next_row; col= O}
             [||] ;
           add_row sys
             [|Some round.b2i; Some round.xq; Some round.yt|]
-            9 b2i xq yt [||] ;
+            Endomul2 b2i xq yt [||] ;
           add_row sys
             [|Some round.xp; Some round.l1; Some round.yp|]
-            10 xp l1 yp [||] ;
+            Endomul3 xp l1 yp [||] ;
           add_row sys
             [|Some round.xs; Some round.xq; Some round.ys|]
-            11 xs xq1 ys [||]
+            Endomul4 xs xq1 ys [||]
         in
         Array.iter
           ~f:(fun round -> add_endoscale_round round)

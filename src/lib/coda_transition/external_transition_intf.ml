@@ -65,7 +65,7 @@ module type External_transition_base_intf = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, to_yojson]
+      type nonrec t = t [@@deriving sexp]
     end
   end]
 
@@ -615,7 +615,8 @@ module type S = sig
 
   module Staged_ledger_validation : sig
     val validate_staged_ledger_diff :
-         ( 'time_received
+         ?skip_staged_ledger_verification:bool
+      -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain

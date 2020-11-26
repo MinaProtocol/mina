@@ -6,6 +6,7 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 
 type t
@@ -127,7 +128,8 @@ val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
 
-val best_chain : t -> Transition_frontier.Breadcrumb.t list option
+val best_chain :
+  ?max_length:int -> t -> Transition_frontier.Breadcrumb.t list option
 
 val transaction_pool : t -> Network_pool.Transaction_pool.t
 
@@ -141,11 +143,11 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed_block.t list -> unit Deferred.t
+  t -> Block_producer.Precomputed_block.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -154,8 +156,6 @@ val transition_frontier :
 
 val get_ledger :
   t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
-
-val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 

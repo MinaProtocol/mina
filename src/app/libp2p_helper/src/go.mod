@@ -1,6 +1,6 @@
 module codanet
 
-go 1.12
+go 1.13
 
 require (
 	github.com/campoy/jsonenums v0.0.0-20180221195324-eec6d38da64e
@@ -30,6 +30,7 @@ require (
 	github.com/libp2p/go-yamux v1.3.8 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/multiformats/go-varint v0.0.6
+	github.com/prometheus/client_golang v1.6.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/net v0.0.0-20200813134508-3edf25e44fcc // indirect
 	golang.org/x/sys v0.0.0-20200821140526-fda516888d29 // indirect

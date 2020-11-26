@@ -119,7 +119,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", `String (Error.to_string_hum e)) ]
+                ; ("error", Error_json.error_to_yojson e) ]
               "Couldn't get best tip from peer: $error" ;
             return None
         | Ok peer_best_tip -> (
@@ -135,7 +135,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 [%log warn]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", `String (Error.to_string_hum e)) ]
+                    ; ("error", Error_json.error_to_yojson e) ]
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(
@@ -288,7 +288,14 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
            ~transition_writer_ref ~frontier_w ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       [%log info]
-        "Successfully loaded frontier and downloaded best tip from network" ;
+        ~metadata:
+          [ ( "length"
+            , `Int
+                (Unsigned.UInt32.to_int
+                   (External_transition.Initial_validated.blockchain_length
+                      best_tip.data)) ) ]
+        "Successfully loaded frontier and downloaded best tip with $length \
+         from network" ;
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
@@ -340,7 +347,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
                   sync_jobs
               with
               | Error e ->
-                  failwith ("Local state sync failed: " ^ Error.to_string_hum e)
+                  Error.tag e ~tag:"Local state sync failed" |> Error.raise
               | Ok () ->
                   () )
         in

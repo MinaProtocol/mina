@@ -234,26 +234,41 @@ module Json_parsing = struct
       Malleable_error.of_string_hard_error
         (Printf.sprintf "failed to parse json value: %s" (Exn.to_string exn))
 
-  let signed_commands_with_statuses :
-      Coda_base.Signed_command.t Coda_base.With_status.t list parser = function
+  let parser_from_of_yojson of_yojson js =
+    match of_yojson js with
+    | Ok cmd ->
+        cmd
+    | Error modl ->
+        let logger = Logger.create () in
+        [%log error] "Could not parse JSON using of_yojson"
+          ~metadata:[("module", `String modl); ("json", js)] ;
+        failwithf "Could not parse JSON using %s.of_yojson" modl ()
+
+  let valid_commands_with_statuses :
+      Coda_base.User_command.Valid.t Coda_base.With_status.t list parser =
+    function
     | `List cmds ->
         let cmd_or_errors =
           List.map cmds
             ~f:
               (Coda_base.With_status.of_yojson
-                 Coda_base.Signed_command.of_yojson)
+                 Coda_base.User_command.Valid.of_yojson)
         in
         List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
             match (accum, cmd_or_err) with
-            | _, Error _ ->
+            | _, Error err ->
+                let logger = Logger.create () in
+                [%log error]
+                  ~metadata:[("error", `String err)]
+                  "Failed to parse JSON for user command status" ;
                 (* fail on any error *)
                 failwith
-                  "signed_commands_with_statuses: unable to parse JSON for \
+                  "valid_commands_with_statuses: unable to parse JSON for \
                    user command"
             | cmds, Ok cmd ->
                 cmd :: cmds )
     | _ ->
-        failwith "signed_commands_with_statuses: expected `List"
+        failwith "valid_commands_with_statuses: expected `List"
 
   let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
       : 'a Malleable_error.t =
@@ -271,7 +286,11 @@ module Json_parsing = struct
         let%bind entry =
           Malleable_error.of_option_hard
             (List.Assoc.find assoc key ~equal:String.equal)
-            "failed to find path in json object"
+            (sprintf "failed to find path using key '%s' in json object { %s }"
+               key
+               (String.concat ~sep:", "
+                  (List.map assoc ~f:(fun (s, json) ->
+                       sprintf "\"%s\":%s" s (Yojson.Safe.to_string json) ))))
         in
         find parser entry path'
     | _ ->
@@ -501,7 +520,7 @@ module Breadcrumb_added_query = struct
   open Coda_base
 
   module Result = struct
-    type t = {user_commands: Signed_command.t With_status.t list}
+    type t = {user_commands: User_command.Valid.t With_status.t list}
   end
 
   let filter testnet_log_filter =
@@ -517,7 +536,7 @@ module Breadcrumb_added_query = struct
     let open Malleable_error.Let_syntax in
     (* JSON path to metadata entry *)
     let path = ["jsonPayload"; "metadata"; "user_commands"] in
-    let parser = signed_commands_with_statuses in
+    let parser = valid_commands_with_statuses in
     let%map user_commands = find parser js path in
     Result.{user_commands}
 end
@@ -684,11 +703,10 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
             (Ivar.create ())
         in
         if Ivar.is_empty ivar then ( Ivar.fill ivar () ; return () )
-        else
-          Malleable_error.of_error_hard
-            (Error.of_string
-               "received initialization for node that has already initialized")
-        )
+        else (
+          [%log warn]
+            "Received initialization for node that has already initialized" ;
+          return () ) )
   in
   let best_tip_map_reader, best_tip_map_writer =
     Broadcast_pipe.create String.Map.empty
@@ -949,11 +967,30 @@ let wait_for :
   with
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", `String (Error.to_string_hum e.error))] ;
+        ~metadata:[("error", Error_json.error_to_yojson e.error)] ;
       Deferred.return
         (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
   | res ->
       Deferred.return res
+
+let command_matches_payment cmd ~sender ~receiver ~amount =
+  let open User_command in
+  match cmd with
+  | Signed_command signed_cmd -> (
+      let open Signature_lib in
+      let body =
+        Signed_command.payload signed_cmd |> Signed_command_payload.body
+      in
+      match body with
+      | Payment {source_pk; receiver_pk; amount= paid_amt; token_id= _}
+        when Public_key.Compressed.equal source_pk sender
+             && Public_key.Compressed.equal receiver_pk receiver
+             && Currency.Amount.equal paid_amt amount ->
+          true
+      | _ ->
+          false )
+  | Snapp_command _ ->
+      false
 
 let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
     unit Malleable_error.t =
@@ -987,45 +1024,54 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
           let open Coda_base in
           let open Signature_lib in
           (* res is a list of Breadcrumb_added_query.Result.t
-           each of those contains a list of user commands
-           fold over the fold of each list
-           as soon as we find a matching payment, don't
-            check any other commands
-        *)
-          let found =
-            List.fold res ~init:false ~f:(fun found_outer {user_commands} ->
-                if found_outer then true
+             each of those contains a list of user commands
+          *)
+          let payment_opt =
+            List.fold res ~init:None ~f:(fun acc {user_commands} ->
+                if Option.is_some acc then acc
                 else
-                  List.fold user_commands ~init:false
-                    ~f:(fun found_inner cmd_with_status ->
-                      if found_inner then true
-                      else
-                        (* N.B.: we're not checking fee, nonce or memo *)
-                        let signed_cmd = cmd_with_status.With_status.data in
-                        let body =
-                          Signed_command.payload signed_cmd
-                          |> Signed_command_payload.body
-                        in
-                        match body with
-                        | Payment
-                            { source_pk
-                            ; receiver_pk
-                            ; amount= paid_amt
-                            ; token_id= _ } ->
-                            Public_key.Compressed.equal source_pk sender
-                            && Public_key.Compressed.equal receiver_pk receiver
-                            && Currency.Amount.equal paid_amt amount
-                        | _ ->
-                            false ) )
+                  List.find user_commands
+                    ~f:(fun (cmd_with_status :
+                              User_command.Valid.t With_status.t)
+                       ->
+                      cmd_with_status.With_status.data
+                      |> User_command.forget_check
+                      |> command_matches_payment ~sender ~receiver ~amount ) )
           in
-          if found then (
-            [%log info] "wait_for_payment: found matching payment"
-              ~metadata:
-                [ ("sender", `String (Public_key.Compressed.to_string sender))
-                ; ( "receiver"
-                  , `String (Public_key.Compressed.to_string receiver) )
-                ; ("amount", `String (Currency.Amount.to_string amount)) ] ;
-            Malleable_error.return () )
+          if Option.is_some payment_opt then
+            let cmd_with_status = Option.value_exn payment_opt in
+            let actual_status = cmd_with_status.With_status.status in
+            let applied =
+              match actual_status with
+              | User_command_status.Applied _ ->
+                  true
+              | _ ->
+                  false
+            in
+            if applied then (
+              [%log info] "wait_for_payment: found matching payment"
+                ~metadata:
+                  [ ("sender", `String (Public_key.Compressed.to_string sender))
+                  ; ( "receiver"
+                    , `String (Public_key.Compressed.to_string receiver) )
+                  ; ("amount", `String (Currency.Amount.to_string amount)) ] ;
+              Malleable_error.return () )
+            else (
+              [%log info]
+                "wait_for_payment: found matching payment, but status is not \
+                 'Applied'"
+                ~metadata:
+                  [ ("sender", `String (Public_key.Compressed.to_string sender))
+                  ; ( "receiver"
+                    , `String (Public_key.Compressed.to_string receiver) )
+                  ; ("amount", `String (Currency.Amount.to_string amount))
+                  ; ( "actual_user_command_status"
+                    , User_command_status.to_yojson actual_status ) ] ;
+              Error.raise
+                (Error.of_string
+                   (sprintf "Unexpected status in matching payment: %s"
+                      ( User_command_status.to_yojson actual_status
+                      |> Yojson.Safe.to_string ))) )
           else (
             [%log info]
               "wait_for_payment: found added breadcrumbs, but did not find \

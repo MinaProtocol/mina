@@ -113,7 +113,8 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     ?skip_verification:bool
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.t
   -> logger:Logger.t

@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signature_lib
@@ -54,8 +56,12 @@ let%test_module "Full_frontier tests" =
       in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-          ~genesis_ledger:Genesis_ledger.t ~epoch_ledger_location
+          ~genesis_ledger:Genesis_ledger.t
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+          ~epoch_ledger_location
           ~ledger_depth:constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       let root_ledger =
         Or_error.ok_exn

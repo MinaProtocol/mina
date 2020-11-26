@@ -27,21 +27,27 @@ module Step = struct
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, _, cs) ~path ->
-        let index =
-          Snarky_bn382.Tweedle.Dum.Plonk.Field_index.read
-            (Backend.Tick.Keypair.load_urs ())
-            path
-        in
-        {Tweedle.Dum_based_plonk.Keypair.index; cs} )
-      (fun t -> Snarky_bn382.Tweedle.Dum.Plonk.Field_index.write t.index)
+        Or_error.try_with (fun () ->
+            let index =
+              Marlin_plonk_bindings.Tweedle_fq_index.read
+                (Backend.Tick.Keypair.load_urs ())
+                path
+            in
+            {Tweedle.Dum_based_plonk.Keypair.index; cs} ) )
+      (fun t path ->
+        Or_error.try_with (fun () ->
+            Marlin_plonk_bindings.Tweedle_fq_index.write t.index path ) )
 
   let vk_storable =
     Key_cache.Sync.Disk_storable.simple Key.Verification.to_string
       (fun _ ~path ->
-        Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.read
-          (Backend.Tick.Keypair.load_urs ())
-          path )
-      (fun x s -> Snarky_bn382.Tweedle.Dum.Plonk.Field_verifier_index.write x s)
+        Or_error.try_with (fun () ->
+            Marlin_plonk_bindings.Tweedle_fq_verifier_index.read
+              (Backend.Tick.Keypair.load_urs ())
+              path ) )
+      (fun x s ->
+        Or_error.try_with (fun () ->
+            Marlin_plonk_bindings.Tweedle_fq_verifier_index.write x s ) )
 
   let read_or_generate cache k_p k_v typ main =
     let s_p = storable in
@@ -112,13 +118,16 @@ module Wrap = struct
   let storable =
     Key_cache.Sync.Disk_storable.simple Key.Proving.to_string
       (fun (_, _, cs) ~path ->
-        let index =
-          Snarky_bn382.Tweedle.Dee.Plonk.Field_index.read
-            (Backend.Tock.Keypair.load_urs ())
-            path
-        in
-        {Tweedle.Dee_based_plonk.Keypair.index; cs} )
-      (fun t -> Snarky_bn382.Tweedle.Dee.Plonk.Field_index.write t.index)
+        Or_error.try_with (fun () ->
+            let index =
+              Marlin_plonk_bindings.Tweedle_fp_index.read
+                (Backend.Tock.Keypair.load_urs ())
+                path
+            in
+            {Tweedle.Dee_based_plonk.Keypair.index; cs} ) )
+      (fun t path ->
+        Or_error.try_with (fun () ->
+            Marlin_plonk_bindings.Tweedle_fp_index.write t.index path ) )
 
   let read_or_generate step_domains cache k_p k_v typ main =
     let module Vk = Verification_key in
@@ -157,12 +166,18 @@ module Wrap = struct
              let pk = Keypair.pk kp in
              let vk : Vk.t =
                { index= vk
-               ; commitments= Backend.Tock.Keypair.vk_commitments vk
+               ; commitments=
+                   Pickles_types.Plonk_verification_key_evals.map vk.evals
+                     ~f:(fun x ->
+                       Array.map x.unshifted ~f:(function
+                         | Infinity ->
+                             failwith "Unexpected zero curve point"
+                         | Finite x ->
+                             x ) )
                ; step_domains
                ; data=
-                   (let open Snarky_bn382.Tweedle.Dee.Plonk.Field_index in
-                   { constraints=
-                       Unsigned.Size_t.to_int (domain_d1_size pk.index) }) }
+                   (let open Marlin_plonk_bindings.Tweedle_fp_index in
+                   {constraints= domain_d1_size pk.index}) }
              in
              let _ = Key_cache.Sync.write cache s_v k_v vk in
              let _vk = Key_cache.Sync.read cache s_v k_v in

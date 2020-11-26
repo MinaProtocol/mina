@@ -82,7 +82,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[("error", `String (Error.to_string_hum e))]
+                     ~metadata:[("error", Error_json.error_to_yojson e)]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -150,7 +150,9 @@ module Worker = struct
         let (module M) = Worker_state.get w in
         Deferred.return
           (M.verify_blockchain_snarks
-             (List.map chains ~f:(fun {state; proof} -> (state, proof))))
+             (List.map chains ~f:(fun snark ->
+                  ( Blockchain_snark.Blockchain.state snark
+                  , Blockchain_snark.Blockchain.proof snark ) )))
 
       let verify_transaction_snarks (w : Worker_state.t) ts =
         let (module M) = Worker_state.get w in
@@ -196,12 +198,13 @@ module Worker = struct
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
+          let num_rotate = 1 in
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"coda-verifier.log" ~max_size) ) ;
+                 ~log_filename:"coda-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create {conf_dir; logger; proof_level}
 
@@ -224,7 +227,7 @@ let plus_or_minus initial ~delta =
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[("err", `String (Error.to_string_hum err))] ;
+      ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
   let create_worker () =

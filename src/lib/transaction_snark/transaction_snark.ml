@@ -220,7 +220,7 @@ module Statement = struct
           , Token_id.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, to_yojson]
+        [@@deriving compare, equal, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -419,7 +419,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, to_yojson]
+    [@@deriving compare, fields, sexp, version, yojson]
 
     let to_latest = Fn.id
   end
@@ -3003,7 +3003,7 @@ module type S = sig
     -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_user_command :
        sok_digest:Sok_message.Digest.t
@@ -3015,7 +3015,7 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
@@ -3027,9 +3027,10 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
-  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
+  val merge :
+    t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
 let check_transaction_union ?(preeval = false) ~constraint_constants
@@ -3351,13 +3352,14 @@ struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state }
     in
-    { statement= s
-    ; proof=
-        base []
-          ~handler:
-            (Base.transaction_union_handler handler transaction state_body
-               init_stack)
-          s }
+    let%map.Async proof =
+      base []
+        ~handler:
+          (Base.transaction_union_handler handler transaction state_body
+             init_stack)
+        s
+    in
+    {statement= s; proof}
 
   let of_snapp_command ~sok_digest ~source ~target ~init_stack:_
       ~pending_coinbase_stack_state ~next_available_token_before
@@ -3397,10 +3399,11 @@ struct
     in
     match to_preunion transaction with
     | `Snapp_command t ->
-        of_snapp_command ~sok_digest ~source ~target ~init_stack
-          ~pending_coinbase_stack_state ~next_available_token_before
-          ~next_available_token_after ~snapp_account1 ~snapp_account2
-          ~state_body t handler
+        Async.Deferred.return
+        @@ of_snapp_command ~sok_digest ~source ~target ~init_stack
+             ~pending_coinbase_stack_state ~next_available_token_before
+             ~next_available_token_after ~snapp_account1 ~snapp_account2
+             ~state_body t handler
     | `Transaction t ->
         of_transaction_union sok_digest source target ~init_stack
           ~pending_coinbase_stack_state ~next_available_token_before
@@ -3451,14 +3454,16 @@ struct
           t23.next_available_token_after (%{sexp:Token_id.t} vs \
           %{sexp:Token_id.t})"
         t12.next_available_token_after t23.next_available_token_before () ;
-    let open Or_error.Let_syntax in
-    let%map fee_excess = Fee_excess.combine t12.fee_excess t23.fee_excess
+    let open Async.Deferred.Or_error.Let_syntax in
+    let%bind fee_excess =
+      Async.return @@ Fee_excess.combine t12.fee_excess t23.fee_excess
     and supply_increase =
       Amount.add t12.supply_increase t23.supply_increase
       |> Option.value_map ~f:Or_error.return
            ~default:
              (Or_error.errorf
                 "Transaction_snark.merge: Supply change amount overflow")
+      |> Async.return
     in
     let s : Statement.With_sok.t =
       { Statement.source= t12.source
@@ -3472,9 +3477,10 @@ struct
           ; target= t23.pending_coinbase_stack_state.target }
       ; sok_digest }
     in
-    { statement= s
-    ; proof= merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
-    }
+    let%map.Async proof =
+      merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
+    in
+    Ok {statement= s; proof}
 end
 
 let%test_module "transaction_snark" =
@@ -3576,6 +3582,7 @@ let%test_module "transaction_snark" =
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
         Coda_state.Genesis_protocol_state.t
           ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants
       in
       compile_time_genesis.data |> Coda_state.Protocol_state.body
@@ -3615,9 +3622,10 @@ let%test_module "transaction_snark" =
         { Transaction_protocol_state.Poly.transaction= user_command
         ; block_data= state_body }
       in
-      of_user_command ~sok_digest ~source ~target ~init_stack
-        ~pending_coinbase_stack_state ~next_available_token_before
-        ~next_available_token_after user_command_in_block handler
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          of_user_command ~sok_digest ~source ~target ~init_stack
+            ~pending_coinbase_stack_state ~next_available_token_before
+            ~next_available_token_after user_command_in_block handler )
 
     (*
                 ~proposer:
@@ -4256,7 +4264,9 @@ let%test_module "transaction_snark" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof13 =
-                merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    merge ~sok_digest proof12 proof23 )
+                |> Or_error.ok_exn
               in
               Proof.verify [(proof13.statement, proof13.proof)] ) )
 
@@ -4283,6 +4293,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in
@@ -4304,6 +4315,7 @@ let%test_module "transaction_snark" =
         let state_body0 =
           Coda_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
           |> Coda_state.Protocol_state.body
         in

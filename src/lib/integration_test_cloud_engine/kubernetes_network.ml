@@ -71,7 +71,7 @@ module Node = struct
           ; Malleable_error.Hard_fail.soft_errors= _ } ->
           Malleable_error.of_error_hard e.error
 
-    (* default port is 3085, may need to be explicit if multiple daemons are running *)
+    (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
     let set_port_forwarding ~logger t port =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
@@ -80,7 +80,7 @@ module Node = struct
       in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
-      let%bind.Malleable_error.Let_syntax proc =
+      let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
           (Process.create ~prog:"kubectl" ~args ())
       in
@@ -163,7 +163,7 @@ module Node = struct
         ()
     | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
         [%log fatal] "Error running k8s port forwarding"
-          ~metadata:[("error", `String (Error.to_string_hum err.error))] ;
+          ~metadata:[("error", Error_json.error_to_yojson err.error)] ;
         failwith "Could not run k8s port forwarding"
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -207,7 +207,7 @@ module Node = struct
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log info] "%d tries left" (n - 1) ;
+              [%log info] "After GraphQL error, %d tries left" (n - 1) ;
               retry (n - 1) )
             else Malleable_error.of_string_hard_error err_string
     in
@@ -273,14 +273,15 @@ module Node = struct
     in
     get_balance ()
 
-  let send_payment ~logger t ~sender ~receiver ~amount ~fee =
-    [%log info] "Sending a payment.."
+  (* if we expect failure, might want retry_on_graphql_error to be false *)
+  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
+      ~amount ~fee =
+    [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let graphql_port = 3085 in
     let open Malleable_error.Let_syntax in
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    let graphql_port = 3085 in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
@@ -303,7 +304,7 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true
+      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error
         ~query_name:"send_payment_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in

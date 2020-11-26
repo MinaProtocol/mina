@@ -1,15 +1,18 @@
 apiVersion: v2
 name: seed-node
-description: A Helm chart for Coda Protocol's seed nodes
+description: A Helm chart for Mina Protocol's seed nodes
 type: application
-version: 0.1.2
+version: 0.2.1
 appVersion: 1.16.0
 dependencies:
-icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+  - name: common-utilities
+    version: 0.0.2
+    repository: "https://coda-charts.storage.googleapis.com"
+icon: https://github.com/MinaProtocol/mina/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
 keywords:
 - seed
 - mina
 - testnet
-home: https://codaprotocol.com/
+home: https://minaprotocol.com/
 sources:
-- https://github.com/CodaProtocol/coda
+- https://github.com/MinaProtocol/mina

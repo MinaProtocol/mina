@@ -148,10 +148,32 @@ let rec start_verifier : type proof partial r.
     t.state <- Waiting ;
     Ivar.fill finished (Ok Outcome.empty) )
   else
-    let out_for_verification = order_proofs t (Queue.to_list t.queue) in
+    let out_for_verification =
+      let proofs =
+        (* TODO: Make this a proper config detail once we have data on what a
+           good default would be.
+        *)
+        match Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE" with
+        | None ->
+            let proofs = Queue.to_list t.queue in
+            Queue.clear t.queue ; proofs
+        | Some max_proofs ->
+            (* NB: Order is irrelevant because we sort immediately after *)
+            let rec take n acc =
+              if n > 0 then
+                match Queue.dequeue t.queue with
+                | Some proof ->
+                    take (n - 1) (proof :: acc)
+                | None ->
+                    acc
+              else acc
+            in
+            take (int_of_string max_proofs) []
+      in
+      order_proofs t proofs
+    in
     let next_finished = Ivar.create () in
     t.state <- Verifying {next_finished; out_for_verification} ;
-    Queue.clear t.queue ;
     let res =
       call_verifier t
         (List.map out_for_verification ~f:(fun (_id, p) -> `Proof p))

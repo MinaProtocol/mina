@@ -6,6 +6,8 @@
  *  and breadcrumb rose trees (via the catchup pipe).
  *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
@@ -174,14 +176,16 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-          )
+            ~parent:parent_breadcrumb
+            ~transition:
+              mostly_validated_transition (* TODO: Can we skip here? *)
+            ~skip_staged_ledger_verification:false () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
               [%log error]
                 ~metadata:
-                  (metadata @ [("error", `String (Error.to_string_hum error))])
+                  (metadata @ [("error", Error_json.error_to_yojson error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
               let (_
@@ -302,8 +306,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                              () ) ) ;
                      [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
-                        transition frontier: %s"
-                       (Error.to_string_hum err) )
+                        transition frontier: $error"
+                       ~metadata:[("error", Error_json.error_to_yojson err)] )
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
@@ -332,8 +336,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        ()
                    | Error err ->
                        [%log error]
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
+                         ~metadata:[("error", Error_json.error_to_yojson err)]
                          "Error, failed to attach produced breadcrumb to \
                           transition frontier: $error" ;
                        let (_ : Transition_frontier.Breadcrumb.t) =

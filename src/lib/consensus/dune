@@ -22,31 +22,33 @@
    non_zero_curve_point
    yojson
    coda_metrics
-   graphql_lib)
+   graphql_lib
+   inline_test_quiet_logs)
  (preprocessor_deps "../../config.mlh")
  (preprocess
   (pps
-   bisect_ppx --conditional
-   h_list.ppx
-   ppx_assert
-   ppx_base
-   ppx_bin_prot
-   ppx_coda
-   ppx_custom_printf
-   ppx_deriving.std
-   ppx_deriving_yojson
-   ppx_fields_conv
-   ppx_inline_test
-   ppx_let
-   ppx_optcomp
-   ppx_sexp_conv
-   ppx_snarky
-   ppx_version))
-  (synopsis "Consensus mechanisms"))
+    h_list.ppx
+    ppx_assert
+    ppx_base
+    ppx_bin_prot
+    ppx_coda
+    ppx_custom_printf
+    ppx_deriving.std
+    ppx_deriving_yojson
+    ppx_fields_conv
+    ppx_inline_test
+    ppx_let
+    ppx_optcomp
+    ppx_sexp_conv
+    ppx_snarky
+    ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Consensus mechanisms"))
 
 (executable
-  (name proof_of_stake_fuzzer)
-  (modules proof_of_stake_fuzzer)
-  (libraries core_kernel signature_lib coda_state coda_transition consensus prover blockchain_snark)
-  (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_version ppx_jane)))
+ (name proof_of_stake_fuzzer)
+ (modules proof_of_stake_fuzzer)
+ (libraries core_kernel signature_lib coda_state coda_transition consensus prover blockchain_snark)
+ (preprocessor_deps "../../config.mlh")
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane)))

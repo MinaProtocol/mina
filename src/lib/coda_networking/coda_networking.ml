@@ -565,7 +565,7 @@ module Rpcs = struct
       | Ok telem ->
           Telemetry_data.Stable.V1.to_yojson telem
       | Error err ->
-          `Assoc [("error", `String (Error.to_string_hum err))]
+          `Assoc [("error", Error_json.error_to_yojson err)]
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
@@ -908,7 +908,7 @@ let create (config : Config.t)
                         ; ( "query"
                           , Syncable_ledger.Query.to_yojson
                               Ledger.Addr.to_yojson query )
-                        ; ("error", `String err_msg) ] ) ))
+                        ; ("error", Error_json.error_to_yojson err) ] ) ))
           else return ()
     in
     return result
@@ -939,12 +939,12 @@ let create (config : Config.t)
     in
     result
   in
-  let get_best_tip_rpc conn ~version:_ query =
+  let get_best_tip_rpc conn ~version:_ (() : unit) =
     [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
-    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
+    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson ())] in
     let%bind result, sender =
-      run_for_rpc_result conn query ~f:get_best_tip action_msg msg_args
+      run_for_rpc_result conn () ~f:get_best_tip action_msg msg_args
     in
     match result with
     | None ->
@@ -1056,7 +1056,7 @@ let create (config : Config.t)
                * 2. add them to go
               *)
               let metadata p e =
-                [ ("error", `String (Error.to_string_hum e))
+                [ ("error", Error_json.error_to_yojson e)
                 ; ("peer", `String (Peer.to_string p)) ]
               in
               let%bind extra_initial_peers =
@@ -1157,6 +1157,8 @@ include struct
 
   let peers = lift peers
 
+  let add_peer = lift add_peer
+
   let initial_peers = lift initial_peers
 
   let ban_notification_reader = lift ban_notification_reader
@@ -1250,11 +1252,14 @@ let make_rpc_request ?timeout ~rpc ~label t peer input =
       Or_error.errorf
         !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
         peer.peer_id label
-  | Connected {data= Error e; _} | Failed_to_connect e ->
+  | Connected {data= Error e; _} ->
       Error e
+  | Failed_to_connect e ->
+      Error (Error.tag e ~tag:"failed-to-connect")
 
 let get_transition_chain_proof t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition" t
+  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof
+    ~label:"transition chain proof" t
 
 let get_transition_chain t =
   make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
@@ -1344,7 +1349,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [("error", `String (Error.to_string_hum e))] ) ))
+                      , [("error", Error_json.error_to_yojson e)] ) ))
         | Local ->
             return ()
       in
@@ -1405,7 +1410,7 @@ let glue_sync_ledger :
                 "Peer $peer didn't have enough information to answer \
                  ledger_hash query. See error for more details: $error"
                 ~metadata:
-                  [ ("error", `String (Error.to_string_hum e))
+                  [ ("error", Error_json.error_to_yojson e)
                   ; ("peer", Peer.to_yojson peer) ] ;
               Hash_set.add peers_tried peer ;
               None
@@ -1413,7 +1418,7 @@ let glue_sync_ledger :
               [%log' info t.logger]
                 "RPC error during ledger_hash query See error for more \
                  details: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:[("error", Error_json.error_to_yojson e)] ;
               Hash_set.add peers_tried peer ;
               None
           | Failed_to_connect err ->

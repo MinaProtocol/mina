@@ -10,6 +10,8 @@ drop index idx_blocks_state_hash;
 
 drop table blocks;
 
+drop table epoch_data;
+
 drop table internal_commands;
 
 drop type internal_command_type;
@@ -17,6 +19,8 @@ drop type internal_command_type;
 drop table user_commands;
 
 drop type user_command_type;
+
+drop type user_command_status;
 
 drop index idx_snarked_ledger_hashes_value;
 

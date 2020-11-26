@@ -164,8 +164,12 @@ module Generator = struct
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger ~epoch_ledger_location
+        ~genesis_ledger
+        ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+        ~epoch_ledger_location
         ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+        ~genesis_state_hash:
+          (With_hash.hash precomputed_values.protocol_state_with_hash)
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values
@@ -184,8 +188,12 @@ module Generator = struct
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger ~epoch_ledger_location
+        ~genesis_ledger
+        ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+        ~epoch_ledger_location
         ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+        ~genesis_state_hash:
+          (With_hash.hash precomputed_values.protocol_state_with_hash)
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

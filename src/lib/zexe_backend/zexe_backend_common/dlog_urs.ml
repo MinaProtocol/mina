@@ -22,7 +22,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   let name =
-    sprintf "%s_%d_%s_v2" name
+    sprintf "%s_%d_%s_v3" name
       (Pickles_types.Nat.to_int Rounds.n)
       Version.marlin_repo_sha
 
@@ -48,8 +48,8 @@ module Make (Inputs : Inputs_intf) = struct
           let store =
             Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
-              (fun () ~path -> Urs.read path)
-              Urs.write
+              (fun () ~path -> Or_error.try_with (fun () -> Urs.read path))
+              (fun urs path -> Or_error.try_with (fun () -> Urs.write urs path))
           in
           let u =
             match Key_cache.Sync.read specs store () with

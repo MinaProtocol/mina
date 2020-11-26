@@ -68,7 +68,7 @@ module Go_log = struct
     | "error" | "panic" | "fatal" ->
         Error
     | "warn" ->
-        Warn
+        Debug
     | "info" ->
         (* this is intentionally debug, because the go info logs are too verbose for our info *)
         Debug
@@ -84,8 +84,76 @@ module Go_log = struct
     ; module_: string [@key "logger"]
     ; level: string
     ; msg: string
-    ; error: string [@default ""] }
-  [@@deriving of_yojson]
+    ; metadata: Yojson.Safe.t String.Map.t }
+
+  let record_of_yojson (json : Yojson.Safe.t) =
+    let open Result.Let_syntax in
+    let prefix = "Coda_net2.Go_log.record_of_yojson: " in
+    match json with
+    | `Assoc fields ->
+        let set_field field_name prev_value parse json =
+          match prev_value with
+          | Some _ ->
+              Error
+                (prefix ^ "Field '" ^ field_name ^ "' appears multiple times")
+          | None ->
+              parse json
+              |> Result.map_error ~f:(fun err ->
+                     prefix ^ "Could not parse field '" ^ field_name ^ "':"
+                     ^ err )
+              |> Result.map ~f:Option.return
+        in
+        let get_field field_name value =
+          match value with
+          | Some x ->
+              Ok x
+          | None ->
+              Error (prefix ^ "Field '" ^ field_name ^ "' is required")
+        in
+        let string_of_yojson = function
+          | `String s ->
+              Ok s
+          | _ ->
+              Error "Expected a string"
+        in
+        let%bind ts, module_, level, msg, metadata =
+          List.fold_result ~init:(None, None, None, None, String.Map.empty)
+            fields ~f:(fun (ts, module_, level, msg, metadata) (field, json) ->
+              match field with
+              | "ts" ->
+                  let%map ts = set_field "ts" ts string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | "logger" ->
+                  let%map module_ =
+                    set_field "logger" module_ string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "level" ->
+                  let%map level =
+                    set_field "level" level string_of_yojson json
+                  in
+                  (ts, module_, level, msg, metadata)
+              | "msg" ->
+                  let%map msg = set_field "msg" msg string_of_yojson json in
+                  (ts, module_, level, msg, metadata)
+              | _ ->
+                  let field =
+                    if String.equal field "error" then "go_error" else field
+                  in
+                  Ok
+                    ( ts
+                    , module_
+                    , level
+                    , msg
+                    , Map.set ~key:field ~data:json metadata ) )
+        in
+        let%bind ts = get_field "ts" ts in
+        let%bind module_ = get_field "logger" module_ in
+        let%bind level = get_field "level" level in
+        let%map msg = get_field "msg" msg in
+        {ts; module_; level; msg; metadata}
+    | _ ->
+        Error (prefix ^ "Expected a JSON object")
 
   let record_to_message r =
     Logger.Message.
@@ -97,10 +165,7 @@ module Go_log = struct
                ~module_:(sprintf "Libp2p_helper.Go.%s" r.module_)
                ~location:"(not tracked)")
       ; message= r.msg
-      ; metadata=
-          ( if r.error <> "" then
-            String.Map.singleton "go_error" (`String r.error)
-          else String.Map.empty )
+      ; metadata= r.metadata
       ; event_id= None }
 end
 
@@ -291,6 +356,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; metrics_port: string
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
@@ -595,8 +661,7 @@ module Helper = struct
                 [%log' error net.logger]
                   "error sending message on stream $idx: $error"
                   ~metadata:
-                    [ ("idx", `Int idx)
-                    ; ("error", `String (Error.to_string_hum e)) ] ;
+                    [("idx", `Int idx); ("error", Error_json.error_to_yojson e)] ;
                 Pipe.close outgoing_w )
       in
       advance_stream_state net stream `Us
@@ -624,6 +689,7 @@ module Helper = struct
       in
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
+          (* This fill should be okay because we "found and removed" the request *)
           Ivar.fill ivar fill_result ; Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
@@ -769,7 +835,7 @@ module Helper = struct
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                      ; ("error", Error_json.error_to_yojson e) ] ;
                   ()
               (* TODO: add sender to Publish.t and include it here. *)
               (* TODO: think about exposing the PeerID of the originator as well? *) )
@@ -808,7 +874,7 @@ module Helper = struct
                     ~metadata:
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                      ; ("error", Error_json.error_to_yojson e) ] ;
                   return `Reject
             in
             match%map
@@ -833,7 +899,7 @@ module Helper = struct
                 [%log' error t.logger]
                   "error during validationComplete, ignoring and continuing: \
                    $error"
-                  ~metadata:[("error", `String (Error.to_string_hum e))])
+                  ~metadata:[("error", Error_json.error_to_yojson e)])
             |> don't_wait_for ;
             Ok ()
         | None ->
@@ -944,8 +1010,7 @@ module Keypair = struct
         ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
-        failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
-          ()
+        Error.tag e ~tag:"Other RPC error generateKeypair" |> Error.raise
 
   let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
@@ -972,7 +1037,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string
+  type t = string [@@deriving compare]
 
   let to_string t = t
 
@@ -1007,7 +1072,7 @@ module Pubsub = struct
         [%log' error net.logger]
           "error while publishing message on $topic: $err"
           ~metadata:
-            [("topic", `String topic); ("err", `String (Error.to_string_hum e))]
+            [("topic", `String topic); ("err", Error_json.error_to_yojson e)]
 
   module Subscription = struct
     type 'a t = 'a Helper.subscription =
@@ -1142,9 +1207,10 @@ let list_peers net =
   | Error _ ->
       []
 
+(* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~seed_peers ~initial_gating_config =
+    ~metrics_port ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers
+    ~peer_exchange ~seed_peers ~initial_gating_config =
   net.Helper.new_peer_callback
   <- Some
        (fun peer_id peer_addrs ->
@@ -1157,6 +1223,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; metrics_port= Option.value metrics_port ~default:""
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
@@ -1168,7 +1235,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
           Helper.gating_config_to_helper_format initial_gating_config }
   with
   | Ok "configure success" ->
-      Ivar.fill net.me_keypair me ;
+      Ivar.fill_if_empty net.me_keypair me ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1256,7 +1323,7 @@ module Protocol_handler = struct
            anyway: $err"
           ~metadata:
             [ ("protocol", `String protocol_name)
-            ; ("err", `String (Error.to_string_hum e)) ] ;
+            ; ("err", Error_json.error_to_yojson e) ] ;
         close_connections net protocol_name
 end
 
@@ -1330,8 +1397,7 @@ let set_connection_gating_config net (config : connection_gating) =
   | Ok v ->
       failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      failwithf "unexpected error doing setGatingConfig: %s"
-        (Error.to_string_hum e) ()
+      Error.tag e ~tag:"Unexpected error doing setGatingConfig" |> Error.raise
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1348,7 +1414,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         (`Handler
           (fun ~killed e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
+                Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
             if
@@ -1378,11 +1444,12 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               Deferred.unit ) ))
   with
   | Error e ->
-      Deferred.Or_error.error_string
-        ( "Could not start libp2p_helper. If you are a dev, did you forget to \
-           `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-           CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-        ^ Error.to_string_hum e )
+      Deferred.Or_error.fail
+        (Error.tag e
+           ~tag:
+             "Could not start libp2p_helper. If you are a dev, did you forget \
+              to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
       let t : Helper.t =
         { subprocess
@@ -1409,12 +1476,6 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
             with
           | Ok (Ok record) -> (
               let r = Go_log.(record_to_message record) in
-              let r =
-                if
-                  String.( = ) r.message "failed when refreshing routing table"
-                then {r with level= Info}
-                else r
-              in
               try Logger.raw logger r
               with _exn ->
                 Logger.raw logger
@@ -1427,7 +1488,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               [%log error]
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error err) ->
               [%log debug]
@@ -1450,13 +1511,13 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               [%log error]
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("error", `String (Error.to_string_hum err)) ]
+                  ; ("error", Error_json.error_to_yojson err) ]
                 "failed to parse log line $line from helper stderr as json"
           | Ok (Error e) ->
               [%log error] "handling line from helper failed! $err"
                 ~metadata:
                   [ ("line", `String line)
-                  ; ("err", `String (Error.to_string_hum e)) ] ) ;
+                  ; ("err", Error_json.error_to_yojson e) ] ) ;
           Deferred.unit )
       |> don't_wait_for ;
       Deferred.Or_error.return t
@@ -1495,7 +1556,7 @@ let%test_module "coda network tests" =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
@@ -1503,7 +1564,7 @@ let%test_module "coda network tests" =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn

@@ -123,7 +123,7 @@ let pack_statement max_branching =
 
 let shifts ~log2_size =
   Common.tock_shifts ~log2_size
-  |> Snarky_bn382.Shifts.map ~f:Impl.Field.constant
+  |> Dlog_plonk_types.Shifts.map ~f:Impl.Field.constant
 
 let domain_generator ~log2_size =
   Backend.Tock.Field.domain_generator ~log2_size |> Impl.Field.constant
@@ -180,8 +180,7 @@ let wrap_main
                ; combined_inner_product
                ; b
                ; which_branch
-               ; bulletproof_challenges
-                   (* TODO: MUST ASSERT EQUALITY WITH ACTUAL *) }
+               ; bulletproof_challenges }
            ; sponge_digest_before_evaluations
            ; me_only= me_only_digest
            ; was_base_case }
@@ -299,7 +298,7 @@ let wrap_main
                     h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
-                          (5 * (Domain.size d.h + 2)) - 5 ) ) ) )
+                          Common.max_quot_size_int (Domain.size d.h) ) ) ) )
               |> Vector.unzip
             in
             let actual_branchings =
@@ -422,10 +421,7 @@ let wrap_main
             (module Max_branching)
             ~step_widths ~step_domains ~verification_key:pairing_plonk_index
             ~xi ~sponge
-            ~public_input:
-              (Array.append [||]
-                 (* [|[Boolean.true_]|]*)
-                 (pack_statement Max_branching.n prev_statement))
+            ~public_input:(pack_statement Max_branching.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
             ~messages ~which_branch ~openings_proof
             ~plonk:

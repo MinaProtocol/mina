@@ -127,6 +127,12 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
+  and libp2p_metrics_port =
+    flag "libp2p-metrics-port"
+      ~doc:
+        "PORT libp2p metrics server for scraping via Prometheus (default no \
+         libp2p-metrics-server)"
+      (optional int16)
   and external_ip_opt =
     flag "external-ip"
       ~doc:
@@ -149,6 +155,7 @@ let setup_daemon logger =
     flag "archive-rocksdb" no_arg ~doc:"Stores all the blocks heard in RocksDB"
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
+  and file_log_level = Flag.Log.file_log_level
   and snark_work_fee =
     flag "snark-worker-fee"
       ~doc:
@@ -238,6 +245,12 @@ let setup_daemon logger =
         "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
          discovery"
       (listed string)
+  and libp2p_peer_list_file =
+    flag "peer-list-file"
+      ~doc:
+        "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
+         discovery inside a file delimited by new-lines (\\n)"
+      (optional string)
   and curr_protocol_version =
     flag "current-protocol-version" (optional string)
       ~doc:
@@ -246,12 +259,13 @@ let setup_daemon logger =
   and proposed_protocol_version =
     flag "proposed-protocol-version" (optional string)
       ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
-  and config_file =
+  and config_files =
     flag "config-file"
       ~doc:
-        "PATH path to the configuration file (overrides CODA_CONFIG_FILE, \
-         default: <config_dir>/daemon.json)"
-      (optional string)
+        "PATH path to a configuration file (overrides CODA_CONFIG_FILE, \
+         default: <config_dir>/daemon.json). Pass multiple times to override \
+         fields from earlier config files"
+      (listed string)
   and may_generate =
     flag "generate-genesis-proof"
       ~doc:
@@ -268,16 +282,7 @@ let setup_daemon logger =
   and plugins = plugin_flag in
   fun () ->
     let open Deferred.Let_syntax in
-    let compute_conf_dir home =
-      Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-    in
-    let%bind conf_dir =
-      if is_background then
-        let home = Core.Sys.home_directory () in
-        let conf_dir = compute_conf_dir home in
-        Deferred.return conf_dir
-      else Sys.home_directory () >>| compute_conf_dir
-    in
+    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
@@ -289,23 +294,32 @@ let setup_daemon logger =
     in
     Stdout_log.setup log_json log_level ;
     (* 512MB logrotate max size = 1GB max filesystem usage *)
-    let logrotate_max_size = 1024 * 1024 * 512 in
+    let logrotate_max_size = 1024 * 1024 * 10 in
+    let logrotate_num_rotate = 50 in
     Logger.Consumer_registry.register ~id:"default"
-      ~processor:(Logger.Processor.raw ())
+      ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"coda.log" ~max_size:logrotate_max_size) ;
+           ~log_filename:"coda.log" ~max_size:logrotate_max_size
+           ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:"best_tip_diff"
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size) ;
+           ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
+           ~num_rotate:1) ;
+    let version_metadata =
+      [ ("commit", `String Coda_version.commit_id)
+      ; ("branch", `String Coda_version.branch)
+      ; ("commit_date", `String Coda_version.commit_date)
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+    in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
-      ~metadata:
-        [ ("commit", `String Coda_version.commit_id)
-        ; ("branch", `String Coda_version.branch) ] ;
+      ~metadata:version_metadata ;
+    let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
@@ -321,6 +335,13 @@ let setup_daemon logger =
           Core.exit 0 )
         () ) ;
     [%log info] "Booting may take several seconds, please wait" ;
+    let wallets_disk_location = conf_dir ^/ "wallets" in
+    let%bind wallets =
+      (* Load wallets early, to give user errors before expensive
+         initialization starts.
+      *)
+      Secrets.Wallets.load ~logger ~disk_location:wallets_disk_location
+    in
     let%bind libp2p_keypair =
       let libp2p_keypair_old_format =
         Option.bind libp2p_keypair ~f:(fun s ->
@@ -342,44 +363,48 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+              ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
+      let version_filename = conf_dir ^/ "coda.version" in
       let make_version () =
-        let%bind () =
+        let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
           File_system.remove_dir (conf_dir ^/ "trace")
         in
-        let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
-        Writer.write_line wr Coda_version.commit_id ;
-        Writer.close wr
+        Yojson.Safe.to_file version_filename (`Assoc version_metadata)
       in
-      match%bind
-        Monitor.try_with_or_error (fun () ->
-            let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
-            match%map Pipe.to_list (Reader.lines r) with
-            | [] ->
-                ""
-            | s ->
-                List.hd_exn s )
+      match
+        Or_error.try_with_join (fun () ->
+            match Yojson.Safe.from_file version_filename with
+            | `Assoc list -> (
+              match String.Map.(find (of_alist_exn list) "commit") with
+              | Some (`String commit) ->
+                  Ok commit
+              | _ ->
+                  Or_error.errorf "commit not found in version file %s"
+                    version_filename )
+            | _ ->
+                Or_error.errorf "Unexpected value in %s" version_filename )
       with
       | Ok c ->
           if String.equal c Coda_version.commit_id then return ()
           else (
             [%log warn]
-              "Different version of Coda detected in config directory \
+              "Different version of Mina detected in config directory \
                $config_directory, removing existing configuration"
               ~metadata:[("config_directory", `String conf_dir)] ;
             make_version () )
       | Error e ->
-          [%log trace]
-            ~metadata:[("error", `String (Error.to_string_mach e))]
-            "Error reading coda.version: $error" ;
           [%log debug]
-            "Failed to read coda.version, cleaning up the config directory \
+            "Error reading $file: $error. Cleaning up the config directory \
              $config_directory"
-            ~metadata:[("config_directory", `String conf_dir)] ;
+            ~metadata:
+              [ ("error", `String (Error.to_string_mach e))
+              ; ("config_directory", `String conf_dir)
+              ; ("file", `String version_filename) ] ;
           make_version ()
     in
     Memory_stats.log_memory_stats logger ~process:"daemon" ;
@@ -393,85 +418,135 @@ let setup_daemon logger =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
     let may_generate = Option.value ~default:false may_generate in
+    (* FIXME adapt to new system, move into child_processes lib *)
+    let pids = Child_processes.Termination.create_pid_table () in
+    let rec terminated_child_loop () =
+      match
+        try Unix.wait_nohang `Any
+        with
+        | Unix.Unix_error (errno, _, _)
+        when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+             (* no child processes exist *)
+        ->
+          None
+      with
+      | None ->
+          (* no children have terminated, wait to check again *)
+          let%bind () = Async.after (Time.Span.of_min 1.) in
+          terminated_child_loop ()
+      | Some (child_pid, exit_or_signal) ->
+          let child_pid_metadata =
+            [("child_pid", `Int (Pid.to_int child_pid))]
+          in
+          ( match exit_or_signal with
+          | Ok () ->
+              [%log info]
+                "Daemon child process $child_pid terminated with exit code 0"
+                ~metadata:child_pid_metadata
+          | Error err -> (
+            match err with
+            | `Signal signal ->
+                [%log info]
+                  "Daemon child process $child_pid terminated after receiving \
+                   signal $signal"
+                  ~metadata:
+                    ( ("signal", `String (Signal.to_string signal))
+                    :: child_pid_metadata )
+            | `Exit_non_zero exit_code ->
+                [%log info]
+                  "Daemon child process $child_pid terminated with nonzero \
+                   exit code $exit_code"
+                  ~metadata:
+                    (("exit_code", `Int exit_code) :: child_pid_metadata) ) ) ;
+          (* terminate daemon if children registered *)
+          Child_processes.Termination.check_terminated_child pids child_pid
+            logger ;
+          (* check for other terminated children, without waiting *)
+          terminated_child_loop ()
+    in
     let coda_initialization_deferred () =
-      let config_file, must_find_config_file =
-        match config_file with
+      let config_file_installed =
+        (* Search for config files installed as part of a deb/brew package.
+           These files are commit-dependent, to ensure that we don't clobber
+           configuration for dev builds or use incompatible configs.
+        *)
+        let config_file_installed =
+          let json = "config_" ^ Coda_version.commit_id_short ^ ".json" in
+          List.fold_until ~init:None
+            (Cache_dir.possible_paths json)
+            ~f:(fun _acc f ->
+              match Core.Sys.file_exists f with
+              | `Yes ->
+                  Stop (Some f)
+              | _ ->
+                  Continue None )
+            ~finish:Fn.id
+        in
+        match config_file_installed with
         | Some config_file ->
-            (config_file, true)
-        | None -> (
-          match Sys.getenv "CODA_CONFIG_FILE" with
-          | Some config_file ->
-              (config_file, false)
-          | None -> (
-              (*Check if the config file is installed as part of the deb before resorting to the default*)
-              let config_file_installed =
-                let json =
-                  "config_" ^ Coda_version.commit_id_short ^ ".json"
-                in
-                List.fold_until ~init:None
-                  (Cache_dir.possible_paths json)
-                  ~f:(fun _acc f ->
-                    match Core.Sys.file_exists f with
-                    | `Yes ->
-                        Stop (Some f)
-                    | _ ->
-                        Continue None )
-                  ~finish:Fn.id
-              in
-              match config_file_installed with
-              | Some config_file ->
-                  (config_file, false)
-              | None ->
-                  (conf_dir ^/ "daemon.json", false) ) )
-      in
-      let%bind config_json =
-        [%log info] "Trying to read runtime config from $config_file"
-          ~metadata:[("config_file", `String config_file)] ;
-        match%map Genesis_ledger_helper.load_config_json config_file with
-        | Ok config ->
-            Some config
-        | Error err when must_find_config_file ->
-            [%log fatal]
-              "Failed reading configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
-            Error.raise err
-        | Error err ->
-            [%log warn]
-              "Failed reading configuration from $config_file: $error"
-              ~metadata:
-                [ ("config_file", `String config_file)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+            Some (config_file, `Must_exist)
+        | None ->
             None
       in
-      let%bind config_json =
-        match config_json with
-        | Some config_json ->
-            let%map config_json =
-              Genesis_ledger_helper.upgrade_old_config ~logger config_file
-                config_json
-            in
-            Some config_json
+      let config_file_configdir =
+        (conf_dir ^/ "daemon.json", `May_be_missing)
+      in
+      let config_file_envvar =
+        match Sys.getenv "CODA_CONFIG_FILE" with
+        | Some config_file ->
+            Some (config_file, `Must_exist)
         | None ->
-            return None
+            None
+      in
+      let config_files =
+        Option.to_list config_file_installed
+        @ (config_file_configdir :: Option.to_list config_file_envvar)
+        @ List.map config_files ~f:(fun config_file ->
+              (config_file, `Must_exist) )
+      in
+      let%bind config_jsons =
+        let config_files_paths =
+          List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+        in
+        [%log info] "Reading configuration files $config_files"
+          ~metadata:[("config_files", `List config_files_paths)] ;
+        Deferred.List.filter_map config_files
+          ~f:(fun (config_file, handle_missing) ->
+            match%bind Genesis_ledger_helper.load_config_json config_file with
+            | Ok config_json ->
+                let%map config_json =
+                  Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                    config_json
+                in
+                Some (config_file, config_json)
+            | Error err -> (
+              match handle_missing with
+              | `Must_exist ->
+                  Mina_user_error.raisef ~where:"reading configuration file"
+                    "The configuration file %s could not be read:\n%s"
+                    config_file (Error.to_string_hum err)
+              | `May_be_missing ->
+                  [%log warn]
+                    "Could not read configuration from $config_file: $error"
+                    ~metadata:
+                      [ ("config_file", `String config_file)
+                      ; ("error", Error_json.error_to_yojson err) ] ;
+                  return None ) )
       in
       let config =
-        match config_json with
-        | Some config_json -> (
-          match Runtime_config.of_yojson config_json with
-          | Ok config ->
-              config
-          | Error err ->
-              [%log fatal]
-                "Could not parse configuration from $config_file: $error"
-                ~metadata:
-                  [ ("config_file", `String config_file)
-                  ; ("config_json", config_json)
-                  ; ("error", `String err) ] ;
-              failwithf "Could not parse configuration: %s" err () )
-        | _ ->
-            Runtime_config.default
+        List.fold ~init:Runtime_config.default config_jsons
+          ~f:(fun config (config_file, config_json) ->
+            match Runtime_config.of_yojson config_json with
+            | Ok loaded_config ->
+                Runtime_config.combine config loaded_config
+            | Error err ->
+                [%log fatal]
+                  "Could not parse configuration from $config_file: $error"
+                  ~metadata:
+                    [ ("config_file", `String config_file)
+                    ; ("config_json", config_json)
+                    ; ("error", `String err) ] ;
+                failwithf "Could not parse configuration file: %s" err () )
       in
       let genesis_dir =
         Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
@@ -488,12 +563,14 @@ let setup_daemon logger =
               "Failed initializing with configuration $config: $error"
               ~metadata:
                 [ ("config", Runtime_config.to_yojson config)
-                ; ("error", `String (Error.to_string_hum err)) ] ;
+                ; ("error", Error_json.error_to_yojson err) ] ;
             Error.raise err
       in
-      let daemon_config =
-        Option.bind config_json ~f:(fun config_json ->
-            YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json)) )
+      let rev_daemon_configs =
+        List.rev_filter_map config_jsons ~f:(fun (config_file, config_json) ->
+            Option.map
+              YJ.Util.(to_option Fn.id (YJ.Util.member "daemon" config_json))
+              ~f:(fun daemon_config -> (config_file, daemon_config)) )
       in
       let maybe_from_config (type a) (f : YJ.t -> a option) (keyname : string)
           (actual_value : a option) : a option =
@@ -503,13 +580,23 @@ let setup_daemon logger =
         | Some v ->
             Some v
         | None ->
-            let%bind daemon_config = daemon_config in
-            let%bind json_val =
-              to_option Fn.id (member keyname daemon_config)
+            (* Load value from the latest config file that both
+               * has the key we are looking for, and
+               * has the key in a format that [f] can parse.
+            *)
+            let%map config_file, data =
+              List.find_map rev_daemon_configs
+                ~f:(fun (config_file, daemon_config) ->
+                  let%bind json_val =
+                    to_option Fn.id (member keyname daemon_config)
+                  in
+                  let%map data = f json_val in
+                  (config_file, data) )
             in
-            [%log debug] "Key $key being used from config file"
-              ~metadata:[("key", `String keyname)] ;
-            f json_val
+            [%log debug] "Key $key being used from config file $config_file"
+              ~metadata:
+                [("key", `String keyname); ("config_file", `String config_file)] ;
+            data
       in
       let or_from_config map keyname actual_value ~default =
         match maybe_from_config map keyname actual_value with
@@ -577,25 +664,25 @@ let setup_daemon logger =
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= log_received_blocks }
       in
-      let json_to_publickey_compressed_option json =
+      let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
                | Ok key ->
                    Some key
-               | Error e ->
-                   [%log error] "Error decoding public key ($key): $error"
-                     ~metadata:
-                       [ ("key", `String pk_str)
-                       ; ("error", `String (Error.to_string_hum e)) ] ;
-                   None )
+               | Error _e ->
+                   Mina_user_error.raisef ~where:"decoding a public key"
+                     "The %s public key %s could not be decoded." which pk_str
+           )
       in
       let run_snark_worker_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark worker")
           "run-snark-worker" run_snark_worker_flag
       in
       let run_snark_coordinator_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark coordinator")
           "run-snark-coordinator" run_snark_coordinator_flag
       in
       let snark_worker_parallelism_flag =
@@ -603,7 +690,8 @@ let setup_daemon logger =
           snark_worker_parallelism_flag
       in
       let coinbase_receiver_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "coinbase receiver")
           "coinbase-receiver" coinbase_receiver_flag
       in
       let%bind external_ip =
@@ -624,7 +712,8 @@ let setup_daemon logger =
           block_production_key
       in
       let block_production_pubkey =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "block producer")
           "block-producer-pubkey" block_production_pubkey
       in
       let block_production_password =
@@ -645,14 +734,16 @@ let setup_daemon logger =
       let%bind block_production_keypair =
         match (block_production_key, block_production_pubkey) with
         | Some _, Some _ ->
-            eprintf
-              "Error: You cannot provide both `block-producer-key` and \
-               `block_production_pubkey`\n" ;
-            exit 11
+            Mina_user_error.raise
+              "You cannot provide both `block-producer-key` and \
+               `block_production_pubkey`"
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
-            let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+            let%map kp =
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
+            in
             Some kp
         | _, Some tracked_pubkey ->
             let%bind wallets =
@@ -660,7 +751,10 @@ let setup_daemon logger =
                 ~disk_location:(conf_dir ^/ "wallets")
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
-            let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+            let%map kp =
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
+            in
             Some kp
       in
       let%bind client_trustlist =
@@ -673,7 +767,15 @@ let setup_daemon logger =
         match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
-              String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+              String.split ~on:',' envstr
+              |> List.filter_map ~f:(fun str ->
+                     try Some (Unix.Cidr.of_string str)
+                     with _ ->
+                       [%log warn]
+                         "Could not parse address $address in \
+                          CODA_CLIENT_TRUSTLIST"
+                         ~metadata:[("address", `String str)] ;
+                       None )
             in
             Some
               (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -732,17 +834,42 @@ let setup_daemon logger =
         Consensus.Data.Local_state.create
           ~genesis_ledger:
             (Precomputed_values.genesis_ledger precomputed_values)
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
           ~epoch_ledger_location
           ( Option.map block_production_keypair ~f:(fun keypair ->
                 let open Keypair in
                 Public_key.compress keypair.public_key )
           |> Option.to_list |> Public_key.Compressed.Set.of_list )
           ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      let%bind peer_list_file_contents_or_empty =
+        match libp2p_peer_list_file with
+        | None ->
+            return []
+        | Some file -> (
+            match%bind
+              Monitor.try_with_or_error (fun () -> Reader.file_contents file)
+            with
+            | Ok contents ->
+                String.split ~on:'\n' contents
+                |> List.filter ~f:(fun s -> not (String.is_empty s))
+                |> List.map ~f:Coda_net2.Multiaddr.of_string
+                |> return
+            | Error _ ->
+                Mina_user_error.raisef
+                  ~where:"reading libp2p peer address file"
+                  "The file %s could not be read.\n\n\
+                   It must be a newline-separated list of libp2p multiaddrs \
+                   (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                  file )
+      in
       let initial_peers =
         List.concat
           [ List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+          ; peer_list_file_contents_or_empty
           ; List.map ~f:Coda_net2.Multiaddr.of_string
             @@ or_from_config
                  (Fn.compose Option.some
@@ -755,7 +882,10 @@ let setup_daemon logger =
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
-        failwith "no seed or initial peer flags passed" ;
+        Mina_user_error.raise
+          {|No peers were given.
+
+Pass one of -peer, -peer-list-file, -seed.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants
@@ -769,6 +899,7 @@ let setup_daemon logger =
           ; unsafe_no_trust_ip= false
           ; initial_peers
           ; addrs_and_ports
+          ; metrics_port= Option.map libp2p_metrics_port ~f:Int.to_string
           ; trust_system
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
@@ -792,11 +923,6 @@ let setup_daemon logger =
       in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let receipt_chain_database =
-        Receipt_chain_database.create receipt_chain_dir_name
-      in
-      trace_database_initialization "receipt_chain_database" __LOC__
-        receipt_chain_dir_name ;
       let transaction_database_dir = conf_dir ^/ "transaction" in
       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
       let transaction_database =
@@ -816,53 +942,6 @@ let setup_daemon logger =
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;
       (* log terminated child processes *)
-      (* FIXME adapt to new system, move into child_processes lib *)
-      let pids = Child_processes.Termination.create_pid_table () in
-      let rec terminated_child_loop () =
-        match
-          try Unix.wait_nohang `Any
-          with
-          | Unix.Unix_error (errno, _, _)
-          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-               (* no child processes exist *)
-          ->
-            None
-        with
-        | None ->
-            (* no children have terminated, wait to check again *)
-            let%bind () = Async.after (Time.Span.of_min 1.) in
-            terminated_child_loop ()
-        | Some (child_pid, exit_or_signal) ->
-            let child_pid_metadata =
-              [("child_pid", `Int (Pid.to_int child_pid))]
-            in
-            ( match exit_or_signal with
-            | Ok () ->
-                [%log info]
-                  "Daemon child process $child_pid terminated with exit code 0"
-                  ~metadata:child_pid_metadata
-            | Error err -> (
-              match err with
-              | `Signal signal ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated after \
-                     receiving signal $signal"
-                    ~metadata:
-                      ( ("signal", `String (Signal.to_string signal))
-                      :: child_pid_metadata )
-              | `Exit_non_zero exit_code ->
-                  [%log info]
-                    "Daemon child process $child_pid terminated with nonzero \
-                     exit code $exit_code"
-                    ~metadata:
-                      (("exit_code", `Int exit_code) :: child_pid_metadata) )
-            ) ;
-            (* terminate daemon if children registered *)
-            Child_processes.Termination.check_terminated_child pids child_pid
-              logger ;
-            (* check for other terminated children, without waiting *)
-            terminated_child_loop ()
-      in
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver =
         Option.value_map coinbase_receiver_flag ~default:`Producer
@@ -878,7 +957,7 @@ let setup_daemon logger =
           proposed_protocol_version
       in
       let%map coda =
-        Coda_lib.create
+        Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
              ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
              ~net_config ~gossip_net_params
@@ -898,19 +977,18 @@ let setup_daemon logger =
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-             ~receipt_chain_database ~time_controller
-             ~initial_block_production_keypairs ~monitor ~consensus_local_state
-             ~transaction_database ~external_transition_database
-             ~is_archive_rocksdb ~work_reassignment_wait
-             ~archive_process_location ~log_block_creation ~precomputed_values
-             ())
+             ~time_controller ~initial_block_production_keypairs ~monitor
+             ~consensus_local_state ~transaction_database
+             ~external_transition_database ~is_archive_rocksdb
+             ~work_reassignment_wait ~archive_process_location
+             ~log_block_creation ~precomputed_values ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Coda_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
-      ~top_logger:logger coda_ref ;
+      ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
     let%bind {Coda_initialization.coda; client_trustlist; rest_server_port} =
@@ -954,11 +1032,17 @@ let replay_blocks logger =
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
          let blocks =
-           In_channel.with_file blocks_filename ~f:(fun blocks_file ->
-               In_channel.input_lines blocks_file
-               |> List.map ~f:(fun s ->
-                      Sexp.of_string_conv_exn s
-                        Block_producer.Precomputed_block.t_of_sexp ) )
+           Sequence.unfold ~init:(In_channel.create blocks_filename)
+             ~f:(fun blocks_file ->
+               match In_channel.input_line blocks_file with
+               | Some line ->
+                   Some
+                     ( Sexp.of_string_conv_exn line
+                         Block_producer.Precomputed_block.t_of_sexp
+                     , blocks_file )
+               | None ->
+                   In_channel.close blocks_file ;
+                   None )
          in
          let%bind coda = setup_daemon () in
          let%bind () = Coda_lib.start_with_precomputed_blocks coda blocks in
@@ -988,7 +1072,7 @@ let rec ensure_testnet_id_still_good logger =
         "Exception while trying to fetch testnet_id: $error. Trying again in \
          $retry_minutes minutes"
         ~metadata:
-          [ ("error", `String (Error.to_string_hum e))
+          [ ("error", Error_json.error_to_yojson e)
           ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
@@ -1078,6 +1162,117 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" )) )
+  ; ( "run-verifier"
+    , Command.async
+        ~summary:"Run verifier on a proof provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open mode =
+          flag "-mode" (required string)
+            ~doc:"transaction/blockchain the snark to verify. Defaults to json"
+        and format =
+          flag "-format" (optional string)
+            ~doc:"sexp/json the format to parse input in"
+        in
+        fun () ->
+          let open Async in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          let%bind conf_dir = Unix.mkdtemp "/tmp/coda-verifier" in
+          let mode =
+            match mode with
+            | "transaction" ->
+                `Transaction
+            | "blockchain" ->
+                `Blockchain
+            | mode ->
+                failwithf
+                  "Expected mode flag to be one of transaction, blockchain, \
+                   got '%s'"
+                  mode ()
+          in
+          let format =
+            match format with
+            | Some "sexp" ->
+                `Sexp
+            | Some "json" | None ->
+                `Json
+            | Some format ->
+                failwithf
+                  "Expected format flag to be one of sexp, json, got '%s'"
+                  format ()
+          in
+          let%bind input =
+            match format with
+            | `Sexp -> (
+                let%map input_sexp =
+                  match%map Reader.read_sexp (Lazy.force Reader.stdin) with
+                  | `Ok input_sexp ->
+                      input_sexp
+                  | `Eof ->
+                      failwith "early EOF while reading sexp"
+                in
+                match mode with
+                | `Transaction ->
+                    `Transaction
+                      (List.t_of_sexp
+                         (Tuple2.t_of_sexp Ledger_proof.t_of_sexp
+                            Sok_message.t_of_sexp)
+                         input_sexp)
+                | `Blockchain ->
+                    `Blockchain
+                      (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
+                         input_sexp) )
+            | `Json -> (
+                let%map input_line =
+                  match%map Reader.read_line (Lazy.force Reader.stdin) with
+                  | `Ok input_line ->
+                      input_line
+                  | `Eof ->
+                      failwith "early EOF while reading json"
+                in
+                match mode with
+                | `Transaction -> (
+                  match
+                    [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Transaction input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () )
+                | `Blockchain -> (
+                  match
+                    [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
+                      (Yojson.Safe.from_string input_line)
+                  with
+                  | Ok input ->
+                      `Blockchain input
+                  | Error err ->
+                      failwithf "Could not parse JSON: %s" err () ) )
+          in
+          let%bind verifier =
+            Verifier.create ~logger
+              ~proof_level:Genesis_constants.Proof_level.compiled
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+          in
+          let%bind result =
+            match input with
+            | `Transaction input ->
+                Verifier.verify_transaction_snarks verifier input
+            | `Blockchain input ->
+                Verifier.verify_blockchain_snarks verifier input
+          in
+          match result with
+          | Ok true ->
+              printf "Proofs verified successfully" ;
+              exit 0
+          | Ok false ->
+              printf "Proofs failed to verify" ;
+              exit 1
+          | Error err ->
+              printf "Failed while verifying proofs:\n%s"
+                (Error.to_string_hum err) ;
+              exit 2) )
   ; ( "dump-structured-events"
     , Command.async ~summary:"Dump the registered structured events"
         (let open Command.Let_syntax in
@@ -1145,7 +1340,6 @@ let coda_commands logger =
         ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
-        ; (module Coda_receipt_chain_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
@@ -1179,8 +1373,7 @@ let print_version_help coda_exe version =
   List.iter lines ~f:(Core.printf "%s\n%!")
 
 let print_version_info () =
-  Core.printf "Commit %s on branch %s\n"
-    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+  Core.printf "Commit %s on branch %s\n" Coda_version.commit_id
     Coda_version.branch
 
 let () =

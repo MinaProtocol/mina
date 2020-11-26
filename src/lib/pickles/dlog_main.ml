@@ -58,6 +58,9 @@ struct
 
       let to_bits_unsafe =
         Wrap_main_inputs.Unsafe.unpack_unboolean ~length:Field.size_in_bits
+
+      let absorb_shifted sponge (x : t Shifted_value.t) =
+        match x with Shifted_value x -> Sponge.absorb sponge x
     end
 
     module Unpacked = struct
@@ -114,9 +117,10 @@ struct
       as_prover
         As_prover.(
           fun () ->
-            Core.printf "in-snark %s: %s\n%!" lab
-              (Field.Constant.to_string
-                 (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
+            Core.printf "in-snark %s:%!" lab ;
+            Field.Constant.print
+              (Field.Constant.project (List.map ~f:(read Boolean.typ) x)) ;
+            Core.printf "\n%!")
 
   let print_bool lab x =
     if debug then
@@ -335,12 +339,12 @@ struct
                   ~else_:acc.point)
             in
             let non_zero =
-              Boolean.((keep && Point.finite p) || acc.non_zero)
+              Boolean.(keep &&& Point.finite p ||| acc.non_zero)
             in
             {Curve_opt.non_zero; point} )
           ~xi
           ~init:(fun (keep, p) ->
-            { non_zero= Boolean.(keep && Point.finite p)
+            { non_zero= Boolean.(keep &&& Point.finite p)
             ; point= Point.underlying p } )
           without_bound with_bound
       in
@@ -351,7 +355,8 @@ struct
   let scale_fast p (Shifted_value.Shifted_value bits) =
     Ops.scale_fast p (`Plus_two_to_len (Array.of_list bits))
 
-  let check_bulletproof ~pcs_batch ~sponge ~xi ~combined_inner_product
+  let check_bulletproof ~pcs_batch ~sponge ~xi
+      ~(combined_inner_product : Other_field.Packed.t Shifted_value.t)
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
@@ -365,6 +370,7 @@ struct
       scale_fast p (Shifted_value.map ~f:Other_field.Packed.to_bits_unsafe s)
     in
     with_label __LOC__ (fun () ->
+        Other_field.Packed.absorb_shifted sponge combined_inner_product ;
         (* a_hat should be equal to
       sum_i < t, r^i pows(beta_i) >
       = sum_i r^i < t, pows(beta_i) > *)
@@ -599,13 +605,13 @@ struct
           in
           let poseidon =
             let ( * ) = Fn.flip Scalar_challenge.endo in
-            (* alpha^3 rcm_comm[0] + alpha^4 rcm_comm[1] + alpha^5 rcm_comm[2]
+            (* alpha^2 rcm_comm[0] + alpha^3 rcm_comm[1] + alpha^4 rcm_comm[2]
                 =
-                alpha^3 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
+                alpha^2 (rcm_comm[0] + alpha (rcm_comm[1] + alpha rcm_comm[2]))
             *)
             let a = alpha in
             m.rcm_comm_0 + (a * (m.rcm_comm_1 + (a * m.rcm_comm_2)))
-            |> ( * ) a |> ( * ) a |> ( * ) a
+            |> ( * ) a |> ( * ) a
           in
           let g =
             List.reduce_exn ~f:( + )

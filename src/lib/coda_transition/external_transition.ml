@@ -23,165 +23,173 @@ module Validate_content = struct
   let __versioned__ = ()
 end
 
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      { protocol_state: Protocol_state.Value.Stable.V1.t
-      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
-      ; delta_transition_chain_proof:
-          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-      ; current_protocol_version: Protocol_version.Stable.V1.t
-      ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
-      ; mutable validation_callback: Validate_content.t }
-    [@@deriving sexp, fields]
+(* do not expose refer to types in here directly; use allocation functor version instead *)
+module Raw_versioned__ = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { protocol_state: Protocol_state.Value.Stable.V1.t
+        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+        ; delta_transition_chain_proof:
+            State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
+        ; current_protocol_version: Protocol_version.Stable.V1.t
+        ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
+        ; mutable validation_callback: Validate_content.t }
+      [@@deriving sexp, fields]
 
-    let to_latest = Fn.id
+      let to_latest = Fn.id
 
-    let to_yojson
+      type 'a creator =
+           protocol_state:Protocol_state.Value.t
+        -> protocol_state_proof:Proof.t
+        -> staged_ledger_diff:Staged_ledger_diff.t
+        -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
+        -> validation_callback:Validate_content.t
+        -> ?proposed_protocol_version_opt:Protocol_version.t
+        -> unit
+        -> 'a
+
+      let map_creator c ~f ~protocol_state ~protocol_state_proof
+          ~staged_ledger_diff ~delta_transition_chain_proof
+          ~validation_callback ?proposed_protocol_version_opt () =
+        f
+          (c ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+             ~delta_transition_chain_proof ~validation_callback
+             ?proposed_protocol_version_opt ())
+
+      let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+          ~delta_transition_chain_proof ~validation_callback
+          ?proposed_protocol_version_opt () =
+        let current_protocol_version =
+          try Protocol_version.get_current ()
+          with _ ->
+            failwith
+              "Cannot create external transition before setting current \
+               protocol version"
+        in
         { protocol_state
-        ; protocol_state_proof= _
-        ; staged_ledger_diff= _
-        ; delta_transition_chain_proof= _
+        ; protocol_state_proof
+        ; staged_ledger_diff
+        ; delta_transition_chain_proof
         ; current_protocol_version
         ; proposed_protocol_version_opt
-        ; validation_callback= _ } =
-      `Assoc
-        [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
-        ; ("protocol_state_proof", `String "<opaque>")
-        ; ("staged_ledger_diff", `String "<opaque>")
-        ; ("delta_transition_chain_proof", `String "<opaque>")
-        ; ( "current_protocol_version"
-          , `String (Protocol_version.to_string current_protocol_version) )
-        ; ( "proposed_protocol_version"
-          , `String
-              (Option.value_map proposed_protocol_version_opt ~default:"<None>"
-                 ~f:Protocol_version.to_string) ) ]
+        ; validation_callback }
+    end
+  end]
+end
 
-    let delta_transition_chain_proof {delta_transition_chain_proof; _} =
-      delta_transition_chain_proof
+include Allocation_functor.Make.Versioned_v1.Sexp (struct
+  let id = "external_transition"
 
-    let current_protocol_version {current_protocol_version; _} =
-      current_protocol_version
-
-    let proposed_protocol_version_opt {proposed_protocol_version_opt; _} =
-      proposed_protocol_version_opt
-
-    let consensus_state {protocol_state; _} =
-      Protocol_state.consensus_state protocol_state
-
-    let blockchain_state {protocol_state; _} =
-      Protocol_state.blockchain_state protocol_state
-
-    let blockchain_length t =
-      consensus_state t |> Consensus.Data.Consensus_state.blockchain_length
-
-    let state_hash {protocol_state; _} = Protocol_state.hash protocol_state
-
-    let parent_hash {protocol_state; _} =
-      Protocol_state.previous_state_hash protocol_state
-
-    let consensus_time_produced_at t =
-      consensus_state t |> Consensus.Data.Consensus_state.consensus_time
-
-    let block_producer {staged_ledger_diff; _} =
-      Staged_ledger_diff.creator staged_ledger_diff
-
-    let transactions ~constraint_constants {staged_ledger_diff; _} =
-      let open Staged_ledger.Pre_diff_info in
-      match get_transactions ~constraint_constants staged_ledger_diff with
-      | Ok transactions ->
-          transactions
-      | Error e ->
-          Core.Error.raise (Error.to_error e)
-
-    let commands {staged_ledger_diff; _} =
-      Staged_ledger_diff.commands staged_ledger_diff
-
-    let payments external_transition =
-      List.filter_map (commands external_transition) ~f:(function
-        | { data= Signed_command ({payload= {body= Payment _; _}; _} as c)
-          ; status } ->
-            Some {With_status.data= c; status}
-        | _ ->
-            None )
-
-    let global_slot t =
-      consensus_state t |> Consensus.Data.Consensus_state.curr_global_slot
-
-    let equal =
-      Comparable.lift Consensus.Data.Consensus_state.Value.equal
-        ~f:consensus_state
-  end
-end]
-
-(* another name, so we can avoid cyclic type below *)
-type t_ = t
-
-type external_transition = t
-
-let broadcast {validation_callback; _} = validation_callback `Accept
-
-let don't_broadcast {validation_callback; _} = validation_callback `Reject
-
-let poke_validation_callback t cb = t.validation_callback <- cb
+  include Raw_versioned__
+end)
 
 [%%define_locally
-Stable.Latest.
+Raw_versioned__.
   ( protocol_state
   , protocol_state_proof
+  , staged_ledger_diff
   , delta_transition_chain_proof
   , current_protocol_version
   , proposed_protocol_version_opt
-  , blockchain_state
-  , blockchain_length
-  , staged_ledger_diff
-  , consensus_state
-  , state_hash
-  , parent_hash
-  , consensus_time_produced_at
-  , block_producer
-  , transactions
-  , commands
-  , payments
-  , global_slot
-  , to_yojson )]
+  , validation_callback
+  , set_validation_callback )]
 
-let equal = Stable.Latest.equal
+[%%define_locally
+Stable.V1.(create, sexp_of_t, t_of_sexp)]
 
-let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-    ~delta_transition_chain_proof ~validation_callback
-    ?proposed_protocol_version_opt () =
-  let current_protocol_version =
-    try Protocol_version.get_current ()
-    with _ ->
-      failwith
-        "Cannot create external transition before setting current protocol \
-         version"
-  in
-  { protocol_state
-  ; protocol_state_proof
-  ; staged_ledger_diff
-  ; delta_transition_chain_proof
-  ; current_protocol_version
-  ; proposed_protocol_version_opt
-  ; validation_callback }
+type external_transition = t
 
-let timestamp {protocol_state; _} =
-  Protocol_state.blockchain_state protocol_state |> Blockchain_state.timestamp
+(*
+type t_ = Raw_versioned__.t =
+  { protocol_state: Protocol_state.Value.t
+  ; protocol_state_proof: Proof.t sexp_opaque
+  ; staged_ledger_diff: Staged_ledger_diff.t
+  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
+  ; current_protocol_version: Protocol_version.t
+  ; proposed_protocol_version_opt: Protocol_version.t option
+  ; mutable validation_callback: Validate_content.t }
+*)
+
+let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
+
+let blockchain_state =
+  Fn.compose Protocol_state.blockchain_state protocol_state
+
+let state_hash = Fn.compose Protocol_state.hash protocol_state
+
+let parent_hash = Fn.compose Protocol_state.previous_state_hash protocol_state
+
+let blockchain_length =
+  Fn.compose Consensus.Data.Consensus_state.blockchain_length consensus_state
+
+let consensus_time_produced_at =
+  Fn.compose Consensus.Data.Consensus_state.consensus_time consensus_state
+
+let global_slot =
+  Fn.compose Consensus.Data.Consensus_state.curr_global_slot consensus_state
+
+let block_producer = Fn.compose Staged_ledger_diff.creator staged_ledger_diff
+
+let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
+
+let to_yojson t =
+  `Assoc
+    [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
+    ; ("protocol_state_proof", `String "<opaque>")
+    ; ("staged_ledger_diff", `String "<opaque>")
+    ; ("delta_transition_chain_proof", `String "<opaque>")
+    ; ( "current_protocol_version"
+      , `String (Protocol_version.to_string (current_protocol_version t)) )
+    ; ( "proposed_protocol_version"
+      , `String
+          (Option.value_map
+             (proposed_protocol_version_opt t)
+             ~default:"<None>" ~f:Protocol_version.to_string) ) ]
+
+let equal =
+  Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state
+
+let transactions ~constraint_constants t =
+  let open Staged_ledger.Pre_diff_info in
+  match get_transactions ~constraint_constants (staged_ledger_diff t) with
+  | Ok transactions ->
+      transactions
+  | Error e ->
+      Core.Error.raise (Error.to_error e)
+
+let payments t =
+  List.filter_map (commands t) ~f:(function
+    | {data= Signed_command ({payload= {body= Payment _; _}; _} as c); status}
+      ->
+        Some {With_status.data= c; status}
+    | _ ->
+        None )
+
+let broadcast t = (validation_callback t) `Accept
+
+let don't_broadcast t = (validation_callback t) `Reject
+
+let poke_validation_callback t cb = set_validation_callback t cb
+
+let timestamp =
+  Fn.compose Blockchain_state.timestamp
+    (Fn.compose Protocol_state.blockchain_state protocol_state)
 
 type protocol_version_status =
   {valid_current: bool; valid_next: bool; matches_daemon: bool}
 
-let protocol_version_status
-    {current_protocol_version; proposed_protocol_version_opt; _} =
-  let valid_current = Protocol_version.is_valid current_protocol_version in
+let protocol_version_status t =
+  let valid_current = Protocol_version.is_valid (current_protocol_version t) in
   let valid_next =
-    Option.for_all proposed_protocol_version_opt ~f:Protocol_version.is_valid
+    Option.for_all
+      (proposed_protocol_version_opt t)
+      ~f:Protocol_version.is_valid
   in
   let matches_daemon =
-    Protocol_version.compatible_with_daemon current_protocol_version
+    Protocol_version.compatible_with_daemon (current_protocol_version t)
   in
   {valid_current; valid_next; matches_daemon}
 
@@ -623,7 +631,7 @@ let skip_delta_transition_chain_validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
 
 let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
-  let {protocol_state= state; _} = With_hash.data t in
+  let state = protocol_state (With_hash.data t) in
   if
     State_hash.equal
       (Protocol_state.genesis_state_hash state)
@@ -632,15 +640,14 @@ let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   else Error `Invalid_genesis_protocol_state
 
 let validate_proofs tvs ~verifier =
-  let open Blockchain_snark.Blockchain in
   let open Deferred.Let_syntax in
   match%map
     Verifier.verify_blockchain_snarks verifier
       (List.map tvs ~f:(fun (t, _validation) ->
-           let {protocol_state= state; protocol_state_proof= proof; _} =
-             With_hash.data t
-           in
-           {state; proof} ))
+           let transition = With_hash.data t in
+           Blockchain_snark.Blockchain.create
+             ~state:(protocol_state transition)
+             ~proof:(protocol_state_proof transition) ))
   with
   | Ok verified ->
       if verified then
@@ -770,7 +777,7 @@ module Validated = struct
   module Stable = struct
     module V1 = struct
       type t =
-        (t_, State_hash.t) With_hash.t
+        (external_transition, State_hash.t) With_hash.t
         * ( [`Time_received] * (unit, Truth.True.t) Truth.t
           , [`Genesis_state] * (unit, Truth.True.t) Truth.t
           , [`Proof] * (unit, Truth.True.t) Truth.t
@@ -1014,7 +1021,8 @@ module Staged_ledger_validation = struct
     Fn.compose statement_target statement
 
   let validate_staged_ledger_diff :
-         ( 'time_received
+         ?skip_staged_ledger_verification:bool
+      -> ( 'time_received
          , 'genesis_state
          , 'proof
          , 'delta_transition_chain
@@ -1045,8 +1053,9 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~precomputed_values ~verifier
-       ~parent_staged_ledger ~parent_protocol_state ->
+   fun ?skip_staged_ledger_verification (t, validation) ~logger
+       ~precomputed_values ~verifier ~parent_staged_ledger
+       ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -1058,7 +1067,7 @@ module Staged_ledger_validation = struct
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_update _ ) =
-      Staged_ledger.apply
+      Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
         ~current_state_view:

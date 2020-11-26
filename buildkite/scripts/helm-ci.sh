@@ -8,7 +8,7 @@ diff=$(
 )
 echo "--- Generated change DIFF: ${diff}"
 
-# Identifying modifications to helm charts (based on existence of Chart.yaml at change root)
+# Identify modifications to helm charts (based on existence of Chart.yaml at change root)
 charts=$(
   for val in $diff; do
     find $(dirname ${val}) -name 'Chart.yaml' || true; # failures occur when value is undefined due to empty diff
@@ -36,7 +36,13 @@ if [ -n "$charts" ]; then
       helm lint $dir
 
       echo "--- Executing dry-run: ${dir}"
-      helm install test $dir --dry-run --namespace test
+      # Only attempt to execute DRY-RUNs against application charts
+      chartType=$(cat $dir/Chart.yaml | grep 'type:' | awk '{ print $2}')
+      if [[ "$chartType" =~ "application" ]]; then
+        helm install test $dir --dry-run --namespace test
+      else
+        echo "found library chart - skipping dry-run"
+      fi
     done
   fi
 

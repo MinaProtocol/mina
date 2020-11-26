@@ -19,15 +19,15 @@ let tick_shifts, tock_shifts =
     in
     fun ~log2_size -> f log2_size
   in
-  ( mk Backend.Tick.B.Field_verifier_index.shifts
-  , mk Backend.Tock.B.Field_verifier_index.shifts )
+  ( mk Backend.Tick.Verification_key.shifts
+  , mk Backend.Tock.Verification_key.shifts )
 
 let wrap_domains =
   { Domains.h= Pow_2_roots_of_unity 17
   ; x=
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ])) }
+         Int.ceil_log2 (Impls.Wrap.Data_spec.size [typ])) }
 
 let hash_pairing_me_only ~app_state
     (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
@@ -140,15 +140,12 @@ module Ipa = struct
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
     let compute_sg chals =
-      let open Snarky_bn382.Tweedle.Dee.Field_poly_comm in
       let comm =
-        Snarky_bn382.Tweedle.Dee.Field_urs.b_poly_commitment
+        Marlin_plonk_bindings_tweedle_fp_urs.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
-          (Backend.Tock.Field.Vector.of_array
-             (Pickles_types.Vector.to_array (compute_challenges chals)))
+          (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      Backend.Tock.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tock.Curve.Affine.of_backend |> Or_infinity.finite_exn
+      comm.unshifted.(0) |> Or_infinity.finite_exn
   end
 
   module Step = struct
@@ -162,33 +159,23 @@ module Ipa = struct
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
     let compute_sg chals =
-      let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
       let comm =
-        Snarky_bn382.Tweedle.Dum.Field_urs.b_poly_commitment
+        Marlin_plonk_bindings_tweedle_fq_urs.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
-          (Backend.Tick.Field.Vector.of_array
-             (Pickles_types.Vector.to_array (compute_challenges chals)))
+          (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      Backend.Tick.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tick.Curve.Affine.of_backend |> Or_infinity.finite_exn
+      comm.unshifted.(0) |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
       let chals =
-        let open Backend.Tick.Field.Vector in
-        let v = create () in
-        List.iter comm_chals ~f:(fun (_, chals) ->
-            Pickles_types.Vector.iter chals ~f:(emplace_back v) ) ;
-        v
+        Array.concat
+        @@ List.map comm_chals ~f:(fun (_, chals) -> Vector.to_array chals)
       in
       let comms =
-        let open Backend.Tick.Curve.Affine in
-        let open Backend.Vector in
-        let v = create () in
-        List.iter comm_chals ~f:(fun (comm, _) ->
-            emplace_back v (to_backend (Finite comm)) ) ;
-        v
+        Array.of_list_map comm_chals ~f:(fun (comm, _) ->
+            Or_infinity.Finite comm )
       in
-      Snarky_bn382.Tweedle.Dum.Plonk.Field_urs.batch_accumulator_check
+      Marlin_plonk_bindings.Tweedle_fq_urs.batch_accumulator_check
         (Backend.Tick.Keypair.load_urs ())
         comms chals
   end
@@ -226,3 +213,8 @@ let index_commitment_length k ~max_degree =
   1
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
+
+let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
+  of_int 5 * (domain_size - of_int 1)
+
+let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
