@@ -59,6 +59,10 @@ type app struct {
 	Bootstrapper    io.Closer
 	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
+
+	// development configuration options
+	NoMDNS bool
+	NoDHT  bool
 }
 
 var seqs = make(chan int)
@@ -388,7 +392,7 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	if err := topic.Publish(context.Background(), data); err != nil {
+	if err := topic.Publish(app.Ctx, data); err != nil {
 		return nil, badp2p(err)
 	}
 
@@ -854,7 +858,7 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		app.Bootstrapper.Close()
 	}
 
-	err = app.P2p.Host.Connect(context.Background(), *info)
+	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
 		return nil, badp2p(err)
 	}
@@ -873,62 +877,17 @@ func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
 	l.FoundPeer <- info
 }
 
-func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
+func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: make(chan peer.AddrInfo)}
+	l := &mdnsListener{FoundPeer: foundPeerCh}
 	mdns.RegisterNotifee(l)
-
-	routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
-
-	if routingDiscovery == nil {
-		return nil, errors.New("failed to create routing discovery")
-	}
-
-	app.P2p.Discovery = routingDiscovery
-
-	discovered := make(chan peer.AddrInfo)
-	app.P2p.DiscoveredPeers = discovered
 
 	validPeer := func(who peer.ID) bool {
 		return who.Validate() == nil && who != app.P2p.Me
-	}
-
-	foundPeer := func(who peer.ID) {
-		addrs := app.P2p.Host.Peerstore().Addrs(who)
-
-		if len(addrs) > 0 {
-			addrStrings := make([]string, len(addrs))
-			for i, a := range addrs {
-				addrStrings[i] = a.String()
-			}
-
-			app.writeMsg(discoveredPeerUpcall{
-				ID:     peer.Encode(who),
-				Addrs:  addrStrings,
-				Upcall: "discoveredPeer",
-			})
-		}
-	}
-
-	for _, info := range app.AddedPeers {
-		err = app.P2p.Host.Connect(context.Background(), info)
-		if err != nil {
-			// perhaps some logging
-			continue
-		}
-	}
-
-	err = app.P2p.Dht.Bootstrap(context.Background())
-	if err != nil {
-		return nil, badp2p(err)
 	}
 
 	// report local discovery peers
@@ -936,33 +895,92 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		for info := range l.FoundPeer {
 			if validPeer(info.ID) {
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				foundPeer(info.ID)
+				foundPeer(app, info.ID)
 			}
 		}
 	}()
 
-	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
+	return nil
+}
+
+func foundPeer(app *app, who peer.ID) {
+	addrs := app.P2p.Host.Peerstore().Addrs(who)
+
+	if len(addrs) > 0 {
+		addrStrings := make([]string, len(addrs))
+		for i, a := range addrs {
+			addrStrings[i] = a.String()
+		}
+
+		app.writeMsg(discoveredPeerUpcall{
+			ID:     peer.Encode(who),
+			Addrs:  addrStrings,
+			Upcall: "discoveredPeer",
+		})
+	}
+}
+
+func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	for _, info := range app.AddedPeers {
+		err := app.P2p.Host.Connect(app.Ctx, info)
+		if err != nil {
+			// perhaps some logging
+			continue
+		}
+	}
+
+	foundPeerCh := make(chan peer.AddrInfo)
+
+	if !app.NoMDNS {
+		err := beginMDNS(app, foundPeerCh)
+		if err != nil {
+			return nil, badp2p(err)
+		}
+	}
+
+	if !app.NoDHT {
+		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
+		if routingDiscovery == nil {
+			return nil, errors.New("failed to create routing discovery")
+		}
+
+		app.P2p.Discovery = routingDiscovery
+
+		err := app.P2p.Dht.Bootstrap(app.Ctx)
+		if err != nil {
+			return nil, badp2p(err)
+		}
+
+		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
+		if err != nil {
+			return nil, badp2p(err)
+		}
+
+		go func() {
+			peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
+			if err != nil {
+				app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
+			}
+
+			for peer := range peerCh {
+				foundPeerCh <- peer
+			}
+		}()
+	}
 
 	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
 		logger.Infof("new connection: %+v", c)
-		foundPeer(c.RemotePeer())
+		foundPeer(app, c.RemotePeer())
 	}
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
 		logger.Infof("dropped connection: %+v", c)
-		foundPeer(c.RemotePeer())
+		foundPeer(app, c.RemotePeer())
 	}
-
-	go func() {
-		peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
-		if err != nil {
-			app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
-		}
-
-		for peer := range peerCh {
-			l.FoundPeer <- peer
-		}
-	}()
 
 	return "beginAdvertising success", nil
 }
@@ -1075,7 +1093,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		trustedPeers.Add(id)
 	}
 
-	return &codanet.CodaGatingState{AddrFilters: newFilter, AllowedPeers: trustedPeers, DeniedPeers: bannedPeers}, nil
+	return codanet.NewCodaGatingState(newFilter, trustedPeers, bannedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {

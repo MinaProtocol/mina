@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/control"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -112,12 +113,12 @@ type Helper struct {
 	Ctx               context.Context
 	Pubsub            *pubsub.PubSub
 	Logger            logging.EventLogger
-	DiscoveredPeers   chan peer.AddrInfo
 	Rendezvous        string
 	Discovery         *discovery.RoutingDiscovery
 	Me                peer.ID
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
+	BandwidthCounter  *metrics.BandwidthCounter
 }
 
 type customValidator struct {
@@ -131,6 +132,27 @@ type CodaGatingState struct {
 	AddrFilters  *ma.Filters
 	DeniedPeers  *peer.Set
 	AllowedPeers *peer.Set
+}
+
+// NewCodaGatingState returns a new CodaGatingState
+func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer.Set) *CodaGatingState {
+	if addrFilters == nil {
+		addrFilters = new(ma.Filters)
+	}
+
+	if denied == nil {
+		denied = new(peer.Set)
+	}
+
+	if allowed == nil {
+		allowed = new(peer.Set)
+	}
+
+	return &CodaGatingState{
+		AddrFilters:  addrFilters,
+		DeniedPeers:  denied,
+		AllowedPeers: allowed,
+	}
 }
 
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
@@ -241,6 +263,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	mplex.MaxMessageSize = 1 << 30
 
 	connManager := newCodaConnectionManager()
+	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
@@ -251,6 +274,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
+			if externalAddr == nil {
+				return as
+			}
+
 			as = append(as, externalAddr)
 			return as
 		}),
@@ -262,6 +289,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			})),
 		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),
 		p2p.PrivateNetwork(pnetKey[:]),
+		p2p.BandwidthReporter(bandwidthCounter),
 	)
 
 	if err != nil {
@@ -276,11 +304,11 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Dht:               kad,
 		Pubsub:            nil,
 		Logger:            logger,
-		DiscoveredPeers:   nil,
 		Rendezvous:        rendezvousString,
 		Discovery:         nil,
 		Me:                me,
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
+		BandwidthCounter:  bandwidthCounter,
 	}, nil
 }
