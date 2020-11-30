@@ -24,7 +24,7 @@ let echoServiceChallenge = metricsMap => {
        (metricRecord: Types.Metrics.t) =>
          metricRecord.transactionsReceivedByEcho,
        1,
-       500,
+       1000,
      );
 };
 

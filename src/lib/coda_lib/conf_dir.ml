@@ -105,8 +105,9 @@ let export_logs_to_tar ?basename ~conf_dir =
   let tarfile = export_dir ^/ basename ^ ".tgz" in
   let log_files =
     Core.Sys.ls_dir conf_dir
-    |> List.filter ~f:(String.is_suffix ~suffix:".log")
+    |> List.filter ~f:(String.is_substring ~substring:".log")
   in
+  let files = "coda.version" :: log_files in
   let%map _result =
     Process.run ~prog:"tar"
       ~args:
@@ -115,7 +116,7 @@ let export_logs_to_tar ?basename ~conf_dir =
           ; (* Create gzipped tar file [file]. *)
             "-czf"
           ; tarfile ]
-        @ log_files )
+        @ files )
       ()
   in
   tarfile
