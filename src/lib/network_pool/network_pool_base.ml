@@ -109,22 +109,17 @@ end)
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
-        [%log' debug t.logger] "Verifying $diff"
-          ~metadata:
-            [ ( "diff"
-              , Resource_pool.Diff.to_yojson @@ Envelope.Incoming.data diff )
-            ] ;
+        let summary =
+          `String (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
+        in
+        [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
         don't_wait_for
           ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
           | Error err ->
               [%log' trace t.logger]
                 "Refusing to rebroadcast $diff. Verification error: $error"
                 ~metadata:
-                  [ ( "diff"
-                    , `String
-                        ( Resource_pool.Diff.summary
-                        @@ Envelope.Incoming.data diff ) )
-                  ; ("error", Error_json.error_to_yojson err) ] ;
+                  [("diff", summary); ("error", Error_json.error_to_yojson err)] ;
               (*reject incoming messages*)
               Broadcast_callback.error err cb
           | Ok verified_diff ->
