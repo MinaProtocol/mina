@@ -81,6 +81,9 @@ end)
 
 module Proof = Plonk_dlog_proof.Make (struct
   open Marlin_plonk_bindings
+
+  let id = "pasta_vesta"
+
   module Scalar_field = Field
   module Base_field = Fq
 

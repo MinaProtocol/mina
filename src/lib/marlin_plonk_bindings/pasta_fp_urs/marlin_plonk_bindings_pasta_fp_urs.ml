@@ -8,9 +8,11 @@ end
 
 external create : int -> t = "caml_pasta_fp_urs_create"
 
-external write : t -> string -> unit = "caml_pasta_fp_urs_write"
+external write :
+  ?append:bool -> t -> string -> unit
+  = "caml_pasta_fp_urs_write"
 
-external read : string -> t option = "caml_pasta_fp_urs_read"
+external read : ?offset:int -> string -> t option = "caml_pasta_fp_urs_read"
 
 external lagrange_commitment :
   t -> domain_size:int -> int -> Poly_comm.t

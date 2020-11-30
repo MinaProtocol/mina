@@ -15,8 +15,8 @@ use commitment_dlog::srs::SRS;
 use plonk_protocol_dlog::index::{Index as DlogIndex, SRSSpec};
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
 
@@ -206,6 +206,7 @@ pub fn caml_pasta_fp_plonk_index_domain_d8_size(index: CamlPastaFpPlonkIndexPtr)
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_read(
+    offset: Option<ocaml::Int>,
     urs: CamlPastaFpUrs,
     path: String,
 ) -> Result<CamlPastaFpPlonkIndex<'static>, ocaml::Error> {
@@ -218,6 +219,12 @@ pub fn caml_pasta_fp_plonk_index_read(
         Ok(file) => file,
     };
     let mut r = BufReader::new(file);
+    match offset {
+        Some(offset) => {
+            r.seek(Start(offset as u64))?;
+        }
+        None => (),
+    };
     let urs_copy = Rc::clone(&urs.0);
     let urs_copy_outer = Rc::clone(&urs.0);
     let srs = {
@@ -236,10 +243,11 @@ pub fn caml_pasta_fp_plonk_index_read(
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_write(
+    append: Option<bool>,
     index: CamlPastaFpPlonkIndexPtr<'static>,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let file = match File::create(path) {
+    let file = match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(
             ocaml::Error::invalid_argument("caml_pasta_fp_plonk_index_write")
                 .err()

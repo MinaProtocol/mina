@@ -14,11 +14,11 @@ module Raw = struct
     = "caml_pasta_fp_plonk_verifier_index_raw_create"
 
   external read :
-    Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
+    ?offset:int -> Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
     = "caml_pasta_fp_plonk_verifier_index_raw_read"
 
   external write :
-    t -> string -> unit
+    ?append:bool -> t -> string -> unit
     = "caml_pasta_fp_plonk_verifier_index_raw_write"
 
   external of_parts :
@@ -37,11 +37,11 @@ external create :
   = "caml_pasta_fp_plonk_verifier_index_create"
 
 external read :
-  Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
+  ?offset:int -> Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
   = "caml_pasta_fp_plonk_verifier_index_read"
 
 external write :
-  t -> string -> unit
+  ?append:bool -> t -> string -> unit
   = "caml_pasta_fp_plonk_verifier_index_write"
 
 external to_raw :

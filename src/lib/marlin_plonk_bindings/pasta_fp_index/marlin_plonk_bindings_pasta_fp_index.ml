@@ -35,7 +35,9 @@ external domain_d4_size : t -> int = "caml_pasta_fp_plonk_index_domain_d4_size"
 external domain_d8_size : t -> int = "caml_pasta_fp_plonk_index_domain_d8_size"
 
 external read :
-  Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
+  ?offset:int -> Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
   = "caml_pasta_fp_plonk_index_read"
 
-external write : t -> string -> unit = "caml_pasta_fp_plonk_index_write"
+external write :
+  ?append:bool -> t -> string -> unit
+  = "caml_pasta_fp_plonk_index_write"

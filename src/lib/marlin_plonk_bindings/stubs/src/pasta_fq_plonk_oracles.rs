@@ -5,9 +5,9 @@ use algebra::pasta::{
 
 use oracle::{
     self,
-    FqSponge,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge, ScalarChallenge},
+    FqSponge,
 };
 
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
@@ -96,7 +96,6 @@ pub fn caml_pasta_fq_plonk_oracles_create_raw(
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
 
@@ -133,7 +132,6 @@ pub fn caml_pasta_fq_plonk_oracles_create(
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );
-
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index.0, &p_comm);
 
