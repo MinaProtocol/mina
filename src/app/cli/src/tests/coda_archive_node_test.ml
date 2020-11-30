@@ -30,6 +30,10 @@ let main () =
     let%map pipe = Coda_worker_testnet.Api.new_block testnet 1 public_key in
     (Option.value_exn pipe).pipe
   in
+  let%bind pre_stored_transitions =
+    Coda_worker_testnet.Api.get_all_transitions testnet 1
+      (Account_id.create public_key Token_id.default)
+  in
   let num_blocks_to_wait = 5 in
   let%bind _, observed_hashes =
     Pipe.fold new_block_pipe ~init:(0, [])
@@ -42,12 +46,33 @@ let main () =
     Coda_worker_testnet.Api.get_all_transitions testnet 1
       (Account_id.create public_key Token_id.default)
   in
+  let pre_stored_state_hashes =
+    State_hash.Hash_set.of_list
+      (List.map (Option.value_exn pre_stored_transitions)
+         ~f:(fun {With_hash.hash; _} -> hash))
+  in
   let stored_state_hashes =
     State_hash.Hash_set.of_list
       (List.map (Option.value_exn stored_transitions)
          ~f:(fun {With_hash.hash; _} -> hash))
   in
-  assert (Hash_set.equal observed_hashset stored_state_hashes) ;
+  (* Ignore any state hashes from before we started observing blocks. *)
+  let stored_state_hashes =
+    Hash_set.diff stored_state_hashes pre_stored_state_hashes
+  in
+  let module M = struct
+    type t = State_hash.Hash_set.t
+
+    let sexp_of_t = State_hash.Hash_set.sexp_of_t
+
+    let equal = Hash_set.equal
+
+    (* Fake compare, we only want this so that [test_eq] will be happy and
+       pretty-print the hashsets on failure.
+    *)
+    let compare x y = if equal x y then 0 else -1
+  end in
+  [%test_eq: M.t] observed_hashset stored_state_hashes ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =

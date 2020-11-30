@@ -9,6 +9,8 @@
     breadcrumbs from those transitions, which will write the breadcrumbs back
     into the processor as if catchup had successfully completed. *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
@@ -102,8 +104,8 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
             | Error err ->
                 [%log trace]
                   !"Error during buildup breadcrumbs inside \
-                    catchup_scheduler: %s"
-                  (Error.to_string_hum err) ;
+                    catchup_scheduler: $error"
+                  ~metadata:[("error", Error_json.error_to_yojson err)] ;
                 List.iter transition_branches ~f:(fun subtree ->
                     Rose_tree.iter subtree ~f:(fun cached_transition ->
                         Cached.invalidate_with_failure cached_transition

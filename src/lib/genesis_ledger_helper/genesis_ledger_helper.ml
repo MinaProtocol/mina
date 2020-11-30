@@ -26,9 +26,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error generating tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error generating tar file")
 
   let extract ~root ~file () =
     match%map
@@ -45,9 +43,7 @@ module Tar = struct
     | Ok _ ->
         Ok ()
     | Error err ->
-        Or_error.errorf
-          !"Error extracting tar file %s. %s"
-          file (Error.to_string_hum err)
+        Error (Error.tag err ~tag:"Error extracting tar file")
 end
 
 let file_exists ?follow_symlinks filename =
@@ -1223,8 +1219,20 @@ let load_config_file filename =
 
 let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~may_generate ~proof_level (config : Runtime_config.t) =
-  [%log info] "Initializing with runtime configuration $config"
-    ~metadata:[("config", Runtime_config.to_yojson config)] ;
+  let ledger_name_json =
+    match
+      let open Option.Let_syntax in
+      let%bind ledger = config.ledger in
+      ledger.name
+    with
+    | Some name ->
+        `String name
+    | None ->
+        `Null
+  in
+  [%log info] "Initializing with runtime configuration. Ledger name: $name"
+    ~metadata:
+      [("name", ledger_name_json); ("config", Runtime_config.to_yojson config)] ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =
