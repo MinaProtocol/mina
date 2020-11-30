@@ -58,9 +58,6 @@ jobs:
             - run:
                   name: Publish dist wallet
                   command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
-            - run:
-                  name: Lint website
-                  command: cd frontend/website && yarn install && yarn run reformat && git diff --exit-code src
             - run: cd frontend/bot && yarn
             - run:
                   name: Lint bot
@@ -482,6 +479,9 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
+            - run:
+                name: Standardize rust flags (remove unsupported flags)
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh'
             ### dune
             - run:
                 name: Build ocaml
@@ -547,10 +547,14 @@ jobs:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    # Remove copies of keys to make some space
+                    rm -r /tmp/s3_cache_dir/ $TMPDIR/coda_cache_dir ||:
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
+                  environment:
+                    CLOUDSDK_PYTHON: /usr/local/opt/python@3.8/libexec/bin/python
             - store_artifacts:
                   path: package
 
@@ -687,24 +691,6 @@ jobs:
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-batch-payment-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    -  dev-build-binaries-v1-{{ .Revision }}
-            - run:
-                  name: Running test -- dev:coda-batch-payment-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-batch-payment-test"; fi
-                  environment:
-                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
-                    GO: /usr/lib/go/bin/go
-                  no_output_timeout: 20m
-            - store_artifacts:
-                  path: test_output/artifacts
     test--dev--coda-peers-test:
         resource_class: large
         docker:
@@ -807,24 +793,6 @@ jobs:
             - run:
                   name: Running test -- dev:coda-change-snark-worker-test
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
-                  environment:
-                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
-                    GO: /usr/lib/go/bin/go
-                  no_output_timeout: 20m
-            - store_artifacts:
-                  path: test_output/artifacts
-    test--dev--coda-archive-node-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-        steps:
-            - restore_cache:
-                name: Restore cache - opam
-                keys:
-                    -  dev-build-binaries-v1-{{ .Revision }}
-            - run:
-                  name: Running test -- dev:coda-archive-node-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-archive-node-test"; fi
                   environment:
                     CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
@@ -1247,9 +1215,6 @@ workflows:
             - test--dev--coda-shared-state-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-batch-payment-test:
-                requires:
-                  - build-binaries--dev
             - test--dev--coda-peers-test:
                 requires:
                   - build-binaries--dev
@@ -1266,9 +1231,6 @@ workflows:
                 requires:
                   - build-binaries--dev
             - test--dev--coda-change-snark-worker-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-archive-node-test:
                 requires:
                   - build-binaries--dev
             - test--dev--coda-delegation-test:

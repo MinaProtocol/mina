@@ -89,7 +89,7 @@ end
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
-  type t
+  type t [@@deriving compare]
 
   val to_string : t -> string
 
@@ -211,6 +211,7 @@ val configure :
   -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
+  -> metrics_port:string option
   -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
   -> flooding:bool

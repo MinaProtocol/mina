@@ -108,10 +108,10 @@ module Make (Inputs : Inputs_intf) :
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
-    let genesis_transition = External_transition.genesis ~precomputed_values in
-    let genesis_state_hash =
-      External_transition.Validated.state_hash genesis_transition
+    let genesis_protocol_state =
+      Precomputed_values.genesis_state_with_hash precomputed_values
     in
+    let genesis_state_hash = With_hash.hash genesis_protocol_state in
     let root_state_hash = External_transition.state_hash root in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =

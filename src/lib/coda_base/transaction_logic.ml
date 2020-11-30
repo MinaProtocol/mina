@@ -334,8 +334,11 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       (* no time restrictions *)
       Or_error.return (Untimed, `Min_balance Balance.zero)
   | Timed
-      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-    ->
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment } ->
       let open Or_error.Let_syntax in
       let%map curr_min_balance =
         let account_balance = account.balance in
@@ -366,7 +369,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
         | Some proposed_new_balance ->
             let curr_min_balance =
               Account.min_balance_at_slot ~global_slot:txn_global_slot
-                ~cliff_time ~vesting_period ~vesting_increment
+                ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
                 ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then

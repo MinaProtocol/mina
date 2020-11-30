@@ -41,7 +41,9 @@ external domain_d8_size :
   = "caml_tweedle_fp_plonk_index_domain_d8_size"
 
 external read :
-  Marlin_plonk_bindings_tweedle_fp_urs.t -> string -> t
+  ?offset:int -> Marlin_plonk_bindings_tweedle_fp_urs.t -> string -> t
   = "caml_tweedle_fp_plonk_index_read"
 
-external write : t -> string -> unit = "caml_tweedle_fp_plonk_index_write"
+external write :
+  ?append:bool -> t -> string -> unit
+  = "caml_tweedle_fp_plonk_index_write"

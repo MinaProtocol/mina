@@ -22,7 +22,7 @@ module T = struct
     in
     match%bind
       Secret_file.write ~path:privkey_path ~mkdir:true ~plaintext:privkey_bytes
-        ~password ~which
+        ~password
     with
     | Ok () ->
         (* The hope is that if [Secret_file.write] succeeded then this ought to
@@ -33,13 +33,13 @@ module T = struct
         Writer.write_line pubkey_f pubkey_string ;
         Writer.close pubkey_f
     | Error e ->
-        Privkey_error.raise e
+        Privkey_error.raise ~which e
 
   (** Reads a private key from [privkey_path] using [Secret_file] *)
   let read ~(privkey_path : string) ~(password : Secret_file.password) :
       (Keypair.t, Privkey_error.t) Deferred.Result.t =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_bytes = Secret_file.read ~path:privkey_path ~password ~which in
+    let%bind pk_bytes = Secret_file.read ~path:privkey_path ~password in
     let open Result.Let_syntax in
     Deferred.return
     @@ let%bind sk =
@@ -50,7 +50,6 @@ module T = struct
            Privkey_error.corrupted_privkey
              (Error.createf "Error parsing decrypted private key file: %s"
                 (Exn.to_string exn))
-             which
        in
        try return (Keypair.of_private_key_exn sk)
        with exn ->
@@ -59,7 +58,6 @@ module T = struct
               "Error computing public key from private, is your keyfile \
                corrupt? %s"
               (Exn.to_string exn))
-           which
 
   (** Reads a private key from [privkey_path] using [Secret_file], throws on failure *)
   let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -68,7 +66,7 @@ module T = struct
     | Ok keypair ->
         keypair
     | Error priv_key_error ->
-        Privkey_error.raise priv_key_error
+        Privkey_error.raise ~which priv_key_error
 
   let read_exn' path =
     read_exn ~privkey_path:path

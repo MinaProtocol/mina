@@ -127,6 +127,12 @@ let setup_daemon logger =
         "PORT metrics server for scraping via Prometheus (default no \
          metrics-server)"
       (optional int16)
+  and libp2p_metrics_port =
+    flag "libp2p-metrics-port"
+      ~doc:
+        "PORT libp2p metrics server for scraping via Prometheus (default no \
+         libp2p-metrics-server)"
+      (optional int16)
   and external_ip_opt =
     flag "external-ip"
       ~doc:
@@ -149,6 +155,7 @@ let setup_daemon logger =
     flag "archive-rocksdb" no_arg ~doc:"Stores all the blocks heard in RocksDB"
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
+  and file_log_level = Flag.Log.file_log_level
   and snark_work_fee =
     flag "snark-worker-fee"
       ~doc:
@@ -290,7 +297,7 @@ let setup_daemon logger =
     let logrotate_max_size = 1024 * 1024 * 10 in
     let logrotate_num_rotate = 50 in
     Logger.Consumer_registry.register ~id:"default"
-      ~processor:(Logger.Processor.raw ())
+      ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size
@@ -306,7 +313,11 @@ let setup_daemon logger =
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:
         [ ("commit", `String Coda_version.commit_id)
-        ; ("branch", `String Coda_version.branch) ] ;
+        ; ("branch", `String Coda_version.branch)
+        ; ("commit_date", `String Coda_version.commit_date)
+        ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+        ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
+    let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
@@ -350,7 +361,8 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn s
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+              ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
@@ -505,12 +517,9 @@ let setup_daemon logger =
             | Error err -> (
               match handle_missing with
               | `Must_exist ->
-                  [%log fatal]
-                    "Failed reading configuration from $config_file: $error"
-                    ~metadata:
-                      [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
-                  Error.raise err
+                  Mina_user_error.raisef ~where:"reading configuration file"
+                    "The configuration file %s could not be read:\n%s"
+                    config_file (Error.to_string_hum err)
               | `May_be_missing ->
                   [%log warn]
                     "Could not read configuration from $config_file: $error"
@@ -650,25 +659,25 @@ let setup_daemon logger =
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= log_received_blocks }
       in
-      let json_to_publickey_compressed_option json =
+      let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
                | Ok key ->
                    Some key
-               | Error e ->
-                   [%log error] "Error decoding public key ($key): $error"
-                     ~metadata:
-                       [ ("key", `String pk_str)
-                       ; ("error", Error_json.error_to_yojson e) ] ;
-                   None )
+               | Error _e ->
+                   Mina_user_error.raisef ~where:"decoding a public key"
+                     "The %s public key %s could not be decoded." which pk_str
+           )
       in
       let run_snark_worker_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark worker")
           "run-snark-worker" run_snark_worker_flag
       in
       let run_snark_coordinator_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "snark coordinator")
           "run-snark-coordinator" run_snark_coordinator_flag
       in
       let snark_worker_parallelism_flag =
@@ -676,7 +685,8 @@ let setup_daemon logger =
           snark_worker_parallelism_flag
       in
       let coinbase_receiver_flag =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "coinbase receiver")
           "coinbase-receiver" coinbase_receiver_flag
       in
       let%bind external_ip =
@@ -697,7 +707,8 @@ let setup_daemon logger =
           block_production_key
       in
       let block_production_pubkey =
-        maybe_from_config json_to_publickey_compressed_option
+        maybe_from_config
+          (json_to_publickey_compressed_option "block producer")
           "block-producer-pubkey" block_production_pubkey
       in
       let block_production_password =
@@ -718,15 +729,15 @@ let setup_daemon logger =
       let%bind block_production_keypair =
         match (block_production_key, block_production_pubkey) with
         | Some _, Some _ ->
-            eprintf
-              "Error: You cannot provide both `block-producer-key` and \
-               `block_production_pubkey`\n" ;
-            exit 11
+            Mina_user_error.raise
+              "You cannot provide both `block-producer-key` and \
+               `block_production_pubkey`"
         | None, None ->
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
         | _, Some tracked_pubkey ->
@@ -736,7 +747,8 @@ let setup_daemon logger =
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn sk_file
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+                ~which:"block producer keypair" sk_file
             in
             Some kp
       in
@@ -750,7 +762,15 @@ let setup_daemon logger =
         match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
-              String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+              String.split ~on:',' envstr
+              |> List.filter_map ~f:(fun str ->
+                     try Some (Unix.Cidr.of_string str)
+                     with _ ->
+                       [%log warn]
+                         "Could not parse address $address in \
+                          CODA_CLIENT_TRUSTLIST"
+                         ~metadata:[("address", `String str)] ;
+                       None )
             in
             Some
               (List.append cidrs (Option.value ~default:[] client_trustlist))
@@ -833,13 +853,13 @@ let setup_daemon logger =
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
                 |> List.map ~f:Coda_net2.Multiaddr.of_string
                 |> return
-            | Error e ->
-                [%log fatal]
-                  ~metadata:[("error", `String (Error.to_string_mach e))]
-                  "Unable to read peer-list file properly. It must be a \
-                   newline separated series of libp2p multiaddrs (ex: \
-                   /ip4/IPADDR/tcp/PORT/p2p/PEERID)" ;
-                exit 15 )
+            | Error _ ->
+                Mina_user_error.raisef
+                  ~where:"reading libp2p peer address file"
+                  "The file %s could not be read.\n\n\
+                   It must be a newline-separated list of libp2p multiaddrs \
+                   (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                  file )
       in
       let initial_peers =
         List.concat
@@ -874,6 +894,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; unsafe_no_trust_ip= false
           ; initial_peers
           ; addrs_and_ports
+          ; metrics_port= Option.map libp2p_metrics_port ~f:Int.to_string
           ; trust_system
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
@@ -895,26 +916,6 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in
-      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-      let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let transaction_database_dir = conf_dir ^/ "transaction" in
-      let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        transaction_database_dir ;
-      let external_transition_database_dir =
-        conf_dir ^/ "external_transition_database"
-      in
-      let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver =
@@ -952,10 +953,9 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
@@ -1316,14 +1316,12 @@ let coda_commands logger =
         ; (module Coda_restart_node_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in

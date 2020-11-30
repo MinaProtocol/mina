@@ -1,6 +1,8 @@
 [%%import
 "/src/config.mlh"]
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Coda_base
@@ -966,7 +968,11 @@ module T = struct
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
       time ~logger "check_completed_works" (fun () ->
-          check_completed_works ~logger ~verifier t.scan_state work )
+          match skip_verification with
+          | Some true ->
+              return ()
+          | Some false | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants
@@ -2990,6 +2996,7 @@ let%test_module "test" =
         Account.create_timed account_id balance
           ~initial_minimum_balance:balance
           ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+          ~cliff_amount:Amount.zero
           ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
           ~vesting_increment:(Amount.of_int 50_000_000_000)
         |> Or_error.ok_exn
