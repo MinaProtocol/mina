@@ -56,8 +56,10 @@ coda daemon \
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
   sleep 10s
+  set +e
   coda client status
   status_exit_code=$?
+  set -e
   if [ $status_exit_code -eq 0 ]; then
     break
   elif [ $i -eq $num_status_retries ]; then
