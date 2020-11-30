@@ -56,3 +56,11 @@ external shifts :
      log2_size:int
   -> Marlin_plonk_bindings_tweedle_fp.t Plonk_verification_shifts.t
   = "caml_tweedle_fp_plonk_verifier_index_shifts"
+
+external dummy : unit -> t = "caml_tweedle_fp_plonk_verifier_index_dummy"
+
+external deep_copy : t -> t = "caml_tweedle_fp_plonk_verifier_index_deep_copy"
+
+let%test "deep_copy" =
+  let x = dummy () in
+  deep_copy x = x

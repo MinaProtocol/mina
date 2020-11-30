@@ -91,11 +91,13 @@ pub fn caml_tweedle_dee_of_affine(x: CamlTweedleDeeAffine<Fq>) -> CamlTweedleDee
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_of_affine_coordinates(
-    x: Fq,
-    y: Fq,
-) -> CamlTweedleDee {
+pub fn caml_tweedle_dee_of_affine_coordinates(x: Fq, y: Fq) -> CamlTweedleDee {
     CamlTweedleDee(GProjective::new(x, y, Fq::one()))
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_dee_affine_deep_copy(x: CamlTweedleDeeAffine<Fq>) -> CamlTweedleDeeAffine<Fq> {
+    x
 }
 
 impl From<GAffine> for CamlTweedleDeeAffine<Fq> {
@@ -119,8 +121,8 @@ impl From<CamlTweedleDeeAffine<Fq>> for GAffine {
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDeePolyComm<T> {
-    shifted: Option<CamlTweedleDeeAffine<T>>,
-    unshifted: Vec<CamlTweedleDeeAffine<Fq>>,
+    pub shifted: Option<CamlTweedleDeeAffine<T>>,
+    pub unshifted: Vec<CamlTweedleDeeAffine<Fq>>,
 }
 
 impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<Fq> {

@@ -3,10 +3,13 @@ use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
     CamlPlonkVerifierIndex,
 };
-use crate::tweedle_dum::CamlTweedleDumPolyComm;
+use crate::tweedle_dum::{CamlTweedleDumAffine::Finite, CamlTweedleDumPolyComm};
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_urs::CamlTweedleFqUrs;
-use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fp::Fp, fq::Fq};
+use algebra::{
+    tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fp::Fp, fq::Fq},
+    One,
+};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
@@ -75,10 +78,7 @@ pub fn to_ocaml<'a>(
             emul2_comm: vi.emul2_comm.into(),
             emul3_comm: vi.emul3_comm.into(),
         },
-        shifts: CamlPlonkVerificationShifts {
-            r: vi.r,
-            o: vi.o,
-        },
+        shifts: CamlPlonkVerificationShifts { r: vi.r, o: vi.o },
     }
 }
 
@@ -116,10 +116,7 @@ pub fn to_ocaml_copy<'a>(
             emul2_comm: vi.emul2_comm.clone().into(),
             emul3_comm: vi.emul3_comm.clone().into(),
         },
-        shifts: CamlPlonkVerificationShifts {
-            r: vi.r,
-            o: vi.o,
-        },
+        shifts: CamlPlonkVerificationShifts { r: vi.r, o: vi.o },
     }
 }
 
@@ -356,8 +353,54 @@ pub fn caml_tweedle_fq_plonk_verifier_index_shifts(
     log2_size: ocaml::Int,
 ) -> CamlPlonkVerificationShifts<Fq> {
     let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
-    CamlPlonkVerificationShifts {
-        r: a,
-        o: b,
+    CamlPlonkVerificationShifts { r: a, o: b }
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fq_plonk_verifier_index_dummy() -> CamlTweedleFqPlonkVerifierIndex {
+    let g = || Finite((Fp::one(), Fp::one()));
+    let comm = || CamlTweedleDumPolyComm {
+        shifted: Some(g()),
+        unshifted: vec![g(), g(), g()],
+    };
+    CamlPlonkVerifierIndex {
+        domain: CamlPlonkDomain {
+            log_size_of_group: 1,
+            group_gen: Fq::one(),
+        },
+        max_poly_size: 0,
+        max_quot_size: 0,
+        urs: CamlTweedleFqUrs(Rc::new(SRS::create(0))),
+        evals: CamlPlonkVerificationEvals {
+            sigma_comm0: comm(),
+            sigma_comm1: comm(),
+            sigma_comm2: comm(),
+            ql_comm: comm(),
+            qr_comm: comm(),
+            qo_comm: comm(),
+            qm_comm: comm(),
+            qc_comm: comm(),
+            rcm_comm0: comm(),
+            rcm_comm1: comm(),
+            rcm_comm2: comm(),
+            psm_comm: comm(),
+            add_comm: comm(),
+            mul1_comm: comm(),
+            mul2_comm: comm(),
+            emul1_comm: comm(),
+            emul2_comm: comm(),
+            emul3_comm: comm(),
+        },
+        shifts: CamlPlonkVerificationShifts {
+            r: Fq::one(),
+            o: Fq::one(),
+        },
     }
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fq_plonk_verifier_index_deep_copy(
+    x: CamlTweedleFqPlonkVerifierIndex,
+) -> CamlTweedleFqPlonkVerifierIndex {
+    x
 }

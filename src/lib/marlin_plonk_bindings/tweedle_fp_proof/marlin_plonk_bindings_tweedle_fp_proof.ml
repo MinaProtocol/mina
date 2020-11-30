@@ -43,3 +43,11 @@ external batch_verify :
   -> t array
   -> bool
   = "caml_tweedle_fp_plonk_proof_batch_verify"
+
+external dummy : unit -> t = "caml_tweedle_fp_plonk_proof_dummy"
+
+external deep_copy : t -> t = "caml_tweedle_fp_plonk_proof_deep_copy"
+
+let%test "deep_copy" =
+  let x = dummy () in
+  deep_copy x = x

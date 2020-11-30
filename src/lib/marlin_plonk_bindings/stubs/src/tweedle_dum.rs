@@ -91,11 +91,13 @@ pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<Fp>) -> CamlTweedleDum
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_of_affine_coordinates(
-    x: Fp,
-    y: Fp,
-) -> CamlTweedleDum {
+pub fn caml_tweedle_dum_of_affine_coordinates(x: Fp, y: Fp) -> CamlTweedleDum {
     CamlTweedleDum(GProjective::new(x, y, Fp::one()))
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_dum_affine_deep_copy(x: CamlTweedleDumAffine<Fp>) -> CamlTweedleDumAffine<Fp> {
+    x
 }
 
 impl From<GAffine> for CamlTweedleDumAffine<Fp> {
@@ -119,8 +121,8 @@ impl From<CamlTweedleDumAffine<Fp>> for GAffine {
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDumPolyComm<T> {
-    shifted: Option<CamlTweedleDumAffine<T>>,
-    unshifted: Vec<CamlTweedleDumAffine<Fp>>,
+    pub shifted: Option<CamlTweedleDumAffine<T>>,
+    pub unshifted: Vec<CamlTweedleDumAffine<Fp>>,
 }
 
 impl From<PolyComm<GAffine>> for CamlTweedleDumPolyComm<Fp> {

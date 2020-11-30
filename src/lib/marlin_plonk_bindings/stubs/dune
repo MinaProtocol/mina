@@ -19,4 +19,5 @@
  (foreign_archives marlin_plonk_stubs)
  (c_library_flags :standard "-lpthread")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (inline_tests)
+ (preprocess (pps ppx_version ppx_inline_test)))

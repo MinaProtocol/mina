@@ -22,7 +22,14 @@ extern "C" fn caml_tweedle_fp_urs_finalize(v: ocaml::Value) {
     unsafe { v.drop_in_place() };
 }
 
+extern "C" fn caml_tweedle_fp_urs_compare(_v1: ocaml::Value, _v2: ocaml::Value) -> i32 {
+    // This shouldn't be used, and has no value anyway since urs is opaque to ocaml, but we want it
+    // for the OCaml <-> Rust transport consistency tests.
+    return 0
+}
+
 ocaml::custom!(CamlTweedleFpUrs {
+    compare: caml_tweedle_fp_urs_compare,
     finalize: caml_tweedle_fp_urs_finalize,
 });
 

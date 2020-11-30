@@ -1,7 +1,10 @@
-use algebra::tweedle::{
-    dum::{Affine as GAffine, TweedledumParameters},
-    fp::Fp,
-    fq::Fq,
+use algebra::{
+    tweedle::{
+        dum::{Affine as GAffine, TweedledumParameters},
+        fp::Fp,
+        fq::Fq,
+    },
+    One,
 };
 
 use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
@@ -17,7 +20,10 @@ use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
-use crate::tweedle_dum::{CamlTweedleDumAffine, CamlTweedleDumPolyComm};
+use crate::tweedle_dum::{
+    CamlTweedleDumAffine::{self, Finite},
+    CamlTweedleDumPolyComm,
+};
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_plonk_verifier_index::{
     CamlTweedleFqPlonkVerifierIndex, CamlTweedleFqPlonkVerifierIndexRawPtr,
@@ -38,10 +44,7 @@ pub struct CamlTweedleFqPlonkProofEvaluations {
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFqPlonkOpeningProof {
-    pub lr: Vec<(
-        CamlTweedleDumAffine<Fp>,
-        CamlTweedleDumAffine<Fp>,
-    )>,
+    pub lr: Vec<(CamlTweedleDumAffine<Fp>, CamlTweedleDumAffine<Fp>)>,
     pub delta: CamlTweedleDumAffine<Fp>,
     pub z1: Fq,
     pub z2: Fq,
@@ -320,4 +323,56 @@ pub fn caml_tweedle_fq_plonk_proof_batch_verify(
         DefaultFrSponge<Fq, PlonkSpongeConstants>,
     >(&group_map, &ts)
     .is_ok()
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fq_plonk_proof_dummy() -> CamlTweedleFqPlonkProof {
+    let g = || Finite((Fp::one(), Fp::one()));
+    let comm = || CamlTweedleDumPolyComm {
+        shifted: Some(g()),
+        unshifted: vec![g(), g(), g()],
+    };
+    CamlTweedleFqPlonkProof {
+        prev_challenges: vec![
+            (vec![Fq::one(), Fq::one()], comm()),
+            (vec![Fq::one(), Fq::one()], comm()),
+            (vec![Fq::one(), Fq::one()], comm()),
+        ],
+        proof: CamlTweedleFqPlonkOpeningProof {
+            lr: vec![(g(), g()), (g(), g()), (g(), g())],
+            z1: Fq::one(),
+            z2: Fq::one(),
+            delta: g(),
+            sg: g(),
+        },
+        messages: CamlTweedleFqPlonkMessages {
+            l_comm: comm(),
+            r_comm: comm(),
+            o_comm: comm(),
+            z_comm: comm(),
+            t_comm: comm(),
+        },
+        public: vec![Fq::one(), Fq::one()],
+        evals: {
+            let evals = || vec![Fq::one(), Fq::one(), Fq::one(), Fq::one()];
+            let evals = || CamlTweedleFqPlonkProofEvaluations {
+                l: evals(),
+                r: evals(),
+                o: evals(),
+                z: evals(),
+                t: evals(),
+                f: evals(),
+                sigma1: evals(),
+                sigma2: evals(),
+            };
+            (evals(), evals())
+        },
+    }
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fq_plonk_proof_deep_copy(
+    x: CamlTweedleFqPlonkProof,
+) -> CamlTweedleFqPlonkProof {
+    x
 }
