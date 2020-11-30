@@ -1,8 +1,6 @@
 use crate::tweedle_dum::{CamlTweedleDumAffine, CamlTweedleDumPolyComm};
-use crate::tweedle_fp::CamlTweedleFp;
-use crate::tweedle_fq::CamlTweedleFq;
 use algebra::{
-    tweedle::{dum::Affine as GAffine, fq::Fq},
+    tweedle::{dum::Affine as GAffine, fp::Fp, fq::Fq},
     One, Zero,
 };
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
@@ -91,7 +89,7 @@ pub fn caml_tweedle_fq_urs_lagrange_commitment(
     urs: CamlTweedleFqUrs,
     domain_size: ocaml::Int,
     i: ocaml::Int,
-) -> Result<CamlTweedleDumPolyComm<CamlTweedleFp>, ocaml::Error> {
+) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_urs_lagrange_commitment")
@@ -112,8 +110,8 @@ pub fn caml_tweedle_fq_urs_lagrange_commitment(
 pub fn caml_tweedle_fq_urs_commit_evaluations(
     urs: CamlTweedleFqUrs,
     domain_size: ocaml::Int,
-    evals: Vec<CamlTweedleFq>,
-) -> Result<CamlTweedleDumPolyComm<CamlTweedleFp>, ocaml::Error> {
+    evals: Vec<Fq>,
+) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_urs_commit_evaluations")
@@ -131,8 +129,8 @@ pub fn caml_tweedle_fq_urs_commit_evaluations(
 #[ocaml::func]
 pub fn caml_tweedle_fq_urs_b_poly_commitment(
     urs: CamlTweedleFqUrs,
-    chals: Vec<CamlTweedleFq>,
-) -> Result<CamlTweedleDumPolyComm<CamlTweedleFp>, ocaml::Error> {
+    chals: Vec<Fq>,
+) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
     let chals: Vec<Fq> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
@@ -142,8 +140,8 @@ pub fn caml_tweedle_fq_urs_b_poly_commitment(
 #[ocaml::func]
 pub fn caml_tweedle_fq_urs_batch_accumulator_check(
     urs: CamlTweedleFqUrs,
-    comms: Vec<CamlTweedleDumAffine<CamlTweedleFp>>,
-    chals: Vec<CamlTweedleFq>,
+    comms: Vec<CamlTweedleDumAffine<Fp>>,
+    chals: Vec<Fq>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
         &urs.0,
@@ -153,6 +151,6 @@ pub fn caml_tweedle_fq_urs_batch_accumulator_check(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_urs_h(urs: CamlTweedleFqUrs) -> CamlTweedleDumAffine<CamlTweedleFp> {
+pub fn caml_tweedle_fq_urs_h(urs: CamlTweedleFqUrs) -> CamlTweedleDumAffine<Fp> {
     urs.0.h.into()
 }
