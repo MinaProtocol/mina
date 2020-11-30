@@ -39,8 +39,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source",
-      "/healthcheck/utilities.sh && isDaemonSynced"
+      "source /healthcheck/utilities.sh && isDaemonSynced"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
