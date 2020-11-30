@@ -834,7 +834,7 @@ let create ?wallets (config : Config.t) =
               | None ->
                   Deferred.unit
               | Some frontier ->
-                  Transition_frontier.close frontier ) ;
+                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in

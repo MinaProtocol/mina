@@ -153,7 +153,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
-          @@ Ledger.unregister_mask_exn
+          @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( diff

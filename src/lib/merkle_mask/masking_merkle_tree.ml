@@ -25,7 +25,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       attached one. We can capture this with a GADT but there's some annoying
       issues with bin_io to do so *)
   module Parent = struct
-    type t = Base.t option [@@deriving sexp]
+    type t = (Base.t, string (* Location where null was set *)) Result.t
+    [@@deriving sexp]
   end
 
   type t =
@@ -44,7 +45,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let create ~depth () =
     { uuid= Uuid_unix.create ()
-    ; parent= None
+    ; parent= Error __LOC__
     ; account_tbl= Location_binable.Table.create ()
     ; token_owners= Token_id.Table.create ()
     ; next_available_token= None
@@ -78,7 +79,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     exception Location_is_not_account of Location.t
 
-    exception Dangling_parent_reference of Uuid.t
+    exception
+      Dangling_parent_reference of
+        Uuid.t * (* Location where null was set*) string
 
     let create () =
       failwith
@@ -90,26 +93,26 @@ module Make (Inputs : Inputs_intf.S) = struct
         "Mask.Attached.with_ledger: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
-    let unset_parent t =
-      assert (Option.is_some t.parent) ;
-      t.parent <- None ;
+    let unset_parent ~loc t =
+      assert (Result.is_ok t.parent) ;
+      t.parent <- Error loc ;
       t
 
     let assert_is_attached t =
       match t.parent with
-      | None ->
-          raise (Dangling_parent_reference t.uuid)
-      | Some _ ->
+      | Error loc ->
+          raise (Dangling_parent_reference (t.uuid, loc))
+      | Ok _ ->
           ()
 
     let get_parent ({parent= opt; _} as t) =
-      assert_is_attached t ; Option.value_exn opt
+      assert_is_attached t ; Result.ok_or_failwith opt
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
     let get_directory t =
       assert_is_attached t ;
-      Option.bind ~f:Base.get_directory t.parent
+      Base.get_directory (Result.ok_or_failwith t.parent)
 
     let depth t = assert_is_attached t ; t.depth
 
@@ -382,7 +385,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* copy tables in t; use same parent *)
     let copy t =
       { uuid= Uuid_unix.create ()
-      ; parent= Some (get_parent t)
+      ; parent= Ok (get_parent t)
       ; account_tbl= Location_binable.Table.copy t.account_tbl
       ; token_owners= Token_id.Table.copy t.token_owners
       ; next_available_token= t.next_available_token
@@ -744,9 +747,9 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   let set_parent t parent =
-    assert (Option.is_none t.parent) ;
+    assert (Result.is_error t.parent) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
-    t.parent <- Some parent ;
+    t.parent <- Ok parent ;
     t.current_location <- Attached.last_filled t ;
     t
 
