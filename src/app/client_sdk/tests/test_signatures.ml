@@ -27,26 +27,27 @@ open Signature_lib
 
 let signer_pk =
   Public_key.Compressed.of_base58_check_exn
-    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T"
+    "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
 
 (* signer *)
 let keypair =
   let private_key =
     Private_key.of_base58_check_exn
-      "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c"
+      "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"
   in
+  printf !"privkey = %{sexp:Inner_curve.Scalar.t}\n%!" private_key ;
   let public_key = Public_key.decompress_exn signer_pk in
   Keypair.{public_key; private_key}
 
 (* payment receiver *)
 let receiver =
   Public_key.Compressed.of_base58_check_exn
-    "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY"
+    "B62qrcFstkpqXww1EkSGrqMCwCNho86kuqBd4FrAAUsPxNKdiPzAUsy"
 
 (* delegatee *)
 let new_delegate =
   Public_key.Compressed.of_base58_check_exn
-    "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt"
+    "B62qkfHpLpELqpMK6ZvUTJ5wRqKDRF3UHyJ4Kv3FU79Sgs4qpBnx5RR"
 
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in
@@ -99,6 +100,11 @@ let delegations =
       ~nonce:1010 ~valid_until:100000 "another memo" ]
 
 let transactions = payments @ delegations
+
+let () =
+  printf "txns = %s\n"
+    (Yojson.Safe.to_string
+       (`List (List.map payments ~f:Signed_command_payload.to_yojson)))
 
 type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 

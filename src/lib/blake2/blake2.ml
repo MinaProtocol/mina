@@ -6,7 +6,7 @@ module Make () = struct
   let digest_size_in_bytes = digest_size_in_bits / 8
 
   module T0 = struct
-    include Digestif.Make_BLAKE2S (struct
+    include Digestif.Make_BLAKE2B (struct
       let digest_size = digest_size_in_bytes
     end)
 
