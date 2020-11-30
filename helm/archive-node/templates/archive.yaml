@@ -104,10 +104,10 @@ spec:
         env:
         imagePullPolicy: Always
         ports:
-        - name: archive-server-port
+        - name: archive-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.server }}
-        - name: archive-postgres-port
+        - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
 {{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
