@@ -4,8 +4,10 @@
 Node selector: preemptible node affinity
 */}}
 {{- define "nodeSelector.preemptible" }}
+{{- if .nodeSelector.preemptible }}
 nodeSelector:
-  cloud.google.com/gke-preemptible: {{ .nodeSelector.preemptible | quote }}
+  cloud.google.com/gke-preemptible: "true"
+{{- end }}
 {{- end }}
 
 {{/*
