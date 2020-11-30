@@ -14,7 +14,7 @@ use oracle::{
 use groupmap::GroupMap;
 
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
-use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
+use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
 use crate::pasta_vesta::{CamlPastaVestaAffine, CamlPastaVestaPolyComm};
@@ -23,7 +23,7 @@ use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_plonk_verifier_index::{
     CamlPastaFpPlonkVerifierIndexPtr, CamlPastaFpPlonkVerifierIndexRawPtr,
 };
-use crate::pasta_fp_vector::CamlPastaFpVectorPtr;
+use crate::pasta_fp_vector::CamlPastaFpVector;
 use crate::pasta_fq::CamlPastaFq;
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -187,8 +187,8 @@ impl From<DlogProof<GAffine>> for CamlPastaFpPlonkProof {
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_create(
     index: CamlPastaFpPlonkIndexPtr<'static>,
-    primary_input: CamlPastaFpVectorPtr,
-    auxiliary_input: CamlPastaFpVectorPtr,
+    primary_input: CamlPastaFpVector,
+    auxiliary_input: CamlPastaFpVector,
     prev_challenges: Vec<CamlPastaFp>,
     prev_sgs: Vec<CamlPastaVestaAffine<CamlPastaFq>>,
 ) -> CamlPastaFpPlonkProof {
@@ -219,13 +219,16 @@ pub fn caml_pasta_fp_plonk_proof_create(
         }
     };
 
+    let auxiliary_input: &Vec<Fp> = auxiliary_input.into();
+    let index: &DlogIndex<GAffine> = &index.as_ref().0;
+
     ocaml::runtime::release_lock();
 
     let map = GroupMap::<Fq>::setup();
     let proof = DlogProof::create::<
         DefaultFqSponge<VestaParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fp, PlonkSpongeConstants>,
-    >(&map, &auxiliary_input.as_ref().0, &index.as_ref().0, prev)
+    >(&map, auxiliary_input, index, prev)
     .unwrap();
 
     ocaml::runtime::acquire_lock();
