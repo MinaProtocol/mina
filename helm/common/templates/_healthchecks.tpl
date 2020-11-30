@@ -37,7 +37,10 @@ Daemon readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced"
+      "/bin/bash",
+      "-c",
+      "source",
+      "/healthcheck/utilities.sh && isDaemonSynced"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
