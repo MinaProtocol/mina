@@ -288,7 +288,14 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
            ~transition_writer_ref ~frontier_w ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       [%log info]
-        "Successfully loaded frontier and downloaded best tip from network" ;
+        ~metadata:
+          [ ( "length"
+            , `Int
+                (Unsigned.UInt32.to_int
+                   (External_transition.Initial_validated.blockchain_length
+                      best_tip.data)) ) ]
+        "Successfully loaded frontier and downloaded best tip with $length \
+         from network" ;
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)

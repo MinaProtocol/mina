@@ -13,9 +13,9 @@ let check_and_set_lockfile ~logger conf_dir =
       let open Async in
       match%map
         Monitor.try_with ~extract_exn:true (fun () ->
-            let open Unix in
-            let%bind fd = openfile ~mode:[`Wronly; `Creat] lockfile in
-            close fd )
+            Writer.with_file ~exclusive:true lockfile ~f:(fun writer ->
+                let pid = Unix.getpid () in
+                return (Writer.writef writer "%d\n" (Pid.to_int pid)) ) )
       with
       | Ok () ->
           [%log info] "Created daemon lockfile $lockfile"
@@ -32,11 +32,53 @@ let check_and_set_lockfile ~logger conf_dir =
             "Could not create the daemon lockfile" ("lockfile", lockfile)
             [%sexp_of: string * string]
           |> Error.raise )
-  | `Yes ->
-      Mina_user_error.raisef
-        "A daemon is already running with the current configuration directory \
-         (%s), or you may need to remove the lockfile (%s)"
-        conf_dir lockfile
+  | `Yes -> (
+      let open Async in
+      match%map
+        Monitor.try_with ~extract_exn:true (fun () ->
+            Reader.with_file ~exclusive:true lockfile ~f:(fun reader ->
+                let%bind pid =
+                  let rm_and_raise () =
+                    Core.Unix.unlink lockfile ;
+                    Mina_user_error.raise
+                      "Invalid format in lockfile (removing it)"
+                  in
+                  match%map Reader.read_line reader with
+                  | `Ok s -> (
+                    try Pid.of_string s with _ -> rm_and_raise () )
+                  | `Eof ->
+                      rm_and_raise ()
+                in
+                let still_running =
+                  (* using signal 0 does not send a signal; see man page `kill(2)` *)
+                  match Signal.(send zero) (`Pid pid) with
+                  | `Ok ->
+                      true
+                  | `No_such_process ->
+                      false
+                in
+                if still_running then
+                  if Pid.equal pid (Unix.getpid ()) then
+                    (* can happen when running in Docker *)
+                    return ()
+                  else
+                    Mina_user_error.raisef
+                      "A daemon (process id %d) is already running with the \
+                       current configuration directory (%s)"
+                      (Pid.to_int pid) conf_dir
+                else (
+                  [%log info] "Removing lockfile for terminated process"
+                    ~metadata:
+                      [ ("lockfile", `String lockfile)
+                      ; ("pid", `Int (Pid.to_int pid)) ] ;
+                  Unix.unlink lockfile ) ) )
+      with
+      | Ok () ->
+          ()
+      | Error exn ->
+          Error.tag_arg (Error.of_exn exn) "Error processing lockfile"
+            ("lockfile", lockfile) [%sexp_of: string * string]
+          |> Error.raise )
   | `Unknown ->
       Error.create "Could not determine whether the daemon lockfile exists"
         ("lockfile", lockfile) [%sexp_of: string * string]
@@ -63,8 +105,9 @@ let export_logs_to_tar ?basename ~conf_dir =
   let tarfile = export_dir ^/ basename ^ ".tgz" in
   let log_files =
     Core.Sys.ls_dir conf_dir
-    |> List.filter ~f:(String.is_suffix ~suffix:".log")
+    |> List.filter ~f:(String.is_substring ~substring:".log")
   in
+  let files = "coda.version" :: log_files in
   let%map _result =
     Process.run ~prog:"tar"
       ~args:
@@ -73,7 +116,7 @@ let export_logs_to_tar ?basename ~conf_dir =
           ; (* Create gzipped tar file [file]. *)
             "-czf"
           ; tarfile ]
-        @ log_files )
+        @ files )
       ()
   in
   tarfile
