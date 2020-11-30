@@ -11,48 +11,56 @@ module T = struct
     ; d= Deferred.Result.map_error d ~f }
 
   let bind t ~f =
-    match Deferred.peek t.d with
-    | None ->
-        let interruption_signal_to_res =
-          t.interruption_signal >>| fun s -> Error s
-        in
-        let maybe_sig_d =
-          let w : ('a, 's) Deferred.Result.t =
-            Deferred.any [t.d; interruption_signal_to_res]
+    match Deferred.peek t.interruption_signal with
+    | None -> (
+      match Deferred.peek t.d with
+      | None ->
+          (* let interruption_signal_to_res =
+            t.interruption_signal >>| fun s -> Error s
+          in *)
+          let maybe_sig_d =
+            let w : ('a, 's) Deferred.Result.t =
+              Deferred.choose
+                [ choice t.interruption_signal (fun s -> Error s)
+                ; choice t.d Fn.id ]
+            in
+            Deferred.Result.map w ~f:(fun a ->
+                let t' = f a in
+                (t'.interruption_signal, t'.d) )
           in
-          Deferred.Result.map w ~f:(fun a ->
-              let t' = f a in
-              (t'.interruption_signal, t'.d) )
-        in
-        let interruption_signal' =
-          Deferred.any
-            [ t.interruption_signal
-            ; ( maybe_sig_d
-              >>= function
-              | Ok (interruption_signal, _) ->
-                  interruption_signal
-              | Error e ->
-                  Deferred.return e ) ]
-        in
-        let d' =
-          Deferred.any
-            [ interruption_signal_to_res
-            ; ( maybe_sig_d
-              >>= fun m ->
-              match m with
-              | Ok (_, d) ->
-                  d
-              | Error e ->
-                  Deferred.return (Error e) ) ]
-        in
-        {interruption_signal= interruption_signal'; d= d'}
-    | Some (Ok a) ->
-        let t' = f a in
-        { interruption_signal=
-            Deferred.any [t'.interruption_signal; t.interruption_signal]
-        ; d= t'.d }
-    | Some (Error e) ->
-        {t with d= Deferred.return (Error e)}
+          let interruption_signal' =
+            Deferred.choose
+              [ choice t.interruption_signal (fun s -> Deferred.return s)
+              ; choice maybe_sig_d (fun x ->
+                    match x with
+                    | Ok (interruption_signal, _) ->
+                        interruption_signal
+                    | Error e ->
+                        Deferred.return e ) ]
+            >>= Fn.id
+          in
+          let d' =
+            Deferred.choose
+              [ choice t.interruption_signal (fun s -> Deferred.return (Error s))
+              ; choice maybe_sig_d (fun x ->
+                    match x with
+                    | Ok (_, d) ->
+                        d
+                    | Error e ->
+                        Deferred.return (Error e) ) ]
+            >>= Fn.id
+          in
+          {interruption_signal= interruption_signal'; d= d'}
+      | Some (Ok a) ->
+          (* {t with d= Deferred.return (Error a)} *)
+          let t' = f a in
+          { interruption_signal=
+              Deferred.any [t'.interruption_signal; t.interruption_signal]
+          ; d= t'.d }
+      | Some (Error e) ->
+          {t with d= Deferred.return (Error e)} )
+    | Some a ->
+        {t with d= Deferred.return (Error a)}
 
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
