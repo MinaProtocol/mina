@@ -2600,7 +2600,12 @@ module Hooks = struct
           : (Get_epoch_ledger.query, Get_epoch_ledger.response) rpc
 
     type rpc_handler =
-      | Rpc_handler : ('q, 'r) rpc * ('q, 'r) rpc_fn -> rpc_handler
+      | Rpc_handler :
+          { rpc: ('q, 'r) rpc
+          ; f: ('q, 'r) rpc_fn
+          ; cost: 'q -> int
+          ; budget: int * [`Per of Core.Time.Span.t] }
+          -> rpc_handler
 
     type query =
       { query:
@@ -2616,14 +2621,17 @@ module Hooks = struct
         rpc_handler -> (q, r) rpc -> do_:((q, r) rpc_fn -> 'a) -> 'a option =
      fun handler rpc ~do_ ->
       match (rpc, handler) with
-      | Get_epoch_ledger, Rpc_handler (Get_epoch_ledger, f) ->
+      | Get_epoch_ledger, Rpc_handler {rpc= Get_epoch_ledger; f; _} ->
           Some (do_ f)
 
     let rpc_handlers ~logger ~local_state ~genesis_ledger_hash =
       [ Rpc_handler
-          ( Get_epoch_ledger
-          , Get_epoch_ledger.implementation ~logger ~local_state
-              ~genesis_ledger_hash ) ]
+          { rpc= Get_epoch_ledger
+          ; f=
+              Get_epoch_ledger.implementation ~logger ~local_state
+                ~genesis_ledger_hash
+          ; cost= (fun _ -> 1)
+          ; budget= (2, `Per Core.Time.Span.minute) } ]
   end
 
   let is_genesis_epoch ~(constants : Constants.t) time =
