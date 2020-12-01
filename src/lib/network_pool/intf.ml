@@ -59,6 +59,12 @@ module type Resource_pool_diff_intf = sig
 
   val verified_size : verified -> int
 
+  (** How big to consider this diff for purposes of metering. *)
+  val score : t -> int
+
+  (** The maximum "diff score" permitted per IP/peer-id per second. *)
+  val max_per_second : int
+
   val summary : t -> string
 
   (** Warning: It must be safe to call this function asynchronously! *)

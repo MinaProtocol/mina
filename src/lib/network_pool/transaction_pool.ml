@@ -743,6 +743,10 @@ struct
 
       let size = List.length
 
+      let score = List.length
+
+      let max_per_second = 2
+
       let verified_size = List.length
 
       let summary t =
