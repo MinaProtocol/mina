@@ -170,6 +170,8 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     ([
                       -- ensure automatic retries on -1 exit status (infra error)
                       Retry::{ exit_status = -1, limit = Some 2 },
+                      -- automatically retry on 100 exit status (apt-get update race condition error)
+                      Retry::{ exit_status = 100, limit = Some 2 },
                       -- automatically retry on 1 exit status (common/flake error)
                       Retry::{ exit_status = +1, limit = Some 1 }
                     ] #
