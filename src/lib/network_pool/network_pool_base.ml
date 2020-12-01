@@ -107,11 +107,7 @@ end)
       :
       (Resource_pool.Diff.verified Envelope.Incoming.t * Broadcast_callback.t)
       Strict_pipe.Reader.t =
-    let (r, w)
-          : ( Resource_pool.Diff.verified Envelope.Incoming.t
-            * Broadcast_callback.t )
-            Strict_pipe.Reader.t
-            * _ =
+    let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered
            ( `Capacity 1024
@@ -119,6 +115,10 @@ end)
                (Call
                   (fun (env, cb) ->
                     let diff = Envelope.Incoming.data env in
+                    [%log' warn t.logger]
+                      "Dropping verified diff $diff due to pipe overflow"
+                      ~metadata:
+                        [("diff", Resource_pool.Diff.verified_to_yojson diff)] ;
                     Broadcast_callback.drop Resource_pool.Diff.empty
                       (Resource_pool.Diff.reject_overloaded_diff diff)
                       cb )) ))

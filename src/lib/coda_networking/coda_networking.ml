@@ -1125,12 +1125,11 @@ let create (config : Config.t)
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              [%str_log debug]
-                (Snark_work_received
-                   { work=
-                       Option.value_exn
-                         (Snark_pool.Resource_pool.Diff.to_compact diff)
-                   ; sender= Envelope.Incoming.sender envelope }) ;
+              Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
+                ~f:(fun work ->
+                  [%str_log debug]
+                    (Snark_work_received
+                       {work; sender= Envelope.Incoming.sender envelope}) ) ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
