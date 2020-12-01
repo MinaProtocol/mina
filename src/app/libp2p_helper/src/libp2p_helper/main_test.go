@@ -81,17 +81,22 @@ func multiaddrs(h host.Host) (multiaddrs []ma.Multiaddr) {
 func TestDHTDiscovery(t *testing.T) {
 	appA := newTestApp(t, nil)
 	appA.NoMDNS = true
+	defer appA.P2p.Host.Close()
 
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
 	appB := newTestApp(t, appAInfos)
 	appB.NoMDNS = true
+	defer appB.P2p.Host.Close()
+
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
 	appC := newTestApp(t, appAInfos)
 	appC.NoMDNS = true
+	defer appC.P2p.Host.Close()
+
 	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
@@ -106,10 +111,12 @@ func TestDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ret, "beginAdvertising success")
 
+	time.Sleep(time.Second * 7)
+
 	// check if peerB knows about peerC
 	ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
 	for _, id := range ids {
-		if id == appA.P2p.Host.ID() {
+		if id == appC.P2p.Host.ID() {
 			return
 		}
 	}
@@ -118,7 +125,34 @@ func TestDHTDiscovery(t *testing.T) {
 }
 
 func TestMDNSDiscovery(t *testing.T) {
+	appA := newTestApp(t, nil)
+	appA.NoDHT = true
+	defer appA.P2p.Host.Close()
 
+	appB := newTestApp(t, nil)
+	appB.NoDHT = true
+	defer appB.P2p.Host.Close()
+
+	// begin appB and appC's DHT advertising
+	ret, err := new(beginAdvertisingMsg).run(appB)
+	require.NoError(t, err)
+	require.Equal(t, ret, "beginAdvertising success")
+
+	ret, err = new(beginAdvertisingMsg).run(appA)
+	require.NoError(t, err)
+	require.Equal(t, ret, "beginAdvertising success")
+
+	time.Sleep(time.Second * 2)
+
+	// check if peerB knows about peerA
+	ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
+	for _, id := range ids {
+		if id == appA.P2p.Host.ID() {
+			return
+		}
+	}
+
+	t.Fatal("B did not discover A via mDNS")
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
