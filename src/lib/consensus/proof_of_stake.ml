@@ -2268,7 +2268,8 @@ module Data = struct
           ~block_stake_winner ~seed:staking_epoch_data.seed
       in
       let%bind supercharge_coinbase =
-        supercharge_coinbase ~winner_account ~global_slot:next_slot_number
+        supercharge_coinbase ~winner_account
+          ~global_slot:global_slot_since_genesis
       in
       let%bind new_total_currency =
         Currency.Amount.Checked.add previous_state.total_currency
