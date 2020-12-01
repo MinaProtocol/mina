@@ -75,8 +75,9 @@ module T = struct
     Deferred.upon (Ivar.read interruption_signal) (fun signal ->
         match Deferred.peek t.d with
         | Some (Ok t') ->
-            (* The computation we bound over has resolved, don't interrupt it
-               in case some other values also depend on it.
+            (* The computation [t] which we bound over has resolved, don't
+               interrupt it in case some other values also depend on it.
+               Still interrupt [t'] because it's a consequence of this [bind].
             *)
             Ivar.fill_if_empty t'.interruption_signal signal
         | Some (Error _) ->
