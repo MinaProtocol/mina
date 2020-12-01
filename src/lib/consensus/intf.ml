@@ -493,6 +493,8 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val block_stake_winner : Value.t -> Public_key.Compressed.t
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t

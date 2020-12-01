@@ -2377,7 +2377,8 @@ module Data = struct
       , total_currency
       , staking_epoch_data
       , next_epoch_data
-      , has_ancestor_in_same_checkpoint_window )]
+      , has_ancestor_in_same_checkpoint_window
+      , block_stake_winner )]
 
     module Unsafe = struct
       (* TODO: very unsafe, do not use unless you know what you are doing *)
