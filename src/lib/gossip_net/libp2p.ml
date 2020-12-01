@@ -63,7 +63,21 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
 
-    let create_rpc_implementations (Rpc_handler (rpc, handler)) =
+    let create_rpc_implementations
+        (Rpc_handler {rpc; f= handler; cost; budget}) =
+      let meter = Network_pool.Meter.create ~capacity:budget in
+      let handler (peer : Network_peer.Peer.t) ~version q =
+        let score = cost q in
+        match
+          Network_pool.Meter.add meter (Remote peer) ~now:(Time.now ()) ~score
+        with
+        | `Capacity_exceeded ->
+            failwithf "peer exceeded capacity: %s"
+              (Network_peer.Peer.to_multiaddr_string peer)
+              ()
+        | `Ok ->
+            handler peer ~version q
+      in
       let (module Impl) = implementation_of_rpc rpc in
       Impl.implement_multi handler
 
