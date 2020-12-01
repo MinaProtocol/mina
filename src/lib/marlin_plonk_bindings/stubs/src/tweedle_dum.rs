@@ -11,55 +11,48 @@ use rand::rngs::StdRng;
 
 use commitment_dlog::commitment::PolyComm;
 
-/* Projective representation is raw bytes on the OCaml heap. */
-
-pub struct CamlTweedleDum(pub GProjective);
-pub type CamlTweedleDumPtr = ocaml::Pointer<CamlTweedleDum>;
-
-ocaml::custom!(CamlTweedleDum);
-
 #[ocaml::func]
-pub fn caml_tweedle_dum_one() -> CamlTweedleDum {
-    CamlTweedleDum(GProjective::prime_subgroup_generator())
+pub fn caml_tweedle_dum_one() -> GProjective {
+    GProjective::prime_subgroup_generator()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_add(x: CamlTweedleDumPtr, y: CamlTweedleDumPtr) -> CamlTweedleDum {
-    CamlTweedleDum(x.as_ref().0 + y.as_ref().0)
+pub fn caml_tweedle_dum_add(x: ocaml::Pointer<GProjective>, y: ocaml::Pointer<GProjective>) -> GProjective {
+    (*x.as_ref()) + (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_sub(x: CamlTweedleDumPtr, y: CamlTweedleDumPtr) -> CamlTweedleDum {
-    CamlTweedleDum(x.as_ref().0 - y.as_ref().0)
+pub fn caml_tweedle_dum_sub(x: ocaml::Pointer<GProjective>, y: ocaml::Pointer<GProjective>) -> GProjective {
+    (*x.as_ref()) - (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_negate(x: CamlTweedleDumPtr) -> CamlTweedleDum {
-    CamlTweedleDum(-x.as_ref().0)
+pub fn caml_tweedle_dum_negate(x: ocaml::Pointer<GProjective>) -> GProjective {
+    -(*x.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_double(x: CamlTweedleDumPtr) -> CamlTweedleDum {
-    CamlTweedleDum(x.as_ref().0.double())
+pub fn caml_tweedle_dum_double(x: ocaml::Pointer<GProjective>) -> GProjective {
+    x.as_ref().double()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_scale(x: CamlTweedleDumPtr, y: Fq) -> CamlTweedleDum {
-    CamlTweedleDum(x.as_ref().0.mul(y))
+pub fn caml_tweedle_dum_scale(x: ocaml::Pointer<GProjective>, y: Fq) -> GProjective {
+    x.as_ref().mul(y)
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_random() -> CamlTweedleDum {
+pub fn caml_tweedle_dum_random() -> GProjective {
     let rng = &mut rand_core::OsRng;
-    CamlTweedleDum(UniformRand::rand(rng))
+    UniformRand::rand(rng)
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_rng(i: ocaml::Int) -> CamlTweedleDum {
+pub fn caml_tweedle_dum_rng(i: ocaml::Int) -> GProjective {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    CamlTweedleDum(UniformRand::rand(&mut rng))
+    UniformRand::rand(&mut rng)
 }
 
 #[ocaml::func]
@@ -81,18 +74,18 @@ pub enum CamlTweedleDumAffine<T> {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_to_affine(x: CamlTweedleDumPtr) -> CamlTweedleDumAffine<Fp> {
-    x.as_ref().0.into_affine().into()
+pub fn caml_tweedle_dum_to_affine(x: ocaml::Pointer<GProjective>) -> CamlTweedleDumAffine<Fp> {
+    x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<Fp>) -> CamlTweedleDum {
-    CamlTweedleDum(Into::<GAffine>::into(x).into_projective())
+pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<Fp>) -> GProjective {
+    Into::<GAffine>::into(x).into_projective()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_of_affine_coordinates(x: Fp, y: Fp) -> CamlTweedleDum {
-    CamlTweedleDum(GProjective::new(x, y, Fp::one()))
+pub fn caml_tweedle_dum_of_affine_coordinates(x: Fp, y: Fp) -> GProjective {
+    GProjective::new(x, y, Fp::one())
 }
 
 #[ocaml::func]
