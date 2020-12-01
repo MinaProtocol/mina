@@ -1843,12 +1843,11 @@ module Data = struct
       end]
 
       module For_tests = struct
-        let with_curr_global_slot (state : t) slot_number =
-          let curr_global_slot : Global_slot.t =
-            Global_slot.For_tests.of_global_slot state.curr_global_slot
-              slot_number
+        let with_global_slot_since_genesis (state : t) slot_number =
+          let global_slot_since_genesis : Coda_numbers.Global_slot.t =
+            slot_number
           in
-          {state with curr_global_slot}
+          {state with global_slot_since_genesis}
       end
     end
 
@@ -2202,11 +2201,7 @@ module Data = struct
         Global_slot.Checked.of_slot_number ~constants transition_data
       in
       let%bind slot_diff =
-        let%bind `Underflow u, diff =
-          Global_slot.Checked.sub next_global_slot prev_global_slot
-        in
-        let%map () = Boolean.(Assert.is_true (not u)) in
-        diff
+        Global_slot.Checked.sub next_global_slot prev_global_slot
       in
       let%bind () =
         let%bind global_slot_increased =

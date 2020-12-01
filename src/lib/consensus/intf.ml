@@ -444,7 +444,8 @@ module type S = sig
         end]
 
         module For_tests : sig
-          val with_curr_global_slot : t -> Global_slot.t -> t
+          val with_global_slot_since_genesis :
+            t -> Coda_numbers.Global_slot.t -> t
         end
       end
 

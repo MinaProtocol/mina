@@ -1872,7 +1872,8 @@ let%test_module "test" =
       sl := sl' ;
       (ledger_proof, diff', is_new_stack, pc_update)
 
-    let dummy_state_view ?(slot = Coda_numbers.Global_slot.zero) () =
+    let dummy_state_view
+        ?(global_slot_since_genesis = Coda_numbers.Global_slot.zero) () =
       let state_body =
         let consensus_constants =
           let genesis_constants = Genesis_constants.for_unit_tests in
@@ -1889,8 +1890,7 @@ let%test_module "test" =
         compile_time_genesis.data |> Coda_state.Protocol_state.body
       in
       { (Coda_state.Protocol_state.Body.view state_body) with
-        curr_global_slot= slot
-      ; global_slot_since_genesis= slot }
+        global_slot_since_genesis }
 
     let create_and_apply ?(self = self_pk)
         ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk) sl logger
@@ -3037,7 +3037,8 @@ let%test_module "test" =
               ~coinbase_receiver:coinbase_receiver.public_key sl logger pids
               ~current_state_view:
                 (dummy_state_view
-                   ~slot:(Coda_numbers.Global_slot.of_int block_count)
+                   ~global_slot_since_genesis:
+                     (Coda_numbers.Global_slot.of_int block_count)
                    ())
               ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
               Sequence.empty

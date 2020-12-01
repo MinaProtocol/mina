@@ -90,7 +90,9 @@ struct
 
   let add a b = op Integer.add a b
 
-  let sub a b = op Integer.subtract_unpacking_or_zero a b
+  let sub_or_zero a b = op Integer.subtract_unpacking_or_zero a b
+
+  let sub a b = op Integer.subtract_unpacking a b
 
   let equal a b = op Integer.equal a b
 
