@@ -177,7 +177,7 @@ let%test_unit "interruptions still run finally blocks" =
       let%map () = wait 100. in
       assert (!r = 2) )
 
-let%test_unit "interruptions branches do not cancel eachother" =
+let%test_unit "interruptions branches do not cancel each other" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let r = ref 0 in
       let s = ref 0 in
