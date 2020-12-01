@@ -1,8 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Coda_base
-open Unsigned
 
 module Poly : sig
   [%%versioned:

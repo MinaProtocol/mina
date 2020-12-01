@@ -1,6 +1,5 @@
 open Unsigned
 open Core
-open Coda_base
 open Snark_params.Tick
 module T = Coda_numbers.Global_slot
 module Length = Coda_numbers.Length
@@ -26,7 +25,7 @@ module Stable = struct
   end
 end]
 
-type value = t [@@deriving sexp, eq, compare, hash, yojson]
+type value = t [@@deriving sexp, compare, hash, yojson]
 
 type var = (T.Checked.t, Length.Checked.t) Poly.t
 
