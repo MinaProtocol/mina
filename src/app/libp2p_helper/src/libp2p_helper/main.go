@@ -692,9 +692,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
-	defer cancel()
-	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
+	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -1271,21 +1269,18 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-
-		go func() {
-			start := time.Now()
-			res, err := msg.run(app)
+		start := time.Now()
+		res, err := msg.run(app)
+		if err == nil {
+			res, err := json.Marshal(res)
 			if err == nil {
-				res, err := json.Marshal(res)
-				if err == nil {
-					app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
-				} else {
-					app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-				}
+				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		}()
+		} else {
+			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+		}
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully
