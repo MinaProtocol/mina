@@ -144,7 +144,7 @@ module Data = struct
   end
 
   module Epoch_and_slot = struct
-    type t = Epoch.t * Slot.t [@@deriving eq, sexp]
+    type t = Epoch.t * Slot.t [@@deriving sexp]
 
     let of_time_exn ~(constants : Constants.t) tm : t =
       let epoch = Epoch.of_time_exn tm ~constants in
@@ -346,7 +346,6 @@ module Data = struct
     let create block_producer_pubkeys ~genesis_ledger ~genesis_epoch_data
         ~epoch_ledger_location ~ledger_depth ~genesis_state_hash =
       (* TODO: remove this duplicate of the genesis ledger *)
-      let open Coda_base in
       let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
         Option.value_map genesis_epoch_data
           ~default:(genesis_ledger, genesis_ledger)
@@ -1350,9 +1349,6 @@ module Data = struct
     (* externally, we are only interested in when the slot starts *)
     let to_time ~(constants : Constants.t) t = start_time ~constants t
 
-    open UInt32
-    open Infix
-
     (* create dummy block to split map on *)
     let get_old ~constants (t : Global_slot.t) : Global_slot.t =
       let ( `Acceptable_network_delay _
@@ -1367,7 +1363,6 @@ module Data = struct
         (* block not beyond gc_width *)
         Global_slot.zero ~constants
       else
-        let open Int in
         (* subtract epoch, slot components of gc_width *)
         Global_slot.diff ~constants t (gc_width_epoch, gc_width_slot)
 
@@ -1777,14 +1772,15 @@ module Data = struct
   [%%else]
 
   module Min_window_density = struct
-    let update_min_window_density ~constants ~prev_global_slot
-        ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density =
+    let update_min_window_density ~constants:_ ~prev_global_slot:_
+        ~next_global_slot:_ ~prev_sub_window_densities ~prev_min_window_density
+        =
       (prev_min_window_density, prev_sub_window_densities)
 
     module Checked = struct
-      let update_min_window_density ~constants ~prev_global_slot
-          ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density
-          =
+      let update_min_window_density ~constants:_ ~prev_global_slot:_
+          ~next_global_slot:_ ~prev_sub_window_densities
+          ~prev_min_window_density =
         Tick.Checked.return (prev_min_window_density, prev_sub_window_densities)
     end
   end
@@ -1912,7 +1908,8 @@ module Data = struct
          ; curr_global_slot
          ; staking_epoch_data
          ; next_epoch_data
-         ; has_ancestor_in_same_checkpoint_window } :
+         ; has_ancestor_in_same_checkpoint_window
+         ; block_stake_winner } :
           Value.t) =
       let input =
         { Random_oracle.Input.bitstrings=
@@ -1929,7 +1926,8 @@ module Data = struct
       List.reduce_exn ~f:Random_oracle.Input.append
         [ input
         ; Epoch_data.Staking.to_input staking_epoch_data
-        ; Epoch_data.Next.to_input next_epoch_data ]
+        ; Epoch_data.Next.to_input next_epoch_data
+        ; Public_key.Compressed.to_input block_stake_winner ]
 
     let var_to_input
         ({ Poly.blockchain_length
@@ -1941,7 +1939,8 @@ module Data = struct
          ; curr_global_slot
          ; staking_epoch_data
          ; next_epoch_data
-         ; has_ancestor_in_same_checkpoint_window } :
+         ; has_ancestor_in_same_checkpoint_window
+         ; block_stake_winner } :
           var) =
       let open Tick.Checked.Let_syntax in
       let%map input =
@@ -1970,8 +1969,11 @@ module Data = struct
       and staking_epoch_data =
         Epoch_data.Staking.var_to_input staking_epoch_data
       and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
+      let block_stake_winner =
+        Public_key.Compressed.Checked.to_input block_stake_winner
+      in
       List.reduce_exn ~f:Random_oracle.Input.append
-        [input; staking_epoch_data; next_epoch_data]
+        [input; staking_epoch_data; next_epoch_data; block_stake_winner]
 
     let global_slot {Poly.curr_global_slot; _} = curr_global_slot
 
@@ -1981,12 +1983,7 @@ module Data = struct
         / constants.checkpoint_window_size_in_slots)
 
     let same_checkpoint_window_unchecked ~constants slot1 slot2 =
-      UInt32.Infix.(
-        checkpoint_window slot1 ~constants = checkpoint_window slot2 ~constants)
-
-    let time_hum (t : Value.t) =
-      let epoch, slot = Global_slot.to_epoch_and_slot t.curr_global_slot in
-      sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
+      checkpoint_window slot1 ~constants = checkpoint_window slot2 ~constants
 
     let update ~(constants : Constants.t) ~(previous_consensus_state : Value.t)
         ~(consensus_transition : Consensus_transition.t)
@@ -2203,7 +2200,7 @@ module Data = struct
       in
       let%bind next_epoch, next_slot =
         Global_slot.Checked.to_epoch_and_slot next_global_slot
-      and prev_epoch, prev_slot =
+      and prev_epoch, _prev_slot =
         Global_slot.Checked.to_epoch_and_slot prev_global_slot
       in
       let%bind epoch_increased = Epoch.Checked.(prev_epoch < next_epoch) in
@@ -2317,8 +2314,6 @@ module Data = struct
           ; has_ancestor_in_same_checkpoint_window
           ; block_stake_winner } )
 
-    let to_lite = None
-
     type display =
       { blockchain_length: int
       ; epoch_count: int
@@ -2369,15 +2364,7 @@ module Data = struct
     let consensus_time (t : Value.t) = t.curr_global_slot
 
     [%%define_locally
-    Poly.
-      ( blockchain_length
-      , epoch_count
-      , min_window_density
-      , last_vrf_output
-      , total_currency
-      , staking_epoch_data
-      , next_epoch_data
-      , has_ancestor_in_same_checkpoint_window )]
+    Poly.(blockchain_length, min_window_density, total_currency)]
 
     module Unsafe = struct
       (* TODO: very unsafe, do not use unless you know what you are doing *)
