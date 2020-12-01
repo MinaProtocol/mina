@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signed
@@ -541,7 +543,10 @@ module Data = struct
                  Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
                    last_checked_epoch_and_slot (epoch, slot)
                in
-               if i >= 0 then None
+               if i > 0 then None
+               else if i = 0 then
+                 (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
+                 Some pk
                else (
                  Table.set !t.last_checked_slot_and_epoch ~key:pk
                    ~data:(epoch, slot) ;
@@ -899,12 +904,13 @@ module Data = struct
 
     type _ Snarky_backendless.Request.t +=
       | Winner_address : Coda_base.Account.Index.t Snarky_backendless.Request.t
+      | Winner_pk : Public_key.Compressed.t Snarky_backendless.Request.t
       | Private_key : Scalar.value Snarky_backendless.Request.t
       | Public_key : Public_key.t Snarky_backendless.Request.t
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        shifted ~ledger ~message =
+        shifted ~block_stake_winner ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
       let%bind private_key =
@@ -923,11 +929,18 @@ module Data = struct
         [%with_label "Account is for the default token"]
           Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
       in
+      let%bind () =
+        [%with_label "Block stake winner matches account pk"]
+          (Public_key.Compressed.Checked.Assert.equal block_stake_winner
+             account.public_key)
+      in
       let%bind delegate =
-        with_label __LOC__ (Public_key.decompress_var account.delegate)
+        [%with_label "Decompress delegate pk"]
+          (Public_key.decompress_var account.delegate)
       in
       let%bind () =
-        with_label __LOC__ (Public_key.assert_equal public_key delegate)
+        [%with_label "Public key matches delegate"]
+          (Public_key.assert_equal public_key delegate)
       in
       let%map evaluation =
         with_label __LOC__
@@ -939,7 +952,8 @@ module Data = struct
     module Checked = struct
       let%snarkydef check
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-          shifted ~(epoch_ledger : Epoch_ledger.var) ~global_slot ~seed =
+          shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
+          ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
           request_witness
@@ -949,7 +963,7 @@ module Data = struct
         in
         let%bind result, winner_account =
           get_vrf_evaluation ~constraint_constants shifted
-            ~ledger:epoch_ledger.hash
+            ~ledger:epoch_ledger.hash ~block_stake_winner
             ~message:{Message.global_slot; seed; delegator= winner_addr}
         in
         let my_stake = winner_account.balance in
@@ -1003,6 +1017,8 @@ module Data = struct
           match request with
           | Winner_address ->
               respond (Provide 0)
+          | Winner_pk ->
+              respond (Provide pk)
           | Private_key ->
               respond (Provide sk)
           | Public_key ->
@@ -1037,6 +1053,8 @@ module Data = struct
                 ~metadata:
                   [ ( "delegator"
                     , `Int (Coda_base.Account.Index.to_int delegator) )
+                  ; ( "delegator_pk"
+                    , Public_key.Compressed.to_yojson account.public_key )
                   ; ("balance", `Int (Balance.to_int account.balance))
                   ; ("amount", `Int (Amount.to_int total_stake))
                   ; ( "result"
@@ -1057,6 +1075,7 @@ module Data = struct
                            { private_key
                            ; public_key
                            ; delegator
+                           ; delegator_pk= account.public_key
                            ; ledger=
                                Local_state.Snapshot.Ledger_snapshot
                                .ledger_subset
@@ -1804,7 +1823,8 @@ module Data = struct
                , 'global_slot_since_genesis
                , 'staking_epoch_data
                , 'next_epoch_data
-               , 'bool )
+               , 'bool
+               , 'pk )
                t =
             { blockchain_length: 'length
             ; epoch_count: 'length
@@ -1816,7 +1836,8 @@ module Data = struct
             ; global_slot_since_genesis: 'global_slot_since_genesis
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
-            ; has_ancestor_in_same_checkpoint_window: 'bool }
+            ; has_ancestor_in_same_checkpoint_window: 'bool
+            ; block_stake_winner: 'pk }
           [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
         end
       end]
@@ -1834,7 +1855,8 @@ module Data = struct
             , Coda_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking_value_versioned.Value.Stable.V1.t
             , Epoch_data.Next_value_versioned.Value.Stable.V1.t
-            , bool )
+            , bool
+            , Public_key.Compressed.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving sexp, eq, compare, hash, yojson]
 
@@ -1861,7 +1883,8 @@ module Data = struct
       , Coda_numbers.Global_slot.Checked.t
       , Epoch_data.var
       , Epoch_data.var
-      , Boolean.var )
+      , Boolean.var
+      , Public_key.Compressed.var )
       Poly.t
 
     let data_spec
@@ -1880,7 +1903,8 @@ module Data = struct
       ; Coda_numbers.Global_slot.typ
       ; Epoch_data.Staking.typ
       ; Epoch_data.Next.typ
-      ; Boolean.typ ]
+      ; Boolean.typ
+      ; Public_key.Compressed.typ ]
 
     let typ ~constraint_constants : (var, Value.t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable
@@ -1986,7 +2010,8 @@ module Data = struct
         ~(supply_increase : Currency.Amount.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
         ~(genesis_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-        ~(producer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
+        ~(producer_vrf_result : Random_oracle.Digest.t)
+        ~(block_stake_winner : Public_key.Compressed.t) : Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
         Global_slot.to_epoch_and_slot previous_consensus_state.curr_global_slot
@@ -2060,7 +2085,7 @@ module Data = struct
           same_checkpoint_window_unchecked ~constants
             (Global_slot.create ~constants ~epoch:prev_epoch ~slot:prev_slot)
             (Global_slot.create ~constants ~epoch:next_epoch ~slot:next_slot)
-      }
+      ; block_stake_winner }
 
     let same_checkpoint_window ~(constants : Constants.var)
         ~prev:(slot1 : Global_slot.Checked.t)
@@ -2127,7 +2152,8 @@ module Data = struct
             ~genesis_epoch_data:genesis_epoch_data_staking
       ; next_epoch_data=
           Epoch_data.Next.genesis ~genesis_epoch_data:genesis_epoch_data_next
-      ; has_ancestor_in_same_checkpoint_window= false }
+      ; has_ancestor_in_same_checkpoint_window= false
+      ; block_stake_winner= fst Vrf.Precomputed.genesis_winner }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition ~genesis_ledger
@@ -2155,7 +2181,8 @@ module Data = struct
                 ~constraint_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash)
+           ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
+           ~block_stake_winner:(fst Vrf.Precomputed.genesis_winner))
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
         ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
@@ -2225,6 +2252,10 @@ module Data = struct
           ~else_:previous_state.staking_epoch_data
       in
       let next_slot_number = Global_slot.slot_number next_global_slot in
+      let%bind block_stake_winner =
+        exists Public_key.Compressed.typ
+          ~request:As_prover.(return Vrf.Winner_pk)
+      in
       let%bind ( threshold_satisfied
                , vrf_result
                , truncated_vrf_result
@@ -2233,7 +2264,7 @@ module Data = struct
         Vrf.Checked.check ~constraint_constants
           (module M)
           ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_slot_number
-          ~seed:staking_epoch_data.seed
+          ~block_stake_winner ~seed:staking_epoch_data.seed
       in
       let%bind supercharge_coinbase =
         supercharge_coinbase ~winner_account ~global_slot:next_slot_number
@@ -2324,7 +2355,8 @@ module Data = struct
           ; total_currency= new_total_currency
           ; staking_epoch_data
           ; next_epoch_data
-          ; has_ancestor_in_same_checkpoint_window } )
+          ; has_ancestor_in_same_checkpoint_window
+          ; block_stake_winner } )
 
     let to_lite = None
 
@@ -2485,7 +2517,7 @@ module Data = struct
 
     let precomputed_handler = Vrf.Precomputed.handler
 
-    let handler {delegator; ledger; private_key; public_key}
+    let handler {delegator; delegator_pk; ledger; private_key; public_key}
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
@@ -2506,6 +2538,8 @@ module Data = struct
         match request with
         | Vrf.Winner_address ->
             respond (Provide delegator)
+        | Vrf.Winner_pk ->
+            respond (Provide delegator_pk)
         | Vrf.Private_key ->
             respond (Provide private_key)
         | Vrf.Public_key ->
@@ -3360,7 +3394,8 @@ module Hooks = struct
              ~consensus_transition
              ~producer_vrf_result:block_data.Block_data.vrf_result
              ~previous_protocol_state_hash ~supply_increase
-             ~snarked_ledger_hash ~genesis_ledger_hash)
+             ~snarked_ledger_hash ~genesis_ledger_hash
+             ~block_stake_winner:block_data.stake_proof.delegator_pk)
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
@@ -3470,7 +3505,8 @@ module Hooks = struct
                 (Global_slot.create ~constants ~epoch:prev_epoch
                    ~slot:prev_slot)
                 (Global_slot.create ~constants ~epoch:curr_epoch
-                   ~slot:curr_slot) }
+                   ~slot:curr_slot)
+          ; block_stake_winner= fst Vrf.Precomputed.genesis_winner }
     end
   end
 end
@@ -3571,6 +3607,7 @@ let%test_module "Proof of stake tests" =
         update ~constants ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
           ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
+          ~block_stake_winner:public_key_compressed
         |> Or_error.ok_exn
       in
       (*If this is a fork then check blockchain length and global_slot_since_genesis have increased correctly*)
@@ -3642,7 +3679,11 @@ let%test_module "Proof of stake tests" =
         let public_key = Public_key.decompress_exn public_key_compressed in
         let handler =
           Prover_state.handler ~constraint_constants
-            {delegator; ledger= sparse_ledger; private_key; public_key}
+            { delegator
+            ; delegator_pk= public_key_compressed
+            ; ledger= sparse_ledger
+            ; private_key
+            ; public_key }
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in

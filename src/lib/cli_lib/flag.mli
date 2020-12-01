@@ -59,6 +59,8 @@ module Log : sig
   val json : bool Command.Spec.param
 
   val level : Logger.Level.t Command.Spec.param
+
+  val file_log_level : Logger.Level.t Command.Spec.param
 end
 
 type signed_command_common =

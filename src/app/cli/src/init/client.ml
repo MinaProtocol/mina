@@ -470,7 +470,9 @@ let batch_send_payments =
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+    let%bind keypair =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
@@ -855,7 +857,10 @@ let dump_keypair =
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
+    let%map kp =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
+    in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
@@ -1153,7 +1158,8 @@ let import_key =
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+             privkey_path
          in
          let pk = Public_key.compress public_key in
          let%bind wallets =
