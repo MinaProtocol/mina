@@ -4,6 +4,7 @@ open Currency
 open Signature_lib
 open Coda_base
 open Integration_test_lib
+open Unix
 
 module Network_config = struct
   type block_producer_config =
@@ -79,7 +80,18 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let testnet_name = "integration-test-" ^ test_name in
+    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
+    let timestr =
+      string_of_int time_now.tm_mday
+      ^ "-"
+      ^ string_of_int time_now.tm_hour
+      ^ ":"
+      ^ string_of_int time_now.tm_min
+    in
+    (* append part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* day_of_month-hr:mn *)
+    (* ex: 15-11:30 *)
+    let testnet_name = "intgn-test-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
