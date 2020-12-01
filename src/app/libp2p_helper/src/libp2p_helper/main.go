@@ -981,7 +981,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
 		logger.Infof("dropped connection: %+v", c)
-		foundPeer(app, c.RemotePeer())
 	}
 
 	return "beginAdvertising success", nil

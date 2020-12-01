@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"codanet"
 	"context"
 	crand "crypto/rand"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -14,10 +16,17 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
+
 	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	testTimeout  = 10 * time.Second
+	testProtocol = protocol.ID("/mina/")
 )
 
 func newTestKey(t *testing.T) crypto.PrivKey {
@@ -37,7 +46,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		nil,
 		dir,
 		newTestKey(t),
-		"/mina/",
+		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
 	)
@@ -100,7 +109,19 @@ func TestDHTDiscovery(t *testing.T) {
 	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Second)
+
+	go func() {
+		<-appA.OutChan
+	}()
+
+	go func() {
+		<-appB.OutChan
+	}()
+
+	go func() {
+		<-appC.OutChan
+	}()
 
 	// begin appB and appC's DHT advertising
 	ret, err := new(beginAdvertisingMsg).run(appB)
@@ -111,17 +132,24 @@ func TestDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ret, "beginAdvertising success")
 
-	time.Sleep(time.Second * 7)
+	done := make(chan struct{})
 
-	// check if peerB knows about peerC
-	ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
-	for _, id := range ids {
-		if id == appC.P2p.Host.ID() {
-			return
+	go func() {
+		// check if peerB knows about peerC
+		ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
+		for _, id := range ids {
+			if id == appC.P2p.Host.ID() {
+				close(done)
+				return
+			}
 		}
-	}
+	}()
 
-	t.Fatal("B did not discover C via DHT")
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("B did not discover C via DHT")
+	case <-done:
+	}
 }
 
 func TestMDNSDiscovery(t *testing.T) {
@@ -142,19 +170,81 @@ func TestMDNSDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ret, "beginAdvertising success")
 
-	time.Sleep(time.Second * 2)
+	done := make(chan struct{})
 
-	// check if peerB knows about peerA
-	ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
-	for _, id := range ids {
-		if id == appA.P2p.Host.ID() {
-			return
+	go func() {
+		// check if peerB knows about peerA
+		ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
+		for _, id := range ids {
+			if id == appA.P2p.Host.ID() {
+				close(done)
+				return
+			}
 		}
-	}
+	}()
 
-	t.Fatal("B did not discover A via mDNS")
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("B did not discover A via mDNS")
+	case <-done:
+	}
+}
+
+func createLargeMessage() []byte {
+	return make([]byte, (1 << 30))
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
+	appA := newTestApp(t, nil)
+	appA.NoDHT = true
+	defer appA.P2p.Host.Close()
+
+	appB := newTestApp(t, nil)
+	appB.NoDHT = true
+	defer appB.P2p.Host.Close()
+
+	// connect the two nodes
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	// create handler that reads 1<<30 bytes
+	done := make(chan struct{})
+	handler := func(stream net.Stream) {
+		r := bufio.NewReader(stream)
+		i := 0
+
+		for {
+			_, err := r.ReadByte()
+			if err == io.EOF {
+				break
+			}
+
+			i++
+			if i == 1<<30 {
+				close(done)
+				return
+			}
+		}
+	}
+
+	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+	// send large message from A to B
+	msg := createLargeMessage()
+
+	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+	require.NoError(t, err)
+
+	_, err = stream.Write(msg)
+	require.NoError(t, err)
+
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("B did not receive a large message from A")
+	case <-done:
+	}
 }
