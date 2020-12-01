@@ -9,19 +9,22 @@ type crash = Overflow_behavior_crash
 
 type drop_head = Overflow_behavior_drop_head
 
-type _ overflow_behavior =
-  | Crash : crash overflow_behavior
-  | Drop_head : drop_head overflow_behavior
+type call = Overflow_behavior_call
+
+type (_, _, _) overflow_behavior =
+  | Crash : ('a, crash, unit) overflow_behavior
+  | Drop_head : ('a, drop_head, unit) overflow_behavior
+  | Call : ('a -> 'r) -> ('a, call, 'r option) overflow_behavior
 
 type synchronous = Type_synchronous
 
 type _ buffered = Type_buffered
 
-type (_, _) type_ =
-  | Synchronous : (synchronous, unit Deferred.t) type_
+type (_, _, _) type_ =
+  | Synchronous : ('a, synchronous, unit Deferred.t) type_
   | Buffered :
-      [`Capacity of int] * [`Overflow of 'b overflow_behavior]
-      -> ('b buffered, unit) type_
+      [`Capacity of int] * [`Overflow of ('a, 'b, 'r) overflow_behavior]
+      -> ('a, 'b buffered, 'r) type_
 
 let value_or_empty = Option.value ~default:"<unnamed>"
 
@@ -211,7 +214,7 @@ end
 
 module Writer = struct
   type ('t, 'type_, 'write_return) t =
-    { type_: ('type_, 'write_return) type_
+    { type_: ('t, 'type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
     ; writer: 't Pipe.Writer.t
     ; name: string option }
@@ -219,20 +222,18 @@ module Writer = struct
   (* TODO: See #1281 *)
   let to_linear_pipe {writer= pipe; _} = pipe
 
-  let handle_overflow : type b.
-      ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
-   fun writer data overflow_behavior ->
-    match overflow_behavior with
-    | Crash ->
-        raise (Overflow (value_or_empty writer.name))
-    | Drop_head ->
-        let logger = Logger.create () in
-        let my_name = Option.value writer.name ~default:"<unnamed>" in
-        [%log warn]
-          ~metadata:[("pipe_name", `String my_name)]
-          "Dropping message on pipe $pipe_name" ;
-        ignore (Pipe.read_now writer.strict_reader.reader) ;
-        Pipe.write_without_pushback writer.writer data
+  let handle_buffered_write : type type_ return.
+         ('t, type_, return) t
+      -> 't
+      -> capacity:int
+      -> on_overflow:(unit -> return)
+      -> normal_return:return
+      -> return =
+   fun t data ~capacity ~on_overflow ~normal_return ->
+    if Pipe.length t.strict_reader.reader > capacity then on_overflow ()
+    else (
+      Pipe.write_without_pushback t.writer data ;
+      normal_return )
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
@@ -247,10 +248,25 @@ module Writer = struct
     match writer.type_ with
     | Synchronous ->
         Pipe.write writer.writer data
-    | Buffered (`Capacity capacity, `Overflow overflow) ->
-        if Pipe.length writer.strict_reader.reader > capacity then
-          handle_overflow writer data overflow
-        else Pipe.write_without_pushback writer.writer data
+    | Buffered (`Capacity capacity, `Overflow Crash) ->
+        handle_buffered_write writer data ~capacity
+          ~on_overflow:(fun () -> raise (Overflow (value_or_empty writer.name)))
+          ~normal_return:()
+    | Buffered (`Capacity capacity, `Overflow Drop_head) ->
+        handle_buffered_write writer data ~capacity
+          ~on_overflow:(fun () ->
+            let logger = Logger.create () in
+            let my_name = Option.value writer.name ~default:"<unnamed>" in
+            [%log warn]
+              ~metadata:[("pipe_name", `String my_name)]
+              "Dropping message on pipe $pipe_name" ;
+            ignore (Pipe.read_now writer.strict_reader.reader) ;
+            Pipe.write_without_pushback writer.writer data )
+          ~normal_return:()
+    | Buffered (`Capacity capacity, `Overflow (Call f)) ->
+        handle_buffered_write writer data ~capacity
+          ~on_overflow:(fun () -> Some (f data))
+          ~normal_return:None
 
   let close {strict_reader; writer; _} =
     Pipe.close writer ;

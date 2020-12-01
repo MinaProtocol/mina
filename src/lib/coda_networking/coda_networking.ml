@@ -1125,10 +1125,11 @@ let create (config : Config.t)
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              [%str_log debug]
-                (Snark_work_received
-                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
-                   ; sender= Envelope.Incoming.sender envelope }) ;
+              Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
+                ~f:(fun work ->
+                  [%str_log debug]
+                    (Snark_work_received
+                       {work; sender= Envelope.Incoming.sender envelope}) ) ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
@@ -1209,7 +1210,9 @@ let broadcast_snark_pool_diff t diff =
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
     ~log_msg:
       (Gossip_snark_pool_diff
-         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
+         { work=
+             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+         })
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =
