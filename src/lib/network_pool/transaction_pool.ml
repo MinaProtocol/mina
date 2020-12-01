@@ -743,7 +743,7 @@ struct
 
       let size = List.length
 
-      let score = List.length
+      let score x = Int.max 1 (List.length x)
 
       let max_per_second = 2
 

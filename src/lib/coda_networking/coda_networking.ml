@@ -1062,7 +1062,7 @@ let create (config : Config.t)
         { rpc= Get_transition_chain
         ; f= get_transition_chain_rpc
         ; budget= (1, `Per second) (* Not that confident about this one. *)
-        ; cost= List.length }
+        ; cost= (fun x -> Int.max 1 (List.length x)) }
     ; Rpc_handler
         { rpc= Get_transition_chain_proof
         ; f= get_transition_chain_proof_rpc
