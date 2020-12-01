@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params
-open Signed
 open Unsigned
 
 module T = Coda_numbers.Nat.Make32 ()
@@ -18,7 +17,6 @@ module Checked = struct
 
   let in_seed_update_range ~(constants : Constants.var) (slot : var) =
     let open Tick in
-    let open Tick.Let_syntax in
     let open Snarky_integer in
     let module Length = Coda_numbers.Length in
     let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
