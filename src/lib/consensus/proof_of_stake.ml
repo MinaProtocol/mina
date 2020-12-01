@@ -2228,7 +2228,8 @@ module Data = struct
         Global_slot.Checked.of_slot_number ~constants transition_data
       in
       let%bind slot_diff =
-        Global_slot.Checked.sub next_global_slot prev_global_slot
+        [%with_label "Next global slot is less that previous global slot"]
+          Global_slot.Checked.sub next_global_slot prev_global_slot
       in
       let%bind () =
         let%bind global_slot_increased =
