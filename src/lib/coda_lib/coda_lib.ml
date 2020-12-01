@@ -820,7 +820,31 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
-            Strict_pipe.create Synchronous
+            let meter =
+              Network_pool.Meter.create
+                ~capacity:
+                  ( (* Max of 20 transitions per slot per peer. *)
+                    20
+                  , `Per
+                      (Block_time.Span.to_time_span
+                         consensus_constants.slot_duration_ms) )
+            in
+            let r, w = Strict_pipe.create Synchronous in
+            ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
+                  let sender = Envelope.Incoming.sender e in
+                  match
+                    Network_pool.Meter.add meter sender ~now:(Time.now ())
+                      ~score:1
+                  with
+                  | `Capacity_exceeded ->
+                      [%log' warn config.logger]
+                        "$sender has sent many blocks. This is very unusual."
+                        ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
+                      cb `Reject ;
+                      None
+                  | `Ok ->
+                      Some x )
+            , w )
           in
           let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
