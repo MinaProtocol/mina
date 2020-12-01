@@ -81,6 +81,7 @@ module Diff_versioned : sig
             Transaction_snark_work.Statement.Stable.V1.t
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
+        | Empty
       [@@deriving compare, sexp]
     end
   end]

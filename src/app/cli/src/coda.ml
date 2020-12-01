@@ -309,14 +309,16 @@ let setup_daemon logger =
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
            ~num_rotate:1) ;
+    let version_metadata =
+      [ ("commit", `String Coda_version.commit_id)
+      ; ("branch", `String Coda_version.branch)
+      ; ("commit_date", `String Coda_version.commit_date)
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
+      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+    in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
-      ~metadata:
-        [ ("commit", `String Coda_version.commit_id)
-        ; ("branch", `String Coda_version.branch)
-        ; ("commit_date", `String Coda_version.commit_date)
-        ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-        ; ("zexe_commit", `String Coda_version.zexe_commit_id) ] ;
+      ~metadata:version_metadata ;
     let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
@@ -366,40 +368,43 @@ let setup_daemon logger =
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
+      let version_filename = conf_dir ^/ "coda.version" in
       let make_version () =
-        let%bind () =
+        let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
           File_system.remove_dir (conf_dir ^/ "trace")
         in
-        let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
-        Writer.write_line wr Coda_version.commit_id ;
-        Writer.close wr
+        Yojson.Safe.to_file version_filename (`Assoc version_metadata)
       in
-      match%bind
-        Monitor.try_with_or_error (fun () ->
-            let%bind r = Reader.open_file (conf_dir ^/ "coda.version") in
-            match%map Pipe.to_list (Reader.lines r) with
-            | [] ->
-                ""
-            | s ->
-                List.hd_exn s )
+      match
+        Or_error.try_with_join (fun () ->
+            match Yojson.Safe.from_file version_filename with
+            | `Assoc list -> (
+              match String.Map.(find (of_alist_exn list) "commit") with
+              | Some (`String commit) ->
+                  Ok commit
+              | _ ->
+                  Or_error.errorf "commit not found in version file %s"
+                    version_filename )
+            | _ ->
+                Or_error.errorf "Unexpected value in %s" version_filename )
       with
       | Ok c ->
           if String.equal c Coda_version.commit_id then return ()
           else (
             [%log warn]
-              "Different version of Coda detected in config directory \
+              "Different version of Mina detected in config directory \
                $config_directory, removing existing configuration"
               ~metadata:[("config_directory", `String conf_dir)] ;
             make_version () )
       | Error e ->
-          [%log trace]
-            ~metadata:[("error", `String (Error.to_string_mach e))]
-            "Error reading coda.version: $error" ;
           [%log debug]
-            "Failed to read coda.version, cleaning up the config directory \
+            "Error reading $file: $error. Cleaning up the config directory \
              $config_directory"
-            ~metadata:[("config_directory", `String conf_dir)] ;
+            ~metadata:
+              [ ("error", `String (Error.to_string_mach e))
+              ; ("config_directory", `String conf_dir)
+              ; ("file", `String version_filename) ] ;
           make_version ()
     in
     Memory_stats.log_memory_stats logger ~process:"daemon" ;
@@ -1345,8 +1350,7 @@ let print_version_help coda_exe version =
   List.iter lines ~f:(Core.printf "%s\n%!")
 
 let print_version_info () =
-  Core.printf "Commit %s on branch %s\n"
-    (String.sub Coda_version.commit_id ~pos:0 ~len:7)
+  Core.printf "Commit %s on branch %s\n" Coda_version.commit_id
     Coda_version.branch
 
 let () =

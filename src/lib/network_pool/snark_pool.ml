@@ -496,6 +496,7 @@ module Diff_versioned = struct
             Transaction_snark_work.Statement.Stable.V1.t
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
+        | Empty
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -506,6 +507,7 @@ module Diff_versioned = struct
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Empty
   [@@deriving compare, sexp, to_yojson]
 end
 
@@ -875,6 +877,8 @@ let%test_module "random set test" =
                      | Mock_snark_pool.Resource_pool.Diff.Add_solved_work
                          (work, _) ->
                          work
+                     | Mock_snark_pool.Resource_pool.Diff.Empty ->
+                         assert false
                    in
                    assert (List.mem works work ~equal:( = )) ;
                    Deferred.unit ) ;
