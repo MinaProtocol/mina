@@ -24,7 +24,6 @@ apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
 TESTNET_NAME="turbo-pickles"
 
-cd coda-automation && git pull origin master && cd -
 
 if [ ! -d coda-automation ]; then
   # Somebody ran this without the mina repo checked out...
@@ -36,6 +35,8 @@ if [ ! -d coda-automation ]; then
   || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/genesis_ledger.json  --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json
   curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/peers.txt --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
   || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/peers.txt  --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt
+else
+  cd coda-automation && git pull origin master && cd -
 fi
 
 # Generate genesis proof and then crash due to no peers
