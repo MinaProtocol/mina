@@ -123,7 +123,7 @@ Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml
 The makefile contains phony targets for all the common tasks that need to be done.
 It also knows how to use Docker automatically. If you have `USEDOCKER=TRUE` in your
 environment, or run `make USEDOCKER=TRUE`, it will do the real work inside a container.
-You should probably use `USEDOCKER=TRUE` unless you've done the [building without docker](#building-without-docker) steps.
+You should probably use `USEDOCKER=TRUE` unless you've done the [building without docker](#building-outside-docker) steps.
 
 These are the most important `make` targets:
 
