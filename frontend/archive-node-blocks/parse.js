@@ -44,5 +44,19 @@ const getSnarkedLedgerHashFromBlocks = () => {
   return Array.from(hashes).map((hash) => [hash]);
 };
 
+const getEpochDataFromBlocks = () => {
+  let epochs = [];
+  blocks.forEach((block) => {
+    const seed = block?.protocolState?.consensusState?.nextEpochData?.seed;
+    const ledgerHashId =
+      block?.protocolState?.blockchainState?.snarkedLedgerHash;
+    if (seed && ledgerHashId) {
+      epochs.push({ seed, ledgerHashId });
+    }
+  });
+  return epochs;
+};
+
 module.exports.getPublicKeysFromBlocks = getPublicKeysFromBlocks;
 module.exports.getSnarkedLedgerHashFromBlocks = getSnarkedLedgerHashFromBlocks;
+module.exports.getEpochDataFromBlocks = getEpochDataFromBlocks;
