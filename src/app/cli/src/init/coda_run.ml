@@ -560,7 +560,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
   |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
-  let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
+  let exn_json = Error_json.error_to_yojson e in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", exn_json)] ;
@@ -638,8 +638,9 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
-           | exn ->
-               handle_crash exn ~time_controller ~conf_dir ~child_pids
+           | _ ->
+               let err = Monitor.exn_to_error exn
+               handle_crash err ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
