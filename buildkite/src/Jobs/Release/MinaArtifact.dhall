@@ -57,6 +57,8 @@ Pipeline.build
 
       DeployTestnet.step "ci-net" [ { name = "MinaArtifact", key = "mina-docker-image" }, { name = "ArchiveNodeArtifact", key = "archive-docker-image" } ],
 
+      DeployTestnet.step "ci-net" dependsOn,
+
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
