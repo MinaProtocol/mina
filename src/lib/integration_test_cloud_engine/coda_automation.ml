@@ -85,14 +85,12 @@ module Network_config = struct
       string_of_int time_now.tm_mday
       ^ "-"
       ^ string_of_int time_now.tm_hour
-      ^ ":"
       ^ string_of_int time_now.tm_min
-      ^ ":"
       ^ string_of_int time_now.tm_sec
     in
     (* append part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
     (* day_of_month-hr:mn:sec *)
-    (* ex: 15-11:30:27 *)
+    (* ex: 15-113027 *)
     let testnet_name = "intgn-test-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
