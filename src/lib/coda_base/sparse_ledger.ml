@@ -597,7 +597,7 @@ let apply_coinbase_exn ~constraint_constants ~txn_global_slot t
 let apply_transaction_exn ~constraint_constants
     ~(txn_state_view : Snapp_predicate.Protocol_state.View.t) t
     (transition : Transaction.t) =
-  let txn_global_slot = txn_state_view.curr_global_slot in
+  let txn_global_slot = txn_state_view.global_slot_since_genesis in
   match transition with
   | Fee_transfer tr ->
       apply_fee_transfer_exn ~constraint_constants ~txn_global_slot t tr

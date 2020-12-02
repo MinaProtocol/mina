@@ -1657,7 +1657,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let root = s.source in
         let ( (root as root_after_fee_payer)
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
@@ -1780,7 +1780,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -1920,7 +1920,7 @@ module Base = struct
               (Zero_proved (Zero_proved.Checked.digested payload)))
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -2112,7 +2112,7 @@ module Base = struct
     in
     let current_global_slot =
       Coda_state.Protocol_state.Body.consensus_state state_body
-      |> Consensus.Data.Consensus_state.curr_global_slot_var
+      |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
     let%bind creating_new_token =
       Boolean.(is_create_account &&& token_invalid)
@@ -3613,7 +3613,7 @@ let%test_module "transaction_snark" =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Coda_state.Protocol_state.Body.consensus_state state_body
-        |> Consensus.Data.Consensus_state.curr_slot
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
       in
       let next_available_token_before = Ledger.next_available_token ledger in
       let target, `Next_available_token next_available_token_after =
@@ -3739,7 +3739,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let next_available_token_before =
                 Ledger.next_available_token ledger
@@ -3913,7 +3913,7 @@ let%test_module "transaction_snark" =
               in
               let consensus_state_at_slot =
                 Consensus.Data.Consensus_state.Value.For_tests
-                .with_curr_global_slot
+                .with_global_slot_since_genesis
                   (Coda_state.Protocol_state.consensus_state state)
                   txn_global_slot
               in
@@ -4201,7 +4201,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body1
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
@@ -4252,7 +4252,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body2
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants

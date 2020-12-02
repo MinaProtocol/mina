@@ -73,6 +73,8 @@ let ( + ) (x : t) n : t = {x with slot_number= T.add x.slot_number (T.of_int n)}
 
 let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
 
+let ( - ) (t : t) (t' : t) = T.sub t.slot_number t'.slot_number
+
 let succ (t : t) = {t with slot_number= T.succ t.slot_number}
 
 let of_slot_number ~(constants : Constants.t) slot_number =
@@ -138,6 +140,8 @@ module Checked = struct
         in
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )
+
+  let sub (t : t) (t' : t) = T.Checked.sub t.slot_number t'.slot_number
 end
 
 module For_tests = struct

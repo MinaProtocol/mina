@@ -56,7 +56,9 @@ module Constraint_constants = struct
   module Fork_config = struct
     (** Fork data *)
     type t = Runtime_config.Fork_config.t =
-      {previous_state_hash: string; previous_length: int}
+      { previous_state_hash: string
+      ; previous_length: int
+      ; previous_global_slot: int }
     [@@deriving yojson]
 
     let opt_to_yojson t : Yojson.Safe.t =
