@@ -213,10 +213,10 @@ WITH RECURSIVE chain AS (
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
   ON b.id = chain.parent_id AND chain.id <> chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
+) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, pk.value as creator FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
   WHERE c.height = ?
@@ -224,7 +224,7 @@ WITH RECURSIVE chain AS (
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? |}
@@ -233,21 +233,21 @@ WITH RECURSIVE chain AS (
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
         WHERE b.id = ? |}
 
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator FROM blocks b
            INNER JOIN public_keys pk
            ON pk.id = b.creator_id
            WHERE b.height = (select MAX(b.height) from blocks b)

@@ -526,6 +526,7 @@ module Block = struct
     ; ledger_hash: string
     ; height: int64
     ; global_slot: int64
+    ; global_slot_since_genesis: int64
     ; timestamp: int64 }
   [@@deriving hlist]
 
@@ -533,7 +534,18 @@ module Block = struct
     let open Caqti_type_spec in
     let spec =
       Caqti_type.
-        [string; int; int; int; int; int; int; string; int64; int64; int64]
+        [ string
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; int64
+        ; int64
+        ; int64 ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -556,7 +568,8 @@ module Block = struct
       (Caqti_request.find Caqti_type.int typ
          "SELECT state_hash, parent_id, creator_id, block_winner_id, \
           snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, \
-          ledger_hash, height, global_slot, timestamp FROM blocks WHERE id = ?")
+          ledger_hash, height, global_slot, global_slot_since_genesis, \
+          timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
@@ -614,17 +627,17 @@ module Block = struct
                    Unsigned.UInt32.one
                then
                  "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
-                  block_winner_idsnarked_ledger_hash_id, \
+                  block_winner_id, snarked_ledger_hash_id, \
                   staking_epoch_data_id, next_epoch_data_id, ledger_hash, \
-                  height, global_slot, timestamp) VALUES ("
-                 ^ string_of_int parent_id
-                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+                  height, global_slot, global_slot_since_genesis, timestamp) \
+                  VALUES (" ^ string_of_int parent_id
+                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
                else
-                 "INSERT INTO blocks (state_hash, parent_id, \
-                  creator_id,block_winner_id snarked_ledger_hash_id, \
+                 "INSERT INTO blocks (state_hash, parent_id, creator_id, \
+                  block_winner_id, snarked_ledger_hash_id, \
                   staking_epoch_data_id, next_epoch_data_id, ledger_hash, \
-                  height, global_slot, timestamp) VALUES (?, ?, ?, ?, ?, ?, \
-                  ?, ?, ?, ?, ?) RETURNING id" ))
+                  height, global_slot, global_slot_since_genesis, timestamp) \
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id" ))
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; creator_id
@@ -641,6 +654,10 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; global_slot=
                 External_transition.global_slot t |> Unsigned.UInt32.to_int64
+            ; global_slot_since_genesis=
+                External_transition.consensus_state t
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
+                |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             }
         in
