@@ -24,23 +24,6 @@ use std::{
 
 use std::rc::Rc;
 
-pub struct CamlTweedleFqPlonkVerifierIndexRaw<'a>(
-    pub DlogVerifierIndex<'a, GAffine>,
-    pub Rc<SRS<GAffine>>,
-);
-
-pub type CamlTweedleFqPlonkVerifierIndexRawPtr<'a> =
-    ocaml::Pointer<CamlTweedleFqPlonkVerifierIndexRaw<'a>>;
-
-extern "C" fn caml_tweedle_fq_plonk_verifier_index_raw_finalize(v: ocaml::Value) {
-    let v: ocaml::Pointer<CamlTweedleFqPlonkVerifierIndexRaw> = ocaml::FromValue::from_value(v);
-    unsafe { v.drop_in_place() };
-}
-
-ocaml::custom!(CamlTweedleFqPlonkVerifierIndexRaw<'a> {
-    finalize: caml_tweedle_fq_plonk_verifier_index_raw_finalize,
-});
-
 pub type CamlTweedleFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<Fq, CamlTweedleFqUrs, PolyComm<GAffine>>;
 
@@ -59,24 +42,24 @@ pub fn to_ocaml<'a>(
         max_quot_size: vi.max_quot_size as isize,
         urs: CamlTweedleFqUrs(Rc::clone(urs)),
         evals: CamlPlonkVerificationEvals {
-            sigma_comm0: sigma_comm0.into(),
-            sigma_comm1: sigma_comm1.into(),
-            sigma_comm2: sigma_comm2.into(),
-            ql_comm: vi.ql_comm.into(),
-            qr_comm: vi.qr_comm.into(),
-            qo_comm: vi.qo_comm.into(),
-            qm_comm: vi.qm_comm.into(),
-            qc_comm: vi.qc_comm.into(),
-            rcm_comm0: rcm_comm0.into(),
-            rcm_comm1: rcm_comm1.into(),
-            rcm_comm2: rcm_comm2.into(),
-            psm_comm: vi.psm_comm.into(),
-            add_comm: vi.add_comm.into(),
-            mul1_comm: vi.mul1_comm.into(),
-            mul2_comm: vi.mul2_comm.into(),
-            emul1_comm: vi.emul1_comm.into(),
-            emul2_comm: vi.emul2_comm.into(),
-            emul3_comm: vi.emul3_comm.into(),
+            sigma_comm0: sigma_comm0,
+            sigma_comm1: sigma_comm1,
+            sigma_comm2: sigma_comm2,
+            ql_comm: vi.ql_comm,
+            qr_comm: vi.qr_comm,
+            qo_comm: vi.qo_comm,
+            qm_comm: vi.qm_comm,
+            qc_comm: vi.qc_comm,
+            rcm_comm0: rcm_comm0,
+            rcm_comm1: rcm_comm1,
+            rcm_comm2: rcm_comm2,
+            psm_comm: vi.psm_comm,
+            add_comm: vi.add_comm,
+            mul1_comm: vi.mul1_comm,
+            mul2_comm: vi.mul2_comm,
+            emul1_comm: vi.emul1_comm,
+            emul2_comm: vi.emul2_comm,
+            emul3_comm: vi.emul3_comm,
         },
         shifts: CamlPlonkVerificationShifts { r: vi.r, o: vi.o },
     }
@@ -97,24 +80,24 @@ pub fn to_ocaml_copy<'a>(
         max_quot_size: vi.max_quot_size as isize,
         urs: CamlTweedleFqUrs(Rc::clone(urs)),
         evals: CamlPlonkVerificationEvals {
-            sigma_comm0: sigma_comm0.clone().into(),
-            sigma_comm1: sigma_comm1.clone().into(),
-            sigma_comm2: sigma_comm2.clone().into(),
-            ql_comm: vi.ql_comm.clone().into(),
-            qr_comm: vi.qr_comm.clone().into(),
-            qo_comm: vi.qo_comm.clone().into(),
-            qm_comm: vi.qm_comm.clone().into(),
-            qc_comm: vi.qc_comm.clone().into(),
-            rcm_comm0: rcm_comm0.clone().into(),
-            rcm_comm1: rcm_comm1.clone().into(),
-            rcm_comm2: rcm_comm2.clone().into(),
-            psm_comm: vi.psm_comm.clone().into(),
-            add_comm: vi.add_comm.clone().into(),
-            mul1_comm: vi.mul1_comm.clone().into(),
-            mul2_comm: vi.mul2_comm.clone().into(),
-            emul1_comm: vi.emul1_comm.clone().into(),
-            emul2_comm: vi.emul2_comm.clone().into(),
-            emul3_comm: vi.emul3_comm.clone().into(),
+            sigma_comm0: sigma_comm0.clone(),
+            sigma_comm1: sigma_comm1.clone(),
+            sigma_comm2: sigma_comm2.clone(),
+            ql_comm: vi.ql_comm.clone(),
+            qr_comm: vi.qr_comm.clone(),
+            qo_comm: vi.qo_comm.clone(),
+            qm_comm: vi.qm_comm.clone(),
+            qc_comm: vi.qc_comm.clone(),
+            rcm_comm0: rcm_comm0.clone(),
+            rcm_comm1: rcm_comm1.clone(),
+            rcm_comm2: rcm_comm2.clone(),
+            psm_comm: vi.psm_comm.clone(),
+            add_comm: vi.add_comm.clone(),
+            mul1_comm: vi.mul1_comm.clone(),
+            mul2_comm: vi.mul2_comm.clone(),
+            emul1_comm: vi.emul1_comm.clone(),
+            emul2_comm: vi.emul2_comm.clone(),
+            emul3_comm: vi.emul3_comm.clone(),
         },
         shifts: CamlPlonkVerificationShifts { r: vi.r, o: vi.o },
     }
@@ -127,7 +110,7 @@ pub fn of_ocaml<'a>(
     urs: CamlTweedleFqUrs,
     evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
     shifts: CamlPlonkVerificationShifts<Fq>,
-) -> CamlTweedleFqPlonkVerifierIndexRaw<'a> {
+) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&urs.0);
     let urs_copy_outer = Rc::clone(&urs.0);
     let srs = {
@@ -144,38 +127,30 @@ pub fn of_ocaml<'a>(
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
-        sigma_comm: [
-            evals.sigma_comm0.into(),
-            evals.sigma_comm1.into(),
-            evals.sigma_comm2.into(),
-        ],
-        ql_comm: evals.ql_comm.into(),
-        qr_comm: evals.qr_comm.into(),
-        qo_comm: evals.qo_comm.into(),
-        qm_comm: evals.qm_comm.into(),
-        qc_comm: evals.qc_comm.into(),
-        rcm_comm: [
-            evals.rcm_comm0.into(),
-            evals.rcm_comm1.into(),
-            evals.rcm_comm2.into(),
-        ],
-        psm_comm: evals.psm_comm.into(),
-        add_comm: evals.add_comm.into(),
-        mul1_comm: evals.mul1_comm.into(),
-        mul2_comm: evals.mul2_comm.into(),
-        emul1_comm: evals.emul1_comm.into(),
-        emul2_comm: evals.emul2_comm.into(),
-        emul3_comm: evals.emul3_comm.into(),
+        sigma_comm: [evals.sigma_comm0, evals.sigma_comm1, evals.sigma_comm2],
+        ql_comm: evals.ql_comm,
+        qr_comm: evals.qr_comm,
+        qo_comm: evals.qo_comm,
+        qm_comm: evals.qm_comm,
+        qc_comm: evals.qc_comm,
+        rcm_comm: [evals.rcm_comm0, evals.rcm_comm1, evals.rcm_comm2],
+        psm_comm: evals.psm_comm,
+        add_comm: evals.add_comm,
+        mul1_comm: evals.mul1_comm,
+        mul2_comm: evals.mul2_comm,
+        emul1_comm: evals.emul1_comm,
+        emul2_comm: evals.emul2_comm,
+        emul3_comm: evals.emul3_comm,
         r: shifts.r,
         o: shifts.o,
         fr_sponge_params: oracle::tweedle::fq::params(),
         fq_sponge_params: oracle::tweedle::fp::params(),
         endo: endo_q,
     };
-    CamlTweedleFqPlonkVerifierIndexRaw(index, urs_copy_outer)
+    (index, urs_copy_outer)
 }
 
-impl From<CamlTweedleFqPlonkVerifierIndex> for CamlTweedleFqPlonkVerifierIndexRaw<'_> {
+impl From<CamlTweedleFqPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
     fn from(index: CamlTweedleFqPlonkVerifierIndex) -> Self {
         of_ocaml(
             index.max_poly_size,
@@ -185,12 +160,7 @@ impl From<CamlTweedleFqPlonkVerifierIndex> for CamlTweedleFqPlonkVerifierIndexRa
             index.evals,
             index.shifts,
         )
-    }
-}
-
-impl From<CamlTweedleFqPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
-    fn from(index: CamlTweedleFqPlonkVerifierIndex) -> Self {
-        CamlTweedleFqPlonkVerifierIndexRaw::from(index).0
+        .0
     }
 }
 
@@ -198,7 +168,7 @@ pub fn read_raw<'a>(
     offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
-) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'a>, ocaml::Error> {
+) -> Result<(DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>), ocaml::Error> {
     match File::open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument(
             "caml_tweedle_fq_plonk_verifier_index_raw_read",
@@ -222,18 +192,9 @@ pub fn read_raw<'a>(
                 Rc::into_raw(urs.0),
                 &mut r,
             )?;
-            Ok(CamlTweedleFqPlonkVerifierIndexRaw(t, Rc::clone(&urs_copy)))
+            Ok((t, Rc::clone(&urs_copy)))
         }
     }
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_raw_read(
-    offset: Option<ocaml::Int>,
-    urs: CamlTweedleFqUrs,
-    path: String,
-) -> Result<CamlTweedleFqPlonkVerifierIndexRaw<'static>, ocaml::Error> {
-    read_raw(offset, urs, path)
 }
 
 #[ocaml::func]
@@ -242,8 +203,8 @@ pub fn caml_tweedle_fq_plonk_verifier_index_read(
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkVerifierIndex, ocaml::Error> {
-    let t = read_raw(offset, urs, path)?;
-    Ok(to_ocaml(&t.1, t.0))
+    let (vi, urs) = read_raw(offset, urs, path)?;
+    Ok(to_ocaml(&urs, vi))
 }
 
 pub fn write_raw(
@@ -268,76 +229,12 @@ pub fn write_raw(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_raw_write(
-    append: Option<bool>,
-    index: CamlTweedleFqPlonkVerifierIndexRawPtr,
-    path: String,
-) -> Result<(), ocaml::Error> {
-    write_raw(append, &index.as_ref().0, path)
-}
-
-#[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_write(
     append: Option<bool>,
     index: CamlTweedleFqPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(
-        append,
-        &CamlTweedleFqPlonkVerifierIndexRaw::from(index).0,
-        path,
-    )
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
-    max_poly_size: ocaml::Int,
-    max_quot_size: ocaml::Int,
-    log_size_of_group: ocaml::Int,
-    urs: CamlTweedleFqUrs,
-    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
-    shifts: CamlPlonkVerificationShifts<Fq>,
-) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    of_ocaml(
-        max_poly_size,
-        max_quot_size,
-        log_size_of_group,
-        urs,
-        evals,
-        shifts,
-    )
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_ocaml(
-    index: CamlTweedleFqPlonkVerifierIndex,
-) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    index.into()
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_ocaml_of_raw(
-    index: CamlTweedleFqPlonkVerifierIndexRawPtr,
-) -> CamlTweedleFqPlonkVerifierIndex {
-    let index = index.as_ref();
-    // We make a copy here because we can't move values out of the raw version.
-    to_ocaml_copy(&index.1, &index.0)
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_verifier_index_raw_create(
-    mut index: CamlTweedleFqPlonkIndexPtr<'static>,
-) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
-    let urs = Rc::clone(&index.as_ref().1);
-    let verifier_index: DlogVerifierIndex<'static, GAffine> =
-        // The underlying urs reference forces a lifetime borrow of `index`, but really
-        // * we only need to borrow the urs
-        // * we know statically that the urs will be live for the whole duration because of the
-        //   refcounted references.
-        // We prefer this to a pointer round-trip because we don't want to allocate memory when the
-        // optimizer will otherwise see to place this straight in the OCaml heap.
-        unsafe { std::mem::transmute(index.as_ref().0.verifier_index()) };
-    CamlTweedleFqPlonkVerifierIndexRaw(verifier_index, urs)
+    write_raw(append, &index.into(), path)
 }
 
 #[ocaml::func]

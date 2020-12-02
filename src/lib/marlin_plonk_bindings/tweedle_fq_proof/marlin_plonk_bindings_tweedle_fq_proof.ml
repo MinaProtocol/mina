@@ -16,26 +16,12 @@ external create :
   -> t
   = "caml_tweedle_fq_plonk_proof_create"
 
-external verify_raw :
-     Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t array
-  -> Marlin_plonk_bindings_tweedle_fq_verifier_index.Raw.t
-  -> t
-  -> bool
-  = "caml_tweedle_fq_plonk_proof_verify_raw"
-
 external verify :
      Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t array
   -> Marlin_plonk_bindings_tweedle_fq_verifier_index.t
   -> t
   -> bool
   = "caml_tweedle_fq_plonk_proof_verify"
-
-external batch_verify_raw :
-     Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t array array
-  -> Marlin_plonk_bindings_tweedle_fq_verifier_index.Raw.t array
-  -> t array
-  -> bool
-  = "caml_tweedle_fq_plonk_proof_batch_verify_raw"
 
 external batch_verify :
      Marlin_plonk_bindings_tweedle_fq_urs.Poly_comm.t array array

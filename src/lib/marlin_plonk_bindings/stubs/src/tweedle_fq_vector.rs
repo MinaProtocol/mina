@@ -1,5 +1,5 @@
-use algebra::tweedle::fq::Fq;
 use crate::caml_pointer::{self, CamlPointer};
+use algebra::tweedle::fq::Fq;
 
 pub type CamlTweedleFqVector = CamlPointer<Vec<Fq>>;
 

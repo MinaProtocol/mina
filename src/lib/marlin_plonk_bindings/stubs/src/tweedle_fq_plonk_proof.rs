@@ -22,9 +22,7 @@ use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifi
 use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
-use crate::tweedle_fq_plonk_verifier_index::{
-    CamlTweedleFqPlonkVerifierIndex, CamlTweedleFqPlonkVerifierIndexRawPtr,
-};
+use crate::tweedle_fq_plonk_verifier_index::CamlTweedleFqPlonkVerifierIndex;
 use crate::tweedle_fq_vector::CamlTweedleFqVector;
 
 #[ocaml::func]
@@ -102,47 +100,12 @@ pub fn proof_verify(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_plonk_proof_verify_raw(
-    lgr_comm: Vec<PolyComm<GAffine>>,
-    index: CamlTweedleFqPlonkVerifierIndexRawPtr<'static>,
-    proof: DlogProof<GAffine>,
-) -> bool {
-    proof_verify(lgr_comm, &index.as_ref().0, proof)
-}
-
-#[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_verify(
     lgr_comm: Vec<PolyComm<GAffine>>,
     index: CamlTweedleFqPlonkVerifierIndex,
     proof: DlogProof<GAffine>,
 ) -> bool {
     proof_verify(lgr_comm, &index.into(), proof)
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fq_plonk_proof_batch_verify_raw(
-    lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
-    indexes: Vec<CamlTweedleFqPlonkVerifierIndexRawPtr<'static>>,
-    proofs: Vec<DlogProof<GAffine>>,
-) -> bool {
-    let proofs: Vec<DlogProof<GAffine>> = proofs.into_iter().map(From::from).collect();
-    let lgr_comms: Vec<Vec<PolyComm<GAffine>>> = lgr_comms
-        .into_iter()
-        .map(|x| x.into_iter().map(From::from).collect())
-        .collect();
-    let group_map = GroupMap::<Fp>::setup();
-    let ts: Vec<_> = indexes
-        .iter()
-        .zip(lgr_comms.iter())
-        .zip(proofs.iter())
-        .map(|((i, l), p)| (&i.as_ref().0, l, p))
-        .collect();
-
-    DlogProof::<GAffine>::verify::<
-        DefaultFqSponge<TweedledumParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
-    >(&group_map, &ts)
-    .is_ok()
 }
 
 #[ocaml::func]

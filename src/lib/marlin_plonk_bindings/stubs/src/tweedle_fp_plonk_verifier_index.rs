@@ -24,23 +24,6 @@ use std::{
 
 use std::rc::Rc;
 
-pub struct CamlTweedleFpPlonkVerifierIndexRaw<'a>(
-    pub DlogVerifierIndex<'a, GAffine>,
-    pub Rc<SRS<GAffine>>,
-);
-
-pub type CamlTweedleFpPlonkVerifierIndexRawPtr<'a> =
-    ocaml::Pointer<CamlTweedleFpPlonkVerifierIndexRaw<'a>>;
-
-extern "C" fn caml_tweedle_fp_plonk_verifier_index_raw_finalize(v: ocaml::Value) {
-    let v: ocaml::Pointer<CamlTweedleFpPlonkVerifierIndexRaw> = ocaml::FromValue::from_value(v);
-    unsafe { v.drop_in_place() };
-}
-
-ocaml::custom!(CamlTweedleFpPlonkVerifierIndexRaw<'a> {
-    finalize: caml_tweedle_fp_plonk_verifier_index_raw_finalize,
-});
-
 pub type CamlTweedleFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<Fp, CamlTweedleFpUrs, PolyComm<GAffine>>;
 
@@ -127,7 +110,7 @@ pub fn of_ocaml<'a>(
     urs: CamlTweedleFpUrs,
     evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
     shifts: CamlPlonkVerificationShifts<Fp>,
-) -> CamlTweedleFpPlonkVerifierIndexRaw<'a> {
+) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&urs.0);
     let urs_copy_outer = Rc::clone(&urs.0);
     let srs = {
@@ -144,21 +127,13 @@ pub fn of_ocaml<'a>(
         max_poly_size: max_poly_size as usize,
         max_quot_size: max_quot_size as usize,
         srs,
-        sigma_comm: [
-            evals.sigma_comm0,
-            evals.sigma_comm1,
-            evals.sigma_comm2,
-        ],
+        sigma_comm: [evals.sigma_comm0, evals.sigma_comm1, evals.sigma_comm2],
         ql_comm: evals.ql_comm,
         qr_comm: evals.qr_comm,
         qo_comm: evals.qo_comm,
         qm_comm: evals.qm_comm,
         qc_comm: evals.qc_comm,
-        rcm_comm: [
-            evals.rcm_comm0,
-            evals.rcm_comm1,
-            evals.rcm_comm2,
-        ],
+        rcm_comm: [evals.rcm_comm0, evals.rcm_comm1, evals.rcm_comm2],
         psm_comm: evals.psm_comm,
         add_comm: evals.add_comm,
         mul1_comm: evals.mul1_comm,
@@ -172,10 +147,10 @@ pub fn of_ocaml<'a>(
         fq_sponge_params: oracle::tweedle::fq::params(),
         endo: endo_q,
     };
-    CamlTweedleFpPlonkVerifierIndexRaw(index, urs_copy_outer)
+    (index, urs_copy_outer)
 }
 
-impl From<CamlTweedleFpPlonkVerifierIndex> for CamlTweedleFpPlonkVerifierIndexRaw<'_> {
+impl From<CamlTweedleFpPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
     fn from(index: CamlTweedleFpPlonkVerifierIndex) -> Self {
         of_ocaml(
             index.max_poly_size,
@@ -185,12 +160,7 @@ impl From<CamlTweedleFpPlonkVerifierIndex> for CamlTweedleFpPlonkVerifierIndexRa
             index.evals,
             index.shifts,
         )
-    }
-}
-
-impl From<CamlTweedleFpPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
-    fn from(index: CamlTweedleFpPlonkVerifierIndex) -> Self {
-        CamlTweedleFpPlonkVerifierIndexRaw::from(index).0
+        .0
     }
 }
 
@@ -198,7 +168,7 @@ pub fn read_raw<'a>(
     offset: Option<ocaml::Int>,
     urs: CamlTweedleFpUrs,
     path: String,
-) -> Result<CamlTweedleFpPlonkVerifierIndexRaw<'a>, ocaml::Error> {
+) -> Result<(DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>), ocaml::Error> {
     match File::open(path) {
         Err(_) => Err(ocaml::Error::invalid_argument(
             "caml_tweedle_fp_plonk_verifier_index_raw_read",
@@ -222,18 +192,9 @@ pub fn read_raw<'a>(
                 Rc::into_raw(urs.0),
                 &mut r,
             )?;
-            Ok(CamlTweedleFpPlonkVerifierIndexRaw(t, Rc::clone(&urs_copy)))
+            Ok((t, Rc::clone(&urs_copy)))
         }
     }
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_raw_read(
-    offset: Option<ocaml::Int>,
-    urs: CamlTweedleFpUrs,
-    path: String,
-) -> Result<CamlTweedleFpPlonkVerifierIndexRaw<'static>, ocaml::Error> {
-    read_raw(offset, urs, path)
 }
 
 #[ocaml::func]
@@ -242,8 +203,8 @@ pub fn caml_tweedle_fp_plonk_verifier_index_read(
     urs: CamlTweedleFpUrs,
     path: String,
 ) -> Result<CamlTweedleFpPlonkVerifierIndex, ocaml::Error> {
-    let t = read_raw(offset, urs, path)?;
-    Ok(to_ocaml(&t.1, t.0))
+    let (vi, urs) = read_raw(offset, urs, path)?;
+    Ok(to_ocaml(&urs, vi))
 }
 
 pub fn write_raw(
@@ -268,76 +229,12 @@ pub fn write_raw(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_raw_write(
-    append: Option<bool>,
-    index: CamlTweedleFpPlonkVerifierIndexRawPtr,
-    path: String,
-) -> Result<(), ocaml::Error> {
-    write_raw(append, &index.as_ref().0, path)
-}
-
-#[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_write(
     append: Option<bool>,
     index: CamlTweedleFpPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    write_raw(
-        append,
-        &CamlTweedleFpPlonkVerifierIndexRaw::from(index).0,
-        path,
-    )
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_parts(
-    max_poly_size: ocaml::Int,
-    max_quot_size: ocaml::Int,
-    log_size_of_group: ocaml::Int,
-    urs: CamlTweedleFpUrs,
-    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
-    shifts: CamlPlonkVerificationShifts<Fp>,
-) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
-    of_ocaml(
-        max_poly_size,
-        max_quot_size,
-        log_size_of_group,
-        urs,
-        evals,
-        shifts,
-    )
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_ocaml(
-    index: CamlTweedleFpPlonkVerifierIndex,
-) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
-    index.into()
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_ocaml_of_raw(
-    index: CamlTweedleFpPlonkVerifierIndexRawPtr,
-) -> CamlTweedleFpPlonkVerifierIndex {
-    let index = index.as_ref();
-    // We make a copy here because we can't move values out of the raw version.
-    to_ocaml_copy(&index.1, &index.0)
-}
-
-#[ocaml::func]
-pub fn caml_tweedle_fp_plonk_verifier_index_raw_create(
-    index: CamlTweedleFpPlonkIndexPtr<'static>,
-) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
-    let urs = Rc::clone(&index.as_ref().1);
-    let verifier_index: DlogVerifierIndex<'static, GAffine> =
-        // The underlying urs reference forces a lifetime borrow of `index`, but really
-        // * we only need to borrow the urs
-        // * we know statically that the urs will be live for the whole duration because of the
-        //   refcounted references.
-        // We prefer this to a pointer round-trip because we don't want to allocate memory when the
-        // optimizer will otherwise see to place this straight in the OCaml heap.
-        unsafe { std::mem::transmute(index.as_ref().0.verifier_index()) };
-    CamlTweedleFpPlonkVerifierIndexRaw(verifier_index, urs)
+    write_raw(append, &index.into(), path)
 }
 
 #[ocaml::func]
