@@ -10,10 +10,17 @@ impl<T> CamlPointer<T> {
             let _box = Box::from_raw(v.as_mut().0);
         }
     }
+
+    extern "C" fn caml_pointer_compare(_: ocaml::Value, _: ocaml::Value) -> i32 {
+        // Always return equal. We can use this for sanity checks, and anything else using this
+        // would be broken anyway.
+        0
+    }
 }
 
 ocaml::custom!(CamlPointer<T> {
     finalize: CamlPointer::<T>::caml_pointer_finalize,
+    compare: CamlPointer::<T>::caml_pointer_compare,
 });
 
 unsafe impl<T> ocaml::FromValue for CamlPointer<T> {

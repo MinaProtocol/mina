@@ -1,3 +1,4 @@
+use crate::caml_pointer;
 use crate::index_serialization;
 use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
@@ -40,7 +41,7 @@ pub fn to_ocaml<'a>(
         },
         max_poly_size: vi.max_poly_size as isize,
         max_quot_size: vi.max_quot_size as isize,
-        urs: CamlTweedleFqUrs(Rc::clone(urs)),
+        urs: caml_pointer::create(Rc::clone(urs)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm0: sigma_comm0,
             sigma_comm1: sigma_comm1,
@@ -78,7 +79,7 @@ pub fn to_ocaml_copy<'a>(
         },
         max_poly_size: vi.max_poly_size as isize,
         max_quot_size: vi.max_quot_size as isize,
-        urs: CamlTweedleFqUrs(Rc::clone(urs)),
+        urs: caml_pointer::create(Rc::clone(urs)),
         evals: CamlPlonkVerificationEvals {
             sigma_comm0: sigma_comm0.clone(),
             sigma_comm1: sigma_comm1.clone(),
@@ -111,8 +112,8 @@ pub fn of_ocaml<'a>(
     evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
     shifts: CamlPlonkVerificationShifts<Fq>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -184,12 +185,13 @@ pub fn read_raw<'a>(
                 None => (),
             };
             let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-            let urs_copy = Rc::clone(&urs.0);
+            let urs_copy = Rc::clone(&*urs);
+            let urs_copy2 = Rc::clone(&urs_copy);
             let t = index_serialization::read_plonk_verifier_index(
                 oracle::tweedle::fq::params(),
                 oracle::tweedle::fp::params(),
                 endo_q,
-                Rc::into_raw(urs.0),
+                Rc::into_raw(urs_copy2),
                 &mut r,
             )?;
             Ok((t, Rc::clone(&urs_copy)))
@@ -267,7 +269,7 @@ pub fn caml_tweedle_fq_plonk_verifier_index_dummy() -> CamlTweedleFqPlonkVerifie
         },
         max_poly_size: 0,
         max_quot_size: 0,
-        urs: CamlTweedleFqUrs(Rc::new(SRS::create(0))),
+        urs: caml_pointer::create(Rc::new(SRS::create(0))),
         evals: CamlPlonkVerificationEvals {
             sigma_comm0: comm(),
             sigma_comm1: comm(),
