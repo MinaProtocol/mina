@@ -14,50 +14,48 @@ use oracle::{
 use groupmap::GroupMap;
 
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
-use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
+use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_protocol_dlog::prover::ProverProof as DlogProof;
 
 use crate::tweedle_dee::{CamlTweedleDeeAffine, CamlTweedleDeePolyComm};
-use crate::tweedle_fp::CamlTweedleFp;
 use crate::tweedle_fp_plonk_index::CamlTweedleFpPlonkIndexPtr;
 use crate::tweedle_fp_plonk_verifier_index::{
-    CamlTweedleFpPlonkVerifierIndexPtr, CamlTweedleFpPlonkVerifierIndexRawPtr,
+    CamlTweedleFpPlonkVerifierIndex, CamlTweedleFpPlonkVerifierIndexRawPtr,
 };
-use crate::tweedle_fp_vector::CamlTweedleFpVectorPtr;
-use crate::tweedle_fq::CamlTweedleFq;
+use crate::tweedle_fp_vector::CamlTweedleFpVector;
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFpPlonkProofEvaluations {
-    pub l: Vec<CamlTweedleFp>,
-    pub r: Vec<CamlTweedleFp>,
-    pub o: Vec<CamlTweedleFp>,
-    pub z: Vec<CamlTweedleFp>,
-    pub t: Vec<CamlTweedleFp>,
-    pub f: Vec<CamlTweedleFp>,
-    pub sigma1: Vec<CamlTweedleFp>,
-    pub sigma2: Vec<CamlTweedleFp>,
+    pub l: Vec<Fp>,
+    pub r: Vec<Fp>,
+    pub o: Vec<Fp>,
+    pub z: Vec<Fp>,
+    pub t: Vec<Fp>,
+    pub f: Vec<Fp>,
+    pub sigma1: Vec<Fp>,
+    pub sigma2: Vec<Fp>,
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFpPlonkOpeningProof {
     pub lr: Vec<(
-        CamlTweedleDeeAffine<CamlTweedleFq>,
-        CamlTweedleDeeAffine<CamlTweedleFq>,
+        CamlTweedleDeeAffine<Fq>,
+        CamlTweedleDeeAffine<Fq>,
     )>,
-    pub delta: CamlTweedleDeeAffine<CamlTweedleFq>,
-    pub z1: CamlTweedleFp,
-    pub z2: CamlTweedleFp,
-    pub sg: CamlTweedleDeeAffine<CamlTweedleFq>,
+    pub delta: CamlTweedleDeeAffine<Fq>,
+    pub z1: Fp,
+    pub z2: Fp,
+    pub sg: CamlTweedleDeeAffine<Fq>,
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleFpPlonkMessages {
     // polynomial commitments
-    pub l_comm: CamlTweedleDeePolyComm<CamlTweedleFq>,
-    pub r_comm: CamlTweedleDeePolyComm<CamlTweedleFq>,
-    pub o_comm: CamlTweedleDeePolyComm<CamlTweedleFq>,
-    pub z_comm: CamlTweedleDeePolyComm<CamlTweedleFq>,
-    pub t_comm: CamlTweedleDeePolyComm<CamlTweedleFq>,
+    pub l_comm: CamlTweedleDeePolyComm<Fq>,
+    pub r_comm: CamlTweedleDeePolyComm<Fq>,
+    pub o_comm: CamlTweedleDeePolyComm<Fq>,
+    pub z_comm: CamlTweedleDeePolyComm<Fq>,
+    pub t_comm: CamlTweedleDeePolyComm<Fq>,
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -68,8 +66,8 @@ pub struct CamlTweedleFpPlonkProof {
         CamlTweedleFpPlonkProofEvaluations,
         CamlTweedleFpPlonkProofEvaluations,
     ),
-    pub public: Vec<CamlTweedleFp>,
-    pub prev_challenges: Vec<(Vec<CamlTweedleFp>, CamlTweedleDeePolyComm<CamlTweedleFq>)>,
+    pub public: Vec<Fp>,
+    pub prev_challenges: Vec<(Vec<Fp>, CamlTweedleDeePolyComm<Fq>)>,
 }
 
 impl From<CamlTweedleFpPlonkProof> for DlogProof<GAffine> {
@@ -87,8 +85,8 @@ impl From<CamlTweedleFpPlonkProof> for DlogProof<GAffine> {
                     .into_iter()
                     .map(|(x, y)| (x.into(), y.into()))
                     .collect(),
-                z1: x.proof.z1.0,
-                z2: x.proof.z2.0,
+                z1: x.proof.z1,
+                z2: x.proof.z2,
                 delta: x.proof.delta.into(),
                 sg: x.proof.sg.into(),
             },
@@ -142,8 +140,8 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
                     .into_iter()
                     .map(|(x, y)| (x.into(), y.into()))
                     .collect(),
-                z1: CamlTweedleFp(x.proof.z1),
-                z2: CamlTweedleFp(x.proof.z2),
+                z1: x.proof.z1,
+                z2: x.proof.z2,
                 delta: x.proof.delta.into(),
                 sg: x.proof.sg.into(),
             },
@@ -187,10 +185,10 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_create(
     index: CamlTweedleFpPlonkIndexPtr<'static>,
-    primary_input: CamlTweedleFpVectorPtr,
-    auxiliary_input: CamlTweedleFpVectorPtr,
-    prev_challenges: Vec<CamlTweedleFp>,
-    prev_sgs: Vec<CamlTweedleDeeAffine<CamlTweedleFq>>,
+    primary_input: CamlTweedleFpVector,
+    auxiliary_input: CamlTweedleFpVector,
+    prev_challenges: Vec<Fp>,
+    prev_sgs: Vec<CamlTweedleDeeAffine<Fq>>,
 ) -> CamlTweedleFpPlonkProof {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
@@ -207,7 +205,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
                     (
                         prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
-                            .map(|x| x.0)
+                            .map(|x| *x)
                             .collect(),
                         PolyComm::<GAffine> {
                             unshifted: vec![sg.into()],
@@ -219,13 +217,16 @@ pub fn caml_tweedle_fp_plonk_proof_create(
         }
     };
 
+    let auxiliary_input: &Vec<Fp> = auxiliary_input.into();
+    let index: &DlogIndex<GAffine> = &index.as_ref().0;
+
     ocaml::runtime::release_lock();
 
     let map = GroupMap::<Fq>::setup();
     let proof = DlogProof::create::<
         DefaultFqSponge<TweedledeeParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fp, PlonkSpongeConstants>,
-    >(&map, &auxiliary_input.as_ref().0, &index.as_ref().0, prev)
+    >(&map, auxiliary_input, index, prev)
     .unwrap();
 
     ocaml::runtime::acquire_lock();
@@ -234,7 +235,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
 }
 
 pub fn proof_verify(
-    lgr_comm: Vec<CamlTweedleDeePolyComm<CamlTweedleFq>>,
+    lgr_comm: Vec<CamlTweedleDeePolyComm<Fq>>,
     index: &DlogVerifierIndex<GAffine>,
     proof: CamlTweedleFpPlonkProof,
 ) -> bool {
@@ -257,7 +258,7 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_verify_raw(
-    lgr_comm: Vec<CamlTweedleDeePolyComm<CamlTweedleFq>>,
+    lgr_comm: Vec<CamlTweedleDeePolyComm<Fq>>,
     index: CamlTweedleFpPlonkVerifierIndexRawPtr<'static>,
     proof: CamlTweedleFpPlonkProof,
 ) -> bool {
@@ -266,8 +267,8 @@ pub fn caml_tweedle_fp_plonk_proof_verify_raw(
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_verify(
-    lgr_comm: Vec<CamlTweedleDeePolyComm<CamlTweedleFq>>,
-    index: CamlTweedleFpPlonkVerifierIndexPtr,
+    lgr_comm: Vec<CamlTweedleDeePolyComm<Fq>>,
+    index: CamlTweedleFpPlonkVerifierIndex,
     proof: CamlTweedleFpPlonkProof,
 ) -> bool {
     proof_verify(lgr_comm, &index.into(), proof)
@@ -275,7 +276,7 @@ pub fn caml_tweedle_fp_plonk_proof_verify(
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_batch_verify_raw(
-    lgr_comms: Vec<Vec<CamlTweedleDeePolyComm<CamlTweedleFq>>>,
+    lgr_comms: Vec<Vec<CamlTweedleDeePolyComm<Fq>>>,
     indexes: Vec<CamlTweedleFpPlonkVerifierIndexRawPtr<'static>>,
     proofs: Vec<CamlTweedleFpPlonkProof>,
 ) -> bool {
@@ -301,8 +302,8 @@ pub fn caml_tweedle_fp_plonk_proof_batch_verify_raw(
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlTweedleDeePolyComm<CamlTweedleFq>>>,
-    indexes: Vec<CamlTweedleFpPlonkVerifierIndexPtr>,
+    lgr_comms: Vec<Vec<CamlTweedleDeePolyComm<Fq>>>,
+    indexes: Vec<CamlTweedleFpPlonkVerifierIndex>,
     proofs: Vec<CamlTweedleFpPlonkProof>,
 ) -> bool {
     let ts: Vec<_> = indexes

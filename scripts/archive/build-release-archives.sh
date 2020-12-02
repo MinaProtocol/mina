@@ -114,7 +114,12 @@ else
 
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-    docker build -t codaprotocol/coda-archive:$DOCKER_TAG -f $SCRIPTPATH/Dockerfile docker_build
+    docker build \
+      -t codaprotocol/coda-archive:$DOCKER_TAG \
+      -f $SCRIPTPATH/Dockerfile \
+      --build-arg coda_deb_version=$VERSION \
+      --build-arg deb_repo=$CODENAME \
+      docker_build
 
     docker push codaprotocol/coda-archive:$DOCKER_TAG
 fi
