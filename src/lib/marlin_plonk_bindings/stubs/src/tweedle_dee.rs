@@ -5,11 +5,9 @@ use algebra::{
         fp::Fp,
         fq::Fq,
     },
-    One, UniformRand, Zero,
+    One, UniformRand,
 };
 use rand::rngs::StdRng;
-
-use commitment_dlog::commitment::PolyComm;
 
 #[ocaml::func]
 pub fn caml_tweedle_dee_one() -> GProjective {
@@ -17,12 +15,18 @@ pub fn caml_tweedle_dee_one() -> GProjective {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_add(x: ocaml::Pointer<GProjective>, y: ocaml::Pointer<GProjective>) -> GProjective {
+pub fn caml_tweedle_dee_add(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
     (*x.as_ref()) + (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_sub(x: ocaml::Pointer<GProjective>, y: ocaml::Pointer<GProjective>) -> GProjective {
+pub fn caml_tweedle_dee_sub(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
     (*x.as_ref()) - (*y.as_ref())
 }
 
@@ -67,19 +71,13 @@ pub extern "C" fn caml_tweedle_dee_endo_scalar() -> Fp {
     endo_r
 }
 
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub enum CamlTweedleDeeAffine<T> {
-    Infinity,
-    Finite((T, T)),
-}
-
 #[ocaml::func]
-pub fn caml_tweedle_dee_to_affine(x: ocaml::Pointer<GProjective>) -> CamlTweedleDeeAffine<Fq> {
+pub fn caml_tweedle_dee_to_affine(x: ocaml::Pointer<GProjective>) -> GAffine {
     x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_of_affine(x: CamlTweedleDeeAffine<Fq>) -> GProjective {
+pub fn caml_tweedle_dee_of_affine(x: GAffine) -> GProjective {
     Into::<GAffine>::into(x).into_projective()
 }
 
@@ -89,49 +87,6 @@ pub fn caml_tweedle_dee_of_affine_coordinates(x: Fq, y: Fq) -> GProjective {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_affine_deep_copy(x: CamlTweedleDeeAffine<Fq>) -> CamlTweedleDeeAffine<Fq> {
+pub fn caml_tweedle_dee_affine_deep_copy(x: GAffine) -> GAffine {
     x
-}
-
-impl From<GAffine> for CamlTweedleDeeAffine<Fq> {
-    fn from(p: GAffine) -> Self {
-        if p.is_zero() {
-            CamlTweedleDeeAffine::Infinity
-        } else {
-            CamlTweedleDeeAffine::Finite((p.x, p.y))
-        }
-    }
-}
-
-impl From<CamlTweedleDeeAffine<Fq>> for GAffine {
-    fn from(p: CamlTweedleDeeAffine<Fq>) -> Self {
-        match p {
-            CamlTweedleDeeAffine::Infinity => GAffine::zero(),
-            CamlTweedleDeeAffine::Finite((x, y)) => GAffine::new(x, y, false),
-        }
-    }
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleDeePolyComm<T> {
-    pub shifted: Option<CamlTweedleDeeAffine<T>>,
-    pub unshifted: Vec<CamlTweedleDeeAffine<Fq>>,
-}
-
-impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<Fq> {
-    fn from(c: PolyComm<GAffine>) -> Self {
-        CamlTweedleDeePolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlTweedleDeePolyComm<Fq>> for PolyComm<GAffine> {
-    fn from(c: CamlTweedleDeePolyComm<Fq>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
 }

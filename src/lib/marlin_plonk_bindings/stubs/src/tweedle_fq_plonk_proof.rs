@@ -1,4 +1,5 @@
 use algebra::{
+    curves::AffineCurve,
     tweedle::{
         dum::{Affine as GAffine, TweedledumParameters},
         fp::Fp,
@@ -18,172 +19,13 @@ use groupmap::GroupMap;
 
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
-use plonk_protocol_dlog::prover::ProverProof as DlogProof;
+use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
-use crate::tweedle_dum::{
-    CamlTweedleDumAffine::{self, Finite},
-    CamlTweedleDumPolyComm,
-};
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_plonk_verifier_index::{
     CamlTweedleFqPlonkVerifierIndex, CamlTweedleFqPlonkVerifierIndexRawPtr,
 };
 use crate::tweedle_fq_vector::CamlTweedleFqVector;
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleFqPlonkProofEvaluations {
-    pub l: Vec<Fq>,
-    pub r: Vec<Fq>,
-    pub o: Vec<Fq>,
-    pub z: Vec<Fq>,
-    pub t: Vec<Fq>,
-    pub f: Vec<Fq>,
-    pub sigma1: Vec<Fq>,
-    pub sigma2: Vec<Fq>,
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleFqPlonkOpeningProof {
-    pub lr: Vec<(CamlTweedleDumAffine<Fp>, CamlTweedleDumAffine<Fp>)>,
-    pub delta: CamlTweedleDumAffine<Fp>,
-    pub z1: Fq,
-    pub z2: Fq,
-    pub sg: CamlTweedleDumAffine<Fp>,
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleFqPlonkMessages {
-    // polynomial commitments
-    pub l_comm: CamlTweedleDumPolyComm<Fp>,
-    pub r_comm: CamlTweedleDumPolyComm<Fp>,
-    pub o_comm: CamlTweedleDumPolyComm<Fp>,
-    pub z_comm: CamlTweedleDumPolyComm<Fp>,
-    pub t_comm: CamlTweedleDumPolyComm<Fp>,
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleFqPlonkProof {
-    pub messages: CamlTweedleFqPlonkMessages,
-    pub proof: CamlTweedleFqPlonkOpeningProof,
-    pub evals: (
-        CamlTweedleFqPlonkProofEvaluations,
-        CamlTweedleFqPlonkProofEvaluations,
-    ),
-    pub public: Vec<Fq>,
-    pub prev_challenges: Vec<(Vec<Fq>, CamlTweedleDumPolyComm<Fp>)>,
-}
-
-impl From<CamlTweedleFqPlonkProof> for DlogProof<GAffine> {
-    fn from(x: CamlTweedleFqPlonkProof) -> Self {
-        DlogProof {
-            prev_challenges: x
-                .prev_challenges
-                .into_iter()
-                .map(|(x, y)| (x.into_iter().map(From::from).collect(), y.into()))
-                .collect(),
-            proof: OpeningProof {
-                lr: x
-                    .proof
-                    .lr
-                    .into_iter()
-                    .map(|(x, y)| (x.into(), y.into()))
-                    .collect(),
-                z1: x.proof.z1,
-                z2: x.proof.z2,
-                delta: x.proof.delta.into(),
-                sg: x.proof.sg.into(),
-            },
-            l_comm: x.messages.l_comm.into(),
-            r_comm: x.messages.r_comm.into(),
-            o_comm: x.messages.o_comm.into(),
-            z_comm: x.messages.z_comm.into(),
-            t_comm: x.messages.t_comm.into(),
-            public: x.public.into_iter().map(From::from).collect(),
-            evals: {
-                let (evals0, evals1) = x.evals;
-                [
-                    DlogProofEvaluations {
-                        l: evals0.l.into_iter().map(From::from).collect(),
-                        r: evals0.r.into_iter().map(From::from).collect(),
-                        o: evals0.o.into_iter().map(From::from).collect(),
-                        z: evals0.z.into_iter().map(From::from).collect(),
-                        t: evals0.t.into_iter().map(From::from).collect(),
-                        f: evals0.f.into_iter().map(From::from).collect(),
-                        sigma1: evals0.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals0.sigma2.into_iter().map(From::from).collect(),
-                    },
-                    DlogProofEvaluations {
-                        l: evals1.l.into_iter().map(From::from).collect(),
-                        r: evals1.r.into_iter().map(From::from).collect(),
-                        o: evals1.o.into_iter().map(From::from).collect(),
-                        z: evals1.z.into_iter().map(From::from).collect(),
-                        t: evals1.t.into_iter().map(From::from).collect(),
-                        f: evals1.f.into_iter().map(From::from).collect(),
-                        sigma1: evals1.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals1.sigma2.into_iter().map(From::from).collect(),
-                    },
-                ]
-            },
-        }
-    }
-}
-
-impl From<DlogProof<GAffine>> for CamlTweedleFqPlonkProof {
-    fn from(x: DlogProof<GAffine>) -> Self {
-        CamlTweedleFqPlonkProof {
-            prev_challenges: x
-                .prev_challenges
-                .into_iter()
-                .map(|(x, y)| (x.into_iter().map(From::from).collect(), y.into()))
-                .collect(),
-            proof: CamlTweedleFqPlonkOpeningProof {
-                lr: x
-                    .proof
-                    .lr
-                    .into_iter()
-                    .map(|(x, y)| (x.into(), y.into()))
-                    .collect(),
-                z1: x.proof.z1,
-                z2: x.proof.z2,
-                delta: x.proof.delta.into(),
-                sg: x.proof.sg.into(),
-            },
-            messages: CamlTweedleFqPlonkMessages {
-                l_comm: x.l_comm.into(),
-                r_comm: x.r_comm.into(),
-                o_comm: x.o_comm.into(),
-                z_comm: x.z_comm.into(),
-                t_comm: x.t_comm.into(),
-            },
-            public: x.public.into_iter().map(From::from).collect(),
-            evals: {
-                let [evals0, evals1] = x.evals;
-                (
-                    CamlTweedleFqPlonkProofEvaluations {
-                        l: evals0.l.into_iter().map(From::from).collect(),
-                        r: evals0.r.into_iter().map(From::from).collect(),
-                        o: evals0.o.into_iter().map(From::from).collect(),
-                        z: evals0.z.into_iter().map(From::from).collect(),
-                        t: evals0.t.into_iter().map(From::from).collect(),
-                        f: evals0.f.into_iter().map(From::from).collect(),
-                        sigma1: evals0.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals0.sigma2.into_iter().map(From::from).collect(),
-                    },
-                    CamlTweedleFqPlonkProofEvaluations {
-                        l: evals1.l.into_iter().map(From::from).collect(),
-                        r: evals1.r.into_iter().map(From::from).collect(),
-                        o: evals1.o.into_iter().map(From::from).collect(),
-                        z: evals1.z.into_iter().map(From::from).collect(),
-                        t: evals1.t.into_iter().map(From::from).collect(),
-                        f: evals1.f.into_iter().map(From::from).collect(),
-                        sigma1: evals1.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals1.sigma2.into_iter().map(From::from).collect(),
-                    },
-                )
-            },
-        }
-    }
-}
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_create(
@@ -191,8 +33,8 @@ pub fn caml_tweedle_fq_plonk_proof_create(
     primary_input: CamlTweedleFqVector,
     auxiliary_input: CamlTweedleFqVector,
     prev_challenges: Vec<Fq>,
-    prev_sgs: Vec<CamlTweedleDumAffine<Fp>>,
-) -> CamlTweedleFqPlonkProof {
+    prev_sgs: Vec<GAffine>,
+) -> DlogProof<GAffine> {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
@@ -234,13 +76,13 @@ pub fn caml_tweedle_fq_plonk_proof_create(
 
     ocaml::runtime::acquire_lock();
 
-    proof.into()
+    proof
 }
 
 pub fn proof_verify(
-    lgr_comm: Vec<CamlTweedleDumPolyComm<Fp>>,
+    lgr_comm: Vec<PolyComm<GAffine>>,
     index: &DlogVerifierIndex<GAffine>,
-    proof: CamlTweedleFqPlonkProof,
+    proof: DlogProof<GAffine>,
 ) -> bool {
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
@@ -252,7 +94,7 @@ pub fn proof_verify(
         &[(
             index,
             &lgr_comm.into_iter().map(From::from).collect(),
-            &proof.into(),
+            &proof,
         )]
         .to_vec(),
     )
@@ -261,27 +103,27 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_verify_raw(
-    lgr_comm: Vec<CamlTweedleDumPolyComm<Fp>>,
+    lgr_comm: Vec<PolyComm<GAffine>>,
     index: CamlTweedleFqPlonkVerifierIndexRawPtr<'static>,
-    proof: CamlTweedleFqPlonkProof,
+    proof: DlogProof<GAffine>,
 ) -> bool {
     proof_verify(lgr_comm, &index.as_ref().0, proof)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_verify(
-    lgr_comm: Vec<CamlTweedleDumPolyComm<Fp>>,
+    lgr_comm: Vec<PolyComm<GAffine>>,
     index: CamlTweedleFqPlonkVerifierIndex,
-    proof: CamlTweedleFqPlonkProof,
+    proof: DlogProof<GAffine>,
 ) -> bool {
     proof_verify(lgr_comm, &index.into(), proof)
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_batch_verify_raw(
-    lgr_comms: Vec<Vec<CamlTweedleDumPolyComm<Fp>>>,
+    lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
     indexes: Vec<CamlTweedleFqPlonkVerifierIndexRawPtr<'static>>,
-    proofs: Vec<CamlTweedleFqPlonkProof>,
+    proofs: Vec<DlogProof<GAffine>>,
 ) -> bool {
     let proofs: Vec<DlogProof<GAffine>> = proofs.into_iter().map(From::from).collect();
     let lgr_comms: Vec<Vec<PolyComm<GAffine>>> = lgr_comms
@@ -305,9 +147,9 @@ pub fn caml_tweedle_fq_plonk_proof_batch_verify_raw(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlTweedleDumPolyComm<Fp>>>,
+    lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
     indexes: Vec<CamlTweedleFqPlonkVerifierIndex>,
-    proofs: Vec<CamlTweedleFqPlonkProof>,
+    proofs: Vec<DlogProof<GAffine>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -326,26 +168,26 @@ pub fn caml_tweedle_fq_plonk_proof_batch_verify(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_plonk_proof_dummy() -> CamlTweedleFqPlonkProof {
-    let g = || Finite((Fp::one(), Fp::one()));
-    let comm = || CamlTweedleDumPolyComm {
+pub fn caml_tweedle_fq_plonk_proof_dummy() -> DlogProof<GAffine> {
+    let g = || GAffine::prime_subgroup_generator();
+    let comm = || PolyComm {
         shifted: Some(g()),
         unshifted: vec![g(), g(), g()],
     };
-    CamlTweedleFqPlonkProof {
+    DlogProof {
         prev_challenges: vec![
             (vec![Fq::one(), Fq::one()], comm()),
             (vec![Fq::one(), Fq::one()], comm()),
             (vec![Fq::one(), Fq::one()], comm()),
         ],
-        proof: CamlTweedleFqPlonkOpeningProof {
+        proof: OpeningProof {
             lr: vec![(g(), g()), (g(), g()), (g(), g())],
             z1: Fq::one(),
             z2: Fq::one(),
             delta: g(),
             sg: g(),
         },
-        messages: CamlTweedleFqPlonkMessages {
+        commitments: DlogCommitments {
             l_comm: comm(),
             r_comm: comm(),
             o_comm: comm(),
@@ -355,7 +197,7 @@ pub fn caml_tweedle_fq_plonk_proof_dummy() -> CamlTweedleFqPlonkProof {
         public: vec![Fq::one(), Fq::one()],
         evals: {
             let evals = || vec![Fq::one(), Fq::one(), Fq::one(), Fq::one()];
-            let evals = || CamlTweedleFqPlonkProofEvaluations {
+            let evals = || DlogProofEvaluations {
                 l: evals(),
                 r: evals(),
                 o: evals(),
@@ -365,14 +207,12 @@ pub fn caml_tweedle_fq_plonk_proof_dummy() -> CamlTweedleFqPlonkProof {
                 sigma1: evals(),
                 sigma2: evals(),
             };
-            (evals(), evals())
+            [evals(), evals()]
         },
     }
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_plonk_proof_deep_copy(
-    x: CamlTweedleFqPlonkProof,
-) -> CamlTweedleFqPlonkProof {
+pub fn caml_tweedle_fq_plonk_proof_deep_copy(x: DlogProof<GAffine>) -> DlogProof<GAffine> {
     x
 }

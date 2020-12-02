@@ -1,11 +1,13 @@
-use crate::tweedle_dee::{CamlTweedleDeeAffine, CamlTweedleDeePolyComm};
 use algebra::{
-    tweedle::{dee::Affine as GAffine, fp::Fp, fq::Fq},
+    tweedle::{dee::Affine as GAffine, fp::Fp},
     One, Zero,
 };
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
 
-use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
+use commitment_dlog::{
+    commitment::{b_poly_coefficients, PolyComm},
+    srs::SRS,
+};
 
 use std::{
     fs::{File, OpenOptions},
@@ -25,7 +27,7 @@ extern "C" fn caml_tweedle_fp_urs_finalize(v: ocaml::Value) {
 extern "C" fn caml_tweedle_fp_urs_compare(_v1: ocaml::Value, _v2: ocaml::Value) -> i32 {
     // This shouldn't be used, and has no value anyway since urs is opaque to ocaml, but we want it
     // for the OCaml <-> Rust transport consistency tests.
-    return 0
+    return 0;
 }
 
 ocaml::custom!(CamlTweedleFpUrs {
@@ -96,7 +98,7 @@ pub fn caml_tweedle_fp_urs_lagrange_commitment(
     urs: CamlTweedleFpUrs,
     domain_size: ocaml::Int,
     i: ocaml::Int,
-) -> Result<CamlTweedleDeePolyComm<Fq>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     match EvaluationDomain::<Fp>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fp_urs_lagrange_commitment")
@@ -118,7 +120,7 @@ pub fn caml_tweedle_fp_urs_commit_evaluations(
     urs: CamlTweedleFpUrs,
     domain_size: ocaml::Int,
     evals: Vec<Fp>,
-) -> Result<CamlTweedleDeePolyComm<Fq>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     match EvaluationDomain::<Fp>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fp_urs_commit_evaluations")
@@ -137,7 +139,7 @@ pub fn caml_tweedle_fp_urs_commit_evaluations(
 pub fn caml_tweedle_fp_urs_b_poly_commitment(
     urs: CamlTweedleFpUrs,
     chals: Vec<Fp>,
-) -> Result<CamlTweedleDeePolyComm<Fq>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     let chals: Vec<Fp> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fp>::from_coefficients_vec(coeffs);
@@ -147,7 +149,7 @@ pub fn caml_tweedle_fp_urs_b_poly_commitment(
 #[ocaml::func]
 pub fn caml_tweedle_fp_urs_batch_accumulator_check(
     urs: CamlTweedleFpUrs,
-    comms: Vec<CamlTweedleDeeAffine<Fq>>,
+    comms: Vec<GAffine>,
     chals: Vec<Fp>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
@@ -158,6 +160,6 @@ pub fn caml_tweedle_fp_urs_batch_accumulator_check(
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_urs_h(urs: CamlTweedleFpUrs) -> CamlTweedleDeeAffine<Fq> {
+pub fn caml_tweedle_fp_urs_h(urs: CamlTweedleFpUrs) -> GAffine {
     urs.0.h.into()
 }

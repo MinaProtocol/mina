@@ -3,17 +3,17 @@ use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
     CamlPlonkVerifierIndex,
 };
-use crate::tweedle_dum::{CamlTweedleDumAffine::Finite, CamlTweedleDumPolyComm};
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_urs::CamlTweedleFqUrs;
 use algebra::{
-    tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fp::Fp, fq::Fq},
+    curves::AffineCurve,
+    tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fq::Fq},
     One,
 };
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
-use commitment_dlog::srs::SRS;
+use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
 
@@ -42,7 +42,7 @@ ocaml::custom!(CamlTweedleFqPlonkVerifierIndexRaw<'a> {
 });
 
 pub type CamlTweedleFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<Fq, CamlTweedleFqUrs, CamlTweedleDumPolyComm<Fp>>;
+    CamlPlonkVerifierIndex<Fq, CamlTweedleFqUrs, PolyComm<GAffine>>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -125,7 +125,7 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlTweedleFqUrs,
-    evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<Fp>>,
+    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
     shifts: CamlPlonkVerificationShifts<Fq>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'a> {
     let urs_copy = Rc::clone(&urs.0);
@@ -295,7 +295,7 @@ pub fn caml_tweedle_fq_plonk_verifier_index_raw_of_parts(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlTweedleFqUrs,
-    evals: CamlPlonkVerificationEvals<CamlTweedleDumPolyComm<Fp>>,
+    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
     shifts: CamlPlonkVerificationShifts<Fq>,
 ) -> CamlTweedleFqPlonkVerifierIndexRaw<'static> {
     of_ocaml(
@@ -358,8 +358,8 @@ pub fn caml_tweedle_fq_plonk_verifier_index_shifts(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_verifier_index_dummy() -> CamlTweedleFqPlonkVerifierIndex {
-    let g = || Finite((Fp::one(), Fp::one()));
-    let comm = || CamlTweedleDumPolyComm {
+    let g = || GAffine::prime_subgroup_generator();
+    let comm = || PolyComm {
         shifted: Some(g()),
         unshifted: vec![g(), g(), g()],
     };
