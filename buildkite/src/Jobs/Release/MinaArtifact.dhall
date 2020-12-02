@@ -12,7 +12,6 @@ let OpamInit = ../../Command/OpamInit.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
-let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DeployTestnet = ../../Command/DeployTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
@@ -56,10 +55,7 @@ Pipeline.build
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
 
-      -- Tests that depend on the debian package
-      ConnectToTestnet.step dependsOn,
-
-      DeployTestnet.step "ci-net" dependsOn # [{ name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" }],
+      DeployTestnet.step "ci-net" [ { name = "ArchiveNodeArtifact", key = "mina-docker-image" }, { name = "ArchiveNodeArtifact", key = "archive-docker-image" } ],
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{

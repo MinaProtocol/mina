@@ -1,7 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 
 let Command = ./Base.dhall
-let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall in
@@ -14,9 +13,9 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).codaToolchain
             }
-            "cd ${testnetName} && terraform apply"
+            "cd coda-automation/terraform/testnets/${testnetName} && terraform apply"
         ],
-        label = "Deploy testnet",
+        label = "Deploy testnet: ${testnetName}",
         key = "deploy-testnet",
         target = Size.Large,
         depends_on = dependsOn
