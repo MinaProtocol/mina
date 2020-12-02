@@ -13,15 +13,9 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).codaToolchain
             }
-<<<<<<< HEAD
             "cd coda-automation/terraform/testnets/${testnetName} && terraform init && terraform apply -auto-approve; terraform destroy -auto-approve"
         ],
         label = "Deploy testnet: ${testnetName}",
-=======
-            "cd ${testnetName} && terraform apply"
-        ],
-        label = "Deploy testnet",
->>>>>>> 58cc509cb... add testnet deployment job to MinaArtifact pipeline
         key = "deploy-testnet",
         target = Size.Large,
         depends_on = dependsOn
