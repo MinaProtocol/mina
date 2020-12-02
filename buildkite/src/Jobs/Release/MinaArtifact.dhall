@@ -13,6 +13,7 @@ let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
+let DeployTestnet = ../../Command/DeployTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -57,6 +58,8 @@ Pipeline.build
 
       -- Tests that depend on the debian package
       ConnectToTestnet.step dependsOn,
+
+      DeployTestnet.step "ci-net" dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
