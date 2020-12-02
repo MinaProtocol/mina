@@ -519,6 +519,7 @@ module Block = struct
     { state_hash: string
     ; parent_id: int
     ; creator_id: int
+    ; block_winner_id: int
     ; snarked_ledger_hash_id: int
     ; staking_epoch_data_id: int
     ; next_epoch_data_id: int
@@ -533,7 +534,18 @@ module Block = struct
     let open Caqti_type_spec in
     let spec =
       Caqti_type.
-        [string; int; int; int; int; int; string; int64; int64; int64; int64]
+        [ string
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; int64
+        ; int64
+        ; int64 ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -554,10 +566,10 @@ module Block = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
-          staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, \
-          global_slot, global_slot_since_genesis, timestamp FROM blocks WHERE \
-          id = ?")
+         "SELECT state_hash, parent_id, creator_id, block_winner_id, \
+          snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, \
+          ledger_hash, height, global_slot, global_slot_since_genesis, \
+          timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
@@ -582,6 +594,11 @@ module Block = struct
           Public_key.add_if_doesn't_exist
             (module Conn)
             (External_transition.block_producer t)
+        in
+        let%bind block_winner_id =
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (External_transition.block_winner t)
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -610,20 +627,21 @@ module Block = struct
                    Unsigned.UInt32.one
                then
                  "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  global_slot_since_genesis, timestamp) VALUES ("
-                 ^ string_of_int parent_id
-                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
+                  block_winner_id, snarked_ledger_hash_id, \
+                  staking_epoch_data_id, next_epoch_data_id, ledger_hash, \
+                  height, global_slot, global_slot_since_genesis, timestamp) \
+                  VALUES (" ^ string_of_int parent_id
+                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
                else
                  "INSERT INTO blocks (state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  global_slot_since_genesis, timestamp) VALUES (?, ?, ?, ?, \
-                  ?, ?, ?, ?, ?, ?, ?) RETURNING id" ))
+                  block_winner_id, snarked_ledger_hash_id, \
+                  staking_epoch_data_id, next_epoch_data_id, ledger_hash, \
+                  height, global_slot, global_slot_since_genesis, timestamp) \
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id" ))
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; creator_id
+            ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id

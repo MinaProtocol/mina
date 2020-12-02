@@ -60,6 +60,7 @@ CREATE TABLE blocks
 , state_hash              text   NOT NULL UNIQUE
 , parent_id               int    NOT NULL        REFERENCES blocks(id)
 , creator_id              int    NOT NULL        REFERENCES public_keys(id)
+, block_winner_id         int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
 , next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)

@@ -2416,7 +2416,8 @@ module Data = struct
       ( blockchain_length
       , min_window_density
       , total_currency
-      , global_slot_since_genesis )]
+      , global_slot_since_genesis
+      , block_stake_winner )]
 
     module Unsafe = struct
       (* TODO: very unsafe, do not use unless you know what you are doing *)
