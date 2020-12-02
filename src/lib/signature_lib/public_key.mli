@@ -58,19 +58,17 @@ module Compressed : sig
       with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
-
-  include Codable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
+      type t = (Field.t, bool) Poly.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash]
 
       include Codable.S with type t := t
     end
+  end]
 
-    module Latest = V1
-  end
+  include Codable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 
@@ -81,6 +79,8 @@ module Compressed : sig
   include Hashable.S_binable with type t := t
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+  val to_bits : t -> bool list
 
   val to_string : t -> string
 

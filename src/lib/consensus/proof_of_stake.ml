@@ -1797,6 +1797,7 @@ module Data = struct
       module Stable = struct
         module V1 = struct
           type ( 'length
+               , 'public_key
                , 'vrf_output
                , 'amount
                , 'global_slot
@@ -1805,6 +1806,7 @@ module Data = struct
                , 'bool )
                t =
             { blockchain_length: 'length
+            ; block_winner: 'public_key
             ; epoch_count: 'length
             ; min_window_density: 'length
             ; sub_window_densities: 'length list
@@ -1825,6 +1827,7 @@ module Data = struct
         module V1 = struct
           type t =
             ( Length.Stable.V1.t
+            , Public_key.Compressed.Stable.V1.t
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
             , Global_slot.Stable.V1.t
@@ -1852,6 +1855,7 @@ module Data = struct
 
     type var =
       ( Length.Checked.t
+      , Public_key.Compressed.var
       , Vrf.Output.Truncated.var
       , Amount.var
       , Global_slot.Checked.t
@@ -1867,6 +1871,7 @@ module Data = struct
         constraint_constants.sub_windows_per_window
       in
       [ Length.typ
+      ; Public_key.Compressed.typ
       ; Length.typ
       ; Length.typ
       ; Typ.list ~length:sub_windows_per_window Length.typ
@@ -1885,6 +1890,7 @@ module Data = struct
 
     let to_input
         ({ Poly.blockchain_length
+         ; block_winner
          ; epoch_count
          ; min_window_density
          ; sub_window_densities
@@ -1898,6 +1904,7 @@ module Data = struct
       let input =
         { Random_oracle.Input.bitstrings=
             [| Length.Bits.to_bits blockchain_length
+             ; Public_key.Compressed.to_bits block_winner
              ; Length.Bits.to_bits epoch_count
              ; Length.Bits.to_bits min_window_density
              ; List.concat_map ~f:Length.Bits.to_bits sub_window_densities
@@ -1914,6 +1921,7 @@ module Data = struct
 
     let var_to_input
         ({ Poly.blockchain_length
+         ; block_winner
          ; epoch_count
          ; min_window_density
          ; sub_window_densities
@@ -1930,6 +1938,7 @@ module Data = struct
         let up k x = k x >>| Bitstring.Lsb_first.to_list in
         let length = up Length.Checked.to_bits in
         let%map blockchain_length = length blockchain_length
+        and block_winner = Obj.magic block_winner
         and epoch_count = length epoch_count
         and min_window_density = length min_window_density
         and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
@@ -1940,6 +1949,7 @@ module Data = struct
         in
         { Random_oracle.Input.bitstrings=
             [| blockchain_length
+             ; block_winner
              ; epoch_count
              ; min_window_density
              ; sub_window_densities

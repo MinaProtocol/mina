@@ -119,13 +119,13 @@ module Compressed = struct
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 
-  let to_input {Poly.x; is_odd} =
+  let to_input Poly.{x; is_odd} =
     {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
+
+  let to_bits Poly.{x; is_odd} = Field.Bits.to_bits x @ [is_odd]
 
   [%%ifdef
   consensus_mechanism]
-
-  (* snarky-dependent *)
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
@@ -163,7 +163,6 @@ module Compressed = struct
     end
   end
 
-  (* end snarky-dependent *)
   [%%endif]
 end
 
@@ -251,8 +250,6 @@ module Uncompressed = struct
   [%%ifdef
   consensus_mechanism]
 
-  (* snarky-dependent *)
-
   type var = Field.Var.t * Field.Var.t
 
   let assert_equal var1 var2 =
@@ -288,7 +285,6 @@ module Uncompressed = struct
     let%map is_odd = parity_var y in
     {Poly.x; is_odd}
 
-  (* end snarky-dependent *)
   [%%endif]
 end
 
