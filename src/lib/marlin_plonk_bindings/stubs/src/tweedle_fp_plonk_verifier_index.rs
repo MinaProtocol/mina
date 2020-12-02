@@ -4,11 +4,9 @@ use crate::plonk_verifier_index::{
     CamlPlonkVerifierIndex,
 };
 use crate::tweedle_dee::CamlTweedleDeePolyComm;
-use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use crate::tweedle_fp_plonk_index::CamlTweedleFpPlonkIndexPtr;
 use crate::tweedle_fp_urs::CamlTweedleFpUrs;
-use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
-use algebra::tweedle::{dee::Affine as GAffine, dum::Affine as GAffineOther, fp::Fp};
+use algebra::tweedle::{dee::Affine as GAffine, dum::Affine as GAffineOther, fp::Fp, fq::Fq};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
@@ -41,12 +39,7 @@ ocaml::custom!(CamlTweedleFpPlonkVerifierIndexRaw<'a> {
 });
 
 pub type CamlTweedleFpPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlTweedleFp, CamlTweedleFpUrs, CamlTweedleDeePolyComm<CamlTweedleFq>>;
-pub type CamlTweedleFpPlonkVerifierIndexPtr = CamlPlonkVerifierIndex<
-    CamlTweedleFpPtr,
-    CamlTweedleFpUrs,
-    CamlTweedleDeePolyComm<CamlTweedleFqPtr>,
->;
+    CamlPlonkVerifierIndex<Fp, CamlTweedleFpUrs, CamlTweedleDeePolyComm<Fq>>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -57,7 +50,7 @@ pub fn to_ocaml<'a>(
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: vi.domain.log_size_of_group as isize,
-            group_gen: CamlTweedleFp(vi.domain.group_gen),
+            group_gen: vi.domain.group_gen,
         },
         max_poly_size: vi.max_poly_size as isize,
         max_quot_size: vi.max_quot_size as isize,
@@ -83,8 +76,8 @@ pub fn to_ocaml<'a>(
             emul3_comm: vi.emul3_comm.into(),
         },
         shifts: CamlPlonkVerificationShifts {
-            r: CamlTweedleFp(vi.r),
-            o: CamlTweedleFp(vi.o),
+            r: vi.r,
+            o: vi.o,
         },
     }
 }
@@ -98,7 +91,7 @@ pub fn to_ocaml_copy<'a>(
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: vi.domain.log_size_of_group as isize,
-            group_gen: CamlTweedleFp(vi.domain.group_gen),
+            group_gen: vi.domain.group_gen,
         },
         max_poly_size: vi.max_poly_size as isize,
         max_quot_size: vi.max_quot_size as isize,
@@ -124,8 +117,8 @@ pub fn to_ocaml_copy<'a>(
             emul3_comm: vi.emul3_comm.clone().into(),
         },
         shifts: CamlPlonkVerificationShifts {
-            r: CamlTweedleFp(vi.r),
-            o: CamlTweedleFp(vi.o),
+            r: vi.r,
+            o: vi.o,
         },
     }
 }
@@ -135,8 +128,8 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlTweedleFpUrs,
-    evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<CamlTweedleFqPtr>>,
-    shifts: CamlPlonkVerificationShifts<CamlTweedleFpPtr>,
+    evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<Fq>>,
+    shifts: CamlPlonkVerificationShifts<Fp>,
 ) -> CamlTweedleFpPlonkVerifierIndexRaw<'a> {
     let urs_copy = Rc::clone(&urs.0);
     let urs_copy_outer = Rc::clone(&urs.0);
@@ -176,8 +169,8 @@ pub fn of_ocaml<'a>(
         emul1_comm: evals.emul1_comm.into(),
         emul2_comm: evals.emul2_comm.into(),
         emul3_comm: evals.emul3_comm.into(),
-        r: shifts.r.as_ref().0,
-        o: shifts.o.as_ref().0,
+        r: shifts.r,
+        o: shifts.o,
         fr_sponge_params: oracle::tweedle::fp::params(),
         fq_sponge_params: oracle::tweedle::fq::params(),
         endo: endo_q,
@@ -185,8 +178,8 @@ pub fn of_ocaml<'a>(
     CamlTweedleFpPlonkVerifierIndexRaw(index, urs_copy_outer)
 }
 
-impl From<CamlTweedleFpPlonkVerifierIndexPtr> for CamlTweedleFpPlonkVerifierIndexRaw<'_> {
-    fn from(index: CamlTweedleFpPlonkVerifierIndexPtr) -> Self {
+impl From<CamlTweedleFpPlonkVerifierIndex> for CamlTweedleFpPlonkVerifierIndexRaw<'_> {
+    fn from(index: CamlTweedleFpPlonkVerifierIndex) -> Self {
         of_ocaml(
             index.max_poly_size,
             index.max_quot_size,
@@ -198,8 +191,8 @@ impl From<CamlTweedleFpPlonkVerifierIndexPtr> for CamlTweedleFpPlonkVerifierInde
     }
 }
 
-impl From<CamlTweedleFpPlonkVerifierIndexPtr> for DlogVerifierIndex<'_, GAffine> {
-    fn from(index: CamlTweedleFpPlonkVerifierIndexPtr) -> Self {
+impl From<CamlTweedleFpPlonkVerifierIndex> for DlogVerifierIndex<'_, GAffine> {
+    fn from(index: CamlTweedleFpPlonkVerifierIndex) -> Self {
         CamlTweedleFpPlonkVerifierIndexRaw::from(index).0
     }
 }
@@ -289,7 +282,7 @@ pub fn caml_tweedle_fp_plonk_verifier_index_raw_write(
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_write(
     append: Option<bool>,
-    index: CamlTweedleFpPlonkVerifierIndexPtr,
+    index: CamlTweedleFpPlonkVerifierIndex,
     path: String,
 ) -> Result<(), ocaml::Error> {
     write_raw(
@@ -305,8 +298,8 @@ pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_parts(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlTweedleFpUrs,
-    evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<CamlTweedleFqPtr>>,
-    shifts: CamlPlonkVerificationShifts<CamlTweedleFpPtr>,
+    evals: CamlPlonkVerificationEvals<CamlTweedleDeePolyComm<Fq>>,
+    shifts: CamlPlonkVerificationShifts<Fp>,
 ) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
     of_ocaml(
         max_poly_size,
@@ -320,7 +313,7 @@ pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_parts(
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_raw_of_ocaml(
-    index: CamlTweedleFpPlonkVerifierIndexPtr,
+    index: CamlTweedleFpPlonkVerifierIndex,
 ) -> CamlTweedleFpPlonkVerifierIndexRaw<'static> {
     index.into()
 }
@@ -361,10 +354,10 @@ pub fn caml_tweedle_fp_plonk_verifier_index_create(
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_verifier_index_shifts(
     log2_size: ocaml::Int,
-) -> CamlPlonkVerificationShifts<CamlTweedleFp> {
+) -> CamlPlonkVerificationShifts<Fp> {
     let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
     CamlPlonkVerificationShifts {
-        r: CamlTweedleFp(a),
-        o: CamlTweedleFp(b),
+        r: a,
+        o: b,
     }
 }
