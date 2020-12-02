@@ -1,1 +1,1 @@
-../../src/app/rosetta/create_schema.sql
+../../src/app/archive/create_schema.sql
