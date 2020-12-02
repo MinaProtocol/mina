@@ -41,6 +41,7 @@ module Stable = struct
   module V1 = struct
     type t =
       { creator: Public_key.Compressed.Stable.V1.t
+      ; winner: Public_key.Compressed.Stable.V1.t
       ; protocol_state: Protocol_state.Stable.V1.t
       ; transactions: Transactions.Stable.V1.t
       ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
@@ -50,6 +51,7 @@ module Stable = struct
   end
 end]
 
+(*TODO: Add winner to this set?*)
 let participants ~next_available_token
     {transactions= {commands; fee_transfers; _}; creator; _} =
   let open Account_id.Set in
@@ -71,6 +73,7 @@ let participants ~next_available_token
     (union user_command_set fee_transfer_participants)
     (Account_id.create creator Token_id.default)
 
+(*TODO: Add winner to this set?*)
 let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
   let open Public_key.Compressed.Set in
   let user_command_set =
@@ -98,6 +101,7 @@ let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =
   let open External_transition.Validated in
   let creator = block_producer external_transition in
+  let winner = block_winner external_transition in
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
@@ -190,4 +194,4 @@ let of_transition external_transition tracked_participants
   let proof =
     External_transition.Validated.protocol_state_proof external_transition
   in
-  {creator; protocol_state; transactions; snark_jobs; proof}
+  {creator; winner; protocol_state; transactions; snark_jobs; proof}

@@ -1189,6 +1189,17 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
               AccountObj.get_best_ledger_account_pk coda data.creator )
+        ; field "winner" ~typ:(non_null public_key)
+            ~doc:"Public key of account that won the slot (Delegator/staker)"
+            ~deprecated:(Deprecated (Some "use creatorAccount field instead"))
+            ~args:Arg.[]
+            ~resolve:(fun _ {With_hash.data; _} -> data.winner)
+        ; field "winnerAccount"
+            ~typ:(non_null AccountObj.account)
+            ~doc:"Account that won the slot"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
+              AccountObj.get_best_ledger_account_pk coda data.winner )
         ; field "stateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
@@ -2631,9 +2642,10 @@ module Queries = struct
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
         in
+        let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data=
-            { Filtered_external_transition.creator=
-                fst Consensus_state_hooks.genesis_winner
+            { Filtered_external_transition.creator= winner
+            ; winner
             ; protocol_state=
                 { previous_state_hash=
                     Protocol_state.previous_state_hash genesis_state
