@@ -634,6 +634,7 @@ struct
              match frontier_opt with
              | None -> (
                  [%log debug] "no frontier" ;
+                 t.best_tip_ledger <- None ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
                  match t.best_tip_diff_relay with
@@ -641,7 +642,6 @@ struct
                      Deferred.unit
                  | Some hdl ->
                      let is_finished = ref false in
-                     t.best_tip_ledger <- None ;
                      Deferred.any_unit
                        [ (let%map () = hdl in
                           t.best_tip_diff_relay <- None ;
