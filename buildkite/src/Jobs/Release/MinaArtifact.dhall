@@ -55,7 +55,7 @@ Pipeline.build
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
 
-      DeployTestnet.step "ci-net" [ { name = "ArchiveNodeArtifact", key = "mina-docker-image" }, { name = "ArchiveNodeArtifact", key = "archive-docker-image" } ],
+      DeployTestnet.step "ci-net" [ { name = "MinaArtifact", key = "mina-docker-image" }, { name = "ArchiveNodeArtifact", key = "archive-docker-image" } ],
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
