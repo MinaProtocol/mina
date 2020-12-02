@@ -13,7 +13,7 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).codaToolchain
             }
-            "cd coda-automation/terraform/testnets/${testnetName} && terraform apply"
+            "cd coda-automation/terraform/testnets/${testnetName} && terraform init && terraform apply; terraform destroy"
         ],
         label = "Deploy testnet: ${testnetName}",
         key = "deploy-testnet",
