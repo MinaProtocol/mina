@@ -639,7 +639,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                in
                Core.print_string message ; Deferred.unit
            | _ ->
-               let err = Monitor.exn_to_error exn
+               let err = Monitor.exn_to_error exn in
                handle_crash err ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
          in
