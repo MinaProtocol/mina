@@ -133,9 +133,9 @@ let export_logs_to_tar ?basename ~conf_dir =
               | Error err ->
                   [sprintf "Error: %s" (Error.to_string_hum err)]
             in
-            return (Option.value_exn linux_info :: header :: output) )
+            return (header :: output) )
       in
-      Some (List.concat outputs)
+      Some (Option.value_exn linux_info :: List.concat outputs)
     else (* TODO: Mac, other Unixes *)
       Deferred.return None
   in
