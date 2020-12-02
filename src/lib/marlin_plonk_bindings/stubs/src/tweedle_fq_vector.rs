@@ -1,55 +1,11 @@
 use algebra::tweedle::fq::Fq;
-use std::ops::{Deref, DerefMut};
+use crate::caml_pointer::{self, CamlPointer};
 
-#[derive(Clone)]
-pub struct CamlTweedleFqVector(pub *mut Vec<Fq>);
-
-/* Note: The vector header is allocated in the OCaml heap, but the data held in
-   the vector elements themselves are stored in the rust heap.
-*/
-
-extern "C" fn caml_tweedle_fq_vector_finalize(v: ocaml::Value) {
-    let mut v: ocaml::Pointer<CamlTweedleFqVector> = ocaml::FromValue::from_value(v);
-    unsafe {
-        // Memory is freed when the variable goes out of scope
-        let _box = Box::from_raw(v.as_mut().0);
-    }
-}
-
-ocaml::custom!(CamlTweedleFqVector {
-    finalize: caml_tweedle_fq_vector_finalize,
-});
-
-impl From<CamlTweedleFqVector> for &Vec<Fq> {
-    fn from(x: CamlTweedleFqVector) -> Self {
-        unsafe { &*x.0 }
-    }
-}
-
-impl Deref for CamlTweedleFqVector {
-    type Target = Vec<Fq>;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.0 }
-    }
-}
-
-impl DerefMut for CamlTweedleFqVector {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.0 }
-    }
-}
-
-unsafe impl ocaml::FromValue for CamlTweedleFqVector {
-    fn from_value(x: ocaml::Value) -> Self {
-        let x = ocaml::Pointer::<CamlTweedleFqVector>::from_value(x);
-        (*x.as_ref()).clone()
-    }
-}
+pub type CamlTweedleFqVector = CamlPointer<Vec<Fq>>;
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_vector_create() -> CamlTweedleFqVector {
-    CamlTweedleFqVector(Box::into_raw(Box::new(Vec::new())))
+    caml_pointer::create(Vec::new())
 }
 
 #[ocaml::func]

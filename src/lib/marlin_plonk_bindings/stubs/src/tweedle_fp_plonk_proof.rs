@@ -62,7 +62,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
         }
     };
 
-    let auxiliary_input: &Vec<Fp> = auxiliary_input.into();
+    let auxiliary_input: &Vec<Fp> = &*auxiliary_input;
     let index: &DlogIndex<GAffine> = &index.as_ref().0;
 
     ocaml::runtime::release_lock();
