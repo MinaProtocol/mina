@@ -51,9 +51,8 @@ module Stable = struct
   end
 end]
 
-(*TODO: Add winner to this set?*)
 let participants ~next_available_token
-    {transactions= {commands; fee_transfers; _}; creator; _} =
+    {transactions= {commands; fee_transfers; _}; creator; winner; _} =
   let open Account_id.Set in
   let _next_available_token, user_command_set =
     List.fold commands ~init:(next_available_token, empty)
@@ -70,11 +69,13 @@ let participants ~next_available_token
         add set (Fee_transfer.Single.receiver ft) )
   in
   add
-    (union user_command_set fee_transfer_participants)
-    (Account_id.create creator Token_id.default)
+    (add
+       (union user_command_set fee_transfer_participants)
+       (Account_id.create creator Token_id.default))
+    (Account_id.create winner Token_id.default)
 
-(*TODO: Add winner to this set?*)
-let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
+let participant_pks
+    {transactions= {commands; fee_transfers; _}; creator; winner; _} =
   let open Public_key.Compressed.Set in
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
@@ -87,7 +88,7 @@ let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
         add set ft.receiver_pk )
   in
-  add (union user_command_set fee_transfer_participants) creator
+  add (add (union user_command_set fee_transfer_participants) creator) winner
 
 let commands {transactions= {Transactions.commands; _}; _} = commands
 
