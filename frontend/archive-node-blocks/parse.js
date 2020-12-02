@@ -1,8 +1,8 @@
 const fs = require("fs");
 const blocksFile = "blocks.json";
+const blocks = JSON.parse(fs.readFileSync(blocksFile, "utf8"));
 
 const getPublicKeysFromBlocks = () => {
-  const blocks = JSON.parse(fs.readFileSync(blocksFile, "utf8"));
   let public_keys = new Set();
   blocks.forEach((block) => {
     const creatorPK = block?.creator;
@@ -32,7 +32,6 @@ const getPublicKeysFromBlocks = () => {
 };
 
 const getSnarkedLedgerHashFromBlocks = () => {
-  const blocks = JSON.parse(fs.readFileSync(blocksFile, "utf8"));
   let hashes = new Set();
   blocks.forEach((block) => {
     const snarkedLedgerHash =
