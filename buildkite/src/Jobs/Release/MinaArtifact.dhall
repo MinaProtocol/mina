@@ -59,7 +59,7 @@ Pipeline.build
       -- Tests that depend on the debian package
       ConnectToTestnet.step dependsOn,
 
-      DeployTestnet.step "ci-net" dependsOn,
+      DeployTestnet.step "ci-net" dependsOn # [{ name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" }],
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
