@@ -1189,14 +1189,9 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
               AccountObj.get_best_ledger_account_pk coda data.creator )
-        ; field "winner" ~typ:(non_null public_key)
-            ~doc:"Public key of account that won the slot (Delegator/staker)"
-            ~deprecated:(Deprecated (Some "use creatorAccount field instead"))
-            ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.winner)
         ; field "winnerAccount"
             ~typ:(non_null AccountObj.account)
-            ~doc:"Account that won the slot"
+            ~doc:"Account that won the slot (Delegator/Staker)"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
               AccountObj.get_best_ledger_account_pk coda data.winner )

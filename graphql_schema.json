@@ -6042,24 +6042,8 @@
               "deprecationReason": null
             },
             {
-              "name": "winner",
-              "description": "Public key of account that won the slot (Delegator/staker)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": true,
-              "deprecationReason": "use creatorAccount field instead"
-            },
-            {
               "name": "winnerAccount",
-              "description": "Account that won the slot",
+              "description": "Account that won the slot (Delegator/Staker)",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
