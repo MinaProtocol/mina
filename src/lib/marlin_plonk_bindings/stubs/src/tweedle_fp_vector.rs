@@ -1,8 +1,7 @@
-use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
 use algebra::tweedle::fp::Fp;
 use std::ops::{Deref, DerefMut};
 
-#[derive (Clone)]
+#[derive(Clone)]
 pub struct CamlTweedleFpVector(pub *mut Vec<Fp>);
 
 /* Note: The vector header is allocated in the OCaml heap, but the data held in
@@ -59,17 +58,17 @@ pub fn caml_tweedle_fp_vector_length(v: CamlTweedleFpVector) -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_vector_emplace_back(mut v: CamlTweedleFpVector, x: CamlTweedleFpPtr) {
-    (*v).push(x.as_ref().0);
+pub fn caml_tweedle_fp_vector_emplace_back(mut v: CamlTweedleFpVector, x: Fp) {
+    (*v).push(x);
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fp_vector_get(
     v: CamlTweedleFpVector,
     i: ocaml::Int,
-) -> Result<CamlTweedleFp, ocaml::Error> {
+) -> Result<Fp, ocaml::Error> {
     match v.get(i as usize) {
-        Some(x) => Ok(CamlTweedleFp(*x)),
+        Some(x) => Ok(*x),
         None => Err(ocaml::Error::invalid_argument("caml_tweedle_fp_vector_get")
             .err()
             .unwrap()),

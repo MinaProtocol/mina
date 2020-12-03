@@ -306,7 +306,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
-        let%map () = Transition_frontier.close frontier in
+        let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
           ~time_controller ~producer_transition_reader_ref
           ~producer_transition_writer_ref ~verified_transition_writer
@@ -501,7 +501,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                             let%bind () =
                               Strict_pipe.Writer.write clear_writer `Clear
                             in
-                            let%map () = Transition_frontier.close frontier in
+                            let%map () =
+                              Transition_frontier.close ~loc:__LOC__ frontier
+                            in
                             start_bootstrap_controller ~logger ~trust_system
                               ~verifier ~network ~time_controller
                               ~producer_transition_reader_ref

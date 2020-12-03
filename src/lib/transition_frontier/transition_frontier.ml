@@ -249,7 +249,7 @@ let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
-let close
+let close ~loc
     { logger
     ; verifier= _
     ; consensus_local_state= _
@@ -261,7 +261,7 @@ let close
     ; extensions
     ; genesis_state_hash= _ } =
   [%log trace] "Closing transition frontier" ;
-  Full_frontier.close full_frontier ;
+  Full_frontier.close ~loc full_frontier ;
   Extensions.close extensions ;
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
