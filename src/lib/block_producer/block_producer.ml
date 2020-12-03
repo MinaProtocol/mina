@@ -232,10 +232,12 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Time.now time_controller |> Time.to_span_since_epoch
               |> Time.Span.to_ms
             in
+            let block_winner = winner_pk in
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data ~snarked_ledger_hash:previous_ledger_hash
+                  ~block_data ~block_winner
+                  ~snarked_ledger_hash:previous_ledger_hash
                   ~genesis_ledger_hash ~supply_increase ~logger
                   ~constraint_constants ) )
       in

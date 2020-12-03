@@ -98,6 +98,9 @@ module Compressed : sig
 
   val var_of_t : t -> var
 
+  val var_to_bits :
+    var -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
+
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 

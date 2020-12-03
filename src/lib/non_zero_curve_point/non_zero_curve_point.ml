@@ -142,6 +142,12 @@ module Compressed = struct
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
+  let var_to_bits Poly.{x; is_odd} =
+    let open Bitstring_lib.Bitstring.Lsb_first in
+    let%map x_bits = Field.Checked.unpack_full x in
+    let x_bits_as_list = to_list x_bits in
+    of_list (x_bits_as_list @ [is_odd])
+
   module Checked = struct
     let equal t1 t2 =
       let%bind x_eq = Field.Checked.equal t1.Poly.x t2.Poly.x in

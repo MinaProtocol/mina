@@ -1938,7 +1938,7 @@ module Data = struct
         let up k x = k x >>| Bitstring.Lsb_first.to_list in
         let length = up Length.Checked.to_bits in
         let%map blockchain_length = length blockchain_length
-        and block_winner = Obj.magic block_winner
+        and block_winner = up Public_key.Compressed.var_to_bits block_winner
         and epoch_count = length epoch_count
         and min_window_density = length min_window_density
         and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
@@ -1985,7 +1985,9 @@ module Data = struct
         ~(supply_increase : Currency.Amount.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
         ~(genesis_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-        ~(producer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
+        ~(producer_vrf_result : Random_oracle.Digest.t)
+        ~(block_winner : Signature_lib.Public_key.Compressed.t) :
+        Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
         Global_slot.to_epoch_and_slot previous_consensus_state.curr_global_slot
@@ -2033,6 +2035,7 @@ module Data = struct
       in
       { Poly.blockchain_length=
           Length.succ previous_consensus_state.blockchain_length
+      ; block_winner
       ; epoch_count
       ; min_window_density
       ; sub_window_densities
@@ -2093,7 +2096,10 @@ module Data = struct
           ~default:(default_epoch_data, default_epoch_data) ~f:(fun data ->
             (data.staking, Option.value ~default:data.staking data.next) )
       in
+      (* NB: not the genesis block winner *)
+      let block_winner = Signature_lib.Public_key.Compressed.empty in
       { Poly.blockchain_length
+      ; block_winner
       ; epoch_count= Length.zero
       ; min_window_density= max_window_density
       ; sub_window_densities=
@@ -2119,9 +2125,11 @@ module Data = struct
         Option.value_map genesis_epoch_data ~default:Epoch_seed.initial
           ~f:(fun data -> data.staking.seed)
       in
+      let genesis_winner_pk, genesis_winner_sk =
+        Vrf.Precomputed.genesis_winner
+      in
       let producer_vrf_result =
-        let _, sk = Vrf.Precomputed.genesis_winner in
-        Vrf.eval ~constraint_constants ~private_key:sk
+        Vrf.eval ~constraint_constants ~private_key:genesis_winner_sk
           { Vrf.Message.global_slot= consensus_transition
           ; seed= staking_seed
           ; delegator= 0 }
@@ -2137,7 +2145,8 @@ module Data = struct
                 ~constraint_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash)
+           ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
+           ~block_winner:genesis_winner_pk)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
         ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
@@ -2209,6 +2218,9 @@ module Data = struct
           (module M)
           ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_slot_number
           ~seed:staking_epoch_data.seed
+      in
+      let block_winner : Public_key.Compressed.var =
+        winner_account.public_key
       in
       let%bind supercharge_coinbase =
         supercharge_coinbase ~winner_account ~global_slot:next_slot_number
@@ -2290,6 +2302,7 @@ module Data = struct
         ( `Success threshold_satisfied
         , `Supercharge_coinbase supercharge_coinbase
         , { Poly.blockchain_length
+          ; block_winner
           ; epoch_count
           ; min_window_density
           ; sub_window_densities
@@ -3265,8 +3278,8 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~snarked_ledger_hash ~genesis_ledger_hash ~supply_increase ~logger
-        ~constraint_constants =
+        ~(block_winner : Public_key.Compressed.t) ~snarked_ledger_hash
+        ~genesis_ledger_hash ~supply_increase ~logger ~constraint_constants =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -3291,7 +3304,7 @@ module Hooks = struct
           (Consensus_state.update ~constants ~previous_consensus_state
              ~consensus_transition
              ~producer_vrf_result:block_data.Block_data.vrf_result
-             ~previous_protocol_state_hash ~supply_increase
+             ~block_winner ~previous_protocol_state_hash ~supply_increase
              ~snarked_ledger_hash ~genesis_ledger_hash)
       in
       let genesis_state_hash =
@@ -3343,6 +3356,7 @@ module Hooks = struct
         in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
+        let%bind block_winner = Public_key.Compressed.gen in
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t)
@@ -3384,6 +3398,7 @@ module Hooks = struct
               ~prev_min_window_density:prev.min_window_density
           in
           { Poly.blockchain_length
+          ; block_winner
           ; epoch_count
           ; min_window_density
           ; sub_window_densities
@@ -3480,10 +3495,12 @@ let%test_module "Proof of stake tests" =
         Vrf.eval ~constraint_constants ~private_key
           {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
+      let block_winner = Public_key.Compressed.empty in
       let next_consensus_state =
         update ~constants ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
           ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
+          ~block_winner
         |> Or_error.ok_exn
       in
       (* build pieces needed to apply "update_var" *)
