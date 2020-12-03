@@ -106,7 +106,7 @@ spec:
         ports: 
         - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
-{{- include "healthcheck.userAgent.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
       {{ if $config.runWithBots -}}
@@ -147,7 +147,7 @@ spec:
         ports:
         - name: graphql-port
           containerPort: {{ $.Values.bots.ports.graphql }}
-{{- include "healthcheck.bots.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
       - name: coda
@@ -214,7 +214,7 @@ spec:
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.external }}
           hostPort: {{ $.Values.coda.ports.external }}
-{{- include "healthcheck.daemon.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys
@@ -265,5 +265,18 @@ spec:
         configMap:
           name: block-producer-daemon-config
       {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - protocol: TCP
+    port: {{ $.Values.coda.ports.p2p }}
+    targetPort: {{ $.Values.coda.ports.p2p }}
+    name: gossip
 ---
 {{ end }}
