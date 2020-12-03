@@ -7,9 +7,9 @@ appVersion: 1.16.0
 dependencies:
   - name: postgresql
     version: "*"
-    repository: "@bitnami"
+    repository: "https://charts.bitnami.com/bitnami"
   - name: common-utilities
-    version: 0.0.3
+    version: 0.0.4
     repository: "https://coda-charts.storage.googleapis.com"
 icon: https://github.com/MinaProtocol/mina/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
 keywords:
