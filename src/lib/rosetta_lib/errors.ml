@@ -33,6 +33,7 @@ module Variant = struct
     | `Unsupported_operation_for_construction
     | `Signature_missing
     | `Public_key_format_not_valid
+    | `No_options_provided
     | `Exception of string ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
@@ -93,6 +94,8 @@ end = struct
         "Unsupported operation for construction"
     | `Signature_missing ->
         "Signature missing"
+    | `No_options_provided ->
+        "No options provided"
     | `Exception _ ->
         "Exception"
 
@@ -147,6 +150,8 @@ end = struct
         None
     | `Signature_missing ->
         None
+    | `No_options_provided ->
+        None
     | `Exception s ->
         Some (sprintf "Exception when processing request: %s" s)
 
@@ -179,8 +184,47 @@ end = struct
         false
     | `Signature_missing ->
         false
+    | `No_options_provided ->
+        false
     | `Exception _ ->
         false
+
+  (* Unlike message above, description can be updated whenever we see fit *)
+  let description = function
+    | `Sql _ ->
+        "We encountered a SQL failure."
+    | `Json_parse _ ->
+        "We encountered an error while parsing JSON."
+    | `Graphql_coda_query _ ->
+        "The GraphQL query failed."
+    | `Network_doesn't_exist _ ->
+        "The network doesn't exist."
+    | `Chain_info_missing ->
+        "Some chain info is missing."
+    | `Account_not_found _ ->
+        "That account could not be found."
+    | `Invariant_violation ->
+        "One of our internal invariants was violated. (That means you found a \
+         bug!)"
+    | `Transaction_not_found _ ->
+        "That transaction could not be found."
+    | `Block_missing ->
+        "That block could not be found."
+    | `Malformed_public_key ->
+        "The public key you provided was malformed."
+    | `Operations_not_valid _ ->
+        "We could not convert those operations to a valid transaction."
+    | `Public_key_format_not_valid ->
+        "The public key you provided had an invalid format."
+    | `Unsupported_operation_for_construction ->
+        "An operation you provided isn't supported for construction."
+    | `Signature_missing ->
+        "Your request is missing a signature."
+    | `No_options_provided ->
+        "Your request is missing options."
+    | `Exception _ ->
+        "We encountered an internal exception while processing your request. \
+         (That means you found a bug!)"
 
   let create ?context kind = {extra_context= context; kind}
 
@@ -201,7 +245,8 @@ end = struct
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context1)
-                ; ("extra", `String context2) ]) ) }
+                ; ("extra", `String context2) ]) )
+    ; description= Some (description t.kind) }
 
   (* The most recent rosetta-cli denies errors that have details in them. When
    * future versions of the spec allow for more detailed descriptions we can
