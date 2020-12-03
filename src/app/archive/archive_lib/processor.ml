@@ -883,8 +883,12 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
 module For_test = struct
   let assert_parent_exist ~parent_id ~parent_hash conn =
     let open Deferred.Result.Let_syntax in
-    let%map Block.{state_hash= actual; _} = Block.load conn ~id:parent_id in
-    [%test_result: string]
-      ~expect:(parent_hash |> State_hash.to_base58_check)
-      actual
+    match parent_id with
+    | Some id ->
+        let%map Block.{state_hash= actual; _} = Block.load conn ~id in
+        [%test_result: string]
+          ~expect:(parent_hash |> State_hash.to_base58_check)
+          actual
+    | None ->
+        failwith "Failed to find parent block in database"
 end
