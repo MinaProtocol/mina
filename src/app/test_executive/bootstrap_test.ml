@@ -37,11 +37,10 @@ module Make (Engine : Engine_intf) = struct
     in
     let%bind () = Node.start ~fresh_state:true node_b in
     let%bind () = Log_engine.wait_for_init node_b log_engine in
-    let%bind () =
+    let%map () =
       Log_engine.wait_for_sync [node_a; node_b]
         ~timeout:(Time.Span.of_ms (15. *. 60. *. 1000.))
         log_engine
     in
-    Malleable_error.return
-      ([%log info] "bootstrap_test completed successfully")
+    [%log info] "bootstrap_test completed successfully"
 end

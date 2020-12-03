@@ -598,7 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  [%log debug] "Pulling %s subscription" subscription_name ;
+  [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ;
   let%bind () =
     uninterruptible
       ( match results with
@@ -694,8 +695,8 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~handle_result:(fun result ->
         let open Initialization_query.Result in
         let open Malleable_error.Let_syntax in
-        [%log debug] "Handling initialization log for node \"%s\""
-          result.pod_id ;
+        [%log debug] "Handling initialization log for node $node_id"
+          ~metadata:[("node_id", `String result.pod_id)] ;
         let%bind ivar =
           (* TEMP hack, this probably should be of_option_hard *)
           Malleable_error.of_option_soft
@@ -750,13 +751,13 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
     let open Deferred.Let_syntax in
     if not (Ivar.is_full cancel_background_tasks_ivar) then
       Ivar.fill cancel_background_tasks_ivar () ;
-    let%bind () =
+    let%map () =
       Deferred.all_unit
         [ errors_task_finished
         ; initialization_task_finished
         ; transition_frontier_diff_application_finished ]
     in
-    Deferred.return ([%log debug] "cancel_background_tasks finished")
+    [%log debug] "cancel_background_tasks finished"
   in
   { testnet_log_filter= network.testnet_log_filter
   ; logger
