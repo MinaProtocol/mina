@@ -956,13 +956,36 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		id := c.RemotePeer()
+
 		app.writeMsg(peerConnectedUpcall{
-			ID:     peer.IDB58Encode(c.RemotePeer()),
+			ID:     peer.Encode(id),
 			Upcall: "peerConnected",
 		})
+
+		go app.checkBandwidth(id)
+		go app.checkLatency(id)
 	}
 
 	return "beginAdvertising success", nil
+}
+
+const latencyMeasurementTime = time.Second
+
+func (a *app) checkBandwidth(id peer.ID) {
+	stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
+	// TODO: expose stats
+	fmt.Println(stats.TotalIn)
+	fmt.Println(stats.TotalOut)
+	fmt.Println(stats.RateIn)
+	fmt.Println(stats.RateOut)
+}
+
+func (a *app) checkLatency(id peer.ID) {
+	a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
+	latency := a.P2p.Host.Peerstore().LatencyEWMA(id)
+	// TODO: expose latency
+	fmt.Println(latency)
 }
 
 type findPeerMsg struct {

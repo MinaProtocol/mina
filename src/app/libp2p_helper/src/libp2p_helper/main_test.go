@@ -199,7 +199,7 @@ func createLargeMessage() []byte {
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
