@@ -58,7 +58,7 @@ CREATE TABLE epoch_data
 CREATE TABLE blocks
 ( id                      serial PRIMARY KEY
 , state_hash              text   NOT NULL UNIQUE
-, parent_id               int    NOT NULL        REFERENCES blocks(id)
+, parent_id               int                    REFERENCES blocks(id)
 , creator_id              int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
@@ -67,6 +67,7 @@ CREATE TABLE blocks
 , height                  bigint NOT NULL
 , global_slot             bigint NOT NULL
 , timestamp               bigint NOT NULL
+, parent_hash             text   NOT NULL
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);

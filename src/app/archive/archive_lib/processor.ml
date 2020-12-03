@@ -517,7 +517,7 @@ end
 module Block = struct
   type t =
     { state_hash: string
-    ; parent_id: int
+    ; parent_id: int option
     ; creator_id: int
     ; snarked_ledger_hash_id: int
     ; staking_epoch_data_id: int
@@ -525,13 +525,25 @@ module Block = struct
     ; ledger_hash: string
     ; height: int64
     ; global_slot: int64
-    ; timestamp: int64 }
+    ; timestamp: int64
+    ; parent_hash: string }
   [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
     let spec =
-      Caqti_type.[string; int; int; int; int; int; string; int64; int64; int64]
+      Caqti_type.
+        [ string
+        ; option int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; int64
+        ; int64
+        ; string ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -554,7 +566,7 @@ module Block = struct
       (Caqti_request.find Caqti_type.int typ
          "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
           staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, \
-          global_slot, timestamp FROM blocks WHERE id = ?")
+          global_slot, timestamp, parent_hash FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
@@ -565,15 +577,9 @@ module Block = struct
         return block_id
     | None ->
         let%bind parent_id =
-          if
-            External_transition.blockchain_length t <> Unsigned.UInt32.of_int 1
-          then
-            find (module Conn) ~state_hash:(External_transition.parent_hash t)
-          else
-            Conn.find
-              (Caqti_request.find Caqti_type.unit Caqti_type.int
-                 "SELECT count(id) + 1 FROM blocks")
-              ()
+          find_opt
+            (module Conn)
+            ~state_hash:(External_transition.parent_hash t)
         in
         let%bind creator_id =
           Public_key.add_if_doesn't_exist
@@ -601,22 +607,11 @@ module Block = struct
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               ( if
-                 Unsigned.UInt32.equal
-                   (External_transition.blockchain_length t)
-                   Unsigned.UInt32.one
-               then
-                 "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  timestamp) VALUES (" ^ string_of_int parent_id
-                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
-               else
-                 "INSERT INTO blocks (state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \
-                  id" ))
+               "INSERT INTO blocks (state_hash, parent_id, creator_id, \
+                snarked_ledger_hash_id, staking_epoch_data_id, \
+                next_epoch_data_id, ledger_hash, height, global_slot, \
+                timestamp, parent_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+                ?) RETURNING id")
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; creator_id
@@ -633,17 +628,8 @@ module Block = struct
             ; global_slot=
                 External_transition.global_slot t |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
-            }
-        in
-        let%bind () =
-          if External_transition.blockchain_length t = Unsigned.UInt32.of_int 1
-          then
-            Conn.exec
-              (Caqti_request.exec Caqti_type.unit
-                 ( "ALTER SEQUENCE blocks_id_seq RESTART WITH "
-                 ^ string_of_int (block_id + 1) ))
-              ()
-          else return ()
+            ; parent_hash=
+                External_transition.parent_hash t |> State_hash.to_string }
         in
         let transactions =
           External_transition.transactions ~constraint_constants t
