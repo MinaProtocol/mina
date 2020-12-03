@@ -192,37 +192,39 @@ end = struct
   (* Unlike message above, description can be updated whenever we see fit *)
   let description = function
     | `Sql _ ->
-        "SQL failure"
+        "We encountered a SQL failure."
     | `Json_parse _ ->
-        "JSON parse error"
+        "We encountered an error while parsing JSON."
     | `Graphql_coda_query _ ->
-        "GraphQL query failed"
+        "The GraphQL query failed."
     | `Network_doesn't_exist _ ->
-        "Network doesn't exist"
+        "The network doesn't exist."
     | `Chain_info_missing ->
-        "Chain info missing"
+        "Some chain info is missing."
     | `Account_not_found _ ->
-        "Account not found"
+        "That account could not be found."
     | `Invariant_violation ->
-        "Internal invariant violation (you found a bug)"
+        "One of our internal invariants was violated. (That means you found a \
+         bug!)"
     | `Transaction_not_found _ ->
-        "Transaction not found"
+        "That transaction could not be found."
     | `Block_missing ->
-        "Block not found"
+        "That block could not be found."
     | `Malformed_public_key ->
-        "Malformed public key"
+        "The public key you provided was malformed."
     | `Operations_not_valid _ ->
-        "Cannot convert operations to valid transaction"
+        "We could not convert those operations to a valid transaction."
     | `Public_key_format_not_valid ->
-        "Invalid public key format"
+        "The public key you provided had an invalid format."
     | `Unsupported_operation_for_construction ->
-        "Unsupported operation for construction"
+        "An operation you provided isn't supported for construction."
     | `Signature_missing ->
-        "Signature missing"
+        "Your request is missing a signature."
     | `No_options_provided ->
-        "No options provided"
+        "Your request is missing options."
     | `Exception _ ->
-        "Exception"
+        "We encountered an internal exception while processing your request. \
+         (That means you found a bug!)"
 
   let create ?context kind = {extra_context= context; kind}
 
