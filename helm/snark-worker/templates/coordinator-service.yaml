@@ -8,6 +8,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: None
+  # publishing of addresses is necessary for node readiness
   publishNotReadyAddresses: true
   selector:
     app: {{ tpl .Values.coordinator.fullname . }}
