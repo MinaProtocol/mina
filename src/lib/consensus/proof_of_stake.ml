@@ -3495,7 +3495,7 @@ let%test_module "Proof of stake tests" =
         Vrf.eval ~constraint_constants ~private_key
           {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
-      let block_winner = Public_key.Compressed.empty in
+      let block_winner = account.public_key in
       let next_consensus_state =
         update ~constants ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
