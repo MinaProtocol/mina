@@ -4,9 +4,11 @@ kind: Service
 metadata:
   name: {{ tpl .Values.archive.fullname . }}
 spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
   selector:
     app: {{ tpl .Values.archive.fullname . }}
-  clusterIP: None
   ports:
   - protocol: TCP
     port: {{ .Values.coda.ports.p2p }}

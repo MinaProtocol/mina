@@ -16,6 +16,6 @@ Node selector: custom affinity mapping
 {{- define "nodeSelector.customMapping" }}
 {{- if . }}
 nodeSelector:
-{{ toYaml . | nindent 2 }}
+{{ toYaml . | indent 2 }}
 {{- end }}
 {{- end }}

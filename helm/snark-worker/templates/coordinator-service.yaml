@@ -2,15 +2,18 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{tpl .Values.coordinator.fullname .}}
+  name: {{ tpl .Values.coordinator.fullname . }}
   labels:
-    app: {{tpl .Values.coordinator.fullname .}}
+    app: {{ tpl .Values.coordinator.fullname . }}
 spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ tpl .Values.coordinator.fullname . }}
   ports:
   - protocol: TCP
     port: {{ .Values.coda.ports.p2p }}
     targetPort: {{ .Values.coda.ports.p2p }}
     name: gossip
-  selector:
-    app: {{tpl .Values.coordinator.fullname .}}
 {{ end }}
