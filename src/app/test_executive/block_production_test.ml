@@ -27,8 +27,6 @@ module Make (Engine : Engine_intf) = struct
     let%map _ =
       Log_engine.wait_for ~blocks:1 ~timeout:(`Slots 30) log_engine
     in
-    [%log info]
-      "block_production_term: cannot remove '.coda-config': Device or \
-       resource busyst finished successfully" ;
+    [%log info] "block_production_test finished successfully" ;
     ()
 end

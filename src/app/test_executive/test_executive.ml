@@ -72,14 +72,14 @@ let dispatch_cleanup ~logger ~network_cleanup_func ~log_engine_cleanup_func
     (module T : Test_intf) reason (test_result : unit Malleable_error.t) :
     unit Deferred.t =
   let cleanup () : unit Deferred.t =
-    let%bind () =
-      Option.value_map !net_manager_ref ~default:Deferred.unit
-        ~f:network_cleanup_func
-    in
     let log_engine_cleanup_result =
       Option.value_map !log_engine_ref
         ~default:(Malleable_error.return Test_error.Set.empty)
         ~f:log_engine_cleanup_func
+    in
+    let%bind () =
+      Option.value_map !net_manager_ref ~default:Deferred.unit
+        ~f:network_cleanup_func
     in
     let%bind log_engine_error_set =
       match%map Malleable_error.lift_error_set log_engine_cleanup_result with
