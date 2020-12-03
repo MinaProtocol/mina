@@ -235,8 +235,19 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok () ->
-      continue persistent_frontier_instance ~ignore_consensus_local_state:true
+  | Ok () -> (
+      match%bind
+        continue persistent_frontier_instance
+          ~ignore_consensus_local_state:true
+      with
+      | Error (`Failure err) when retry_with_fresh_db ->
+          [%log error]
+            "Failed to initialize transition frontier: $err. Destroying old \
+             persistent frontier database and retrying."
+            ~metadata:[("err", `String err)] ;
+          reset_and_continue ()
+      | res ->
+          return res )
 
 let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~precomputed_values () =
