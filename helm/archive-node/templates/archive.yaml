@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: archive-node-{{ .Values.archive.nodeName }}
+  name: {{ .Values.archive.fullname }}
   labels:
-    app: archive-node-{{ .Values.archive.nodeName }}
+    app: {{ .Values.archive.fullname }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: archive-node-{{ .Values.archive.nodeName }}
+      app: {{ .Values.archive.fullname }}
   template:
     metadata:
       labels:
-        app: archive-node-{{ .Values.archive.nodeName }}
+        app: {{ .Values.archive.fullname }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
