@@ -272,9 +272,6 @@ metadata:
   name: {{ $config.name }}
 spec:
   type: ClusterIP
-  clusterIP: None
-  # publishing of addresses is necessary for node readiness
-  publishNotReadyAddresses: true
   selector:
     app: {{ $config.name }}
   ports:
