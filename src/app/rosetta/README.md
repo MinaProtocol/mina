@@ -4,6 +4,10 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+11/30:
+
+- Upgrades from Rosetta spec 1.4.4 to 1.4.7
+
 9/14:
 
 - Upgrades from Rosetta spec v1.4.2 to v1.4.4

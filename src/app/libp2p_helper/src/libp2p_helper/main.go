@@ -249,10 +249,9 @@ type configureMsg struct {
 	GatingConfig    setGatingConfigMsg `json:"gating_config"`
 }
 
-type discoveredPeerUpcall struct {
-	ID     string   `json:"peer_id"`
-	Addrs  []string `json:"multiaddrs"`
-	Upcall string   `json:"upcall"`
+type peerConnectedUpcall struct {
+	ID     string `json:"peer_id"`
+	Upcall string `json:"upcall"`
 }
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
@@ -893,31 +892,15 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
+			fmt.Println("found peer", info, app.P2p.Me)
 			if validPeer(info.ID) {
+				fmt.Println("added peer", info, app.P2p.Me)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				foundPeer(app, info.ID)
 			}
 		}
 	}()
 
 	return nil
-}
-
-func foundPeer(app *app, who peer.ID) {
-	addrs := app.P2p.Host.Peerstore().Addrs(who)
-
-	if len(addrs) > 0 {
-		addrStrings := make([]string, len(addrs))
-		for i, a := range addrs {
-			addrStrings[i] = a.String()
-		}
-
-		app.writeMsg(discoveredPeerUpcall{
-			ID:     peer.Encode(who),
-			Addrs:  addrStrings,
-			Upcall: "discoveredPeer",
-		})
-	}
 }
 
 func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
@@ -972,13 +955,11 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}()
 	}
 
-	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		logger.Infof("new connection: %+v", c)
-		foundPeer(app, c.RemotePeer())
-	}
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		logger.Infof("dropped connection: %+v", c)
+		app.writeMsg(peerConnectedUpcall{
+			ID:     peer.IDB58Encode(c.RemotePeer()),
+			Upcall: "peerConnected",
+		})
 	}
 
 	return "beginAdvertising success", nil
@@ -1287,20 +1268,22 @@ func main() {
 			log.Panic(err)
 		}
 
-		start := time.Now()
-		ret, err := msg.run(app)
-		if err != nil {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-			continue
-		}
+		go func() {
+			start := time.Now()
+			ret, err := msg.run(app)
+			if err != nil {
+				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				return
+			}
 
-		res, err := json.Marshal(ret)
-		if err != nil {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-			continue
-		}
+			res, err := json.Marshal(ret)
+			if err != nil {
+				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				return
+			}
 
-		app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Since(start).String()})
+			app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Since(start).String()})
+		}()
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully

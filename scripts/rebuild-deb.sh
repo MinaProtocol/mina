@@ -230,7 +230,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
-#remove build dir
+#remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
 

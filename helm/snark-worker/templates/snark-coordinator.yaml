@@ -96,4 +96,5 @@ spec:
         configMap:
           name: snark-coordinator-daemon-config
       {{- end }}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{- end }}

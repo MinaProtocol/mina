@@ -135,13 +135,14 @@ func TestDHTDiscovery(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		// check if peerB knows about peerC
-		ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
-		for _, id := range ids {
-			if id == appC.P2p.Host.ID() {
+		for {
+			// check if peerB knows about peerC
+			addrs := appB.P2p.Host.Peerstore().Addrs(appC.P2p.Host.ID())
+			if len(addrs) != 0 {
 				close(done)
 				return
 			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
@@ -153,6 +154,8 @@ func TestDHTDiscovery(t *testing.T) {
 }
 
 func TestMDNSDiscovery(t *testing.T) {
+	time.Sleep(time.Second)
+
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
 	defer appA.P2p.Host.Close()
@@ -161,7 +164,7 @@ func TestMDNSDiscovery(t *testing.T) {
 	appB.NoDHT = true
 	defer appB.P2p.Host.Close()
 
-	// begin appB and appC's DHT advertising
+	// begin appA and appB's mDNS advertising
 	ret, err := new(beginAdvertisingMsg).run(appB)
 	require.NoError(t, err)
 	require.Equal(t, ret, "beginAdvertising success")
@@ -173,13 +176,14 @@ func TestMDNSDiscovery(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		// check if peerB knows about peerA
-		ids := appB.P2p.Host.Peerstore().PeersWithAddrs()
-		for _, id := range ids {
-			if id == appA.P2p.Host.ID() {
+		for {
+			// check if peerB knows about peerA
+			addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
+			if len(addrs) != 0 {
 				close(done)
 				return
 			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}()
 
@@ -195,6 +199,8 @@ func createLargeMessage() []byte {
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
+	time.Sleep(time.Second)
+
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
