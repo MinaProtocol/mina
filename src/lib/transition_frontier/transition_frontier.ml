@@ -171,9 +171,11 @@ let rec load_with_max_length :
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
   in
-  let reset_and_continue () =
+  let reset_and_continue ?(destroy_frontier_instance = true) () =
     let%bind () =
-      Persistent_frontier.Instance.destroy persistent_frontier_instance
+      if destroy_frontier_instance then
+        Persistent_frontier.Instance.destroy persistent_frontier_instance
+      else return ()
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
@@ -245,7 +247,10 @@ let rec load_with_max_length :
             "Failed to initialize transition frontier: $err. Destroying old \
              persistent frontier database and retrying."
             ~metadata:[("err", `String err)] ;
-          reset_and_continue ()
+          (* The frontier instance is already destroyed by [continue] before it
+             returns an [Error], don't attempt to do it again.
+          *)
+          reset_and_continue ~destroy_frontier_instance:false ()
       | res ->
           return res )
 
