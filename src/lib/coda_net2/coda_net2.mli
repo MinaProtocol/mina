@@ -45,13 +45,31 @@ is vulnerable to resource exhaustion by opening many new connections.
 
 *)
 
-open Base
+open Core
 open Async
 open Pipe_lib
 open Network_peer
 
 (** Handle to all network functionality. *)
 type net
+
+module Validation_callback : sig
+  type validation_result = [`Accept | `Reject | `Ignore]
+
+  type t
+
+  val create : Time_ns.t -> t
+
+  val create_without_expiration : unit -> t
+
+  val is_expired : t -> bool
+
+  val await : t -> validation_result option Deferred.t
+
+  val await_exn : t -> validation_result Deferred.t
+
+  val fire_exn : t -> validation_result -> unit
+end
 
 module Keypair : sig
   [%%versioned:
@@ -100,8 +118,6 @@ end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
 
-type validation_result = [`Accept | `Reject | `Ignore]
-
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
   module Subscription : sig
@@ -147,7 +163,8 @@ module Pubsub : sig
        net
     -> string
     -> should_forward_message:(   string Envelope.Incoming.t
-                               -> validation_result Deferred.t)
+                               -> Validation_callback.t
+                               -> unit Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -165,7 +182,8 @@ module Pubsub : sig
        net
     -> string
     -> should_forward_message:(   'a Envelope.Incoming.t
-                               -> validation_result Deferred.t)
+                               -> Validation_callback.t
+                               -> unit Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of
