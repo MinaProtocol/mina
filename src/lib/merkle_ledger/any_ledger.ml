@@ -137,6 +137,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
+    let get_directory (T ((module Base), t)) = Base.get_directory t
+
     let last_filled (T ((module Base), t)) = Base.last_filled t
 
     let close (T ((module Base), t)) = Base.close t
@@ -158,6 +160,12 @@ module Make_base (Inputs : Inputs_intf) :
     let tokens (T ((module Base), t)) pk = Base.tokens t pk
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
+
+    let next_available_token (T ((module Base), t)) =
+      Base.next_available_token t
+
+    let set_next_available_token (T ((module Base), t)) =
+      Base.set_next_available_token t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 

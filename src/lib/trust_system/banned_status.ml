@@ -1,5 +1,4 @@
 open Core_kernel
-open Module_version
 
 [%%versioned_asserted
 module Stable = struct
@@ -30,14 +29,12 @@ module Stable = struct
     let%test "banned status serialization v1" =
       let tm = Time.of_string "2019-10-08 17:51:23.050849Z" in
       let status = V1.Banned_until tm in
-      let known_good_hash =
-        "\x52\x14\x64\x6A\xB0\x37\x7A\x62\x8D\x28\x6A\x3F\x02\xB8\xE8\xDE\x24\x5B\xED\xBA\x74\x72\xF0\xD3\xFE\x59\x09\x18\xCC\x8C\x0E\x31"
-      in
-      Serialization.check_serialization (module V1) status known_good_hash
+      let known_good_digest = "99a12fdb97c62ceba0c4d4f5879b0cdc" in
+      Ppx_version_runtime.Serialization.check_serialization
+        (module V1)
+        status known_good_digest
   end
 end]
-
-type t = Stable.Latest.t = Unbanned | Banned_until of Time.t
 
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson)]

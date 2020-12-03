@@ -69,7 +69,7 @@ let diff_in_slots ~(constants : Constants.t) ((epoch, slot) : t * Slot.t)
   else slot - slot'
 
 let%test_unit "test diff_in_slots" =
-  let constants = Constants.for_unit_tests in
+  let constants = Lazy.force Constants.for_unit_tests in
   let open Int64.Infix in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in

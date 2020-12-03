@@ -5,7 +5,7 @@ type uint64 = Unsigned.uint64
 type uint32 = Unsigned.uint32
 
 module type S = sig
-  type t [@@deriving sexp, hash, compare, eq, yojson]
+  type t [@@deriving sexp, hash, compare, yojson]
 
   val length_in_bits : int
 
@@ -22,6 +22,8 @@ module type S = sig
   val ( <= ) : t -> t -> bool
 
   val ( >= ) : t -> t -> bool
+
+  val to_bigint : t -> Bigint.t
 end
 
 module type F = functor

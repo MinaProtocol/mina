@@ -11,7 +11,7 @@ def main(required_file):
         if not (len(required_status) > 0):
             print("required status was empty, this is probably in error and I refuse to turn off all status checks", file=sys.stderr)
             sys.exit(1)
-        r = requests.patch("https://api.github.com/repos/CodaProtocol/coda/branches/develop/protection/required_status_checks",
+        r = requests.patch("https://api.github.com/repos/MinaProtocol/mina/branches/develop/protection/required_status_checks",
             json={"strict": True, "contexts": required_status},
             auth=('o1-service-account', os.environ['GITHUB_API_TOKEN']),
         )

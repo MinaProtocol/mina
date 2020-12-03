@@ -1,7 +1,7 @@
 open Core_kernel
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -24,7 +24,8 @@ module type S = sig
   val typ : (t, Unchecked.t) Typ.t
 end
 
-module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
+module Make (Impl : Snarky_backendless.Snark_intf.S) :
+  S with module Impl := Impl = struct
   module B = Bigint
   open Impl
   open Let_syntax

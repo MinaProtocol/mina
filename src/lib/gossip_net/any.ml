@@ -40,13 +40,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
   let peers (Any ((module M), t)) = M.peers t
 
+  let add_peer (Any ((module M), t)) xs = M.add_peer t xs
+
   let initial_peers (Any ((module M), t)) = M.initial_peers t
 
   let random_peers (Any ((module M), t)) = M.random_peers t
 
   let random_peers_except (Any ((module M), t)) = M.random_peers_except t
 
-  let query_peer (Any ((module M), t)) = M.query_peer t
+  let query_peer ?timeout (Any ((module M), t)) = M.query_peer ?timeout t
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
@@ -65,5 +67,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   let ban_notification_reader (Any ((module M), t)) =
     M.ban_notification_reader t
 
-  let net2 (Any ((module M), t)) = M.net2 t
+  let connection_gating (Any ((module M), t)) = M.connection_gating t
+
+  let set_connection_gating (Any ((module M), t)) config =
+    M.set_connection_gating t config
 end

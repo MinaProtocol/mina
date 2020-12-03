@@ -6,7 +6,7 @@
     "build": "bsb -make-world && tsc src/SDKWrapper.ts -d",
     "start": "bsb -make-world -w",
     "clean": "bsb -clean-world",
-    "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src",
+    "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && chmod 0666 src/client_sdk.bc.js",
     "prepublishOnly": "yarn make-jsoo && yarn build && yarn test",
     "test": "tsc test/Test.ts && node test/Test.js"
   },

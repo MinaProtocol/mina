@@ -10,29 +10,30 @@ import (
 	"io"
 	"log"
 	gonet "net"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
 
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
-
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	logging "github.com/ipfs/go-log"
-	logwriter "github.com/ipfs/go-log/writer"
+	"github.com/ipfs/go-ipfs/core/bootstrap"
+	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	coredisc "github.com/libp2p/go-libp2p-core/discovery"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	filter "github.com/libp2p/go-maddr-filter"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
-	logging2 "github.com/whyrusleeping/go-logging"
+	ma "github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type subscription struct {
@@ -43,7 +44,7 @@ type subscription struct {
 }
 
 type validationStatus struct {
-	Completion chan bool
+	Completion chan string
 	TimedOutAt *time.Time
 }
 
@@ -57,6 +58,8 @@ type app struct {
 	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
 	OutChan         chan interface{}
+	Bootstrapper    io.Closer
+	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
 }
 
@@ -84,8 +87,7 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
-	banIP
-	unbanIP
+	setGatingConfig
 )
 
 const validationTimeout = 5 * time.Minute
@@ -190,20 +192,64 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	return maybePeer, nil
 }
 
-type configureMsg struct {
-	Statedir        string   `json:"statedir"`
-	Privk           string   `json:"privk"`
-	NetworkID       string   `json:"network_id"`
-	ListenOn        []string `json:"ifaces"`
-	External        string   `json:"external_maddr"`
-	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
-	Flood           bool     `json:"flood_gossip"`
+type codaMetricsServer struct {
+	port   string
+	server *http.Server
+	done   *sync.WaitGroup
 }
 
-type discoveredPeerUpcall struct {
-	ID     string   `json:"peer_id"`
-	Addrs  []string `json:"multiaddrs"`
-	Upcall string   `json:"upcall"`
+func startMetricsServer(port string) *codaMetricsServer {
+	log := logging.Logger("metrics server")
+	done := &sync.WaitGroup{}
+	done.Add(1)
+	server := &http.Server{Addr: ":" + port}
+
+	// does this need re-registered every time?
+	// http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		defer done.Done()
+
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("http server error: %v", err)
+		}
+	}()
+
+	return &codaMetricsServer{
+		port:   port,
+		server: server,
+		done:   done,
+	}
+}
+
+func (ms *codaMetricsServer) Shutdown() {
+	if err := ms.server.Shutdown(context.Background()); err != nil {
+		panic(err)
+	}
+
+	ms.done.Wait()
+}
+
+var metricsServer *codaMetricsServer = nil
+
+type configureMsg struct {
+	Statedir        string             `json:"statedir"`
+	Privk           string             `json:"privk"`
+	NetworkID       string             `json:"network_id"`
+	ListenOn        []string           `json:"ifaces"`
+	MetricsPort     string             `json:"metrics_port"`
+	External        string             `json:"external_maddr"`
+	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
+	Flood           bool               `json:"flood"`
+	PeerExchange    bool               `json:"peer_exchange"`
+	DirectPeers     []string           `json:"direct_peers"`
+	SeedPeers       []string           `json:"seed_peers"`
+	GatingConfig    setGatingConfigMsg `json:"gating_config"`
+}
+
+type peerConnectedUpcall struct {
+	ID     string `json:"peer_id"`
+	Upcall string `json:"upcall"`
 }
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
@@ -225,21 +271,53 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		maddrs[i] = res
 	}
 
+	seeds := make([]peer.AddrInfo, 0, len(m.SeedPeers))
+	for _, v := range m.SeedPeers {
+		addr, err := addrInfoOfString(v)
+		if err != nil {
+			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+			// isn't supported by this version of libp2p.
+			// But more likely, it is an RPC error.
+			return nil, badRPC(err)
+		}
+		seeds = append(seeds, *addr)
+	}
+
+	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
+	for _, v := range m.DirectPeers {
+		addr, err := addrInfoOfString(v)
+		if err != nil {
+			// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
+			// isn't supported by this version of libp2p.
+			// But more likely, it is an RPC error.
+			return nil, badRPC(err)
+		}
+		directPeers = append(directPeers, *addr)
+	}
+
 	externalMaddr, err := multiaddr.NewMultiaddr(m.External)
 	if err != nil {
 		return nil, badAddr(err)
 	}
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID)
+
+	gatingConfig, err := gatingConfigFromJson(&m.GatingConfig)
+
+	if err != nil {
+		return nil, badRPC(err)
+	}
+
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, *gatingConfig)
+
 	if err != nil {
 		return nil, badHelper(err)
 	}
 
+	// SOMEDAY:
+	// - stop putting block content on the mesh.
+	// - bigger than 32MiB block size?
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
 	var ps *pubsub.PubSub
-	if m.Flood {
-		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
-	} else {
-		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
-	}
+	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
 
 	if err != nil {
 		return nil, badHelper(err)
@@ -247,6 +325,15 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 
 	helper.Pubsub = ps
 	app.P2p = helper
+
+	app.P2p.Logger.Infof("here are the seeds: %v", seeds)
+
+	if metricsServer != nil && metricsServer.port != m.MetricsPort {
+		metricsServer.Shutdown()
+	}
+	if len(m.MetricsPort) > 0 {
+		metricsServer = startMetricsServer(m.MetricsPort)
+	}
 
 	return "configure success", nil
 }
@@ -332,15 +419,16 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p.Dht == nil {
 		return nil, needsDHT()
 	}
-	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+	app.P2p.Pubsub.Join(s.Topic)
+	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
-			return true
+			return pubsub.ValidationAccept
 		}
 
 		seqno := <-seqs
-		ch := make(chan bool, 1)
+		ch := make(chan string, 1)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
@@ -355,7 +443,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			app.ValidatorMutex.Lock()
 			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
-			return false
+			return pubsub.ValidationIgnore
 		}
 
 		app.writeMsg(validateUpcall{
@@ -384,17 +472,24 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
-				return true
+				return pubsub.ValidationAccept
 			}
 			app.P2p.Logger.Info("unvalidated :(")
-			return false
+			return pubsub.ValidationReject
 		case res := <-ch:
-			if !res {
-				app.P2p.Logger.Error("why u fail to validate :(")
-			} else {
+			switch res {
+			case "reject":
+				app.P2p.Logger.Info("why u fail to validate :(")
+				return pubsub.ValidationReject
+			case "accept":
 				app.P2p.Logger.Info("validated!")
+				return pubsub.ValidationAccept
+			case "ignore":
+				app.P2p.Logger.Info("ignoring valid message!")
+				return pubsub.ValidationIgnore
 			}
-			return res
+			app.P2p.Logger.Info("ignoring message that falled off the end!")
+			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -470,8 +565,8 @@ type validateUpcall struct {
 }
 
 type validationCompleteMsg struct {
-	Seqno int  `json:"seqno"`
-	Valid bool `json:"is_valid"`
+	Seqno int    `json:"seqno"`
+	Valid string `json:"is_valid"`
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
@@ -596,7 +691,9 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
+	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
+	defer cancel()
+	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -741,27 +838,33 @@ type addPeerMsg struct {
 	Multiaddr string `json:"multiaddr"`
 }
 
+func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
+	multiaddr, err := multiaddr.NewMultiaddr(maddr)
+	if err != nil {
+		return nil, err
+	}
+	info, err := peer.AddrInfoFromP2pAddr(multiaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-	multiaddr, err := multiaddr.NewMultiaddr(ap.Multiaddr)
+	info, err := addrInfoOfString(ap.Multiaddr)
 	if err != nil {
-		// TODO: this isn't necessarily an RPC error. Perhaps the encoded multiaddr
-		// isn't supported by this version of libp2p.
-		// But more likely, it is an RPC error.
-		return nil, badRPC(err)
-	}
-	info, err := peer.AddrInfoFromP2pAddr(multiaddr)
-	if err != nil {
-		// TODO: this isn't necessarily an RPC error. Perhaps the contained peer ID
-		// isn't supported by this version of libp2p.
-		// But more likely, it is an RPC error.
-		return nil, badRPC(err)
+		return nil, err
 	}
 
-	// discovery should notice the connection event and do the dht thing
-	err = app.P2p.Host.Connect(app.Ctx, *info)
+	app.AddedPeers = append(app.AddedPeers, *info)
+	if app.Bootstrapper != nil {
+		app.Bootstrapper.Close()
+	}
+	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -805,58 +908,42 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	discovered := make(chan peer.AddrInfo)
 	app.P2p.DiscoveredPeers = discovered
 
-	foundPeer := func(info peer.AddrInfo, source string) {
-		if info.ID != "" && len(info.Addrs) != 0 {
-			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
-			defer cancel()
-			if err := app.P2p.Host.Connect(ctx, info); err != nil {
-				app.P2p.Logger.Warningf("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
-			} else {
-				app.P2p.Logger.Infof("Found a %s peer: %s", source, info.Loggable())
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				addrStrings := make([]string, len(info.Addrs))
-				for i, a := range info.Addrs {
-					addrStrings[i] = a.String()
-				}
-				app.writeMsg(discoveredPeerUpcall{
-					ID:     peer.IDB58Encode(info.ID),
-					Addrs:  addrStrings,
-					Upcall: "discoveredPeer",
-				})
-			}
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
+	if len(app.AddedPeers) > 0 {
+		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+		if err != nil {
+			return nil, badp2p(err)
 		}
 	}
 
-	// report local discovery peers
+	// add locally discovered peers to peerstore
 	go func() {
 		for info := range l.FoundPeer {
-			foundPeer(info, "local")
+			if validPeer(info.ID) {
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+			}
 		}
 	}()
 
-	if err := app.P2p.Dht.Bootstrap(app.Ctx); err != nil {
-		return nil, badp2p(err)
+	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.writeMsg(peerConnectedUpcall{
+			ID:     peer.IDB58Encode(c.RemotePeer()),
+			Upcall: "peerConnected",
+		})
 	}
 
 	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
-	// report dht peers
 	go func() {
-		// wait a bit for our advertisement to go out and get some responses
-		time.Sleep(1 * time.Second)
-
 		for {
-			// default is to yield only 100 peers at a time. for now, always be
-			// looking... TODO: Is there a better way to use discovery? Should we only
-			// have to explicitly search once at startup?
-			dhtpeers, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
+			_, err := discovery.FindPeers(app.Ctx, routingDiscovery, app.P2p.Rendezvous, coredisc.Limit(20))
 			if err != nil {
-				app.P2p.Logger.Error("failed to find DHT peers: ", err)
+				app.P2p.Logger.Warning("error while trying to find some peers: ", err.Error())
 			}
-			for info := range dhtpeers {
-				foundPeer(info, "dht")
-			}
-			time.Sleep(30 * time.Second)
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 
@@ -892,7 +979,7 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 
 	connsHere := app.P2p.Host.Network().Conns()
 
-	peerInfos := make([]codaPeerInfo, len(connsHere))
+	peerInfos := make([]codaPeerInfo, 0, len(connsHere))
 
 	for _, conn := range connsHere {
 		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
@@ -906,61 +993,92 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	return peerInfos, nil
 }
 
-type banIPMsg struct {
-	IP string `json:"ip"`
-}
+func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
+	realIP := gonet.ParseIP(ip).To4()
 
-func (ban *banIPMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	ip := gonet.ParseIP(ban.IP).To4()
-
-	if ip == nil {
+	if realIP == nil {
 		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+		return badRPC(errors.New("unparsable IP or IPv6"))
 	}
 
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
+	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: realIP}
 
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
+	filters.AddFilter(ipnet, action)
 
-	app.P2p.Filters.AddFilter(ipnet, filter.ActionDeny)
-
-	if currentAction == filter.ActionDeny && isFromRule {
-		return "banIP already banned", nil
-	}
-	return "banIP success", nil
+	return nil
 }
 
 type unbanIPMsg struct {
 	IP string `json:"ip"`
 }
 
-func (unban *unbanIPMsg) run(app *app) (interface{}, error) {
+type setGatingConfigMsg struct {
+	BannedIPs      []string `json:"banned_ips"`
+	BannedPeerIDs  []string `json:"banned_peers"`
+	TrustedPeerIDs []string `json:"trusted_peers"`
+	TrustedIPs     []string `json:"trusted_ips"`
+	Isolate        bool     `json:"isolate"`
+}
+
+func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
+	newFilter := ma.NewFilters()
+	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
+
+	if gc.Isolate {
+		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
+		if err != nil {
+			return nil, err
+		}
+		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+	}
+	for _, ip := range gc.BannedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, ip := range gc.TrustedIPs {
+		err := filterIPString(newFilter, ip, ma.ActionAccept)
+		if err != nil {
+			return nil, err
+		}
+	}
+	bannedPeers := peer.NewSet()
+	for _, peerID := range gc.BannedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		bannedPeers.Add(id)
+	}
+	trustedPeers := peer.NewSet()
+	for _, peerID := range gc.TrustedPeerIDs {
+		id, err := peer.IDB58Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
+		trustedPeers.Add(id)
+	}
+
+	return &codanet.CodaGatingState{AddrFilters: newFilter, AllowedPeers: trustedPeers, DeniedPeers: bannedPeers}, nil
+}
+
+func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
 
-	ip := gonet.ParseIP(unban.IP).To4()
+	newState, err := gatingConfigFromJson(gc)
 
-	if ip == nil {
-		// TODO: how to compute mask for IPv6?
-		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+	if err != nil {
+		return nil, badRPC(err)
 	}
 
-	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
+	*app.P2p.GatingState = *newState
 
-	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
-
-	if !isFromRule || currentAction == filter.ActionAccept {
-		return "unbanIP not banned", nil
-	}
-
-	app.P2p.Filters.RemoveLiteral(ipnet)
-
-	return "unbanIP success", nil
+	return "ok", nil
 }
 
 var msgHandlers = map[methodIdx]func() action{
@@ -982,8 +1100,7 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
-	banIP:               func() action { return &banIPMsg{} },
-	unbanIP:             func() action { return &unbanIPMsg{} },
+	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
 }
 
 type errorResult struct {
@@ -997,11 +1114,66 @@ type successResult struct {
 	Duration string          `json:"duration"`
 }
 
+func init() {
+	// === Register metrics collectors here ===
+	// currently, we only register the default go collector (which promhttp does automatically for us)
+	http.Handle("/metrics", promhttp.Handler())
+}
+
 func main() {
-	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-	log.SetOutput(os.Stderr)
-	logging.SetAllLoggers(logging2.INFO)
+	logging.SetupLogging(logging.Config{
+		Format: logging.JSONOutput,
+		Stderr: true,
+		Stdout: false,
+		Level:  logging.LevelDebug,
+		File:   "",
+	})
 	helperLog := logging.Logger("helper top-level JSON handling")
+
+	helperLog.Infof("libp2p_helper has the following logging subsystems active: %v", logging.GetSubsystems())
+
+	// === Set subsystem log levels ===
+	// All subsystems that have been considered are explicitly listed. Any that
+	// are added when modifying this code should be considered and added to
+	// this list.
+	// The levels below set the **minimum** log level for each subsystem.
+	// Messages emitted at lower levels than the given level will not be
+	// emitted.
+	logging.SetLogLevel("mplex", "debug")
+	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
+	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
+	logging.SetLogLevel("ping", "info")         // Logs every ping timeout at debug
+	logging.SetLogLevel("basichost", "info")    // Spammy at debug
+	logging.SetLogLevel("test-logger", "debug")
+	logging.SetLogLevel("blankhost", "debug")
+	logging.SetLogLevel("connmgr", "debug")
+	logging.SetLogLevel("eventlog", "debug")
+	logging.SetLogLevel("p2p-config", "debug")
+	logging.SetLogLevel("ipns", "debug")
+	logging.SetLogLevel("nat", "debug")
+	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
+	logging.SetLogLevel("providers", "debug")
+	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
+	logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
+	logging.SetLogLevel("peerstore", "debug")
+	logging.SetLogLevel("diversityFilter", "debug")
+	logging.SetLogLevel("table", "debug")
+	logging.SetLogLevel("stream-upgrader", "debug")
+	logging.SetLogLevel("helper top-level JSON handling", "debug")
+	logging.SetLogLevel("dht.pb", "debug")
+	logging.SetLogLevel("tcp-tpt", "debug")
+	logging.SetLogLevel("autonat", "debug")
+	logging.SetLogLevel("discovery", "debug")
+	logging.SetLogLevel("routing/record", "debug")
+	logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
+	logging.SetLogLevel("badger", "debug")
+	logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
+	logging.SetLogLevel("routedhost", "debug")
+	logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
+	logging.SetLogLevel("peerstore/ds", "debug")
+	logging.SetLogLevel("mdns", "info") // Logs each mdns call
+	logging.SetLogLevel("bootstrap", "debug")
+	logging.SetLogLevel("reuseport-transport", "debug")
 
 	go func() {
 		i := 0
@@ -1014,7 +1186,7 @@ func main() {
 	lines := bufio.NewScanner(os.Stdin)
 	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
 	// 4 * (2^24/3) / 2^20 = 21.33
-	bufsize := (1024 * 1024) * 22
+	bufsize := (1024 * 1024) * 1024
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -1027,6 +1199,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
+		AddedPeers:     make([]peer.AddrInfo, 0, 512),
 	}
 
 	go func() {
@@ -1056,12 +1229,13 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", string(debug.Stack()))
 		}
 	}()
 
 	for lines.Scan() {
 		line = lines.Text()
+		helperLog.Debugf("message size is %d", len(line))
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,
@@ -1075,18 +1249,21 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		start := time.Now()
-		res, err := msg.run(app)
-		if err == nil {
-			res, err := json.Marshal(res)
+
+		go func() {
+			start := time.Now()
+			res, err := msg.run(app)
 			if err == nil {
-				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				res, err := json.Marshal(res)
+				if err == nil {
+					app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				} else {
+					app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				}
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		} else {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-		}
+		}()
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully

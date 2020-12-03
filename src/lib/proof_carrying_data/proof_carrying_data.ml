@@ -8,6 +8,3 @@ module Stable = struct
     type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields]
   end
 end]
-
-type ('a, 'b) t = ('a, 'b) Stable.Latest.t = {data: 'a; proof: 'b}
-[@@deriving sexp, fields]

@@ -2,9 +2,9 @@ open Core_kernel
 open Coda_base
 open Coda_transition
 
-type full
+type full = Full
 
-type lite
+type lite = Lite
 
 module Node = struct
   type _ t =
@@ -63,8 +63,6 @@ module Node_list = struct
         let to_latest = Fn.id
       end
     end]
-
-    include Stable.Latest
   end
 end
 
@@ -84,11 +82,6 @@ module Root_transition = struct
         let to_latest = Fn.id
       end
     end]
-
-    include struct
-      type t = Stable.Latest.t =
-        {new_root: Root_data.Limited.t; garbage: Node_list.Lite.t}
-    end [@ocaml.warning "-34"]
   end
 
   module Lite = struct
@@ -123,8 +116,6 @@ module Root_transition = struct
         let to_latest = Fn.id
       end
     end]
-
-    include Stable.Latest
   end
 end
 
@@ -190,13 +181,6 @@ module Lite_binable = struct
       let to_latest = Fn.id
     end
   end]
-
-  include struct
-    type t = Stable.Latest.t =
-      | New_node of External_transition.Validated.t
-      | Root_transitioned of Root_transition.Lite.t
-      | Best_tip_changed of State_hash.t
-  end [@warning "-34"]
 end
 
 module Lite = struct
@@ -245,8 +229,6 @@ module Lite = struct
       end
     end]
 
-    type t = Stable.Latest.t = E : (lite, 'mutant) diff -> t
-
     include (Stable.Latest : module type of Stable.Latest with type t := t)
   end
 end
@@ -258,6 +240,8 @@ module Full = struct
     type t = E : (full, 'mutant) diff -> t
 
     let to_lite (E diff) = Lite.E.E (to_lite diff)
+
+    let to_yojson (E diff) = to_yojson diff
   end
 
   module With_mutant = struct

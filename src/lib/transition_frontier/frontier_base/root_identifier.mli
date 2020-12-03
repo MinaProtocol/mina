@@ -2,8 +2,10 @@ open Coda_base
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
-    type t = {state_hash: State_hash.t; frontier_hash: Frontier_hash.t}
+    type t = {state_hash: State_hash.t}
   end
 end]
 

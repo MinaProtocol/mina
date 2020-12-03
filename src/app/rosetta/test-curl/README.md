@@ -1,0 +1,1 @@
+For now a collection of shell scripts that hit different endpoints for manual verification. This may evolve into proper [gold master testing](https://en.wikipedia.org/wiki/Characterization_test) at some point (see #5306)

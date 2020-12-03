@@ -1,5 +1,6 @@
 (library
-  (name truth)
-  (public_name truth)
-  (preprocess (pps ppx_coda ppx_jane))
-  (libraries core_kernel))
+ (name truth)
+ (public_name truth)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane))
+ (libraries core_kernel))

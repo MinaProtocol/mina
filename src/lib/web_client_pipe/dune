@@ -3,8 +3,9 @@
  (public_name web_client_pipe)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async pipe_lib logger web_request)
+ (libraries core async error_json pipe_lib logger web_request)
  (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std))
+ (instrumentation (backend bisect_ppx))
  (synopsis
    "Transforming Coda data such that it can be easy for the Web Client to process"))

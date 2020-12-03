@@ -1,7 +1,7 @@
 open Sgn_type
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 

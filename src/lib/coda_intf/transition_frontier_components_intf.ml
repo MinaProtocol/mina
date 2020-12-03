@@ -173,6 +173,7 @@ module type Best_tip_prover_intf = sig
   val verify :
        verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -189,6 +190,7 @@ module type Consensus_best_tip_prover_intf = sig
 
   val prove :
        logger:Logger.t
+    -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
@@ -199,7 +201,9 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
+    -> precomputed_values:Precomputed_values.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
@@ -316,7 +320,8 @@ module type Initial_validator_intf = sig
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t]
-                         * [`Valid_cb of bool -> unit] )
+                         * [`Valid_cb of Coda_net2.validation_result -> unit]
+                         )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -347,6 +352,7 @@ module type Transition_router_intf = sig
     -> verifier:Verifier.t
     -> network:network
     -> is_seed:bool
+    -> is_demo_mode:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string
@@ -359,14 +365,14 @@ module type Transition_router_intf = sig
                                      External_transition.t Envelope.Incoming.t
                                    ]
                                  * [`Time_received of Block_time.t]
-                                 * [`Valid_cb of bool -> unit] )
+                                 * [ `Valid_cb of
+                                     Coda_net2.validation_result -> unit ] )
                                  Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )

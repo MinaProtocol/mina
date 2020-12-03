@@ -1,0 +1,41 @@
+{{- if .Values.worker.active }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{tpl .Values.worker.fullname .}}
+  labels:
+    app: {{tpl .Values.worker.fullname .}}
+spec:
+  replicas: {{ .Values.worker.numReplicas }}
+  selector:
+    matchLabels:
+      app: {{tpl .Values.worker.fullname .}}
+  template:
+    metadata:
+      labels:
+        app: {{tpl .Values.worker.fullname .}}
+        testnet: {{ .Values.testnetName }}
+        role: snark-worker
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '10000'
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: worker
+        resources:
+          limits:
+            memory: 16.0Gi
+          requests:
+            memory: 6.0Gi
+            cpu: 4
+        image: {{ .Values.coda.image }}
+        command: ["bash", "-c"]
+        args: [ "sleep 120 && coda internal snark-worker -proof-level full -daemon-address '{{ tpl $.Values.worker.remoteCoordinatorHost . }}:{{ $.Values.worker.remoteCoordinatorPort }}'" ]
+        env:
+          - name: "RAYON_NUM_THREADS"
+            value: "4"
+        imagePullPolicy: Always
+{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
+{{ end }}

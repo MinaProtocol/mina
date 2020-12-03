@@ -1,1 +1,1 @@
-(dirs :standard \ async_kernel digestif)
+(dirs :standard \ async_kernel)

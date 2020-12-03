@@ -1,3 +1,5 @@
+module Input = Random_oracle_input
+
 module type S = sig
   module State : sig
     type _ t

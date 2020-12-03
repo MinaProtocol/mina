@@ -11,9 +11,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t = {major: int; minor: int; patch: int}
-[@@deriving sexp]
-
 let (current_protocol_version : t option ref) = ref None
 
 let (proposed_protocol_version_opt : t option ref) = ref None

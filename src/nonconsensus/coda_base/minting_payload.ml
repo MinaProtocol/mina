@@ -1,0 +1,1 @@
+../../lib/coda_base/minting_payload.ml

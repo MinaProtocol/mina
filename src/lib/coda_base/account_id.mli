@@ -1,17 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Import
 
 [%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
 
 [%%else]
 
-module Random_oracle = Random_oracle_nonconsensus
 open Snark_params_nonconsensus
-open Signature_lib_nonconsensus
 
 [%%endif]
 
@@ -21,8 +19,6 @@ module Stable : sig
     type t [@@deriving sexp, equal, compare, hash, yojson]
   end
 end]
-
-type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
 val create : Public_key.Compressed.t -> Token_id.t -> t
 
@@ -60,9 +56,11 @@ module Checked : sig
 
   val to_input :
        var
-    -> ( Snark_params.Tick.Field.Var.t
-       , Snark_params.Tick.Boolean.var )
-       Random_oracle.Input.t
+    -> ( ( Snark_params.Tick.Field.Var.t
+         , Snark_params.Tick.Boolean.var )
+         Random_oracle.Input.t
+       , _ )
+       Checked.t
 
   val equal : var -> var -> (Boolean.var, _) Checked.t
 

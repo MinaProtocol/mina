@@ -11,19 +11,17 @@ module type Base_ledger_intf =
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
-module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) : sig
+module Make
+    (Source : Base_ledger_intf)
+    (Dest : Base_ledger_intf with type Addr.t = Source.Addr.t) : sig
   val transfer_accounts : src:Source.t -> dest:Dest.t -> Dest.t Or_error.t
 end = struct
   let transfer_accounts ~src ~dest =
-    let sorted =
+    let accounts =
       Source.foldi src ~init:[] ~f:(fun addr acc account ->
           (addr, account) :: acc )
-      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-             Source.Addr.compare addr1 addr2 )
     in
-    List.iter sorted ~f:(fun (_addr, account) ->
-        let key = Account.identifier account in
-        ignore (Dest.get_or_create_account_exn dest key account) ) ;
+    Dest.set_batch_accounts dest accounts ;
     let src_hash = Source.merkle_root src in
     let dest_hash = Dest.merkle_root dest in
     if not (Ledger_hash.equal src_hash dest_hash) then
@@ -32,4 +30,27 @@ end = struct
         (Ledger_hash.to_string src_hash)
         (Ledger_hash.to_string dest_hash)
     else Ok dest
+end
+
+module From_sparse_ledger (Dest : Base_ledger_intf) : sig
+  val transfer_accounts :
+    src:Sparse_ledger.t -> dest:Dest.t -> Dest.t Or_error.t
+end = struct
+  let transfer_accounts ~src ~dest =
+    if Dest.depth dest = Sparse_ledger.depth src then (
+      Sparse_ledger.iteri src ~f:(fun _idx account ->
+          let id = Account.identifier account in
+          ignore (Dest.get_or_create_account_exn dest id account) ) ;
+      let src_hash = Sparse_ledger.merkle_root src in
+      let dest_hash = Dest.merkle_root dest in
+      if not (Ledger_hash.equal src_hash dest_hash) then
+        Or_error.errorf
+          "Merkle roots differ after transfer: expected %s, actual %s"
+          (Ledger_hash.to_string src_hash)
+          (Ledger_hash.to_string dest_hash)
+      else Ok dest )
+    else
+      Or_error.errorf
+        "Ledger depth of src and dest doesn't match: src %d, dest %d"
+        (Sparse_ledger.depth src) (Dest.depth dest)
 end

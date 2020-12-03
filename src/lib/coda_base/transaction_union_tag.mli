@@ -10,8 +10,16 @@ open Snark_params.Tick
 
 [%%endif]
 
-type t = Payment | Stake_delegation | Fee_transfer | Coinbase
+type t =
+  | Payment
+  | Stake_delegation
+  | Create_account
+  | Mint_tokens
+  | Fee_transfer
+  | Coinbase
 [@@deriving enum, eq, sexp]
+
+val to_string : t -> string
 
 val gen : t Quickcheck.Generator.t
 
@@ -45,6 +53,10 @@ module Unpacked : sig
   val is_payment : var -> Boolean.var
 
   val is_stake_delegation : var -> Boolean.var
+
+  val is_create_account : var -> Boolean.var
+
+  val is_mint_tokens : var -> Boolean.var
 
   val is_fee_transfer : var -> Boolean.var
 

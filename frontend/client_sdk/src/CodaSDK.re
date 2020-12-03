@@ -121,6 +121,7 @@ let value = (~default: 'a, option: option('a)): 'a => {
 type common_payload_js = {
   .
   "fee": string,
+  "feePayer": publicKey,
   "nonce": string,
   "validUntil": string,
   "memo": string,
@@ -131,15 +132,22 @@ type payment_js = {
   "common": common_payload_js,
   "paymentPayload": {
     .
+    "source": publicKey,
     "receiver": publicKey,
     "amount": string,
   },
 };
 
+type delegation_payload_js = {
+  .
+  "delegator": publicKey,
+  "newDelegate": publicKey,
+};
+
 type stake_delegation_js = {
   .
   "common": common_payload_js,
-  "newDelegate": publicKey,
+  "delegationPayload": delegation_payload_js,
 };
 
 type signed_js = {
@@ -192,11 +200,13 @@ let signPayment =
           {
             "common": {
               "fee": fee,
+              "feePayer": key.publicKey,
               "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
             "paymentPayload": {
+              "source": payment.from,
               "receiver": payment.to_,
               "amount": amount,
             },
@@ -216,7 +226,7 @@ external signStakeDelegation:
   * This type of transaction allows a user to delegate their
   * funds from one account to another for use in staking. The
   * account that is delegated to is then considered as having these
-  * funds when determininng whether it can produce a block in a given slot.
+  * funds when determining whether it can produce a block in a given slot.
   *
   * @param stakeDelegation - An object describing the stake delegation
   * @param key - The keypair used to sign the transaction
@@ -251,11 +261,15 @@ let signStakeDelegation =
           {
             "common": {
               "fee": fee,
+              "feePayer": key.publicKey,
               "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
-            "newDelegate": stakeDelegation.to_,
+            "delegationPayload": {
+              "newDelegate": stakeDelegation.to_,
+              "delegator": stakeDelegation.from,
+            }
           },
         )##signature,
     };

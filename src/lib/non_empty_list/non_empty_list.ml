@@ -8,9 +8,6 @@ module Stable = struct
   end
 end]
 
-(* bin_io omitted intentionally *)
-type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
-
 let init x xs = (x, xs)
 
 let singleton x = (x, [])
@@ -45,15 +42,10 @@ module C = Container.Make (struct
   let length = `Define_using_fold
 end)
 
-let find = C.find
-
-let find_map = C.find_map
+[%%define_locally
+C.(find, find_map, iter, length)]
 
 let fold (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
-
-let iter = C.iter
-
-let length = C.length
 
 let to_list (x, xs) = x :: xs
 

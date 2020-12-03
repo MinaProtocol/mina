@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core
 open Async
 open Cache_lib
@@ -56,63 +58,54 @@ module Catchup_jobs = struct
   let decr () = update (( - ) 1)
 end
 
-let verify_transition ~logger ~trust_system ~verifier ~frontier
+let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
+  let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
-    let open Deferred.Result.Let_syntax in
-    let transition = Envelope.Incoming.data enveloped_transition in
+    let open Result.Let_syntax in
     let%bind initially_validated_transition =
-      External_transition.Validation.wrap transition
+      transition_with_hash
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_protocol_versions_validation
-           `This_transition_has_valid_protocol_versions
-      |> Fn.compose Deferred.return
-           (External_transition.validate_genesis_protocol_state
-              ~genesis_state_hash)
-      >>= External_transition.validate_proof ~verifier
-      >>= Fn.compose Deferred.return
-            External_transition.validate_delta_transition_chain
+      |> External_transition.validate_genesis_protocol_state
+           ~genesis_state_hash
+      >>= External_transition.validate_protocol_versions
+      >>= External_transition.validate_delta_transition_chain
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Deferred.return
-    @@ Transition_handler.Validator.validate_transition ~logger ~frontier
-         ~unprocessed_transition_cache enveloped_initially_validated_transition
+    Transition_handler.Validator.validate_transition ~logger ~frontier
+      ~consensus_constants ~unprocessed_transition_cache
+      enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
-  match%bind cached_initially_validated_transition_result with
+  match cached_initially_validated_transition_result with
   | Ok x ->
       Deferred.return @@ Ok (`Building_path x)
   | Error (`In_frontier hash) ->
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         "transition queried during ledger catchup has already been seen" ;
       Deferred.return @@ Ok (`In_frontier hash)
   | Error (`In_process consumed_state) -> (
-      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      [%log trace]
         "transition queried during ledger catchup is still in process in one \
          of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
       | `Failed ->
-          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            "transition queried during ledger catchup failed" ;
+          [%log trace] "transition queried during ledger catchup failed" ;
           Error (Error.of_string "Previous transition failed")
       | `Success hash ->
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("error", `String (Error.to_string_hum error))]
+      [%log warn]
+        ~metadata:[("error", Error_json.error_to_yojson error)]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
-      return
-        (Error
-           (Error.of_string
-              (sprintf "verifier threw an error: %s"
-                 (Error.to_string_hum error))))
+      Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
@@ -134,6 +127,46 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
           , Some ("invalid delta transition chain witness", []) )
       in
       Error (Error.of_string "invalid delta transition chain witness")
+  | Error `Invalid_protocol_version ->
+      let transition =
+        External_transition.Validation.forget_validation transition_with_hash
+      in
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Sent_invalid_protocol_version
+          , Some
+              ( "Invalid current or proposed protocol version in catchup block"
+              , [ ( "current_protocol_version"
+                  , `String
+                      ( External_transition.current_protocol_version transition
+                      |> Protocol_version.to_string ) )
+                ; ( "proposed_protocol_version"
+                  , `String
+                      ( External_transition.proposed_protocol_version_opt
+                          transition
+                      |> Option.value_map ~default:"<None>"
+                           ~f:Protocol_version.to_string ) ) ] ) )
+      in
+      Error (Error.of_string "invalid protocol version")
+  | Error `Mismatched_protocol_version ->
+      let transition =
+        External_transition.Validation.forget_validation transition_with_hash
+      in
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Sent_mismatched_protocol_version
+          , Some
+              ( "Current protocol version in catchup block does not match \
+                 daemon protocol version"
+              , [ ( "block_current_protocol_version"
+                  , `String
+                      ( External_transition.current_protocol_version transition
+                      |> Protocol_version.to_string ) )
+                ; ( "daemon_current_protocol_version"
+                  , `String Protocol_version.(get_current () |> to_string) ) ]
+              ) )
+      in
+      Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
@@ -153,10 +186,9 @@ let rec fold_until ~(init : 'accum)
           fold_until ~init ~f ~finish xs )
 
 (* returns a list of state-hashes with the older ones at the front *)
-let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
+let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
     ~target_hash =
-  let%bind peers = Coda_networking.random_peers network num_peers in
-  Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+  [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
   Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
@@ -179,7 +211,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
             in
             ignore
               Trust_system.(
-                record trust_system logger peer.host
+                record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
@@ -193,7 +225,21 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
              if Transition_frontier.find frontier hash |> Option.is_some then
                Continue_or_stop.Stop (Ok (peer, acc))
              else Continue_or_stop.Continue (hash :: acc) )
-           ~finish:(fun _ ->
+           ~finish:(fun acc ->
+             let module T = struct
+               type t = State_hash.t list [@@deriving to_yojson]
+             end in
+             let all_hashes =
+               List.map (Transition_frontier.all_breadcrumbs frontier)
+                 ~f:(fun b -> Frontier_base.Breadcrumb.state_hash b)
+             in
+             [%log debug]
+               ~metadata:
+                 [ ("n", `Int (List.length acc))
+                 ; ("hashes", T.to_yojson acc)
+                 ; ("all_hashes", T.to_yojson all_hashes) ]
+               "Finishing download_state_hashes with $n $hashes. with \
+                $all_hashes" ;
              Or_error.errorf
                !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
                peer ) )
@@ -210,57 +256,182 @@ let rec partition size = function
       let sub, rest = List.split_n ls size in
       sub :: partition size rest
 
-(* returns a list of transitions with old ones comes first *)
-let download_transitions ~logger ~trust_system ~network ~num_peers
-    ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
-  let%bind random_peers = Coda_networking.random_peers network num_peers in
-  Deferred.Or_error.List.concat_map
-    (partition maximum_download_size hashes_of_missing_transitions)
-    ~how:`Parallel ~f:(fun hashes ->
-      Deferred.Or_error.find_map_ok (preferred_peer :: random_peers)
-        ~f:(fun peer ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind transitions =
-            Coda_networking.get_transition_chain network peer hashes
-          in
-          Coda_metrics.(
-            Gauge.set
-              Transition_frontier_controller
-              .transitions_downloaded_from_catchup
-              (Float.of_int (List.length transitions))) ;
-          if not @@ verify_against_hashes transitions hashes then (
-            let error_msg =
-              sprintf
-                !"Peer %{sexp:Network_peer.Peer.t} returned a list that is \
-                  different from the one that is requested."
-                peer
-            in
-            Trust_system.(
-              record trust_system logger peer.host
-                Actions.(Violated_protocol, Some (error_msg, [])))
-            |> don't_wait_for ;
-            Deferred.Or_error.error_string error_msg )
-          else
-            Deferred.Or_error.return
-            @@ List.map2_exn hashes transitions ~f:(fun hash transition ->
-                   let transition_with_hash =
-                     With_hash.of_data transition ~hash_data:(Fn.const hash)
-                   in
-                   Envelope.Incoming.wrap ~data:transition_with_hash
-                     ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
-               ) ) )
+module Peers_pool = struct
+  type t =
+    {preferred: Peer.t Queue.t; normal: Peer.t Queue.t; busy: Peer.Hash_set.t}
 
-let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
+  let create ~busy ~preferred peers =
+    {preferred= Queue.of_list preferred; normal= Queue.of_list peers; busy}
+
+  let dequeue {preferred; normal; busy} =
+    let find_available q =
+      let n = Queue.length q in
+      let rec go tried =
+        if tried = n then `All_busy
+        else
+          match Queue.dequeue q with
+          | None ->
+              `Empty
+          | Some x ->
+              if Hash_set.mem busy x then (
+                Queue.enqueue q x ;
+                go (tried + 1) )
+              else `Available x
+      in
+      go 0
+    in
+    match find_available preferred with
+    | `Available x ->
+        `Available x
+    | `Empty ->
+        find_available normal
+    | `All_busy -> (
+      match find_available normal with
+      | `Available x ->
+          `Available x
+      | `Empty | `All_busy ->
+          `All_busy )
+end
+
+(* returns a list of transitions with old ones comes first *)
+let download_transitions ~target_hash ~logger ~trust_system ~network
+    ~preferred_peer ~hashes_of_missing_transitions =
+  let busy = Peer.Hash_set.create () in
+  Deferred.Or_error.List.concat_map
+    (partition Transition_frontier.max_catchup_chunk_length
+       hashes_of_missing_transitions) ~how:`Parallel ~f:(fun hashes ->
+      let%bind.Async peers = Coda_networking.peers network in
+      let peers =
+        Peers_pool.create ~busy ~preferred:[preferred_peer]
+          (List.permute peers)
+      in
+      let rec go errs =
+        match Peers_pool.dequeue peers with
+        | `Empty ->
+            (* Tried everyone *)
+            Deferred.return (Error (Error.of_list (List.rev errs)))
+        | `All_busy ->
+            let%bind () = after (Time.Span.of_sec 10.) in
+            go errs
+        | `Available peer -> (
+            Hash_set.add busy peer ;
+            let%bind res =
+              Deferred.Or_error.try_with_join (fun () ->
+                  let open Deferred.Or_error.Let_syntax in
+                  [%log debug]
+                    ~metadata:
+                      [ ("n", `Int (List.length hashes))
+                      ; ("peer", Peer.to_yojson peer)
+                      ; ("target_hash", State_hash.to_yojson target_hash) ]
+                    "requesting $n blocks from $peer for catchup to \
+                     $target_hash" ;
+                  let%bind transitions =
+                    match%map.Async
+                      Coda_networking.get_transition_chain network peer hashes
+                    with
+                    | Ok x ->
+                        Ok x
+                    | Error e ->
+                        [%log debug]
+                          ~metadata:
+                            [ ("error", `String (Error.to_string_hum e))
+                            ; ("n", `Int (List.length hashes))
+                            ; ("peer", Peer.to_yojson peer) ]
+                          "$error from downloading $n blocks from $peer" ;
+                        Error e
+                  in
+                  Coda_metrics.(
+                    Gauge.set
+                      Transition_frontier_controller
+                      .transitions_downloaded_from_catchup
+                      (Float.of_int (List.length transitions))) ;
+                  [%log debug]
+                    ~metadata:
+                      [ ("n", `Int (List.length transitions))
+                      ; ("peer", Peer.to_yojson peer) ]
+                    "downloaded $n blocks from $peer" ;
+                  if not @@ verify_against_hashes transitions hashes then (
+                    let error_msg =
+                      sprintf
+                        !"Peer %{sexp:Network_peer.Peer.t} returned a list \
+                          that is different from the one that is requested."
+                        peer
+                    in
+                    Trust_system.(
+                      record trust_system logger peer
+                        Actions.(Violated_protocol, Some (error_msg, [])))
+                    |> don't_wait_for ;
+                    Deferred.Or_error.error_string error_msg )
+                  else
+                    Deferred.Or_error.return
+                    @@ List.map2_exn hashes transitions
+                         ~f:(fun hash transition ->
+                           let transition_with_hash =
+                             With_hash.of_data transition
+                               ~hash_data:(Fn.const hash)
+                           in
+                           Envelope.Incoming.wrap_peer
+                             ~data:transition_with_hash ~sender:peer ) )
+            in
+            Hash_set.remove busy peer ;
+            match res with
+            | Ok x ->
+                Deferred.return (Ok x)
+            | Error e ->
+                go (e :: errs) )
+      in
+      go [] )
+
+let verify_transitions_and_build_breadcrumbs ~logger
+    ~(precomputed_values : Precomputed_values.t) ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
     =
   let open Deferred.Or_error.Let_syntax in
+  let verification_start_time = Core.Time.now () in
   let%bind transitions_with_initial_validation, initial_hash =
-    fold_until (List.rev transitions) ~init:[]
+    let%bind tvs =
+      let open Deferred.Let_syntax in
+      match%bind
+        External_transition.validate_proofs ~verifier
+          (List.map transitions ~f:(fun t ->
+               External_transition.Validation.wrap (Envelope.Incoming.data t)
+           ))
+      with
+      | Ok tvs ->
+          return
+            (Ok
+               (List.map2_exn transitions tvs ~f:(fun e data -> {e with data})))
+      | Error (`Verifier_error error) ->
+          [%log warn]
+            ~metadata:[("error", Error_json.error_to_yojson error)]
+            "verifier threw an error while verifying transition queried \
+             during ledger catchup: $error" ;
+          Deferred.Or_error.fail
+            (Error.tag ~tag:"verifier threw an error" error)
+      | Error `Invalid_proof ->
+          let%map () =
+            (* TODO: Isolate and punish all the evil sender *)
+            Deferred.unit
+          in
+          Error (Error.of_string "invalid proof")
+    in
+    let verification_end_time = Core.Time.now () in
+    [%log debug]
+      ~metadata:
+        [ ("target_hash", State_hash.to_yojson target_hash)
+        ; ( "time_elapsed"
+          , `Float
+              Core.Time.(
+                Span.to_sec
+                @@ diff verification_end_time verification_start_time) ) ]
+      "verification of proofs complete" ;
+    fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->
         let open Deferred.Let_syntax in
         match%bind
-          verify_transition ~logger ~trust_system ~verifier ~frontier
-            ~unprocessed_transition_cache transition
+          verify_transition ~logger
+            ~consensus_constants:precomputed_values.consensus_constants
+            ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
             List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
@@ -273,6 +444,16 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
             @@ Continue_or_stop.Continue
                  (transition_with_initial_validation :: acc) )
       ~finish:(fun acc ->
+        let validation_end_time = Core.Time.now () in
+        [%log debug]
+          ~metadata:
+            [ ("target_hash", State_hash.to_yojson target_hash)
+            ; ( "time_elapsed"
+              , `Float
+                  Core.Time.(
+                    Span.to_sec
+                    @@ diff validation_end_time verification_end_time) ) ]
+          "validation of transitions complete" ;
         if List.length transitions <= 0 then
           Deferred.Or_error.return ([], target_hash)
         else
@@ -284,6 +465,7 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
           in
           Deferred.Or_error.return (acc, initial_state_hash) )
   in
+  let build_start_time = Core.Time.now () in
   let trees_of_transitions =
     Option.fold
       (Non_empty_list.of_list_opt transitions_with_initial_validation)
@@ -293,23 +475,44 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
   let open Deferred.Let_syntax in
   match%bind
     Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~verifier ~trust_system ~frontier ~initial_hash trees_of_transitions
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
+      [%log debug]
+        ~metadata:
+          [ ("target_hash", State_hash.to_yojson target_hash)
+          ; ( "time_elapsed"
+            , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
+            ) ]
+        "build of breadcrumbs complete" ;
       Deferred.Or_error.return result
   | Error e ->
-      List.map transitions_with_initial_validation
-        ~f:Cached.invalidate_with_failure
-      |> ignore ;
+      [%log debug]
+        ~metadata:
+          [ ("target_hash", State_hash.to_yojson target_hash)
+          ; ( "time_elapsed"
+            , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
+            )
+          ; ("error", `String (Error.to_string_hum e)) ]
+        "build of breadcrumbs failed with $error" ;
+      ( try
+          List.map transitions_with_initial_validation
+            ~f:Cached.invalidate_with_failure
+          |> ignore
+        with e ->
+          [%log error]
+            ~metadata:[("exn", `String (Exn.to_string e))]
+            "$exn in cached" ) ;
       Deferred.Or_error.fail e
 
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
       Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    "garbage collected failed cached transitions"
+  [%log trace] "garbage collected failed cached transitions"
 
-let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
+    ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
@@ -317,24 +520,64 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
-  let num_peers = 8 in
-  let maximum_download_size = 100 in
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
          don't_wait_for
            (let start_time = Core.Time.now () in
+            [%log info] "Catch up to $target_hash"
+              ~metadata:[("target_hash", State_hash.to_yojson target_hash)] ;
             let%bind () = Catchup_jobs.incr () in
+            let subtree_peers =
+              List.fold subtrees ~init:[] ~f:(fun acc_outer tree ->
+                  let cacheds = Rose_tree.flatten tree in
+                  let cached_peers =
+                    List.fold cacheds ~init:[] ~f:(fun acc_inner cached ->
+                        let envelope = Cached.peek cached in
+                        match Envelope.Incoming.sender envelope with
+                        | Local ->
+                            acc_inner
+                        | Remote peer ->
+                            peer :: acc_inner )
+                  in
+                  cached_peers @ acc_outer )
+              |> List.dedup_and_sort ~compare:Peer.compare
+            in
             match%bind
               let open Deferred.Or_error.Let_syntax in
               let%bind preferred_peer, hashes_of_missing_transitions =
-                download_state_hashes ~logger ~trust_system ~network ~frontier
-                  ~num_peers ~target_hash
+                (* try peers from subtrees first *)
+                let open Deferred.Let_syntax in
+                match%bind
+                  download_state_hashes ~logger ~trust_system ~network
+                    ~frontier ~peers:subtree_peers ~target_hash
+                with
+                | Ok (peer, hashes) ->
+                    return (Ok (peer, hashes))
+                | Error err -> (
+                    [%log info]
+                      "Could not download state hashes using peers from \
+                       subtrees; trying again with random peers"
+                      ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                    let%bind random_peers =
+                      Coda_networking.peers network >>| List.permute
+                    in
+                    match%bind
+                      download_state_hashes ~logger ~trust_system ~network
+                        ~frontier ~peers:random_peers ~target_hash
+                    with
+                    | Ok (peer, hashes) ->
+                        return (Ok (peer, hashes))
+                    | Error err ->
+                        [%log info]
+                          "Could not download state hashes using random peers"
+                          ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                        return (Error err) )
               in
               let num_of_missing_transitions =
                 List.length hashes_of_missing_transitions
               in
-              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              [%log debug]
                 ~metadata:
                   [ ( "hashes_of_missing_transitions"
                     , `List
@@ -347,15 +590,18 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                   Deferred.Or_error.return []
                 else
                   download_transitions ~logger ~trust_system ~network
-                    ~num_peers ~preferred_peer ~maximum_download_size
-                    ~hashes_of_missing_transitions
+                    ~preferred_peer ~hashes_of_missing_transitions ~target_hash
               in
-              verify_transitions_and_build_breadcrumbs ~logger ~trust_system
-                ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-                ~target_hash ~subtrees
+              [%log debug]
+                ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+                "Download transitions complete" ;
+              verify_transitions_and_build_breadcrumbs ~logger
+                ~precomputed_values ~trust_system ~verifier ~frontier
+                ~unprocessed_transition_cache ~transitions ~target_hash
+                ~subtrees
             with
             | Ok trees_of_breadcrumbs ->
-                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                [%log trace]
                   ~metadata:
                     [ ( "hashes of transitions"
                       , `List
@@ -368,7 +614,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                                  tree )) ) ]
                   "about to write to the catchup breadcrumbs pipe" ;
                 if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
-                  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                  [%log trace]
                     "catchup breadcrumbs pipe was closed; attempt to write to \
                      closed pipe" ;
                   garbage_collect_subtrees ~logger
@@ -387,8 +633,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr ()
             | Error e ->
-                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata:[("error", `String (Error.to_string_hum e))]
+                [%log warn]
+                  ~metadata:[("error", Error_json.error_to_yojson e)]
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;
@@ -408,12 +654,9 @@ let%test_module "Ledger_catchup tests" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
-
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
+    let proof_level = precomputed_values.proof_level
 
     let trust_system = Trust_system.null ()
 
@@ -467,8 +710,8 @@ let%test_module "Ledger_catchup tests" =
       let%map verifier =
         Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
       in
-      run ~logger ~verifier ~trust_system ~network ~frontier
-        ~catchup_breadcrumbs_writer ~catchup_job_reader
+      run ~logger ~precomputed_values ~verifier ~trust_system ~network
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       { cache= unprocessed_transition_cache
       ; job_writer= catchup_job_writer
@@ -536,8 +779,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -556,8 +798,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -571,8 +812,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~constraint_constants ~precomputed_values
-            ~max_frontier_length
+          gen ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

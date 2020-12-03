@@ -13,8 +13,28 @@ open O1trace
 open Otp_lib
 open Network_peer
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
+
+type Structured_log_events.t += Connecting
+  [@@deriving register_event {msg= "Coda daemon is connecting"}]
+
+type Structured_log_events.t += Listening
+  [@@deriving register_event {msg= "Coda daemon is listening"}]
+
+type Structured_log_events.t += Bootstrapping
+  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
+
+type Structured_log_events.t += Ledger_catchup
+  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
+
+type Structured_log_events.t += Synced
+  [@@deriving register_event {msg= "Coda daemon is synced"}]
+
+type Structured_log_events.t +=
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event {msg= "Rebroadcasting $state_hash"}]
 
 exception Snark_worker_error of int
 
@@ -51,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (bool -> unit) )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -83,7 +103,7 @@ type t =
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
-  ; mutable seen_jobs: Work_selector.State.t
+  ; snark_job_state: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
@@ -114,11 +134,27 @@ let block_production_pubkeys t : Public_key.Compressed.Set.t =
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
+let log_snark_worker_warning t =
+  if Option.is_some t.config.snark_coordinator_key then
+    [%log' warn t.config.logger]
+      "The snark coordinator flag is set; running a snark worker will \
+       override the snark coordinator key"
+
+let log_snark_coordinator_warning (config : Config.t) snark_worker =
+  if Option.is_some config.snark_coordinator_key then
+    match snark_worker with
+    | `On _ ->
+        [%log' warn config.logger]
+          "The snark coordinator key will be ignored because the snark worker \
+           key is set "
+    | _ ->
+        ()
+
 module Snark_worker = struct
   let run_process ~logger ~proof_level client_port kill_ivar num_threads =
     let env =
       Option.map
-        ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
+        ~f:(fun num -> `Extend [("RAYON_NUM_THREADS", string_of_int num)])
         num_threads
     in
     let%map snark_worker_process =
@@ -138,30 +174,27 @@ module Snark_worker = struct
       | Ok signal_or_error -> (
         match signal_or_error with
         | Ok () ->
-            Logger.info logger "Snark worker process died" ~module_:__MODULE__
-              ~location:__LOC__ ;
+            [%log info] "Snark worker process died" ;
             Ivar.fill kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
-            Logger.fatal logger
+            [%log fatal]
               !"Snark worker process died with a nonzero error %i"
-              non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+              non_zero_error ;
             raise (Snark_worker_error non_zero_error)
         | Error (`Signal signal) ->
-            Logger.info logger
+            [%log fatal]
               !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
-              signal ~module_:__MODULE__ ~location:__LOC__ ;
+              signal ;
             raise (Snark_worker_signal_interrupt signal) )
       | Error exn ->
-          Logger.info logger
+          [%log info]
             !"Exception when waiting for snark worker process to terminate: \
               $exn"
-            ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("exn", `String (Exn.to_string exn))] ;
           Deferred.unit ) ;
-    Logger.trace logger
+    [%log trace]
       !"Created snark worker with pid: %i"
-      ~module_:__MODULE__ ~location:__LOC__
       (Pid.to_int @@ Process.pid snark_worker_process) ;
     (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
@@ -177,42 +210,39 @@ module Snark_worker = struct
   let start t =
     match t.processes.snark_worker with
     | `On ({process= process_ivar; kill_ivar; _}, _) ->
-        Logger.debug t.config.logger
-          !"Starting snark worker process"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+        [%log' debug t.config.logger] !"Starting snark worker process" ;
+        log_snark_worker_warning t ;
         let%map snark_worker_process =
-          run_process ~logger:t.config.logger ~proof_level:t.config.proof_level
+          run_process ~logger:t.config.logger
+            ~proof_level:t.config.precomputed_values.proof_level
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
-        Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        [%log' debug t.config.logger]
           ~metadata:
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
         Ivar.fill process_ivar snark_worker_process
     | `Off _ ->
-        Logger.info t.config.logger
+        [%log' info t.config.logger]
           !"Attempted to turn on snark worker, but snark worker key is set to \
-            none"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+            none" ;
         Deferred.unit
 
   let stop ?(should_wait_kill = false) t =
     match t.processes.snark_worker with
     | `On ({public_key= _; process; kill_ivar}, _) ->
         let%bind process = Ivar.read process in
-        Logger.info t.config.logger
+        [%log' info t.config.logger]
           "Killing snark worker process with pid: $snark_worker_pid"
-          ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [("snark_worker_pid", `Int (Pid.to_int (Process.pid process)))] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
         if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
-        Logger.warn t.config.logger
-          "Attempted to turn off snark worker, but no snark worker was running"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+        [%log' warn t.config.logger]
+          "Attempted to turn off snark worker, but no snark worker was running" ;
         Deferred.unit
 
   let get_key {processes= {snark_worker; _}; _} =
@@ -226,10 +256,9 @@ module Snark_worker = struct
       new_key =
     match (snark_worker, new_key) with
     | `Off _, None ->
-        Logger.info logger
+        [%log info]
           "Snark work is still not happening since keys snark worker keys are \
-           still set to None"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+           still set to None" ;
         Deferred.unit
     | `Off fee, Some new_key ->
         let process = Ivar.create () in
@@ -237,10 +266,12 @@ module Snark_worker = struct
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         start t
-    | `On ({public_key= _; process; kill_ivar}, fee), Some new_key ->
-        Logger.debug logger
+    | `On ({public_key= old; process; kill_ivar}, fee), Some new_key ->
+        [%log debug]
           !"Changing snark worker key from $old to $new"
-          ~module_:__MODULE__ ~location:__LOC__ ;
+          ~metadata:
+            [ ("old", Public_key.Compressed.to_yojson old)
+            ; ("new", Public_key.Compressed.to_yojson new_key) ] ;
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         Deferred.unit
@@ -252,6 +283,8 @@ end
 let replace_snark_worker_key = Snark_worker.replace_key
 
 let snark_worker_key = Snark_worker.get_key
+
+let snark_coordinator_key t = t.config.snark_coordinator_key
 
 let stop_snark_worker = Snark_worker.stop
 
@@ -347,28 +380,25 @@ let create_sync_status_observer ~logger ~demo_mode
           match online_status with
           | `Offline ->
               if `Empty = first_connection then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now connecting" ;
+                [%str_log info] Connecting ;
                 `Connecting )
               else if `Empty = first_message then (
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Coda daemon is now listening" ;
+                [%str_log info] Listening ;
                 `Listening )
               else `Offline
           | `Online -> (
             match active_status with
             | None ->
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                let logger = Logger.create () in
+                [%str_log info] Bootstrapping ;
                 `Bootstrap
             | Some (_, catchup_jobs) ->
+                let logger = Logger.create () in
                 if catchup_jobs > 0 then (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                  [%str_log info] Ledger_catchup ;
                   `Catchup )
                 else (
-                  Logger.info (Logger.create ()) ~module_:__MODULE__
-                    ~location:__LOC__ "Coda daemon is now synced" ;
+                  [%str_log info] Synced ;
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
@@ -444,7 +474,9 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   let txn_pool_nonce =
     let nonces =
       List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+        ~f:
+          (Fn.compose User_command.nonce_exn
+             Transaction_hash.User_command_with_valid_signature.command)
     in
     (* The last nonce gives us the maximum nonce in the transaction pool *)
     List.last nonces
@@ -457,15 +489,13 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account account_id in
       account.Account.Poly.nonce
 
-let seen_jobs t = t.seen_jobs
+let snark_job_state t = t.snark_job_state
 
 let add_block_subscriber t public_key =
   Coda_subscriptions.add_block_subscriber t.subscriptions public_key
 
 let add_payment_subscriber t public_key =
   Coda_subscriptions.add_payment_subscriber t.subscriptions public_key
-
-let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
 let transaction_pool t = t.components.transaction_pool
 
@@ -490,8 +520,6 @@ let set_snark_work_fee t new_fee =
      | `Off _ ->
          `Off new_fee )
 
-let receipt_chain_database t = t.config.receipt_chain_database
-
 let top_level_logger t = t.config.logger
 
 let most_recent_valid_transition t = t.components.most_recent_valid_block
@@ -507,14 +535,13 @@ module Root_diff = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      type t =
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        ; root_length: int }
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    {user_commands: User_command.t list; root_length: int}
 end
 
 let initialization_finish_signal t = t.initialization_finish_signal
@@ -541,7 +568,10 @@ let root_diff t =
         | Some frontier ->
             let root = Transition_frontier.root frontier in
             Strict_pipe.Writer.write root_diff_writer
-              { user_commands= Transition_frontier.Breadcrumb.user_commands root
+              { commands=
+                  List.map
+                    (Transition_frontier.Breadcrumb.commands root)
+                    ~f:(With_status.map ~f:User_command.forget_check)
               ; root_length= length_of_breadcrumb root } ;
             Broadcast_pipe.Reader.iter
               Transition_frontier.(
@@ -563,9 +593,13 @@ let root_diff t =
                         Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
-                        { user_commands=
-                            Transition_frontier.Breadcrumb.user_commands
+                        { commands=
+                            Transition_frontier.Breadcrumb.commands
                               new_root_breadcrumb
+                            |> List.map
+                                 ~f:
+                                   (With_status.map
+                                      ~f:User_command.forget_check)
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -584,33 +618,28 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
-let best_chain t =
+let best_chain ?max_length t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  Transition_frontier.root frontier
-  :: Transition_frontier.best_tip_path frontier
+  let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
+  match max_length with
+  | Some max_length when max_length <= List.length best_tip_path ->
+      (* The [best_tip_path] has already been truncated to the correct length,
+         we skip adding the root to stay below the maximum.
+      *)
+      best_tip_path
+  | _ ->
+      Transition_frontier.root frontier :: best_tip_path
 
 let request_work t =
-  let open Option.Let_syntax in
   let (module Work_selection_method) = t.config.work_selection_method in
-  let%bind sl =
-    match best_staged_ledger t with
-    | `Active staged_ledger ->
-        Some staged_ledger
-    | `Bootstrapping ->
-        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
-          "Snark-work-request error: Could not retrieve staged_ledger due to \
-           bootstrapping" ;
-        None
-  in
   let fee = snark_work_fee t in
-  let instances_opt, seen_jobs =
+  let instances_opt =
     Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) sl (seen_jobs t)
+      ~snark_pool:(snark_pool t) (snark_job_state t)
   in
-  set_seen_jobs t seen_jobs ;
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
 
@@ -619,27 +648,28 @@ let work_selection_method t = t.config.work_selection_method
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
-    match best_staged_ledger t |> Participating_state.active with
-    | Some staged_ledger ->
-        let snark_pool = snark_pool t in
-        let fee_opt =
-          Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
-        in
-        let pending_work =
-          Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
-            ~staged_ledger
-          |> List.length
-        in
-        Coda_metrics.(
-          Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
-    | None ->
-        ()
+    let snark_pool = snark_pool t in
+    let fee_opt =
+      Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
+    in
+    let pending_work =
+      Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
+        t.snark_job_state
+      |> List.length
+    in
+    Coda_metrics.(
+      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
-  set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
+  let cb _ =
+    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+    Work_selection_method.remove t.snark_job_state spec
+  in
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
@@ -667,12 +697,7 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:t.config.constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants t.config.precomputed_values)
-  in
+  let consensus_constants = t.config.precomputed_values.consensus_constants in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -727,18 +752,24 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~constraint_constants:t.config.constraint_constants
-    ~genesis_constants:
-      (Precomputed_values.genesis_constants t.config.precomputed_values) ;
+    ~precomputed_values:t.config.precomputed_values ;
   Snark_worker.start t
 
-let create (config : Config.t) =
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:config.constraint_constants
-      ~protocol_constants:
-        (Precomputed_values.protocol_constants config.precomputed_values)
+let start_with_precomputed_blocks t blocks =
+  let%bind () =
+    Block_producer.run_precomputed ~logger:t.config.logger
+      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~time_controller:t.config.time_controller
+      ~frontier_reader:t.components.transition_frontier
+      ~transition_writer:t.pipes.producer_transition_writer
+      ~precomputed_values:t.config.precomputed_values
+      ~precomputed_blocks:blocks
   in
+  start t
+
+let create ?wallets (config : Config.t) =
+  let constraint_constants = config.precomputed_values.constraint_constants in
+  let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -747,16 +778,15 @@ let create (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
-                    Logger.warn config.logger
+                    [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
-                      ~proof_level:config.proof_level
-                      ~constraint_constants:config.constraint_constants
-                      ~pids:config.pids ~conf_dir:config.conf_dir ) )
+                      ~proof_level:config.precomputed_values.proof_level
+                      ~constraint_constants ~pids:config.pids
+                      ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -764,16 +794,15 @@ let create (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
-                    Logger.warn config.logger
+                    [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~module_:__MODULE__ ~location:__LOC__
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
-                      ~proof_level:config.proof_level ~pids:config.pids
-                      ~conf_dir:(Some config.conf_dir) ) )
+                      ~proof_level:config.precomputed_values.proof_level
+                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -786,6 +815,7 @@ let create (config : Config.t) =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
+          log_snark_coordinator_warning config snark_worker ;
           Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
@@ -804,7 +834,7 @@ let create (config : Config.t) =
               | None ->
                   Deferred.unit
               | Some frontier ->
-                  Transition_frontier.close frontier ) ;
+                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
@@ -818,11 +848,6 @@ let create (config : Config.t) =
           in
           (* knot-tying hack so we can pass a get_telemetry function before net created *)
           let net_ref = ref None in
-          let block_producers =
-            config.initial_block_production_keypairs |> Keypair.Set.to_list
-            |> List.map ~f:(fun {Keypair.public_key; _} ->
-                   Public_key.compress public_key )
-          in
           let get_telemetry_data _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -844,9 +869,8 @@ let create (config : Config.t) =
               match !net_ref with
               | None ->
                   (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
-                  Logger.info config.logger
-                    "Network not instantiated when telemetry data requested"
-                    ~module_:__MODULE__ ~location:__LOC__ ;
+                  [%log' info config.logger]
+                    "Network not instantiated when telemetry data requested" ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
@@ -855,47 +879,63 @@ let create (config : Config.t) =
                                Unix.Inet_addr.t}, peer ID=%s, network not \
                                instantiated when telemetry data requested"
                              node_ip_addr node_peer_id))
-              | Some net -> (
-                match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
-                | None ->
-                    Deferred.return
-                    @@ Error
-                         (Error.of_string
-                            (sprintf
-                               !"Node with IP address=%{sexp: \
-                                 Unix.Inet_addr.t}, peer ID=%s, could not get \
-                                 transition frontier for telemetry data"
-                               node_ip_addr node_peer_id))
-                | Some frontier ->
-                    let%map peers = Coda_networking.peers net in
-                    let protocol_state_hash =
-                      let tip = Transition_frontier.best_tip frontier in
-                      let state =
-                        Transition_frontier.Breadcrumb.protocol_state tip
-                      in
-                      Coda_state.Protocol_state.hash state
-                    in
-                    let ban_statuses =
-                      Trust_system.Peer_trust.peer_statuses config.trust_system
-                    in
-                    let k_block_hashes =
-                      List.map
-                        ( Transition_frontier.root frontier
-                        :: Transition_frontier.best_tip_path frontier )
-                        ~f:Transition_frontier.Breadcrumb.state_hash
-                    in
-                    Ok
-                      Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                        { node_ip_addr
-                        ; node_peer_id
-                        ; peers
-                        ; block_producers
-                        ; protocol_state_hash
-                        ; ban_statuses
-                        ; k_block_hashes } )
+              | Some net ->
+                  let protocol_state_hash, k_block_hashes =
+                    match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                    | None ->
+                        ( config.precomputed_values.protocol_state_with_hash
+                            .hash
+                        , [] )
+                    | Some frontier ->
+                        let protocol_state_hash =
+                          let tip = Transition_frontier.best_tip frontier in
+                          let state =
+                            Transition_frontier.Breadcrumb.protocol_state tip
+                          in
+                          Coda_state.Protocol_state.hash state
+                        in
+                        let k_block_hashes =
+                          List.map
+                            ( Transition_frontier.root frontier
+                            :: Transition_frontier.best_tip_path frontier )
+                            ~f:Transition_frontier.Breadcrumb.state_hash
+                        in
+                        (protocol_state_hash, k_block_hashes)
+                  in
+                  let%map peers = Coda_networking.peers net in
+                  let block_producers =
+                    config.initial_block_production_keypairs
+                    |> Keypair.Set.to_list
+                    |> List.map ~f:(fun {Keypair.public_key; _} ->
+                           Public_key.compress public_key )
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node_ip_addr
+                      ; node_peer_id
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes }
+          in
+          let get_some_initial_peers _ =
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                [%log' error config.logger]
+                  "Network not instantiated when initial peers requested" ;
+                Deferred.return []
+            | Some net ->
+                Coda_networking.peers net
           in
           let%bind net =
-            Coda_networking.create config.net_config
+            Coda_networking.create config.net_config ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring
@@ -921,8 +961,7 @@ let create (config : Config.t) =
                         (Staged_ledger.Scan_state.hash scan_state)
                         expected_merkle_root pending_coinbases
                     in
-                    Logger.debug config.logger ~module_:__MODULE__
-                      ~location:__LOC__
+                    [%log' debug config.logger]
                       ~metadata:
                         [ ( "staged_ledger_hash"
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
@@ -954,7 +993,9 @@ let create (config : Config.t) =
                                    ledger_hash)) ) )
               ~get_ancestry:
                 (handle_request "get_ancestry"
-                   ~f:(Sync_handler.Root.prove ~logger:config.logger))
+                   ~f:
+                     (Sync_handler.Root.prove ~consensus_constants
+                        ~logger:config.logger))
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
@@ -979,14 +1020,15 @@ let create (config : Config.t) =
             Strict_pipe.(create ~name:"local snark work" Synchronous)
           in
           let txn_pool_config =
-            Network_pool.Transaction_pool.Resource_pool.make_config
+            Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~logger:config.logger
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -1006,12 +1048,13 @@ let create (config : Config.t) =
                   else
                     (*callback for the result from transaction_pool.apply_diff*)
                     Strict_pipe.Writer.write local_txns_writer
-                      (user_commands, result_cb)
+                      ( List.map user_commands ~f:(fun c ->
+                            User_command.Signed_command c )
+                      , result_cb )
               | Error e ->
-                  Logger.error config.logger
+                  [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~module_:__MODULE__ ~location:__LOC__
-                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
@@ -1026,7 +1069,7 @@ let create (config : Config.t) =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
-                  ~is_seed:config.is_seed
+                  ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
                   ~time_controller:config.time_controller
                   ~consensus_local_state:config.consensus_local_state
                   ~persistent_root_location:config.persistent_root_location
@@ -1073,13 +1116,12 @@ let create (config : Config.t) =
                          in
                          External_transition.Validated.poke_validation_callback
                            et (fun v ->
-                             if v then
+                             if v = `Accept then
                                Coda_networking.broadcast_state net
                                @@ External_transition.Validation
                                   .forget_validation_with_hash et ) ;
                          breadcrumb ))
                   ~most_recent_valid_block
-                  ~constraint_constants:config.constraint_constants
                   ~precomputed_values:config.precomputed_values )
           in
           let ( valid_transitions_for_network
@@ -1121,14 +1163,14 @@ let create (config : Config.t) =
                       consensus_state
                   with
                   | Ok () ->
-                      Logger.trace config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        ~metadata:
-                          [ ("state_hash", State_hash.to_yojson hash)
-                          ; ( "external_transition"
-                            , External_transition.Validated.to_yojson
-                                transition ) ]
-                        "Rebroadcasting $state_hash" ;
+                      (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
+                      if not (source = `Internal) then
+                        [%str_log' trace config.logger]
+                          ~metadata:
+                            [ ( "external_transition"
+                              , External_transition.Validated.to_yojson
+                                  transition ) ]
+                          (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
@@ -1150,14 +1192,12 @@ let create (config : Config.t) =
                       | `Catchup ->
                           ()
                       | `Internal ->
-                          Logger.error config.logger ~module_:__MODULE__
-                            ~location:__LOC__ ~metadata
+                          [%log' error config.logger] ~metadata
                             "Internally generated block $state_hash cannot be \
                              rebroadcast because it's not a valid time to do \
                              so ($timing)"
                       | `Gossip ->
-                          Logger.warn config.logger ~module_:__MODULE__
-                            ~location:__LOC__ ~metadata
+                          [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ) ) ) ;
           don't_wait_for
@@ -1183,18 +1223,29 @@ let create (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
+              ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
-              ~logger:config.logger
-              ~disk_location:config.snark_pool_disk_location
+              ~constraint_constants ~consensus_constants
+              ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let snark_jobs_state =
+            Work_selector.State.init
+              ~reassignment_wait:config.work_reassignment_wait
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~logger:config.logger
+          in
           let%bind wallets =
-            Secrets.Wallets.load ~logger:config.logger
-              ~disk_location:config.wallets_disk_location
+            match wallets with
+            | Some wallets ->
+                return wallets
+            | None ->
+                Secrets.Wallets.load ~logger:config.logger
+                  ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
@@ -1212,7 +1263,7 @@ let create (config : Config.t) =
           in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
-              Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+              [%log' info config.logger]
                 "Communicating with the archive process"
                 ~metadata:
                   [ ( "Host"
@@ -1225,7 +1276,8 @@ let create (config : Config.t) =
                 archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
-              ~time_controller:config.time_controller ~new_blocks ~wallets
+              ~constraint_constants ~time_controller:config.time_controller
+              ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
@@ -1281,9 +1333,7 @@ let create (config : Config.t) =
             ; wallets
             ; block_production_keypairs
             ; coinbase_receiver= config.coinbase_receiver
-            ; seen_jobs=
-                Work_selector.State.init
-                  ~reassignment_wait:config.work_reassignment_wait
+            ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status } ) )
 

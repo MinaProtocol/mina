@@ -68,9 +68,9 @@ module On_conflict = struct
     create `blocks_snark_jobs_block_id_snark_job_id_key []
 end
 
-type bit = Yojson.Basic.json
+type bit = Yojson.Basic.t
 
-type user_command_type = Yojson.Basic.json
+type user_command_type = Yojson.Basic.t
 
 type public_keys_insert_input =
   < blocks: blocks_arr_rel_insert_input option

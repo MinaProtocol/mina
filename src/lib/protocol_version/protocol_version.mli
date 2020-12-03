@@ -7,8 +7,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
-
 val create_exn : major:int -> minor:int -> patch:int -> t
 
 val create_opt : major:int -> minor:int -> patch:int -> t option

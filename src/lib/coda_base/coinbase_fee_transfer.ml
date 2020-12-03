@@ -17,10 +17,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  {receiver_pk: Public_key.Compressed.t; fee: Currency.Fee.t}
-[@@deriving sexp, compare, yojson, hash]
-
 let create ~receiver_pk ~fee = {receiver_pk; fee}
 
 include Comparable.Make (Stable.Latest)
@@ -38,7 +34,8 @@ let receiver {receiver_pk; _} = Account_id.create receiver_pk Token_id.default
 
 let fee {fee; _} = fee
 
-let to_fee_transfer {receiver_pk; fee} = (receiver_pk, fee)
+let to_fee_transfer {receiver_pk; fee} =
+  Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token:Token_id.default
 
 module Gen = struct
   let gen ~max_fee : t Quickcheck.Generator.t =

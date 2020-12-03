@@ -1,6 +1,0 @@
-(library
- (name module_version)
- (public_name module_version)
- (preprocess (pps ppx_jane ppx_coda -lint-version-syntax-warnings) )
- (inline_tests)
- (libraries bin_prot core_kernel coda_digestif))

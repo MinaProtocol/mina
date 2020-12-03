@@ -6,6 +6,3 @@ module Stable : sig
     type t = Pos | Neg [@@deriving sexp, hash, compare, eq, yojson]
   end
 end]
-
-type t = Stable.Latest.t = Pos | Neg
-[@@deriving sexp, hash, compare, eq, yojson]

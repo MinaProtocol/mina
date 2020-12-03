@@ -1,5 +1,5 @@
 module Make
-    (Impl : Snarky.Snark_intf.S) (Scalar : sig
+    (Impl : Snarky_backendless.Snark_intf.S) (Scalar : sig
         type value
 
         type var
@@ -41,7 +41,10 @@ module Make
 
       type var
 
-      val hash_to_group : value -> Group.value
+      val hash_to_group :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> value
+        -> Group.value
 
       module Checked : sig
         val hash_to_group : var -> (Group.var, _) Impl.Checked.t
@@ -51,13 +54,21 @@ module Make
 
       type var
 
-      val hash : Message.value -> Group.value -> value
+      val hash :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> Message.value
+        -> Group.value
+        -> value
 
       module Checked : sig
         val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
       end
     end) : sig
-  val eval : private_key:Scalar.value -> Message.value -> Output_hash.value
+  val eval :
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> private_key:Scalar.value
+    -> Message.value
+    -> Output_hash.value
 
   module Checked : sig
     val eval :
@@ -76,10 +87,10 @@ module Make
 end = struct
   open Impl
 
-  let eval ~private_key m =
-    let h = Message.hash_to_group m in
+  let eval ~constraint_constants ~private_key m =
+    let h = Message.hash_to_group ~constraint_constants m in
     let u = Group.scale h private_key in
-    Output_hash.hash m u
+    Output_hash.hash ~constraint_constants m u
 
   module Checked = struct
     open Let_syntax

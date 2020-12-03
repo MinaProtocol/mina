@@ -13,7 +13,7 @@ module type Checked = sig
 end
 
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   module Unchecked : Unchecked
 

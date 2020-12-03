@@ -15,21 +15,19 @@ module Payload = struct
           , Token_id.Stable.V1.t
           , Account_nonce.Stable.V1.t option
           , Global_slot.Stable.V1.t
-          , User_command_memo.Stable.V1.t )
-          User_command_payload.Common.Poly.Stable.V1.t
+          , Signed_command_memo.Stable.V1.t )
+          Signed_command_payload.Common.Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
     end]
 
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
-
     let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo : t =
       {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
     let to_user_command_common (t : t) ~inferred_nonce :
-        (User_command_payload.Common.t, string) Result.t =
+        (Signed_command_payload.Common.t, string) Result.t =
       let open Result.Let_syntax in
       let%map () =
         match t.nonce with
@@ -45,7 +43,7 @@ module Payload = struct
                    (Account_nonce.to_string nonce)
                    (Account_nonce.to_string inferred_nonce))
       in
-      { User_command_payload.Common.Poly.fee= t.fee
+      { Signed_command_payload.Common.Poly.fee= t.fee
       ; fee_token= t.fee_token
       ; fee_payer_pk= t.fee_payer_pk
       ; nonce= inferred_nonce
@@ -61,15 +59,13 @@ module Payload = struct
     module V1 = struct
       type t =
         ( Common.Stable.V1.t
-        , User_command_payload.Body.Stable.V1.t )
-        User_command_payload.Poly.Stable.V1.t
+        , Signed_command_payload.Body.Stable.V1.t )
+        Signed_command_payload.Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo ~body : t
       =
@@ -78,10 +74,10 @@ module Payload = struct
     ; body }
 
   let to_user_command_payload (t : t) ~inferred_nonce :
-      (User_command_payload.t, string) Result.t =
+      (Signed_command_payload.t, string) Result.t =
     let open Result.Let_syntax in
     let%map common = Common.to_user_command_common t.common ~inferred_nonce in
-    {User_command_payload.Poly.common; body= t.body}
+    {Signed_command_payload.Poly.common; body= t.body}
 
   let fee_payer ({common; _} : t) = Common.fee_payer common
 end
@@ -99,12 +95,6 @@ module Sign_choice = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Stable.Latest.t =
-    | Signature of Signature.t
-    | Hd_index of Unsigned_extended.UInt32.t
-    | Keypair of Keypair.t
-  [@@deriving sexp, to_yojson]
 end
 
 [%%versioned
@@ -114,34 +104,37 @@ module Stable = struct
       ( Payload.Stable.V1.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
-      User_command.Poly.Stable.V1.t
+      Signed_command.Poly.Stable.V1.t
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+[%%define_locally
+Stable.Latest.(to_yojson)]
 
 let fee_payer ({payload; _} : t) = Payload.fee_payer payload
 
 let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
     ~signer ~sign_choice () : t =
+  let valid_until = Option.value valid_until ~default:Global_slot.max_value in
   let payload =
     Payload.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
       ~body
   in
   {payload; signer; signature= sign_choice}
 
-let sign ~signer ~(user_command_payload : User_command_payload.t) = function
+let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
-        (User_command.create_with_signature_checked signature signer
+        (Signed_command.create_with_signature_checked signature signer
            user_command_payload)
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
-      Deferred.Result.return (User_command.sign signer_kp user_command_payload)
+      Deferred.Result.return
+        (Signed_command.sign signer_kp user_command_payload)
   | Hd_index hd_index ->
       Secrets.Hardware_wallets.sign ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
@@ -183,10 +176,10 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     sign ~signer:client_input.signer ~user_command_payload
       client_input.signature
   in
-  (User_command.forget_check signed_user_command, updated_nonce_map)
+  (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
 let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    uc_inputs : User_command.t list Deferred.Or_error.t =
+    uc_inputs : Signed_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
       one of them.

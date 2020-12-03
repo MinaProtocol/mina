@@ -10,13 +10,20 @@ open Coda_base
 open Frontier_base
 module Breadcrumb = Breadcrumb
 module Diff = Diff
-module Hash = Frontier_hash
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
 
 include Frontier_intf.S
+
+type Structured_log_events.t += Added_breadcrumb_user_commands
+  [@@deriving register_event]
+
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+  [@@deriving register_event]
+
+val max_catchup_chunk_length : int
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
@@ -30,7 +37,6 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> precomputed_values:Precomputed_values.t
   -> unit
   -> ( t
@@ -39,7 +45,7 @@ val load :
        | `Persistent_frontier_malformed ] )
      Deferred.Result.t
 
-val close : t -> unit Deferred.t
+val close : loc:string -> t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
@@ -66,7 +72,6 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> ( t
@@ -77,7 +82,6 @@ module For_tests : sig
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> precomputed_values:Precomputed_values.t
     -> unit
@@ -85,19 +89,16 @@ module For_tests : sig
 
   val gen_persistence :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
-    -> ledger_depth:int
     -> ?verifier:Verifier.t
+    -> precomputed_values:Precomputed_values.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
@@ -113,11 +114,9 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
-    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list

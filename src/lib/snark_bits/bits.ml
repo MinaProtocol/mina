@@ -99,13 +99,13 @@ module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
 consensus_mechanism]
 
 module type Big_int_intf = sig
-  include Snarky.Bigint_intf.S
+  include Snarky_backendless.Bigint_intf.S
 
   val to_field : t -> field
 end
 
 module Make_field0
-    (Field : Snarky.Field_intf.S)
+    (Field : Snarky_backendless.Field_intf.S)
     (Bigint : Big_int_intf with type field := Field.t) (M : sig
         val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
@@ -140,7 +140,7 @@ module Make_field0
 end
 
 module Make_field
-    (Field : Snarky.Field_intf.S)
+    (Field : Snarky_backendless.Field_intf.S)
     (Bigint : Big_int_intf with type field := Field.t) :
   Bits_intf.S with type t = Field.t =
   Make_field0 (Field) (Bigint)
@@ -149,7 +149,7 @@ module Make_field
     end)
 
 module Small
-    (Field : Snarky.Field_intf.S)
+    (Field : Snarky_backendless.Field_intf.S)
     (Bigint : Big_int_intf with type field := Field.t) (M : sig
         val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
@@ -160,7 +160,7 @@ end
 
 module Snarkable = struct
   module Small_bit_vector
-      (Impl : Snarky.Snark_intf.S) (V : sig
+      (Impl : Snarky_backendless.Snark_intf.S) (V : sig
           type t
 
           val empty : t
@@ -302,13 +302,13 @@ module Snarkable = struct
           failwith "Bits.if_: unpacked bit lengths were unequal"
   end
 
-  module UInt64 (Impl : Snarky.Snark_intf.S) =
+  module UInt64 (Impl : Snarky_backendless.Snark_intf.S) =
     Small_bit_vector (Impl) (Vector.UInt64)
-  module UInt32 (Impl : Snarky.Snark_intf.S) =
+  module UInt32 (Impl : Snarky_backendless.Snark_intf.S) =
     Small_bit_vector (Impl) (Vector.UInt32)
 
   module Field_backed
-      (Impl : Snarky.Snark_intf.S) (M : sig
+      (Impl : Snarky_backendless.Snark_intf.S) (M : sig
           val bit_length : int
       end) =
   struct
@@ -364,7 +364,7 @@ module Snarkable = struct
     let unpack_value = Fn.id
   end
 
-  module Field (Impl : Snarky.Snark_intf.S) :
+  module Field (Impl : Snarky_backendless.Snark_intf.S) :
     Bits_intf.Snarkable.Lossy
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
@@ -380,7 +380,7 @@ module Snarkable = struct
       end)
 
   module Small
-      (Impl : Snarky.Snark_intf.S) (M : sig
+      (Impl : Snarky_backendless.Snark_intf.S) (M : sig
           val bit_length : int
       end) :
     Bits_intf.Snarkable.Faithful
@@ -406,7 +406,7 @@ module Snarkable = struct
 end
 
 module Make_unpacked
-    (Impl : Snarky.Snark_intf.S) (M : sig
+    (Impl : Snarky_backendless.Snark_intf.S) (M : sig
         val bit_length : int
     end) =
 struct

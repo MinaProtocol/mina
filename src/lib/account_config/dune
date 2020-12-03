@@ -1,5 +1,0 @@
-(library
-  (name account_config)
-  (public_name account_config)
-  (libraries core_kernel async coda_base coda_state signature_lib)
-  (preprocess (pps ppx_coda ppx_let ppx_deriving_yojson)))

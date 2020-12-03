@@ -20,9 +20,6 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t = Pos | Neg
-[@@deriving sexp, hash, compare, eq, yojson]
-
 val to_field : t -> Field.t
 
 val of_field_exn : Field.t -> t

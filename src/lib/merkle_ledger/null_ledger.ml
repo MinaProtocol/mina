@@ -87,6 +87,8 @@ end = struct
 
   let get_uuid t = t.uuid
 
+  let get_directory _ = None
+
   let last_filled _t = None
 
   let close _t = ()
@@ -106,6 +108,11 @@ end = struct
   let token_owners _t = Account_id.Set.empty
 
   let tokens _t _pk = Token_id.Set.empty
+
+  let next_available_token _t = Token_id.(next default)
+
+  let set_next_available_token _t _tid =
+    failwith "set_next_available_token: null ledgers cannot be mutated"
 
   let iteri _t ~f:_ = ()
 

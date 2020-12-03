@@ -62,21 +62,13 @@ module Make (Inputs : Inputs.S) = struct
   end
 
   module Proof = struct
-    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1} [@@deriving sexp]
-
-    let to_hlist {a; b; c} = Snarky.H_list.[a; b; c]
-
-    let of_hlist :
-        (unit, 'a -> 'b -> 'a -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
-      function
-      | [a; b; c] ->
-          {a; b; c}
+    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1} [@@deriving sexp, hlist]
 
     let typ =
       Typ.of_hlistable
         Data_spec.[G1.typ; G2.typ; G1.typ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+        ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+        ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
   end
 
   let verify (vk : (_, _, _) Verification_key.t_)

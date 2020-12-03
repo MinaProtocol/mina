@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Currency
+open Pipe_lib
 
 module Make_test (Make_selection_method : Intf.Make_selection_method_intf) =
 struct
@@ -17,6 +18,17 @@ struct
     @@ Snark_work_lib.Work.Single.Spec.gen Int.quickcheck_generator
          Int.quickcheck_generator Fee.gen
 
+  let precomputed_values = Precomputed_values.for_unit_tests
+
+  let init_state sl reassignment_wait logger =
+    let tf_reader, tf_writer = Broadcast_pipe.create None in
+    let work_state =
+      Lib.State.init ~reassignment_wait ~frontier_broadcast_pipe:tf_reader
+        ~logger
+    in
+    let%map () = Broadcast_pipe.Writer.write tf_writer (Some sl) in
+    work_state
+
   let%test_unit "Workspec chunk doesn't send same things again" =
     Backtrace.elide := false ;
     let p = 50 in
@@ -26,46 +38,46 @@ struct
     Quickcheck.test gen_staged_ledger ~trials:100 ~f:(fun sl ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
-            let rec go i seen =
+            let%bind work_state = init_state sl reassignment_wait logger in
+            let rec go i =
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let stuff, seen =
-                Selection_method.work ~snark_pool ~fee sl seen ~logger
+              let stuff =
+                Selection_method.work ~snark_pool ~fee ~logger work_state
               in
-              match stuff with None -> return () | _ -> go (i + 1) seen
+              match stuff with None -> return () | _ -> go (i + 1)
             in
-            go 0 (Lib.State.init ~reassignment_wait) ) )
+            go 0 ) )
 
   let%test_unit "Reassign work after the wait time" =
     Backtrace.elide := false ;
     let snark_pool = T.Snark_pool.create () in
     let fee = Currency.Fee.zero in
     let logger = Logger.null () in
-    let send_work sl seen =
-      let rec go seen all_work =
-        let stuff, seen =
-          Selection_method.work ~snark_pool ~fee sl seen ~logger
+    let send_work work_state =
+      let rec go all_work =
+        let stuff =
+          Selection_method.work ~snark_pool ~fee ~logger work_state
         in
         match stuff with
         | None ->
-            (all_work, seen)
+            all_work
         | Some work ->
-            go seen (One_or_two.to_list work @ all_work)
+            go (One_or_two.to_list work @ all_work)
       in
-      go seen []
+      go []
     in
     Quickcheck.test gen_staged_ledger ~trials:10 ~f:(fun sl ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
-            let work_sent, seen =
-              send_work sl (Lib.State.init ~reassignment_wait)
-            in
+            let%bind work_state = init_state sl reassignment_wait logger in
+            let work_sent = send_work work_state in
             (*wait for wait_time after which all the work will be reassigned*)
             let%map () =
               Async.after (Time.Span.of_ms (Float.of_int reassignment_wait))
             in
-            let work_sent_again, _seen = send_work sl seen in
+            let work_sent_again = send_work work_state in
             assert (List.length work_sent = List.length work_sent_again) ) )
 
   let gen_snark_pool (works : ('a, 'b, 'c) Lib.Work_spec.t One_or_two.t list)
@@ -99,7 +111,11 @@ struct
       let%bind sl = gen_staged_ledger in
       let%map pool =
         gen_snark_pool
-          (T.Staged_ledger.all_work_pairs_exn sl)
+          ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
+                Ok
+                  (Lazy.force precomputed_values).protocol_state_with_hash.data
+            )
+          |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in
       (sl, pool)
@@ -112,12 +128,14 @@ struct
       ~f:(fun (sl, snark_pool) ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
-            let rec go i seen =
+            let%bind work_state = init_state sl reassignment_wait logger in
+            let rec go i =
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let work, seen =
-                Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
+              let work =
+                Selection_method.work ~snark_pool ~fee:my_fee work_state
+                  ~logger
               in
               match work with
               | None ->
@@ -126,8 +144,9 @@ struct
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
-                       ~fee:my_fee job) ;
-                  go (i + 1) seen
+                       ~fee:my_fee
+                       (One_or_two.map job ~f:Lib.Work_spec.statement)) ;
+                  go (i + 1)
             in
-            go 0 (Lib.State.init ~reassignment_wait) ) )
+            go 0 ) )
 end

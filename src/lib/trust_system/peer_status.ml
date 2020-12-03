@@ -9,6 +9,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t = {trust: float; banned: Banned_status.t}
-[@@deriving yojson]

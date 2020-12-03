@@ -10,11 +10,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
-      [@@deriving compare, eq, hash]
+      [@@deriving compare, eq, hash, hlist]
     end
   end]
-
-  type ('field, 'boolean) t = ('field, 'boolean) Stable.Latest.t =
-    {x: 'field; is_odd: 'boolean}
-  [@@deriving compare, eq, hash]
 end

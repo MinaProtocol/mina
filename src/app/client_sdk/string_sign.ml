@@ -63,6 +63,7 @@ module Message = struct
       ; string_bits t ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
+    |> Base.(Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1)))
     |> Tock.Field.project
 
   let hash t ~public_key ~r =

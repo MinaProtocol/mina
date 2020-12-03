@@ -23,6 +23,8 @@ val length : 'a t -> int
 
 val to_list : 'a t -> 'a list
 
+val to_numbered_list : 'a t -> (int * 'a) list
+
 val group_sequence : 'a Sequence.t -> 'a t Sequence.t
 
 val group_list : 'a list -> 'a t list

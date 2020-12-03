@@ -29,12 +29,19 @@ module type Action_intf = sig
 
   (** Convert an action into a format string and a set of metadata for
       logging *)
-  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
+  val to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
     peer does no good things) in actions/second. *)
 val max_rate : float -> float
+
+type Structured_log_events.t +=
+  | Peer_banned of
+      { peer: Network_peer.Peer.t
+      ; expiration: Time.t
+      ; action: string }
+  [@@deriving register_event]
 
 (* FIXME The parameter docs don't render :( *)
 
@@ -54,27 +61,27 @@ module Make (Action : Action_intf) : sig
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
-  val ban_pipe :
-    t -> (Unix.Inet_addr.Blocking_sexp.t * Time.t) Strict_pipe.Reader.t
+  val ban_pipe : t -> (Network_peer.Peer.t * Time.t) Strict_pipe.Reader.t
 
   (** Record an action a peer took. This may result in a ban event being
       emitted *)
   val record :
+    t -> Logger.t -> Network_peer.Peer.t -> Action.t -> unit Deferred.t
+
+  (** Look up the score of all peers associated with an IP and whether they are banned .*)
+  val lookup_ip :
        t
-    -> Logger.t
     -> Unix.Inet_addr.Blocking_sexp.t
-    -> Action.t
-    -> unit Deferred.t
+    -> (Network_peer.Peer.t * Peer_status.t) list
 
-  (** Look up the score of a peer and whether it's banned .*)
-  val lookup : t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_status.t
-
-  (** reset peer status; return the reset status *)
-  val reset : t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_status.t
+  (** reset status of all peers associated with an IP; return the reset statuses *)
+  val reset_ip :
+       t
+    -> Unix.Inet_addr.Blocking_sexp.t
+    -> (Network_peer.Peer.t * Peer_status.t) list
 
   (** get all peer, status pairs in the trust system *)
-  val peer_statuses :
-    t -> (Unix.Inet_addr.Blocking_sexp.t * Peer_status.t) list
+  val peer_statuses : t -> (Network_peer.Peer.t * Peer_status.t) list
 
   (** Shut down. *)
   val close : t -> unit
@@ -82,7 +89,6 @@ module Make (Action : Action_intf) : sig
   module For_tests : sig
     (** Get a pipe of the actions being recorded. Close it when you're done to
         avoid a memory leak. *)
-    val get_action_pipe :
-      t -> (Action.t * Unix.Inet_addr.Blocking_sexp.t) Pipe.Reader.t
+    val get_action_pipe : t -> (Action.t * Network_peer.Peer.t) Pipe.Reader.t
   end
 end

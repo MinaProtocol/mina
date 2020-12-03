@@ -6,7 +6,7 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
-  {state_hash= genesis_state_hash; frontier_hash= Frontier_hash.empty}
+  {state_hash= genesis_state_hash}
 
 let with_file ?size filename access_level ~f =
   let open Unix in
@@ -74,7 +74,7 @@ module Instance = struct
   let snarked_ledger {snarked_ledger; _} = snarked_ledger
 
   let set_root_identifier t new_root_identifier =
-    Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+    [%log' trace t.factory.logger]
       ~metadata:
         [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
       "Setting persistent root identifier" ;
@@ -96,18 +96,13 @@ module Instance = struct
             let root_identifier =
               Root_identifier.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
             in
-            Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
+            [%log' trace t.factory.logger]
               ~metadata:
                 [("root_identifier", Root_identifier.to_yojson root_identifier)]
               "Loaded persistent root identifier" ;
             Some root_identifier )
 
-  let set_root_state_hash t state_hash ~genesis_state_hash =
-    let root_identifier =
-      load_root_identifier t
-      |> Option.value ~default:(genesis_root_identifier ~genesis_state_hash)
-    in
-    set_root_identifier t {root_identifier with state_hash}
+  let set_root_state_hash t state_hash = set_root_identifier t {state_hash}
 end
 
 type t = Factory_type.t

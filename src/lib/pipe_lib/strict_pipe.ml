@@ -228,15 +228,22 @@ module Writer = struct
     | Drop_head ->
         let logger = Logger.create () in
         let my_name = Option.value writer.name ~default:"<unnamed>" in
-        Logger.warn logger
+        [%log warn]
           ~metadata:[("pipe_name", `String my_name)]
-          ~location:__LOC__ ~module_:__MODULE__
           "Dropping message on pipe $pipe_name" ;
         ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
+    ( if Pipe.is_closed writer.writer then
+      let logger = Logger.create () in
+      [%log warn] "writing to closed pipe $name"
+        ~metadata:
+          [ ( "name"
+            , `String
+                (Sexplib.Sexp.to_string ([%sexp_of: string option] writer.name))
+            ) ] ) ;
     match writer.type_ with
     | Synchronous ->
         Pipe.write writer.writer data

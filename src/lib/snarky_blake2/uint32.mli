@@ -1,5 +1,5 @@
 module type S = sig
-  module Impl : Snarky.Snark_intf.S
+  module Impl : Snarky_backendless.Snark_intf.S
 
   open Impl
 
@@ -25,4 +25,5 @@ module type S = sig
   val typ : (t, Unchecked.t) Typ.t
 end
 
-module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl
+module Make (Impl : Snarky_backendless.Snark_intf.S) :
+  S with module Impl := Impl

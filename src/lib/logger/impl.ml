@@ -35,7 +35,7 @@ module Metadata = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Yojson.Safe.json String.Map.t
+      type t = Yojson.Safe.t String.Map.t
 
       let to_latest = Fn.id
 
@@ -67,8 +67,6 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
-  type t = Stable.Latest.t
-
   let mem = String.Map.mem
 
   let extend (t : t) alist =
@@ -86,46 +84,22 @@ module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t option
+    ; source: Source.t option [@default None]
     ; message: string
-    ; metadata: Metadata.t }
+    ; metadata: Metadata.t
+    ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
-
-  type without_source =
-    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
-  [@@deriving yojson]
-
-  let escape_string str =
-    String.to_list str
-    |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
-    |> String.of_char_list
-
-  let of_yojson json =
-    match without_source_of_yojson json with
-    | Ok {timestamp; level; message; metadata} ->
-        Ok {timestamp; level; message; metadata; source= None}
-    | Error _ ->
-        of_yojson json
-
-  let to_yojson ({timestamp; level; source; message; metadata} as m) =
-    match source with
-    | Some _ ->
-        to_yojson {m with message= escape_string m.message}
-    | None ->
-        without_source_to_yojson {timestamp; level; message; metadata}
-
-  let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
-
-  let metadata_references str =
-    match Re2.find_all ~sub:(`Index 1) metadata_interpolation_regex str with
-    | Ok ls ->
-        ls
-    | Error _ ->
-        []
 
   let check_invariants (t : t) =
-    let refs = metadata_references t.message in
-    List.for_all refs ~f:(Metadata.mem t.metadata)
+    match Logproc_lib.Interpolator.parse t.message with
+    | Error _ ->
+        false
+    | Ok items ->
+        List.for_all items ~f:(function
+          | `Interpolate item ->
+              Metadata.mem t.metadata item
+          | `Raw _ ->
+              true )
 end
 
 module Processor = struct
@@ -224,10 +198,12 @@ module Transport = struct
         { directory: string
         ; log_filename: string
         ; max_size: int
+        ; num_rotate: int
+        ; mutable curr_index: int
         ; mutable primary_log: File_descr.t
         ; mutable primary_log_size: int }
 
-      let create ~directory ~max_size ~log_filename =
+      let create ~directory ~max_size ~log_filename ~num_rotate =
         if not (Result.is_ok (access directory [`Exists])) then
           mkdir_p ~perm:0o755 directory ;
         if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
@@ -243,11 +219,21 @@ module Transport = struct
           else (0, [O_RDWR; O_CREAT])
         in
         let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        {directory; log_filename; max_size; primary_log; primary_log_size}
+        { directory
+        ; log_filename
+        ; max_size
+        ; primary_log
+        ; primary_log_size
+        ; num_rotate
+        ; curr_index= 0 }
 
       let rotate t =
         let primary_log_loc = Filename.concat t.directory t.log_filename in
-        let secondary_log_filename = t.log_filename ^ ".0" in
+        let secondary_log_filename =
+          t.log_filename ^ "." ^ string_of_int t.curr_index
+        in
+        if t.curr_index < t.num_rotate then t.curr_index <- t.curr_index + 1
+        else t.curr_index <- 0 ;
         let secondary_log_loc =
           Filename.concat t.directory secondary_log_filename
         in
@@ -266,10 +252,11 @@ module Transport = struct
         t.primary_log_size <- t.primary_log_size + len
     end
 
-    let dumb_logrotate ~directory ~log_filename ~max_size =
+    let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
       T
         ( (module Dumb_logrotate)
-        , Dumb_logrotate.create ~directory ~log_filename ~max_size )
+        , Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate
+        )
   end
 end
 
@@ -318,8 +305,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
-
 let metadata t = t.metadata
 
 let create ?(metadata = []) ?(id = "default") () =
@@ -333,23 +318,32 @@ let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
 
 let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
-let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
+let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
+    =
   { Message.timestamp= Time.now ()
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+  ; event_id }
 
 let raw ({id; _} as t) msg =
   if t.null then ()
   else if Message.check_invariants msg then
     Consumer_registry.broadcast_log_message ~id msg
-  else failwith "invalid log call"
+  else failwithf "invalid log call \"%s\"" (String.escaped msg.message) ()
 
-let log t ~level ~module_ ~location ?(metadata = []) fmt =
+let add_tags_to_metadata metadata tags =
+  Option.value_map tags ~default:metadata ~f:(fun tags ->
+      let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
+      tags_item :: metadata )
+
+let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
+  let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t @@ make_message t ~level ~module_ ~location ~metadata ~message
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
   in
   ksprintf f fmt
 
@@ -357,7 +351,9 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
-  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ?tags:Tags.t list
+  -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+  -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
 
@@ -375,7 +371,43 @@ let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
 
-let spam = log ~level:Spam ~module_:"" ~location:""
+let spam = log ~level:Spam ~module_:"" ~location:"" ?event_id:None
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment
+
+module Structured = struct
+  type log_function =
+       t
+    -> module_:string
+    -> location:string
+    -> ?tags:Tags.t list
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
+
+  let log t ~level ~module_ ~location ?tags ?(metadata = []) event =
+    let message, event_id, str_metadata = Structured_log_events.log event in
+    let event_id = Some event_id in
+    let metadata = add_tags_to_metadata (str_metadata @ metadata) tags in
+    raw t
+    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+
+  let trace = log ~level:Trace
+
+  let debug = log ~level:Debug
+
+  let info = log ~level:Info
+
+  let warn = log ~level:Warn
+
+  let error = log ~level:Error
+
+  let fatal = log ~level:Fatal
+
+  let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+  let best_tip_diff = log ~level:Spam ~module_:"" ~location:""
+end
+
+module Str = Structured

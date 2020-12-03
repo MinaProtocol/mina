@@ -295,7 +295,7 @@ module BlockRewards = {
              let isDelegationInProgress =
                Array.any(
                  ~f=commands => commands##isDelegation,
-                 data##pooledUserCommands,
+                 data##pooledUserCommands |> Array.map(~f=(`UserCommand x) => x),
                );
              switch (account.delegateAccount, data##syncStatus) {
              | (None, `SYNCED) =>

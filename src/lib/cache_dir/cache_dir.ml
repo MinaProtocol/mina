@@ -5,34 +5,10 @@ let autogen_path = Filename.temp_dir_name ^/ "coda_cache_dir"
 
 let s3_install_path = "/tmp/s3_cache_dir"
 
-let manual_install_path = "/var/lib/coda"
+let s3_keys_bucket_prefix =
+  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
 
-let genesis_dir_name
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(genesis_constants : Genesis_constants.t) ~proof_level =
-  let digest =
-    (*include all the time constants that would affect the genesis
-    ledger and the proof*)
-    let str =
-      ( List.map
-          [ Coda_compile_config.curve_size
-          ; Coda_compile_config.ledger_depth
-          ; Option.value ~default:0 genesis_constants.num_accounts
-          ; constraint_constants.c
-          ; genesis_constants.protocol.k ]
-          ~f:Int.to_string
-      |> String.concat ~sep:"" )
-      ^ Genesis_constants.Proof_level.to_string proof_level
-      ^ Coda_compile_config.genesis_ledger
-    in
-    Blake2.digest_string str |> Blake2.to_hex
-  in
-  let digest_short =
-    let len = 16 in
-    if String.length digest - len <= 0 then digest
-    else String.sub digest ~pos:0 ~len
-  in
-  "coda_genesis" ^ "_" ^ Coda_version.commit_id_short ^ "_" ^ digest_short
+let manual_install_path = "/var/lib/coda"
 
 let brew_install_path =
   match
@@ -45,6 +21,15 @@ let brew_install_path =
   | _ ->
       "/usr/local/var/coda"
 
+let cache =
+  let dir d w = Key_cache.Spec.On_disk {directory= d; should_write= w} in
+  [ dir manual_install_path false
+  ; dir brew_install_path false
+  ; dir s3_install_path false
+  ; dir autogen_path true
+  ; Key_cache.Spec.S3
+      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} ]
+
 let env_path =
   match Sys.getenv "CODA_KEYS_PATH" with
   | Some path ->
@@ -53,25 +38,31 @@ let env_path =
       manual_install_path
 
 let possible_paths base =
-  List.map [env_path; brew_install_path; s3_install_path; autogen_path]
-    ~f:(fun d -> d ^/ base)
+  List.map
+    [ env_path
+    ; brew_install_path
+    ; s3_install_path
+    ; autogen_path
+    ; manual_install_path ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   Deferred.map ~f:Result.join
   @@ Monitor.try_with (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
-           let%map result =
-             Process.run_exn ~prog:"curl"
-               ~args:["-o"; file_path; uri_string]
-               ()
-           in
-           Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-             "Curl finished"
+           [%log trace] "Downloading file from S3"
              ~metadata:
                [ ("url", `String uri_string)
-               ; ("local_file_path", `String file_path)
-               ; ("result", `String result) ] ;
+               ; ("local_file_path", `String file_path) ] ;
+           let%map _result =
+             Process.run_exn ~prog:"curl"
+               ~args:["--fail"; "-o"; file_path; uri_string]
+               ()
+           in
+           [%log trace] "Download finished"
+             ~metadata:
+               [ ("url", `String uri_string)
+               ; ("local_file_path", `String file_path) ] ;
            Result.return ()
          in
          Deferred.List.map ~f:each_uri

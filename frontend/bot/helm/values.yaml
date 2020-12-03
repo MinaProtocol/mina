@@ -1,0 +1,37 @@
+bot: # user-agent role default settings
+  name: o1-bot
+  image: codaprotocol/coda-user-agent:0.1.5
+  testnet: default
+  role: user-agent
+  command: ["bash"]
+  args: ["-c", "python3 agent.py"]
+  resources:
+    requests:
+      memory: 1.0Gi
+      cpu: 1000m
+    limits:
+      cpu: 1000m
+      memory: 1.0Gi
+  optionalEnv:
+    - name: AGENT_MIN_FEE
+      value: 1
+    - name: AGENT_MAX_FEE
+      value: 5
+    - name: AGENT_MIN_TX
+      value: 1
+    - name: AGENT_MAX_TX
+      value: 10
+    - name: AGENT_SEND_EVERY_MINUTES
+      value: "10"
+    - name: PYTHONUNBUFFERED
+      value: "1"
+  ports: []
+  #   - name: graphql
+  #     containerPort: 3085
+  volumeMounts: []
+  #   - name: wallet-keys
+  #     mountPath: /root/wallet-keys
+  volumes: []
+  #   - name: wallet-keys
+  #     emptyDir: {}
+  

@@ -23,3 +23,7 @@ let uint32 () =
 
 let uint64 () =
   unsigned_scalar_scalar ~to_string:Unsigned.UInt64.to_string "UInt64"
+
+let token_id () =
+  scalar "TokenId" ~doc:"String representation of a token's UInt64 identifier"
+    ~coerce:(fun tid -> `String (Coda_base.Token_id.to_string tid))

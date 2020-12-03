@@ -1,11 +1,15 @@
-open Snark_params
+open Pickles_types
 
-type t = Tock.Proof.t [@@deriving sexp, yojson]
+type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t [@@deriving sexp, yojson]
 
-val dummy : Tock.Proof.t
+val blockchain_dummy : t
+
+val transaction_dummy : t
 
 [%%versioned:
 module Stable : sig
+  [@@@no_toplevel_latest_type]
+
   module V1 : sig
     type nonrec t = t [@@deriving compare, sexp, yojson]
   end

@@ -14,7 +14,13 @@ val to_group :
   -> 'f * 'f
 
 module Checked : sig
-  open Snarky
+  open Snarky_backendless
+
+  val wrap :
+       'f Snark.m
+    -> potential_xs:('input -> 'f Cvar.t * 'f Cvar.t * 'f Cvar.t)
+    -> y_squared:(x:'f Cvar.t -> 'f Cvar.t)
+    -> ('input -> 'f Cvar.t * 'f Cvar.t) Core_kernel.Staged.t
 
   val to_group :
        (module Snark_intf.Run with type field = 'f)

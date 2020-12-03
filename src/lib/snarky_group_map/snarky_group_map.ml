@@ -25,7 +25,9 @@ let to_group (type t)
   List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
 
 module Checked = struct
-  open Snarky
+  open Snarky_backendless
+
+  let wrap = Checked_map.wrap
 
   let to_group (type f) (module M : Snark_intf.Run with type field = f) ~params
       t =

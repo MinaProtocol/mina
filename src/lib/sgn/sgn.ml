@@ -24,9 +24,6 @@ module Stable = struct
   end
 end]
 
-type t = Sgn_type.Sgn.t = Pos | Neg
-[@@deriving sexp, hash, compare, eq, yojson]
-
 let gen =
   Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
       if b then Pos else Neg )

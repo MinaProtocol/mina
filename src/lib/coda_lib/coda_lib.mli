@@ -6,9 +6,19 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 
 type t
+
+type Structured_log_events.t +=
+  | Connecting
+  | Listening
+  | Bootstrapping
+  | Ledger_catchup
+  | Synced
+  | Rebroadcast_transition of {state_hash: State_hash.t}
+  [@@deriving register_event]
 
 exception Snark_worker_error of int
 
@@ -26,7 +36,8 @@ val replace_block_production_keypairs :
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
-val staking_ledger : t -> Sparse_ledger.t option
+val staking_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
@@ -45,9 +56,11 @@ val add_block_subscriber :
      With_hash.t
      Pipe.Reader.t
 
-val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
-val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
+val snark_worker_key : t -> Public_key.Compressed.t option
+
+val snark_coordinator_key : t -> Public_key.Compressed.t option
 
 val snark_work_fee : t -> Currency.Fee.t
 
@@ -58,6 +71,8 @@ val request_work : t -> Snark_worker.Work.Spec.t option
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
+
+val snark_job_state : t -> Work_selector.State.t
 
 val add_transactions :
      t
@@ -98,11 +113,11 @@ module Root_diff : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      type t =
+        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
+        ; root_length: int }
     end
   end]
-
-  type t = Stable.Latest.t
 end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
@@ -113,7 +128,8 @@ val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
 
-val best_chain : t -> Transition_frontier.Breadcrumb.t list option
+val best_chain :
+  ?max_length:int -> t -> Transition_frontier.Breadcrumb.t list option
 
 val transaction_pool : t -> Network_pool.Transaction_pool.t
 
@@ -126,9 +142,12 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 
 val start : t -> unit Deferred.t
 
+val start_with_precomputed_blocks :
+  t -> Block_producer.Precomputed_block.t Sequence.t -> unit Deferred.t
+
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -137,8 +156,6 @@ val transition_frontier :
 
 val get_ledger :
   t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
-
-val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 

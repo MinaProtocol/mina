@@ -6,18 +6,15 @@ open Async_unix
 
 (* register a thunk to be called at exit; log registration and execution *)
 let register_handler ~logger ~description (f : unit -> unit) =
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Registering exit handler: $description"
+  [%log info] "Registering exit handler: $description"
     ~metadata:[("description", `String description)] ;
   let logging_thunk () =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Running exit handler: $description"
+    [%log info] "Running exit handler: $description"
       ~metadata:[("description", `String description)] ;
     (* if there's an exception, log it, allow other handlers to run *)
     try f ()
     with exn ->
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "When running exit handler: $description, got exception $exn"
+      [%log info] "When running exit handler: $description, got exception $exn"
         ~metadata:
           [ ("description", `String description)
           ; ("exn", `String (Exn.to_string exn)) ]
@@ -27,12 +24,10 @@ let register_handler ~logger ~description (f : unit -> unit) =
 (* register a Deferred.t thunk to be called at Async shutdown; log registration and execution *)
 let register_async_shutdown_handler ~logger ~description
     (f : unit -> unit Deferred.t) =
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Registering async shutdown handler: $description"
+  [%log info] "Registering async shutdown handler: $description"
     ~metadata:[("description", `String description)] ;
   let logging_thunk () =
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Running async shutdown handler: $description"
+    [%log info] "Running async shutdown handler: $description"
       ~metadata:[("description", `String description)] ;
     let open Deferred.Let_syntax in
     let%map () =
@@ -40,7 +35,7 @@ let register_async_shutdown_handler ~logger ~description
       | Ok () ->
           ()
       | Error exn ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          [%log info]
             "When running async shutdown handler: $description, got exception \
              $exn"
             ~metadata:

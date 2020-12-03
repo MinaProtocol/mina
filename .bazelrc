@@ -1,0 +1,32 @@
+## Sandboxed build fails; I don't know if this is a bug in OBazl or in Bazel.
+## In any case, until this resolved we must use a different spawn strategy:
+build --spawn_strategy=local
+
+# always enable platform-based toolchain resolution:
+build --incompatible_enable_cc_toolchain_resolution
+
+## for private control over bazel, use ./user.bazelrc
+## (which should be listed in .gitignore)
+
+try-import user.bazelrc
+
+## copy the following to user.bazelrc to get started:
+
+# build --color=yes
+# build --symlink_prefix=.bazel/   # use hidden dir instead of top-level symlinks
+# build --subcommands    # prints build cmd with space-separate args
+# build --subcommands=pretty_print  # same, but args are newline-separated
+# build --verbose_failures
+# build --explain bazel.log
+# build --verbose_explanations
+# build --sandbox_debug
+# build --toolchain_resolution_debug
+# build --show_timestamps
+# build --keep_going
+# build --jobs 600
+# build --toolchain_resolution_debug
+# build --nobuild  # run load and analysis phases only, do not run execution phase
+# query --keep_going
+
+## for development/debugging: use local obazl repo
+# build --override_repository=obazl=/path/to/obazl

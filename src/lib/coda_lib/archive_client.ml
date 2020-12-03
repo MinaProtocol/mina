@@ -5,18 +5,19 @@ open O1trace
 
 let dispatch (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name)
     diff =
-  match%bind
+  match%map
     Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t diff archive_location.value
   with
   | Ok () ->
-      Deferred.Or_error.ok_unit
+      Ok ()
   | Error e ->
-      Deferred.Or_error.errorf
-        !"Could not send data to archive host_and_port (%s). The archive \
-          process may not be running. Please check the daemon-argument (%s):\n\
-          %s"
-        (Host_and_port.to_string archive_location.value)
-        archive_location.name (Error.to_string_hum e)
+      Error
+        (Error.tag_arg e
+           "Could not send data to archive process. It may not be running, \
+            please check the daemon-argument"
+           ( ("host_and_port", archive_location.value)
+           , ("daemon-argument", archive_location.name) )
+           [%sexp_of: (string * Host_and_port.t) * (string * string)])
 
 let transfer ~logger ~archive_location
     (breadcrumb_reader :
@@ -29,9 +30,9 @@ let transfer ~logger ~archive_location
           | Ok () ->
               ()
           | Error e ->
-              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              [%log warn]
                 ~metadata:
-                  [ ("error", `String (Error.to_string_hum e))
+                  [ ("error", Error_json.error_to_yojson e)
                   ; ( "breadcrumb"
                     , Transition_frontier.Breadcrumb.to_yojson breadcrumb ) ]
                 "Could not send breadcrumb to archive: $error" ) )

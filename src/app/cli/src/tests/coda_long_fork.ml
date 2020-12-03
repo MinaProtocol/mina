@@ -4,36 +4,30 @@ open Async
 let name = "coda-long-fork"
 
 let main n waiting_time () =
-  let consensus_constants =
-    Consensus.Constants.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-      ~protocol_constants:Genesis_constants.compiled.protocol
+  let precomputed_values =
+    (* TODO: Load for this specific test. *)
+    Lazy.force Precomputed_values.compiled
   in
+  let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
-  let keypairs =
+  let public_keys =
     List.map
-      (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+      (Lazy.force (Precomputed_values.accounts precomputed_values))
+      ~f:Precomputed_values.pk_of_account_record
   in
-  let snark_work_public_keys i =
-    Some
-      ( (List.nth_exn keypairs i).public_key
-      |> Signature_lib.Public_key.compress )
-  in
+  let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let epoch_duration =
     let block_window_duration_ms =
       Block_time.Span.to_ms consensus_constants.block_window_duration_ms
       |> Int64.to_int_exn
     in
-    Unsigned.UInt32.(
-      block_window_duration_ms * 3
-      * to_int consensus_constants.c
-      * to_int consensus_constants.k)
+    block_window_duration_ms
+    * Unsigned.UInt32.to_int consensus_constants.slots_per_epoch
   in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1

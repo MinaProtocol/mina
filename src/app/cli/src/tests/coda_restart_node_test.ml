@@ -1,6 +1,5 @@
 open Core
 open Async
-open Signature_lib
 
 let name = "coda-restart-node-test"
 
@@ -8,20 +7,20 @@ include Heartbeat.Make ()
 
 let main () =
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let largest_account_pk =
+    Precomputed_values.largest_account_pk_exn precomputed_values
   in
   Deferred.don't_wait_for (print_heartbeat logger) ;
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i =
-    if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
-    else None
+    if i = 0 then Some largest_account_pk else None
   in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1

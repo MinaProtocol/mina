@@ -10,7 +10,3 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  {pending_coinbases: Pending_coinbase.t; is_new_stack: bool}
-[@@deriving to_yojson, sexp]

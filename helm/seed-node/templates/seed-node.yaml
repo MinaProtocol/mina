@@ -1,0 +1,105 @@
+{{- if .Values.seed.active }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{tpl .Values.seed.fullname .}}
+  labels:
+    app: {{tpl .Values.seed.fullname .}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{tpl .Values.seed.fullname .}}
+  template:
+    metadata:
+      labels:
+        app: {{tpl .Values.seed.fullname .}}
+        testnet: {{ .Values.testnetName }}
+        role: seed
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '10000'
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: coda-network-services
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: gcr.io/o1labs-192920/coda-network-services:latest
+        command: ["bash"]
+        args: ["-c", "/code/main.sh"]
+        ports: 
+        - name: metrics-port
+          containerPort: 8000
+        imagePullPolicy: Always
+      - name: seed
+        resources:
+          limits:
+          requests:
+            memory: 16.0Gi
+            cpu: 8.0
+        image: {{ $.Values.coda.image }}
+        args: [ "daemon",
+          "-log-level", "Trace",
+          "-log-json",
+          "-log-snark-work-gossip", "true",
+          "-config-directory", "/root/.coda-config",
+          "-log-received-blocks", "true",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-enable-peer-exchange", "true",
+          "-seed",
+          "-discovery-keypair", "{{ .Values.seed.discoveryKeypair }}",
+          {{- if .Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          "-generate-genesis-proof", "true",
+          {{- end }}
+          {{- range $.Values.coda.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end }}
+        ]
+        env:
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ .Values.coda.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ .Values.coda.ports.p2p | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ .Values.coda.ports.metrics | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ .Values.coda.ports.external | quote }}
+        ports:
+        - name: p2p-port
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.p2p }}
+        - name: graphql-port
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.graphql }}
+        - name: metrics-port
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.metrics }}
+        - name: external-port
+          protocol: TCP 
+          containerPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ $.Values.coda.ports.external }}
+{{- include "healthcheck.seed.allChecks" .Values | indent 8 }}
+        imagePullPolicy: Always
+      {{- if .Values.coda.runtimeConfig }}
+        volumeMounts:
+        - name: daemon-config
+          mountPath: "/config/"
+      volumes:
+      - name: daemon-config
+        configMap:
+          name: {{ tpl .Values.seed.fullname . }}-daemon-config
+      {{- end -}}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
+{{- end }}

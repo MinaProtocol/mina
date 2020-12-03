@@ -30,12 +30,6 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  | Set_delegate of
-      { delegator: Public_key.Compressed.t
-      ; new_delegate: Public_key.Compressed.t }
-[@@deriving eq, sexp, hash, yojson]
-
 let receiver_pk = function Set_delegate {new_delegate; _} -> new_delegate
 
 let receiver = function

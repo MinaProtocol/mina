@@ -7,5 +7,3 @@ module Stable = struct
     [@@deriving sexp, compare, eq, hash]
   end
 end]
-
-type ('field, 'scalar) t = ('field, 'scalar) Stable.Latest.t

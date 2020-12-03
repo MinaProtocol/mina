@@ -13,9 +13,9 @@ end
 module type S = sig
   type t
 
-  val to_yojson : t -> Yojson.Safe.json
+  val to_yojson : t -> Yojson.Safe.t
 
-  val of_yojson : Yojson.Safe.json -> t Ppx_deriving_yojson_runtime.error_or
+  val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 end
 
 module Make (Iso : Iso_intf) = struct
@@ -92,7 +92,7 @@ struct
   let of_base58_check s =
     let open Or_error.Let_syntax in
     let%bind decoded = Base58_check.decode s in
-    Ok (Binable.of_string (module T) decoded)
+    Or_error.try_with (fun () -> Binable.of_string (module T) decoded)
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
 

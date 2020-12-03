@@ -4,5 +4,6 @@
  (inline_tests)
  (libraries core_kernel currency signature_lib)
  (preprocess
-  (pps ppx_jane ppx_coda ppx_deriving_yojson ppx_enumerate))
+  (pps ppx_jane ppx_version ppx_deriving_yojson ppx_enumerate))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Different kinds of status for Coda "))

@@ -26,44 +26,107 @@ module Time = struct
     end
   end]
 
+  let max_value = UInt64.max_int
+
+  let zero = UInt64.zero
+
   module Controller = struct
     [%%if
     time_offsets]
 
-    type t = Time.Span.t Lazy.t
+    type t = unit -> Time.Span.t [@@deriving sexp]
+
+    let time_offset = ref None
+
+    let setting_enabled = ref None
+
+    let disable_setting_offset () = setting_enabled := Some false
+
+    let enable_setting_offset () =
+      match !setting_enabled with
+      | None ->
+          setting_enabled := Some true
+      | Some true ->
+          ()
+      | Some false ->
+          failwith
+            "Cannot enable time offset mutations; it has been explicitly \
+             disabled"
+
+    let set_time_offset offset =
+      match !setting_enabled with
+      | Some true ->
+          time_offset := Some offset
+      | None | Some false ->
+          failwith "Cannot mutate the time offset"
 
     let create offset = offset
 
-    let basic ~logger =
-      lazy
-        (let offset =
-           match Core.Sys.getenv "CODA_TIME_OFFSET" with
-           | Some tm ->
-               Int.of_string tm
-           | None ->
-               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-                 "Environment variable CODA_TIME_OFFSET not found, using \
-                  default of 0" ;
-               0
-         in
-         Core_kernel.Time.Span.of_int_sec offset)
+    let basic ~logger () =
+      match !time_offset with
+      | Some offset ->
+          offset
+      | None ->
+          let offset =
+            let env_offset =
+              match Core.Sys.getenv "CODA_TIME_OFFSET" with
+              | Some tm ->
+                  Int.of_string tm
+              | None ->
+                  [%log debug]
+                    "Environment variable CODA_TIME_OFFSET not found, using \
+                     default of 0" ;
+                  0
+            in
+            Core_kernel.Time.Span.of_int_sec env_offset
+          in
+          time_offset := Some offset ;
+          offset
+
+    let get_time_offset ~logger = basic ~logger ()
 
     [%%else]
 
-    type t = unit
+    type t = unit [@@deriving sexp]
 
     let create () = ()
 
     let basic ~logger:_ = ()
 
+    let disable_setting_offset () = ()
+
+    let enable_setting_offset () = ()
+
+    let set_time_offset _ = failwith "Cannot mutate the time offset"
+
+    let get_time_offset _ = Core_kernel.Time.Span.of_int_sec 0
+
     [%%endif]
   end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   module B = Bits
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
+
+  module Checked = struct
+    type t = Unpacked.var
+
+    module N = Coda_numbers.Nat.Make_checked (UInt64) (Bits)
+
+    let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
+      let g = Fn.compose N.of_bits Unpacked.var_to_bits in
+      f (g x) (g y)
+
+    let ( = ) x = op N.( = ) x
+
+    let ( <= ) x = op N.( <= ) x
+
+    let ( >= ) x = op N.( >= ) x
+
+    let ( < ) x = op N.( < ) x
+
+    let ( > ) x = op N.( > ) x
+  end
 
   module Span = struct
     [%%versioned
@@ -75,8 +138,6 @@ module Time = struct
         let to_latest = Fn.id
       end
     end]
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
@@ -129,7 +190,7 @@ module Time = struct
   [%%if
   time_offsets]
 
-  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+  let now offset = of_time (Time.sub (Time.now ()) (offset ()))
 
   [%%else]
 
@@ -174,7 +235,7 @@ module Time = struct
   let to_string_system_time (offset : Controller.t) (t : t) : string =
     let t2 : t =
       of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (Lazy.force offset))
+        Span.(to_span_since_epoch t + of_time_span (offset ()))
     in
     Int64.to_string (to_int64 t2)
 
@@ -203,4 +264,4 @@ module Time = struct
 end
 
 include Time
-module Timeout = Timeout.Make (Time)
+module Timeout = Timeout_lib.Make (Time)

@@ -70,9 +70,9 @@ type t = T.t =
   ; ciphertext: Bytes.t }
 [@@deriving sexp]
 
-let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
+let to_yojson t : Yojson.Safe.t = Json.to_yojson (Json.of_stable t)
 
-let of_yojson (t : Yojson.Safe.json) =
+let of_yojson (t : Yojson.Safe.t) =
   Result.map ~f:Json.to_stable (Json.of_yojson t)
 
 (** warning: this will zero [password] *)
@@ -93,7 +93,7 @@ let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =
   ; ciphertext }
 
 (** warning: this will zero [password] *)
-let decrypt ~(password : Bytes.t) ~which
+let decrypt ~(password : Bytes.t)
     { box_primitive
     ; pw_primitive
     ; nonce
@@ -103,17 +103,15 @@ let decrypt ~(password : Bytes.t) ~which
   if box_primitive <> Secret_box.primitive then
     Error
       (`Corrupted_privkey
-        ( Error.createf
-            !"don't know how to handle a %s secret_box"
-            box_primitive
-        , which ))
+        (Error.createf
+           !"don't know how to handle a %s secret_box"
+           box_primitive))
   else if pw_primitive <> Password_hash.primitive then
     Error
       (`Corrupted_privkey
-        ( Error.createf
-            !"don't know how to handle a %s password_hash"
-            pw_primitive
-        , which ))
+        (Error.createf
+           !"don't know how to handle a %s password_hash"
+           pw_primitive))
   else
     let nonce = Secret_box.Bytes.to_nonce nonce in
     let salt = Password_hash.Bytes.to_salt pwsalt in
@@ -132,9 +130,7 @@ let%test_unit "successful roundtrip" =
     ~trials:4
     ~f:(fun (password, plaintext) ->
       let enc = encrypt ~password:(Bytes.copy password) ~plaintext in
-      let dec =
-        Option.value_exn (decrypt enc ~password ~which:"test" |> Result.ok)
-      in
+      let dec = Option.value_exn (decrypt enc ~password |> Result.ok) in
       [%test_eq: Bytes.t] dec plaintext )
 
 let%test "bad password fails" =
@@ -142,5 +138,4 @@ let%test "bad password fails" =
     encrypt ~password:(Bytes.of_string "foobar")
       ~plaintext:(Bytes.of_string "yo")
   in
-  Result.is_error
-    (decrypt ~password:(Bytes.of_string "barfoo") ~which:"test" enc)
+  Result.is_error (decrypt ~password:(Bytes.of_string "barfoo") enc)

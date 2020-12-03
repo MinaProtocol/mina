@@ -20,9 +20,10 @@ module type S = sig
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_path : t -> Breadcrumb.t list
+  val best_tip_path : ?max_length:int -> t -> Breadcrumb.t list
 
-  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
+  val path_map :
+    ?max_length:int -> t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
 
   val hash_path : t -> Breadcrumb.t -> State_hash.t list
 
@@ -48,6 +49,8 @@ module type S = sig
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
+
+  val precomputed_values : t -> Precomputed_values.t
 
   val genesis_constants : t -> Genesis_constants.t
 end
