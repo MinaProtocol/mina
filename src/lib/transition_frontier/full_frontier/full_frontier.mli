@@ -34,7 +34,7 @@ val create :
   -> precomputed_values:Precomputed_values.t
   -> t
 
-val close : t -> unit
+val close : loc:string -> t -> unit
 
 val root_data : t -> Root_data.t
 

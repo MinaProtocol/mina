@@ -6,7 +6,7 @@ archive-node startup probe settings
 {{- define "healthcheck.archive.startupProbe" }}
 startupProbe:
   tcpSocket:
-    port: archive-postgres-port
+    port: postgres-port
 {{- end }}
 
 {{/*
@@ -15,7 +15,7 @@ archive-node liveness check settings
 {{- define "healthcheck.archive.livenessCheck" }}
 livenessProbe:
   tcpSocket:
-    port: archive-server-port
+    port: archive-port
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 

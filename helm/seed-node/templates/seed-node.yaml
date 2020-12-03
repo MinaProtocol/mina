@@ -101,4 +101,5 @@ spec:
         configMap:
           name: {{ tpl .Values.seed.fullname . }}-daemon-config
       {{- end -}}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{- end }}
