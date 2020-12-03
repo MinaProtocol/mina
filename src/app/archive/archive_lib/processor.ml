@@ -568,7 +568,7 @@ module Block = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         "SELECT state_hash, parent_id, parent_hash creator_id, \
+         "SELECT state_hash, parent_id, parent_hash, creator_id, \
           block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, \
           next_epoch_data_id, ledger_hash, height, global_slot, \
           global_slot_since_genesis, timestamp FROM blocks WHERE id = ?")
