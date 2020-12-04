@@ -97,7 +97,7 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ "coda-archive -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
+        args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
         env:
         imagePullPolicy: Always
         ports:

@@ -279,9 +279,8 @@ spec:
   selector:
     app: {{ $config.name }}
   ports:
-  - protocol: TCP
+  - name: tcp-p2p
     port: {{ $.Values.coda.ports.p2p }}
-    targetPort: {{ $.Values.coda.ports.p2p }}
-    name: gossip
+    targetPort: p2p-port
 ---
 {{ end }}
