@@ -21,6 +21,8 @@ seed-node readiness settings
 readinessProbe:
   exec:
     command: [
+      "/bin/bash",
+      "-c",
       "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0"
     ]
 {{- end }}

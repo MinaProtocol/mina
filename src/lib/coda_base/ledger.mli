@@ -77,7 +77,7 @@ include
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
    doing reparenting and shouldn't be able to turn off the check parameter.
 *)
-val unregister_mask_exn : Mask.Attached.t -> Mask.t
+val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
