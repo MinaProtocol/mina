@@ -237,7 +237,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    .update_max_blocklength_observed blockchain_length ;
                    return ()
                | Error error ->
-                   Coda_net2.Validation_callback.fire_exn valid_cb `Reject ;
+                   Coda_net2.Validation_callback.fire_if_not_already_fired
+                     valid_cb `Reject ;
                    Interruptible.uninterruptible
                    @@ handle_validation_error ~logger ~trust_system ~sender
                         ~state_hash:(With_hash.hash transition_with_hash)

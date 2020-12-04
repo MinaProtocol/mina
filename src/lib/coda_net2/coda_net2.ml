@@ -46,6 +46,9 @@ module Validation_callback = struct
     | Some result ->
         result
 
+  let fire_if_not_already_fired cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+
   let fire_exn cb result =
     if not (is_expired cb) then Ivar.fill cb.signal result
 end
