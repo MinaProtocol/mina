@@ -212,12 +212,14 @@ module Ledger_inner = struct
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn ~grandchildren:`Recursive masked_ledger
+        Maskable.unregister_mask_exn ~loc:__LOC__ ~grandchildren:`Recursive
+          masked_ledger
       in
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn ~grandchildren:`Recursive masked_ledger
+        Maskable.unregister_mask_exn ~loc:__LOC__ ~grandchildren:`Recursive
+          masked_ledger
       in
       raise exn
 
@@ -225,7 +227,7 @@ module Ledger_inner = struct
 
   let register_mask t mask = Maskable.register_mask (packed t) mask
 
-  let unregister_mask_exn mask = Maskable.unregister_mask_exn mask
+  let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
 
   let remove_and_reparent_exn t t_as_mask =
     Maskable.remove_and_reparent_exn (packed t) t_as_mask
