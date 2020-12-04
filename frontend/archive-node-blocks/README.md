@@ -4,6 +4,11 @@ This project is responsible for taking a JSON file representing blocks and conve
 
 ## Resources Explained
 
+Please download the resouces needed here:
+`https://drive.google.com/file/d/1OjV40QTZDbUnin81vywBLUGhfMW8JU3d/view?usp=sharing`
+
+Note: You must have a o(1) labs email to access.
+
 `pg_dump_archive_empty`
 
 This is a postgres dump of the Archive node before it crashed and couldn't resync. The contents of the dump has been modified so it only includes the first block and other related information in other tables. This is so we can reset a test database to the genesis block and then restart the resurrection process.
