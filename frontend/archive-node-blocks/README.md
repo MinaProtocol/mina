@@ -11,11 +11,11 @@ Note: You must have a o(1) labs email to access.
 
 `pg_dump_archive_empty`
 
-This is a postgres dump of the Archive node before it crashed and couldn't resync. The contents of the dump has been modified so it only includes the first block and other related information in other tables. This is so we can reset a test database to the genesis block and then restart the resurrection process.
+This is a Postgres dump of the Archive node before it crashed and couldn't resync. The contents of the dump has been modified so it only includes the first block and other related information in other tables. This is so we can reset a test database to the genesis block and then restart the resurrection process.
 
 `pg_dump_archive`
 
-This is the intact postgres dump of the Archive node up until it crashed (block heigh 307). This is used to compare the output of the resurrected database for correctness.
+This is the intact Postgres dump of the Archive node up until it crashed (block height 307). This is used to compare the output of the resurrected database for correctness.
 
 `blocks.json`
 
@@ -31,7 +31,7 @@ This is a smaller dataset of the block data which is used to develop against.
   ` . make-postgres-db.sh`
 
 - Run the node script by running the following:
-  ` node index.js`
+  `node index.js`
 
 - Clean the database by running the following:
-  ` drop-db.sh`
+  `. drop-db.sh`
