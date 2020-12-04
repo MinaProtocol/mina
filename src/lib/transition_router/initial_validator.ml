@@ -203,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                in
                let%bind () =
                  Interruptible.lift Deferred.unit
-                   (Coda_net2.Validation_callback.await valid_cb)
+                   (Coda_net2.Validation_callback.await_timeout valid_cb)
                in
                match%bind
                  let open Interruptible.Result.Let_syntax in

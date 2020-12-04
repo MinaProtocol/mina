@@ -22,6 +22,17 @@ module Validation_callback = struct
     | Some expires_at ->
         Time_ns.(now () >= expires_at)
 
+  let await_timeout cb =
+    if is_expired cb then Deferred.return ()
+    else
+      match cb.expiration with
+      | None ->
+          Deferred.never ()
+      | Some expires_at ->
+          after
+            ( Time_ns.Span.to_span_float_round_nearest
+            @@ Time_ns.diff expires_at (Time_ns.now ()) )
+
   let await cb =
     if is_expired cb then Deferred.return None
     else
