@@ -4,12 +4,69 @@ open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
 open Network_peer
+module Timeout = Timeout_lib.Core_time_ns
+
+module Validation_callback = struct
+  type validation_result = [`Accept | `Reject | `Ignore]
+
+  type t = {expiration: Time_ns.t option; signal: validation_result Ivar.t}
+
+  let create expiration = {expiration= Some expiration; signal= Ivar.create ()}
+
+  let create_without_expiration () = {expiration= None; signal= Ivar.create ()}
+
+  let is_expired cb =
+    match cb.expiration with
+    | None ->
+        false
+    | Some expires_at ->
+        Time_ns.(now () >= expires_at)
+
+  let await_timeout cb =
+    if is_expired cb then Deferred.return ()
+    else
+      match cb.expiration with
+      | None ->
+          Deferred.never ()
+      | Some expires_at ->
+          after
+            ( Time_ns.Span.to_span_float_round_nearest
+            @@ Time_ns.diff expires_at (Time_ns.now ()) )
+
+  let await cb =
+    if is_expired cb then Deferred.return None
+    else
+      match cb.expiration with
+      | None ->
+          Ivar.read cb.signal >>| Option.some
+      | Some expires_at -> (
+          match%map
+            Timeout.await ()
+              ~timeout_duration:(Time_ns.diff expires_at (Time_ns.now ()))
+              (Ivar.read cb.signal)
+          with
+          | `Ok result ->
+              Some result
+          | `Timeout ->
+              None )
+
+  let await_exn cb =
+    match%map await cb with
+    | None ->
+        failwith "timeout"
+    | Some result ->
+        result
+
+  let fire_if_not_already_fired cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+
+  let fire_exn cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
-
-type validation_result = [`Accept | `Reject | `Ignore]
 
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
@@ -202,7 +259,8 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+    ; validator:
+        'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -717,6 +775,7 @@ module Helper = struct
       type t =
         { sender: peer_info option
         ; data: Data.t
+        ; expiration: int64
         ; seqno: int
         ; upcall: string
         ; subscription_idx: int }
@@ -857,10 +916,20 @@ module Helper = struct
             (let open Deferred.Let_syntax in
             let raw_data = Data.to_string m.data in
             let decoded = sub.decode raw_data in
-            let%bind action =
+            let%bind action_opt =
               match decoded with
               | Ok data ->
-                  sub.validator (wrap m.sender data)
+                  let expiration_time =
+                    Int63.of_int64_exn m.expiration
+                    |> Time_ns.Span.of_int63_ns |> Time_ns.of_span_since_epoch
+                  in
+                  let validation_callback =
+                    Validation_callback.create expiration_time
+                  in
+                  let%bind () =
+                    sub.validator (wrap m.sender data) validation_callback
+                  in
+                  Validation_callback.await validation_callback
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -874,31 +943,38 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", Error_json.error_to_yojson e) ] ;
-                  return `Reject
+                  return (Some `Reject)
             in
-            match%map
-              do_rpc t
-                (module Rpcs.Validation_complete)
-                { seqno
-                ; is_valid=
-                    ( match action with
-                    | `Accept ->
-                        "accept"
-                    | `Reject ->
-                        "reject"
-                    | `Ignore ->
-                        "ignore" ) }
-            with
-            | Ok "validationComplete success" ->
-                ()
-            | Ok v ->
-                failwithf
-                  "helper broke RPC protocol: validationComplete got %s" v ()
-            | Error e ->
-                [%log' error t.logger]
-                  "error during validationComplete, ignoring and continuing: \
-                   $error"
-                  ~metadata:[("error", Error_json.error_to_yojson e)])
+            match action_opt with
+            | None ->
+                [%log' warn t.logger]
+                  "validation callback timed out before we could respond" ;
+                Deferred.unit
+            | Some action -> (
+                match%map
+                  do_rpc t
+                    (module Rpcs.Validation_complete)
+                    { seqno
+                    ; is_valid=
+                        ( match action with
+                        | `Accept ->
+                            "accept"
+                        | `Reject ->
+                            "reject"
+                        | `Ignore ->
+                            "ignore" ) }
+                with
+                | Ok "validationComplete success" ->
+                    ()
+                | Ok v ->
+                    failwithf
+                      "helper broke RPC protocol: validationComplete got %s" v
+                      ()
+                | Error e ->
+                    [%log' error t.logger]
+                      "error during validationComplete, ignoring and \
+                       continuing: $error"
+                      ~metadata:[("error", Error_json.error_to_yojson e)] ))
             |> don't_wait_for ;
             Ok ()
         | None ->
@@ -1079,7 +1155,8 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+      ; validator:
+          'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
