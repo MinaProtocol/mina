@@ -446,12 +446,21 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationIgnore
 		}
 
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			app.P2p.Logger.Errorf("no deadline set on validation context")
+			defer app.ValidatorMutex.Unlock()
+			delete(app.Validators, seqno)
+			return pubsub.ValidationIgnore
+		}
+
 		app.writeMsg(validateUpcall{
-			Sender: sender,
-			Data:   codaEncode(msg.Data),
-			Seqno:  seqno,
-			Upcall: "validate",
-			Idx:    s.Subscription,
+			Sender:     sender,
+			Expiration: deadline.UnixNano(),
+			Data:       codaEncode(msg.Data),
+			Seqno:      seqno,
+			Upcall:     "validate",
+			Idx:        s.Subscription,
 		})
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
@@ -557,11 +566,12 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	Sender *codaPeerInfo `json:"sender"`
-	Data   string        `json:"data"`
-	Seqno  int           `json:"seqno"`
-	Upcall string        `json:"upcall"`
-	Idx    int           `json:"subscription_idx"`
+	Sender     *codaPeerInfo `json:"sender"`
+	Expiration int64         `json:"expiration"`
+	Data       string        `json:"data"`
+	Seqno      int           `json:"seqno"`
+	Upcall     string        `json:"upcall"`
+	Idx        int           `json:"subscription_idx"`
 }
 
 type validationCompleteMsg struct {
