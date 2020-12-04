@@ -361,7 +361,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
   in
   let%bind metadata_res =
     Peek.Construction.metadata ~rosetta_uri ~network_response ~logger
-      ~options:preprocess_res.options
+      ~options:(Option.value_exn preprocess_res.options)
   in
   [%log debug]
     ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]

@@ -101,7 +101,7 @@ module Internal_command_info = struct
         ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]] ~plan
         ~f:(fun ~related_operations ~operation_identifier op ->
           (* All internal commands succeed if they're in blocks *)
-          let status = Some (Operation_statuses.name `Success) in
+          let status = Operation_statuses.name `Success in
           match op.label with
           | `Coinbase_inc ->
               M.return

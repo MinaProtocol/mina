@@ -249,14 +249,7 @@ module Metadata = struct
     let handle ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t)
         =
       let open M.Let_syntax in
-      let%bind req_options =
-        match req.options with
-        | Some options ->
-            M.return options
-        | None ->
-            M.fail (Errors.create `No_options_provided)
-      in
-      let%bind options = Options.of_json req_options |> env.lift in
+      let%bind options = Options.of_json req.options |> env.lift in
       let%bind res =
         env.gql ~token_id:options.token_id ~address:options.sender ()
       in

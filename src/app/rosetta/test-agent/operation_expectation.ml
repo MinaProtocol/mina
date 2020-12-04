@@ -61,7 +61,7 @@ let similar ~logger:_ t (op : Operation.t) =
               fail Account_token_id
         in
         () )
-  and () = test (Option.equal String.equal (Some t.status) op.status) Status
+  and () = test String.(equal t.status op.status) Status
   and () =
     match t.target with
     | `Ignore ->
