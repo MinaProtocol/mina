@@ -80,18 +80,21 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_sanitized =
+      Str.global_replace (Str.regexp "\\W|_") "" user_from_env
+    in
+    let user = String.sub user_sanitized ~pos:0 ~len:5 in
     let time_now = Unix.gmtime (Unix.gettimeofday ()) in
     let timestr =
       string_of_int time_now.tm_mday
-      ^ "-"
       ^ string_of_int time_now.tm_hour
       ^ string_of_int time_now.tm_min
-      ^ string_of_int time_now.tm_sec
     in
-    (* append part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
-    (* day_of_month-HrMinSec *)
-    (* ex: 15-113027 is the 15th of a month, 11:30:27 AM, GMT time*)
-    let testnet_name = "intgn-test-" ^ test_name ^ "-" ^ timestr in
+    (* append the first 5 chars of the username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* intntest-username-testname-DaymonthHrMin *)
+    (* ex: intntest-adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = "intntest-" ^ user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
