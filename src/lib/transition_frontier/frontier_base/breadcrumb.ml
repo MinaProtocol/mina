@@ -392,7 +392,8 @@ module For_tests = struct
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~validation_callback:Fn.ignore
+          ~validation_callback:
+            (Coda_net2.Validation_callback.create_without_expiration ())
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)

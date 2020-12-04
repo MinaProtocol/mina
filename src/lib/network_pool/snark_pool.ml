@@ -101,7 +101,7 @@ module type S = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * (Coda_net2.validation_result -> unit) )
+                      * Coda_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
@@ -841,7 +841,9 @@ let%test_module "random set test" =
             (*incomming diffs*)
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
-                   (Envelope.Incoming.local work, Fn.const ()) )
+                   ( Envelope.Incoming.local work
+                   , Coda_net2.Validation_callback.create_without_expiration ()
+                   ) )
             |> List.iter ~f:(fun diff ->
                    Strict_pipe.Writer.write pool_writer diff
                    |> Deferred.don't_wait_for ) ;
