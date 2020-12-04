@@ -212,7 +212,7 @@ val configure :
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> metrics_port:string option
-  -> on_peer_connected:(Peer.Id.t -> unit)
+  -> on_new_peer:(discovered_peer -> unit)
   -> unsafe_no_trust_ip:bool
   -> flooding:bool
   -> direct_peers:Multiaddr.t list

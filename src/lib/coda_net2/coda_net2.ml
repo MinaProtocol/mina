@@ -194,7 +194,7 @@ module Helper = struct
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
-    ; mutable peer_connected_callback: (string -> unit) option
+    ; mutable new_peer_callback: (string -> string list -> unit) option
     ; mutable finished: bool }
 
   and 'a subscription =
@@ -743,8 +743,9 @@ module Helper = struct
       [@@deriving yojson]
     end
 
-    module Peer_connected = struct
-      type t = {upcall: string; peer_id: string} [@@deriving yojson]
+    module Discovered_peer = struct
+      type t = {upcall: string; peer_id: string; multiaddrs: string list}
+      [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -953,9 +954,9 @@ module Helper = struct
             (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
-    | "peerConnected" ->
-        let%map p = Peer_connected.of_yojson v |> or_error in
-        Option.iter t.peer_connected_callback ~f:(fun cb -> cb p.peer_id)
+    | "discoveredPeer" ->
+        let%map p = Discovered_peer.of_yojson v |> or_error in
+        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id p.multiaddrs)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -1208,10 +1209,14 @@ let list_peers net =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~metrics_port ~on_peer_connected ~unsafe_no_trust_ip ~flooding
-    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config =
-  net.Helper.peer_connected_callback
-  <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
+    ~metrics_port ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers
+    ~peer_exchange ~seed_peers ~initial_gating_config =
+  net.Helper.new_peer_callback
+  <- Some
+       (fun peer_id peer_addrs ->
+         on_new_peer
+           { id= Peer.Id.unsafe_of_string peer_id
+           ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1457,7 +1462,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
-        ; peer_connected_callback= None
+        ; new_peer_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
         ; seqno= 1
         ; finished= false }
@@ -1550,7 +1555,7 @@ let%test_module "coda network tests" =
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
@@ -1558,7 +1563,7 @@ let%test_module "coda network tests" =
       and () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}

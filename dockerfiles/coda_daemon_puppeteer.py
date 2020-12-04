@@ -41,13 +41,11 @@ def start_daemon():
         stdout=f,
         stderr=subprocess.STDOUT
     )
-  Path('daemon-active').touch()
 
 def stop_daemon():
   global coda_process
   coda_process.send_signal(signal.SIGTERM)
   coda_process.wait()
-  Path('daemon-active').unlink()
   coda_process = None
 
 # technically, doing the loops like this will eventually result in a stack overflow

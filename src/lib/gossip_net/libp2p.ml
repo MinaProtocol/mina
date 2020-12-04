@@ -180,8 +180,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         List.filter_map ~f:Coda_net2.Multiaddr.to_peer
                           config.initial_peers
                     ; isolate= config.isolate }
-                ~on_peer_connected:(fun _ ->
-                  [%log' trace config.logger] "Fired peer_connected callback" ;
+                ~on_new_peer:(fun _ ->
+                  [%log' trace config.logger] "Fired on_new_peer callback" ;
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
@@ -342,7 +342,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                          (List.map initial_peers ~f:Multiaddr.to_string)) ) ] ;
             don't_wait_for
               (Deferred.map
-                 (let%bind () =
+                 (let%bind () = Coda_net2.begin_advertising net2 in
+                  let%bind () =
                     Deferred.map
                       (Deferred.all_unit
                          (List.map
@@ -352,7 +353,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                             initial_peers))
                       ~f:(fun () -> Ok ())
                   in
-                  let%bind () = Coda_net2.begin_advertising net2 in
                   return ())
                  ~f:(function
                    | Ok () ->
