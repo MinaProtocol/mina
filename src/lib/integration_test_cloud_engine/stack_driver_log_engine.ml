@@ -598,7 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  [%log info] "Pulling %s subscription" subscription_name ;
+  [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ;
   let%bind () =
     uninterruptible
       ( match results with
@@ -625,7 +626,7 @@ let start_background_query (type r)
     Subscription.create ~logger ~name:Query.name
       ~filter:(Query.filter testnet_log_filter)
   in
-  [%log info] "Subscription created for $query"
+  [%log debug] "Subscription created for $query"
     ~metadata:[("query", `String Query.name)] ;
   let subscription_task =
     let open Interruptible.Let_syntax in
@@ -658,6 +659,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~cancel_ivar:cancel_background_tasks_ivar
       ~handle_result:(fun result ->
         let open Error_query.Result in
+        [%log debug] "Handling error log" ;
         let acc =
           match result.message.level with
           | Warn ->
@@ -693,7 +695,8 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~handle_result:(fun result ->
         let open Initialization_query.Result in
         let open Malleable_error.Let_syntax in
-        [%log info] "Handling initialization log for node \"%s\"" result.pod_id ;
+        [%log debug] "Handling initialization log for node $node_id"
+          ~metadata:[("node_id", `String result.pod_id)] ;
         let%bind ivar =
           (* TEMP hack, this probably should be of_option_hard *)
           Malleable_error.of_option_soft
@@ -722,6 +725,8 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         Option.value_map result.best_tip_changed
           ~default:Malleable_error.ok_unit ~f:(fun new_best_tip ->
             let open Malleable_error.Let_syntax in
+            [%log debug]
+              "Handling transition frontier diff application query log" ;
             let best_tip_map =
               Broadcast_pipe.Reader.peek best_tip_map_reader
             in
@@ -743,12 +748,16 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
             () ) )
   in
   let cancel_background_tasks () =
+    let open Deferred.Let_syntax in
     if not (Ivar.is_full cancel_background_tasks_ivar) then
       Ivar.fill cancel_background_tasks_ivar () ;
-    Deferred.all_unit
-      [ errors_task_finished
-      ; initialization_task_finished
-      ; transition_frontier_diff_application_finished ]
+    let%map () =
+      Deferred.all_unit
+        [ errors_task_finished
+        ; initialization_task_finished
+        ; transition_frontier_diff_application_finished ]
+    in
+    [%log debug] "cancel_background_tasks finished"
   in
   { testnet_log_filter= network.testnet_log_filter
   ; logger
@@ -784,7 +793,9 @@ let destroy t : Test_error.Set.t Malleable_error.t =
     Deferred.bind (cancel_background_tasks ()) ~f:Malleable_error.return
   in
   Broadcast_pipe.Writer.close best_tip_map_writer ;
+  let logger = Logger.create () in
   let%map _ = delete_subscriptions subscriptions in
+  [%log debug] "subscriptions deleted" ;
   let lift error_array =
     DynArray.to_list error_array
     |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->

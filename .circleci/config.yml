@@ -479,6 +479,9 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
+            - run:
+                name: Standardize rust flags (remove unsupported flags)
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh'
             ### dune
             - run:
                 name: Build ocaml
@@ -544,10 +547,14 @@ jobs:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    # Remove copies of keys to make some space
+                    rm -r /tmp/s3_cache_dir/ $TMPDIR/coda_cache_dir ||:
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
+                  environment:
+                    CLOUDSDK_PYTHON: /usr/local/opt/python@3.8/libexec/bin/python
             - store_artifacts:
                   path: package
 

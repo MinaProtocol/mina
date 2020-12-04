@@ -22,7 +22,6 @@ use std::{
 
 use crate::index_serialization;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
-use crate::tweedle_fp::CamlTweedleFp;
 use crate::tweedle_fp_urs::CamlTweedleFpUrs;
 
 pub struct CamlTweedleFpPlonkGateVector(Vec<Gate<Fp>>);
@@ -45,13 +44,12 @@ pub fn caml_tweedle_fp_plonk_gate_vector_create() -> CamlTweedleFpPlonkGateVecto
 #[ocaml::func]
 pub fn caml_tweedle_fp_plonk_gate_vector_add(
     mut v: CamlTweedleFpPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<CamlTweedleFp>>,
+    gate: CamlPlonkGate<Vec<Fp>>,
 ) {
-    let c = gate.c.iter().map(|x| x.0).collect();
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c,
+        c: gate.c,
     });
 }
 
@@ -59,9 +57,9 @@ pub fn caml_tweedle_fp_plonk_gate_vector_add(
 pub fn caml_tweedle_fp_plonk_gate_vector_get(
     v: CamlTweedleFpPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<CamlTweedleFp>> {
+) -> CamlPlonkGate<Vec<Fp>> {
     let gate = &(v.as_ref().0)[i as usize];
-    let c = gate.c.iter().map(|x| CamlTweedleFp(*x)).collect();
+    let c = gate.c.iter().map(|x| *x).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
         wires: (&gate.wires).into(),

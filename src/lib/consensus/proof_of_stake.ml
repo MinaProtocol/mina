@@ -2909,22 +2909,28 @@ module Hooks = struct
       let d x = Blake2.(to_raw_string (digest_string x)) in
       String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
     in
-    let ( << ) a b =
+    let less_than_or_equal_when a b ~condition =
       let c = Length.compare a b in
-      (* TODO: I'm not sure we should throw away our current chain if they compare equal *)
-      c < 0 || (c = 0 && candidate_vrf_is_bigger)
+      c < 0 || (c = 0 && condition)
+    in
+    let blockchain_length_is_longer =
+      less_than_or_equal_when existing.blockchain_length
+        candidate.blockchain_length ~condition:candidate_vrf_is_bigger
+    in
+    let long_fork_chain_quality_is_better =
+      less_than_or_equal_when existing.min_window_density
+        candidate.min_window_density ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
         ( "most recent finalized checkpoints are equal"
         , "candidate length is longer than existing length "
-        , existing.blockchain_length << candidate.blockchain_length )
+        , blockchain_length_is_longer )
       else
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , Length.(existing.min_window_density < candidate.min_window_density)
-        )
+        , long_fork_chain_quality_is_better )
     in
     let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;

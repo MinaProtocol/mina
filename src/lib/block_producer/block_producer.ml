@@ -153,7 +153,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
-          @@ Ledger.unregister_mask_exn
+          @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( diff
@@ -491,7 +491,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         ; data=
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
-                              ~validation_callback:Fn.ignore
+                              ~validation_callback:
+                                (Coda_net2.Validation_callback
+                                 .create_without_expiration ())
                               ~delta_transition_chain_proof () }
                       |> External_transition.skip_time_received_validation
                            `This_transition_was_not_received_via_gossip
@@ -764,7 +766,9 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               ; data=
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
-                    ~validation_callback:Fn.ignore
+                    ~validation_callback:
+                      (Coda_net2.Validation_callback.create_without_expiration
+                         ())
                     ~delta_transition_chain_proof () }
             |> External_transition.skip_time_received_validation
                  `This_transition_was_not_received_via_gossip

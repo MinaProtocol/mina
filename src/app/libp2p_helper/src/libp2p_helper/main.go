@@ -247,10 +247,9 @@ type configureMsg struct {
 	GatingConfig    setGatingConfigMsg `json:"gating_config"`
 }
 
-type discoveredPeerUpcall struct {
-	ID     string   `json:"peer_id"`
-	Addrs  []string `json:"multiaddrs"`
-	Upcall string   `json:"upcall"`
+type peerConnectedUpcall struct {
+	ID     string `json:"peer_id"`
+	Upcall string `json:"upcall"`
 }
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
@@ -447,12 +446,21 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationIgnore
 		}
 
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			app.P2p.Logger.Errorf("no deadline set on validation context")
+			defer app.ValidatorMutex.Unlock()
+			delete(app.Validators, seqno)
+			return pubsub.ValidationIgnore
+		}
+
 		app.writeMsg(validateUpcall{
-			Sender: sender,
-			Data:   codaEncode(msg.Data),
-			Seqno:  seqno,
-			Upcall: "validate",
-			Idx:    s.Subscription,
+			Sender:     sender,
+			Expiration: deadline.UnixNano(),
+			Data:       codaEncode(msg.Data),
+			Seqno:      seqno,
+			Upcall:     "validate",
+			Idx:        s.Subscription,
 		})
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
@@ -558,11 +566,12 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	Sender *codaPeerInfo `json:"sender"`
-	Data   string        `json:"data"`
-	Seqno  int           `json:"seqno"`
-	Upcall string        `json:"upcall"`
-	Idx    int           `json:"subscription_idx"`
+	Sender     *codaPeerInfo `json:"sender"`
+	Expiration int64         `json:"expiration"`
+	Data       string        `json:"data"`
+	Seqno      int           `json:"seqno"`
+	Upcall     string        `json:"upcall"`
+	Idx        int           `json:"subscription_idx"`
 }
 
 type validationCompleteMsg struct {
@@ -692,7 +701,9 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
+	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
+	defer cancel()
+	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -911,23 +922,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		return who.Validate() == nil && who != app.P2p.Me
 	}
 
-	foundPeer := func(who peer.ID) {
-		addrs := app.P2p.Host.Peerstore().Addrs(who)
-
-		if len(addrs) > 0 {
-			addrStrings := make([]string, len(addrs))
-			for i, a := range addrs {
-				addrStrings[i] = a.String()
-			}
-
-			app.writeMsg(discoveredPeerUpcall{
-				ID:     peer.IDB58Encode(who),
-				Addrs:  addrStrings,
-				Upcall: "discoveredPeer",
-			})
-		}
-	}
-
 	if len(app.AddedPeers) > 0 {
 		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 		if err != nil {
@@ -935,27 +929,23 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	// report local discovery peers
+	// add locally discovered peers to peerstore
 	go func() {
 		for info := range l.FoundPeer {
 			if validPeer(info.ID) {
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				foundPeer(info.ID)
 			}
 		}
 	}()
 
-	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
-
-	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		logger.Infof("new connection: %+v", c)
-		foundPeer(c.RemotePeer())
+		app.writeMsg(peerConnectedUpcall{
+			ID:     peer.IDB58Encode(c.RemotePeer()),
+			Upcall: "peerConnected",
+		})
 	}
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		logger.Infof("dropped connection: %+v", c)
-		foundPeer(c.RemotePeer())
-	}
+
+	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
 	go func() {
 		for {
@@ -1269,18 +1259,21 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		start := time.Now()
-		res, err := msg.run(app)
-		if err == nil {
-			res, err := json.Marshal(res)
+
+		go func() {
+			start := time.Now()
+			res, err := msg.run(app)
 			if err == nil {
-				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				res, err := json.Marshal(res)
+				if err == nil {
+					app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
+				} else {
+					app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				}
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
-		} else {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-		}
+		}()
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully
