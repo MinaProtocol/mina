@@ -30,6 +30,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -232,7 +233,9 @@ func (ms *codaMetricsServer) Shutdown() {
 	ms.done.Wait()
 }
 
-var metricsServer *codaMetricsServer = nil
+var (
+	metricsServer *codaMetricsServer
+)
 
 type configureMsg struct {
 	Statedir        string             `json:"statedir"`
@@ -902,9 +905,7 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	// report local discovery peers
 	go func() {
 		for info := range l.FoundPeer {
-			fmt.Println("found peer", info, app.P2p.Me)
 			if validPeer(info.ID) {
-				fmt.Println("added peer", info, app.P2p.Me)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 			}
 		}
@@ -980,22 +981,60 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	return "beginAdvertising success", nil
 }
 
-const latencyMeasurementTime = time.Second
+const (
+	latencyMeasurementTime = time.Second * 5
+	metricsRefreshTime     = time.Minute
+)
 
 func (a *app) checkBandwidth(id peer.ID) {
-	stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
-	// TODO: expose stats
-	fmt.Println(stats.TotalIn)
-	fmt.Println(stats.TotalOut)
-	fmt.Println(stats.RateIn)
-	fmt.Println(stats.RateOut)
+	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("total_bandwidth_in_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	totalOut := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("total_bandwidth_out_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	rateIn := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("bandwidth_rate_in_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	rateOut := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("bandwidth_rate_out_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+
+	prometheus.MustRegister(totalIn)
+	prometheus.MustRegister(totalOut)
+	prometheus.MustRegister(rateIn)
+	prometheus.MustRegister(rateOut)
+
+	for {
+		stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
+		totalIn.Set(float64(stats.TotalIn))
+		totalOut.Set(float64(stats.TotalOut))
+		rateIn.Set(stats.RateIn)
+		rateOut.Set(stats.RateOut)
+
+		time.Sleep(metricsRefreshTime)
+	}
 }
 
 func (a *app) checkLatency(id peer.ID) {
-	a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
-	latency := a.P2p.Host.Peerstore().LatencyEWMA(id)
-	// TODO: expose latency
-	fmt.Println(latency)
+	latencyGauge := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("latency_%s", id),
+		Help: "The latency for the given peer.",
+	})
+
+	prometheus.MustRegister(latencyGauge)
+
+	for {
+		a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
+		latency := a.P2p.Host.Peerstore().LatencyEWMA(id)
+		latencyGauge.Set(float64(latency))
+
+		time.Sleep(metricsRefreshTime)
+	}
 }
 
 type findPeerMsg struct {
