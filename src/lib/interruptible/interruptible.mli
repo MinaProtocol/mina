@@ -50,3 +50,9 @@ val uninterruptible : 'a Deferred.t -> ('a, 's) t
     result.
 *)
 val force : ('a, 's) t -> ('a, 's) Deferred.Result.t
+
+module Result : sig
+  type nonrec ('a, 'b, 's) t = (('a, 'b) Result.t, 's) t
+
+  include Monad.S3 with type ('a, 'b, 's) t := ('a, 'b, 's) t
+end
