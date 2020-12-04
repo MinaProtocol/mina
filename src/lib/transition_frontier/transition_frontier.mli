@@ -45,7 +45,7 @@ val load :
        | `Persistent_frontier_malformed ] )
      Deferred.Result.t
 
-val close : t -> unit Deferred.t
+val close : loc:string -> t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
