@@ -934,10 +934,26 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       let external_transition_database_dir =
         conf_dir ^/ "external_transition_database"
       in
-      let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
+      let%bind external_transition_database =
+        let create_db () =
+          let%map () =
+            Async.Unix.mkdir ~p:() external_transition_database_dir
+          in
+          Auxiliary_database.External_transition_database.create ~logger
+            external_transition_database_dir
+        in
+        match%bind Deferred.Or_error.try_with create_db with
+        | Ok res ->
+            return res
+        | Error err ->
+            [%log warn]
+              "Encountered an error $err while creating the external \
+               transition database. Retrying."
+              ~metadata:[("err", Error_json.error_to_yojson err)] ;
+            let%bind () =
+              File_system.remove_dir external_transition_database_dir
+            in
+            create_db ()
       in
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;

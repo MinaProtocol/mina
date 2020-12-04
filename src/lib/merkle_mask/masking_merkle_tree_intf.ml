@@ -46,7 +46,9 @@ module type S = sig
        and type account_id := account_id
        and type account_id_set := account_id_set
 
-    exception Dangling_parent_reference of Uuid.t
+    exception
+      Dangling_parent_reference of
+        Uuid.t * (* Location where null was set*) string
 
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
@@ -55,7 +57,7 @@ module type S = sig
     val commit : t -> unit
 
     (** remove parent *)
-    val unset_parent : t -> unattached
+    val unset_parent : loc:string -> t -> unattached
 
     (** get mask parent *)
     val get_parent : t -> parent
