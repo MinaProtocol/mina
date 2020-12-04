@@ -79,18 +79,18 @@ const getBlockDataFromBlocks = () => {
     const creatorPK = block.creator;
 
     const snarkedLedgerHash =
-      block?.protocolState?.blockchainState?.snarkedLedgerHash;
+      block.protocolState.blockchainState.snarkedLedgerHash;
 
     const stakingEpochDataSeed =
-      block?.protocolState?.consensusState?.stakingEpochData?.seed;
+      block.protocolState.consensusState.stakingEpochData.seed;
 
     const nextEpochDataSeed =
-      block?.protocolState?.consensusState.nextEpochData?.seed;
+      block.protocolState.consensusState.nextEpochData.seed;
 
     const stagedLedgerHash =
-      block?.protocolState?.blockchainState?.stagedLedgerHash;
+      block.protocolState.blockchainState.stagedLedgerHash;
 
-    const height = block?.protocolState?.consensusState.blockHeight;
+    const height = block.protocolState.consensusState.blockHeight;
 
     const globalSlot = block?.protocolState?.consensusState?.slot;
 
