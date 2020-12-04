@@ -1926,7 +1926,8 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask
+      )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
