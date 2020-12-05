@@ -71,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * (Coda_net2.validation_result -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -1114,22 +1114,12 @@ let create ?wallets (config : Config.t) =
                            Transition_frontier.Breadcrumb.validated_transition
                              breadcrumb
                          in
-                         let validation_callback =
-                           Coda_net2.Validation_callback
-                           .create_without_expiration ()
-                         in
                          External_transition.Validated.poke_validation_callback
-                           et validation_callback ;
-                         don't_wait_for
-                           (* this will never throw since the callback was created without expiration *)
-                           (let%map v =
-                              Coda_net2.Validation_callback.await_exn
-                                validation_callback
-                            in
-                            if v = `Accept then
-                              Coda_networking.broadcast_state net
-                                (External_transition.Validation
-                                 .forget_validation_with_hash et)) ;
+                           et (fun v ->
+                             if v = `Accept then
+                               Coda_networking.broadcast_state net
+                               @@ External_transition.Validation
+                                  .forget_validation_with_hash et ) ;
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~precomputed_values:config.precomputed_values )

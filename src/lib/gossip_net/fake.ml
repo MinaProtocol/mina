@@ -30,7 +30,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t
+            * (Coda_net2.validation_result -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -83,9 +84,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
                     in
                     Strict_pipe.Writer.write intf.broadcast_message_writer
-                      ( msg
-                      , Coda_net2.Validation_callback.create_without_expiration
-                          () ) ) ) )
+                      (msg, Fn.const ()) ) ) )
 
     let call_rpc : type q r.
            t
@@ -118,10 +117,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; initial_peers: Peer.t list
       ; connection_gating: Coda_net2.connection_gating ref
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
+          ( Message.msg Envelope.Incoming.t
+          * (Coda_net2.validation_result -> unit) )
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t
+            * (Coda_net2.validation_result -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t

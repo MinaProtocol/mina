@@ -119,21 +119,6 @@ module M = Monad.Make2 (T)
 include T
 include M
 
-module Result = struct
-  type nonrec ('a, 'b, 's) t = (('a, 'b) Result.t, 's) t
-
-  include Monad.Make3 (struct
-    type nonrec ('a, 'b, 's) t = ('a, 'b, 's) t
-
-    let bind x ~f =
-      x >>= function Ok y -> f y | Error err -> return (Error err)
-
-    let map = `Define_using_bind
-
-    let return x = return (Result.return x)
-  end)
-end
-
 let%test_unit "monad gets interrupted" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let r = ref 0 in
