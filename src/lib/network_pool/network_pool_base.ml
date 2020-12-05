@@ -21,36 +21,44 @@ end)
       | Local of
           (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
            -> unit)
-      | External of (Coda_net2.validation_result -> unit)
+      | External of Coda_net2.Validation_callback.t
+
+    let is_expired = function
+      | Local _ ->
+          false
+      | External cb ->
+          Coda_net2.Validation_callback.is_expired cb
+
+    open Coda_net2.Validation_callback
 
     let error err =
       Fn.compose Deferred.return (function
         | Local f ->
             f (Error err)
-        | External f ->
-            f `Reject )
+        | External cb ->
+            fire_exn cb `Reject )
 
     let drop accepted rejected =
       Fn.compose Deferred.return (function
         | Local f ->
             f (Ok (accepted, rejected))
-        | External f ->
-            f `Ignore )
+        | External cb ->
+            fire_exn cb `Ignore )
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
-      | External f ->
-          f `Accept ;
+      | External cb ->
+          fire_exn cb `Accept ;
           Deferred.unit
 
     let replace broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
-      | External f ->
-          f `Ignore ;
+      | External cb ->
+          fire_exn cb `Ignore ;
           Linear_pipe.write broadcast_pipe accepted
   end
 
@@ -109,30 +117,32 @@ end)
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
-        let summary =
-          `String (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
-        in
-        [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
-        don't_wait_for
-          ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
-          | Error err ->
-              [%log' trace t.logger]
-                "Refusing to rebroadcast $diff. Verification error: $error"
-                ~metadata:
-                  [("diff", summary); ("error", Error_json.error_to_yojson err)] ;
-              (*reject incoming messages*)
-              Broadcast_callback.error err cb
-          | Ok verified_diff ->
-              [%log' debug t.logger] "Verified diff: $verified_diff"
-                ~metadata:
-                  [ ( "verified_diff"
-                    , Resource_pool.Diff.verified_to_yojson
-                      @@ Envelope.Incoming.data verified_diff )
-                  ; ( "sender"
-                    , Envelope.Sender.to_yojson
-                      @@ Envelope.Incoming.sender verified_diff ) ] ;
-              Deferred.return @@ Strict_pipe.Writer.write w (verified_diff, cb)
-          ) )
+        if not (Broadcast_callback.is_expired cb) then (
+          let summary =
+            `String (Resource_pool.Diff.summary @@ Envelope.Incoming.data diff)
+          in
+          [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
+          don't_wait_for
+            ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
+            | Error err ->
+                [%log' trace t.logger]
+                  "Refusing to rebroadcast $diff. Verification error: $error"
+                  ~metadata:
+                    [ ("diff", summary)
+                    ; ("error", Error_json.error_to_yojson err) ] ;
+                (*reject incoming messages*)
+                Broadcast_callback.error err cb
+            | Ok verified_diff ->
+                [%log' debug t.logger] "Verified diff: $verified_diff"
+                  ~metadata:
+                    [ ( "verified_diff"
+                      , Resource_pool.Diff.verified_to_yojson
+                        @@ Envelope.Incoming.data verified_diff )
+                    ; ( "sender"
+                      , Envelope.Sender.to_yojson
+                        @@ Envelope.Incoming.sender verified_diff ) ] ;
+                Deferred.return
+                @@ Strict_pipe.Writer.write w (verified_diff, cb) ) ) )
     |> don't_wait_for ;
     r
 
