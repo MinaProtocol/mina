@@ -400,50 +400,44 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         let%bind ( local_state_sync_time
                  , (local_state_sync_required, local_state_sync_result) ) =
           time_deferred
-            ((*Sync local state according to the root we just bootstrapped to*)
-             let root_consensus_state =
-               External_transition.consensus_state
-                 (With_hash.data (fst new_root))
-             in
-             match
-               Consensus.Hooks.required_local_state_sync
-                 ~constants:precomputed_values.consensus_constants
-                 ~consensus_state:root_consensus_state
-                 ~local_state:consensus_local_state
-             with
-             | None ->
-                 [%log debug]
-                   ~metadata:
-                     [ ( "local_state"
-                       , Consensus.Data.Local_state.to_yojson
-                           consensus_local_state )
-                     ; ( "consensus_state"
-                       , Consensus.Data.Consensus_state.Value.to_yojson
-                           consensus_state ) ]
-                   "Not synchronizing consensus local state" ;
-                 Deferred.return (false, Or_error.return ())
-             | Some sync_jobs ->
-                 [%log info] "Synchronizing consensus local state" ;
-                 let%map result =
-                   Consensus.Hooks.sync_local_state
-                     ~local_state:consensus_local_state ~logger ~trust_system
-                     ~random_peers:(fun n ->
-                       (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
-                       let%map peers =
-                         Coda_networking.random_peers t.network n
-                       in
-                       sender :: peers )
-                     ~query_peer:
-                       { Consensus.Hooks.Rpcs.query=
-                           (fun peer rpc query ->
-                             Coda_networking.(
-                               query_peer t.network peer.peer_id
-                                 (Rpcs.Consensus_rpc rpc) query) ) }
-                     ~ledger_depth:
-                       precomputed_values.constraint_constants.ledger_depth
-                     sync_jobs
-                 in
-                 (true, result))
+            ( match
+                Consensus.Hooks.required_local_state_sync
+                  ~constants:precomputed_values.consensus_constants
+                  ~consensus_state ~local_state:consensus_local_state
+              with
+            | None ->
+                [%log debug]
+                  ~metadata:
+                    [ ( "local_state"
+                      , Consensus.Data.Local_state.to_yojson
+                          consensus_local_state )
+                    ; ( "consensus_state"
+                      , Consensus.Data.Consensus_state.Value.to_yojson
+                          consensus_state ) ]
+                  "Not synchronizing consensus local state" ;
+                Deferred.return (false, Or_error.return ())
+            | Some sync_jobs ->
+                [%log info] "Synchronizing consensus local state" ;
+                let%map result =
+                  Consensus.Hooks.sync_local_state
+                    ~local_state:consensus_local_state ~logger ~trust_system
+                    ~random_peers:(fun n ->
+                      (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
+                      let%map peers =
+                        Coda_networking.random_peers t.network n
+                      in
+                      sender :: peers )
+                    ~query_peer:
+                      { Consensus.Hooks.Rpcs.query=
+                          (fun peer rpc query ->
+                            Coda_networking.(
+                              query_peer t.network peer.peer_id
+                                (Rpcs.Consensus_rpc rpc) query) ) }
+                    ~ledger_depth:
+                      precomputed_values.constraint_constants.ledger_depth
+                    sync_jobs
+                in
+                (true, result) )
         in
         match local_state_sync_result with
         | Error e ->
