@@ -844,7 +844,8 @@ let setup_daemon logger =
           ~genesis_state_hash:
             (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
-      trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      trace_database_initialization "epoch ledger" __LOC__
+        epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
         match libp2p_peer_list_file with
         | None ->
