@@ -207,7 +207,7 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
