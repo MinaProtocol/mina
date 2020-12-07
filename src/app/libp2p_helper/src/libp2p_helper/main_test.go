@@ -151,11 +151,11 @@ func TestDHTDiscovery(t *testing.T) {
 		t.Fatal("B did not discover C via DHT")
 	case <-done:
 	}
+
+	time.Sleep(time.Second)
 }
 
 func TestMDNSDiscovery(t *testing.T) {
-	time.Sleep(time.Second)
-
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
 	defer appA.P2p.Host.Close()
@@ -192,6 +192,8 @@ func TestMDNSDiscovery(t *testing.T) {
 		t.Fatal("B did not discover A via mDNS")
 	case <-done:
 	}
+
+	time.Sleep(time.Second * 3)
 }
 
 func createLargeMessage() []byte {
@@ -199,8 +201,6 @@ func createLargeMessage() []byte {
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
-	time.Sleep(time.Second * 3)
-
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
