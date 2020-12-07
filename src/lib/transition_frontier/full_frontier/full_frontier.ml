@@ -96,10 +96,10 @@ let protocol_states_for_root_scan_state t =
 
 let best_tip t = find_exn t t.best_tip
 
-let close t =
+let close ~loc t =
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
-    (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
+    (Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
@@ -176,17 +176,22 @@ let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
       succ :: successors_rec t succ )
 
-let path_map t breadcrumb ~f =
-  let rec find_path b =
-    let elem = f b in
-    let parent_hash = Breadcrumb.parent_hash b in
-    if State_hash.equal (Breadcrumb.state_hash b) t.root then []
-    else if State_hash.equal parent_hash t.root then [elem]
-    else elem :: find_path (find_exn t parent_hash)
+let path_map ?max_length t breadcrumb ~f =
+  let rec find_path b count_opt acc =
+    match count_opt with
+    | Some count when count <= 0 ->
+        acc
+    | _ ->
+        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let elem = f b in
+        let parent_hash = Breadcrumb.parent_hash b in
+        if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
+        else if State_hash.equal parent_hash t.root then elem :: acc
+        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
   in
-  List.rev (find_path breadcrumb)
+  find_path breadcrumb max_length []
 
-let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+let best_tip_path ?max_length t = path_map ?max_length t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
@@ -380,7 +385,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
-        ignore (Ledger.Maskable.unregister_mask_exn mask) ;
+        ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask) ;
         Hashtbl.remove t.table hash ) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
@@ -435,7 +440,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
-      ignore (Ledger.Maskable.unregister_mask_exn mt) ) ;
+      ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt) ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)

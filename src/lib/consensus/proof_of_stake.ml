@@ -1,3 +1,5 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signed
@@ -537,7 +539,10 @@ module Data = struct
                  Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
                    last_checked_epoch_and_slot (epoch, slot)
                in
-               if i >= 0 then None
+               if i > 0 then None
+               else if i = 0 then
+                 (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
+                 Some pk
                else (
                  Table.set !t.last_checked_slot_and_epoch ~key:pk
                    ~data:(epoch, slot) ;
@@ -2904,22 +2909,28 @@ module Hooks = struct
       let d x = Blake2.(to_raw_string (digest_string x)) in
       String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
     in
-    let ( << ) a b =
+    let less_than_or_equal_when a b ~condition =
       let c = Length.compare a b in
-      (* TODO: I'm not sure we should throw away our current chain if they compare equal *)
-      c < 0 || (c = 0 && candidate_vrf_is_bigger)
+      c < 0 || (c = 0 && condition)
+    in
+    let blockchain_length_is_longer =
+      less_than_or_equal_when existing.blockchain_length
+        candidate.blockchain_length ~condition:candidate_vrf_is_bigger
+    in
+    let long_fork_chain_quality_is_better =
+      less_than_or_equal_when existing.min_window_density
+        candidate.min_window_density ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
         ( "most recent finalized checkpoints are equal"
         , "candidate length is longer than existing length "
-        , existing.blockchain_length << candidate.blockchain_length )
+        , blockchain_length_is_longer )
       else
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , Length.(existing.min_window_density < candidate.min_window_density)
-        )
+        , long_fork_chain_quality_is_better )
     in
     let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;

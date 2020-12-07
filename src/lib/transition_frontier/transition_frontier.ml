@@ -13,6 +13,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
+let max_catchup_chunk_length = 20
+
 let global_max_length (genesis_constants : Genesis_constants.t) =
   genesis_constants.protocol.k
 
@@ -169,9 +171,11 @@ let rec load_with_max_length :
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
   in
-  let reset_and_continue () =
+  let reset_and_continue ?(destroy_frontier_instance = true) () =
     let%bind () =
-      Persistent_frontier.Instance.destroy persistent_frontier_instance
+      if destroy_frontier_instance then
+        Persistent_frontier.Instance.destroy persistent_frontier_instance
+      else return ()
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
@@ -233,8 +237,22 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok () ->
-      continue persistent_frontier_instance ~ignore_consensus_local_state:true
+  | Ok () -> (
+      match%bind
+        continue persistent_frontier_instance
+          ~ignore_consensus_local_state:true
+      with
+      | Error (`Failure err) when retry_with_fresh_db ->
+          [%log error]
+            "Failed to initialize transition frontier: $err. Destroying old \
+             persistent frontier database and retrying."
+            ~metadata:[("err", `String err)] ;
+          (* The frontier instance is already destroyed by [continue] before it
+             returns an [Error], don't attempt to do it again.
+          *)
+          reset_and_continue ~destroy_frontier_instance:false ()
+      | res ->
+          return res )
 
 let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~precomputed_values () =
@@ -247,7 +265,7 @@ let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
-let close
+let close ~loc
     { logger
     ; verifier= _
     ; consensus_local_state= _
@@ -259,7 +277,7 @@ let close
     ; extensions
     ; genesis_state_hash= _ } =
   [%log trace] "Closing transition frontier" ;
-  Full_frontier.close full_frontier ;
+  Full_frontier.close ~loc full_frontier ;
   Extensions.close extensions ;
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
@@ -386,15 +404,15 @@ include struct
   let root_length = proxy1 root_length
 
   (* TODO: probably shouldn't be an `_exn` function *)
-  let best_tip_path = proxy1 best_tip_path
+  let best_tip_path ?max_length = proxy1 (best_tip_path ?max_length)
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
   let find_protocol_state = proxy1 find_protocol_state
 
   (* why can't this one be proxied? *)
-  let path_map {full_frontier; _} breadcrumb ~f =
-    path_map full_frontier breadcrumb ~f
+  let path_map ?max_length {full_frontier; _} breadcrumb ~f =
+    path_map ?max_length full_frontier breadcrumb ~f
 end
 
 module For_tests = struct

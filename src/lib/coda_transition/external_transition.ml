@@ -4,19 +4,19 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = Coda_net2.validation_result -> unit
+  type t = Coda_net2.Validation_callback.t
 
-  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
+  let bin_read_t buf ~pos_ref =
+    bin_read_unit buf ~pos_ref ;
+    Coda_net2.Validation_callback.create_without_expiration ()
 
-  let bin_write_t buf ~pos _ =
-    let pos = bin_write_unit buf ~pos () in
-    pos
+  let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
   let bin_shape_t = bin_shape_unit
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Fn.ignore
+  let t_of_sexp _ = Coda_net2.Validation_callback.create_without_expiration ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -168,9 +168,11 @@ let payments t =
     | _ ->
         None )
 
-let broadcast t = (validation_callback t) `Accept
+let broadcast t =
+  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Accept
 
-let don't_broadcast t = (validation_callback t) `Reject
+let don't_broadcast t =
+  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -940,7 +942,9 @@ let genesis ~precomputed_values =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
            create ~protocol_state ~protocol_state_proof
-             ~staged_ledger_diff:empty_diff ~validation_callback:Fn.ignore
+             ~staged_ledger_diff:empty_diff
+             ~validation_callback:
+               (Coda_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              () ))

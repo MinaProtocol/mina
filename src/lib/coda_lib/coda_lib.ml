@@ -71,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (Coda_net2.validation_result -> unit) )
+      * Coda_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -618,13 +618,20 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
-let best_chain t =
+let best_chain ?max_length t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  Transition_frontier.root frontier
-  :: Transition_frontier.best_tip_path frontier
+  let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
+  match max_length with
+  | Some max_length when max_length <= List.length best_tip_path ->
+      (* The [best_tip_path] has already been truncated to the correct length,
+         we skip adding the root to stay below the maximum.
+      *)
+      best_tip_path
+  | _ ->
+      Transition_frontier.root frontier :: best_tip_path
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
@@ -827,7 +834,7 @@ let create ?wallets (config : Config.t) =
               | None ->
                   Deferred.unit
               | Some frontier ->
-                  Transition_frontier.close frontier ) ;
+                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
@@ -841,11 +848,6 @@ let create ?wallets (config : Config.t) =
           in
           (* knot-tying hack so we can pass a get_telemetry function before net created *)
           let net_ref = ref None in
-          let block_producers =
-            config.initial_block_production_keypairs |> Keypair.Set.to_list
-            |> List.map ~f:(fun {Keypair.public_key; _} ->
-                   Public_key.compress public_key )
-          in
           let get_telemetry_data _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -877,44 +879,50 @@ let create ?wallets (config : Config.t) =
                                Unix.Inet_addr.t}, peer ID=%s, network not \
                                instantiated when telemetry data requested"
                              node_ip_addr node_peer_id))
-              | Some net -> (
-                match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
-                | None ->
-                    Deferred.return
-                    @@ Error
-                         (Error.of_string
-                            (sprintf
-                               !"Node with IP address=%{sexp: \
-                                 Unix.Inet_addr.t}, peer ID=%s, could not get \
-                                 transition frontier for telemetry data"
-                               node_ip_addr node_peer_id))
-                | Some frontier ->
-                    let%map peers = Coda_networking.peers net in
-                    let protocol_state_hash =
-                      let tip = Transition_frontier.best_tip frontier in
-                      let state =
-                        Transition_frontier.Breadcrumb.protocol_state tip
-                      in
-                      Coda_state.Protocol_state.hash state
-                    in
-                    let ban_statuses =
-                      Trust_system.Peer_trust.peer_statuses config.trust_system
-                    in
-                    let k_block_hashes =
-                      List.map
-                        ( Transition_frontier.root frontier
-                        :: Transition_frontier.best_tip_path frontier )
-                        ~f:Transition_frontier.Breadcrumb.state_hash
-                    in
-                    Ok
-                      Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                        { node_ip_addr
-                        ; node_peer_id
-                        ; peers
-                        ; block_producers
-                        ; protocol_state_hash
-                        ; ban_statuses
-                        ; k_block_hashes } )
+              | Some net ->
+                  let protocol_state_hash, k_block_hashes =
+                    match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                    | None ->
+                        ( config.precomputed_values.protocol_state_with_hash
+                            .hash
+                        , [] )
+                    | Some frontier ->
+                        let protocol_state_hash =
+                          let tip = Transition_frontier.best_tip frontier in
+                          let state =
+                            Transition_frontier.Breadcrumb.protocol_state tip
+                          in
+                          Coda_state.Protocol_state.hash state
+                        in
+                        let k_block_hashes =
+                          List.map
+                            ( Transition_frontier.root frontier
+                            :: Transition_frontier.best_tip_path frontier )
+                            ~f:Transition_frontier.Breadcrumb.state_hash
+                        in
+                        (protocol_state_hash, k_block_hashes)
+                  in
+                  let%map peers = Coda_networking.peers net in
+                  let block_producers =
+                    config.initial_block_production_keypairs
+                    |> Keypair.Set.to_list
+                    |> List.map ~f:(fun {Keypair.public_key; _} ->
+                           Public_key.compress public_key )
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node_ip_addr
+                      ; node_peer_id
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1106,12 +1114,22 @@ let create ?wallets (config : Config.t) =
                            Transition_frontier.Breadcrumb.validated_transition
                              breadcrumb
                          in
+                         let validation_callback =
+                           Coda_net2.Validation_callback
+                           .create_without_expiration ()
+                         in
                          External_transition.Validated.poke_validation_callback
-                           et (fun v ->
-                             if v = `Accept then
-                               Coda_networking.broadcast_state net
-                               @@ External_transition.Validation
-                                  .forget_validation_with_hash et ) ;
+                           et validation_callback ;
+                         don't_wait_for
+                           (* this will never throw since the callback was created without expiration *)
+                           (let%map v =
+                              Coda_net2.Validation_callback.await_exn
+                                validation_callback
+                            in
+                            if v = `Accept then
+                              Coda_networking.broadcast_state net
+                                (External_transition.Validation
+                                 .forget_validation_with_hash et)) ;
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~precomputed_values:config.precomputed_values )

@@ -12,6 +12,7 @@ let OpamInit = ../../Command/OpamInit.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
+let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -29,6 +30,7 @@ Pipeline.build
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
+          S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
         path = "Release",
@@ -51,6 +53,9 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
+
+      -- Tests that depend on the debian package
+      ConnectToTestnet.step dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
@@ -81,7 +86,7 @@ Pipeline.build
         service="coda-rosetta",
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-docker-image"
       }
 
@@ -96,7 +101,7 @@ Pipeline.build
         service="coda-rosetta",
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
         step_key="rosetta-dune-docker-image"
       }
 

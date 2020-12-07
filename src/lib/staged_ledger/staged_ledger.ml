@@ -1,6 +1,8 @@
 [%%import
 "/src/config.mlh"]
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Coda_base
@@ -966,7 +968,11 @@ module T = struct
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
       time ~logger "check_completed_works" (fun () ->
-          check_completed_works ~logger ~verifier t.scan_state work )
+          match skip_verification with
+          | Some true ->
+              return ()
+          | Some false | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants
@@ -1920,7 +1926,8 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask
+      )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the

@@ -4,12 +4,69 @@ open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
 open Network_peer
+module Timeout = Timeout_lib.Core_time_ns
+
+module Validation_callback = struct
+  type validation_result = [`Accept | `Reject | `Ignore]
+
+  type t = {expiration: Time_ns.t option; signal: validation_result Ivar.t}
+
+  let create expiration = {expiration= Some expiration; signal= Ivar.create ()}
+
+  let create_without_expiration () = {expiration= None; signal= Ivar.create ()}
+
+  let is_expired cb =
+    match cb.expiration with
+    | None ->
+        false
+    | Some expires_at ->
+        Time_ns.(now () >= expires_at)
+
+  let await_timeout cb =
+    if is_expired cb then Deferred.return ()
+    else
+      match cb.expiration with
+      | None ->
+          Deferred.never ()
+      | Some expires_at ->
+          after
+            ( Time_ns.Span.to_span_float_round_nearest
+            @@ Time_ns.diff expires_at (Time_ns.now ()) )
+
+  let await cb =
+    if is_expired cb then Deferred.return None
+    else
+      match cb.expiration with
+      | None ->
+          Ivar.read cb.signal >>| Option.some
+      | Some expires_at -> (
+          match%map
+            Timeout.await ()
+              ~timeout_duration:(Time_ns.diff expires_at (Time_ns.now ()))
+              (Ivar.read cb.signal)
+          with
+          | `Ok result ->
+              Some result
+          | `Timeout ->
+              None )
+
+  let await_exn cb =
+    match%map await cb with
+    | None ->
+        failwith "timeout"
+    | Some result ->
+        result
+
+  let fire_if_not_already_fired cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+
+  let fire_exn cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
-
-type validation_result = [`Accept | `Reject | `Ignore]
 
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
@@ -194,7 +251,7 @@ module Helper = struct
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
-    ; mutable new_peer_callback: (string -> string list -> unit) option
+    ; mutable peer_connected_callback: (string -> unit) option
     ; mutable finished: bool }
 
   and 'a subscription =
@@ -202,7 +259,8 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+    ; validator:
+        'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -356,6 +414,7 @@ module Helper = struct
         { privk: string
         ; statedir: string
         ; ifaces: string list
+        ; metrics_port: string
         ; external_maddr: string
         ; network_id: string
         ; unsafe_no_trust_ip: bool
@@ -688,6 +747,7 @@ module Helper = struct
       in
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
+          (* This fill should be okay because we "found and removed" the request *)
           Ivar.fill ivar fill_result ; Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
@@ -715,6 +775,7 @@ module Helper = struct
       type t =
         { sender: peer_info option
         ; data: Data.t
+        ; expiration: int64
         ; seqno: int
         ; upcall: string
         ; subscription_idx: int }
@@ -741,9 +802,8 @@ module Helper = struct
       [@@deriving yojson]
     end
 
-    module Discovered_peer = struct
-      type t = {upcall: string; peer_id: string; multiaddrs: string list}
-      [@@deriving yojson]
+    module Peer_connected = struct
+      type t = {upcall: string; peer_id: string} [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -856,10 +916,20 @@ module Helper = struct
             (let open Deferred.Let_syntax in
             let raw_data = Data.to_string m.data in
             let decoded = sub.decode raw_data in
-            let%bind action =
+            let%bind action_opt =
               match decoded with
               | Ok data ->
-                  sub.validator (wrap m.sender data)
+                  let expiration_time =
+                    Int63.of_int64_exn m.expiration
+                    |> Time_ns.Span.of_int63_ns |> Time_ns.of_span_since_epoch
+                  in
+                  let validation_callback =
+                    Validation_callback.create expiration_time
+                  in
+                  let%bind () =
+                    sub.validator (wrap m.sender data) validation_callback
+                  in
+                  Validation_callback.await validation_callback
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -873,31 +943,38 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", Error_json.error_to_yojson e) ] ;
-                  return `Reject
+                  return (Some `Reject)
             in
-            match%map
-              do_rpc t
-                (module Rpcs.Validation_complete)
-                { seqno
-                ; is_valid=
-                    ( match action with
-                    | `Accept ->
-                        "accept"
-                    | `Reject ->
-                        "reject"
-                    | `Ignore ->
-                        "ignore" ) }
-            with
-            | Ok "validationComplete success" ->
-                ()
-            | Ok v ->
-                failwithf
-                  "helper broke RPC protocol: validationComplete got %s" v ()
-            | Error e ->
-                [%log' error t.logger]
-                  "error during validationComplete, ignoring and continuing: \
-                   $error"
-                  ~metadata:[("error", Error_json.error_to_yojson e)])
+            match action_opt with
+            | None ->
+                [%log' warn t.logger]
+                  "validation callback timed out before we could respond" ;
+                Deferred.unit
+            | Some action -> (
+                match%map
+                  do_rpc t
+                    (module Rpcs.Validation_complete)
+                    { seqno
+                    ; is_valid=
+                        ( match action with
+                        | `Accept ->
+                            "accept"
+                        | `Reject ->
+                            "reject"
+                        | `Ignore ->
+                            "ignore" ) }
+                with
+                | Ok "validationComplete success" ->
+                    ()
+                | Ok v ->
+                    failwithf
+                      "helper broke RPC protocol: validationComplete got %s" v
+                      ()
+                | Error e ->
+                    [%log' error t.logger]
+                      "error during validationComplete, ignoring and \
+                       continuing: $error"
+                      ~metadata:[("error", Error_json.error_to_yojson e)] ))
             |> don't_wait_for ;
             Ok ()
         | None ->
@@ -952,9 +1029,9 @@ module Helper = struct
             (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
-    | "discoveredPeer" ->
-        let%map p = Discovered_peer.of_yojson v |> or_error in
-        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id p.multiaddrs)
+    | "peerConnected" ->
+        let%map p = Peer_connected.of_yojson v |> or_error in
+        Option.iter t.peer_connected_callback ~f:(fun cb -> cb p.peer_id)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -1008,8 +1085,7 @@ module Keypair = struct
         ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
-        failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
-          ()
+        Error.tag e ~tag:"Other RPC error generateKeypair" |> Error.raise
 
   let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
@@ -1036,7 +1112,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string
+  type t = string [@@deriving compare]
 
   let to_string t = t
 
@@ -1079,7 +1155,8 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+      ; validator:
+          'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -1208,20 +1285,17 @@ let list_peers net =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers ~peer_exchange
-    ~seed_peers ~initial_gating_config =
-  net.Helper.new_peer_callback
-  <- Some
-       (fun peer_id peer_addrs ->
-         on_new_peer
-           { id= Peer.Id.unsafe_of_string peer_id
-           ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
+    ~metrics_port ~on_peer_connected ~unsafe_no_trust_ip ~flooding
+    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config =
+  net.Helper.peer_connected_callback
+  <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
       { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
+      ; metrics_port= Option.value metrics_port ~default:""
       ; external_maddr= Multiaddr.to_string external_maddr
       ; network_id
       ; unsafe_no_trust_ip
@@ -1233,7 +1307,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
           Helper.gating_config_to_helper_format initial_gating_config }
   with
   | Ok "configure success" ->
-      Ivar.fill net.me_keypair me ;
+      Ivar.fill_if_empty net.me_keypair me ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s" j ()
@@ -1395,8 +1469,7 @@ let set_connection_gating_config net (config : connection_gating) =
   | Ok v ->
       failwithf "helper broke RPC protocol: setGatingConfig got %s" v ()
   | Error e ->
-      failwithf "unexpected error doing setGatingConfig: %s"
-        (Error.to_string_hum e) ()
+      Error.tag e ~tag:"Unexpected error doing setGatingConfig" |> Error.raise
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
@@ -1413,7 +1486,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         (`Handler
           (fun ~killed e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                Ivar.fill iv
+                Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
             if
@@ -1443,11 +1516,12 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               Deferred.unit ) ))
   with
   | Error e ->
-      Deferred.Or_error.error_string
-        ( "Could not start libp2p_helper. If you are a dev, did you forget to \
-           `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
-           CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
-        ^ Error.to_string_hum e )
+      Deferred.Or_error.fail
+        (Error.tag e
+           ~tag:
+             "Could not start libp2p_helper. If you are a dev, did you forget \
+              to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
+              CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
       let t : Helper.t =
         { subprocess
@@ -1460,7 +1534,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
-        ; new_peer_callback= None
+        ; peer_connected_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
         ; seqno= 1
         ; finished= false }
@@ -1553,16 +1627,16 @@ let%test_module "coda network tests" =
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       and () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~unsafe_no_trust_ip:true
+          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~metrics_port:None ~unsafe_no_trust_ip:true
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn

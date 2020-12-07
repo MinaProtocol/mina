@@ -221,6 +221,9 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 #       and a distinct one for the mina codebase in the next stage
 ARG MINA_BRANCH=develop
 
+# repo to checkout the branch from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
+
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
@@ -233,7 +236,7 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/MinaProtocol/mina ${HOME}/${MINA_DIR}
+  ${MINA_REPO:-https://github.com/MinaProtocol/mina} ${HOME}/${MINA_DIR}
 
 WORKDIR $HOME/${MINA_DIR}
 

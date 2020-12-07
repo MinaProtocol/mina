@@ -33,7 +33,8 @@ let%test_module "network pool test" =
       let local_reader, _local_writer =
         Strict_pipe.(create ~name:"Network pool test" Synchronous)
       in
-      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
+      let tf = Mocks.Transition_frontier.create [] in
+      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
       let work =
         `One
           (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
@@ -59,6 +60,7 @@ let%test_module "network pool test" =
               ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let%bind () = Mocks.Transition_frontier.refer_statements tf [work] in
           let command =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (work, priced_proof)
@@ -106,7 +108,10 @@ let%test_module "network pool test" =
           Strict_pipe.(create ~name:"Network pool test" Synchronous)
         in
         List.map (List.take works per_reader) ~f:create_work
-        |> List.map ~f:(fun work -> (Envelope.Incoming.local work, Fn.const ()))
+        |> List.map ~f:(fun work ->
+               ( Envelope.Incoming.local work
+               , Coda_net2.Validation_callback.create_without_expiration () )
+           )
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff
                |> Deferred.don't_wait_for ) ;
@@ -115,9 +120,8 @@ let%test_module "network pool test" =
                Strict_pipe.Writer.write local_writer (diff, Fn.const ())
                |> Deferred.don't_wait_for ) ;
         let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-        let frontier_broadcast_pipe_r, _ =
-          Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
-        in
+        let tf = Mocks.Transition_frontier.create [] in
+        let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
         let%bind verifier =
           Verifier.create ~logger ~proof_level
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -130,6 +134,7 @@ let%test_module "network pool test" =
             ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
+        let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
              ~f:(fun work_command ->

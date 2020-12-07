@@ -115,6 +115,9 @@ chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
+mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
+cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
+
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
@@ -227,7 +230,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
-#remove build dir
+#remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
 
