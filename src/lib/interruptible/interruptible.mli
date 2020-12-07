@@ -56,3 +56,23 @@ module Result : sig
 
   include Monad.S3 with type ('a, 'b, 's) t := ('a, 'b, 's) t
 end
+
+module Or_error : sig
+  type nonrec ('a, 's) t = ('a Or_error.t, 's) t
+
+  include Monad.S2 with type ('a, 's) t := ('a, 's) t
+end
+
+module Deferred_let_syntax : sig
+  module Let_syntax : sig
+    val return : 'a -> ('a, _) t
+
+    val bind : 'a Deferred.t -> f:('a -> ('b, 's) t) -> ('b, 's) t
+
+    val map : 'a Deferred.t -> f:('a -> 'b) -> ('b, _) t
+
+    val both : 'a Deferred.t -> 'b Deferred.t -> ('a * 'b, _) t
+
+    module Open_on_rhs = Deferred.Let_syntax
+  end
+end

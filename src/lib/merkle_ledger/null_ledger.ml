@@ -156,4 +156,6 @@ end = struct
   let num_accounts _t = 0
 
   let depth t = t.depth
+
+  let detatched_signal _ = Async.Deferred.never ()
 end
