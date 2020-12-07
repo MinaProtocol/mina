@@ -5,7 +5,7 @@
  (inline_tests)
  (libraries
    async async_extra core coda_base coda_intf coda_state
-   coda_transition interruptible o1trace pipe_lib
+   coda_transition coinbase_receiver interruptible o1trace pipe_lib
    prover transaction_snark_scan_state transition_frontier
    network_pool unix_timestamp otp_lib transition_chain_prover)
  (preprocess

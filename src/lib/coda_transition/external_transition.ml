@@ -131,7 +131,11 @@ let consensus_time_produced_at =
 let global_slot =
   Fn.compose Consensus.Data.Consensus_state.curr_global_slot consensus_state
 
-let block_producer = Fn.compose Staged_ledger_diff.creator staged_ledger_diff
+let block_producer =
+  Fn.compose Consensus.Data.Consensus_state.block_creator consensus_state
+
+let coinbase_receiver =
+  Fn.compose Consensus.Data.Consensus_state.coinbase_receiver consensus_state
 
 let block_winner =
   Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
@@ -155,9 +159,12 @@ let to_yojson t =
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state
 
-let transactions ~constraint_constants t =
+let transactions ~constraint_constants ~coinbase_receiver t =
   let open Staged_ledger.Pre_diff_info in
-  match get_transactions ~constraint_constants (staged_ledger_diff t) with
+  match
+    get_transactions ~constraint_constants ~coinbase_receiver
+      (staged_ledger_diff t)
+  with
   | Ok transactions ->
       transactions
   | Error e ->
@@ -733,10 +740,12 @@ module With_validation = struct
 
   let block_winner t = lift block_winner t
 
+  let coinbase_receiver t = lift coinbase_receiver t
+
   let commands t = lift commands t
 
-  let transactions ~constraint_constants t =
-    lift (transactions ~constraint_constants) t
+  let transactions ~constraint_constants ~coinbase_receiver t =
+    lift (transactions ~constraint_constants ~coinbase_receiver) t
 
   let payments t = lift payments t
 
@@ -900,6 +909,7 @@ module Validated = struct
     , consensus_time_produced_at
     , block_producer
     , block_winner
+    , coinbase_receiver
     , transactions
     , commands
     , payments
@@ -930,15 +940,12 @@ let genesis ~precomputed_values =
   let protocol_state_proof =
     Precomputed_values.genesis_proof precomputed_values
   in
-  let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator
-    ; coinbase_receiver= creator
     ; supercharge_coinbase= false }
   in
   (* the genesis transition is assumed to be valid *)
@@ -1069,6 +1076,10 @@ module Staged_ledger_validation = struct
     in
     let staged_ledger_diff = staged_ledger_diff transition in
     let apply_start_time = Core.Time.now () in
+    let coinbase_receiver =
+      Protocol_state.(consensus_state parent_protocol_state)
+      |> Consensus.Data.Consensus_state.coinbase_receiver
+    in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
@@ -1084,6 +1095,7 @@ module Staged_ledger_validation = struct
            in
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
+        ~coinbase_receiver
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

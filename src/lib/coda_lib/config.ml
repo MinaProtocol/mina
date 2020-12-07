@@ -22,7 +22,7 @@ type t =
   ; is_seed: bool
   ; disable_telemetry: bool
   ; initial_block_production_keypairs: Keypair.Set.t
-  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
+  ; coinbase_receiver: Coinbase_receiver.t
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; snark_coordinator_key: Public_key.Compressed.t option [@default None]

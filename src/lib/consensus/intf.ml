@@ -496,6 +496,10 @@ module type S = sig
 
       val block_stake_winner : Value.t -> Public_key.Compressed.t
 
+      val block_creator : Value.t -> Public_key.Compressed.t
+
+      val coinbase_receiver : Value.t -> Public_key.Compressed.t
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t
@@ -608,6 +612,7 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
+      -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
       -> block_producer_timing
 

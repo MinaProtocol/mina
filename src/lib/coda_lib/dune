@@ -3,7 +3,7 @@
  (public_name coda_lib)
  (library_flags -linkall)
  (inline_tests)
- (libraries core coda_intf pipe_lib user_command_input logger async async_extra
+ (libraries core coda_intf coinbase_receiver pipe_lib user_command_input logger async async_extra
             filtered_external_transition unix_timestamp debug_assert o1trace consensus
             incremental secrets work_selector coda_networking block_producer
             genesis_constants sync_handler transition_router node_addrs_and_ports

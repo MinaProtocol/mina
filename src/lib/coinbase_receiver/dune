@@ -1,0 +1,10 @@
+(library
+ (name coinbase_receiver)
+ (public_name coinbase_receiver)
+ (library_flags -linkall)
+ (libraries
+   signature_lib)
+ (preprocess
+  (pps ppx_coda ppx_version))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Which account gets coinbases"))

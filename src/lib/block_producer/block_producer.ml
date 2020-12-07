@@ -106,8 +106,8 @@ end
 
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~coinbase_receiver ~(keypair : Keypair.t)
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
+    ~(coinbase_receiver : Coinbase_receiver.t) ~(keypair : Keypair.t)
     ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
@@ -133,9 +133,12 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
         Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
           ~epoch_ledger ~global_slot
       in
+      let coinbase_receiver =
+        Coinbase_receiver.resolve ~self coinbase_receiver
+      in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+            Staged_ledger.create_diff ~constraint_constants staged_ledger
               ~coinbase_receiver ~logger
               ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
@@ -146,6 +149,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
+          ~coinbase_receiver
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -364,9 +368,9 @@ let time ~logger ~time_controller label f =
   x
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
-    ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
-    ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation
+    ~transaction_resource_pool ~time_controller ~keypairs
+    ~consensus_local_state ~coinbase_receiver ~frontier_reader
+    ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
@@ -637,7 +641,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       Consensus.Hooks.next_producer_timing
                         ~constraint_constants ~constants:consensus_constants
                         (time_to_ms now) consensus_state
-                        ~local_state:consensus_local_state ~keypairs ~logger )
+                        ~local_state:consensus_local_state ~keypairs
+                        ~coinbase_receiver ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with
