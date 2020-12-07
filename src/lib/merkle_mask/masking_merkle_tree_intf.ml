@@ -57,8 +57,9 @@ module type S = sig
     val commit : t -> unit
 
     (** [unset_parent ?trigger_signal ~loc:__LOC__ t] detaches the parent from
-        [t] and sets the location string [loc] to display if [t] is used while
-        no parent is registered.
+        [t]. The [loc] argument is shown in the [Dangling_parent_reference]
+        exception, which will be raised if [t] is used while no parent is
+        registered.
 
         If the [trigger_signal] optional argument is [true] or omitted,
         [detached_signal] for [t] will be resolved. This should only be set to
