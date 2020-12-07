@@ -26,27 +26,23 @@ In some cases, two separate approaches are outlined. This RFC proposes that we g
 
 **Protocol/Archive**
 
-- Add a new table `balances` to the SQL database with the following schema:
+- Add the following columns to the `blocks_user_commands` table in SQL
 
 ```
-id,
-public_key,
-amount
+fee_payer_amount : bigint NOT NULL,
+sender_amount : bigint NOT NULL,
+receiver_amount :  bigint NOT NULL
 ```
 
-- Add a new table `user_commands_balances` to the SQL database with the following schema:
+These represent the amounts of tokens in the accounts (measured in nanocoda) after applying the user_command referenced by that block at that moment.
+
+- Add the following columns to the `blocks_internal_commands` table in SQL
 
 ```
-user_command_id,
-balance_id
+receiver_amount :  bigint NOT NULL
 ```
 
-- Add a new table `internal_commands_balances` to the SQL database with the following schema:
-
-```
-internal_command_id,
-balance_id
-```
+This represent the amounts of tokens in the account (measured in nanocoda) after applying the internal_command referenced by that block at that moment.
 
 - (Approach B) Add a new table `timing_info` to the SQL database with the following schema:
 
