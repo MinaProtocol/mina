@@ -119,6 +119,8 @@ module type S = sig
 
   val remove_accounts_exn : t -> account_id list -> unit
 
-  (** Triggers when the ledger is detatched from its parent *)
-  val detatched_signal : t -> unit Async.Deferred.t
+  (** Triggers when the ledger has been detached and should no longer be
+      accessed.
+  *)
+  val detached_signal : t -> unit Async.Deferred.t
 end

@@ -204,6 +204,6 @@ module Make_base (Inputs : Inputs_intf) :
      * time *)
     let depth (T ((module Base), t)) = Base.depth t
 
-    let detatched_signal (T ((module Base), t)) = Base.detatched_signal t
+    let detached_signal (T ((module Base), t)) = Base.detached_signal t
   end
 end

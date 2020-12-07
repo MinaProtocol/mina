@@ -157,5 +157,5 @@ end = struct
 
   let depth t = t.depth
 
-  let detatched_signal _ = Async.Deferred.never ()
+  let detached_signal _ = Async.Deferred.never ()
 end

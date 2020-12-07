@@ -56,13 +56,13 @@ module type S = sig
     (** commit all state to the parent, flush state locally *)
     val commit : t -> unit
 
-    (** [unset_parent ?trigger_signal ~loc:__LOC__ t] detatches the parent from
+    (** [unset_parent ?trigger_signal ~loc:__LOC__ t] detaches the parent from
         [t] and sets the location string [loc] to display if [t] is used while
         no parent is registered.
 
-        The [trigger_signal] optional argument determines whether to resolve
-        [detatched_signal] for [t] or not, defaulting to [true]. This should
-        only be set to [false] when the mask will be reparented.
+        If the [trigger_signal] optional argument is [true] or omitted,
+        [detached_signal] for [t] will be resolved. This should only be set to
+        [false] when the mask will be reparented.
     *)
     val unset_parent : ?trigger_signal:bool -> loc:string -> t -> unattached
 

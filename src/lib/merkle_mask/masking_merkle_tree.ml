@@ -29,7 +29,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     [@@deriving sexp]
   end
 
-  module Detatched_parent_signal = struct
+  module Detached_parent_signal = struct
     type t = unit Async.Ivar.t
 
     let sexp_of_t (_ : t) = Sexp.List []
@@ -43,7 +43,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; token_owners: Key.Stable.Latest.t Token_id.Table.t
     ; mutable next_available_token: Token_id.t option
     ; mutable parent: Parent.t
-    ; detatched_parent_signal: Detatched_parent_signal.t
+    ; detached_parent_signal: Detached_parent_signal.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Account_id.Table.t
     ; mutable current_location: Location.t option
@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   let create ~depth () =
     { uuid= Uuid_unix.create ()
     ; parent= Error __LOC__
-    ; detatched_parent_signal= Async.Ivar.create ()
+    ; detached_parent_signal= Async.Ivar.create ()
     ; account_tbl= Location_binable.Table.create ()
     ; token_owners= Token_id.Table.create ()
     ; next_available_token= None
@@ -107,7 +107,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert (Result.is_ok t.parent) ;
       t.parent <- Error loc ;
       if trigger_signal then
-        Async.Ivar.fill_if_empty t.detatched_parent_signal () ;
+        Async.Ivar.fill_if_empty t.detached_parent_signal () ;
       t
 
     let assert_is_attached t =
@@ -117,9 +117,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Ok _ ->
           ()
 
-    let detatched_signal t =
+    let detached_signal t =
       assert_is_attached t ;
-      Async.Ivar.read t.detatched_parent_signal
+      Async.Ivar.read t.detached_parent_signal
 
     let get_parent ({parent= opt; _} as t) =
       assert_is_attached t ; Result.ok_or_failwith opt
@@ -402,7 +402,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let copy t =
       { uuid= Uuid_unix.create ()
       ; parent= Ok (get_parent t)
-      ; detatched_parent_signal= Async.Ivar.create ()
+      ; detached_parent_signal= Async.Ivar.create ()
       ; account_tbl= Location_binable.Table.copy t.account_tbl
       ; token_owners= Token_id.Table.copy t.token_owners
       ; next_available_token= t.next_available_token
@@ -588,7 +588,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       t.next_available_token <- None ;
       Addr.Table.clear t.hash_tbl ;
       Account_id.Table.clear t.location_tbl ;
-      Async.Ivar.fill_if_empty t.detatched_parent_signal ()
+      Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
       assert_is_attached t ;
@@ -766,7 +766,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let set_parent t parent =
     assert (Result.is_error t.parent) ;
-    assert (Option.is_none (Async.Ivar.peek t.detatched_parent_signal)) ;
+    assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Ok parent ;
     t.current_location <- Attached.last_filled t ;

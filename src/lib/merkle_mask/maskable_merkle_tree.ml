@@ -160,7 +160,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Uuid.to_string_hum parent_uuid)
         suffix
     in
-    let trigger_detatch_signal =
+    let trigger_detach_signal =
       match grandchildren with
       | `Check | `Recursive ->
           true
@@ -210,7 +210,7 @@ module Make (Inputs : Inputs_intf) = struct
             | other_masks ->
                 Uuid.Table.set registered_masks ~key:parent_uuid
                   ~data:other_masks ) ) ;
-        Mask.Attached.unset_parent ~trigger_signal:trigger_detatch_signal ~loc
+        Mask.Attached.unset_parent ~trigger_signal:trigger_detach_signal ~loc
           mask
 
   (** a set calls the Base implementation set, notifies registered mask childen *)

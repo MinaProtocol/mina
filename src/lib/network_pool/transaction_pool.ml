@@ -161,7 +161,7 @@ module Make0 (Base_ledger : sig
 
   val get : t -> Location.t -> Account.t option
 
-  val detatched_signal : t -> unit Deferred.t
+  val detached_signal : t -> unit Deferred.t
 end) (Staged_ledger : sig
   type t
 
@@ -1145,8 +1145,7 @@ struct
               @@
               let open Interruptible.Let_syntax in
               let signal =
-                Deferred.map (Base_ledger.detatched_signal ledger)
-                  ~f:(fun () ->
+                Deferred.map (Base_ledger.detached_signal ledger) ~f:(fun () ->
                     Error.createf "Ledger was detatched"
                     |> Error.tag ~tag:"Transaction_pool.apply" )
               in
@@ -1253,7 +1252,7 @@ let%test_module _ =
 
       let get t l = Map.find t l
 
-      let detatched_signal _ = Deferred.never ()
+      let detached_signal _ = Deferred.never ()
     end
 
     module Mock_staged_ledger = struct
