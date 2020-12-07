@@ -5,6 +5,36 @@ open Core_kernel
 *)
 let header_string = "MINA_SNARK_KEYS\n"
 
+module UInt64 = struct
+  (* [Unsigned_extended] depends on pickles, manually include what we need here
+     to break a dependency cycle
+
+     TODO: Separate [Unsigned_extended] into snark and non-snark parts.
+  *)
+  type t = Unsigned.UInt64.t [@@deriving ord, eq]
+
+  let to_yojson x = `String (Unsigned.UInt64.to_string x)
+
+  let of_yojson = function
+    | `String x ->
+        Or_error.try_with (fun () -> Unsigned.UInt64.of_string x)
+        |> Result.map_error ~f:(fun err ->
+               sprintf
+                 "Snark_keys_header.UInt64.of_yojson: Could not parse string \
+                  as UInt64: %s"
+                 (Error.to_string_hum err) )
+    | _ ->
+        Error "Snark_keys_header.UInt64.of_yojson: Expected a string"
+
+  let sexp_of_t x = Sexp.Atom (Unsigned.UInt64.to_string x)
+
+  let t_of_sexp = function
+    | Sexp.Atom x ->
+        Unsigned.UInt64.of_string x
+    | _ ->
+        failwith "Snark_keys_header.UInt64.t_of_sexp: Expected an atom"
+end
+
 module Kind = struct
   (** The 'kind' of data in the file.
     For example, a step proving key for the base transaction snark may have the
@@ -21,13 +51,14 @@ module Kind = struct
             human-readable format
         *)
     }
-  [@@deriving yojson]
+  [@@deriving yojson, sexp, ord, eq]
 end
 
 module Constraint_constants = struct
   module Transaction_capacity = struct
     (** Transaction pool capacity *)
     type t = Log_2 of int | Txns_per_second_x10 of int
+    [@@deriving sexp, ord, eq]
 
     let to_yojson t : Yojson.Safe.t =
       match t with
@@ -55,9 +86,8 @@ module Constraint_constants = struct
 
   module Fork_config = struct
     (** Fork data *)
-    type t = Runtime_config.Fork_config.t =
-      {previous_state_hash: string; previous_length: int}
-    [@@deriving yojson]
+    type t = {previous_state_hash: string; previous_length: int}
+    [@@deriving yojson, sexp, ord, eq]
 
     let opt_to_yojson t : Yojson.Safe.t =
       match t with Some t -> to_yojson t | None -> `Assoc []
@@ -77,19 +107,22 @@ module Constraint_constants = struct
     ; work_delay: int
     ; block_window_duration_ms: int
     ; transaction_capacity: Transaction_capacity.t
-    ; coinbase_amount: Unsigned_extended.UInt64.t
+    ; pending_coinbase_depth: int
+    ; coinbase_amount: UInt64.t
     ; supercharged_coinbase_factor: int
-    ; account_creation_fee: Unsigned_extended.UInt64.t
+    ; account_creation_fee: UInt64.t
     ; fork:
         (Fork_config.t option[@to_yojson Fork_config.opt_to_yojson]
                              [@of_yojson Fork_config.opt_of_yojson]) }
-  [@@deriving yojson]
+  [@@deriving yojson, sexp, ord, eq]
 end
 
 module Commits = struct
   (** Commit identifiers *)
-  type t = {mina: string; marlin: string} [@@deriving yojson]
+  type t = {mina: string; marlin: string} [@@deriving yojson, sexp, ord, eq]
 end
+
+let header_version = 1
 
 (** Header contents *)
 type t =
@@ -101,7 +134,7 @@ type t =
   ; commit_date: string
   ; constraint_system_hash: string
   ; identifying_hash: string }
-[@@deriving yojson]
+[@@deriving yojson, sexp, ord, eq]
 
 let prefix = "MINA_SNARK_KEYS\n"
 
@@ -185,9 +218,10 @@ let%test_module "Check parsing of header" =
           ; work_delay= 1000
           ; block_window_duration_ms= 1000
           ; transaction_capacity= Log_2 3
-          ; coinbase_amount= Unsigned_extended.UInt64.of_int 1
+          ; pending_coinbase_depth= 12
+          ; coinbase_amount= Unsigned.UInt64.of_int 1
           ; supercharged_coinbase_factor= 1
-          ; account_creation_fee= Unsigned_extended.UInt64.of_int 1
+          ; account_creation_fee= Unsigned.UInt64.of_int 1
           ; fork= None }
       ; commits=
           { mina= "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
