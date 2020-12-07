@@ -587,7 +587,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       Location_binable.Table.clear t.account_tbl ;
       t.next_available_token <- None ;
       Addr.Table.clear t.hash_tbl ;
-      Account_id.Table.clear t.location_tbl
+      Account_id.Table.clear t.location_tbl ;
+      Async.Ivar.fill_if_empty t.detatched_parent_signal ()
 
     let index_of_account_exn t key =
       assert_is_attached t ;
