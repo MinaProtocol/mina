@@ -318,13 +318,13 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         [%log info]
           "Network best tip is recent enough to catchup to; syncing local \
            state and starting participation" ;
-        let root = Transition_frontier.root frontier in
+        let curr_best_tip = Transition_frontier.best_tip frontier in
         let%map () =
           match
             Consensus.Hooks.required_local_state_sync
               ~constants:precomputed_values.consensus_constants
               ~consensus_state:
-                (Transition_frontier.Breadcrumb.consensus_state root)
+                (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
               ~local_state:consensus_local_state
           with
           | None ->
