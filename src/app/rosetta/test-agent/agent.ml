@@ -166,7 +166,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     ~expected:
       ( List.map ~f:succesful operation_expectations
       @ Operation_expectation.
-          [ { amount= Some 20_000_000_000
+          [ { amount= Some 40_000_000_000
             ; account=
                 Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
             ; status= "Success"
