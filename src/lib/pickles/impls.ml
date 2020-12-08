@@ -6,6 +6,22 @@ module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock) (Unit)
 
 let test_bit x i = B.(shift_right x i land one = one)
 
+let forbidden_shifted_values ~modulus:r ~size_in_bits ~f =
+  let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
+  let neg_two_to_n = B.(neg two_to_n) in
+  let representatives x =
+    let open Sequence in
+    (* All values equivalent to x mod r that fit in [size_in_bits]
+       many bits. *)
+    let fits_in_n_bits x = B.(x < two_to_n) in
+    unfold ~init:B.(x % r) ~f:(fun x -> Some (x, B.(x + r)))
+    |> take_while ~f:fits_in_n_bits
+    |> to_list
+  in
+  List.concat_map [neg_two_to_n; B.(neg_two_to_n - one)] ~f:representatives
+  |> List.dedup_and_sort ~compare:B.compare
+  |> List.map ~f
+
 module Step = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Tick) (Unit)
   include Impl
@@ -20,17 +36,15 @@ module Step = struct
       Field.t * Boolean.var
 
     let forbidden_shifted_values =
-      let neg_two_to_n =
-        B.(
-          neg (pow (of_int 2) (of_int Constant.size_in_bits))
-          % Wrap_impl.Bigint.to_bignum_bigint Constant.size)
-      in
-      List.map
-        ~f:(fun x ->
+      forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
+        ~modulus:(Wrap_impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
           let hi = test_bit x (Field.size_in_bits - 1) in
           let lo = B.shift_right x 1 in
           (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi) )
-        [neg_two_to_n; B.(neg_two_to_n - one)]
+
+    let () =
+      Core.printf "step forb vals %d\n%!"
+        (List.length forbidden_shifted_values)
 
     let (typ_unchecked : (t, Constant.t) Typ.t), check =
       let t0 =
@@ -97,14 +111,13 @@ module Wrap = struct
     type t = Field.t
 
     let forbidden_shifted_values =
-      let neg_two_to_n =
-        B.(
-          neg (pow (of_int 2) (of_int Constant.size_in_bits))
-          % Step.Impl.Bigint.to_bignum_bigint Constant.size)
-      in
-      List.map
-        ~f:(fun x -> Impl.Bigint.(to_field (of_bignum_bigint x)))
-        [neg_two_to_n; B.(neg_two_to_n - one)]
+      forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
+        ~modulus:(Step.Impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
+          Impl.Bigint.(to_field (of_bignum_bigint x)) )
+
+    let () =
+      Core.printf "wrap forb vals %d\n%!"
+        (List.length forbidden_shifted_values)
 
     let typ_unchecked, check =
       let t0 =
