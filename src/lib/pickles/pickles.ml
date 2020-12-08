@@ -355,6 +355,8 @@ module type Inputs = sig
 
   module Branches : Nat.Intf
 
+  val constraint_constants : Snark_keys_header.Constraint_constants.t
+
   val name : string
 
   val self :
@@ -456,7 +458,7 @@ module Make (Inputs : Inputs) = struct
          cache:Key_cache.Spec.t list
       -> ?disk_keys:(Cache.Step.Key.Verification.t, Branches.n) Vector.t
                     * Cache.Wrap.Key.Verification.t
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> unit
       -> ( prev_valuess
          , widthss
          , heightss
@@ -466,7 +468,7 @@ module Make (Inputs : Inputs) = struct
          * _
          * _
          * _ =
-   fun ~cache ?disk_keys ~constraint_constants ->
+   fun ~cache ?disk_keys () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version= Snark_keys_header.header_version
       ; kind
@@ -964,6 +966,8 @@ let compile
     module Max_branching = Max_branching
     module Branches = Branches
 
+    let constraint_constants = constraint_constants
+
     let name = name
 
     let self = match self with None -> `New | Some self -> `Existing self
@@ -981,7 +985,7 @@ let compile
     let choices = choices
   end) in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~cache ?disk_keys ~constraint_constants
+    M.compile ~cache ?disk_keys ()
   in
   let T = Max_branching.eq in
   let module P = struct
