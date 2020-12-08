@@ -2606,6 +2606,16 @@ module Data = struct
   end
 end
 
+module Coinbase_receiver = struct
+  type t = [`Producer | `Other of Public_key.Compressed.t]
+
+  let resolve ~self : t -> Public_key.Compressed.t = function
+    | `Producer ->
+        self
+    | `Other pk ->
+        pk
+end
+
 module Hooks = struct
   open Data
 
@@ -3151,11 +3161,8 @@ module Hooks = struct
           Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
             ~f:(fun () (keypair, public_key_compressed) ->
               let coinbase_receiver =
-                match coinbase_receiver with
-                | `Other pk ->
-                    pk
-                | `Producer ->
-                    public_key_compressed
+                Coinbase_receiver.resolve ~self:public_key_compressed
+                  coinbase_receiver
               in
               if
                 not

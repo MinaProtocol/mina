@@ -107,7 +107,7 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~(coinbase_receiver : Coinbase_receiver.t) ~(keypair : Keypair.t)
+    ~(coinbase_receiver : Consensus.Coinbase_receiver.t) ~(keypair : Keypair.t)
     ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
@@ -134,7 +134,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           ~epoch_ledger ~global_slot
       in
       let coinbase_receiver =
-        Coinbase_receiver.resolve ~self coinbase_receiver
+        Consensus.Coinbase_receiver.resolve ~self coinbase_receiver
       in
       let diff =
         measure "create_diff" (fun () ->
