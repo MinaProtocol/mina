@@ -175,8 +175,7 @@ module Stable = struct
     type t =
       { diff: Diff.Stable.V1.t
       ; creator: Public_key.Compressed.Stable.V1.t
-      ; coinbase_receiver: Public_key.Compressed.Stable.V1.t
-      ; supercharge_coinbase: bool }
+      ; coinbase_receiver: Public_key.Compressed.Stable.V1.t }
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
@@ -186,8 +185,7 @@ end]
 type t = Stable.Latest.t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.t
-  ; supercharge_coinbase: bool }
+  ; coinbase_receiver: Public_key.Compressed.t }
 [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
@@ -211,8 +209,7 @@ module With_valid_signatures_and_proofs = struct
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t
-    ; supercharge_coinbase: bool }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
   let commands t =
@@ -231,11 +228,10 @@ let coinbase_amount
   else Some constraint_constants.coinbase_amount
 
 let coinbase ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    t =
+    ~supercharge_coinbase t =
   let first_pre_diff, second_pre_diff_opt = t.diff in
   let coinbase_amount =
-    coinbase_amount ~constraint_constants
-      ~supercharge_coinbase:t.supercharge_coinbase
+    coinbase_amount ~constraint_constants ~supercharge_coinbase
   in
   match
     ( first_pre_diff.coinbase
@@ -268,17 +264,15 @@ module With_valid_signatures = struct
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t
-    ; supercharge_coinbase: bool }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
   let coinbase
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      (t : t) =
+      ~supercharge_coinbase (t : t) =
     let first_pre_diff, second_pre_diff_opt = t.diff in
     let coinbase_amount =
-      coinbase_amount ~constraint_constants
-        ~supercharge_coinbase:t.supercharge_coinbase
+      coinbase_amount ~constraint_constants ~supercharge_coinbase
     in
     match
       ( first_pre_diff.coinbase
@@ -326,8 +320,7 @@ let validate_commands (t : t)
       in
       ( { creator= t.creator
         ; coinbase_receiver= t.coinbase_receiver
-        ; diff= (p1, p2)
-        ; supercharge_coinbase= t.supercharge_coinbase }
+        ; diff= (p1, p2) }
         : With_valid_signatures.t ) )
 
 let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
@@ -345,10 +338,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
           ; coinbase= d2.coinbase }
           : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
   in
-  { creator= d.creator
-  ; coinbase_receiver= d.coinbase_receiver
-  ; diff= (p1, p2)
-  ; supercharge_coinbase= d.supercharge_coinbase }
+  {creator= d.creator; coinbase_receiver= d.coinbase_receiver; diff= (p1, p2)}
 
 let forget_pre_diff_with_at_most_two
     (pre_diff :
@@ -370,8 +360,7 @@ let forget (t : With_valid_signatures_and_proofs.t) =
       ( forget_pre_diff_with_at_most_two (fst t.diff)
       , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
   ; coinbase_receiver= t.coinbase_receiver
-  ; creator= t.creator
-  ; supercharge_coinbase= t.supercharge_coinbase }
+  ; creator= t.creator }
 
 let commands (t : t) =
   (fst t.diff).commands

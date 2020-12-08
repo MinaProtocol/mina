@@ -89,13 +89,14 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (t, body)
   in
-  let%bind ( `Success updated_consensus_state
-           , `Supercharge_coinbase supercharge_coinbase
-           , consensus_state ) =
+  let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
          transition txn_snark.supply_increase)
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
   in
   let prev_pending_coinbase_root =
     previous_state |> Protocol_state.blockchain_state
