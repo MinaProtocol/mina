@@ -527,16 +527,16 @@ module Make (Inputs : Inputs) = struct
     Timer.clock __LOC__ ; res
 
   module Branch_data = struct
-      type ('vars, 'vals, 'n, 'm) t =
-        ( A.t
-        , A_value.t
-        , Max_branching.n
-        , Branches.n
-        , 'vars
-        , 'vals
-        , 'n
-        , 'm )
-        Step_branch_data.t
+    type ('vars, 'vals, 'n, 'm) t =
+      ( A.t
+      , A_value.t
+      , Max_branching.n
+      , Branches.n
+      , 'vars
+      , 'vals
+      , 'n
+      , 'm )
+      Step_branch_data.t
   end
 
   let step_data =
@@ -546,8 +546,8 @@ module Make (Inputs : Inputs) = struct
     let module M =
       H4.Map (IR) (Branch_data)
         (struct
-          let f : type a b c d.
-              (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
+          let f : type a b c d. (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t
+              =
            fun rule ->
             Timer.clock __LOC__ ;
             let res =
@@ -561,6 +561,19 @@ module Make (Inputs : Inputs) = struct
         end)
     in
     M.f choices
+
+  let step_domains =
+    let module M =
+      H4.Map
+        (Branch_data)
+        (E04 (Domains))
+        (struct
+          let f (T b : _ Branch_data.t) = b.domains
+        end)
+    in
+    let module V = H4.To_vector (Domains) in
+    let res = V.f prev_varss_length (M.f step_data) in
+    Timer.clock __LOC__ ; res
 
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
@@ -590,19 +603,6 @@ module Make (Inputs : Inputs) = struct
          * _ =
    fun ~cache ?disk_keys () ->
     let T = Max_branching.eq in
-    Timer.clock __LOC__ ;
-    let step_domains =
-      let module M =
-        H4.Map
-          (Branch_data)
-          (E04 (Domains))
-          (struct
-            let f (T b : _ Branch_data.t) = b.domains
-          end)
-      in
-      let module V = H4.To_vector (Domains) in
-      V.f prev_varss_length (M.f step_data)
-    in
     let cache_handle = ref (Lazy.return `Cache_hit) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
     Timer.clock __LOC__ ;
