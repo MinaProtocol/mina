@@ -30,7 +30,7 @@ struct
   type ('k, 'v) t =
     { to_string: 'k -> string
     ; read: 'k -> path:string -> 'v M.t
-    ; write: 'v -> string -> unit M.t }
+    ; write: 'k -> 'v -> string -> unit M.t }
 end
 
 module type S = sig
@@ -45,7 +45,7 @@ module type S = sig
     type ('k, 'v) t = ('k, 'v) Disk_storable(M).t =
       { to_string: 'k -> string
       ; read: 'k -> path:string -> 'v M.t
-      ; write: 'v -> string -> unit M.t }
+      ; write: 'k -> 'v -> string -> unit M.t }
 
     val of_binable :
       ('k -> string) -> (module Binable.S with type t = 'v) -> ('k, 'v) t
@@ -53,7 +53,7 @@ module type S = sig
     val simple :
          ('k -> string)
       -> ('k -> path:string -> 'v M.t)
-      -> ('v -> string -> unit M.t)
+      -> ('k -> 'v -> string -> unit M.t)
       -> ('k, 'v) t
   end
 
@@ -85,7 +85,7 @@ module Sync : S with module M := Or_error = struct
           Or_error.errorf "directory %s does not exist or cannot be read"
             prefix
       | `Yes ->
-          write v (path key)
+          write key v (path key)
     in
     {read; write}
 
@@ -132,7 +132,7 @@ module Sync : S with module M := Or_error = struct
         Or_error.try_with (fun () ->
             Binable.of_string m (In_channel.read_all path) )
       in
-      let write t path =
+      let write _k t path =
         Or_error.try_with (fun () ->
             Out_channel.write_all path ~data:(Binable.to_string m t) )
       in
@@ -141,7 +141,7 @@ module Sync : S with module M := Or_error = struct
     let simple to_string read write =
       { to_string
       ; read= (fun k ~path -> read k ~path)
-      ; write= (fun v s -> write v s) }
+      ; write= (fun k v s -> write k v s) }
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =
@@ -199,7 +199,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
             (Or_error.errorf "directory %s does not exist or cannot be read"
                prefix)
       | `Yes ->
-          write v (path key)
+          write key v (path key)
     in
     {read; write}
 
@@ -239,7 +239,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
 
     let of_binable (type t) to_string (module B : Binable.S with type t = t) =
       let read _ ~path = Reader.load_bin_prot path B.bin_reader_t in
-      let write t path =
+      let write _ t path =
         Deferred.map
           (Writer.save_bin_prot path B.bin_writer_t t)
           ~f:Or_error.return

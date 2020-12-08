@@ -75,6 +75,26 @@ module Constraint_constants = struct
     end
   end]
 
+  let to_snark_keys_header (t : t) : Snark_keys_header.Constraint_constants.t =
+    { sub_windows_per_window= t.sub_windows_per_window
+    ; ledger_depth= t.ledger_depth
+    ; work_delay= t.work_delay
+    ; block_window_duration_ms= t.block_window_duration_ms
+    ; transaction_capacity= Log_2 t.transaction_capacity_log_2
+    ; pending_coinbase_depth= t.pending_coinbase_depth
+    ; coinbase_amount= Currency.Amount.to_uint64 t.coinbase_amount
+    ; supercharged_coinbase_factor= t.supercharged_coinbase_factor
+    ; account_creation_fee= Currency.Fee.to_uint64 t.account_creation_fee
+    ; fork=
+        ( match t.fork with
+        | Some {previous_length; previous_state_hash} ->
+            Some
+              { previous_length= Unsigned.UInt32.to_int previous_length
+              ; previous_state_hash=
+                  Pickles.Backend.Tick.Field.to_string previous_state_hash }
+        | None ->
+            None ) }
+
   (* Generate the compile-time constraint constants, using a signature to hide
      the optcomp constants that we import.
   *)
