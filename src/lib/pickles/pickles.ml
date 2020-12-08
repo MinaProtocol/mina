@@ -350,14 +350,23 @@ module type Inputs = sig
   module A : Statement_var_intf
 
   module A_value : Statement_value_intf
+
+  module Max_branching : Nat.Add.Intf
+
+  module Branches : Nat.Intf
+
+  val self : (A.t, A_value.t, Max_branching.n, Branches.n) Tag.t
 end
 
 module Make (Inputs : Inputs) = struct
   open Inputs
+
+  let self = self
+
   module IR = Inductive_rule.T (A) (A_value)
   module HIR = H4.T (IR)
 
-  let max_local_max_branchings ~self (type n)
+  let max_local_max_branchings (type n)
       (module Max_branching : Nat.Intf with type n = n) branches choices =
     let module Local_max_branchings = struct
       type t = (int, Max_branching.n) Vector.t
@@ -376,7 +385,7 @@ module Make (Inputs : Inputs) = struct
               (E04 (Int))
               (struct
                 let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                  if Type_equal.Id.same t.id self then
+                  if Type_equal.Id.same t.id self.id then
                     Nat.to_int Max_branching.n
                   else
                     let (module M) = Types_map.max_branching t in
@@ -405,31 +414,25 @@ module Make (Inputs : Inputs) = struct
     (* TODO Think this is right.. *)
   end
 
-  let compile
-      : type prev_varss prev_valuess widthss heightss max_branching branches.
-         self:(A.t, A_value.t, max_branching, branches) Tag.t
-      -> cache:Key_cache.Spec.t list
-      -> ?disk_keys:(Cache.Step.Key.Verification.t, branches) Vector.t
+  let compile : type prev_varss prev_valuess widthss heightss.
+         cache:Key_cache.Spec.t list
+      -> ?disk_keys:(Cache.Step.Key.Verification.t, Branches.n) Vector.t
                     * Cache.Wrap.Key.Verification.t
-      -> branches:(module Nat.Intf with type n = branches)
-      -> max_branching:(module Nat.Add.Intf with type n = max_branching)
       -> name:string
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
-      -> choices:(   self:(A.t, A_value.t, max_branching, branches) Tag.t
+      -> choices:(   self:(A.t, A_value.t, Max_branching.n, Branches.n) Tag.t
                   -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t)
       -> ( prev_valuess
          , widthss
          , heightss
          , A_value.t
-         , (max_branching, max_branching) Proof.t Async.Deferred.t )
+         , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
          H3_2.T(Prover).t
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
-       ~max_branching:(module Max_branching) ~name ~constraint_constants ~typ
-       ~choices ->
+   fun ~cache ?disk_keys ~name ~constraint_constants ~typ ~choices ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version= Snark_keys_header.header_version
       ; kind
@@ -449,9 +452,7 @@ module Make (Inputs : Inputs) = struct
     let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
     let T = Nat.eq_exn prev_varss_n Branches.n in
     let padded, (module Maxes) =
-      max_local_max_branchings
-        (module Max_branching)
-        prev_varss_length choices ~self:self.id
+      max_local_max_branchings (module Max_branching) prev_varss_length choices
     in
     let full_signature = {Full_signature.padded; maxes= (module Maxes)} in
     Timer.clock __LOC__ ;
@@ -766,7 +767,7 @@ module Make (Inputs : Inputs) = struct
              , xs3
              , xs4
              , A_value.t
-             , (max_branching, max_branching) Proof.t Async.Deferred.t )
+             , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -921,7 +922,8 @@ let compile
          , (max_branching, max_branching) Proof.t Async.Deferred.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_branching ~name ~constraint_constants ~choices ->
+     ~branches:(module Branches) ~max_branching:(module Max_branching) ~name
+     ~constraint_constants ~choices ->
   let self =
     match self with
     | None ->
@@ -932,6 +934,10 @@ let compile
   let module M = Make (struct
     module A = A_var
     module A_value = A_value
+    module Max_branching = Max_branching
+    module Branches = Branches
+
+    let self = self
   end) in
   let rec conv_irs : type v1ss v2ss wss hss.
          (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
@@ -942,10 +948,9 @@ let compile
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~cache ?disk_keys ~branches ~max_branching ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+    M.compile ~cache ?disk_keys ~name ~typ ~constraint_constants
+      ~choices:(fun ~self -> conv_irs (choices ~self))
   in
-  let (module Max_branching) = max_branching in
   let T = Max_branching.eq in
   let module P = struct
     type statement = A_value.t
