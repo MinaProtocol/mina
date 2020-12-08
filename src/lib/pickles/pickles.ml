@@ -526,6 +526,42 @@ module Make (Inputs : Inputs) = struct
     let res = V.f prev_varss_length (M.f choices) in
     Timer.clock __LOC__ ; res
 
+  module Branch_data = struct
+      type ('vars, 'vals, 'n, 'm) t =
+        ( A.t
+        , A_value.t
+        , Max_branching.n
+        , Branches.n
+        , 'vars
+        , 'vals
+        , 'n
+        , 'm )
+        Step_branch_data.t
+  end
+
+  let step_data =
+    let T = Max_branching.eq in
+    let i = ref 0 in
+    Timer.clock __LOC__ ;
+    let module M =
+      H4.Map (IR) (Branch_data)
+        (struct
+          let f : type a b c d.
+              (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
+           fun rule ->
+            Timer.clock __LOC__ ;
+            let res =
+              Common.time "make step data" (fun () ->
+                  Step_branch_data.create ~index:(Index.of_int_exn !i)
+                    ~max_branching:Max_branching.n ~branches:Branches.n ~self
+                    ~typ A.to_field_elements A_value.to_field_elements rule
+                    ~wrap_domains ~branchings:step_widths )
+            in
+            Timer.clock __LOC__ ; incr i ; res
+        end)
+    in
+    M.f choices
+
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
   end
@@ -554,41 +590,6 @@ module Make (Inputs : Inputs) = struct
          * _ =
    fun ~cache ?disk_keys () ->
     let T = Max_branching.eq in
-    Timer.clock __LOC__ ;
-    let module Branch_data = struct
-      type ('vars, 'vals, 'n, 'm) t =
-        ( A.t
-        , A_value.t
-        , Max_branching.n
-        , Branches.n
-        , 'vars
-        , 'vals
-        , 'n
-        , 'm )
-        Step_branch_data.t
-    end in
-    let step_data =
-      let i = ref 0 in
-      Timer.clock __LOC__ ;
-      let module M =
-        H4.Map (IR) (Branch_data)
-          (struct
-            let f : type a b c d.
-                (a, b, c, d) IR.t -> (a, b, c, d) Branch_data.t =
-             fun rule ->
-              Timer.clock __LOC__ ;
-              let res =
-                Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:(Index.of_int_exn !i)
-                      ~max_branching:Max_branching.n ~branches:Branches.n ~self
-                      ~typ A.to_field_elements A_value.to_field_elements rule
-                      ~wrap_domains ~branchings:step_widths )
-              in
-              Timer.clock __LOC__ ; incr i ; res
-          end)
-      in
-      M.f choices
-    in
     Timer.clock __LOC__ ;
     let step_domains =
       let module M =
