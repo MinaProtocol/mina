@@ -1113,7 +1113,7 @@ let create (config : Config.t)
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             if config.log_gossip_heard.new_state then
-              [%str_log debug]
+              [%str_log info]
                 ~metadata:
                   [("external_transition", External_transition.to_yojson state)]
                 (Block_received
@@ -1197,9 +1197,11 @@ let broadcast t ~log_msg msg =
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_state t state =
-  broadcast t
-    (Gossip_net.Message.New_state (With_hash.data state))
-    ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
+  let msg = Gossip_net.Message.New_state (With_hash.data state) in
+  [%str_log' info t.logger]
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    (Gossip_new_state {state_hash= With_hash.hash state}) ;
+  Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_transaction_pool_diff t diff =
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
