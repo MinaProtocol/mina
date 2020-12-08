@@ -359,6 +359,8 @@ module type Inputs = sig
 
   val self :
     [`New | `Existing of (A.t, A_value.t, Max_branching.n, Branches.n) Tag.t]
+
+  val typ : (A.t, A_value.t) Impls.Step.Typ.t
 end
 
 module Make (Inputs : Inputs) = struct
@@ -427,7 +429,6 @@ module Make (Inputs : Inputs) = struct
       -> ?disk_keys:(Cache.Step.Key.Verification.t, Branches.n) Vector.t
                     * Cache.Wrap.Key.Verification.t
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
-      -> typ:(A.t, A_value.t) Impls.Step.Typ.t
       -> choices:(   self:(A.t, A_value.t, Max_branching.n, Branches.n) Tag.t
                   -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t)
       -> ( prev_valuess
@@ -439,7 +440,7 @@ module Make (Inputs : Inputs) = struct
          * _
          * _
          * _ =
-   fun ~cache ?disk_keys ~constraint_constants ~typ ~choices ->
+   fun ~cache ?disk_keys ~constraint_constants ~choices ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version= Snark_keys_header.header_version
       ; kind
@@ -940,6 +941,8 @@ let compile
     let name = name
 
     let self = match self with None -> `New | Some self -> `Existing self
+
+    let typ = typ
   end) in
   let rec conv_irs : type v1ss v2ss wss hss.
          (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
@@ -950,8 +953,8 @@ let compile
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~cache ?disk_keys ~typ ~constraint_constants
-      ~choices:(fun ~self -> conv_irs (choices ~self))
+    M.compile ~cache ?disk_keys ~constraint_constants ~choices:(fun ~self ->
+        conv_irs (choices ~self) )
   in
   let T = Max_branching.eq in
   let module P = struct
