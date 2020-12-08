@@ -29,20 +29,20 @@ In some cases, two separate approaches are outlined. This RFC proposes that we g
 - Add the following columns to the `blocks_user_commands` table in SQL
 
 ```
-fee_payer_amount : bigint NOT NULL,
-sender_amount : bigint NOT NULL,
-receiver_amount :  bigint NOT NULL
+fee_payer_balance : bigint NOT NULL,
+sender_balance : bigint NOT NULL,
+receiver_balance :  bigint NOT NULL
 ```
 
-These represent the amounts of tokens in the accounts (measured in nanocoda) after applying the user_command referenced by that block at that moment.
+These represent the amounts of tokens in the accounts (measured in nanomina) after applying the user_command referenced by that block at that moment.
 
 - Add the following columns to the `blocks_internal_commands` table in SQL
 
 ```
-receiver_amount :  bigint NOT NULL
+receiver_balance :  bigint NOT NULL
 ```
 
-This represent the amounts of tokens in the account (measured in nanocoda) after applying the internal_command referenced by that block at that moment.
+This represent the amounts of tokens in the account (measured in nanomina) after applying the internal_command referenced by that block at that moment.
 
 - (Approach B) Add a new table `timing_info` to the SQL database with the following schema:
 
