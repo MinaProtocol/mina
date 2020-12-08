@@ -455,6 +455,40 @@ module Make (Inputs : Inputs) = struct
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
 
+  let choices_length = HIR.length choices
+
+  let ( (prev_varss_n : Branches.n Nat.t)
+      , (prev_varss_length : (prev_varss, Branches.n) Length.t) ) =
+    let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
+    let T = Nat.eq_exn prev_varss_n Branches.n in
+    (prev_varss_n, prev_varss_length)
+
+  (* This abstract type serves an unfortunate purpose: we know that the type
+     derived for the module [Maxes] below is depedent on the values passed to
+     this functor, but OCaml has no sense of value-dependent types.
+
+     We prefer this to a generative functor because it allows our types to
+     alias between different 'instances' of this functor, giving us far more
+     flexibility in where and how we call it, particularly when loading keys.
+  *)
+  type maxes_ns
+
+  let full_signature =
+    let T = Max_branching.eq in
+    let padded, (maxes : (module Maxes.S with type length = Max_branching.n)) =
+      max_local_max_branchings (module Max_branching) prev_varss_length choices
+    in
+    (* This coercion allows the [Maxes.ns] type to escape as [maxes_ns]. *)
+    let (maxes
+          : (module Maxes.S
+               with type length = Max_branching.n
+                and type ns = maxes_ns)) =
+      Obj.magic maxes
+    in
+    {Full_signature.padded; maxes}
+
+  module Maxes = (val full_signature.maxes)
+
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
   end
@@ -484,12 +518,6 @@ module Make (Inputs : Inputs) = struct
    fun ~cache ?disk_keys () ->
     Timer.start __LOC__ ;
     let T = Max_branching.eq in
-    let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
-    let T = Nat.eq_exn prev_varss_n Branches.n in
-    let padded, (module Maxes) =
-      max_local_max_branchings (module Max_branching) prev_varss_length choices
-    in
-    let full_signature = {Full_signature.padded; maxes= (module Maxes)} in
     Timer.clock __LOC__ ;
     let wrap_domains =
       let module M = Wrap_domains.Make (A) (A_value) in
