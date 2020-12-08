@@ -346,7 +346,14 @@ module Debug = struct
       log
 end
 
-module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
+module type Inputs = sig
+  module A : Statement_var_intf
+
+  module A_value : Statement_value_intf
+end
+
+module Make (Inputs : Inputs) = struct
+  open Inputs
   module IR = Inductive_rule.T (A) (A_value)
   module HIR = H4.T (IR)
 
@@ -922,7 +929,10 @@ let compile
     | Some self ->
         self
   in
-  let module M = Make (A_var) (A_value) in
+  let module M = Make (struct
+    module A = A_var
+    module A_value = A_value
+  end) in
   let rec conv_irs : type v1ss v2ss wss hss.
          (v1ss, v2ss, wss, hss, a_var, a_value) H4_2.T(Inductive_rule).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
