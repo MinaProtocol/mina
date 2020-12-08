@@ -569,8 +569,8 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> [`Keep | `Take]
 
@@ -617,8 +617,8 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> bool
 

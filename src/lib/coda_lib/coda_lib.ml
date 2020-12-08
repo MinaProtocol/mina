@@ -998,7 +998,13 @@ let create ?wallets (config : Config.t) =
                         ~logger:config.logger))
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
-                     Best_tip_prover.prove ~logger:config.logger frontier ))
+                     let open Option.Let_syntax in
+                     let open Proof_carrying_data in
+                     let%map proof_with_data =
+                       Best_tip_prover.prove ~logger:config.logger frontier
+                     in
+                     { proof_with_data with
+                       data= With_hash.data proof_with_data.data } ))
               ~get_telemetry_data
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"

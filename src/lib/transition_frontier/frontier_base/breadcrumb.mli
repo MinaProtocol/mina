@@ -57,6 +57,9 @@ val protocol_state : t -> Coda_state.Protocol_state.Value.t
 
 val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
+val consensus_state_with_hash :
+  t -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
+
 val blockchain_length : t -> Unsigned.UInt32.t
 
 val state_hash : t -> State_hash.t

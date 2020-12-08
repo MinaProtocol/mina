@@ -55,7 +55,8 @@ module Rpcs : sig
   end
 
   module Get_ancestry : sig
-    type query = Consensus.Data.Consensus_state.Value.t
+    type query =
+      (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
       ( External_transition.t
@@ -187,7 +188,7 @@ val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 val get_ancestry :
      t
   -> Peer.Id.t
-  -> Consensus.Data.Consensus_state.Value.t
+  -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
