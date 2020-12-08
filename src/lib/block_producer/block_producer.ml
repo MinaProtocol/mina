@@ -386,7 +386,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 Transition_registry
             in
             let crumb = Transition_frontier.best_tip frontier in
-            [%log trace]
+            [%log info]
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
               "Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
@@ -533,7 +533,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                              | `Prover_error _ ) as err ->
                                err )
                     in
-                    [%str_log trace]
+                    [%str_log info]
                       ~metadata:
                         [("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
                       Block_produced ;

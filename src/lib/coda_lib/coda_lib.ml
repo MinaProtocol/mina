@@ -1175,7 +1175,7 @@ let create ?wallets (config : Config.t) =
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
                       if not (source = `Internal) then
-                        [%str_log' trace config.logger]
+                        [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
                               , External_transition.Validated.to_yojson
