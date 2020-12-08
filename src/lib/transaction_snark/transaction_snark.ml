@@ -1718,7 +1718,8 @@ module Base = struct
         (proof1_must_verify (), proof2_must_verify ())
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
-        { prevs= [snapp1_tag; snapp2_tag]
+        { identifier= "snapp-two-proved"
+        ; prevs= [snapp1_tag; snapp2_tag]
         ; main=
             (fun [t1; t2] x ->
               let s1, s2 = main t1 t2 ~constraint_constants x in
@@ -1858,7 +1859,8 @@ module Base = struct
         proof1_must_verify ()
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
-        { prevs= [snapp1_tag]
+        { identifier= "snapp-one-proved"
+        ; prevs= [snapp1_tag]
         ; main=
             (fun [t1] x ->
               let s1 = main t1 ~constraint_constants x in
@@ -1997,7 +1999,8 @@ module Base = struct
             s.next_available_token_before)
 
       let _rule ~constraint_constants : _ Pickles.Inductive_rule.t =
-        { prevs= []
+        { identifier= "snapp-zero-proved"
+        ; prevs= []
         ; main=
             (fun [] x ->
               let () = main ~constraint_constants x in
@@ -2847,7 +2850,8 @@ module Base = struct
           statement.next_available_token_after ]
 
   let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
-    { prevs= []
+    { identifier= "transaction"
+    ; prevs= []
     ; main=
         (fun [] x ->
           Run.run_checked (main ~constraint_constants x) ;
@@ -2936,7 +2940,8 @@ module Merge = struct
           false
     in
     let b = Boolean.var_of_value prev_should_verify in
-    { prevs= [self; self]
+    { identifier= "merge"
+    ; prevs= [self; self]
     ; main=
         (fun ps x ->
           Run.run_checked (main ps x) ;
@@ -2969,6 +2974,9 @@ let system ~constraint_constants =
         ~branches:(module Nat.N2)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
+        ~constraint_constants:
+          (Genesis_constants.Constraint_constants.to_snark_keys_header
+             constraint_constants)
         ~choices:(fun ~self ->
           [Base.rule ~constraint_constants; Merge.rule self] ) )
 
