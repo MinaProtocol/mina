@@ -192,7 +192,7 @@ module type Consensus_best_tip_prover_intf = sig
        logger:Logger.t
     -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
-    -> Consensus.Data.Consensus_state.Value.t
+    -> Consensus.Data.Consensus_state.Value.t * State_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -205,6 +205,7 @@ module type Consensus_best_tip_prover_intf = sig
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
     -> Consensus.Data.Consensus_state.Value.t
+    -> State_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t

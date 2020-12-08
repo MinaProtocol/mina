@@ -491,7 +491,10 @@ let calculate_diffs t breadcrumb =
           Consensus.Hooks.select
             ~constants:t.precomputed_values.consensus_constants
             ~existing:(Breadcrumb.consensus_state current_best_tip)
+            ~existing_protocol_state_hash:
+              (Breadcrumb.state_hash current_best_tip)
             ~candidate:(Breadcrumb.consensus_state breadcrumb)
+            ~candidate_protocol_state_hash:(Breadcrumb.state_hash breadcrumb)
             ~logger:
               (Logger.extend t.logger
                  [ ( "selection_context"

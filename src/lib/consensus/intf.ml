@@ -570,7 +570,9 @@ module type S = sig
     val select :
          constants:Constants.t
       -> existing:Consensus_state.Value.t
+      -> existing_protocol_state_hash:State_hash.t
       -> candidate:Consensus_state.Value.t
+      -> candidate_protocol_state_hash:State_hash.t
       -> logger:Logger.t
       -> [`Keep | `Take]
 
@@ -618,7 +620,9 @@ module type S = sig
     val should_bootstrap :
          constants:Constants.t
       -> existing:Consensus_state.Value.t
+      -> existing_protocol_state_hash:State_hash.t
       -> candidate:Consensus_state.Value.t
+      -> candidate_protocol_state_hash:State_hash.t
       -> logger:Logger.t
       -> bool
 

@@ -49,7 +49,7 @@ let time_deferred deferred =
   let end_time = Time.now () in
   (Time.diff end_time start_time, result)
 
-let worth_getting_root t candidate =
+let worth_getting_root t candidate candidate_protocol_state_hash =
   `Take
   = Consensus.Hooks.select ~constants:t.consensus_constants
       ~logger:
@@ -59,7 +59,10 @@ let worth_getting_root t candidate =
       ~existing:
         ( t.best_seen_transition
         |> External_transition.Initial_validated.consensus_state )
-      ~candidate
+      ~existing_protocol_state_hash:
+        ( t.best_seen_transition
+        |> External_transition.Initial_validated.state_hash )
+      ~candidate ~candidate_protocol_state_hash
 
 let received_bad_proof t host e =
   Trust_system.(
@@ -73,9 +76,9 @@ let received_bad_proof t host e =
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
 
-let should_sync ~root_sync_ledger t candidate_state =
+let should_sync ~root_sync_ledger t candidate_state candidate_state_hash =
   (not @@ done_syncing_root root_sync_ledger)
-  && worth_getting_root t candidate_state
+  && worth_getting_root t candidate_state candidate_state_hash
 
 let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
     peer_root =
@@ -120,12 +123,16 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
   let candidate_state =
     External_transition.consensus_state candidate_transition
   in
-  if not @@ should_sync ~root_sync_ledger t candidate_state then
-    Deferred.return `Ignored
+  let candidate_state_hash =
+    External_transition.state_hash candidate_transition
+  in
+  if
+    not @@ should_sync ~root_sync_ledger t candidate_state candidate_state_hash
+  then Deferred.return `Ignored
   else
     match%bind
       Coda_networking.get_ancestry t.network sender.Peer.peer_id
-        candidate_state
+        (candidate_state, candidate_state_hash)
     with
     | Error e ->
         [%log' error t.logger]
@@ -138,7 +145,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
             ~consensus_constants:t.consensus_constants ~genesis_constants
             ~precomputed_values:t.precomputed_values candidate_state
-            peer_root_with_proof.data
+            candidate_state_hash peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -163,7 +170,10 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
       Transition_cache.add transition_graph ~parent:previous_state_hash
         incoming_transition ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
-      if worth_getting_root t (External_transition.consensus_state transition)
+      if
+        worth_getting_root t
+          (External_transition.consensus_state transition)
+          (External_transition.state_hash transition)
       then (
         [%log' trace t.logger]
           "Added the transition from sync_ledger_reader into cache"
@@ -178,16 +188,20 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
 
 let external_transition_compare consensus_constants =
   Comparable.lift
-    (fun existing candidate ->
+    (fun (existing, existing_protocol_state_hash)
+         (candidate, candidate_protocol_state_hash) ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
       if Consensus.Data.Consensus_state.Value.equal existing candidate then 0
       else if
         `Keep
         = Consensus.Hooks.select ~constants:consensus_constants ~existing
-            ~candidate ~logger:(Logger.null ())
+            ~existing_protocol_state_hash ~candidate
+            ~candidate_protocol_state_hash ~logger:(Logger.null ())
       then -1
       else 1 )
-    ~f:External_transition.consensus_state
+    ~f:(fun transition ->
+      ( External_transition.consensus_state transition
+      , External_transition.state_hash transition ) )
 
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
@@ -500,9 +514,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 [ ( "context"
                   , `String "Filter collected transitions in bootstrap" ) ]
             in
-            let root_consensus_state =
-              Transition_frontier.(
-                Breadcrumb.consensus_state (root new_frontier))
+            let root_consensus_state, root_protocol_state_hash =
+              let frontier_root = Transition_frontier.root new_frontier in
+              ( Transition_frontier.Breadcrumb.consensus_state frontier_root
+              , Transition_frontier.Breadcrumb.state_hash frontier_root )
             in
             let filtered_collected_transitions =
               List.filter collected_transitions ~f:(fun incoming_transition ->
@@ -512,8 +527,11 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                   `Take
                   = Consensus.Hooks.select ~constants:t.consensus_constants
                       ~existing:root_consensus_state
+                      ~existing_protocol_state_hash:root_protocol_state_hash
                       ~candidate:
                         (External_transition.consensus_state transition)
+                      ~candidate_protocol_state_hash:
+                        (External_transition.state_hash transition)
                       ~logger )
             in
             [%log debug] "Sorting filtered transitions by consensus state"

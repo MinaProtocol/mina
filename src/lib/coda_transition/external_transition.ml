@@ -985,10 +985,13 @@ struct
     let hash = With_hash.hash t in
     let protocol_state = protocol_state (With_hash.data t) in
     let parent_hash = Protocol_state.previous_state_hash protocol_state in
-    let root_protocol_state =
-      Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.validated_transition
-      |> Validated.protocol_state
+    let root_protocol_state, root_protocol_state_hash =
+      let frontier_root =
+        Transition_frontier.root frontier
+        |> Transition_frontier.Breadcrumb.validated_transition
+      in
+      ( Validated.protocol_state frontier_root
+      , Validated.state_hash frontier_root )
     in
     let%bind () =
       Result.ok_if_true
@@ -1008,7 +1011,9 @@ struct
                        "External_transition.Transition_frontier_validation.validate_frontier_dependencies"
                    ) ])
             ~existing:(Protocol_state.consensus_state root_protocol_state)
-            ~candidate:(Protocol_state.consensus_state protocol_state) )
+            ~existing_protocol_state_hash:root_protocol_state_hash
+            ~candidate:(Protocol_state.consensus_state protocol_state)
+            ~candidate_protocol_state_hash:hash )
         ~error:`Not_selected_over_frontier_root
     in
     let%map () =

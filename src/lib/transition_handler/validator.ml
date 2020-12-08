@@ -17,9 +17,10 @@ let validate_transition ~consensus_constants ~logger ~frontier
     Envelope.Incoming.data enveloped_transition
   in
   let protocol_state = External_transition.protocol_state transition in
-  let root_protocol_state =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.protocol_state
+  let root_protocol_state, root_protocol_state_hash =
+    let frontier_root = Transition_frontier.root frontier in
+    ( Transition_frontier.Breadcrumb.protocol_state frontier_root
+    , Transition_frontier.Breadcrumb.state_hash frontier_root )
   in
   let%bind () =
     Option.fold (Transition_frontier.find frontier transition_hash)
@@ -40,7 +41,9 @@ let validate_transition ~consensus_constants ~logger ~frontier
             (Logger.extend logger
                [("selection_context", `String "Transition_handler.Validator")])
           ~existing:(consensus_state root_protocol_state)
-          ~candidate:(consensus_state protocol_state) )
+          ~existing_protocol_state_hash:root_protocol_state_hash
+          ~candidate:(consensus_state protocol_state)
+          ~candidate_protocol_state_hash:transition_hash )
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)

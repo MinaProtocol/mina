@@ -164,7 +164,8 @@ module Make (Inputs : Inputs_intf) :
              validated_transition )
 
   module Root = struct
-    let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
+    let prove ~logger ~consensus_constants ~frontier
+        (seen_consensus_state, seen_protocol_state_hash) =
       let open Option.Let_syntax in
       let%bind best_tip_with_witness =
         Best_tip_prover.prove ~logger frontier
@@ -175,33 +176,38 @@ module Make (Inputs : Inputs_intf) :
             (Logger.extend logger [("selection_context", `String "Root.prove")])
           ~existing:
             (External_transition.consensus_state best_tip_with_witness.data)
+          ~existing_protocol_state_hash:
+            (External_transition.state_hash best_tip_with_witness.data)
           ~candidate:seen_consensus_state
+          ~candidate_protocol_state_hash:seen_protocol_state_hash
         = `Keep
       in
       let%map () = Option.some_if is_tip_better () in
       best_tip_with_witness
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
-        ~precomputed_values observed_state peer_root =
+        ~precomputed_values observed_state observed_state_hash peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
         Best_tip_prover.verify ~verifier ~genesis_constants ~precomputed_values
           peer_root
       in
-      let is_before_best_tip candidate =
+      let is_before_best_tip candidate candidate_hash =
         Consensus.Hooks.select ~constants:consensus_constants
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.verify")])
           ~existing:
             (External_transition.consensus_state best_tip_transition.data)
-          ~candidate
+          ~existing_protocol_state_hash:
+            (External_transition.state_hash best_tip_transition.data)
+          ~candidate ~candidate_protocol_state_hash:candidate_hash
         = `Keep
       in
       let%map () =
         Deferred.return
           (Result.ok_if_true
-             (is_before_best_tip observed_state)
+             (is_before_best_tip observed_state observed_state_hash)
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"

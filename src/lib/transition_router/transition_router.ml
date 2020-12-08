@@ -18,17 +18,23 @@ let create_bufferred_pipe ?name () =
 
 let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
-  let root_state =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.protocol_state
+  let root_state, root_state_hash =
+    let frontier_root = Transition_frontier.root frontier in
+    ( Transition_frontier.Breadcrumb.protocol_state frontier_root
+    , Transition_frontier.Breadcrumb.state_hash frontier_root )
   in
   let new_state =
     External_transition.Initial_validated.protocol_state new_transition
   in
+  let new_state_hash =
+    External_transition.Initial_validated.state_hash new_transition
+  in
   let constants = precomputed_values.consensus_constants in
   Consensus.Hooks.should_bootstrap ~constants
     ~existing:(Protocol_state.consensus_state root_state)
+    ~existing_protocol_state_hash:root_state_hash
     ~candidate:(Protocol_state.consensus_state new_state)
+    ~candidate_protocol_state_hash:new_state_hash
     ~logger:
       (Logger.extend logger
          [ ( "selection_context"
@@ -468,8 +474,14 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                      ~existing:
                        (External_transition.Initial_validated.consensus_state
                           current_transition)
+                     ~existing_protocol_state_hash:
+                       (External_transition.Initial_validated.state_hash
+                          current_transition)
                      ~candidate:
                        (External_transition.Initial_validated.consensus_state
+                          incoming_transition)
+                     ~candidate_protocol_state_hash:
+                       (External_transition.Initial_validated.state_hash
                           incoming_transition)
                      ~logger
                    = `Take

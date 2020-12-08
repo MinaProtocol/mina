@@ -2881,7 +2881,8 @@ module Hooks = struct
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
 
-  let select ~constants ~existing ~candidate ~logger =
+  let select ~constants ~existing ~existing_protocol_state_hash ~candidate
+      ~candidate_protocol_state_hash ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
       [%log debug] "Select result: $choice -- $message"
@@ -2908,9 +2909,25 @@ module Hooks = struct
     (* Each branch contains a precondition predicate and a choice predicate,
      * which takes the new state when true. Each predicate is also decorated
      * with a string description, used for debugging messages *)
-    let candidate_vrf_is_bigger =
+    let candidate_vrf_or_protocol_state_is_bigger =
       let d x = Blake2.(to_raw_string (digest_string x)) in
-      String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
+      let c =
+        String.compare
+          (d candidate.last_vrf_output)
+          (d existing.last_vrf_output)
+      in
+      if c = 0 then
+        let to_bignum x =
+          Tick.Bigint.of_field x |> Tick.Bigint.to_bignum_bigint
+        in
+        let existing_protocol_state_hash =
+          to_bignum existing_protocol_state_hash
+        in
+        let candidate_protocol_state_hash =
+          to_bignum candidate_protocol_state_hash
+        in
+        Bigint.( > ) existing_protocol_state_hash candidate_protocol_state_hash
+      else c > 0
     in
     let less_than_or_equal_when a b ~condition =
       let c = Length.compare a b in
@@ -2918,7 +2935,8 @@ module Hooks = struct
     in
     let blockchain_length_is_longer =
       less_than_or_equal_when existing.blockchain_length
-        candidate.blockchain_length ~condition:candidate_vrf_is_bigger
+        candidate.blockchain_length
+        ~condition:candidate_vrf_or_protocol_state_is_bigger
     in
     let long_fork_chain_quality_is_better =
       less_than_or_equal_when existing.min_window_density
@@ -3144,9 +3162,13 @@ module Hooks = struct
     candidate - existing
     > (UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1)
 
-  let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
-      =
-    match select ~constants ~existing ~candidate ~logger with
+  let should_bootstrap ~(constants : Constants.t) ~existing
+      ~existing_protocol_state_hash ~candidate ~candidate_protocol_state_hash
+      ~logger =
+    match
+      select ~constants ~existing ~existing_protocol_state_hash ~candidate
+        ~candidate_protocol_state_hash ~logger
+    with
     | `Keep ->
         false
     | `Take ->
