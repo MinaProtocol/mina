@@ -184,9 +184,7 @@ let external_transition_compare consensus_constants =
   Comparable.lift
     (fun existing candidate ->
       (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
-      if
-        Consensus.Data.Consensus_state.Value.equal (With_hash.data existing)
-          (With_hash.data candidate)
+      if State_hash.equal (With_hash.hash existing) (With_hash.hash candidate)
       then 0
       else if
         `Keep
