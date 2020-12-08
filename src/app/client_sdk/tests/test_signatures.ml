@@ -35,7 +35,6 @@ let keypair =
     Private_key.of_base58_check_exn
       "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"
   in
-  printf !"privkey = %{sexp:Inner_curve.Scalar.t}\n%!" private_key ;
   let public_key = Public_key.decompress_exn signer_pk in
   Keypair.{public_key; private_key}
 
@@ -100,11 +99,6 @@ let delegations =
       ~nonce:1010 ~valid_until:100000 "another memo" ]
 
 let transactions = payments @ delegations
-
-let () =
-  printf "txns = %s\n"
-    (Yojson.Safe.to_string
-       (`List (List.map payments ~f:Signed_command_payload.to_yojson)))
 
 type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 
