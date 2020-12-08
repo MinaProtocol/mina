@@ -331,7 +331,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~snarked_ledger:temp_mask ~expected_merkle_root
                     ~pending_coinbases ~get_state
                 in
-                ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
+                ignore
+                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask) ;
                 Result.map result
                   ~f:
                     (const
@@ -702,7 +703,9 @@ let%test_module "Bootstrap_controller tests" =
         Transition_frontier.(
           Breadcrumb.validated_transition (root my_net.state.frontier))
       in
-      let%bind () = Transition_frontier.close my_net.state.frontier in
+      let%bind () =
+        Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
+      in
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run ~logger ~trust_system ~verifier ~network:my_net.network

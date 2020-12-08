@@ -119,6 +119,44 @@ module M = Monad.Make2 (T)
 include T
 include M
 
+module Result = struct
+  type nonrec ('a, 'b, 's) t = (('a, 'b) Result.t, 's) t
+
+  include Monad.Make3 (struct
+    type nonrec ('a, 'b, 's) t = ('a, 'b, 's) t
+
+    let bind x ~f =
+      x >>= function Ok y -> f y | Error err -> return (Error err)
+
+    let map = `Define_using_bind
+
+    let return x = return (Result.return x)
+  end)
+end
+
+module Or_error = struct
+  type nonrec ('a, 's) t = ('a Or_error.t, 's) t
+
+  include (
+    Result :
+      module type of Result with type ('a, 'b, 's) t := ('a, 'b, 's) Result.t )
+end
+
+module Deferred_let_syntax = struct
+  module Let_syntax = struct
+    let return = return
+
+    let bind x ~f = bind (uninterruptible x) ~f
+
+    let map x ~f = map (uninterruptible x) ~f
+
+    let both x y =
+      Let_syntax.Let_syntax.both (uninterruptible x) (uninterruptible y)
+
+    module Open_on_rhs = Deferred.Let_syntax
+  end
+end
+
 let%test_unit "monad gets interrupted" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let r = ref 0 in
