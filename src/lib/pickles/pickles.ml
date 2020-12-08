@@ -404,7 +404,20 @@ module Make (Inputs : Inputs) = struct
     | r :: rs ->
         r :: conv_irs rs
 
-  let choices ~self = conv_irs (choices ~self)
+  let choices = conv_irs (choices ~self)
+
+  let snark_keys_header kind constraint_system_hash =
+    { Snark_keys_header.header_version= Snark_keys_header.header_version
+    ; kind
+    ; constraint_constants
+    ; commits=
+        {mina= Coda_version.commit_id; marlin= Coda_version.marlin_commit_id}
+    ; length= (* This is a dummy, it gets filled in on read/write. *) 0
+    ; commit_date= Coda_version.commit_date
+    ; constraint_system_hash
+    ; identifying_hash=
+        (* TODO: Proper identifying hash. *)
+        constraint_system_hash }
 
   let max_local_max_branchings (type n)
       (module Max_branching : Nat.Intf with type n = n) branches choices =
@@ -469,22 +482,8 @@ module Make (Inputs : Inputs) = struct
          * _
          * _ =
    fun ~cache ?disk_keys () ->
-    let snark_keys_header kind constraint_system_hash =
-      { Snark_keys_header.header_version= Snark_keys_header.header_version
-      ; kind
-      ; constraint_constants
-      ; commits=
-          {mina= Coda_version.commit_id; marlin= Coda_version.marlin_commit_id}
-      ; length= (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date= Coda_version.commit_date
-      ; constraint_system_hash
-      ; identifying_hash=
-          (* TODO: Proper identifying hash. *)
-          constraint_system_hash }
-    in
     Timer.start __LOC__ ;
     let T = Max_branching.eq in
-    let choices = choices ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
     let T = Nat.eq_exn prev_varss_n Branches.n in
     let padded, (module Maxes) =
