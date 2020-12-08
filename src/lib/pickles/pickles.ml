@@ -463,6 +463,8 @@ module Make (Inputs : Inputs) = struct
     let T = Nat.eq_exn prev_varss_n Branches.n in
     (prev_varss_n, prev_varss_length)
 
+  let () = Timer.start __LOC__
+
   (* This abstract type serves an unfortunate purpose: we know that the type
      derived for the module [Maxes] below is depedent on the values passed to
      this functor, but OCaml has no sense of value-dependent types.
@@ -485,9 +487,44 @@ module Make (Inputs : Inputs) = struct
                 and type ns = maxes_ns)) =
       Obj.magic maxes
     in
+    Timer.clock __LOC__ ;
     {Full_signature.padded; maxes}
 
   module Maxes = (val full_signature.maxes)
+
+  let wrap_domains =
+    let module M = Wrap_domains.Make (A) (A_value) in
+    let rec f : type a b c d.
+        (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t = function
+      | [] ->
+          []
+      | x :: xs ->
+          x :: f xs
+    in
+    let res =
+      M.f full_signature prev_varss_n prev_varss_length ~self
+        ~choices:(f choices)
+        ~max_branching:(module Max_branching)
+    in
+    Timer.clock __LOC__ ; res
+
+  let step_widths =
+    let module M =
+      H4.Map
+        (IR)
+        (E04 (Int))
+        (struct
+          module M = H4.T (Tag)
+
+          let f : type a b c d. (a, b, c, d) IR.t -> int =
+           fun r ->
+            let (T (n, _)) = M.length r.prevs in
+            Nat.to_int n
+        end)
+    in
+    let module V = H4.To_vector (Int) in
+    let res = V.f prev_varss_length (M.f choices) in
+    Timer.clock __LOC__ ; res
 
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
@@ -516,22 +553,7 @@ module Make (Inputs : Inputs) = struct
          * _
          * _ =
    fun ~cache ?disk_keys () ->
-    Timer.start __LOC__ ;
     let T = Max_branching.eq in
-    Timer.clock __LOC__ ;
-    let wrap_domains =
-      let module M = Wrap_domains.Make (A) (A_value) in
-      let rec f : type a b c d.
-          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(M.I).t = function
-        | [] ->
-            []
-        | x :: xs ->
-            x :: f xs
-      in
-      M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
-        ~max_branching:(module Max_branching)
-    in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm) t =
@@ -545,23 +567,6 @@ module Make (Inputs : Inputs) = struct
         , 'm )
         Step_branch_data.t
     end in
-    let step_widths =
-      let module M =
-        H4.Map
-          (IR)
-          (E04 (Int))
-          (struct
-            module M = H4.T (Tag)
-
-            let f : type a b c d. (a, b, c, d) IR.t -> int =
-             fun r ->
-              let (T (n, _)) = M.length r.prevs in
-              Nat.to_int n
-          end)
-      in
-      let module V = H4.To_vector (Int) in
-      V.f prev_varss_length (M.f choices)
-    in
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
