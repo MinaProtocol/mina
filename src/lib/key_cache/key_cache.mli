@@ -20,7 +20,7 @@ end) : sig
   type ('k, 'v) t =
     { to_string: 'k -> string
     ; read: 'k -> path:string -> 'v M.t
-    ; write: 'v -> string -> unit M.t }
+    ; write: 'k -> 'v -> string -> unit M.t }
 end
 
 module type S = sig
@@ -35,7 +35,7 @@ module type S = sig
     type ('k, 'v) t = ('k, 'v) Disk_storable(M).t =
       { to_string: 'k -> string
       ; read: 'k -> path:string -> 'v M.t
-      ; write: 'v -> string -> unit M.t }
+      ; write: 'k -> 'v -> string -> unit M.t }
 
     val of_binable :
       ('k -> string) -> (module Binable.S with type t = 'v) -> ('k, 'v) t
@@ -43,7 +43,7 @@ module type S = sig
     val simple :
          ('k -> string)
       -> ('k -> path:string -> 'v M.t)
-      -> ('v -> string -> unit M.t)
+      -> ('k -> 'v -> string -> unit M.t)
       -> ('k, 'v) t
   end
 
