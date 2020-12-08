@@ -286,7 +286,8 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
-  { prevs= [self; transaction_snark]
+  { identifier= "step"
+  ; prevs= [self; transaction_snark]
   ; main=
       (fun [x1; x2] x ->
         let b1, b2 =
@@ -374,6 +375,9 @@ end) : S = struct
       ~branches:(module Nat.N1)
       ~max_branching:(module Nat.N2)
       ~name:"blockchain-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants)
       ~choices:(fun ~self ->
         [rule ~proof_level ~constraint_constants T.tag self] )
 

@@ -49,7 +49,8 @@ module Make (Inputs : Inputs_intf) = struct
             Key_cache.Sync.Disk_storable.simple
               (fun () -> name)
               (fun () ~path -> Or_error.try_with (fun () -> Urs.read path))
-              (fun urs path -> Or_error.try_with (fun () -> Urs.write urs path))
+              (fun _ urs path ->
+                Or_error.try_with (fun () -> Urs.write urs path) )
           in
           let u =
             match Key_cache.Sync.read specs store () with
