@@ -1,10 +1,9 @@
-use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
-use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
     tweedle::{
         dum::{Affine as GAffine, Projective as GProjective},
         fp::Fp,
+        fq::Fq,
     },
     One, UniformRand, Zero,
 };
@@ -45,8 +44,8 @@ pub fn caml_tweedle_dum_double(x: CamlTweedleDumPtr) -> CamlTweedleDum {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_scale(x: CamlTweedleDumPtr, y: CamlTweedleFqPtr) -> CamlTweedleDum {
-    CamlTweedleDum(x.as_ref().0.mul(y.as_ref().0))
+pub fn caml_tweedle_dum_scale(x: CamlTweedleDumPtr, y: Fq) -> CamlTweedleDum {
+    CamlTweedleDum(x.as_ref().0.mul(y))
 }
 
 #[ocaml::func]
@@ -64,15 +63,15 @@ pub fn caml_tweedle_dum_rng(i: ocaml::Int) -> CamlTweedleDum {
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_tweedle_dum_endo_base() -> CamlTweedleFp {
+pub extern "C" fn caml_tweedle_dum_endo_base() -> Fp {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlTweedleFp(endo_q)
+    endo_q
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_tweedle_dum_endo_scalar() -> CamlTweedleFq {
+pub extern "C" fn caml_tweedle_dum_endo_scalar() -> Fq {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlTweedleFq(endo_r)
+    endo_r
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -82,47 +81,38 @@ pub enum CamlTweedleDumAffine<T> {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_to_affine(x: CamlTweedleDumPtr) -> CamlTweedleDumAffine<CamlTweedleFp> {
+pub fn caml_tweedle_dum_to_affine(x: CamlTweedleDumPtr) -> CamlTweedleDumAffine<Fp> {
     x.as_ref().0.into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<CamlTweedleFpPtr>) -> CamlTweedleDum {
+pub fn caml_tweedle_dum_of_affine(x: CamlTweedleDumAffine<Fp>) -> CamlTweedleDum {
     CamlTweedleDum(Into::<GAffine>::into(x).into_projective())
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_dum_of_affine_coordinates(
-    x: CamlTweedleFpPtr,
-    y: CamlTweedleFpPtr,
+    x: Fp,
+    y: Fp,
 ) -> CamlTweedleDum {
-    CamlTweedleDum(GProjective::new(x.as_ref().0, y.as_ref().0, Fp::one()))
+    CamlTweedleDum(GProjective::new(x, y, Fp::one()))
 }
 
-impl From<GAffine> for CamlTweedleDumAffine<CamlTweedleFp> {
+impl From<GAffine> for CamlTweedleDumAffine<Fp> {
     fn from(p: GAffine) -> Self {
         if p.is_zero() {
             CamlTweedleDumAffine::Infinity
         } else {
-            CamlTweedleDumAffine::Finite((CamlTweedleFp(p.x), CamlTweedleFp(p.y)))
+            CamlTweedleDumAffine::Finite((p.x, p.y))
         }
     }
 }
 
-impl From<CamlTweedleDumAffine<CamlTweedleFp>> for GAffine {
-    fn from(p: CamlTweedleDumAffine<CamlTweedleFp>) -> Self {
+impl From<CamlTweedleDumAffine<Fp>> for GAffine {
+    fn from(p: CamlTweedleDumAffine<Fp>) -> Self {
         match p {
             CamlTweedleDumAffine::Infinity => GAffine::zero(),
-            CamlTweedleDumAffine::Finite((x, y)) => GAffine::new(x.0, y.0, false),
-        }
-    }
-}
-
-impl From<CamlTweedleDumAffine<CamlTweedleFpPtr>> for GAffine {
-    fn from(p: CamlTweedleDumAffine<CamlTweedleFpPtr>) -> Self {
-        match p {
-            CamlTweedleDumAffine::Infinity => GAffine::zero(),
-            CamlTweedleDumAffine::Finite((x, y)) => GAffine::new(x.as_ref().0, y.as_ref().0, false),
+            CamlTweedleDumAffine::Finite((x, y)) => GAffine::new(x, y, false),
         }
     }
 }
@@ -130,10 +120,10 @@ impl From<CamlTweedleDumAffine<CamlTweedleFpPtr>> for GAffine {
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlTweedleDumPolyComm<T> {
     shifted: Option<CamlTweedleDumAffine<T>>,
-    unshifted: Vec<CamlTweedleDumAffine<CamlTweedleFp>>,
+    unshifted: Vec<CamlTweedleDumAffine<Fp>>,
 }
 
-impl From<PolyComm<GAffine>> for CamlTweedleDumPolyComm<CamlTweedleFp> {
+impl From<PolyComm<GAffine>> for CamlTweedleDumPolyComm<Fp> {
     fn from(c: PolyComm<GAffine>) -> Self {
         CamlTweedleDumPolyComm {
             shifted: Option::map(c.shifted, Into::into),
@@ -142,17 +132,8 @@ impl From<PolyComm<GAffine>> for CamlTweedleDumPolyComm<CamlTweedleFp> {
     }
 }
 
-impl From<CamlTweedleDumPolyComm<CamlTweedleFp>> for PolyComm<GAffine> {
-    fn from(c: CamlTweedleDumPolyComm<CamlTweedleFp>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlTweedleDumPolyComm<CamlTweedleFpPtr>> for PolyComm<GAffine> {
-    fn from(c: CamlTweedleDumPolyComm<CamlTweedleFpPtr>) -> Self {
+impl From<CamlTweedleDumPolyComm<Fp>> for PolyComm<GAffine> {
+    fn from(c: CamlTweedleDumPolyComm<Fp>) -> Self {
         PolyComm {
             shifted: Option::map(c.shifted, Into::into),
             unshifted: c.unshifted.into_iter().map(From::from).collect(),

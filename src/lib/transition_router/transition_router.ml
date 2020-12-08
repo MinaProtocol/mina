@@ -306,7 +306,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
-        let%map () = Transition_frontier.close frontier in
+        let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
           ~time_controller ~producer_transition_reader_ref
           ~producer_transition_writer_ref ~verified_transition_writer
@@ -318,13 +318,13 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         [%log info]
           "Network best tip is recent enough to catchup to; syncing local \
            state and starting participation" ;
-        let root = Transition_frontier.root frontier in
+        let curr_best_tip = Transition_frontier.best_tip frontier in
         let%map () =
           match
             Consensus.Hooks.required_local_state_sync
               ~constants:precomputed_values.consensus_constants
               ~consensus_state:
-                (Transition_frontier.Breadcrumb.consensus_state root)
+                (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
               ~local_state:consensus_local_state
           with
           | None ->
@@ -501,7 +501,9 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                             let%bind () =
                               Strict_pipe.Writer.write clear_writer `Clear
                             in
-                            let%map () = Transition_frontier.close frontier in
+                            let%map () =
+                              Transition_frontier.close ~loc:__LOC__ frontier
+                            in
                             start_bootstrap_controller ~logger ~trust_system
                               ~verifier ~network ~time_controller
                               ~producer_transition_reader_ref

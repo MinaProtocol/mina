@@ -45,11 +45,20 @@ module Make (Inputs : Inputs_intf) :
 
   type path = Path.t
 
+  module Detached_parent_signal = struct
+    type t = unit Async.Ivar.t
+
+    let sexp_of_t (_ : t) = Sexp.List []
+
+    let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
+  end
+
   type t =
     { uuid: Uuid.Stable.V1.t
     ; kvdb: Kvdb.t sexp_opaque
     ; depth: int
-    ; directory: string }
+    ; directory: string
+    ; detached_parent_signal: Detached_parent_signal.t }
   [@@deriving sexp]
 
   let get_uuid t = t.uuid
@@ -73,14 +82,23 @@ module Make (Inputs : Inputs_intf) :
     in
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
-    {uuid; kvdb; depth; directory}
+    {uuid; kvdb; depth; directory; detached_parent_signal= Async.Ivar.create ()}
 
   let create_checkpoint t ~directory_name () =
     let uuid = Uuid_unix.create () in
     let kvdb = Kvdb.create_checkpoint t.kvdb directory_name in
-    {uuid; kvdb; depth= t.depth; directory= directory_name}
+    { uuid
+    ; kvdb
+    ; depth= t.depth
+    ; directory= directory_name
+    ; detached_parent_signal= Async.Ivar.create () }
 
-  let close {kvdb; uuid= _; depth= _; directory= _} = Kvdb.close kvdb
+  let close {kvdb; uuid= _; depth= _; directory= _; detached_parent_signal} =
+    Kvdb.close kvdb ;
+    Async.Ivar.fill_if_empty detached_parent_signal ()
+
+  let detached_signal {detached_parent_signal; _} =
+    Async.Ivar.read detached_parent_signal
 
   let with_ledger ~depth ~f =
     let t = create ~depth () in

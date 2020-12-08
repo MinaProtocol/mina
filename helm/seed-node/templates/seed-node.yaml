@@ -47,7 +47,6 @@ spec:
           "-log-json",
           "-log-snark-work-gossip", "true",
           "-config-directory", "/root/.coda-config",
-          "-log-received-blocks", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
@@ -101,4 +100,5 @@ spec:
         configMap:
           name: {{ tpl .Values.seed.fullname . }}-daemon-config
       {{- end -}}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{- end }}

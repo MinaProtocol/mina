@@ -71,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (Coda_net2.validation_result -> unit) )
+      * Coda_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -858,7 +858,7 @@ let create ?wallets (config : Config.t) =
               | None ->
                   Deferred.unit
               | Some frontier ->
-                  Transition_frontier.close frontier ) ;
+                  Transition_frontier.close ~loc:__LOC__ frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
@@ -1138,12 +1138,22 @@ let create ?wallets (config : Config.t) =
                            Transition_frontier.Breadcrumb.validated_transition
                              breadcrumb
                          in
+                         let validation_callback =
+                           Coda_net2.Validation_callback
+                           .create_without_expiration ()
+                         in
                          External_transition.Validated.poke_validation_callback
-                           et (fun v ->
-                             if v = `Accept then
-                               Coda_networking.broadcast_state net
-                               @@ External_transition.Validation
-                                  .forget_validation_with_hash et ) ;
+                           et validation_callback ;
+                         don't_wait_for
+                           (* this will never throw since the callback was created without expiration *)
+                           (let%map v =
+                              Coda_net2.Validation_callback.await_exn
+                                validation_callback
+                            in
+                            if v = `Accept then
+                              Coda_networking.broadcast_state net
+                                (External_transition.Validation
+                                 .forget_validation_with_hash et)) ;
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~precomputed_values:config.precomputed_values )
@@ -1189,7 +1199,7 @@ let create ?wallets (config : Config.t) =
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
                       if not (source = `Internal) then
-                        [%str_log' trace config.logger]
+                        [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
                               , External_transition.Validated.to_yojson

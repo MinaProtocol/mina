@@ -160,6 +160,8 @@ module Make0 (Base_ledger : sig
   val location_of_account : t -> Account_id.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
+
+  val detached_signal : t -> unit Deferred.t
 end) (Staged_ledger : sig
   type t
 
@@ -191,8 +193,29 @@ struct
 
     module Batcher = Batcher.Transaction_pool
 
+    module Lru_cache = struct
+      let max_size = 2048
+
+      module T = struct
+        type t = User_command.t list [@@deriving hash]
+      end
+
+      module Q = Hash_queue.Make_with_table (Int) (Int.Table)
+
+      type t = unit Q.t
+
+      let mem t h = Q.mem t h
+
+      let add t h =
+        if not (Q.mem t h) then (
+          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
+          Q.enqueue_back_exn t h () )
+        else Q.lookup_and_move_to_back t h |> ignore
+    end
+
     type t =
       { mutable pool: Indexed_pool.t
+      ; recently_seen: Lru_cache.t sexp_opaque
       ; locally_generated_uncommitted:
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t )
@@ -604,6 +627,7 @@ struct
         ; logger
         ; batcher= Batcher.create config.verifier
         ; best_tip_diff_relay= None
+        ; recently_seen= Lru_cache.Q.create ()
         ; best_tip_ledger= None }
       in
       don't_wait_for
@@ -612,6 +636,7 @@ struct
              match frontier_opt with
              | None -> (
                  [%log debug] "no frontier" ;
+                 t.best_tip_ledger <- None ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
                  match t.best_tip_diff_relay with
@@ -619,7 +644,6 @@ struct
                      Deferred.unit
                  | Some hdl ->
                      let is_finished = ref false in
-                     t.best_tip_ledger <- None ;
                      Deferred.any_unit
                        [ (let%map () = hdl in
                           t.best_tip_diff_relay <- None ;
@@ -780,7 +804,7 @@ struct
           verified Envelope.Incoming.t Deferred.Or_error.t =
         let open Deferred.Let_syntax in
         let sender = Envelope.Incoming.sender diffs in
-        let diffs_are_valid =
+        let diffs_are_valid () =
           List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
               let is_valid = not (User_command.has_insufficient_fee cmd) in
               if not is_valid then
@@ -794,7 +818,11 @@ struct
                     ] ;
               is_valid )
         in
-        if not diffs_are_valid then
+        let h = Lru_cache.T.hash diffs.data in
+        let already_mem = Lru_cache.mem t.recently_seen h in
+        Lru_cache.add t.recently_seen h ;
+        if already_mem then Deferred.Or_error.error_string "already saw this"
+        else if not (diffs_are_valid ()) then
           Deferred.Or_error.error_string
             "at least one user command had an insufficient fee"
         else
@@ -850,16 +878,17 @@ struct
             Deferred.Or_error.error_string
               "Got transaction pool diff when transition frontier is \
                unavailable, ignoring."
-        | Some ledger ->
+        | Some ledger -> (
             let trust_record =
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
             in
             let rec go txs' pool (accepted, rejected) =
+              let open Interruptible.Deferred_let_syntax in
               match txs' with
               | [] ->
                   t.pool <- pool ;
-                  Deferred.Or_error.return
+                  Interruptible.Or_error.return
                   @@ (List.rev accepted, List.rev rejected)
               | tx' :: txs'' -> (
                   let tx = User_command.forget_check tx' in
@@ -1115,7 +1144,22 @@ struct
                             , (tx, Diff_versioned.Diff_error.Insufficient_fee)
                               :: rejected ) )
             in
-            go txs t.pool ([], [])
+            match%map
+              Interruptible.force
+              @@
+              let open Interruptible.Let_syntax in
+              let signal =
+                Deferred.map (Base_ledger.detached_signal ledger) ~f:(fun () ->
+                    Error.createf "Ledger was detatched"
+                    |> Error.tag ~tag:"Transaction_pool.apply" )
+              in
+              let%bind () = Interruptible.lift Deferred.unit signal in
+              go txs t.pool ([], [])
+            with
+            | Ok res ->
+                res
+            | Error err ->
+                Error err )
 
       let unsafe_apply t diff =
         match%map apply t diff with
@@ -1211,6 +1255,8 @@ let%test_module _ =
       let location_of_account _t k = Some k
 
       let get t l = Map.find t l
+
+      let detached_signal _ = Deferred.never ()
     end
 
     module Mock_staged_ledger = struct

@@ -36,7 +36,6 @@ Parameter | Description | Default
 `blockProducerConfigs[].privateKeySecret` | account wallet private key secret associated with Coda test account/wallet | `<item-data>`
 `blockProducerConfigs[].externalPort` | Port Coda clients use for connecting to the external network | `<item-data>`
 `coda.logLevel` | log level to set for Coda daemon | `TRACE` 
-`coda.logReceivedBlocks` | whether the Coda daemon should log received blocks events | `false`
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
 `coda.privKeyPass` | public-private key-pair associated with Coda daemon account | `see [default] values.yaml`
