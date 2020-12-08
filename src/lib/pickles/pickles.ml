@@ -288,58 +288,7 @@ module Proof_system = struct
            t
 end
 
-module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
-  module IR = Inductive_rule.T (A) (A_value)
-  module HIR = H4.T (IR)
-
-  let max_local_max_branchings ~self (type n)
-      (module Max_branching : Nat.Intf with type n = n) branches choices =
-    let module Local_max_branchings = struct
-      type t = (int, Max_branching.n) Vector.t
-    end in
-    let module M =
-      H4.Map
-        (IR)
-        (E04 (Local_max_branchings))
-        (struct
-          module V = H4.To_vector (Int)
-          module HT = H4.T (Tag)
-
-          module M =
-            H4.Map
-              (Tag)
-              (E04 (Int))
-              (struct
-                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                  if Type_equal.Id.same t.id self then
-                    Nat.to_int Max_branching.n
-                  else
-                    let (module M) = Types_map.max_branching t in
-                    Nat.to_int M.n
-              end)
-
-          let f : type a b c d. (a, b, c, d) IR.t -> Local_max_branchings.t =
-           fun rule ->
-            let (T (_, l)) = HT.length rule.prevs in
-            Vector.extend_exn (V.f l (M.f rule.prevs)) Max_branching.n 0
-        end)
-    in
-    let module V = H4.To_vector (Local_max_branchings) in
-    let padded = V.f branches (M.f choices) |> Vector.transpose in
-    (padded, Maxes.m padded)
-
-  module Lazy_ (A : T0) = struct
-    type t = A.t Lazy.t
-  end
-
-  module Lazy_keys = struct
-    type t =
-      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t) Lazy.t
-
-    (* TODO Think this is right.. *)
-  end
-
+module Debug = struct
   let log_step main typ name index =
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
@@ -395,6 +344,59 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
          name (Type_equal.Id.uid id))
       log
+end
+
+module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
+  module IR = Inductive_rule.T (A) (A_value)
+  module HIR = H4.T (IR)
+
+  let max_local_max_branchings ~self (type n)
+      (module Max_branching : Nat.Intf with type n = n) branches choices =
+    let module Local_max_branchings = struct
+      type t = (int, Max_branching.n) Vector.t
+    end in
+    let module M =
+      H4.Map
+        (IR)
+        (E04 (Local_max_branchings))
+        (struct
+          module V = H4.To_vector (Int)
+          module HT = H4.T (Tag)
+
+          module M =
+            H4.Map
+              (Tag)
+              (E04 (Int))
+              (struct
+                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
+                  if Type_equal.Id.same t.id self then
+                    Nat.to_int Max_branching.n
+                  else
+                    let (module M) = Types_map.max_branching t in
+                    Nat.to_int M.n
+              end)
+
+          let f : type a b c d. (a, b, c, d) IR.t -> Local_max_branchings.t =
+           fun rule ->
+            let (T (_, l)) = HT.length rule.prevs in
+            Vector.extend_exn (V.f l (M.f rule.prevs)) Max_branching.n 0
+        end)
+    in
+    let module V = H4.To_vector (Local_max_branchings) in
+    let padded = V.f branches (M.f choices) |> Vector.transpose in
+    (padded, Maxes.m padded)
+
+  module Lazy_ (A : T0) = struct
+    type t = A.t Lazy.t
+  end
+
+  module Lazy_keys = struct
+    type t =
+      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t) Lazy.t
+
+    (* TODO Think this is right.. *)
+  end
 
   let compile
       : type prev_varss prev_valuess widthss heightss max_branching branches.
@@ -547,7 +549,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                   (Impls.Step.with_label "conv" (fun () -> conv x))
                   ~step_domains
               in
-              let () = if debug then log_step main typ name b.index in
+              let () = if debug then Debug.log_step main typ name b.index in
               let open Impls.Step in
               let k_p =
                 lazy
@@ -640,7 +642,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = wrap_main (conv x) in
-      let () = if debug then log_wrap main typ name self.id in
+      let () = if debug then Debug.log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
