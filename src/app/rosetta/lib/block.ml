@@ -22,9 +22,6 @@ module Get_coinbase_and_genesis =
       peers
     }
     initialPeers
-    genesisConstants {
-      coinbase @bsDecoder(fn: "Decoders.uint64")
-    }
   }
 |}]
 
@@ -79,7 +76,7 @@ module Internal_command_info = struct
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
 
-    let to_operations ~coinbase_receiver ~coinbase (t : t) :
+    let to_operations ~coinbase_receiver (t : t) :
         (Operation.t list, Errors.t) M.t =
       (* We choose to represent the dec-side of fee transfers from txns from the
        * canonical user command that created them so we are able consistently
@@ -111,7 +108,7 @@ module Internal_command_info = struct
                 ; account=
                     Some (account_id t.receiver Amount_of.Token_id.default)
                 ; _type= Operation_types.name `Coinbase_inc
-                ; amount= Some (Amount_of.coda coinbase)
+                ; amount= Some (Amount_of.token t.token t.fee)
                 ; coin_change= None
                 ; metadata= None }
           | `Fee_receiver_inc ->
@@ -207,7 +204,7 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
@@ -530,11 +527,6 @@ module Specific = struct
                    object
                      method stateHash = "STATE_HASH_GENESIS"
                    end
-
-                 method genesisConstants =
-                   object
-                     method coinbase = Unsigned.UInt64.of_int 20_000_000_000
-                   end
                end )
           (* TODO: Add variants to cover every branch *)
       ; logger
@@ -579,7 +571,6 @@ module Specific = struct
             ; user_commands= [] }
         else env.db_block query
       in
-      let coinbase = (res#genesisConstants)#coinbase in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
             info.Internal_command_info.kind = `Coinbase )
@@ -590,8 +581,7 @@ module Specific = struct
           ~f:(fun macc info ->
             let%bind acc = macc in
             let%map operations =
-              Internal_command_info_ops.to_operations ~coinbase_receiver
-                ~coinbase info
+              Internal_command_info_ops.to_operations ~coinbase_receiver info
             in
             [%log debug]
               ~metadata:[("info", Internal_command_info.to_yojson info)]
