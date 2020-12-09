@@ -315,7 +315,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?
-	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers), pubsub.WithValidateQueueSize(150)}
 	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
 
