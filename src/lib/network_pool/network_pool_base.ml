@@ -109,23 +109,23 @@ end)
           ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
 
-  let log_meter_occasionally t meter =
+  let log_rate_limiter_occasionally t rl =
     let time = Time_ns.Span.of_min 1. in
     every time (fun () ->
         [%log' info t.logger]
-          ~metadata:[("meter", Meter.summary meter)]
-          !"%s $meter" Resource_pool.label )
+          ~metadata:[("rate_limiter", Rate_limiter.summary rl)]
+          !"%s $rate_limiter" Resource_pool.label )
 
   let filter_verified pipe t ~f =
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered (`Capacity 1024, `Overflow Drop_head))
     in
-    let meter =
-      Meter.create
+    let rl =
+      Rate_limiter.create
         ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
     in
-    log_meter_occasionally t meter ;
+    log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
@@ -136,7 +136,7 @@ end)
           [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
           don't_wait_for
             ( match
-                Meter.add meter diff.sender ~now:(Time.now ())
+                Rate_limiter.add rl diff.sender ~now:(Time.now ())
                   ~score:(Resource_pool.Diff.score diff.data)
               with
             | `Capacity_exceeded ->

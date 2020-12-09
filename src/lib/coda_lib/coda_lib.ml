@@ -820,15 +820,16 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
-            let log_meter_occasionally meter =
+            let log_rate_limiter_occasionally rl =
               let t = Time.Span.of_min 1. in
               every t (fun () ->
                   [%log' info config.logger]
-                    ~metadata:[("meter", Network_pool.Meter.summary meter)]
-                    !"new_block $meter" meter )
+                    ~metadata:
+                      [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+                    !"new_block $rate_limiter" )
             in
-            let meter =
-              Network_pool.Meter.create
+            let rl =
+              Network_pool.Rate_limiter.create
                 ~capacity:
                   ( (* Max of 20 transitions per slot per peer. *)
                     20
@@ -836,12 +837,12 @@ let create ?wallets (config : Config.t) =
                       (Block_time.Span.to_time_span
                          consensus_constants.slot_duration_ms) )
             in
-            log_meter_occasionally meter ;
+            log_rate_limiter_occasionally rl ;
             let r, w = Strict_pipe.create Synchronous in
             ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
                   let sender = Envelope.Incoming.sender e in
                   match
-                    Network_pool.Meter.add meter sender ~now:(Time.now ())
+                    Network_pool.Rate_limiter.add rl sender ~now:(Time.now ())
                       ~score:1
                   with
                   | `Capacity_exceeded ->
