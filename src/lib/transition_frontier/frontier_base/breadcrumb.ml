@@ -145,6 +145,11 @@ let protocol_state = lift External_transition.Validated.protocol_state
 
 let consensus_state = lift External_transition.Validated.consensus_state
 
+let consensus_state_with_hash breadcrumb =
+  breadcrumb |> validated_transition
+  |> External_transition.Validation.forget_validation_with_hash
+  |> With_hash.map ~f:External_transition.consensus_state
+
 let blockchain_state = lift External_transition.Validated.blockchain_state
 
 let blockchain_length = lift External_transition.Validated.blockchain_length

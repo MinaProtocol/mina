@@ -337,7 +337,9 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.t
+        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
+        type query =
+          (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
         [@@deriving sexp, to_yojson]
 
         type response =
@@ -362,7 +364,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
+        type query =
+          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =

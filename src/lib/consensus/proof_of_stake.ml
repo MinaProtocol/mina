@@ -2956,7 +2956,12 @@ module Hooks = struct
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
 
-  let select ~constants ~existing ~candidate ~logger =
+  let select ~constants ~existing:existing_with_hash
+      ~candidate:candidate_with_hash ~logger =
+    let {With_hash.hash= existing_hash; data= existing} = existing_with_hash in
+    let {With_hash.hash= candidate_hash; data= candidate} =
+      candidate_with_hash
+    in
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
       [%log debug] "Select result: $choice -- $message"
@@ -2983,21 +2988,31 @@ module Hooks = struct
     (* Each branch contains a precondition predicate and a choice predicate,
      * which takes the new state when true. Each predicate is also decorated
      * with a string description, used for debugging messages *)
-    let candidate_vrf_is_bigger =
-      let d x = Blake2.(to_raw_string (digest_string x)) in
-      String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
-    in
-    let less_than_or_equal_when a b ~condition =
-      let c = Length.compare a b in
+    let less_than_or_equal_when a b ~compare ~condition =
+      let c = compare a b in
       c < 0 || (c = 0 && condition)
+    in
+    let candidate_hash_is_bigger =
+      Coda_base.State_hash.(candidate_hash > existing_hash)
+    in
+    let candidate_vrf_is_bigger =
+      let string_of_blake2 = Blake2.(Fn.compose to_raw_string digest_string) in
+      let compare_blake2 a b =
+        String.compare (string_of_blake2 a) (string_of_blake2 b)
+      in
+      less_than_or_equal_when existing.last_vrf_output
+        candidate.last_vrf_output ~compare:compare_blake2
+        ~condition:candidate_hash_is_bigger
     in
     let blockchain_length_is_longer =
       less_than_or_equal_when existing.blockchain_length
-        candidate.blockchain_length ~condition:candidate_vrf_is_bigger
+        candidate.blockchain_length ~compare:Length.compare
+        ~condition:candidate_vrf_is_bigger
     in
     let long_fork_chain_quality_is_better =
       less_than_or_equal_when existing.min_window_density
-        candidate.min_window_density ~condition:blockchain_length_is_longer
+        candidate.min_window_density ~compare:Length.compare
+        ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
@@ -3252,8 +3267,10 @@ module Hooks = struct
         false
     | `Take ->
         should_bootstrap_len ~constants
-          ~existing:(Consensus_state.blockchain_length existing)
-          ~candidate:(Consensus_state.blockchain_length candidate)
+          ~existing:
+            (Consensus_state.blockchain_length (With_hash.data existing))
+          ~candidate:
+            (Consensus_state.blockchain_length (With_hash.data candidate))
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
