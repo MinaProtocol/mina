@@ -157,7 +157,13 @@ let equal =
 
 let transactions ~constraint_constants t =
   let open Staged_ledger.Pre_diff_info in
-  match get_transactions ~constraint_constants (staged_ledger_diff t) with
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase (consensus_state t)
+  in
+  match
+    get_transactions ~constraint_constants ~supercharge_coinbase
+      (staged_ledger_diff t)
+  with
   | Ok transactions ->
       transactions
   | Error e ->
@@ -940,8 +946,7 @@ let genesis ~precomputed_values =
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
     ; creator
-    ; coinbase_receiver= creator
-    ; supercharge_coinbase= false }
+    ; coinbase_receiver= creator }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -1072,6 +1077,10 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let supercharge_coinbase =
+      consensus_state transition
+      |> Consensus.Data.Consensus_state.supercharge_coinbase
+    in
     let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
@@ -1088,6 +1097,7 @@ module Staged_ledger_validation = struct
            in
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
+        ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

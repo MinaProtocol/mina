@@ -122,17 +122,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.body previous_protocol_state
     |> Coda_state.Protocol_state.Body.view
   in
+  let supercharge_coinbase =
+    let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+    let global_slot =
+      Consensus.Data.Block_data.global_slot_since_genesis block_data
+    in
+    Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+      ~epoch_ledger ~global_slot
+  in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
-      let supercharge_coinbase =
-        let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-        let global_slot =
-          Consensus.Data.Block_data.global_slot_since_genesis block_data
-        in
-        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
-          ~epoch_ledger ~global_slot
-      in
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
@@ -146,6 +146,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
+          ~supercharge_coinbase
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -237,7 +238,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data ~snarked_ledger_hash:previous_ledger_hash
+                  ~block_data ~supercharge_coinbase
+                  ~snarked_ledger_hash:previous_ledger_hash
                   ~genesis_ledger_hash ~supply_increase ~logger
                   ~constraint_constants ) )
       in

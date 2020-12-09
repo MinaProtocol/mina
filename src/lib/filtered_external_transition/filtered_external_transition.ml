@@ -96,7 +96,12 @@ let validate_transactions external_transition =
   let staged_ledger_diff =
     External_transition.Validated.staged_ledger_diff external_transition
   in
-  Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
+  let supercharge_coinbase =
+    External_transition.Validated.consensus_state external_transition
+    |> Consensus.Data.Consensus_state.supercharge_coinbase
+  in
+  Staged_ledger.Pre_diff_info.get_transactions ~supercharge_coinbase
+    staged_ledger_diff
 
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =

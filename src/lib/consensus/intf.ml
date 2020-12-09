@@ -223,6 +223,7 @@ module type State_hooks = sig
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
+    -> supercharge_coinbase:bool
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
@@ -240,9 +241,7 @@ module type State_hooks = sig
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var]
-         * [`Supercharge_coinbase of Snark_params.Tick.Boolean.var]
-         * consensus_state_var
+    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -527,6 +526,10 @@ module type S = sig
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
+
+      val supercharge_coinbase_var : var -> Boolean.var
+
+      val supercharge_coinbase : Value.t -> bool
     end
 
     module Block_data : sig
