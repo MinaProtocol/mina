@@ -575,6 +575,142 @@ module Make (Inputs : Inputs) = struct
     let res = V.f prev_varss_length (M.f step_data) in
     Timer.clock __LOC__ ; res
 
+  module type Step = sig
+    type prev_vars
+
+    type prev_values
+
+    type widths
+
+    type heights
+
+    val branch_data : (prev_vars, prev_values, widths, heights) Branch_data.t
+
+    val constraint_system : Tick.R1CS_constraint_system.t Lazy.t
+
+    val constraint_system_digest : Md5.t Lazy.t
+
+    val constraint_system_hash : string Lazy.t
+
+    module Keys : sig
+      val proving_key_header : Snark_keys_header.t Lazy.t
+
+      val verification_key_header : Snark_keys_header.t Lazy.t
+
+      val proving_key_cache_key : Cache.Step.Key.Proving.t Lazy.t
+
+      val verification_key_cache_key : Cache.Step.Key.Verification.t Lazy.t
+
+      val generate : unit -> Tick.Proving_key.t * Tick.Verification_key.t
+
+      val read_or_generate_from_cache :
+           Key_cache.Spec.t list
+        -> (Pickles__.Impls.Step.Keypair.t * Dirty.t) Lazy.t
+           * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t)
+             Lazy.t
+    end
+  end
+
+  module Step_m = struct
+    type ('prev_vars, 'prev_values, 'widths, 'heights) t =
+      (module Step
+         with type prev_vars = 'prev_vars
+          and type prev_values = 'prev_values
+          and type widths = 'widths
+          and type heights = 'heights)
+  end
+
+  let steps =
+    let T = Max_branching.eq in
+    let module M =
+      H4.Map (Branch_data) (Step_m)
+        (struct
+          let etyp =
+            Impls.Step.input ~branching:Max_branching.n
+              ~wrap_rounds:Tock.Rounds.n
+
+          let f (type prev_vars prev_values widths heights)
+              (T b as data :
+                (prev_vars, prev_values, widths, heights) Branch_data.t) :
+              (prev_vars, prev_values, widths, heights) Step_m.t =
+            let (T (typ, conv)) = etyp in
+            let main x () : unit =
+              b.main
+                (Impls.Step.with_label "conv" (fun () -> conv x))
+                ~step_domains
+            in
+            let () = if debug then Debug.log_step main typ name b.index in
+            let open Impls.Step in
+            ( module struct
+              type nonrec prev_vars = prev_vars
+
+              type nonrec prev_values = prev_values
+
+              type nonrec widths = widths
+
+              type nonrec heights = heights
+
+              let branch_data = data
+
+              let rule = b.rule
+
+              let constraint_system =
+                lazy (Impls.Step.constraint_system ~exposing:[typ] main)
+
+              let constraint_system_digest =
+                Lazy.map ~f:R1CS_constraint_system.digest constraint_system
+
+              let constraint_system_hash =
+                Lazy.map ~f:Md5.to_hex constraint_system_digest
+
+              module Keys = struct
+                let proving_key_header =
+                  Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+                      snark_keys_header
+                        { type_= "step-proving-key"
+                        ; identifier= name ^ "-" ^ b.rule.identifier }
+                        cs_hash )
+
+                let verification_key_header =
+                  Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+                      snark_keys_header
+                        { type_= "step-verification-key"
+                        ; identifier= name ^ "-" ^ b.rule.identifier }
+                        cs_hash )
+
+                let proving_key_cache_key =
+                  let%map.Lazy.Let_syntax cs = constraint_system
+                  and header = proving_key_header in
+                  (Type_equal.Id.uid self.id, header, Index.to_int b.index, cs)
+
+                let verification_key_cache_key :
+                    Cache.Step.Key.Verification.t Lazy.t =
+                  let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
+                  and header = verification_key_header in
+                  ( Type_equal.Id.uid self.id
+                  , header
+                  , Index.to_int b.index
+                  , cs_hash )
+
+                let generate () =
+                  Common.time "stepkeygen" (fun () ->
+                      let kp = generate_keypair ~exposing:[typ] main in
+                      (Keypair.pk kp, Keypair.vk kp) )
+
+                let read_or_generate_from_cache =
+                  Memo.of_comparable
+                    (module Key_cache.Spec.List)
+                    (fun cache ->
+                      Common.time "step read or generate" (fun () ->
+                          Cache.Step.read_or_generate cache
+                            proving_key_cache_key verification_key_cache_key
+                            typ main ) )
+              end
+            end )
+        end)
+    in
+    M.f step_data
+
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
   end
