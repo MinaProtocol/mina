@@ -187,12 +187,13 @@ let rec fold_until ~(init : 'accum)
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
-    ~target_hash =
+    ~target_hash ~job =
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
+  let hash_tree = Transition_frontier.catchup_hash_tree frontier in
+  let open Deferred.Or_error.Let_syntax in
   Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-      let open Deferred.Or_error.Let_syntax in
       let%bind transition_chain_proof =
         Coda_networking.get_transition_chain_proof network peer target_hash
       in
@@ -222,9 +223,12 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
            (Non_empty_list.to_list hashes)
            ~init:[]
            ~f:(fun acc hash ->
-             if Transition_frontier.find frontier hash |> Option.is_some then
-               Continue_or_stop.Stop (Ok (peer, acc))
-             else Continue_or_stop.Continue (hash :: acc) )
+             match Transition_frontier.find frontier hash with
+             | Some final ->
+                 Continue_or_stop.Stop
+                   (Ok (peer, Frontier_base.Breadcrumb.state_hash final, acc))
+             | None ->
+                 Continue_or_stop.Continue (hash :: acc) )
            ~finish:(fun acc ->
              let module T = struct
                type t = State_hash.t list [@@deriving to_yojson]
@@ -243,6 +247,13 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
              Or_error.errorf
                !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
                peer ) )
+  >>| fun (peer, final, hashes) ->
+  let (_ : State_hash.t) =
+    List.fold hashes ~init:final ~f:(fun parent h ->
+        Transition_frontier.Catchup_hash_tree.add hash_tree h ~parent ~job ;
+        h )
+  in
+  (peer, hashes)
 
 let verify_against_hashes transitions hashes =
   List.length transitions = List.length hashes
@@ -523,6 +534,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
+         let job =
+           Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
+         in
          don't_wait_for
            (let start_time = Core.Time.now () in
             [%log info] "Catch up to $target_hash"
@@ -550,7 +564,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 let open Deferred.Let_syntax in
                 match%bind
                   download_state_hashes ~logger ~trust_system ~network
-                    ~frontier ~peers:subtree_peers ~target_hash
+                    ~frontier ~peers:subtree_peers ~target_hash ~job
                 with
                 | Ok (peer, hashes) ->
                     return (Ok (peer, hashes))
@@ -564,7 +578,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     in
                     match%bind
                       download_state_hashes ~logger ~trust_system ~network
-                        ~frontier ~peers:random_peers ~target_hash
+                        ~frontier ~peers:random_peers ~target_hash ~job
                     with
                     | Ok (peer, hashes) ->
                         return (Ok (peer, hashes))
@@ -638,6 +652,10 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;
+                Transition_frontier.(
+                  Catchup_hash_tree.catchup_failed
+                    (catchup_hash_tree frontier)
+                    job) ;
                 garbage_collect_subtrees ~logger ~subtrees ;
                 Coda_metrics.(
                   Gauge.set Transition_frontier_controller.catchup_time_ms
