@@ -1,7 +1,7 @@
 (* sql.ml -- (Postgresql) SQL queries for missing blocks auditor *)
 
 module Unparented_blocks = struct
-  (* state hashes of ends of chains leading to an orphan block *)
+  (* parent_hashes represent ends of chains leading to an orphan block *)
 
   let query =
     Caqti_request.collect Caqti_type.unit
