@@ -137,7 +137,7 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
       else `Capacity_exceeded
 
 module Summary = struct
-  type r = {remaining_capacity: Score.t} [@@deriving to_yojson]
+  type r = {capacity_used: Score.t} [@@deriving to_yojson]
 
   type t = {by_ip: (string * r) list; by_peer_id: (string * r) list}
   [@@deriving to_yojson]
@@ -149,11 +149,13 @@ let summary ({by_ip; by_peer_id} : t) =
     { by_ip=
         Ip.Hash_queue.foldi by_ip.table ~init:[] ~f:(fun acc ~key ~data ->
             ( Unix.Inet_addr.to_string key
-            , {remaining_capacity= data.remaining_capacity} )
+            , {capacity_used= by_ip.initial_capacity - data.remaining_capacity}
+            )
             :: acc )
     ; by_peer_id=
         Peer_id.Hash_queue.foldi by_peer_id.table ~init:[]
           ~f:(fun acc ~key ~data ->
             ( Peer.Id.to_string key
-            , {remaining_capacity= data.remaining_capacity} )
+            , {capacity_used= by_ip.initial_capacity - data.remaining_capacity}
+            )
             :: acc ) }

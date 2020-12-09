@@ -116,7 +116,7 @@ end)
           ~metadata:[("rate_limiter", Rate_limiter.summary rl)]
           !"%s $rate_limiter" Resource_pool.label )
 
-  let filter_verified pipe t ~f =
+  let filter_verified ~log_rate_limiter pipe t ~f =
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
         (Buffered (`Capacity 1024, `Overflow Drop_head))
@@ -125,7 +125,7 @@ end)
       Rate_limiter.create
         ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
     in
-    log_rate_limiter_occasionally t rl ;
+    if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
@@ -186,12 +186,13 @@ end)
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
       ; Strict_pipe.Reader.map
-          (filter_verified local_diffs network_pool ~f:(fun (diff, cb) ->
+          (filter_verified ~log_rate_limiter:false local_diffs network_pool
+             ~f:(fun (diff, cb) ->
                (Envelope.Incoming.local diff, Broadcast_callback.Local cb) ))
           ~f:(fun d -> `Local d)
       ; Strict_pipe.Reader.map
-          (filter_verified incoming_diffs network_pool ~f:(fun (diff, cb) ->
-               (diff, Broadcast_callback.External cb) ))
+          (filter_verified ~log_rate_limiter:true incoming_diffs network_pool
+             ~f:(fun (diff, cb) -> (diff, Broadcast_callback.External cb)))
           ~f:(fun d -> `Incoming d) ]
       ~f:(fun diff_source ->
         match diff_source with
