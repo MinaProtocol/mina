@@ -2681,12 +2681,15 @@ module Hooks = struct
       Epoch.equal epoch
         (Epoch.succ (Consensus_state.curr_epoch consensus_state))
     in
-    (* has the first transition in the epoch reached finalization? *)
-    let epoch_is_finalized =
-      consensus_state.next_epoch_data.epoch_length > constants.k
+    (* has the first transition in the epoch (other than the genesis epoch) reached finalization? *)
+    let epoch_is_not_finalized =
+      let is_genesis_epoch = Length.equal epoch Length.zero in
+      let epoch_is_finalized =
+        consensus_state.next_epoch_data.epoch_length > constants.k
+      in
+      (not epoch_is_finalized) && not is_genesis_epoch
     in
-    let is_genesis_epoch = Length.equal epoch Length.zero in
-    if in_next_epoch || ((not epoch_is_finalized) && not is_genesis_epoch) then
+    if in_next_epoch || epoch_is_not_finalized then
       (`Curr, !local_state.Data.next_epoch_snapshot)
     else (`Last, !local_state.staking_epoch_snapshot)
 
@@ -2909,22 +2912,28 @@ module Hooks = struct
       let d x = Blake2.(to_raw_string (digest_string x)) in
       String.( > ) (d candidate.last_vrf_output) (d existing.last_vrf_output)
     in
-    let ( << ) a b =
+    let less_than_or_equal_when a b ~condition =
       let c = Length.compare a b in
-      (* TODO: I'm not sure we should throw away our current chain if they compare equal *)
-      c < 0 || (c = 0 && candidate_vrf_is_bigger)
+      c < 0 || (c = 0 && condition)
+    in
+    let blockchain_length_is_longer =
+      less_than_or_equal_when existing.blockchain_length
+        candidate.blockchain_length ~condition:candidate_vrf_is_bigger
+    in
+    let long_fork_chain_quality_is_better =
+      less_than_or_equal_when existing.min_window_density
+        candidate.min_window_density ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
         ( "most recent finalized checkpoints are equal"
         , "candidate length is longer than existing length "
-        , existing.blockchain_length << candidate.blockchain_length )
+        , blockchain_length_is_longer )
       else
         ( "most recent finalized checkpoints are not equal"
         , "candidate virtual min-length is longer than existing virtual \
            min-length"
-        , Length.(existing.min_window_density < candidate.min_window_density)
-        )
+        , long_fork_chain_quality_is_better )
     in
     let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
@@ -2999,13 +3008,16 @@ module Hooks = struct
             Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger
           in
           [%log debug]
-            !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-            (epoch_snapshot_name source)
-            snapshot_ledger_hash ;
-          (*These are computed using different values but are supposed to be equal*)
-          assert (
+            ~metadata:
+              [ ( "ledger_hash"
+                , Coda_base.Frozen_ledger_hash.to_yojson snapshot_ledger_hash
+                ) ]
+            !"Using %s_epoch_snapshot root hash $ledger_hash"
+            (epoch_snapshot_name source) ;
+          (*TODO: uncomment after #6956 is resolved*)
+          (*assert (
             Coda_base.Frozen_ledger_hash.equal snapshot_ledger_hash
-              epoch_data.ledger.hash ) ;
+              epoch_data.ledger.hash ) ;*)
           snapshot
         in
         let block_data unseen_pks slot =

@@ -191,10 +191,6 @@ let setup_daemon logger =
       ~doc:
         "true|false Log snark-pool diff received from peers (default: false)"
       (optional bool)
-  and log_received_blocks =
-    flag "log-received-blocks"
-      ~doc:"true|false Log blocks received from peers (default: false)"
-      (optional bool)
   and log_transaction_pool_diff =
     flag "log-txn-pool-gossip"
       ~doc:
@@ -647,10 +643,6 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
           ~default:false log_received_snark_pool_diff
       in
-      let log_received_blocks =
-        or_from_config YJ.Util.to_bool_option "log-received-blocks"
-          ~default:false log_received_blocks
-      in
       let log_transaction_pool_diff =
         or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
           ~default:false log_transaction_pool_diff
@@ -662,7 +654,7 @@ let setup_daemon logger =
       let log_gossip_heard =
         { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
-        ; new_state= log_received_blocks }
+        ; new_state= true }
       in
       let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
@@ -844,7 +836,8 @@ let setup_daemon logger =
           ~genesis_state_hash:
             (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
-      trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      trace_database_initialization "epoch ledger" __LOC__
+        epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
         match libp2p_peer_list_file with
         | None ->
@@ -934,10 +927,26 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       let external_transition_database_dir =
         conf_dir ^/ "external_transition_database"
       in
-      let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
+      let%bind external_transition_database =
+        let create_db () =
+          let%map () =
+            Async.Unix.mkdir ~p:() external_transition_database_dir
+          in
+          Auxiliary_database.External_transition_database.create ~logger
+            external_transition_database_dir
+        in
+        match%bind Deferred.Or_error.try_with create_db with
+        | Ok res ->
+            return res
+        | Error err ->
+            [%log warn]
+              "Encountered an error $err while creating the external \
+               transition database. Retrying."
+              ~metadata:[("err", Error_json.error_to_yojson err)] ;
+            let%bind () =
+              File_system.remove_dir external_transition_database_dir
+            in
+            create_db ()
       in
       trace_database_initialization "external_transition_database" __LOC__
         external_transition_database_dir ;
