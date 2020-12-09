@@ -499,10 +499,6 @@ let add_payment_subscriber t public_key =
 
 let transaction_pool t = t.components.transaction_pool
 
-let transaction_database t = t.config.transaction_database
-
-let external_transition_database t = t.config.external_transition_database
-
 let snark_pool t = t.components.snark_pool
 
 let peers t = Coda_networking.peers t.components.net
@@ -1292,9 +1288,7 @@ let create ?wallets (config : Config.t) =
                 archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
-              ~constraint_constants ~time_controller:config.time_controller
-              ~new_blocks ~wallets
-              ~external_transition_database:config.external_transition_database
+              ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
           in

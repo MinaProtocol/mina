@@ -122,7 +122,8 @@ module Make (Inputs : Inputs_intf) = struct
                         Or_error.errorf
                           "Could not read the URS from disk; its format did \
                            not match the expected format" ) )
-              (fun urs path -> Or_error.try_with (fun () -> Urs.write urs path))
+              (fun _ urs path ->
+                Or_error.try_with (fun () -> Urs.write urs path) )
           in
           let u =
             match Key_cache.Sync.read specs store () with

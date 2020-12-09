@@ -109,10 +109,27 @@ end)
           ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
 
-  let filter_verified pipe t ~f =
+  let filter_verified (type a) (pipe : a Strict_pipe.Reader.t) (t : t)
+      ~(f :
+         a -> Resource_pool.Diff.t Envelope.Incoming.t * Broadcast_callback.t)
+      :
+      (Resource_pool.Diff.verified Envelope.Incoming.t * Broadcast_callback.t)
+      Strict_pipe.Reader.t =
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
-        (Buffered (`Capacity 1024, `Overflow Drop_head))
+        (Buffered
+           ( `Capacity 1024
+           , `Overflow
+               (Call
+                  (fun (env, cb) ->
+                    let diff = Envelope.Incoming.data env in
+                    [%log' warn t.logger]
+                      "Dropping verified diff $diff due to pipe overflow"
+                      ~metadata:
+                        [("diff", Resource_pool.Diff.verified_to_yojson diff)] ;
+                    Broadcast_callback.drop Resource_pool.Diff.empty
+                      (Resource_pool.Diff.reject_overloaded_diff diff)
+                      cb )) ))
     in
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
@@ -132,7 +149,7 @@ end)
                     ; ("error", Error_json.error_to_yojson err) ] ;
                 (*reject incoming messages*)
                 Broadcast_callback.error err cb
-            | Ok verified_diff ->
+            | Ok verified_diff -> (
                 [%log' debug t.logger] "Verified diff: $verified_diff"
                   ~metadata:
                     [ ( "verified_diff"
@@ -141,8 +158,11 @@ end)
                     ; ( "sender"
                       , Envelope.Sender.to_yojson
                         @@ Envelope.Incoming.sender verified_diff ) ] ;
-                Deferred.return
-                @@ Strict_pipe.Writer.write w (verified_diff, cb) ) ) )
+                match Strict_pipe.Writer.write w (verified_diff, cb) with
+                | Some r ->
+                    r
+                | None ->
+                    Deferred.unit ) ) ) )
     |> don't_wait_for ;
     r
 

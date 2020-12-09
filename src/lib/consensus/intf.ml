@@ -444,7 +444,8 @@ module type S = sig
         end]
 
         module For_tests : sig
-          val with_curr_global_slot : t -> Global_slot.t -> t
+          val with_global_slot_since_genesis :
+            t -> Coda_numbers.Global_slot.t -> t
         end
       end
 
@@ -493,6 +494,8 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val block_stake_winner : Value.t -> Public_key.Compressed.t
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t
@@ -516,6 +519,11 @@ module type S = sig
 
       val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
+      val global_slot_since_genesis : Value.t -> Coda_numbers.Global_slot.t
+
+      val global_slot_since_genesis_var :
+        var -> Coda_numbers.Global_slot.Checked.t
+
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
@@ -529,6 +537,8 @@ module type S = sig
       val global_slot : t -> Coda_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
+
+      val global_slot_since_genesis : t -> Coda_numbers.Global_slot.t
     end
   end
 

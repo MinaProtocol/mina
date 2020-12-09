@@ -133,6 +133,9 @@ let global_slot =
 
 let block_producer = Fn.compose Staged_ledger_diff.creator staged_ledger_diff
 
+let block_winner =
+  Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
+
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
 
 let to_yojson t =
@@ -730,6 +733,8 @@ module With_validation = struct
 
   let block_producer t = lift block_producer t
 
+  let block_winner t = lift block_winner t
+
   let commands t = lift commands t
 
   let transactions ~constraint_constants t =
@@ -896,6 +901,7 @@ module Validated = struct
     , parent_hash
     , consensus_time_produced_at
     , block_producer
+    , block_winner
     , transactions
     , commands
     , payments
