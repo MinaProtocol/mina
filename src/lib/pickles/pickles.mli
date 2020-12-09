@@ -177,8 +177,6 @@ end
 val compile :
      ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
-  -> ?disk_keys:(Cache.Step.Key.Verification.t, 'branches) Vector.t
-                * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
