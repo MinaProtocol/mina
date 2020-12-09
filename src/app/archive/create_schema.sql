@@ -91,9 +91,12 @@ CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
 CREATE TABLE blocks_user_commands
-( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
-, user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
-, sequence_no     int NOT NULL
+( block_id          int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
+, user_command_id   int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
+, sequence_no       int NOT NULL
+, fee_payer_balance bigint
+, source_balance    bigint
+, receiver_balance  bigint
 , PRIMARY KEY (block_id, user_command_id)
 );
 
@@ -102,5 +105,6 @@ CREATE TABLE blocks_internal_commands
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
 , secondary_sequence_no int NOT NULL
+, receiver_balance      bigint
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );

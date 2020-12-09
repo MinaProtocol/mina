@@ -466,8 +466,6 @@ module User_command = struct
             , None
             , balances_to_int64s balances )
       in
-      (* TODO: Record these with the transaction *)
-      ignore (fee_payer_balance, source_balance, receiver_balance) ;
       let%map () =
         Conn.exec
           (Caqti_request.exec
@@ -490,7 +488,7 @@ module User_command = struct
             , created_token )
           , user_command_id )
       in
-      user_command_id
+      (user_command_id, (fee_payer_balance, source_balance, receiver_balance))
   end
 
   let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =
@@ -787,15 +785,17 @@ end
 
 module Block_and_internal_command = struct
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
-      ~sequence_no ~secondary_sequence_no =
+      ~sequence_no ~secondary_sequence_no ~balance =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup4 int int int int)
+         Caqti_type.(tup3 (tup2 int int) (tup2 int int) int64)
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
-                VALUES (?, ?, ?, ?)
-         |sql})
-      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+                 (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
+                 VALUES (?, ?, ?, ?, ?)
+          |sql})
+      ( (block_id, internal_command_id)
+      , (sequence_no, secondary_sequence_no)
+      , Unsigned.UInt64.to_int64 (Currency.Balance.to_uint64 balance) )
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -812,7 +812,7 @@ module Block_and_internal_command = struct
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~internal_command_id ~sequence_no ~secondary_sequence_no =
+      ~internal_command_id ~sequence_no ~secondary_sequence_no ~balance =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -825,27 +825,32 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+          ~balance
 
   let add_with_balance conn ~block_id ~internal_command_id ~sequence_no
       ~secondary_sequence_no ~balance =
-    (* TODO(omerzach): Store balance. *)
-    let () = ignore balance in
     add conn ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+      ~balance
 end
 
 module Block_and_signed_command = struct
-  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
+  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no
+      ~fee_payer_balance ~source_balance ~receiver_balance =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup3 int int int)
-         {sql| INSERT INTO blocks_user_commands
-                 (block_id, user_command_id, sequence_no)
-               VALUES (?, ?, ?)
+         Caqti_type.(
+           tup2 (tup3 int int int)
+             (tup3 (option int64) (option int64) (option int64)))
+         {sql| INSERT INTO blocks_user_commands (block_id, user_command_id,
+          sequence_no, fee_payer_balance, source_balance, receiver_balance)
+          VALUES (?, ?, ?, ?, ?, ?)
          |sql})
-      (block_id, user_command_id, sequence_no)
+      ( (block_id, user_command_id, sequence_no)
+      , (fee_payer_balance, source_balance, receiver_balance) )
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~user_command_id ~sequence_no =
+      ~user_command_id ~sequence_no ~fee_payer_balance ~source_balance
+      ~receiver_balance =
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
@@ -862,7 +867,10 @@ module Block_and_signed_command = struct
     | Some _ ->
         return ()
     | None ->
-        add (module Conn) ~block_id ~user_command_id ~sequence_no
+        add
+          (module Conn)
+          ~block_id ~user_command_id ~sequence_no ~fee_payer_balance
+          ~source_balance ~receiver_balance
 end
 
 module Block = struct
@@ -1029,7 +1037,9 @@ module Block = struct
                 let user_command =
                   {Mina_base.With_status.status; data= command}
                 in
-                let%bind id =
+                let%bind ( id
+                         , (fee_payer_balance, source_balance, receiver_balance)
+                         ) =
                   User_command.add_with_status
                     (module Conn)
                     user_command.data user_command.status
@@ -1038,6 +1048,7 @@ module Block = struct
                   Block_and_signed_command.add
                     (module Conn)
                     ~block_id ~user_command_id:id ~sequence_no
+                    ~fee_payer_balance ~source_balance ~receiver_balance
                   >>| ignore
                 in
                 sequence_no + 1
@@ -1230,8 +1241,11 @@ module Block = struct
       deferred_result_list_fold user_cmd_ids_and_seq_nos ~init:()
         ~f:(fun () (user_command_id, sequence_no) ->
           Block_and_signed_command.add_if_doesn't_exist
-            (module Conn)
-            ~block_id ~user_command_id ~sequence_no )
+            (module Conn )
+            (* TODO(omerzach): https://github.com/MinaProtocol/mina/issues/7586
+             *   Thread real values through for balances *)
+            ~block_id ~user_command_id ~sequence_no ~fee_payer_balance:None
+            ~source_balance:None ~receiver_balance:None )
     in
     (* add internal commands *)
     let%bind internal_cmd_ids_and_seq_nos =
@@ -1260,6 +1274,9 @@ module Block = struct
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+            ~balance:(Currency.Balance.of_int 0)
+          (* TODO(omerzach): https://github.com/MinaProtocol/mina/issues/7586
+           * Thread real balance here *)
       )
     in
     return block_id
