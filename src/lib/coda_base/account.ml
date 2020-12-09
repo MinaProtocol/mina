@@ -164,12 +164,30 @@ module Binable_arg = struct
   end]
 end
 
+let check = Fn.id
+
 [%%if
-feature_snapps]
+not feature_snapps]
 
-include Binable_arg
+let check (t : Binable_arg.t) =
+  let t = check t in
+  match t.snapp with
+  | None ->
+      t
+  | Some _ ->
+      failwith "Snapp accounts not supported"
 
-[%%else]
+[%%endif]
+
+[%%if
+not feature_tokens]
+
+let check (t : Binable_arg.t) =
+  let t = check t in
+  if Token_id.equal Token_id.default t.token_id then t
+  else failwith "Token accounts not supported"
+
+[%%endif]
 
 let check (t : Binable_arg.t) =
   match t.snapp with
@@ -199,8 +217,6 @@ module Stable = struct
     let public_key (t : t) : key = t.public_key
   end
 end]
-
-[%%endif]
 
 [%%define_locally
 Stable.Latest.(public_key)]
