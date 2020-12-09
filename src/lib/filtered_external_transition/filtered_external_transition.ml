@@ -98,9 +98,7 @@ let validate_transactions ((transition_with_hash, _validity) as transition) =
   in
   let external_transition = With_hash.data transition_with_hash in
   let coinbase_receiver =
-    External_transition.protocol_state external_transition
-    |> Coda_state.Protocol_state.consensus_state
-    |> Consensus.Data.Consensus_state.coinbase_receiver
+    External_transition.coinbase_receiver external_transition
   in
   Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
     ~coinbase_receiver

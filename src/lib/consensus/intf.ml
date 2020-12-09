@@ -543,6 +543,8 @@ module type S = sig
       val prover_state : t -> Prover_state.t
 
       val global_slot_since_genesis : t -> Coda_numbers.Global_slot.t
+
+      val coinbase_receiver : t -> Public_key.Compressed.t
     end
   end
 

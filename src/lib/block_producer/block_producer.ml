@@ -107,10 +107,8 @@ end
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~(coinbase_receiver : Consensus.Coinbase_receiver.t) ~(keypair : Keypair.t)
     ~log_block_creation =
   let open Interruptible.Let_syntax in
-  let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
@@ -134,7 +132,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           ~epoch_ledger ~global_slot
       in
       let coinbase_receiver =
-        Consensus.Coinbase_receiver.resolve ~self coinbase_receiver
+        Consensus.Data.Block_data.coinbase_receiver block_data
       in
       let diff =
         measure "create_diff" (fun () ->
@@ -379,7 +377,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (keypair, scheduled_time, block_data, winner_pk) =
+      let produce ivar (_keypair, scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -415,11 +413,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             in
             let%bind next_state_opt =
               generate_next_state ~constraint_constants ~scheduled_time
-                ~coinbase_receiver ~block_data ~previous_protocol_state
-                ~time_controller
+                ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
-                ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation ~winner_pk
+                ~transactions ~get_completed_work ~logger ~log_block_creation
+                ~winner_pk
             in
             trace_event "next state generated" ;
             match next_state_opt with

@@ -98,7 +98,7 @@ Raw_versioned__.
   , set_validation_callback )]
 
 [%%define_locally
-Stable.V1.(create, sexp_of_t, t_of_sexp)]
+Stable.Latest.(create, sexp_of_t, t_of_sexp)]
 
 type external_transition = t
 
@@ -1075,11 +1075,8 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let coinbase_receiver = coinbase_receiver transition in
     let apply_start_time = Core.Time.now () in
-    let coinbase_receiver =
-      Protocol_state.(consensus_state parent_protocol_state)
-      |> Consensus.Data.Consensus_state.coinbase_receiver
-    in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger

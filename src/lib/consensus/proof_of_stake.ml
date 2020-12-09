@@ -175,6 +175,8 @@ module Data = struct
 
     let global_slot_since_genesis {global_slot_since_genesis; _} =
       global_slot_since_genesis
+
+    let coinbase_receiver {stake_proof; _} = stake_proof.coinbase_receiver_pk
   end
 
   module Local_state = struct
@@ -3230,12 +3232,12 @@ module Hooks = struct
               | None ->
                   find_winning_slot (Slot.succ slot)
               | Some (keypair, data, delegator_pk) ->
-                  Some (slot, keypair, data, delegator_pk) )
+                  Some (keypair, slot, data, delegator_pk) )
         in
         find_winning_slot slot
       in
       match next_slot with
-      | Some (next_slot, keypair, data, delegator_pk) ->
+      | Some (keypair, next_slot, data, delegator_pk) ->
           [%log info] "Producing block in %d slots"
             (Slot.to_int next_slot - Slot.to_int slot) ;
           if Slot.equal curr_slot next_slot then
