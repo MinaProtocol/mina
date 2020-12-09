@@ -500,6 +500,8 @@ module type S = sig
 
       val coinbase_receiver : Value.t -> Public_key.Compressed.t
 
+      val coinbase_receiver_var : var -> Public_key.Compressed.var
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t

@@ -2453,6 +2453,8 @@ module Data = struct
 
     let next_epoch_data (t : Value.t) = t.next_epoch_data
 
+    let coinbase_receiver_var (t : var) = t.coinbase_receiver
+
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
 

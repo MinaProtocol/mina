@@ -789,8 +789,7 @@ module T = struct
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants t
-      pre_diff_info ~current_state_view ~state_and_body_hash ~log_prefix
-      ~coinbase_receiver =
+      pre_diff_info ~current_state_view ~state_and_body_hash ~log_prefix =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -906,7 +905,7 @@ module T = struct
     , `Pending_coinbase_update
         ( is_new_stack
         , { Pending_coinbase.Update.Poly.action= stack_update_in_snark
-          ; coinbase_data= (coinbase_receiver, coinbase_amount) } ) )
+          ; coinbase_amount } ) )
 
   let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
     let open Or_error.Let_syntax in
@@ -987,7 +986,7 @@ module T = struct
       apply_diff ?skip_verification ~constraint_constants t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
-        ~log_prefix:"apply_diff" ~coinbase_receiver
+        ~log_prefix:"apply_diff"
     in
     [%log debug]
       ~metadata:
@@ -1019,7 +1018,7 @@ module T = struct
     apply_diff t
       (forget_prediff_info prediff)
       ~constraint_constants ~logger ~current_state_view ~state_and_body_hash
-      ~log_prefix:"apply_diff_unchecked" ~coinbase_receiver
+      ~log_prefix:"apply_diff_unchecked"
 
   module Resources = struct
     module Discarded = struct
@@ -2841,11 +2840,14 @@ let%test_module "test" =
             (Hash.var_of_t root_before)
         in
         let pc_update_var = Update.var_of_t pc_update in
+        let coinbase_receiver =
+          Public_key.Compressed.(var_of_t coinbase_receiver)
+        in
         let supercharge_coinbase = Boolean.var_of_value supercharge_coinbase in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
-          root_after_popping pc_update_var ~supercharge_coinbase
-          state_body_hash_var
+          root_after_popping pc_update_var ~coinbase_receiver
+          ~supercharge_coinbase state_body_hash_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
