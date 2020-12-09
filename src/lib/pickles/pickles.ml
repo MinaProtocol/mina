@@ -826,9 +826,11 @@ module Make (Inputs : Inputs) = struct
     in
     M.f step_data
 
-  let step_vks =
+  let step_vk_commitments =
     let module Vk = struct
-      type t = Impls.Step.Verification_key.t Lazy.t
+      type t =
+        Tick.Curve.Affine.t Dlog_plonk_types.Poly_comm.Without_degree_bound.t
+        Plonk_verification_key_evals.t
     end in
     let module M =
       H4.Map
@@ -839,12 +841,14 @@ module Make (Inputs : Inputs) = struct
               (( module
                 Step ) :
                 (prev_vars, prev_values, widths, heights) Step_keys_m.t) =
-            ( Step.Keys.Verification.registered_key_lazy
-              :> Impls.Step.Verification_key.t Lazy.t )
+            Tick.Keypair.vk_commitments
+              (Lazy.force
+                 ( Step.Keys.Verification.registered_key_lazy
+                   :> Impls.Step.Verification_key.t Lazy.t ))
         end)
     in
     let module V = H4.To_vector (Vk) in
-    V.f prev_varss_length (M.f steps_keys)
+    lazy (V.f prev_varss_length (M.f steps_keys))
 
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
@@ -908,13 +912,6 @@ module Make (Inputs : Inputs) = struct
       M.f steps_keys
     in
     Timer.clock __LOC__ ;
-    let step_vks =
-      let module V = H4.To_vector (Lazy_keys) in
-      lazy
-        (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ))
-    in
-    Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
       Timer.clock __LOC__ ;
       let prev_wrap_domains =
@@ -948,8 +945,8 @@ module Make (Inputs : Inputs) = struct
         M.f choices
       in
       Timer.clock __LOC__ ;
-      Wrap_main.wrap_main full_signature prev_varss_length step_vks step_widths
-        step_domains prev_wrap_domains
+      Wrap_main.wrap_main full_signature prev_varss_length step_vk_commitments
+        step_widths step_domains prev_wrap_domains
         (module Max_branching)
     in
     Timer.clock __LOC__ ;
@@ -1050,7 +1047,7 @@ module Make (Inputs : Inputs) = struct
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
-              ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
+              ~pairing_plonk_indices:step_vk_commitments ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
           in
