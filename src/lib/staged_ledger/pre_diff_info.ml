@@ -31,6 +31,7 @@ module type S = sig
   val get_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
+    -> supercharge_coinbase:bool
     -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
     -> ( Transaction.Valid.t With_status.t list
          * Transaction_snark_work.t list
@@ -42,6 +43,7 @@ module type S = sig
   val get_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> coinbase_receiver:Public_key.Compressed.t
+    -> supercharge_coinbase:bool
     -> Staged_ledger_diff.t
     -> (Transaction.t With_status.t list, Error.t) result
 end
@@ -352,7 +354,7 @@ let get' (type c)
   , p1.coinbases @ p2.coinbases )
 
 (* TODO: This is important *)
-let get ~check ~constraint_constants ~coinbase_receiver t =
+let get ~check ~constraint_constants ~coinbase_receiver  ~supercharge_coinbase t =
   let open Async in
   match%map validate_commands t ~check with
   | Error e ->
@@ -364,23 +366,25 @@ let get ~check ~constraint_constants ~coinbase_receiver t =
         ~diff:diff.diff ~coinbase_receiver
         ~coinbase_amount:
           (Staged_ledger_diff.With_valid_signatures.coinbase
-             ~constraint_constants diff)
+             ~constraint_constants ~supercharge_coinbase diff)
 
-let get_unchecked ~constraint_constants ~coinbase_receiver
+let get_unchecked ~constraint_constants  ~coinbase_receiver ~supercharge_coinbase
     (t : With_valid_signatures_and_proofs.t) =
   let t = forget_proof_checks t in
   get' ~constraint_constants ~diff:t.diff ~coinbase_receiver
     ~forget:User_command.forget_check
     ~coinbase_amount:
       (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
-         t)
+         ~supercharge_coinbase t)
 
-let get_transactions ~constraint_constants ~coinbase_receiver (sl_diff : t) =
+let get_transactions ~constraint_constants ~coinbase_receiver ~supercharge_coinbase (sl_diff : t)
+    =
   let open Result.Let_syntax in
   let%map transactions, _, _, _ =
     get' ~constraint_constants ~diff:sl_diff.diff ~coinbase_receiver
       ~forget:Fn.id
       ~coinbase_amount:
-        (Staged_ledger_diff.coinbase ~constraint_constants sl_diff)
+        (Staged_ledger_diff.coinbase ~constraint_constants
+           ~supercharge_coinbase sl_diff)
   in
   transactions

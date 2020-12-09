@@ -4,19 +4,19 @@ open Coda_base
 open Coda_state
 
 module Validate_content = struct
-  type t = Coda_net2.validation_result -> unit
+  type t = Coda_net2.Validation_callback.t
 
-  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
+  let bin_read_t buf ~pos_ref =
+    bin_read_unit buf ~pos_ref ;
+    Coda_net2.Validation_callback.create_without_expiration ()
 
-  let bin_write_t buf ~pos _ =
-    let pos = bin_write_unit buf ~pos () in
-    pos
+  let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
   let bin_shape_t = bin_shape_unit
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Fn.ignore
+  let t_of_sexp _ = Coda_net2.Validation_callback.create_without_expiration ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -159,10 +159,16 @@ let to_yojson t =
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state
 
-let transactions ~constraint_constants ~coinbase_receiver t =
+let transactions ~constraint_constants t =
   let open Staged_ledger.Pre_diff_info in
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver (consensus_state t)
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase (consensus_state t)
+  in
   match
-    get_transactions ~constraint_constants ~coinbase_receiver
+    get_transactions ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
       (staged_ledger_diff t)
   with
   | Ok transactions ->
@@ -178,9 +184,11 @@ let payments t =
     | _ ->
         None )
 
-let broadcast t = (validation_callback t) `Accept
+let broadcast t =
+  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Accept
 
-let don't_broadcast t = (validation_callback t) `Reject
+let don't_broadcast t =
+  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -945,15 +953,16 @@ let genesis ~precomputed_values =
         ( { completed_works= []
           ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-        , None )
-    ; supercharge_coinbase= false }
+        , None ) }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
            create ~protocol_state ~protocol_state_proof
-             ~staged_ledger_diff:empty_diff ~validation_callback:Fn.ignore
+             ~staged_ledger_diff:empty_diff
+             ~validation_callback:
+               (Coda_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              () ))
@@ -992,13 +1001,13 @@ struct
       ~logger ~frontier =
     let open Result.Let_syntax in
     let hash = With_hash.hash t in
-    let protocol_state = protocol_state (With_hash.data t) in
-    let parent_hash = Protocol_state.previous_state_hash protocol_state in
-    let root_protocol_state =
+    let root_transition =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
-      |> Validated.protocol_state
+      |> Validation.forget_validation_with_hash
     in
+    let protocol_state = protocol_state (With_hash.data t) in
+    let parent_hash = Protocol_state.previous_state_hash protocol_state in
     let%bind () =
       Result.ok_if_true
         (Transition_frontier.find frontier hash |> Option.is_none)
@@ -1016,8 +1025,8 @@ struct
                    , `String
                        "External_transition.Transition_frontier_validation.validate_frontier_dependencies"
                    ) ])
-            ~existing:(Protocol_state.consensus_state root_protocol_state)
-            ~candidate:(Protocol_state.consensus_state protocol_state) )
+            ~existing:(With_hash.map ~f:consensus_state root_transition)
+            ~candidate:(With_hash.map ~f:consensus_state t) )
         ~error:`Not_selected_over_frontier_root
     in
     let%map () =
@@ -1076,6 +1085,10 @@ module Staged_ledger_validation = struct
     in
     let staged_ledger_diff = staged_ledger_diff transition in
     let coinbase_receiver = coinbase_receiver transition in
+    let supercharge_coinbase =
+      consensus_state transition
+      |> Consensus.Data.Consensus_state.supercharge_coinbase
+    in
     let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
@@ -1093,6 +1106,7 @@ module Staged_ledger_validation = struct
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
         ~coinbase_receiver
+        ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

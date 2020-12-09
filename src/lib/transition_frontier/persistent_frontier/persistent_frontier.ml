@@ -189,7 +189,9 @@ module Instance = struct
         , [`Invalid_genesis_protocol_state] )
         Result.t =
       let open Result.Let_syntax in
-      let transition, _ = External_transition.Validated.erase transition in
+      let transition =
+        External_transition.Validation.forget_validation_with_hash transition
+      in
       let%map t =
         External_transition.Validation.wrap transition
         |> External_transition.skip_time_received_validation

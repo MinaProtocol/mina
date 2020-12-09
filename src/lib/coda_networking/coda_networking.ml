@@ -337,7 +337,9 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.t
+        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
+        type query =
+          (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
         [@@deriving sexp, to_yojson]
 
         type response =
@@ -362,7 +364,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
+        type query =
+          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -711,15 +716,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * (Coda_net2.validation_result -> unit) )
+      * Coda_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * (Coda_net2.validation_result -> unit) )
+      * Coda_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
       ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * (Coda_net2.validation_result -> unit) )
+      * Coda_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
@@ -1113,7 +1118,7 @@ let create (config : Config.t)
                  |> Protocol_state.blockchain_state
                  |> Blockchain_state.timestamp |> Block_time.to_time )) ;
             if config.log_gossip_heard.new_state then
-              [%str_log debug]
+              [%str_log info]
                 ~metadata:
                   [("external_transition", External_transition.to_yojson state)]
                 (Block_received
@@ -1198,9 +1203,11 @@ let broadcast t ~log_msg msg =
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_state t state =
-  broadcast t
-    (Gossip_net.Message.New_state (With_hash.data state))
-    ~log_msg:(Gossip_new_state {state_hash= With_hash.hash state})
+  let msg = Gossip_net.Message.New_state (With_hash.data state) in
+  [%str_log' info t.logger]
+    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    (Gossip_new_state {state_hash= With_hash.hash state}) ;
+  Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_transaction_pool_diff t diff =
   broadcast t (Gossip_net.Message.Transaction_pool_diff diff)

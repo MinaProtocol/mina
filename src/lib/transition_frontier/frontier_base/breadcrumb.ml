@@ -145,6 +145,11 @@ let protocol_state = lift External_transition.Validated.protocol_state
 
 let consensus_state = lift External_transition.Validated.consensus_state
 
+let consensus_state_with_hash breadcrumb =
+  breadcrumb |> validated_transition
+  |> External_transition.Validation.forget_validation_with_hash
+  |> With_hash.map ~f:External_transition.consensus_state
+
 let blockchain_state = lift External_transition.Validated.blockchain_state
 
 let blockchain_length = lift External_transition.Validated.blockchain_length
@@ -318,10 +323,11 @@ module For_tests = struct
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let coinbase_receiver = largest_account_public_key in
+      let supercharge_coinbase = true in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
-          ~coinbase_receiver ~current_state_view ~supercharge_coinbase:true
+          ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
@@ -332,7 +338,7 @@ module For_tests = struct
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
-            ~current_state_view ~state_and_body_hash
+            ~current_state_view ~state_and_body_hash ~supercharge_coinbase
         with
         | Ok r ->
             return r
@@ -392,7 +398,8 @@ module For_tests = struct
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~validation_callback:Fn.ignore
+          ~validation_callback:
+            (Coda_net2.Validation_callback.create_without_expiration ())
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)

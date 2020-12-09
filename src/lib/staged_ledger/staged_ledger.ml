@@ -962,7 +962,7 @@ module T = struct
 
   let apply ?skip_verification ~constraint_constants t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
-      ~state_and_body_hash ~coinbase_receiver =
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -974,7 +974,7 @@ module T = struct
               check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
-      Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
+      Pre_diff_info.get witness ~constraint_constants  ~coinbase_receiver ~supercharge_coinbase
         ~check:(check_commands t.ledger ~verifier)
       |> Deferred.map
            ~f:
@@ -1007,12 +1007,12 @@ module T = struct
 
   let apply_diff_unchecked ~constraint_constants t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver =
+      ~current_state_view ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get_unchecked ~constraint_constants ~coinbase_receiver
-           sl_diff
+      @@ Pre_diff_info.get_unchecked ~constraint_constants
+           ~coinbase_receiver ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
     apply_diff t
@@ -1804,8 +1804,7 @@ module T = struct
             , Diff_creation_log.detail_list_to_yojson
                 (List.map ~f:List.rev detailed) ) ] ;
     trace_event "prediffs done" ;
-    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
-    ; supercharge_coinbase }
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
 end
 
 include T
@@ -1860,7 +1859,7 @@ let%test_module "test" =
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants !sl diff' ~logger ~verifier
-            ~current_state_view ~state_and_body_hash ~coinbase_receiver
+            ~current_state_view ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -1869,7 +1868,7 @@ let%test_module "test" =
       in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
-      (ledger_proof, diff', is_new_stack, pc_update)
+      (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
 
     let dummy_state_view
         ?(global_slot_since_genesis = Coda_numbers.Global_slot.zero) () =
@@ -1919,7 +1918,8 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask
+      )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
@@ -2349,8 +2349,7 @@ let%test_module "test" =
                 ( { completed_works= List.take completed_works job_count1
                   ; commands= List.take txns slots
                   ; coinbase= Zero }
-                , None )
-            ; supercharge_coinbase= true }
+                , None ) }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -2364,15 +2363,14 @@ let%test_module "test" =
                   ; commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; supercharge_coinbase= true}
+            {diff}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
             ( { completed_works= []
               ; commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-            , None )
-        ; supercharge_coinbase= true }
+            , None ) }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
@@ -2422,6 +2420,7 @@ let%test_module "test" =
                         ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
                         ~coinbase_receiver
+                        ~supercharge_coinbase:true
                     in
                     let checked', diff' =
                       match apply_res with
@@ -2897,7 +2896,8 @@ let%test_module "test" =
             in
             let sl_before = !sl in
             let state_body_hash = List.hd_exn state_body_hashes in
-            let%map proof, diff, is_new_stack, pc_update =
+            let%map proof, diff, is_new_stack, pc_update, supercharge_coinbase
+                =
               create_and_apply_with_state_body_hash ~current_state_view
                 ~state_and_body_hash:state_body_hash sl logger pids
                 cmds_this_iter
@@ -2905,10 +2905,8 @@ let%test_module "test" =
                    (List.take work_list proofs_available_this_iter)
                    provers)
             in
-            check_pending_coinbase proof
-              ~supercharge_coinbase:
-                (Staged_ledger_diff.supercharge_coinbase diff)
-              ~sl_before ~sl_after:!sl state_body_hash pc_update ~is_new_stack ;
+            check_pending_coinbase proof ~supercharge_coinbase ~sl_before
+              ~sl_after:!sl state_body_hash pc_update ~is_new_stack ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.commands diff

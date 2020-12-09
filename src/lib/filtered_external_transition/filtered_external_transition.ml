@@ -100,8 +100,12 @@ let validate_transactions ((transition_with_hash, _validity) as transition) =
   let coinbase_receiver =
     External_transition.coinbase_receiver external_transition
   in
-  Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
-    ~coinbase_receiver
+  let supercharge_coinbase =
+    External_transition.Validated.consensus_state external_transition
+    |> Consensus.Data.Consensus_state.supercharge_coinbase
+  in
+  Staged_ledger.Pre_diff_info.get_transactions ~coinbase_receiver
+    ~supercharge_coinbase staged_ledger_diff
 
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =

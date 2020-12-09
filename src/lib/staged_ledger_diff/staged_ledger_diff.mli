@@ -105,13 +105,13 @@ module Diff : sig
     with type V1.t = t
 end
 
-type t = {diff: Diff.t; supercharge_coinbase: bool}
+type t = {diff: Diff.t}
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
   sig
     module V1 : sig
-      type t = {diff: Diff.t; supercharge_coinbase: bool}
+      type t = {diff: Diff.t}
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -137,7 +137,7 @@ module With_valid_signatures_and_proofs : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff; supercharge_coinbase: bool}
+  type t = {diff: diff}
   [@@deriving sexp, to_yojson]
 
   val commands : t -> User_command.Valid.t With_status.t list
@@ -161,11 +161,12 @@ module With_valid_signatures : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff; supercharge_coinbase: bool}
+  type t = {diff: diff}
   [@@deriving sexp, to_yojson]
 
   val coinbase :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> supercharge_coinbase:bool
     -> t
     -> Currency.Amount.t option
 end
@@ -188,5 +189,6 @@ val completed_works : t -> Transaction_snark_work.t list
 
 val coinbase :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> supercharge_coinbase:bool
   -> t
   -> Currency.Amount.t option
