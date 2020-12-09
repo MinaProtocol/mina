@@ -3,7 +3,7 @@ open Network_peer
 
 type t
 
-val create : capacity:int -> t
+val create : capacity:int * [`Per of Time.Span.t] -> t
 
 val add :
      t

@@ -25,16 +25,6 @@ end
 
 module type Score_intf = Coned_abelian_group
 
-let ( > ) = `Don't_use
-
-let ( < ) = `Don't_use
-
-let ( >= ) = `Don't_use
-
-let ( <= ) = `Don't_use
-
-let ( = ) = `Don't_use
-
 module Score : Score_intf with type t = int = struct
   open Int
 
