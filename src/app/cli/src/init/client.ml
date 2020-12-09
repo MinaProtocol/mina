@@ -1659,8 +1659,7 @@ let telemetry =
                    @@ Coda_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
-               (Error.to_string_hum err) ))
+             printf {| { "error": "%s"\n%! } |} (Error.to_string_hum err) ))
 
 let next_available_token_cmd =
   Command.async

@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Coda_base
 open Coda_state
 open Coda_transition
@@ -11,40 +11,61 @@ module T = struct
   type t =
     { validated_transition: External_transition.Validated.t
     ; staged_ledger: Staged_ledger.t sexp_opaque
-    ; just_emitted_a_proof: bool }
+    ; just_emitted_a_proof: bool
+    ; transition_receipt_time: Time.t }
   [@@deriving sexp, fields]
 
   type 'a creator =
        validated_transition:External_transition.Validated.t
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
+    -> transition_receipt_time:Time.t
     -> 'a
 
   let map_creator creator ~f ~validated_transition ~staged_ledger
-      ~just_emitted_a_proof =
-    f (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof)
+      ~just_emitted_a_proof ~transition_receipt_time =
+    f
+      (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
+         ~transition_receipt_time)
 
-  let create ~validated_transition ~staged_ledger ~just_emitted_a_proof =
-    {validated_transition; staged_ledger; just_emitted_a_proof}
+  let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
+      ~transition_receipt_time =
+    { validated_transition
+    ; staged_ledger
+    ; just_emitted_a_proof
+    ; transition_receipt_time }
 
-  let to_yojson {validated_transition; staged_ledger= _; just_emitted_a_proof}
-      =
+  let to_yojson
+      { validated_transition
+      ; staged_ledger= _
+      ; just_emitted_a_proof
+      ; transition_receipt_time } =
     `Assoc
       [ ( "validated_transition"
         , External_transition.Validated.to_yojson validated_transition )
       ; ("staged_ledger", `String "<opaque>")
-      ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
+      ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
+      ; ( "transition_receipt_time"
+        , `String
+            (Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+               transition_receipt_time) ) ]
 end
 
 [%%define_locally
-T.(validated_transition, staged_ledger, just_emitted_a_proof, to_yojson)]
+T.
+  ( validated_transition
+  , staged_ledger
+  , just_emitted_a_proof
+  , transition_receipt_time
+  , to_yojson )]
 
 include Allocation_functor.Make.Sexp (T)
 
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values
     ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation :
-                  External_transition.Almost_validated.t) ~sender () =
+                  External_transition.Almost_validated.t) ~sender
+    ~transition_receipt_time () =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
@@ -66,7 +87,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
           @@ Ok
                (create ~validated_transition:fully_valid_external_transition
                   ~staged_ledger:transitioned_staged_ledger
-                  ~just_emitted_a_proof)
+                  ~just_emitted_a_proof ~transition_receipt_time)
       | Error (`Invalid_staged_ledger_diff errors) ->
           let reasons =
             String.concat ~sep:" && "
@@ -401,13 +422,15 @@ module For_tests = struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
+      let transition_receipt_time = Time.now () in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~parent:parent_breadcrumb
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None ~skip_staged_ledger_verification:true ()
+          ~sender:None ~skip_staged_ledger_verification:true
+          ~transition_receipt_time ()
       with
       | Ok new_breadcrumb ->
           [%log info]

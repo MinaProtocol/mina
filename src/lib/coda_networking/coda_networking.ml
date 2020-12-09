@@ -526,6 +526,7 @@ module Rpcs = struct
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+            ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -535,7 +536,10 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
                   [@to_yojson yojson_of_ban_statuses]
-            ; k_block_hashes: State_hash.Stable.V1.t list }
+            ; k_block_hashes_and_timestamps:
+                (State_hash.Stable.V1.t * string) list
+            ; git_commit: string
+            ; uptime: string }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id

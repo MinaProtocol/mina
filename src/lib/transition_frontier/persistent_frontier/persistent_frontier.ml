@@ -281,12 +281,13 @@ module Instance = struct
                    Error (`Fatal_error (Invalid_genesis_state_hash transition))
                    |> Deferred.return
              in
+             let transition_receipt_time = Time.now () in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:true
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None ()
+                 ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
