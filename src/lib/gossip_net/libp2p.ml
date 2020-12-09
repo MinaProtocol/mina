@@ -64,7 +64,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let create_rpc_implementations
         (Rpc_handler {rpc; f= handler; cost; budget}) =
+      let (module Impl) = implementation_of_rpc rpc in
+      let logger = Logger.create () in
+      let log_meter_occasionally meter =
+        let t = Time.Span.of_min 1. in
+        every t (fun () ->
+            [%log' info logger]
+              ~metadata:[("meter", Network_pool.Meter.summary meter)]
+              !"%s $meter" Impl.name )
+      in
       let meter = Network_pool.Meter.create ~capacity:budget in
+      log_meter_occasionally meter ;
       let handler (peer : Network_peer.Peer.t) ~version q =
         let score = cost q in
         match
@@ -77,7 +87,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         | `Ok ->
             handler peer ~version q
       in
-      let (module Impl) = implementation_of_rpc rpc in
       Impl.implement_multi handler
 
     let prepare_stream_transport stream =

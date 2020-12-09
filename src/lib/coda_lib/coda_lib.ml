@@ -820,6 +820,13 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
+            let log_meter_occasionally meter =
+              let t = Time.Span.of_min 1. in
+              every t (fun () ->
+                  [%log' info config.logger]
+                    ~metadata:[("meter", Network_pool.Meter.summary meter)]
+                    !"new_block $meter" meter )
+            in
             let meter =
               Network_pool.Meter.create
                 ~capacity:
@@ -829,6 +836,7 @@ let create ?wallets (config : Config.t) =
                       (Block_time.Span.to_time_span
                          consensus_constants.slot_duration_ms) )
             in
+            log_meter_occasionally meter ;
             let r, w = Strict_pipe.create Synchronous in
             ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
                   let sender = Envelope.Incoming.sender e in
@@ -840,7 +848,8 @@ let create ?wallets (config : Config.t) =
                       [%log' warn config.logger]
                         "$sender has sent many blocks. This is very unusual."
                         ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
-                      cb `Reject ;
+                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                        cb `Reject ;
                       None
                   | `Ok ->
                       Some x )

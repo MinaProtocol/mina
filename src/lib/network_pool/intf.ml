@@ -11,6 +11,8 @@ open Network_peer
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
+  val label : string
+
   type transition_frontier_diff
 
   type transition_frontier

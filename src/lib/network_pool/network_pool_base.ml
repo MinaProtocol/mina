@@ -109,6 +109,13 @@ end)
           ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
 
+  let log_meter_occasionally t meter =
+    let time = Time_ns.Span.of_min 1. in
+    every time (fun () ->
+        [%log' info t.logger]
+          ~metadata:[("meter", Meter.summary meter)]
+          !"%s $meter" Resource_pool.label meter )
+
   let filter_verified pipe t ~f =
     let r, w =
       Strict_pipe.create ~name:"verified network pool diffs"
@@ -118,6 +125,7 @@ end)
       Meter.create
         ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
     in
+    log_meter_occasionally t meter ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
@@ -128,36 +136,38 @@ end)
           [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
           don't_wait_for
             ( match
-              Meter.add meter diff.sender ~now:(Time.now ())
-                ~score:(Resource_pool.Diff.score diff.data)
+                Meter.add meter diff.sender ~now:(Time.now ())
+                  ~score:(Resource_pool.Diff.score diff.data)
               with
-              | `Capacity_exceeded ->
+            | `Capacity_exceeded ->
                 [%log' trace t.logger]
                   ~metadata:[("sender", Envelope.Sender.to_yojson diff.sender)]
                   "exceeded capacity from $sender" ;
-                Broadcast_callback.error (Error.of_string "exceeded capacity") cb
-              | `Ok ->
-
-              match%bind Resource_pool.Diff.verify t.resource_pool diff with
-            | Error err ->
-                [%log' trace t.logger]
-                  "Refusing to rebroadcast $diff. Verification error: $error"
-                  ~metadata:
-                    [ ("diff", summary)
-                    ; ("error", Error_json.error_to_yojson err) ] ;
-                (*reject incoming messages*)
-                Broadcast_callback.error err cb
-            | Ok verified_diff ->
-                [%log' debug t.logger] "Verified diff: $verified_diff"
-                  ~metadata:
-                    [ ( "verified_diff"
-                      , Resource_pool.Diff.verified_to_yojson
-                        @@ Envelope.Incoming.data verified_diff )
-                    ; ( "sender"
-                      , Envelope.Sender.to_yojson
-                        @@ Envelope.Incoming.sender verified_diff ) ] ;
-                Deferred.return
-                @@ Strict_pipe.Writer.write w (verified_diff, cb) ) ) )
+                Broadcast_callback.error
+                  (Error.of_string "exceeded capacity")
+                  cb
+            | `Ok -> (
+                match%bind Resource_pool.Diff.verify t.resource_pool diff with
+                | Error err ->
+                    [%log' trace t.logger]
+                      "Refusing to rebroadcast $diff. Verification error: \
+                       $error"
+                      ~metadata:
+                        [ ("diff", summary)
+                        ; ("error", Error_json.error_to_yojson err) ] ;
+                    (*reject incoming messages*)
+                    Broadcast_callback.error err cb
+                | Ok verified_diff ->
+                    [%log' debug t.logger] "Verified diff: $verified_diff"
+                      ~metadata:
+                        [ ( "verified_diff"
+                          , Resource_pool.Diff.verified_to_yojson
+                            @@ Envelope.Incoming.data verified_diff )
+                        ; ( "sender"
+                          , Envelope.Sender.to_yojson
+                            @@ Envelope.Incoming.sender verified_diff ) ] ;
+                    Deferred.return
+                    @@ Strict_pipe.Writer.write w (verified_diff, cb) ) ) ) )
     |> don't_wait_for ;
     r
 
