@@ -145,6 +145,9 @@ let%snarkydef step ~(logger : Logger.t)
       Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
+      let coinbase_receiver =
+        Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
+      in
       let%bind root_after_delete, deleted_stack =
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
           prev_pending_coinbase_root
@@ -161,7 +164,7 @@ let%snarkydef step ~(logger : Logger.t)
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
              (Snark_transition.pending_coinbase_update transition)
-             ~supercharge_coinbase previous_state_body_hash)
+             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in

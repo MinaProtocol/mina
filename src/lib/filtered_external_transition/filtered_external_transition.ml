@@ -92,16 +92,19 @@ let participant_pks
 
 let commands {transactions= {Transactions.commands; _}; _} = commands
 
-let validate_transactions external_transition =
+let validate_transactions ((transition_with_hash, _validity) as transition) =
   let staged_ledger_diff =
-    External_transition.Validated.staged_ledger_diff external_transition
+    External_transition.Validated.staged_ledger_diff transition
+  in
+  let external_transition = With_hash.data transition_with_hash in
+  let coinbase_receiver =
+    External_transition.coinbase_receiver external_transition
   in
   let supercharge_coinbase =
-    External_transition.Validated.consensus_state external_transition
-    |> Consensus.Data.Consensus_state.supercharge_coinbase
+    External_transition.supercharge_coinbase external_transition
   in
-  Staged_ledger.Pre_diff_info.get_transactions ~supercharge_coinbase
-    staged_ledger_diff
+  Staged_ledger.Pre_diff_info.get_transactions ~coinbase_receiver
+    ~supercharge_coinbase staged_ledger_diff
 
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =

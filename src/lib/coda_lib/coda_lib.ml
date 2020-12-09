@@ -100,7 +100,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t

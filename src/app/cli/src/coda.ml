@@ -916,7 +916,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       in
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
-      let coinbase_receiver =
+      let coinbase_receiver : Consensus.Coinbase_receiver.t =
         Option.value_map coinbase_receiver_flag ~default:`Producer
           ~f:(fun pk -> `Other pk)
       in

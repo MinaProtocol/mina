@@ -2,7 +2,7 @@
  (name filtered_external_transition)
  (public_name filtered_external_transition)
  (library_flags -linkall)
- (libraries core_kernel coda_base coda_transition)
+ (libraries core_kernel coda_base coda_state coda_transition)
  (preprocess
   (pps ppx_coda ppx_version ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

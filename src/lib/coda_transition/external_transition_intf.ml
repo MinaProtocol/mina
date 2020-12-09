@@ -34,6 +34,10 @@ module type External_transition_common_intf = sig
 
   val block_winner : t -> Public_key.Compressed.t
 
+  val coinbase_receiver : t -> Public_key.Compressed.t
+
+  val supercharge_coinbase : t -> bool
+
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t

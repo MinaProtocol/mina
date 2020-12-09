@@ -175,6 +175,8 @@ module Data = struct
 
     let global_slot_since_genesis {global_slot_since_genesis; _} =
       global_slot_since_genesis
+
+    let coinbase_receiver {stake_proof; _} = stake_proof.coinbase_receiver_pk
   end
 
   module Local_state = struct
@@ -904,19 +906,18 @@ module Data = struct
     type _ Snarky_backendless.Request.t +=
       | Winner_address : Coda_base.Account.Index.t Snarky_backendless.Request.t
       | Winner_pk : Public_key.Compressed.t Snarky_backendless.Request.t
-      | Private_key : Scalar.value Snarky_backendless.Request.t
-      | Public_key : Public_key.t Snarky_backendless.Request.t
+      | Coinbase_receiver_pk :
+          Public_key.Compressed.t Snarky_backendless.Request.t
+      | Producer_private_key : Scalar.value Snarky_backendless.Request.t
+      | Producer_public_key : Public_key.t Snarky_backendless.Request.t
 
     let%snarkydef get_vrf_evaluation
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-        shifted ~block_stake_winner ~ledger ~message =
+        shifted ~block_stake_winner ~block_creator ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
       let%bind private_key =
-        request_witness Scalar.typ (As_prover.return Private_key)
-      in
-      let%bind public_key =
-        request_witness Public_key.typ (As_prover.return Public_key)
+        request_witness Scalar.typ (As_prover.return Producer_private_key)
       in
       let staker_addr = message.Message.delegator in
       let%bind account =
@@ -933,13 +934,14 @@ module Data = struct
           (Public_key.Compressed.Checked.Assert.equal block_stake_winner
              account.public_key)
       in
+      let%bind () =
+        [%with_label "Block creator matches delegate pk"]
+          (Public_key.Compressed.Checked.Assert.equal block_creator
+             account.delegate)
+      in
       let%bind delegate =
         [%with_label "Decompress delegate pk"]
           (Public_key.decompress_var account.delegate)
-      in
-      let%bind () =
-        [%with_label "Public key matches delegate"]
-          (Public_key.assert_equal public_key delegate)
       in
       let%map evaluation =
         with_label __LOC__
@@ -952,7 +954,7 @@ module Data = struct
       let%snarkydef check
           ~(constraint_constants : Genesis_constants.Constraint_constants.t)
           shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
-          ~global_slot ~seed =
+          ~block_creator ~global_slot ~seed =
         let open Snark_params.Tick in
         let%bind winner_addr =
           request_witness
@@ -962,7 +964,7 @@ module Data = struct
         in
         let%bind result, winner_account =
           get_vrf_evaluation ~constraint_constants shifted
-            ~ledger:epoch_ledger.hash ~block_stake_winner
+            ~ledger:epoch_ledger.hash ~block_stake_winner ~block_creator
             ~message:{Message.global_slot; seed; delegator= winner_addr}
         in
         let my_stake = winner_account.balance in
@@ -1018,9 +1020,11 @@ module Data = struct
               respond (Provide 0)
           | Winner_pk ->
               respond (Provide pk)
-          | Private_key ->
+          | Coinbase_receiver_pk ->
+              respond (Provide pk)
+          | Producer_private_key ->
               respond (Provide sk)
-          | Public_key ->
+          | Producer_public_key ->
               respond (Provide (Public_key.decompress_exn pk))
           | _ ->
               respond
@@ -1031,8 +1035,8 @@ module Data = struct
     end
 
     let check ~constraint_constants ~global_slot ~global_slot_since_genesis
-        ~seed ~private_key ~public_key ~public_key_compressed ~total_stake
-        ~logger ~epoch_snapshot =
+        ~seed ~private_key ~public_key ~public_key_compressed
+        ~coinbase_receiver ~total_stake ~logger ~epoch_snapshot =
       let open Message in
       let open Local_state in
       let open Snapshot in
@@ -1071,10 +1075,11 @@ module Data = struct
                 return
                   (Some
                      ( { Block_data.stake_proof=
-                           { private_key
-                           ; public_key
+                           { producer_private_key= private_key
+                           ; producer_public_key= public_key
                            ; delegator
                            ; delegator_pk= account.public_key
+                           ; coinbase_receiver_pk= coinbase_receiver
                            ; ledger=
                                Local_state.Snapshot.Ledger_snapshot
                                .ledger_subset
@@ -1834,6 +1839,8 @@ module Data = struct
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool
             ; block_stake_winner: 'pk
+            ; block_creator: 'pk
+            ; coinbase_receiver: 'pk
             ; supercharge_coinbase: 'bool }
           [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
         end
@@ -1902,6 +1909,8 @@ module Data = struct
       ; Epoch_data.Next.typ
       ; Boolean.typ
       ; Public_key.Compressed.typ
+      ; Public_key.Compressed.typ
+      ; Public_key.Compressed.typ
       ; Boolean.typ ]
 
     let typ ~constraint_constants : (var, Value.t) Typ.t =
@@ -1923,6 +1932,8 @@ module Data = struct
          ; next_epoch_data
          ; has_ancestor_in_same_checkpoint_window
          ; block_stake_winner
+         ; block_creator
+         ; coinbase_receiver
          ; supercharge_coinbase } :
           Value.t) =
       let input =
@@ -1943,7 +1954,9 @@ module Data = struct
         [ input
         ; Epoch_data.Staking.to_input staking_epoch_data
         ; Epoch_data.Next.to_input next_epoch_data
-        ; Public_key.Compressed.to_input block_stake_winner ]
+        ; Public_key.Compressed.to_input block_stake_winner
+        ; Public_key.Compressed.to_input block_creator
+        ; Public_key.Compressed.to_input coinbase_receiver ]
 
     let var_to_input
         ({ Poly.blockchain_length
@@ -1958,6 +1971,8 @@ module Data = struct
          ; next_epoch_data
          ; has_ancestor_in_same_checkpoint_window
          ; block_stake_winner
+         ; block_creator
+         ; coinbase_receiver
          ; supercharge_coinbase } :
           var) =
       let open Tick.Checked.Let_syntax in
@@ -1994,8 +2009,19 @@ module Data = struct
       let block_stake_winner =
         Public_key.Compressed.Checked.to_input block_stake_winner
       in
+      let block_creator =
+        Public_key.Compressed.Checked.to_input block_creator
+      in
+      let coinbase_receiver =
+        Public_key.Compressed.Checked.to_input coinbase_receiver
+      in
       List.reduce_exn ~f:Random_oracle.Input.append
-        [input; staking_epoch_data; next_epoch_data; block_stake_winner]
+        [ input
+        ; staking_epoch_data
+        ; next_epoch_data
+        ; block_stake_winner
+        ; block_creator
+        ; coinbase_receiver ]
 
     let global_slot {Poly.curr_global_slot; _} = curr_global_slot
 
@@ -2015,6 +2041,8 @@ module Data = struct
         ~(genesis_ledger_hash : Coda_base.Frozen_ledger_hash.t)
         ~(producer_vrf_result : Random_oracle.Digest.t)
         ~(block_stake_winner : Public_key.Compressed.t)
+        ~(block_creator : Public_key.Compressed.t)
+        ~(coinbase_receiver : Public_key.Compressed.t)
         ~(supercharge_coinbase : bool) : Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
@@ -2090,6 +2118,8 @@ module Data = struct
             (Global_slot.create ~constants ~epoch:prev_epoch ~slot:prev_slot)
             (Global_slot.create ~constants ~epoch:next_epoch ~slot:next_slot)
       ; block_stake_winner
+      ; block_creator
+      ; coinbase_receiver
       ; supercharge_coinbase }
 
     let same_checkpoint_window ~(constants : Constants.var)
@@ -2140,6 +2170,7 @@ module Data = struct
           ~default:(default_epoch_data, default_epoch_data) ~f:(fun data ->
             (data.staking, Option.value ~default:data.staking data.next) )
       in
+      let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
       { Poly.blockchain_length
       ; epoch_count= Length.zero
       ; min_window_density= max_window_density
@@ -2158,7 +2189,9 @@ module Data = struct
       ; next_epoch_data=
           Epoch_data.Next.genesis ~genesis_epoch_data:genesis_epoch_data_next
       ; has_ancestor_in_same_checkpoint_window= false
-      ; block_stake_winner= fst Vrf.Precomputed.genesis_winner
+      ; block_stake_winner= genesis_winner_pk
+      ; block_creator= genesis_winner_pk
+      ; coinbase_receiver= genesis_winner_pk
       ; supercharge_coinbase= true }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
@@ -2180,6 +2213,10 @@ module Data = struct
         Lazy.force genesis_ledger |> Coda_base.Ledger.merkle_root
         |> Coda_base.Frozen_ledger_hash.of_ledger_hash
       in
+      let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
+      (* no coinbases for genesis block, so CLI flag for coinbase receiver
+         not relevant
+      *)
       Or_error.ok_exn
         (update ~constants ~producer_vrf_result
            ~previous_consensus_state:
@@ -2188,8 +2225,9 @@ module Data = struct
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
-           ~block_stake_winner:(fst Vrf.Precomputed.genesis_winner)
-           ~supercharge_coinbase:true)
+           ~block_stake_winner:genesis_winner_pk
+           ~block_creator:genesis_winner_pk
+           ~coinbase_receiver:genesis_winner_pk ~supercharge_coinbase:true)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
         ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
@@ -2268,6 +2306,17 @@ module Data = struct
         exists Public_key.Compressed.typ
           ~request:As_prover.(return Vrf.Winner_pk)
       in
+      let%bind block_creator =
+        let%bind.Checked.Let_syntax bc_compressed =
+          exists Public_key.typ
+            ~request:As_prover.(return Vrf.Producer_public_key)
+        in
+        Public_key.compress_var bc_compressed
+      in
+      let%bind coinbase_receiver =
+        exists Public_key.Compressed.typ
+          ~request:As_prover.(return Vrf.Coinbase_receiver_pk)
+      in
       let%bind ( threshold_satisfied
                , vrf_result
                , truncated_vrf_result
@@ -2276,7 +2325,7 @@ module Data = struct
         Vrf.Checked.check ~constraint_constants
           (module M)
           ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_slot_number
-          ~block_stake_winner ~seed:staking_epoch_data.seed
+          ~block_stake_winner ~block_creator ~seed:staking_epoch_data.seed
       in
       let%bind supercharge_coinbase =
         compute_supercharge_coinbase ~winner_account
@@ -2369,6 +2418,8 @@ module Data = struct
           ; next_epoch_data
           ; has_ancestor_in_same_checkpoint_window
           ; block_stake_winner
+          ; block_creator
+          ; coinbase_receiver
           ; supercharge_coinbase } )
 
     type display =
@@ -2415,6 +2466,8 @@ module Data = struct
 
     let next_epoch_data (t : Value.t) = t.next_epoch_data
 
+    let coinbase_receiver_var (t : var) = t.coinbase_receiver
+
     let curr_global_slot_var (t : var) =
       Global_slot.slot_number t.curr_global_slot
 
@@ -2431,7 +2484,9 @@ module Data = struct
       , min_window_density
       , total_currency
       , global_slot_since_genesis
-      , block_stake_winner )]
+      , block_stake_winner
+      , block_creator
+      , coinbase_receiver )]
 
     module Unsafe = struct
       (* TODO: very unsafe, do not use unless you know what you are doing *)
@@ -2522,7 +2577,13 @@ module Data = struct
 
     let precomputed_handler = Vrf.Precomputed.handler
 
-    let handler {delegator; delegator_pk; ledger; private_key; public_key}
+    let handler
+        { delegator
+        ; delegator_pk
+        ; coinbase_receiver_pk
+        ; ledger
+        ; producer_private_key
+        ; producer_public_key }
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
@@ -2545,10 +2606,12 @@ module Data = struct
             respond (Provide delegator)
         | Vrf.Winner_pk ->
             respond (Provide delegator_pk)
-        | Vrf.Private_key ->
-            respond (Provide private_key)
-        | Vrf.Public_key ->
-            respond (Provide public_key)
+        | Vrf.Coinbase_receiver_pk ->
+            respond (Provide coinbase_receiver_pk)
+        | Vrf.Producer_private_key ->
+            respond (Provide producer_private_key)
+        | Vrf.Producer_public_key ->
+            respond (Provide producer_public_key)
         | _ ->
             respond
               (Provide
@@ -2558,6 +2621,16 @@ module Data = struct
 
     let ledger_depth {ledger; _} = ledger.depth
   end
+end
+
+module Coinbase_receiver = struct
+  type t = [`Producer | `Other of Public_key.Compressed.t]
+
+  let resolve ~self : t -> Public_key.Compressed.t = function
+    | `Producer ->
+        self
+    | `Other pk ->
+        pk
 end
 
 module Hooks = struct
@@ -3045,16 +3118,12 @@ module Hooks = struct
 
   type block_producer_timing =
     [ `Check_again of Unix_timestamp.t
-    | `Produce_now of
-      Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
-    | `Produce of
-      Unix_timestamp.t
-      * Signature_lib.Keypair.t
-      * Block_data.t
-      * Public_key.Compressed.t ]
+    | `Produce_now of Block_data.t * Public_key.Compressed.t
+    | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t ]
 
   let next_producer_timing ~constraint_constants ~(constants : Constants.t) now
-      (state : Consensus_state.Value.t) ~local_state ~keypairs ~logger =
+      (state : Consensus_state.Value.t) ~local_state ~keypairs
+      ~(coinbase_receiver : Coinbase_receiver.t) ~logger =
     [%log info] "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn ~constants
@@ -3130,6 +3199,10 @@ module Hooks = struct
        * chance of winning. See #2573 *)
           Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
             ~f:(fun () (keypair, public_key_compressed) ->
+              let coinbase_receiver =
+                Coinbase_receiver.resolve ~self:public_key_compressed
+                  coinbase_receiver
+              in
               if
                 not
                 @@ Public_key.Compressed.Set.mem unseen_pks
@@ -3176,13 +3249,12 @@ module Hooks = struct
                     ~global_slot_since_genesis ~seed:epoch_data.seed
                     ~epoch_snapshot ~private_key:keypair.private_key
                     ~public_key:keypair.public_key ~public_key_compressed
-                    ~total_stake ~logger
+                    ~coinbase_receiver ~total_stake ~logger
                 with
                 | None ->
                     Continue_or_stop.Continue ()
                 | Some (data, delegator_pk) ->
-                    Continue_or_stop.Stop (Some (keypair, data, delegator_pk))
-              )
+                    Continue_or_stop.Stop (Some (data, delegator_pk)) )
             ~finish:(fun () -> None)
         in
         let rec find_winning_slot (slot : Slot.t) =
@@ -3195,22 +3267,21 @@ module Hooks = struct
               match block_data pks slot with
               | None ->
                   find_winning_slot (Slot.succ slot)
-              | Some (keypair, data, delegator_pk) ->
-                  Some (slot, keypair, data, delegator_pk) )
+              | Some (data, delegator_pk) ->
+                  Some (slot, data, delegator_pk) )
         in
         find_winning_slot slot
       in
       match next_slot with
-      | Some (next_slot, keypair, data, delegator_pk) ->
+      | Some (next_slot, data, delegator_pk) ->
           [%log info] "Producing block in %d slots"
             (Slot.to_int next_slot - Slot.to_int slot) ;
           if Slot.equal curr_slot next_slot then
-            `Produce_now (keypair, data, delegator_pk)
+            `Produce_now (data, delegator_pk)
           else
             `Produce
               ( Epoch.slot_start_time ~constants epoch next_slot
                 |> Time.to_span_since_epoch |> Time.Span.to_ms
-              , keypair
               , data
               , delegator_pk )
       | None ->
@@ -3422,6 +3493,9 @@ module Hooks = struct
       let previous_protocol_state_hash =
         Protocol_state.hash previous_protocol_state
       in
+      let block_creator =
+        block_data.stake_proof.producer_public_key |> Public_key.compress
+      in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~constants ~previous_consensus_state
@@ -3430,6 +3504,8 @@ module Hooks = struct
              ~previous_protocol_state_hash ~supply_increase
              ~snarked_ledger_hash ~genesis_ledger_hash
              ~block_stake_winner:block_data.stake_proof.delegator_pk
+             ~block_creator
+             ~coinbase_receiver:block_data.stake_proof.coinbase_receiver_pk
              ~supercharge_coinbase)
       in
       let genesis_state_hash =
@@ -3526,6 +3602,7 @@ module Hooks = struct
               ~prev_sub_window_densities:prev.sub_window_densities
               ~prev_min_window_density:prev.min_window_density
           in
+          let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
           { Poly.blockchain_length
           ; epoch_count
           ; min_window_density
@@ -3542,7 +3619,9 @@ module Hooks = struct
                    ~slot:prev_slot)
                 (Global_slot.create ~constants ~epoch:curr_epoch
                    ~slot:curr_slot)
-          ; block_stake_winner= fst Vrf.Precomputed.genesis_winner
+          ; block_stake_winner= genesis_winner_pk
+          ; block_creator= genesis_winner_pk
+          ; coinbase_receiver= genesis_winner_pk
           ; supercharge_coinbase }
     end
   end
@@ -3614,10 +3693,10 @@ let%test_module "Proof of stake tests" =
         |> Or_error.ok_exn
       in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
-      let private_key = Option.value_exn maybe_sk in
-      let public_key_compressed = Account.public_key account in
+      let producer_private_key = Option.value_exn maybe_sk in
+      let producer_public_key_compressed = Account.public_key account in
       let account_id =
-        Account_id.create public_key_compressed Token_id.default
+        Account_id.create producer_public_key_compressed Token_id.default
       in
       let location =
         Ledger.Any_ledger.M.location_of_account ledger account_id
@@ -3637,14 +3716,17 @@ let%test_module "Proof of stake tests" =
             previous_consensus_state.next_epoch_data.seed
           else previous_consensus_state.staking_epoch_data.seed
         in
-        Vrf.eval ~constraint_constants ~private_key
+        Vrf.eval ~constraint_constants ~private_key:producer_private_key
           {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
       let next_consensus_state =
         update ~constants ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
           ~genesis_ledger_hash:snarked_ledger_hash ~producer_vrf_result
-          ~block_stake_winner:public_key_compressed ~supercharge_coinbase:true
+          ~block_stake_winner:producer_public_key_compressed
+          ~block_creator:producer_public_key_compressed
+          ~coinbase_receiver:producer_public_key_compressed
+          ~supercharge_coinbase:true
         |> Or_error.ok_exn
       in
       (*If this is a fork then check blockchain length and global_slot_since_genesis have increased correctly*)
@@ -3713,14 +3795,17 @@ let%test_module "Proof of stake tests" =
         let sparse_ledger =
           Sparse_ledger.of_ledger_index_subset_exn ledger indices
         in
-        let public_key = Public_key.decompress_exn public_key_compressed in
+        let producer_public_key =
+          Public_key.decompress_exn producer_public_key_compressed
+        in
         let handler =
           Prover_state.handler ~constraint_constants
             { delegator
-            ; delegator_pk= public_key_compressed
+            ; delegator_pk= producer_public_key_compressed
+            ; coinbase_receiver_pk= producer_public_key_compressed
             ; ledger= sparse_ledger
-            ; private_key
-            ; public_key }
+            ; producer_private_key
+            ; producer_public_key }
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
@@ -3811,7 +3896,8 @@ let%test_module "Proof of stake tests" =
         let result =
           Vrf.check ~constraint_constants ~global_slot
             ~global_slot_since_genesis ~seed ~private_key ~public_key
-            ~public_key_compressed ~total_stake ~logger ~epoch_snapshot
+            ~public_key_compressed ~coinbase_receiver:public_key_compressed
+            ~total_stake ~logger ~epoch_snapshot
         in
         match result with Some _ -> 1 | None -> 0
       in

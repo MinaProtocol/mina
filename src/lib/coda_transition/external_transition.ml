@@ -98,7 +98,7 @@ Raw_versioned__.
   , set_validation_callback )]
 
 [%%define_locally
-Stable.V1.(create, sexp_of_t, t_of_sexp)]
+Stable.Latest.(create, sexp_of_t, t_of_sexp)]
 
 type external_transition = t
 
@@ -131,7 +131,15 @@ let consensus_time_produced_at =
 let global_slot =
   Fn.compose Consensus.Data.Consensus_state.curr_global_slot consensus_state
 
-let block_producer = Fn.compose Staged_ledger_diff.creator staged_ledger_diff
+let block_producer =
+  Fn.compose Consensus.Data.Consensus_state.block_creator consensus_state
+
+let coinbase_receiver =
+  Fn.compose Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+
+let supercharge_coinbase =
+  Fn.compose Consensus.Data.Consensus_state.supercharge_coinbase
+    consensus_state
 
 let block_winner =
   Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
@@ -157,12 +165,15 @@ let equal =
 
 let transactions ~constraint_constants t =
   let open Staged_ledger.Pre_diff_info in
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver (consensus_state t)
+  in
   let supercharge_coinbase =
     Consensus.Data.Consensus_state.supercharge_coinbase (consensus_state t)
   in
   match
-    get_transactions ~constraint_constants ~supercharge_coinbase
-      (staged_ledger_diff t)
+    get_transactions ~constraint_constants ~coinbase_receiver
+      ~supercharge_coinbase (staged_ledger_diff t)
   with
   | Ok transactions ->
       transactions
@@ -741,6 +752,10 @@ module With_validation = struct
 
   let block_winner t = lift block_winner t
 
+  let coinbase_receiver t = lift coinbase_receiver t
+
+  let supercharge_coinbase t = lift supercharge_coinbase t
+
   let commands t = lift commands t
 
   let transactions ~constraint_constants t =
@@ -908,6 +923,8 @@ module Validated = struct
     , consensus_time_produced_at
     , block_producer
     , block_winner
+    , coinbase_receiver
+    , supercharge_coinbase
     , transactions
     , commands
     , payments
@@ -938,15 +955,12 @@ let genesis ~precomputed_values =
   let protocol_state_proof =
     Precomputed_values.genesis_proof precomputed_values
   in
-  let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-        , None )
-    ; creator
-    ; coinbase_receiver= creator }
+        , None ) }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -1077,6 +1091,7 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let coinbase_receiver = coinbase_receiver transition in
     let supercharge_coinbase =
       consensus_state transition
       |> Consensus.Data.Consensus_state.supercharge_coinbase
@@ -1097,7 +1112,7 @@ module Staged_ledger_validation = struct
            in
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
-        ~supercharge_coinbase
+        ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

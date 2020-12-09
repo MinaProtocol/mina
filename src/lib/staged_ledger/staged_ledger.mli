@@ -121,6 +121,7 @@ val apply :
   -> verifier:Verifier.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
+  -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
@@ -138,6 +139,7 @@ val apply_diff_unchecked :
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
+  -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
@@ -156,8 +158,7 @@ val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> ?log_block_creation:bool
   -> t
-  -> self:Public_key.Compressed.t
-  -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
+  -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t

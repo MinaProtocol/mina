@@ -1,6 +1,5 @@
 open Core_kernel
 open Coda_base
-open Signature_lib
 
 module At_most_two : sig
   type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
@@ -106,20 +105,12 @@ module Diff : sig
     with type V1.t = t
 end
 
-type t =
-  { diff: Diff.t
-  ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.t }
-[@@deriving sexp, to_yojson, fields]
+type t = {diff: Diff.t} [@@deriving sexp, to_yojson, fields]
 
 module Stable :
   sig
     module V1 : sig
-      type t =
-        { diff: Diff.t
-        ; creator: Public_key.Compressed.t
-        ; coinbase_receiver: Public_key.Compressed.t }
-      [@@deriving sexp, to_yojson, bin_io, version]
+      type t = {diff: Diff.t} [@@deriving sexp, to_yojson, bin_io, version]
     end
 
     module Latest = V1
@@ -144,11 +135,7 @@ module With_valid_signatures_and_proofs : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   val commands : t -> User_command.Valid.t With_status.t list
 end
@@ -171,11 +158,7 @@ module With_valid_signatures : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t }
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   val coinbase :
        constraint_constants:Genesis_constants.Constraint_constants.t

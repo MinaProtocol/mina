@@ -322,12 +322,12 @@ module For_tests = struct
         ( current_state_view
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
+      let coinbase_receiver = largest_account_public_key in
       let supercharge_coinbase = true in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
-          ~coinbase_receiver:`Producer ~self:largest_account_public_key
-          ~current_state_view ~supercharge_coinbase
+          ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
@@ -335,8 +335,8 @@ module For_tests = struct
                , `Staged_ledger _
                , `Pending_coinbase_update _ ) =
         match%bind
-          Staged_ledger.apply_diff_unchecked parent_staged_ledger ~logger
-            staged_ledger_diff
+          Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
         with
