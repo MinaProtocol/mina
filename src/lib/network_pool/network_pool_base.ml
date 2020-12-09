@@ -114,7 +114,7 @@ end)
     every time (fun () ->
         [%log' info t.logger]
           ~metadata:[("meter", Meter.summary meter)]
-          !"%s $meter" Resource_pool.label meter )
+          !"%s $meter" Resource_pool.label )
 
   let filter_verified pipe t ~f =
     let r, w =
