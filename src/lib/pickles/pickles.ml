@@ -593,21 +593,27 @@ module Make (Inputs : Inputs) = struct
     val constraint_system_hash : string Lazy.t
 
     module Keys : sig
-      val proving_key_header : Snark_keys_header.t Lazy.t
+      module Proving : sig
+        type t = private Tick.Proving_key.t
 
-      val verification_key_header : Snark_keys_header.t Lazy.t
+        val header : Snark_keys_header.t Lazy.t
 
-      val proving_key_cache_key : Cache.Step.Key.Proving.t Lazy.t
+        val cache_key : Cache.Step.Key.Proving.t Lazy.t
+      end
 
-      val verification_key_cache_key : Cache.Step.Key.Verification.t Lazy.t
+      module Verification : sig
+        type t = private Tick.Verification_key.t
 
-      val generate : unit -> Tick.Proving_key.t * Tick.Verification_key.t
+        val header : Snark_keys_header.t Lazy.t
+
+        val cache_key : Cache.Step.Key.Verification.t Lazy.t
+      end
+
+      val generate : unit -> Proving.t * Verification.t
 
       val read_or_generate_from_cache :
            Key_cache.Spec.t list
-        -> (Pickles__.Impls.Step.Keypair.t * Dirty.t) Lazy.t
-           * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t)
-             Lazy.t
+        -> (Proving.t * Dirty.t) Lazy.t * (Verification.t * Dirty.t) Lazy.t
     end
   end
 
@@ -664,47 +670,66 @@ module Make (Inputs : Inputs) = struct
                 Lazy.map ~f:Md5.to_hex constraint_system_digest
 
               module Keys = struct
-                let proving_key_header =
-                  Lazy.map constraint_system_hash ~f:(fun cs_hash ->
-                      snark_keys_header
-                        { type_= "step-proving-key"
-                        ; identifier= name ^ "-" ^ b.rule.identifier }
-                        cs_hash )
+                module Proving = struct
+                  type t = Tick.Proving_key.t
 
-                let verification_key_header =
-                  Lazy.map constraint_system_hash ~f:(fun cs_hash ->
-                      snark_keys_header
-                        { type_= "step-verification-key"
-                        ; identifier= name ^ "-" ^ b.rule.identifier }
-                        cs_hash )
+                  let header =
+                    Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+                        snark_keys_header
+                          { type_= "step-proving-key"
+                          ; identifier= name ^ "-" ^ b.rule.identifier }
+                          cs_hash )
 
-                let proving_key_cache_key =
-                  let%map.Lazy.Let_syntax cs = constraint_system
-                  and header = proving_key_header in
-                  (Type_equal.Id.uid self.id, header, Index.to_int b.index, cs)
+                  let cache_key =
+                    let%map.Lazy.Let_syntax cs = constraint_system
+                    and header = header in
+                    ( Type_equal.Id.uid self.id
+                    , header
+                    , Index.to_int b.index
+                    , cs )
+                end
 
-                let verification_key_cache_key :
-                    Cache.Step.Key.Verification.t Lazy.t =
-                  let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
-                  and header = verification_key_header in
-                  ( Type_equal.Id.uid self.id
-                  , header
-                  , Index.to_int b.index
-                  , cs_hash )
+                module Verification = struct
+                  type t = Tick.Verification_key.t
+
+                  let header =
+                    Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+                        snark_keys_header
+                          { type_= "step-verification-key"
+                          ; identifier= name ^ "-" ^ b.rule.identifier }
+                          cs_hash )
+
+                  let cache_key : Cache.Step.Key.Verification.t Lazy.t =
+                    let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
+                    and header = header in
+                    ( Type_equal.Id.uid self.id
+                    , header
+                    , Index.to_int b.index
+                    , cs_hash )
+                end
 
                 let generate () =
                   Common.time "stepkeygen" (fun () ->
                       let kp = generate_keypair ~exposing:[typ] main in
                       (Keypair.pk kp, Keypair.vk kp) )
 
-                let read_or_generate_from_cache =
+                let read_or_generate_from_cache :
+                       Key_cache.Spec.t list
+                    -> (Proving.t * Dirty.t) Lazy.t
+                       * (Verification.t * Dirty.t) Lazy.t =
                   Memo.of_comparable
                     (module Key_cache.Spec.List)
                     (fun cache ->
                       Common.time "step read or generate" (fun () ->
-                          Cache.Step.read_or_generate cache
-                            proving_key_cache_key verification_key_cache_key
-                            typ main ) )
+                          let kp_cache, vk_cache =
+                            Cache.Step.read_or_generate cache Proving.cache_key
+                              Verification.cache_key typ main
+                          in
+                          let pk_cache =
+                            let%map.Lazy.Let_syntax kp, dirty = kp_cache in
+                            (Keypair.pk kp, dirty)
+                          in
+                          (pk_cache, vk_cache) ) )
               end
             end )
         end)
