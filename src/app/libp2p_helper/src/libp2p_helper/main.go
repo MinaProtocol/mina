@@ -324,7 +324,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		pubsub.WithPeerExchange(m.PeerExchange),
 		pubsub.WithFloodPublish(m.Flood),
 		pubsub.WithDirectPeers(directPeers),
-		pubsub.WithValidateQueueSize(150)
+		pubsub.WithValidateQueueSize(150),
 	}
 
 	var ps *pubsub.PubSub
