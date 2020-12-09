@@ -608,13 +608,9 @@ module type S = sig
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Produce_now of
-        Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
-      | `Produce of
-        Unix_timestamp.t
-        * Signature_lib.Keypair.t
-        * Block_data.t
-        * Public_key.Compressed.t ]
+      | `Produce_now of Block_data.t * Public_key.Compressed.t
+      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
+      ]
 
     (**
      * Determine if and when to next produce a block. Either informs the callee

@@ -974,7 +974,8 @@ module T = struct
               check_completed_works ~logger ~verifier t.scan_state work )
     in
     let%bind prediff =
-      Pre_diff_info.get witness ~constraint_constants  ~coinbase_receiver ~supercharge_coinbase
+      Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
+        ~supercharge_coinbase
         ~check:(check_commands t.ledger ~verifier)
       |> Deferred.map
            ~f:
@@ -1007,12 +1008,13 @@ module T = struct
 
   let apply_diff_unchecked ~constraint_constants t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
-      ~current_state_view ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
+      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get_unchecked ~constraint_constants
-           ~coinbase_receiver ~supercharge_coinbase sl_diff
+      @@ Pre_diff_info.get_unchecked ~constraint_constants ~coinbase_receiver
+           ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
     apply_diff t
@@ -1804,7 +1806,7 @@ module T = struct
             , Diff_creation_log.detail_list_to_yojson
                 (List.map ~f:List.rev detailed) ) ] ;
     trace_event "prediffs done" ;
-    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
+    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff}
 end
 
 include T
@@ -1859,7 +1861,8 @@ let%test_module "test" =
               , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants !sl diff' ~logger ~verifier
-            ~current_state_view ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+            ~current_state_view ~state_and_body_hash ~coinbase_receiver
+            ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -1893,7 +1896,7 @@ let%test_module "test" =
     let create_and_apply ?(coinbase_receiver = coinbase_receiver)
         ?(winner = self_pk) sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
-      let%map ledger_proof, diff, _, _ =
+      let%map ledger_proof, diff, _, _, _ =
         create_and_apply_with_state_body_hash ~coinbase_receiver ~winner
           ~current_state_view:(dummy_state_view ())
           ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
@@ -2419,8 +2422,7 @@ let%test_module "test" =
                         ~current_state_view:(dummy_state_view ())
                         ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
-                        ~coinbase_receiver
-                        ~supercharge_coinbase:true
+                        ~coinbase_receiver ~supercharge_coinbase:true
                     in
                     let checked', diff' =
                       match apply_res with

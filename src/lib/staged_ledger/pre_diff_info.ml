@@ -354,7 +354,8 @@ let get' (type c)
   , p1.coinbases @ p2.coinbases )
 
 (* TODO: This is important *)
-let get ~check ~constraint_constants ~coinbase_receiver  ~supercharge_coinbase t =
+let get ~check ~constraint_constants ~coinbase_receiver ~supercharge_coinbase t
+    =
   let open Async in
   match%map validate_commands t ~check with
   | Error e ->
@@ -368,8 +369,8 @@ let get ~check ~constraint_constants ~coinbase_receiver  ~supercharge_coinbase t
           (Staged_ledger_diff.With_valid_signatures.coinbase
              ~constraint_constants ~supercharge_coinbase diff)
 
-let get_unchecked ~constraint_constants  ~coinbase_receiver ~supercharge_coinbase
-    (t : With_valid_signatures_and_proofs.t) =
+let get_unchecked ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase (t : With_valid_signatures_and_proofs.t) =
   let t = forget_proof_checks t in
   get' ~constraint_constants ~diff:t.diff ~coinbase_receiver
     ~forget:User_command.forget_check
@@ -377,8 +378,8 @@ let get_unchecked ~constraint_constants  ~coinbase_receiver ~supercharge_coinbas
       (Staged_ledger_diff.With_valid_signatures.coinbase ~constraint_constants
          ~supercharge_coinbase t)
 
-let get_transactions ~constraint_constants ~coinbase_receiver ~supercharge_coinbase (sl_diff : t)
-    =
+let get_transactions ~constraint_constants ~coinbase_receiver
+    ~supercharge_coinbase (sl_diff : t) =
   let open Result.Let_syntax in
   let%map transactions, _, _, _ =
     get' ~constraint_constants ~diff:sl_diff.diff ~coinbase_receiver

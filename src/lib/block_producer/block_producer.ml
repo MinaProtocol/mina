@@ -378,7 +378,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (_keypair, scheduled_time, block_data, winner_pk) =
+      let produce ivar (scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -655,14 +655,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
-                | `Produce_now (keypair, data, winner_pk) ->
+                | `Produce_now (data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
-                         (keypair, now, data, winner_pk))
+                         (now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
-                | `Produce (time, keypair, data, winner_pk) ->
+                | `Produce (time, data, winner_pk) ->
                     Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
@@ -671,7 +671,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch
                                 production_supervisor
-                                (keypair, scheduled_time, data, winner_pk))
+                                (scheduled_time, data, winner_pk))
                              ~f:check_next_block_timing) ) ) )
       in
       let start () =

@@ -137,6 +137,10 @@ let block_producer =
 let coinbase_receiver =
   Fn.compose Consensus.Data.Consensus_state.coinbase_receiver consensus_state
 
+let supercharge_coinbase =
+  Fn.compose Consensus.Data.Consensus_state.supercharge_coinbase
+    consensus_state
+
 let block_winner =
   Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
 
@@ -168,8 +172,8 @@ let transactions ~constraint_constants t =
     Consensus.Data.Consensus_state.supercharge_coinbase (consensus_state t)
   in
   match
-    get_transactions ~constraint_constants ~coinbase_receiver ~supercharge_coinbase
-      (staged_ledger_diff t)
+    get_transactions ~constraint_constants ~coinbase_receiver
+      ~supercharge_coinbase (staged_ledger_diff t)
   with
   | Ok transactions ->
       transactions
@@ -750,10 +754,12 @@ module With_validation = struct
 
   let coinbase_receiver t = lift coinbase_receiver t
 
+  let supercharge_coinbase t = lift supercharge_coinbase t
+
   let commands t = lift commands t
 
-  let transactions ~constraint_constants ~coinbase_receiver t =
-    lift (transactions ~constraint_constants ~coinbase_receiver) t
+  let transactions ~constraint_constants t =
+    lift (transactions ~constraint_constants) t
 
   let payments t = lift payments t
 
@@ -918,6 +924,7 @@ module Validated = struct
     , block_producer
     , block_winner
     , coinbase_receiver
+    , supercharge_coinbase
     , transactions
     , commands
     , payments
@@ -1105,8 +1112,7 @@ module Staged_ledger_validation = struct
            in
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
-        ~coinbase_receiver
-        ~supercharge_coinbase
+        ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

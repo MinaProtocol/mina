@@ -2677,18 +2677,14 @@ module Queries = struct
         let%map best_chain = Coda_lib.best_chain ?max_length coda in
         List.map best_chain ~f:(fun breadcrumb ->
             let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-            let ((transition_with_hash, _validity) as transition) =
+            let transition =
               Transition_frontier.Breadcrumb.validated_transition breadcrumb
-            in
-            let coinbase_receiver =
-              Coda_transition.External_transition.coinbase_receiver
-                (With_hash.data transition_with_hash)
             in
             let transactions =
               Coda_transition.External_transition.Validated.transactions
                 ~constraint_constants:
                   (Coda_lib.config coda).precomputed_values
-                    .constraint_constants transition ~coinbase_receiver
+                    .constraint_constants transition
             in
             With_hash.Stable.Latest.
               { data=

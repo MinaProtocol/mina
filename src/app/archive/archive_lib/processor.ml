@@ -649,10 +649,8 @@ module Block = struct
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             }
         in
-        let coinbase_receiver = External_transition.coinbase_receiver t in
         let transactions =
-          External_transition.transactions ~constraint_constants
-            ~coinbase_receiver t
+          External_transition.transactions ~constraint_constants t
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->

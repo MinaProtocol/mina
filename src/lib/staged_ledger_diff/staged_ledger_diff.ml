@@ -171,15 +171,13 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V1 = struct
-    type t = {diff: Diff.Stable.V1.t}
-    [@@deriving sexp, to_yojson]
+    type t = {diff: Diff.Stable.V1.t} [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t = {diff: Diff.t}
-[@@deriving sexp, to_yojson, fields]
+type t = Stable.Latest.t = {diff: Diff.t} [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =
@@ -199,8 +197,7 @@ module With_valid_signatures_and_proofs = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff}
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   let commands t =
     (fst t.diff).commands
@@ -251,8 +248,7 @@ module With_valid_signatures = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t = {diff: diff}
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   let coinbase
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -305,8 +301,7 @@ let validate_commands (t : t)
               ; commands= commands2
               ; coinbase= d2.coinbase } )
       in
-      ( {diff= (p1, p2)}
-        : With_valid_signatures.t ) )
+      ({diff= (p1, p2)} : With_valid_signatures.t) )
 
 let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     With_valid_signatures.t =

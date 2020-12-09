@@ -2227,8 +2227,7 @@ module Data = struct
            ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
            ~block_stake_winner:genesis_winner_pk
            ~block_creator:genesis_winner_pk
-           ~coinbase_receiver:genesis_winner_pk
-           ~supercharge_coinbase:true)
+           ~coinbase_receiver:genesis_winner_pk ~supercharge_coinbase:true)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
         ~genesis_epoch_data ~constraint_constants ~constants : Value.t =
@@ -3119,13 +3118,8 @@ module Hooks = struct
 
   type block_producer_timing =
     [ `Check_again of Unix_timestamp.t
-    | `Produce_now of
-      Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
-    | `Produce of
-      Unix_timestamp.t
-      * Signature_lib.Keypair.t
-      * Block_data.t
-      * Public_key.Compressed.t ]
+    | `Produce_now of Block_data.t * Public_key.Compressed.t
+    | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t ]
 
   let next_producer_timing ~constraint_constants ~(constants : Constants.t) now
       (state : Consensus_state.Value.t) ~local_state ~keypairs
@@ -3260,8 +3254,7 @@ module Hooks = struct
                 | None ->
                     Continue_or_stop.Continue ()
                 | Some (data, delegator_pk) ->
-                    Continue_or_stop.Stop (Some (keypair, data, delegator_pk))
-              )
+                    Continue_or_stop.Stop (Some (data, delegator_pk)) )
             ~finish:(fun () -> None)
         in
         let rec find_winning_slot (slot : Slot.t) =
@@ -3274,22 +3267,21 @@ module Hooks = struct
               match block_data pks slot with
               | None ->
                   find_winning_slot (Slot.succ slot)
-              | Some (keypair, data, delegator_pk) ->
-                  Some (keypair, slot, data, delegator_pk) )
+              | Some (data, delegator_pk) ->
+                  Some (slot, data, delegator_pk) )
         in
         find_winning_slot slot
       in
       match next_slot with
-      | Some (keypair, next_slot, data, delegator_pk) ->
+      | Some (next_slot, data, delegator_pk) ->
           [%log info] "Producing block in %d slots"
             (Slot.to_int next_slot - Slot.to_int slot) ;
           if Slot.equal curr_slot next_slot then
-            `Produce_now (keypair, data, delegator_pk)
+            `Produce_now (data, delegator_pk)
           else
             `Produce
               ( Epoch.slot_start_time ~constants epoch next_slot
                 |> Time.to_span_since_epoch |> Time.Span.to_ms
-              , keypair
               , data
               , delegator_pk )
       | None ->
