@@ -67,9 +67,9 @@ end
 
 let ban_message =
   if tmp_bans_are_disabled then
-    "Would ban peer $peer_id until $expiration due to $action, refusing due \
+    "Would ban peer $sender_id until $expiration due to $action, refusing due \
      to trust system being disabled"
-  else "Banning peer $peer_id until $expiration due to $action"
+  else "Banning peer $sender_id until $expiration due to $action"
 
 module Log_events = struct
   (* TODO: Split per action. *)
@@ -175,8 +175,8 @@ module Make0 (Inputs : Input_intf) = struct
         else "Decreasing"
       in
       [%log debug]
-        ~metadata:([("peer_id", Peer_id.to_yojson peer)] @ action_metadata)
-        "%s trust for peer $peer_id due to %s. New trust is %f." verb
+        ~metadata:([("sender_id", Peer_id.to_yojson peer)] @ action_metadata)
+        "%s trust for peer $sender_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
     in
     let%map () =
