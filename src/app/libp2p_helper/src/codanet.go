@@ -284,7 +284,12 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
-				kad, err = dual.New(ctx, host, dual.WanDHTOption(dht.Datastore(dsDht)), dual.DHTOption(dht.Validator(rv)), dual.WanDHTOption(dht.BootstrapPeers(seeds...)), dual.DHTOption(dht.ProtocolPrefix("/coda")))
+				kad, err = dual.New(ctx, host,
+					dual.WanDHTOption(dht.Datastore(dsDht)),
+					dual.DHTOption(dht.Validator(rv)),
+					dual.DHTOption(dht.BootstrapPeers(seeds...)),
+					dual.DHTOption(dht.ProtocolPrefix("/coda")),
+				)
 				return kad, err
 			})),
 		p2p.UserAgent("github.com/codaprotocol/coda/tree/master/src/app/libp2p_helper"),

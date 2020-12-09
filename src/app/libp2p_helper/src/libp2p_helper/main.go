@@ -288,6 +288,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		seeds = append(seeds, *addr)
 	}
 
+	app.AddedPeers = append(app.AddedPeers, seeds...)
+
 	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
 	for _, v := range m.DirectPeers {
 		addr, err := addrInfoOfString(v)
@@ -311,7 +313,6 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	}
 
 	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig)
-
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -319,10 +320,14 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?
-	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32),
+		pubsub.WithPeerExchange(m.PeerExchange),
+		pubsub.WithFloodPublish(m.Flood),
+		pubsub.WithDirectPeers(directPeers),
+	}
+
 	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
-
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -909,6 +914,7 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	go func() {
 		for info := range l.FoundPeer {
 			if validPeer(info.ID) {
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 			}
 		}
@@ -933,6 +939,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	foundPeerCh := make(chan peer.AddrInfo)
 
 	if !app.NoMDNS {
+		app.P2p.Logger.Debugf("beginning mDNS discovery")
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
 			return nil, badp2p(err)
@@ -940,6 +947,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	if !app.NoDHT {
+		app.P2p.Logger.Debugf("beginning DHT discovery")
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
 			return nil, errors.New("failed to create routing discovery")
@@ -1148,7 +1156,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		trustedPeers.Add(id)
 	}
 
-	return codanet.NewCodaGatingState(newFilter, trustedPeers, bannedPeers), nil
+	return codanet.NewCodaGatingState(newFilter, bannedPeers, trustedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
