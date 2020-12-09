@@ -559,9 +559,6 @@ module type S = sig
     *)
 
     type t = [`Producer | `Other of Public_key.Compressed.t]
-
-    (* choose a key, either `self` or a key given as an argument *)
-    val resolve : self:Public_key.Compressed.t -> t -> Public_key.Compressed.t
   end
 
   module Hooks : sig
