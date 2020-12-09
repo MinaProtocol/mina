@@ -41,11 +41,11 @@ type CodaConnectionManager struct {
 	OnDisconnect func(network.Network, network.Conn)
 }
 
-func newCodaConnectionManager() *CodaConnectionManager {
+func newCodaConnectionManager(maxConnections int) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:   p2pconnmgr.NewConnManager(25, 50, time.Duration(30*time.Second)),
+		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(30*time.Second)),
 		OnConnect:    noop,
 		OnDisconnect: noop,
 	}
@@ -225,7 +225,7 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
 
 	me, err := peer.IDFromPrivateKey(pk)
@@ -262,7 +262,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager()
+	connManager := newCodaConnectionManager(maxConnections)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,

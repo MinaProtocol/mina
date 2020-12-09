@@ -422,7 +422,9 @@ module Helper = struct
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
-        ; seed_peers: string list }
+        ; seed_peers: string list
+        ; max_connections: int
+        ; validation_queue_size: int }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -1286,7 +1288,8 @@ let list_peers net =
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~metrics_port ~on_peer_connected ~unsafe_no_trust_ip ~flooding
-    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config =
+    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
+    ~max_connections ~validation_queue_size =
   net.Helper.peer_connected_callback
   <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   match%map
@@ -1303,6 +1306,8 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
+      ; max_connections
+      ; validation_queue_size
       ; gating_config=
           Helper.gating_config_to_helper_format initial_gating_config }
   with
@@ -1628,7 +1633,8 @@ let%test_module "coda network tests" =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
@@ -1636,7 +1642,8 @@ let%test_module "coda network tests" =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
           ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn

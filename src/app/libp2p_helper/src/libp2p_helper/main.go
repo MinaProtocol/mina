@@ -238,18 +238,20 @@ var (
 )
 
 type configureMsg struct {
-	Statedir        string             `json:"statedir"`
-	Privk           string             `json:"privk"`
-	NetworkID       string             `json:"network_id"`
-	ListenOn        []string           `json:"ifaces"`
-	MetricsPort     string             `json:"metrics_port"`
-	External        string             `json:"external_maddr"`
-	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
-	Flood           bool               `json:"flood"`
-	PeerExchange    bool               `json:"peer_exchange"`
-	DirectPeers     []string           `json:"direct_peers"`
-	SeedPeers       []string           `json:"seed_peers"`
-	GatingConfig    setGatingConfigMsg `json:"gating_config"`
+	Statedir            string             `json:"statedir"`
+	Privk               string             `json:"privk"`
+	NetworkID           string             `json:"network_id"`
+	ListenOn            []string           `json:"ifaces"`
+	MetricsPort         string             `json:"metrics_port"`
+	External            string             `json:"external_maddr"`
+	UnsafeNoTrustIP     bool               `json:"unsafe_no_trust_ip"`
+	Flood               bool               `json:"flood"`
+	PeerExchange        bool               `json:"peer_exchange"`
+	DirectPeers         []string           `json:"direct_peers"`
+	SeedPeers           []string           `json:"seed_peers"`
+	GatingConfig        setGatingConfigMsg `json:"gating_config"`
+	MaxConnections      int                `json:"max_connections"`
+	ValidationQueueSize int                `json:"validation_queue_size"`
 }
 
 type peerConnectedUpcall struct {
@@ -312,7 +314,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections)
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -324,6 +326,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		pubsub.WithPeerExchange(m.PeerExchange),
 		pubsub.WithFloodPublish(m.Flood),
 		pubsub.WithDirectPeers(directPeers),
+		pubsub.WithValidateQueueSize(m.ValidationQueueSize),
 	}
 
 	var ps *pubsub.PubSub
