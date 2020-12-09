@@ -1,0 +1,15 @@
+open Core
+open Network_peer
+
+type t
+
+val create : capacity:int -> t
+
+val add :
+     t
+  -> Envelope.Sender.t
+  -> now:Time.t
+  -> score:int
+  -> [`Ok | `Capacity_exceeded]
+
+val summary : t -> Yojson.Safe.t
