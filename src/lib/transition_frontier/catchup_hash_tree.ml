@@ -20,7 +20,7 @@ end
 type t =
   { nodes: Node.t State_hash.Table.t
   ; tips: State_hash.Hash_set.t
-  ; child_counts: int State_hash.Table.t (* How many children does it have *)
+  ; children: State_hash.Set.t State_hash.Table.t
   ; mutable root: State_hash.t
   ; logger: Logger.t }
 
@@ -49,7 +49,9 @@ let create ~root =
   in
   { root= root_hash
   ; tips= State_hash.Hash_set.create ()
-  ; child_counts= State_hash.Table.of_alist_exn [(parent, 1)]
+  ; children=
+      State_hash.Table.of_alist_exn
+        [(parent, State_hash.Set.singleton root_hash)]
   ; nodes
   ; logger= Logger.create () }
 
@@ -68,6 +70,13 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
         log "expected $parent to have breadcrumb (child is $hash)"
       else ()
 
+let add_child t h ~parent =
+  Hashtbl.update t.children parent ~f:(function
+    | None ->
+        State_hash.Set.singleton h
+    | Some s ->
+        Set.add s h )
+
 let add t h ~parent ~job =
   if Hashtbl.mem t.nodes h then
     match (Hashtbl.find_exn t.nodes h).state with
@@ -77,8 +86,8 @@ let add t h ~parent ~job =
         Hash_set.add s job
   else (
     check_for_parent t h ~parent ~check_has_breadcrumb:false ;
-    if not (Hashtbl.mem t.child_counts h) then Hash_set.add t.tips h ;
-    Hashtbl.incr t.child_counts ~by:1 parent ;
+    if not (Hashtbl.mem t.children h) then Hash_set.add t.tips h ;
+    add_child t h ~parent ;
     Hash_set.remove t.tips parent ;
     Hashtbl.set t.nodes ~key:h
       ~data:
@@ -91,7 +100,7 @@ let breadcrumb_added (t : t) b =
   Hashtbl.update t.nodes h ~f:(function
     | None ->
         (* New child *)
-        Hashtbl.incr ~by:1 t.child_counts parent ;
+        add_child t h ~parent ;
         {parent; state= Have_breadcrumb}
     | Some x ->
         {x with state= Have_breadcrumb} ) ;
@@ -103,12 +112,34 @@ let remove_node t h =
   | None ->
       ()
   | Some {parent; _} ->
-      Hashtbl.change t.child_counts parent ~f:(function
+      Hashtbl.change t.children parent ~f:(function
         | None ->
             None
-        | Some n ->
-            let n' = n - 1 in
-            if n' > 0 then Some n' else None )
+        | Some s ->
+            let s' = Set.remove s h in
+            if Set.is_empty s' then None else Some s' )
+
+(* Remove everything not reachable from the root *)
+let prune t =
+  let keep = State_hash.Hash_set.create () in
+  let rec go stack =
+    match stack with
+    | [] ->
+        ()
+    | next :: stack ->
+        Hash_set.add keep next ;
+        let stack =
+          match Hashtbl.find t.children next with
+          | None ->
+              stack
+          | Some cs ->
+              List.rev_append (Set.to_list cs) stack
+        in
+        go stack
+  in
+  go [t.root] ;
+  List.iter (Hashtbl.keys t.nodes) ~f:(fun h ->
+      if not (Hash_set.mem keep h) then remove_node t h )
 
 let catchup_failed t job =
   let to_remove =
@@ -138,6 +169,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
               None
           | Some x ->
               t.root <- h ;
-              Some {x with state= Have_breadcrumb} )
+              Some {x with state= Have_breadcrumb} ) ;
+        prune t
     | E (Best_tip_changed _) ->
         () )

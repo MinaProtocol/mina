@@ -537,6 +537,10 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
          let job =
            Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
          in
+         let notify_hash_tree_of_failure () =
+           Transition_frontier.(
+             Catchup_hash_tree.catchup_failed (catchup_hash_tree frontier) job)
+         in
          don't_wait_for
            (let start_time = Core.Time.now () in
             [%log info] "Catch up to $target_hash"
@@ -631,6 +635,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   [%log trace]
                     "catchup breadcrumbs pipe was closed; attempt to write to \
                      closed pipe" ;
+                  notify_hash_tree_of_failure () ;
                   garbage_collect_subtrees ~logger
                     ~subtrees:trees_of_breadcrumbs ;
                   Coda_metrics.(
@@ -652,10 +657,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;
-                Transition_frontier.(
-                  Catchup_hash_tree.catchup_failed
-                    (catchup_hash_tree frontier)
-                    job) ;
+                notify_hash_tree_of_failure () ;
                 garbage_collect_subtrees ~logger ~subtrees ;
                 Coda_metrics.(
                   Gauge.set Transition_frontier_controller.catchup_time_ms
