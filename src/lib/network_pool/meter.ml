@@ -14,7 +14,7 @@ let interval = Time.Span.of_min 5.
    values.
 *)
 module type Coned_abelian_group = sig
-  type t
+  type t [@@deriving sexp, to_yojson]
 
   val ( + ) : t -> t -> t
 
@@ -35,13 +35,24 @@ let ( <= ) = `Don't_use
 
 let ( = ) = `Don't_use
 
-module Score : Score_intf with type t = int = Int
+module Score : Score_intf with type t = int = struct
+  open Int
+
+  type t = int [@@deriving to_yojson, sexp]
+
+  let ( + ) = ( + )
+
+  let ( - ) = ( - )
+
+  let is_non_negative = is_non_negative
+end
 
 module Record = struct
   (* For a given peer, all of the actions within [interval] that peer has performed,
      along with the remaining capacity for actions. *)
   type t =
     {mutable remaining_capacity: Score.t; elts: (Score.t * Time.t) Queue.t}
+  [@@deriving sexp]
 
   let clear_old_entries r ~now =
     let rec go () =
@@ -74,6 +85,7 @@ module Lru_table (Q : Hash_queue.S) = struct
   let max_size = 2048
 
   type t = {table: Record.t Q.t; initial_capacity: Score.t}
+  [@@deriving sexp_of]
 
   let add ({table; initial_capacity} : t) (k : Q.Key.t) ~now ~score =
     match Q.lookup_and_move_to_back table k with
@@ -107,7 +119,7 @@ module Peer_id = struct
   module Lru = Lru_table (Hash_queue)
 end
 
-type t = {by_ip: Ip.Lru.t; by_peer_id: Peer_id.Lru.t}
+type t = {by_ip: Ip.Lru.t; by_peer_id: Peer_id.Lru.t} [@@deriving sexp_of]
 
 let create ~capacity:(capacity, `Per t) =
   let initial_capacity =
@@ -133,3 +145,25 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
         Peer_id.Lru.add by_peer_id id ~now ~score |> ignore ;
         `Ok )
       else `Capacity_exceeded
+
+module Summary = struct
+  type r = {remaining_capacity: Score.t} [@@deriving to_yojson]
+
+  type t = {by_ip: (string * r) list; by_peer_id: (string * r) list}
+  [@@deriving to_yojson]
+end
+
+let summary ({by_ip; by_peer_id} : t) =
+  let open Summary in
+  to_yojson
+    { by_ip=
+        Ip.Hash_queue.foldi by_ip.table ~init:[] ~f:(fun acc ~key ~data ->
+            ( Unix.Inet_addr.to_string key
+            , {remaining_capacity= data.remaining_capacity} )
+            :: acc )
+    ; by_peer_id=
+        Peer_id.Hash_queue.foldi by_peer_id.table ~init:[]
+          ~f:(fun acc ~key ~data ->
+            ( Peer.Id.to_string key
+            , {remaining_capacity= data.remaining_capacity} )
+            :: acc ) }
