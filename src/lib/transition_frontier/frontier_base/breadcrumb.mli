@@ -24,7 +24,7 @@ val create :
      validated_transition:External_transition.Validated.t
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
-  -> transition_receipt_time:Time.t
+  -> transition_receipt_time:Time.t option
   -> t
 
 val build :
@@ -36,7 +36,7 @@ val build :
   -> parent:t
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
-  -> transition_receipt_time:Time.t
+  -> transition_receipt_time:Time.t option
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
@@ -51,7 +51,7 @@ val staged_ledger : t -> Staged_ledger.t
 
 val just_emitted_a_proof : t -> bool
 
-val transition_receipt_time : t -> Time.t
+val transition_receipt_time : t -> Time.t option
 
 val hash : t -> int
 

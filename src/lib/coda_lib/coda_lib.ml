@@ -904,10 +904,13 @@ let create ?wallets (config : Config.t) =
                         let k_block_hashes_and_timestamps =
                           List.map k_breadcrumbs ~f:(fun bc ->
                               ( Transition_frontier.Breadcrumb.state_hash bc
-                              , Time.to_string_iso8601_basic
-                                  ~zone:Time.Zone.utc
-                                @@ Transition_frontier.Breadcrumb
-                                   .transition_receipt_time bc ) )
+                              , Option.value_map
+                                  (Transition_frontier.Breadcrumb
+                                   .transition_receipt_time bc)
+                                  ~default:"no timestamp available"
+                                  ~f:
+                                    (Time.to_string_iso8601_basic
+                                       ~zone:Time.Zone.utc) ) )
                         in
                         (protocol_state_hash, k_block_hashes_and_timestamps)
                   in

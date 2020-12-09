@@ -281,7 +281,10 @@ module Instance = struct
                    Error (`Fatal_error (Invalid_genesis_state_hash transition))
                    |> Deferred.return
              in
-             let transition_receipt_time = Time.now () in
+             (* we're loading transitions from persistent storage,
+                don't assign a timestamp
+             *)
+             let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:true
                  ~logger:t.factory.logger ~precomputed_values

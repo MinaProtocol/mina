@@ -61,7 +61,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 let transition_with_initial_validation =
                   Envelope.Incoming.data enveloped_transition
                 in
-                let transition_receipt_time = Time.now () in
+                let transition_receipt_time = Some (Time.now ()) in
                 let transition_with_hash, _ =
                   transition_with_initial_validation
                 in

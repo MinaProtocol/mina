@@ -514,7 +514,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~consensus_constants
                       |> Deferred.return
                     in
-                    let transition_receipt_time = Core_kernel.Time.now () in
+                    let transition_receipt_time =
+                      Some (Core_kernel.Time.now ())
+                    in
                     let%bind breadcrumb =
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
@@ -789,7 +791,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   ~logger ~frontier ~consensus_constants
             |> Deferred.return
           in
-          let transition_receipt_time = Core_kernel.Time.now () in
+          let transition_receipt_time = None in
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->

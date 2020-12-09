@@ -469,7 +469,7 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let transition_receipt_time = Time.now () in
+        let transition_receipt_time = Some (Time.now ()) in
         let genesis_transition =
           External_transition.For_tests.genesis ~precomputed_values
         in

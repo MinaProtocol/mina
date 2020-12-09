@@ -12,14 +12,14 @@ module T = struct
     { validated_transition: External_transition.Validated.t
     ; staged_ledger: Staged_ledger.t sexp_opaque
     ; just_emitted_a_proof: bool
-    ; transition_receipt_time: Time.t }
+    ; transition_receipt_time: Time.t option }
   [@@deriving sexp, fields]
 
   type 'a creator =
        validated_transition:External_transition.Validated.t
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
-    -> transition_receipt_time:Time.t
+    -> transition_receipt_time:Time.t option
     -> 'a
 
   let map_creator creator ~f ~validated_transition ~staged_ledger
@@ -47,8 +47,9 @@ module T = struct
       ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
       ; ( "transition_receipt_time"
         , `String
-            (Time.to_string_iso8601_basic ~zone:Time.Zone.utc
-               transition_receipt_time) ) ]
+            (Option.value_map transition_receipt_time
+               ~default:"<not available>"
+               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc)) ) ]
 end
 
 [%%define_locally
@@ -422,7 +423,7 @@ module For_tests = struct
             next_verified_external_transition) =
         External_transition.Validated.create_unsafe next_external_transition
       in
-      let transition_receipt_time = Time.now () in
+      let transition_receipt_time = Some (Time.now ()) in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
           ~parent:parent_breadcrumb

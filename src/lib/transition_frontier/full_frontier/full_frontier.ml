@@ -105,7 +105,7 @@ let close ~loc t =
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values =
   let open Root_data in
-  let transition_receipt_time = Time.now () in
+  let transition_receipt_time = Some (Time.now ()) in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
   in
