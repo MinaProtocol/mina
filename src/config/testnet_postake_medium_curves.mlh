@@ -3,7 +3,7 @@
 [%%import "/src/config/coinbase/realistic.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
-[%%import "/src/config/proof_level/full.mlh"]
+[%%import "/src/config/proof_level/check.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/realistic.mlh"]
@@ -12,9 +12,9 @@
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
-[%%define k 290]
+[%%define k 28]
 [%%define delta 0]
-[%%define slots_per_epoch 7140]
+[%%define slots_per_epoch 308]
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
 
@@ -27,12 +27,12 @@
 [%%define genesis_ledger "testnet_postake"]
 
 [%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
-[%%define block_window_duration 180000]
+[%%define block_window_duration 10000]
 
 [%%define integration_tests false]
 [%%define force_updates false]
 
-[%%define download_snark_keys true]
+[%%define download_snark_keys false]
 
 [%%define mock_frontend_data false]
 

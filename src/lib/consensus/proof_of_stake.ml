@@ -1363,7 +1363,7 @@ module Data = struct
   end
 
   [%%if
-  false]
+  true]
 
   module Min_window_density = struct
     (* Three cases for updating the lengths of sub_windows
