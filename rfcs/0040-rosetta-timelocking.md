@@ -22,8 +22,6 @@ This is not a solution alone -- the specification goes on to say that in the cas
 
 ### Implementation details
 
-In some cases, two separate approaches are outlined. This RFC proposes that we go with Approach A in the case that by mainnet we do not need to support creating time-locked accounts after the genesis ledger, and Approach B if we do end up needing to support this feature.
-
 **Protocol/Archive**
 
 - Add the following columns to the `blocks_user_commands` table in SQL
@@ -44,7 +42,7 @@ receiver_balance :  bigint NOT NULL
 
 This represent the amounts of tokens in the account (measured in nanomina) after applying the internal_command referenced by that block at that moment.
 
-- (Approach B) Add a new table `timing_info` to the SQL database with the following schema:
+- Add a new table `timing_info` to the SQL database with the following schema:
 
 ```
 public_key,
@@ -53,21 +51,20 @@ public_key,
 
 - Change the SQL schema to add relevant indexes to support the SQL query we'll be performing from Rosetta
 - Populate the new tables with the relevant info every time we add transactions to the archive node (remember to look at fee, sender, and receiver)
-- (Approach B) Pull the genesis ledger (either via RocksDB or JSON, see unresolved question 3) and add timing information to the database to the `timing_info` table
-- (Approach B, in the case we support time-locked account creation after genesis) Every time we create a new time locked account, add to the `timing_info` table
+- Pull the genesis ledger and add timing information to the database to the `timing_info` table
+- Every time we create a new time locked account, add to the `timing_info` table
 
 **Rosetta**
 
 - Set historical-balance-lookups to true
-- (Approach A) Pull in the genesis ledger (either via RocksDB or JSON, see unresolved question 3)
-- Use the time-locked accounts to populate the balance exemption field (either via the database Approach B) or from the genesis ledger (Approach A).
+- Use the time-locked accounts to populate the balance exemption field.
 - Change `/account/balance` queries to support the block-identifier parameter and use it to perform the following SQL queries against the archive node:
 
 1. Recursively traverse the canonical chain until you find the starting block that the identifier points to (we already have a similar query in the `/block` section, use this as a starting point)
 2. Recursively traverse the chain backward from that point until you find the first transaction that involves the public key (either via fee, sender, receiver) specified in the `/account/balance` parameter
 3. Use the join-tables to find the relevant data in the `balances` table and look at the amount
 
-- For `/account/balance` queries involving the time-locked accounts, use the time-locking functions that already exist https://github.com/MinaProtocol/mina/blob/92ea2c06523559b9980658d15b9e5271400ac856/src/lib/coda_base/account.ml#L561 using the timing info either in the genesis ledger (Approach A) or the database (Approach B) and the balance we found above.
+- For `/account/balance` queries involving the time-locked accounts, use the time-locking functions that already exist https://github.com/MinaProtocol/mina/blob/92ea2c06523559b9980658d15b9e5271400ac856/src/lib/coda_base/account.ml#L561 using the timing info in the database and the balance we found above.
 
 ## Drawbacks
 
@@ -105,11 +102,5 @@ Celo's and Solana's Rosetta implementation is similar to the "Change the protoco
 
 [unresolved-questions]: #unresolved-questions
 
-I would like at least (2) and (3) resolved before we do significant implementation work on this feature.
-
 1. Will the Rosetta team officially be okay with this approach, even in the world where we need time locked account creation after genesis (and thus need a non-static balance exemption list) . See this discourse thread for more info:
    https://community.rosetta-api.org/t/representing-minas-vesting-accounts-using-balance-exemptions/317
-
-2. Is Approach A actually easier if we don't yet support time-locked account creation after genesis? We will eventually need to support this later, are we wasting time if we don't just go with Approach B?
-
-3. Assuming we go with Approach A, is it easier to retrieve genesis ledger information from the RocksDB database or from the JSON in the runtime ledger
