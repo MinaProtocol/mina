@@ -932,6 +932,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
+		app.P2p.Logger.Error("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
@@ -945,6 +946,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		app.P2p.Logger.Debugf("beginning mDNS discovery")
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
+			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
 			return nil, badp2p(err)
 		}
 	}
@@ -960,11 +962,13 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 		err := app.P2p.Dht.Bootstrap(app.Ctx)
 		if err != nil {
+			app.P2p.Logger.Error("failed to dht bootstrap: ", err.Error())
 			return nil, badp2p(err)
 		}
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
+			app.P2p.Logger.Error("failed to routing advertise: ", err.Error())
 			return nil, badp2p(err)
 		}
 
