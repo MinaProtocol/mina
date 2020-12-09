@@ -41,7 +41,7 @@ func newCodaConnectionManager() *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:   p2pconnmgr.NewConnManager(25, 250, time.Duration(30*time.Second)),
+		p2pManager:   p2pconnmgr.NewConnManager(25, 50, time.Duration(30*time.Second)),
 		OnConnect:    noop,
 		OnDisconnect: noop,
 	}
