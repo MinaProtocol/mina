@@ -1421,7 +1421,10 @@ let%test_module _ =
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data= cmd
-      ; status= Applied User_command_status.Auxiliary_data.empty }
+      ; status=
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty ) }
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
