@@ -99,7 +99,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
         (estring s, Location.none)
   in
   let checked_interpolations =
-    ebool @@ checked_interpolations_statically ~loc:msg_loc msg label_names
+    checked_interpolations_statically ~loc:msg_loc msg label_names
   in
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
@@ -142,8 +142,9 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
     in
     construct (Located.mk (Lident ctor)) arg
   in
-  [ [%stri
-      if not [%e checked_interpolations] then
+  [ ( if checked_interpolations then [%stri ()]
+    else
+      [%stri
         (* same formatting as in Ppxlib.Location.print
            avoid adding Ppxlib as runtime dependency
         *)
@@ -155,7 +156,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
             [%e eint (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol)]
         in
         Structured_log_events.check_interpolations_exn ~msg_loc [%e msg]
-          [%e elist ~f:estring label_names]]
+          [%e elist ~f:estring label_names]] )
   ; [%stri
       let ([%p pvar (event_name ^ "_structured_events_id")] :
             Structured_log_events.id) =
