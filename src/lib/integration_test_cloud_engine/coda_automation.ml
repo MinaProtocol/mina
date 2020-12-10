@@ -97,11 +97,11 @@ module Network_config = struct
     let testnet_name = "intntest-" ^ user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
-    let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
-    let cluster_name = "coda-infra-east" in
-    let cluster_region = "us-east1" in
-    let seed_zone = "us-east1-b" in
-    let seed_region = "us-east1" in
+    let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
+    let cluster_name = "mina-integration-west1" in
+    let cluster_region = "us-west1" in
+    let seed_zone = "us-west1-a" in
+    let seed_region = "us-west1" in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -360,7 +360,9 @@ module Network_manager = struct
       Network_config.testnet_log_filter network_config
     in
     let cons_node pod_id port =
-      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      { Kubernetes_network.Node.cluster= network_config.cluster_id
+      ; Kubernetes_network.Node.namespace=
+          network_config.terraform.testnet_name
       ; Kubernetes_network.Node.pod_id
       ; Kubernetes_network.Node.node_graphql_port= port }
     in

@@ -6,14 +6,15 @@ open Integration_test_lib
 [@@@coverage exclude_file]
 
 module Node = struct
-  type t = {namespace: string; pod_id: string; node_graphql_port: int}
+  type t =
+    {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
   let run_in_container node cmd =
     let kubectl_cmd =
       Printf.sprintf
-        "kubectl -n %s -c coda exec -i $(kubectl get pod -n %s -l \"app=%s\" \
-         -o name) -- %s"
-        node.namespace node.namespace node.pod_id cmd
+        "kubectl --cluster %s -n %s -c coda exec -i $(kubectl get pod \
+         --cluster %s -n %s -l \"app=%s\" -o name) -- %s"
+        node.cluster node.namespace node.cluster node.namespace node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -76,7 +77,13 @@ module Node = struct
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
       let args =
-        ["port-forward"; name; "--namespace"; t.namespace; string_of_int port]
+        [ "port-forward"
+        ; name
+        ; "--namespace"
+        ; t.namespace
+        ; "--cluster"
+        ; t.cluster
+        ; string_of_int port ]
       in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
