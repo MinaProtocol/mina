@@ -49,6 +49,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
+		50
 	)
 	require.NoError(t, err)
 
@@ -85,6 +86,31 @@ func multiaddrs(h host.Host) (multiaddrs []ma.Multiaddr) {
 		multiaddrs = append(multiaddrs, multiaddr)
 	}
 	return multiaddrs
+}
+
+func TestDHTDiscovery_TwoNodes(t *testing.T) {
+	appA := newTestApp(t, nil)
+	appA.NoMDNS = true
+	defer appA.P2p.Host.Close()
+
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	appB := newTestApp(t, appAInfos)
+	appB.AddedPeers = appAInfos
+	appB.NoMDNS = true
+	defer appB.P2p.Host.Close()
+
+	// begin appB and appC's DHT advertising
+	ret, err := new(beginAdvertisingMsg).run(appB)
+	require.NoError(t, err)
+	require.Equal(t, ret, "beginAdvertising success")
+
+	ret, err = new(beginAdvertisingMsg).run(appA)
+	require.NoError(t, err)
+	require.Equal(t, ret, "beginAdvertising success")
+
+	time.Sleep(time.Second)
 }
 
 func TestDHTDiscovery(t *testing.T) {
@@ -139,6 +165,8 @@ func TestDHTDiscovery(t *testing.T) {
 			// check if peerB knows about peerC
 			addrs := appB.P2p.Host.Peerstore().Addrs(appC.P2p.Host.ID())
 			if len(addrs) != 0 {
+        // send a stream message
+        // then exit
 				close(done)
 				return
 			}

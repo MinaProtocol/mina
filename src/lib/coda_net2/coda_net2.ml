@@ -1689,17 +1689,88 @@ let%test_module "coda network tests" =
         let%bind () = File_system.remove_dir b_tmp in
         File_system.remove_dir c_tmp
       in
-      (a, b, shutdown)
+      (b, c, shutdown)
+
+    let%test_unit "does_b_see_c" =
+      let () = Core.Backtrace.elide := false in
+      ignore testmsg ;
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peers = peers b in
+        let%bind c_peerid = me c >>| Keypair.to_peer_id in
+        assert (
+          b_peers
+          |> List.map ~f:(fun p -> p.Peer.peer_id)
+          |> fun l -> List.mem l c_peerid ~equal:Peer.Id.equal ) ;
+        let%bind c_peers = peers c in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        assert (
+          c_peers
+          |> List.map ~f:(fun p -> p.Peer.peer_id)
+          |> fun l -> List.mem l b_peerid ~equal:Peer.Id.equal ) ;
+        shutdown ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    let%test_unit "b_stream_c" =
+      let () = Core.Backtrace.elide := false in
+      ignore testmsg ;
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        let handler_finished = ref false in
+        let%bind _echo_handler =
+          handle_protocol b ~on_handler_error:`Raise ~protocol:"read_bytes"
+            (fun stream ->
+              let r, w = Stream.pipes stream in
+              let rec go i =
+                if i = 0 then return ()
+                else
+                  let%bind _s =
+                    match%map Pipe.read' ~max_queue_length:1 r with
+                    | `Eof ->
+                        failwith "Eof"
+                    | `Ok q ->
+                        Base.Queue.peek_exn q
+                  in
+                  go (i - 1)
+              in
+              let%map () = go 1000 in
+              Pipe.write_without_pushback w "done" ;
+              Pipe.close w ;
+              handler_finished := true )
+          |> Deferred.Or_error.ok_exn
+        in
+        let%bind stream =
+          open_stream c ~protocol:"read_bytes" b_peerid >>| Or_error.ok_exn
+        in
+        let r, w = Stream.pipes stream in
+        for i = 0 to 999 do
+          Pipe.write_without_pushback w (Printf.sprintf "%d" i)
+        done ;
+        Pipe.close w ;
+        (* HACK: let our messages send before we reset.
+           It would be more principled to add flushing to
+           the stream interface. *)
+        let%bind () = after (Time.Span.of_sec 5.) in
+        let%bind _ = Stream.reset stream in
+        let%bind msgs = Pipe.read_all r in
+        assert !handler_finished ;
+        shutdown ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
     let%test_unit "stream" =
       let () = Core.Backtrace.elide := false in
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a, b, shutdown = setup_two_nodes "test_stream" in
-        let%bind a_peerid = me a >>| Keypair.to_peer_id in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
         let handler_finished = ref false in
         let%bind echo_handler =
-          handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
+          handle_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
@@ -1708,14 +1779,14 @@ let%test_module "coda network tests" =
           |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
-          open_stream b ~protocol:"echo" a_peerid >>| Or_error.ok_exn
+          open_stream c ~protocol:"echo" b_peerid >>| Or_error.ok_exn
         in
         let r, w = Stream.pipes stream in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
-         It would be more principled to add flushing to
-         the stream interface. *)
+           It would be more principled to add flushing to
+           the stream interface. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let%bind _ = Stream.reset stream in
         let%bind msg = Pipe.read_all r in
@@ -1725,7 +1796,8 @@ let%test_module "coda network tests" =
         assert (msg = testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in
-        shutdown ()
+        let%map () = shutdown () in
+        ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 

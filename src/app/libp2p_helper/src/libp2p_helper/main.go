@@ -727,7 +727,11 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
-
+	go func() {
+		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
+		time.Sleep(250 * time.Millisecond)
+		handleStreamReads(app, stream, streamIdx)
+	}()
 	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
 }
 
@@ -965,6 +969,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			app.P2p.Logger.Error("failed to dht bootstrap: ", err.Error())
 			return nil, badp2p(err)
 		}
+
+		time.Sleep(time.Millisecond * 100)
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
@@ -1301,7 +1307,7 @@ func main() {
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
-		AddedPeers:     make([]peer.AddrInfo, 0, 512),
+		AddedPeers:     []peer.AddrInfo{},
 	}
 
 	go func() {
