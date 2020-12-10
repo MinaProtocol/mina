@@ -16,7 +16,7 @@
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
-[%%define block_window_duration 2000]
+[%%define block_window_duration 4000]
 
 [%%define integration_tests true]
 [%%define force_updates false]
@@ -36,7 +36,7 @@
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 28]
 [%%define delta 0]
-[%%define slots_per_epoch 308]
+[%%define slots_per_epoch 924]
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
 
