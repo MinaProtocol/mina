@@ -103,7 +103,7 @@ module Make
       | _ ->
           failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
+  let verify pool ({data; sender; _} as t : t Envelope.Incoming.t) =
     match data with
     | Empty ->
         Deferred.Or_error.error_string "cannot verify empty snark pool diff"
@@ -127,7 +127,7 @@ module Make
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
-    let {Envelope.Incoming.data= diff; sender} = t in
+    let {Envelope.Incoming.data= diff; sender; _} = t in
     match diff with
     | Empty ->
         Deferred.return

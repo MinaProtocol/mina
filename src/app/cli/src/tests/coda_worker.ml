@@ -446,6 +446,7 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let start_time = Time.now () in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
@@ -469,7 +470,7 @@ module T = struct
                  ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~precomputed_values
+                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
