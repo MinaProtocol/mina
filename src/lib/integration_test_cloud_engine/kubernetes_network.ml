@@ -6,7 +6,7 @@ open Integration_test_lib
 [@@@coverage exclude_file]
 
 module Node = struct
-  type t = {namespace: string; pod_id: string}
+  type t = {namespace: string; pod_id: string; node_graphql_port: int}
 
   let run_in_container node cmd =
     let kubectl_cmd =
@@ -222,12 +222,13 @@ module Node = struct
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let graphql_port = 3085 in
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
+    (* let graphql_port = 3085 in *)
+    Deferred.don't_wait_for
+      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
-      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true
-        ~query_name:"query_peer_id" query_obj
+      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+        ~retry_on_graphql_error:true ~query_name:"query_peer_id" query_obj
     in
     let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
     let%bind self_id =
@@ -247,8 +248,9 @@ module Node = struct
         [ ("namespace", `String t.namespace)
         ; ("pod_id", `String t.pod_id)
         ; ("account_id", Coda_base.Account_id.to_yojson account_id) ] ;
-    let graphql_port = 3085 in
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
+    (* let graphql_port = 3085 in *)
+    Deferred.don't_wait_for
+      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
     let pk = Coda_base.Account_id.public_key account_id in
     let token = Coda_base.Account_id.token_id account_id in
     let get_balance () =
@@ -259,8 +261,9 @@ module Node = struct
           ()
       in
       let%bind balance_obj =
-        exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error:true
-          ~query_name:"get_balance_graphql" get_balance_obj
+        exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+          ~retry_on_graphql_error:true ~query_name:"get_balance_graphql"
+          get_balance_obj
       in
       match balance_obj#account with
       | None ->
@@ -281,7 +284,7 @@ module Node = struct
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let open Malleable_error.Let_syntax in
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
-    let graphql_port = 3085 in
+    (* let graphql_port = 3085 in *)
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
@@ -290,7 +293,7 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      exec_graphql_reqest ~logger ~graphql_port
+      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
@@ -304,8 +307,9 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_reqest ~logger ~graphql_port ~retry_on_graphql_error
-        ~query_name:"send_payment_graphql" send_payment_obj
+      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+        ~retry_on_graphql_error ~query_name:"send_payment_graphql"
+        send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
