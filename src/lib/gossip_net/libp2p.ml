@@ -69,7 +69,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let log_rate_limiter_occasionally rl =
         let t = Time.Span.of_min 1. in
         every t (fun () ->
-            [%log' info logger]
+            [%log' debug logger]
               ~metadata:[("rate_limiter", Network_pool.Rate_limiter.summary rl)]
               !"%s $rate_limiter" Impl.name )
       in

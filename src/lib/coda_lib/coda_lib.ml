@@ -823,7 +823,7 @@ let create ?wallets (config : Config.t) =
             let log_rate_limiter_occasionally rl =
               let t = Time.Span.of_min 1. in
               every t (fun () ->
-                  [%log' info config.logger]
+                  [%log' debug config.logger]
                     ~metadata:
                       [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
                     !"new_block $rate_limiter" )

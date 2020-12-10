@@ -112,7 +112,7 @@ end)
   let log_rate_limiter_occasionally t rl =
     let time = Time_ns.Span.of_min 1. in
     every time (fun () ->
-        [%log' info t.logger]
+        [%log' debug t.logger]
           ~metadata:[("rate_limiter", Rate_limiter.summary rl)]
           !"%s $rate_limiter" Resource_pool.label )
 
