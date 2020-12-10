@@ -11,6 +11,8 @@ open Network_peer
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
+  val label : string
+
   type transition_frontier_diff
 
   type transition_frontier
@@ -58,6 +60,12 @@ module type Resource_pool_diff_intf = sig
   val size : t -> int
 
   val verified_size : verified -> int
+
+  (** How big to consider this diff for purposes of metering. *)
+  val score : t -> int
+
+  (** The maximum "diff score" permitted per IP/peer-id per second. *)
+  val max_per_second : int
 
   val summary : t -> string
 
