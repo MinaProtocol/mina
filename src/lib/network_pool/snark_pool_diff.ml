@@ -48,7 +48,11 @@ module Make
   (* snark pool diffs are not bundled, so size is always 1 *)
   let size _ = 1
 
+  let score = function Add_solved_work (_w, p) -> One_or_two.length p.proof
+
   let verified_size _ = 1
+
+  let max_per_second = 4
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
