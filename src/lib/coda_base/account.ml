@@ -189,13 +189,6 @@ let check (t : Binable_arg.t) =
 
 [%%endif]
 
-let check (t : Binable_arg.t) =
-  match t.snapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
 [%%versioned_binable
 module Stable = struct
   module V1 = struct

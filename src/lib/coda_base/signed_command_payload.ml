@@ -54,7 +54,6 @@ module Common = struct
           , Global_slot.Stable.V1.t
           , Memo.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving compare, eq, sexp, hash, yojson]
 
         let to_latest = Fn.id
       end
