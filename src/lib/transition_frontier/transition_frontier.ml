@@ -469,6 +469,7 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
+        let transition_receipt_time = Some (Time.now ()) in
         let genesis_transition =
           External_transition.For_tests.genesis ~precomputed_values
         in
@@ -500,7 +501,8 @@ module For_tests = struct
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
         Breadcrumb.create ~validated_transition:genesis_transition
-          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false )
+          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
+          ~transition_receipt_time )
 
   let gen_persistence ?(logger = Logger.null ()) ?verifier
       ~(precomputed_values : Precomputed_values.t) () =

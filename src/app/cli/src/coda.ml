@@ -929,6 +929,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
+      let start_time = Time.now () in
       let%map coda =
         Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
@@ -953,7 +954,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~time_controller ~initial_block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
-             ())
+             ~start_time ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
