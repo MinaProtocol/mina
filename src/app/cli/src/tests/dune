@@ -14,7 +14,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_assert
-               ppx_coda
+               ppx_mina
                ppx_version
                ppx_optcomp ppx_bin_prot ppx_let
                ppx_custom_printf)))
