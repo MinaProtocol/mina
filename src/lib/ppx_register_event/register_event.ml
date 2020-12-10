@@ -9,7 +9,7 @@ let deriver = "register_event"
 
 let digest s = Md5.digest_string s |> Md5.to_hex
 
-let check_interpolations ~loc msg label_names =
+let checked_interpolations_statically ~loc msg label_names =
   match msg with
   | {pexp_desc= Pexp_constant (Pconst_string (s, _)); _} -> (
     (* check that every interpolation point $foo in msg has a matching label;
@@ -28,9 +28,10 @@ let check_interpolations ~loc msg label_names =
                  field in the record"
                 interp
           | _ ->
-              () ) )
+              () ) ;
+        true )
   | _ ->
-      ()
+      false
 
 let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   let ctor, label_decls =
@@ -97,7 +98,9 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
         in
         (estring s, Location.none)
   in
-  check_interpolations ~loc:msg_loc msg label_names ;
+  let checked_interpolations =
+    ebool @@ checked_interpolations_statically ~loc:msg_loc msg label_names
+  in
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
   let split_path = String.split path ~on:'.' in
@@ -140,6 +143,20 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
     construct (Located.mk (Lident ctor)) arg
   in
   [ [%stri
+      if not [%e checked_interpolations] then
+        (* same formatting as in Ppxlib.Location.print
+           avoid adding Ppxlib as runtime dependency
+        *)
+        let msg_loc =
+          sprintf "File \"%s\", line %d, characters %d-%d:"
+            [%e estring msg_loc.loc_start.pos_fname]
+            [%e eint msg_loc.loc_start.pos_lnum]
+            [%e eint (msg_loc.loc_start.pos_cnum - msg_loc.loc_start.pos_bol)]
+            [%e eint (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol)]
+        in
+        Structured_log_events.check_interpolations_exn ~msg_loc [%e msg]
+          [%e elist ~f:estring label_names]]
+  ; [%stri
       let ([%p pvar (event_name ^ "_structured_events_id")] :
             Structured_log_events.id) =
         Structured_log_events.id_of_string [%e estring (digest event_path)]]
