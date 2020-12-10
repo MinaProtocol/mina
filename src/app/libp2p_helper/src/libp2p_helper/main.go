@@ -428,7 +428,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		}
 
 		seqno := <-seqs
-		ch := make(chan string, 1)
+		ch := make(chan string)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
 		(*app.Validators[seqno]).Completion = ch
