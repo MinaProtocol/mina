@@ -84,9 +84,12 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 let process_transition ~logger ~trust_system ~verifier ~frontier
     ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition ~precomputed_values =
-  let transition_receipt_time = Some (Time.now ()) in
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
+  in
+  let transition_receipt_time =
+    Some
+      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
   in
   let sender =
     Envelope.Incoming.sender enveloped_initially_validated_transition

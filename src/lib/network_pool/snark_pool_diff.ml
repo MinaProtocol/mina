@@ -94,7 +94,7 @@ module Make
       | _ ->
           failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
+  let verify pool ({data; sender; _} as t : t Envelope.Incoming.t) =
     let (Add_solved_work (work, ({Priced_proof.fee; _} as p))) = data in
     let is_local = match sender with Local -> true | _ -> false in
     let verify () =
@@ -115,7 +115,7 @@ module Make
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
-    let {Envelope.Incoming.data= diff; sender} = t in
+    let {Envelope.Incoming.data= diff; sender; _} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
       | `Statement_not_referenced ->
