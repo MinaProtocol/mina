@@ -67,11 +67,15 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
+  let of_alist_exn = String.Map.of_alist_exn
+
   let mem = String.Map.mem
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
         String.Map.set acc ~key ~data )
+
+  let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
 end
 
 let global_metadata = ref []
@@ -325,7 +329,9 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+      Metadata.extend
+        (Metadata.merge (Metadata.of_alist_exn !global_metadata) t.metadata)
+        metadata
   ; event_id }
 
 let raw ({id; _} as t) msg =
