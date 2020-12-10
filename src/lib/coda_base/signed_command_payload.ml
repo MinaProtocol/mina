@@ -42,24 +42,6 @@ module Common = struct
     end]
   end
 
-  module Binable_arg = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( Currency.Fee.Stable.V1.t
-          , Public_key.Compressed.Stable.V1.t
-          , Token_id.Stable.V1.t
-          , Account_nonce.Stable.V1.t
-          , Global_slot.Stable.V1.t
-          , Memo.Stable.V1.t )
-          Poly.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   [%%if
   feature_tokens]
 
@@ -81,6 +63,25 @@ module Common = struct
   end]
 
   [%%else]
+
+  module Binable_arg = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Currency.Fee.Stable.V1.t
+          , Public_key.Compressed.Stable.V1.t
+          , Token_id.Stable.V1.t
+          , Account_nonce.Stable.V1.t
+          , Global_slot.Stable.V1.t
+          , Memo.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving compare, eq, sexp, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
 
   let check (t : Binable_arg.t) =
     if Token_id.equal t.fee_token Token_id.default then t
