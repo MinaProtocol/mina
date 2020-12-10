@@ -40,7 +40,12 @@ module type Rpc_interface_intf = sig
   type ('query, 'response) rpc
 
   type rpc_handler =
-    | Rpc_handler : ('q, 'r) rpc * ('q, 'r) rpc_fn -> rpc_handler
+    | Rpc_handler :
+        { rpc: ('q, 'r) rpc
+        ; f: ('q, 'r) rpc_fn
+        ; cost: 'q -> int
+        ; budget: int * [`Per of Time.Span.t] }
+        -> rpc_handler
 
   val implementation_of_rpc : ('q, 'r) rpc -> ('q, 'r) rpc_implementation
 

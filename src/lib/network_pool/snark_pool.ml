@@ -125,6 +125,8 @@ end
 module Make (Transition_frontier : Transition_frontier_intf) = struct
   module Resource_pool = struct
     module T = struct
+      let label = "snark_pool"
+
       module Config = struct
         type t =
           { trust_system: Trust_system.t sexp_opaque
