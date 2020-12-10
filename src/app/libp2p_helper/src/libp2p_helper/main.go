@@ -730,6 +730,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
+		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
 		handleStreamReads(app, stream, streamIdx)
 	}()
 	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil

@@ -1756,7 +1756,7 @@ let%test_module "coda network tests" =
            the stream interface. *)
         let%bind () = after (Time.Span.of_sec 5.) in
         let%bind _ = Stream.reset stream in
-        let%bind msgs = Pipe.read_all r in
+        let%bind _msgs = Pipe.read_all r in
         assert !handler_finished ;
         shutdown ()
       in
