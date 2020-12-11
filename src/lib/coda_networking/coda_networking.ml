@@ -1092,45 +1092,10 @@ let create (config : Config.t)
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
-           (let%bind initial_peers = Gossip_net.Any.peers gossip_net in
+           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
               [%log fatal] "Failed to connect to any initial peers" ;
-              raise No_initial_peers )
-            else (
-              [%log info] "Getting some extra initial peers to start" ;
-              (* 1. Get some peers
-               * 2. add them to go
-              *)
-              let metadata p e =
-                [ ("error", Error_json.error_to_yojson e)
-                ; ("peer", `String (Peer.to_string p)) ]
-              in
-              let%bind extra_initial_peers =
-                Deferred.List.concat_map initial_peers ~how:`Parallel
-                  ~f:(fun peer ->
-                    match%map
-                      Gossip_net.Any.query_peer ~timeout:(Time.Span.of_sec 10.)
-                        gossip_net peer.peer_id Rpcs.Get_some_initial_peers ()
-                    with
-                    | Connected {data= Ok xs; _} ->
-                        xs
-                    | Connected {data= Error e; _} | Failed_to_connect e ->
-                        [%log warn] ~metadata:(metadata peer e)
-                          "could not get initial peers from $peer with $error" ;
-                        [] )
-              in
-              [%log info]
-                ~metadata:
-                  [("peers", [%to_yojson: Peer.t list] extra_initial_peers)]
-                "Got extra $peers" ;
-              Deferred.List.iter ~how:`Sequential extra_initial_peers
-                ~f:(fun p ->
-                  match%map Gossip_net.Any.add_peer gossip_net p with
-                  | Ok () ->
-                      ()
-                  | Error e ->
-                      [%log warn] ~metadata:(metadata p e)
-                        "failed to add peer $peer with $error" ) )) )) ;
+              raise No_initial_peers )) )) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
