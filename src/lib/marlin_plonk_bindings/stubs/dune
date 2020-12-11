@@ -5,8 +5,7 @@
  (deps
    Cargo.toml
    (source_tree src)
-   (source_tree ../../marlin)
-   (source_tree ../../zexe))
+   (source_tree ../../marlin))
  (action
   (progn
    (setenv RUSTFLAGS "-C target-feature=+bmi2,+adx"
