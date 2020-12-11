@@ -600,7 +600,7 @@ let update_metrics_with_diff (type mutant) t
   | _ ->
       ()
 
-let apply_diffs t diffs ~enable_epoch_ledger_sync =
+let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Root_identifier.Stable.Latest in
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
@@ -627,7 +627,8 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
     )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
-  if not (enable_epoch_ledger_sync = `Disabled) then
+  if (not (enable_epoch_ledger_sync = `Disabled)) && not has_long_catchup_job
+  then
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync
