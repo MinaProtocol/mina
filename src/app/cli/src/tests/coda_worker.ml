@@ -694,7 +694,7 @@ module T = struct
                   ()
           in
           let coda_sync_status () =
-            let schema = Coda_graphql.schema in
+            let schema = Mina_graphql.schema in
             match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with

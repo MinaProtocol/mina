@@ -1,6 +1,6 @@
 (library
- (name coda_graphql)
- (public_name coda_graphql)
+ (name mina_graphql)
+ (public_name mina_graphql)
  (libraries
    ; opam deps
    async node_addrs_and_ports network_peer core cohttp graphql-async graphql-cohttp
