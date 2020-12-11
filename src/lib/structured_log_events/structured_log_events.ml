@@ -63,7 +63,11 @@ let dump_registered_events () =
       (event_name, id, Set.to_list arguments) )
 
 let check_interpolations_exn ~msg_loc msg label_names =
-  match Logproc_lib.Interpolator.parse msg with
+  (* don't use Logproc_lib, which depends on C++ code
+     using Interpolator_lib allows use in js_of_ocaml
+     the `parse` code is the same
+  *)
+  match Interpolator_lib.Interpolator.parse msg with
   | Error err ->
       failwithf
         "%s\nEncountered an error while parsing the structured log message: %s"
