@@ -1225,7 +1225,7 @@ module T = struct
       { max_space= slots
       ; max_jobs= job_count
       ; commands_rev=
-          uc_seq
+          seq_rev uc_seq
           (*Completed work in reverse order for faster removal of proofs if budget doesn't suffice*)
       ; completed_work_rev= seq_rev cw_seq
       ; fee_transfers
@@ -1599,6 +1599,22 @@ module T = struct
     let isEmpty (res : Resources.t) =
       has_no_commands res && Resources.coinbase_added res = 0
     in
+    let cw_seq =
+      let max_works =
+        snd partitions.first
+        + Option.value_map ~f:snd ~default:0 partitions.second
+      in
+      Sequence.take cw_seq max_works
+    in
+    let ts_seq =
+      let max_txns =
+        (* NOTE: -1 because we need space for at least 1 coinbase. *)
+        fst partitions.first
+        + Option.value_map ~f:fst ~default:0 partitions.second
+        - 1
+      in
+      Sequence.take ts_seq max_txns
+    in
     (*Partitioning explained in PR #687 *)
     match partitions.second with
     | None ->
@@ -1710,59 +1726,69 @@ module T = struct
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
+    (* TODO: Lazily evaluate this as a [Sequence.t]. *)
     let work_to_do = Scan_state.work_statements_for_new_diff t.scan_state in
     O1trace.trace_event "computed_work" ;
-    let completed_works_seq, proof_count =
-      List.fold_until work_to_do ~init:(Sequence.empty, 0)
-        ~f:(fun (seq, count) w ->
-          match get_completed_work w with
-          | Some cw_checked ->
-              (*If new provers can't pay the account-creation-fee then discard
-              their work unless their fee is zero in which case their account
-              won't be created. This is to encourage using an existing accounts
-              for snarking.
-              This also imposes new snarkers to have a min fee until one of
-              their snarks are purchased and their accounts get created*)
-              if
-                Currency.Fee.(cw_checked.fee = zero)
-                || Currency.Fee.(
-                     cw_checked.fee
-                     >= constraint_constants.account_creation_fee)
-                || not (is_new_account cw_checked.prover)
-              then
-                Continue
-                  ( Sequence.append seq (Sequence.singleton cw_checked)
-                  , One_or_two.length cw_checked.proofs + count )
-              else (
+    let completed_works_seq =
+      Sequence.unfold ~init:work_to_do ~f:(fun work_to_do ->
+          match work_to_do with
+          | [] ->
+              None
+          | work :: work_to_do -> (
+            match get_completed_work work with
+            | Some cw_checked ->
+                (* If new provers can't pay the account-creation-fee then
+                   discard their work unless their fee is zero in which case
+                   their account won't be created. This is to encourage using
+                   an existing accounts for snarking.
+                   This also imposes new snarkers to have a min fee until one
+                   of their snarks are purchased and their accounts get
+                   created
+                *)
+                (* TODO: This should be checked in the pool.
+                   Running the check here allows block production to be blocked
+                   by low-fee snark work for a pk that isn't in the ledger.
+                *)
+                if
+                  Currency.Fee.(cw_checked.fee = zero)
+                  || Currency.Fee.(
+                       cw_checked.fee
+                       >= constraint_constants.account_creation_fee)
+                  || not (is_new_account cw_checked.prover)
+                then Some (cw_checked, work_to_do)
+                else (
+                  [%log debug]
+                    ~metadata:
+                      [ ( "work"
+                        , Transaction_snark_work.Checked.to_yojson cw_checked
+                        )
+                      ; ( "work_ids"
+                        , Transaction_snark_work.Statement.compact_json work )
+                      ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
+                      ; ( "account_creation_fee"
+                        , Currency.Fee.to_yojson
+                            constraint_constants.account_creation_fee ) ]
+                    !"Staged_ledger_diff creation: Snark fee $snark_fee \
+                      insufficient to create the snark worker account" ;
+                  None )
+            | None ->
                 [%log debug]
                   ~metadata:
-                    [ ( "work"
-                      , Transaction_snark_work.Checked.to_yojson cw_checked )
+                    [ ( "statement"
+                      , Transaction_snark_work.Statement.to_yojson work )
                     ; ( "work_ids"
-                      , Transaction_snark_work.Statement.compact_json w )
-                    ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
-                    ; ( "account_creation_fee"
-                      , Currency.Fee.to_yojson
-                          constraint_constants.account_creation_fee ) ]
-                  !"Staged_ledger_diff creation: Snark fee $snark_fee \
-                    insufficient to create the snark worker account" ;
-                Stop (seq, count) )
-          | None ->
-              [%log debug]
-                ~metadata:
-                  [ ("statement", Transaction_snark_work.Statement.to_yojson w)
-                  ; ( "work_ids"
-                    , Transaction_snark_work.Statement.compact_json w ) ]
-                !"Staged_ledger_diff creation: No snark work found for \
-                  $statement" ;
-              Stop (seq, count) )
-        ~finish:Fn.id
+                      , Transaction_snark_work.Statement.compact_json work ) ]
+                  !"Staged_ledger_diff creation: No snark work found for \
+                    $statement" ;
+                None ) )
     in
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
-      Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
-        ~f:(fun (seq, count) txn ->
+      Sequence.unfold ~init:transactions_by_fee ~f:(fun transactions_by_fee ->
+          let%bind.Option.Let_syntax txn, transactions_by_fee =
+            Sequence.next transactions_by_fee
+          in
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction ~constraint_constants
@@ -1776,16 +1802,12 @@ module T = struct
                   ; ("error", Error_json.error_to_yojson e) ]
                 "Staged_ledger_diff creation: Skipping user command: \
                  $user_command due to error: $error" ;
-              Continue (seq, count)
+              None
           | Ok status ->
-              let txn_with_status = {With_status.data= txn; status} in
-              let seq' =
-                Sequence.append (Sequence.singleton txn_with_status) seq
-              in
-              let count' = count + 1 in
-              if count' >= Scan_state.free_space t.scan_state then Stop seq'
-              else Continue (seq', count') )
-        ~finish:fst
+              (* TODO: This status doesn't necessarily represent the applied
+                 state, if the accounts involved have also received fees.
+              *)
+              Some ({With_status.data= txn; status}, transactions_by_fee) )
     in
     let diff, log =
       O1trace.measure "generate diff" (fun () ->
@@ -1794,13 +1816,9 @@ module T = struct
             ~is_coinbase_reciever_new ~supercharge_coinbase partitions )
     in
     let summaries, detailed = List.unzip log in
-    [%log debug]
-      "Number of proofs ready for purchase: $proof_count Number of user \
-       commands ready to be included: $txn_count Diff creation log: $diff_log"
+    [%log debug] "Diff creation log: $diff_log"
       ~metadata:
-        [ ("proof_count", `Int proof_count)
-        ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
-        ; ("diff_log", Diff_creation_log.summary_list_to_yojson summaries) ] ;
+        [("diff_log", Diff_creation_log.summary_list_to_yojson summaries)] ;
     if log_block_creation then
       [%log debug] "Detailed diff creation log: $diff_log"
         ~metadata:
