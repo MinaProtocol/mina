@@ -123,7 +123,7 @@ let create ~capacity:(capacity, `Per t) =
 let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
   match sender with
   | Local ->
-      `Ok
+      `Within_capacity
   | Remote peer ->
       let ip = Peer.ip peer in
       let id = peer.peer_id in
@@ -133,7 +133,7 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
       then (
         Ip.Lru.add by_ip ip ~now ~score |> ignore ;
         Peer_id.Lru.add by_peer_id id ~now ~score |> ignore ;
-        `Ok )
+        `Within_capacity )
       else `Capacity_exceeded
 
 module Summary = struct
