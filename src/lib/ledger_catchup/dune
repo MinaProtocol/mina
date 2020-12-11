@@ -18,5 +18,5 @@
    mina_base
    coda_metrics
    transition_chain_verifier
-   coda_networking
+   mina_networking
    fake_network))

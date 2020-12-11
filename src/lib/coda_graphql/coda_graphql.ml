@@ -2432,7 +2432,7 @@ module Mutations = struct
         let open Deferred.Result.Let_syntax in
         let%bind config = Deferred.return config in
         let open Deferred.Let_syntax in
-        Coda_networking.set_connection_gating_config (Mina_lib.net coda) config
+        Mina_networking.set_connection_gating_config (Mina_lib.net coda) config
         >>| Result.return )
 
   let add_peer =
@@ -2454,7 +2454,7 @@ module Mutations = struct
         let%bind.Async maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Coda_networking.add_peer net peer with
+              match%map.Async Mina_networking.add_peer net peer with
               | Ok () ->
                   None
               | Error err ->
@@ -2835,7 +2835,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
       ~resolve:(fun {ctx= coda; _} () ->
-        let%map peers = Coda_networking.peers (Mina_lib.net coda) in
+        let%map peers = Mina_networking.peers (Mina_lib.net coda) in
         Ok (List.map ~f:Network_peer.Peer.to_display peers) )
 
   let snark_pool =
@@ -2905,7 +2905,7 @@ module Queries = struct
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun {ctx= coda; _} _ ->
         let net = Mina_lib.net coda in
-        let%map config = Coda_networking.connection_gating_config net in
+        let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
   let commands =
