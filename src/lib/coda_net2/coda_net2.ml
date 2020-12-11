@@ -1691,6 +1691,7 @@ let%test_module "coda network tests" =
       in
       (b, c, shutdown)
 
+    (*
     let%test_unit "does_b_see_c" =
       let () = Core.Backtrace.elide := false in
       ignore testmsg ;
@@ -1761,6 +1762,7 @@ let%test_module "coda network tests" =
         shutdown ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+  *)
 
     let%test_unit "stream" =
       let () = Core.Backtrace.elide := false in
