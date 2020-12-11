@@ -53,9 +53,17 @@ module Make
   let empty = Empty
 
   (* snark pool diffs are not bundled, so size is always 1 *)
-  let size = function Add_solved_work _ -> 1 | Empty -> 0
+  let size _ = 1
 
-  let verified_size diff = size diff
+  let score = function
+    | Add_solved_work (_w, p) ->
+        One_or_two.length p.proof
+    | Empty ->
+        1
+
+  let verified_size _ = 1
+
+  let max_per_second = 4
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->
@@ -103,7 +111,7 @@ module Make
       | _ ->
           failwith "compare didn't return -1, 0, or 1!" )
 
-  let verify pool ({data; sender} as t : t Envelope.Incoming.t) =
+  let verify pool ({data; sender; _} as t : t Envelope.Incoming.t) =
     match data with
     | Empty ->
         Deferred.Or_error.error_string "cannot verify empty snark pool diff"
@@ -127,7 +135,7 @@ module Make
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
-    let {Envelope.Incoming.data= diff; sender} = t in
+    let {Envelope.Incoming.data= diff; sender; _} = t in
     match diff with
     | Empty ->
         Deferred.return

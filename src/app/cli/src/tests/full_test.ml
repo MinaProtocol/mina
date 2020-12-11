@@ -145,6 +145,8 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
+          ; max_connections= 50
+          ; validation_queue_size= 150
           ; keypair= None }
       in
       let net_config =
@@ -178,6 +180,7 @@ let run_test () : unit Deferred.t =
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
+      let start_time = Time.now () in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
@@ -201,7 +204,7 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
-             ~precomputed_values ())
+             ~precomputed_values ~start_time ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

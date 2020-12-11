@@ -816,7 +816,41 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
-            Strict_pipe.create Synchronous
+            let log_rate_limiter_occasionally rl =
+              let t = Time.Span.of_min 1. in
+              every t (fun () ->
+                  [%log' debug config.logger]
+                    ~metadata:
+                      [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+                    !"new_block $rate_limiter" )
+            in
+            let rl =
+              Network_pool.Rate_limiter.create
+                ~capacity:
+                  ( (* Max of 20 transitions per slot per peer. *)
+                    20
+                  , `Per
+                      (Block_time.Span.to_time_span
+                         consensus_constants.slot_duration_ms) )
+            in
+            log_rate_limiter_occasionally rl ;
+            let r, w = Strict_pipe.create Synchronous in
+            ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
+                  let sender = Envelope.Incoming.sender e in
+                  match
+                    Network_pool.Rate_limiter.add rl sender ~now:(Time.now ())
+                      ~score:1
+                  with
+                  | `Capacity_exceeded ->
+                      [%log' warn config.logger]
+                        "$sender has sent many blocks. This is very unusual."
+                        ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
+                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                        cb `Reject ;
+                      None
+                  | `Within_capacity ->
+                      Some x )
+            , w )
           in
           let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
@@ -842,8 +876,9 @@ let create ?wallets (config : Config.t) =
                 in
                 f ~frontier input )
           in
-          (* knot-tying hack so we can pass a get_telemetry function before net created *)
+          (* knot-tying hacks so we can pass a get_telemetry function before net, Coda_lib.t created *)
           let net_ref = ref None in
+          let sync_status_ref = ref None in
           let get_telemetry_data _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -864,7 +899,7 @@ let create ?wallets (config : Config.t) =
             else
               match !net_ref with
               | None ->
-                  (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                  (* should be unreachable; without a network, we wouldn't receive this RPC call *)
                   [%log' info config.logger]
                     "Network not instantiated when telemetry data requested" ;
                   Deferred.return
@@ -876,7 +911,7 @@ let create ?wallets (config : Config.t) =
                                instantiated when telemetry data requested"
                              node_ip_addr node_peer_id))
               | Some net ->
-                  let protocol_state_hash, k_block_hashes =
+                  let protocol_state_hash, k_block_hashes_and_timestamps =
                     match
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     with
@@ -892,15 +927,33 @@ let create ?wallets (config : Config.t) =
                           in
                           Coda_state.Protocol_state.hash state
                         in
-                        let k_block_hashes =
-                          List.map
-                            ( Transition_frontier.root frontier
-                            :: Transition_frontier.best_tip_path frontier )
-                            ~f:Transition_frontier.Breadcrumb.state_hash
+                        let k_breadcrumbs =
+                          Transition_frontier.root frontier
+                          :: Transition_frontier.best_tip_path frontier
                         in
-                        (protocol_state_hash, k_block_hashes)
+                        let k_block_hashes_and_timestamps =
+                          List.map k_breadcrumbs ~f:(fun bc ->
+                              ( Transition_frontier.Breadcrumb.state_hash bc
+                              , Option.value_map
+                                  (Transition_frontier.Breadcrumb
+                                   .transition_receipt_time bc)
+                                  ~default:"no timestamp available"
+                                  ~f:
+                                    (Time.to_string_iso8601_basic
+                                       ~zone:Time.Zone.utc) ) )
+                        in
+                        (protocol_state_hash, k_block_hashes_and_timestamps)
                   in
-                  let%map peers = Coda_networking.peers net in
+                  let%bind peers = Coda_networking.peers net in
+                  let open Deferred.Or_error.Let_syntax in
+                  let%map sync_status =
+                    match !sync_status_ref with
+                    | None ->
+                        Deferred.return (Ok `Offline)
+                    | Some status ->
+                        Deferred.return
+                          (Coda_incremental.Status.Observer.value status)
+                  in
                   let block_producers =
                     config.initial_block_production_keypairs
                     |> Keypair.Set.to_list
@@ -910,20 +963,27 @@ let create ?wallets (config : Config.t) =
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  Ok
-                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                      { node_ip_addr
-                      ; node_peer_id
-                      ; peers
-                      ; block_producers
-                      ; protocol_state_hash
-                      ; ban_statuses
-                      ; k_block_hashes }
+                  let git_commit = Coda_version.commit_id_short in
+                  let uptime =
+                    Time.diff (Time.now ()) config.start_time
+                    |> Time.Span.to_string_hum ~decimals:1
+                  in
+                  Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                    { node_ip_addr
+                    ; node_peer_id
+                    ; sync_status
+                    ; peers
+                    ; block_producers
+                    ; protocol_state_hash
+                    ; ban_statuses
+                    ; k_block_hashes_and_timestamps
+                    ; git_commit
+                    ; uptime }
           in
           let get_some_initial_peers _ =
             match !net_ref with
             | None ->
-                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                (* should be unreachable; without a network, we wouldn't receive this RPC call *)
                 [%log' error config.logger]
                   "Network not instantiated when initial peers requested" ;
                 Deferred.return []
@@ -1010,7 +1070,7 @@ let create ?wallets (config : Config.t) =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
-          (* tie the knot *)
+          (* tie the first knot *)
           net_ref := Some net ;
           let user_command_input_reader, user_command_input_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
@@ -1321,6 +1381,8 @@ let create ?wallets (config : Config.t) =
                 ( Var.watch @@ of_deferred
                 @@ Coda_networking.on_first_received_message net ~f:Fn.id )
           in
+          (* tie other knot *)
+          sync_status_ref := Some sync_status ;
           Deferred.return
             { config
             ; next_producer_timing= None

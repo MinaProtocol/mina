@@ -125,6 +125,8 @@ end
 module Make (Transition_frontier : Transition_frontier_intf) = struct
   module Resource_pool = struct
     module T = struct
+      let label = "snark_pool"
+
       module Config = struct
         type t =
           { trust_system: Trust_system.t sexp_opaque
@@ -352,9 +354,9 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                     ~f:(fun (_, s) -> log_and_punish ?punish s e)
                 in
                 let proof_env =
-                  { Envelope.Incoming.data=
-                      (One_or_two.map proofs ~f:fst, message)
-                  ; sender }
+                  Envelope.Incoming.wrap
+                    ~data:(One_or_two.map proofs ~f:fst, message)
+                    ~sender
                 in
                 match%bind Batcher.Snark_pool.verify t.batcher proof_env with
                 | Ok true ->
@@ -539,7 +541,7 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      let enveloped_diff = {Envelope.Incoming.data= diff; sender} in
+      let enveloped_diff = Envelope.Incoming.wrap ~data:diff ~sender in
       match%bind
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with

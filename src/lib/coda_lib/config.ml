@@ -47,5 +47,6 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; log_block_creation: bool [@default false]
-  ; precomputed_values: Precomputed_values.t }
+  ; precomputed_values: Precomputed_values.t
+  ; start_time: Time.t }
 [@@deriving make]

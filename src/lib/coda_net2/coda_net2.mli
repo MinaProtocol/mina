@@ -242,6 +242,8 @@ val configure :
   -> peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
+  -> max_connections:int
+  -> validation_queue_size:int
   -> unit Deferred.Or_error.t
 
 (** The keypair the network was configured with.

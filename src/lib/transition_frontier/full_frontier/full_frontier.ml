@@ -105,6 +105,7 @@ let close ~loc t =
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values =
   let open Root_data in
+  let transition_receipt_time = None in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
   in
@@ -128,6 +129,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   let root_breadcrumb =
     Breadcrumb.create ~validated_transition:root_data.transition
       ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
+      ~transition_receipt_time
   in
   let root_node =
     {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
@@ -451,6 +453,8 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       ~staged_ledger:new_staged_ledger
       ~just_emitted_a_proof:
         (Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb)
+      ~transition_receipt_time:
+        (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
   Note: this should be after applying the transactions to the snarked ledger (Step 5)
@@ -596,7 +600,7 @@ let update_metrics_with_diff (type mutant) t
   | _ ->
       ()
 
-let apply_diffs t diffs ~enable_epoch_ledger_sync =
+let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Root_identifier.Stable.Latest in
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
@@ -623,7 +627,8 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
     )
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
-  if not (enable_epoch_ledger_sync = `Disabled) then
+  if (not (enable_epoch_ledger_sync = `Disabled)) && not has_long_catchup_job
+  then
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync

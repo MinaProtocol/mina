@@ -524,13 +524,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~consensus_constants
                       |> Deferred.return
                     in
+                    let transition_receipt_time =
+                      Some (Core_kernel.Time.now ())
+                    in
                     let%bind breadcrumb =
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values
                             ~verifier ~trust_system ~parent:crumb ~transition
                             ~sender:None (* Consider skipping here *)
-                            ~skip_staged_ledger_verification:false () )
+                            ~skip_staged_ledger_verification:false
+                            ~transition_receipt_time () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
                                `Invalid_staged_ledger_diff
@@ -804,12 +808,14 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   ~logger ~frontier ~consensus_constants
             |> Deferred.return
           in
+          let transition_receipt_time = None in
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
                   ~trust_system ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:false ()
+                  ~skip_staged_ledger_verification:false
+                  ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)

@@ -33,6 +33,8 @@ module Config = struct
     ; flooding: bool
     ; direct_peers: Coda_net2.Multiaddr.t list
     ; peer_exchange: bool
+    ; max_connections: int
+    ; validation_queue_size: int
     ; mutable keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -62,8 +64,32 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
 
-    let create_rpc_implementations (Rpc_handler (rpc, handler)) =
+    let create_rpc_implementations
+        (Rpc_handler {rpc; f= handler; cost; budget}) =
       let (module Impl) = implementation_of_rpc rpc in
+      let logger = Logger.create () in
+      let log_rate_limiter_occasionally rl =
+        let t = Time.Span.of_min 1. in
+        every t (fun () ->
+            [%log' debug logger]
+              ~metadata:[("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+              !"%s $rate_limiter" Impl.name )
+      in
+      let rl = Network_pool.Rate_limiter.create ~capacity:budget in
+      log_rate_limiter_occasionally rl ;
+      let handler (peer : Network_peer.Peer.t) ~version q =
+        let score = cost q in
+        match
+          Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
+            ~score
+        with
+        | `Capacity_exceeded ->
+            failwithf "peer exceeded capacity: %s"
+              (Network_peer.Peer.to_multiaddr_string peer)
+              ()
+        | `Within_capacity ->
+            handler peer ~version q
+      in
       Impl.implement_multi handler
 
     let prepare_stream_transport stream =
@@ -165,6 +191,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:initial_peers ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange ~flooding:config.flooding
+                ~max_connections:config.max_connections
+                ~validation_queue_size:config.validation_queue_size
                 ~initial_gating_config:
                   Coda_net2.
                     { banned_peers=

@@ -109,7 +109,15 @@ end)
           ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
 
-  let filter_verified (type a) (pipe : a Strict_pipe.Reader.t) (t : t)
+  let log_rate_limiter_occasionally t rl =
+    let time = Time_ns.Span.of_min 1. in
+    every time (fun () ->
+        [%log' debug t.logger]
+          ~metadata:[("rate_limiter", Rate_limiter.summary rl)]
+          !"%s $rate_limiter" Resource_pool.label )
+
+  let filter_verified (type a) ~log_rate_limiter
+      (pipe : a Strict_pipe.Reader.t) (t : t)
       ~(f :
          a -> Resource_pool.Diff.t Envelope.Incoming.t * Broadcast_callback.t)
       :
@@ -131,6 +139,11 @@ end)
                       (Resource_pool.Diff.reject_overloaded_diff diff)
                       cb )) ))
     in
+    let rl =
+      Rate_limiter.create
+        ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
+    in
+    if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
     Strict_pipe.Reader.iter_without_pushback pipe ~f:(fun d ->
         let diff, cb = f d in
@@ -140,29 +153,42 @@ end)
           in
           [%log' debug t.logger] "Verifying $diff" ~metadata:[("diff", summary)] ;
           don't_wait_for
-            ( match%bind Resource_pool.Diff.verify t.resource_pool diff with
-            | Error err ->
+            ( match
+                Rate_limiter.add rl diff.sender ~now:(Time.now ())
+                  ~score:(Resource_pool.Diff.score diff.data)
+              with
+            | `Capacity_exceeded ->
                 [%log' trace t.logger]
-                  "Refusing to rebroadcast $diff. Verification error: $error"
-                  ~metadata:
-                    [ ("diff", summary)
-                    ; ("error", Error_json.error_to_yojson err) ] ;
-                (*reject incoming messages*)
-                Broadcast_callback.error err cb
-            | Ok verified_diff -> (
-                [%log' debug t.logger] "Verified diff: $verified_diff"
-                  ~metadata:
-                    [ ( "verified_diff"
-                      , Resource_pool.Diff.verified_to_yojson
-                        @@ Envelope.Incoming.data verified_diff )
-                    ; ( "sender"
-                      , Envelope.Sender.to_yojson
-                        @@ Envelope.Incoming.sender verified_diff ) ] ;
-                match Strict_pipe.Writer.write w (verified_diff, cb) with
-                | Some r ->
-                    r
-                | None ->
-                    Deferred.unit ) ) ) )
+                  ~metadata:[("sender", Envelope.Sender.to_yojson diff.sender)]
+                  "exceeded capacity from $sender" ;
+                Broadcast_callback.error
+                  (Error.of_string "exceeded capacity")
+                  cb
+            | `Within_capacity -> (
+                match%bind Resource_pool.Diff.verify t.resource_pool diff with
+                | Error err ->
+                    [%log' trace t.logger]
+                      "Refusing to rebroadcast $diff. Verification error: \
+                       $error"
+                      ~metadata:
+                        [ ("diff", summary)
+                        ; ("error", Error_json.error_to_yojson err) ] ;
+                    (*reject incoming messages*)
+                    Broadcast_callback.error err cb
+                | Ok verified_diff -> (
+                    [%log' debug t.logger] "Verified diff: $verified_diff"
+                      ~metadata:
+                        [ ( "verified_diff"
+                          , Resource_pool.Diff.verified_to_yojson
+                            @@ Envelope.Incoming.data verified_diff )
+                        ; ( "sender"
+                          , Envelope.Sender.to_yojson
+                            @@ Envelope.Incoming.sender verified_diff ) ] ;
+                    match Strict_pipe.Writer.write w (verified_diff, cb) with
+                    | Some r ->
+                        r
+                    | None ->
+                        Deferred.unit ) ) ) ) )
     |> don't_wait_for ;
     r
 
@@ -181,12 +207,13 @@ end)
       [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
       ; Strict_pipe.Reader.map
-          (filter_verified local_diffs network_pool ~f:(fun (diff, cb) ->
+          (filter_verified ~log_rate_limiter:false local_diffs network_pool
+             ~f:(fun (diff, cb) ->
                (Envelope.Incoming.local diff, Broadcast_callback.Local cb) ))
           ~f:(fun d -> `Local d)
       ; Strict_pipe.Reader.map
-          (filter_verified incoming_diffs network_pool ~f:(fun (diff, cb) ->
-               (diff, Broadcast_callback.External cb) ))
+          (filter_verified ~log_rate_limiter:true incoming_diffs network_pool
+             ~f:(fun (diff, cb) -> (diff, Broadcast_callback.External cb)))
           ~f:(fun d -> `Incoming d) ]
       ~f:(fun diff_source ->
         match diff_source with

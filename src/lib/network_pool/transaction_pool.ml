@@ -178,6 +178,8 @@ struct
     type transition_frontier_diff =
       Transition_frontier.best_tip_diff * Base_ledger.t
 
+    let label = "transaction_pool"
+
     module Config = struct
       type t =
         { trust_system: Trust_system.t sexp_opaque
@@ -777,6 +779,10 @@ struct
       let empty = []
 
       let size = List.length
+
+      let score x = Int.max 1 (List.length x)
+
+      let max_per_second = 2
 
       let verified_size = List.length
 
