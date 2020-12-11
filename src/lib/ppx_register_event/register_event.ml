@@ -210,19 +210,21 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   in
   if checked_interpolations then stris
   else
-    [%stri
+    let msg_loc_str =
       (* same formatting as in Ppxlib.Location.print
-            avoid adding Ppxlib as runtime dependency
-       *)
-      let msg_loc =
-        sprintf "File \"%s\", line %d, characters %d-%d:"
-          [%e estring msg_loc.loc_start.pos_fname]
-          [%e eint msg_loc.loc_start.pos_lnum]
-          [%e eint (msg_loc.loc_start.pos_cnum - msg_loc.loc_start.pos_bol)]
-          [%e eint (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol)]
-      in
-      Structured_log_events.check_interpolations_exn ~msg_loc [%e msg]
-        [%e elist ~f:estring label_names]]
+         avoid adding Ppxlib as runtime dependency
+      *)
+      estring
+        (sprintf "File \"%s\", line %d, characters %d-%d:"
+           msg_loc.loc_start.pos_fname msg_loc.loc_start.pos_lnum
+           (msg_loc.loc_start.pos_cnum - msg_loc.loc_start.pos_bol)
+           (msg_loc.loc_end.pos_cnum - msg_loc.loc_start.pos_bol))
+    in
+    [%stri
+      let () =
+        Structured_log_events.check_interpolations_exn
+          ~msg_loc:[%e msg_loc_str] [%e msg]
+          [%e elist ~f:estring label_names]]
     :: stris
 
 let generate_signature_items ~loc ~path:_ ty_ext =
