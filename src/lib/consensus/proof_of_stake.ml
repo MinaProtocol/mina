@@ -1383,7 +1383,7 @@ module Data = struct
   end
 
   [%%if
-  false]
+  true]
 
   module Min_window_density = struct
     (* Three cases for updating the lengths of sub_windows
@@ -1453,9 +1453,6 @@ module Data = struct
       (min_window_density, sub_window_densities)
 
     module Checked = struct
-      open Tick.Checked
-      open Tick.Checked.Let_syntax
-
       let%snarkydef update_min_window_density ~(constants : Constants.var)
           ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
           ~prev_min_window_density =
@@ -1589,7 +1586,7 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
-        let constants = Constants.for_unit_tests
+        let constants = Lazy.force Constants.for_unit_tests
 
         (* converting the input for actual implementation to the input required by the
            reference implementation *)
@@ -1616,7 +1613,6 @@ module Data = struct
            1/n^2  | [n*slots_per_sub_window, (n+1)*slots_per_sub_window)
         *)
         let gen_slot_diff =
-          let open Quickcheck.Generator in
           let to_int = Length.to_int in
           Quickcheck.Generator.weighted_union
           @@ List.init
@@ -3115,6 +3111,124 @@ module Hooks = struct
     let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
+
+  let gen_epoch_data =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind ledger = Coda_base.Frozen_ledger_hash.gen in
+    let%bind seed = Coda_base.Epoch_seed.gen in
+    let%bind start_checkpoint = Coda_base.State_hash.gen in
+    let%bind lock_checkpoint = Coda_base.State_hash.gen in
+    return (ledger, seed, start_checkpoint, lock_checkpoint)
+
+  let gen_consensus_state_parts =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind staking_epoch_data = gen_epoch_data in
+    let%bind next_epoch_data = gen_epoch_data in
+    let%bind pk = Public_key.Compressed.gen in
+    return (staking_epoch_data, next_epoch_data, pk)
+
+  let%test_unit "test consensus.select for min-window-density case" =
+    Quickcheck.test ~trials:10
+      (Quickcheck.Generator.tuple4 gen_consensus_state_parts
+         gen_consensus_state_parts Coda_base.State_hash.gen
+         Coda_base.State_hash.gen)
+      ~f:(fun ( ( (s_ledger1, s_seed1, s_start_checkpoint1, s_lock_checkpoint1)
+                , (n_ledger1, n_seed1, n_start_checkpoint1, n_lock_checkpoint1)
+                , pk1 )
+              , ( (s_ledger2, s_seed2, s_start_checkpoint2, s_lock_checkpoint2)
+                , (n_ledger2, n_seed2, n_start_checkpoint2, n_lock_checkpoint2)
+                , pk2 )
+              , hash1
+              , hash2 )
+         ->
+        let (staking_epoch_data1 : Coda_base.Epoch_data.Value.t) =
+          Coda_base.Epoch_data.Poly.
+            { ledger=
+                Coda_base.Epoch_ledger.Poly.
+                  {hash= s_ledger1; total_currency= Amount.of_int 1000000}
+            ; seed= s_seed1
+            ; start_checkpoint= s_start_checkpoint1
+            ; lock_checkpoint= s_lock_checkpoint1
+            ; epoch_length= Length.of_int 1 }
+        in
+        let (next_epoch_data1 : Coda_base.Epoch_data.Value.t) =
+          Coda_base.Epoch_data.Poly.
+            { ledger=
+                Coda_base.Epoch_ledger.Poly.
+                  {hash= n_ledger1; total_currency= Amount.of_int 1000500}
+            ; seed= n_seed1
+            ; start_checkpoint= n_start_checkpoint1
+            ; lock_checkpoint= n_lock_checkpoint1
+            ; epoch_length= Length.of_int 1 }
+        in
+        let (staking_epoch_data2 : Coda_base.Epoch_data.Value.t) =
+          Coda_base.Epoch_data.Poly.
+            { ledger=
+                Coda_base.Epoch_ledger.Poly.
+                  {hash= s_ledger2; total_currency= Amount.of_int 1000000}
+            ; seed= s_seed2
+            ; start_checkpoint= s_start_checkpoint2
+            ; lock_checkpoint= s_lock_checkpoint2
+            ; epoch_length= Length.of_int 1 }
+        in
+        let (next_epoch_data2 : Coda_base.Epoch_data.Value.t) =
+          Coda_base.Epoch_data.Poly.
+            { ledger=
+                Coda_base.Epoch_ledger.Poly.
+                  {hash= n_ledger2; total_currency= Amount.of_int 1000500}
+            ; seed= n_seed2
+            ; start_checkpoint= n_start_checkpoint2
+            ; lock_checkpoint= n_lock_checkpoint2
+            ; epoch_length= Length.of_int 1 }
+        in
+        let blockchain_length = Length.of_int 1000 in
+        let epoch_count = Length.of_int 2 in
+        let last_vrf_output = Vrf.Output.Truncated.dummy in
+        let total_currency = Amount.of_int 10010000 in
+        let curr_global_slot =
+          Global_slot.of_slot_number
+            ~constants:(Lazy.force Constants.for_unit_tests)
+            (UInt32.of_int 2000)
+        in
+        let global_slot_since_genesis = Coda_numbers.Global_slot.of_int 2000 in
+        let has_ancestor_in_same_checkpoint_window = false in
+        let supercharge_coinbase = false in
+        let (existing : Data.Consensus_state.Value.t) =
+          { Data.Consensus_state.Poly.blockchain_length
+          ; epoch_count
+          ; min_window_density= Length.of_int 50
+          ; sub_window_densities= List.init 10 ~f:(fun _ -> Length.of_int 5)
+          ; last_vrf_output
+          ; total_currency
+          ; curr_global_slot
+          ; global_slot_since_genesis
+          ; staking_epoch_data= staking_epoch_data1
+          ; next_epoch_data= next_epoch_data1
+          ; has_ancestor_in_same_checkpoint_window
+          ; block_stake_winner= pk1
+          ; block_creator= pk1
+          ; coinbase_receiver= pk1
+          ; supercharge_coinbase }
+        in
+        let (candidate : Data.Consensus_state.Value.t) =
+          { existing with
+            min_window_density= Length.of_int 10
+          ; sub_window_densities= List.init 10 ~f:(fun _ -> Length.of_int 1)
+          ; staking_epoch_data= staking_epoch_data2
+          ; next_epoch_data= next_epoch_data2
+          ; block_stake_winner= pk2
+          ; block_creator= pk2
+          ; coinbase_receiver= pk2 }
+        in
+        let existing_with_hash = With_hash.{hash= hash1; data= existing} in
+        let candidate_with_hash = With_hash.{hash= hash2; data= candidate} in
+        let result =
+          select
+            ~constants:(Lazy.force Constants.for_unit_tests)
+            ~existing:existing_with_hash ~candidate:candidate_with_hash
+            ~logger:(Logger.create ())
+        in
+        assert (result = `Keep) )
 
   type block_producer_timing =
     [ `Check_again of Unix_timestamp.t
