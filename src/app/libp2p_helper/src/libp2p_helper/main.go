@@ -999,8 +999,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			Upcall: "peerConnected",
 		})
 
-		go app.checkBandwidth(id)
-		go app.checkLatency(id)
+		// Note: These are disabled because we see weirdness on our networks
+		//       caused by this prometheus issues.
+		// go app.checkBandwidth(id)
+		// go app.checkLatency(id)
 	}
 
 	return "beginAdvertising success", nil
