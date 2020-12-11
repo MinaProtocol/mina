@@ -33,6 +33,8 @@ module Config = struct
     ; flooding: bool
     ; direct_peers: Coda_net2.Multiaddr.t list
     ; peer_exchange: bool
+    ; max_connections: int
+    ; validation_queue_size: int
     ; mutable keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -85,7 +87,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             failwithf "peer exceeded capacity: %s"
               (Network_peer.Peer.to_multiaddr_string peer)
               ()
-        | `Ok ->
+        | `Within_capacity ->
             handler peer ~version q
       in
       Impl.implement_multi handler
@@ -189,6 +191,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:initial_peers ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange ~flooding:config.flooding
+                ~max_connections:config.max_connections
+                ~validation_queue_size:config.validation_queue_size
                 ~initial_gating_config:
                   Coda_net2.
                     { banned_peers=
