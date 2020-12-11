@@ -852,7 +852,7 @@ let create ?wallets (config : Config.t) =
                       Coda_net2.Validation_callback.fire_if_not_already_fired
                         cb `Reject ;
                       None
-                  | `Ok ->
+                  | `Within_capacity ->
                       Some x )
             , w )
           in
