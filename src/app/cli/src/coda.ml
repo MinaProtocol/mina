@@ -162,7 +162,7 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_int Coda_compile_config.default_snark_worker_fee))
+           (Currency.Fee.to_int Mina_compile_config.default_snark_worker_fee))
       (optional txn_fee)
   and work_reassignment_wait =
     flag "work-reassignment-wait" (optional int)
@@ -615,7 +615,7 @@ let setup_daemon logger =
           YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
         in
         or_from_config json_to_currency_fee_option "snark-worker-fee"
-          ~default:Coda_compile_config.default_snark_worker_fee snark_work_fee
+          ~default:Mina_compile_config.default_snark_worker_fee snark_work_fee
       in
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
@@ -1016,7 +1016,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           Coda_metrics.server ~port ~logger >>| ignore )
       |> Option.value ~default:Deferred.unit
     in
-    let () = Coda_plugins.init_plugins ~logger coda plugins in
+    let () = Mina_plugins.init_plugins ~logger coda plugins in
     return coda
 
 let daemon logger =

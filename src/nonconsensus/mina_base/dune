@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (libraries
    mina_numbers_nonconsensus
-   coda_compile_config_nonconsensus
+   mina_compile_config_nonconsensus
    currency_nonconsensus
    data_hash_lib_nonconsensus
    hash_prefix_states_nonconsensus

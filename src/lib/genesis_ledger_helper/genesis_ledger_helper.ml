@@ -1316,7 +1316,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
-           { base= Named Coda_compile_config.genesis_ledger
+           { base= Named Mina_compile_config.genesis_ledger
            ; num_accounts= None
            ; balances= []
            ; hash= None

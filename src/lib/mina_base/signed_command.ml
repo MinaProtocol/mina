@@ -71,7 +71,7 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Coda_compile_config.minimum_user_command_fee
+let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
@@ -161,7 +161,7 @@ module Gen = struct
       ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~fee_range
       create_body =
     let open Quickcheck.Generator.Let_syntax in
-    let min_fee = Fee.to_int Coda_compile_config.minimum_user_command_fee in
+    let min_fee = Fee.to_int Mina_compile_config.minimum_user_command_fee in
     let max_fee = min_fee + fee_range in
     let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t) =
       key_gen

@@ -26,8 +26,8 @@ module type Gen_intf = sig
   module Gen : sig
     (** Generate a single transaction between
     * Generate random keys for sender and receiver
-    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
-    * Coda_compile_config.minimum_user_command_fee+fee_range]$
+    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+    * Mina_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment :
@@ -44,8 +44,8 @@ module type Gen_intf = sig
 
     (** Generate a single transaction between
     * $a, b \in keys$
-    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
-    * Coda_compile_config.minimum_user_command_fee+fee_range]$
+    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+    * Mina_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
