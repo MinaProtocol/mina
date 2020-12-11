@@ -9,15 +9,15 @@ module Node = struct
   type t =
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
-  let base_kube_cmd t =
-    Printf.sprintf "kubectl --cluster %s --namespace %s" t.cluster t.namespace
+  let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
   let run_in_container node cmd =
-    let base = base_kube_cmd node in
+    let base_args = base_kube_args node in
+    let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
       Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s" base
-        base node.pod_id cmd
+        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
+        base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -47,16 +47,17 @@ module Node = struct
 
     let get_pod_name t : string Malleable_error.t =
       let args =
-        [ "get"
-        ; "pod"
-        ; "-l"
-        ; sprintf "app=%s" t.pod_id
-        ; "-o=custom-columns=NAME:.metadata.name"
-        ; "--no-headers" ]
+        List.append (base_kube_args t)
+          [ "get"
+          ; "pod"
+          ; "-l"
+          ; sprintf "app=%s" t.pod_id
+          ; "-o=custom-columns=NAME:.metadata.name"
+          ; "--no-headers" ]
       in
       let%bind run_result =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.run_lines ~prog:(base_kube_cmd t) ~args ())
+          (Process.run_lines ~prog:"kubectl" ~args ())
       in
       match run_result with
       | Ok
@@ -78,12 +79,14 @@ module Node = struct
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
       let portmap = string_of_int port ^ ":3085" in
-      let args = ["port-forward"; name; portmap] in
+      let args =
+        List.append (base_kube_args t) ["port-forward"; name; portmap]
+      in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
       let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.create ~prog:(base_kube_cmd t) ~args ())
+          (Process.create ~prog:"kubectl" ~args ())
       in
       Exit_handlers.register_handler ~logger
         ~description:
