@@ -18,7 +18,7 @@ struct
     let reader, writer =
       Strict_pipe.(
         create
-          ~name:("Coda_incremental__" ^ Name.t)
+          ~name:("Mina_incremental__" ^ Name.t)
           (Buffered (`Capacity 1, `Overflow Drop_head)))
     in
     Observer.on_update_exn observer ~f:(function
