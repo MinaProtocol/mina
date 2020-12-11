@@ -85,7 +85,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             failwithf "peer exceeded capacity: %s"
               (Network_peer.Peer.to_multiaddr_string peer)
               ()
-        | `Ok ->
+        | `Within_capacity ->
             handler peer ~version q
       in
       Impl.implement_multi handler

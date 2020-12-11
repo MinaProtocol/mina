@@ -48,7 +48,8 @@ type Structured_log_events.t +=
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
  *   - add the new constructor for Rpcs.rpc to Rpcs.all_of_type_erased_rpc
  *   - add a pattern matching case to Rpcs.implementation_of_rpc mapping the
- *     new constructor to the new module for your RPC
+ *      new constructor to the new module for your RPC
+ *   - add a match case to `match_handler`, below
 *)
 module Rpcs = struct
   (* for versioning of the types here, see
@@ -679,6 +680,8 @@ module Rpcs = struct
     | Ban_notify, Ban_notify ->
         Some (do_ f)
     | Get_best_tip, Get_best_tip ->
+        Some (do_ f)
+    | Get_telemetry_data, Get_telemetry_data ->
         Some (do_ f)
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
