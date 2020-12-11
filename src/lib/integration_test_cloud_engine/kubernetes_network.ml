@@ -9,12 +9,15 @@ module Node = struct
   type t =
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
+  let base_kube_cmd t =
+    Printf.sprintf "kubectl --cluster %s -n %s" t.cluster t.namespace
+
   let run_in_container node cmd =
+    let base = base_kube_cmd node in
     let kubectl_cmd =
       Printf.sprintf
-        "kubectl --cluster %s -n %s -c coda exec -i $(kubectl get pod \
-         --cluster %s -n %s -l \"app=%s\" -o name) -- %s"
-        node.cluster node.namespace node.cluster node.namespace node.pod_id cmd
+        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s" base
+        base node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -46,8 +49,6 @@ module Node = struct
       let args =
         [ "get"
         ; "pod"
-        ; "-n"
-        ; t.namespace
         ; "-l"
         ; sprintf "app=%s" t.pod_id
         ; "-o=custom-columns=NAME:.metadata.name"
@@ -55,7 +56,7 @@ module Node = struct
       in
       let%bind run_result =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.run_lines ~prog:"kubectl" ~args ())
+          (Process.run_lines ~prog:(base_kube_cmd t) ~args ())
       in
       match run_result with
       | Ok
@@ -76,20 +77,12 @@ module Node = struct
     let set_port_forwarding ~logger t port =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
-      let args =
-        [ "port-forward"
-        ; name
-        ; "--namespace"
-        ; t.namespace
-        ; "--cluster"
-        ; t.cluster
-        ; string_of_int port ]
-      in
+      let args = ["port-forward"; name; string_of_int port] in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
       let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.create ~prog:"kubectl" ~args ())
+          (Process.create ~prog:(base_kube_cmd t) ~args ())
       in
       Exit_handlers.register_handler ~logger
         ~description:
