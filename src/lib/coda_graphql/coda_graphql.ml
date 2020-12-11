@@ -1926,7 +1926,7 @@ module Subscriptions = struct
               ~typ:Types.Input.public_key_arg ]
       ~resolve:(fun {ctx= coda; _} public_key ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.new_block coda public_key )
+        @@ Mina_commands.Subscriptions.new_block coda public_key )
 
   let chain_reorganization =
     subscription_field "chainReorganization"
@@ -1937,7 +1937,7 @@ module Subscriptions = struct
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.reorganization coda )
+        @@ Mina_commands.Subscriptions.reorganization coda )
 
   let commands = [new_sync_update; new_block; chain_reorganization]
 end
@@ -2084,11 +2084,11 @@ module Mutations = struct
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        Some (Coda_commands.reset_trust_status coda ip_address) )
+        Some (Mina_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
     match
-      Coda_commands.setup_and_submit_user_command coda user_command_input
+      Mina_commands.setup_and_submit_user_command coda user_command_input
     with
     | `Active f -> (
         match%map f with
@@ -2568,7 +2568,7 @@ module Queries = struct
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -2578,7 +2578,7 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
-            Some (Coda_commands.get_trust_status coda ip_addr)
+            Some (Mina_commands.get_trust_status coda ip_addr)
         | Error _ ->
             None )
 
@@ -2588,7 +2588,7 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
       ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_trust_status_all coda )
+        Mina_commands.get_trust_status_all coda )
 
   let version =
     field "version" ~typ:string

@@ -1317,7 +1317,7 @@ let internal_commands logger =
           Deferred.return ()) )
   ; ("replay-blocks", replay_blocks logger) ]
 
-let coda_commands logger =
+let mina_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
   ; ("client", Client.client)
@@ -1336,7 +1336,7 @@ module type Integration_test = sig
   val command : Async.Command.t
 end
 
-let coda_commands logger =
+let mina_commands logger =
   let open Tests in
   let group =
     List.map
@@ -1362,7 +1362,7 @@ let coda_commands logger =
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in
-  coda_commands logger
+  mina_commands logger
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]
 
 [%%endif]
@@ -1406,5 +1406,5 @@ let () =
    | _ ->
        Command.run
          (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
-            (coda_commands logger))) ;
+            (mina_commands logger))) ;
   Core.exit 0

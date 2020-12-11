@@ -120,7 +120,7 @@ let setup_and_submit_user_commands t user_command_list =
   [%log' warn (Coda_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
-      [("coda_command", `String "scheduling a batch of user transactions")] ;
+      [("mina_command", `String "scheduling a batch of user transactions")] ;
   Coda_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct

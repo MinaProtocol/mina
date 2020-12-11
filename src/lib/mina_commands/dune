@@ -1,6 +1,6 @@
 (library
- (name coda_commands)
- (public_name coda_commands)
+ (name mina_commands)
+ (public_name mina_commands)
  (libraries
    ; opam deps
    core

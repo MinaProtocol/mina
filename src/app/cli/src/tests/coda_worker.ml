@@ -571,12 +571,12 @@ module T = struct
           in
           let coda_get_balance account_id =
             return
-              ( Coda_commands.get_balance coda account_id
+              ( Mina_commands.get_balance coda account_id
               |> Participating_state.active_exn )
           in
           let coda_get_nonce account_id =
             return
-              ( Coda_commands.get_nonce coda account_id
+              ( Mina_commands.get_nonce coda account_id
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
@@ -604,13 +604,13 @@ module T = struct
             in
             let payment_input = build_user_command_input amount sk pk fee in
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda payment_input
+              ( Mina_commands.setup_and_submit_user_command coda payment_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
           let coda_process_user_command cmd_input =
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda cmd_input
+              ( Mina_commands.setup_and_submit_user_command coda cmd_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
@@ -622,7 +622,7 @@ module T = struct
           in
           let coda_new_block key =
             Deferred.return
-            @@ Coda_commands.Subscriptions.new_block coda (Some key)
+            @@ Mina_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
@@ -715,12 +715,12 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
+            @@ Mina_commands.For_tests.Subscriptions.new_user_commands coda
           in
           let coda_get_all_user_commands t =
             Deferred.return
               (List.filter_map
-                 (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
+                 (Mina_commands.For_tests.get_all_commands coda t) ~f:(function
                 | Signed_command c ->
                     Some c
                 | Snapp_command _ ->
