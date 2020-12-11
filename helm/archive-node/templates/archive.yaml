@@ -32,9 +32,6 @@ spec:
         args: [ "daemon",
           "-log-level", {{ .Values.coda.logLevel }},
           "-log-json",
-          {{- if .Values.coda.logReceivedBlocks }}
-          "-log-received-blocks", "true",
-          {{- end -}}
           {{- if .Values.coda.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}

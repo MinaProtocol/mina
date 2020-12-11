@@ -191,10 +191,6 @@ let setup_daemon logger =
       ~doc:
         "true|false Log snark-pool diff received from peers (default: false)"
       (optional bool)
-  and log_received_blocks =
-    flag "log-received-blocks"
-      ~doc:"true|false Log blocks received from peers (default: false)"
-      (optional bool)
   and log_transaction_pool_diff =
     flag "log-txn-pool-gossip"
       ~doc:
@@ -313,8 +309,7 @@ let setup_daemon logger =
       [ ("commit", `String Coda_version.commit_id)
       ; ("branch", `String Coda_version.branch)
       ; ("commit_date", `String Coda_version.commit_date)
-      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id) ]
     in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
@@ -647,10 +642,6 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
           ~default:false log_received_snark_pool_diff
       in
-      let log_received_blocks =
-        or_from_config YJ.Util.to_bool_option "log-received-blocks"
-          ~default:false log_received_blocks
-      in
       let log_transaction_pool_diff =
         or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
           ~default:false log_transaction_pool_diff
@@ -662,7 +653,7 @@ let setup_daemon logger =
       let log_gossip_heard =
         { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
-        ; new_state= log_received_blocks }
+        ; new_state= true }
       in
       let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
@@ -844,7 +835,8 @@ let setup_daemon logger =
           ~genesis_state_hash:
             (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
-      trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      trace_database_initialization "epoch ledger" __LOC__
+        epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
         match libp2p_peer_list_file with
         | None ->

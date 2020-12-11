@@ -160,6 +160,13 @@ module Make (Inputs : Inputs_intf) = struct
         (Uuid.to_string_hum parent_uuid)
         suffix
     in
+    let trigger_detach_signal =
+      match grandchildren with
+      | `Check | `Recursive ->
+          true
+      | `I_promise_I_am_reparenting_this_mask ->
+          false
+    in
     ( match grandchildren with
     | `Check -> (
       match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
@@ -203,7 +210,8 @@ module Make (Inputs : Inputs_intf) = struct
             | other_masks ->
                 Uuid.Table.set registered_masks ~key:parent_uuid
                   ~data:other_masks ) ) ;
-        Mask.Attached.unset_parent ~loc mask
+        Mask.Attached.unset_parent ~trigger_signal:trigger_detach_signal ~loc
+          mask
 
   (** a set calls the Base implementation set, notifies registered mask childen *)
   let set t location account =

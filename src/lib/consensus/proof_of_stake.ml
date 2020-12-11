@@ -2600,7 +2600,12 @@ module Hooks = struct
           : (Get_epoch_ledger.query, Get_epoch_ledger.response) rpc
 
     type rpc_handler =
-      | Rpc_handler : ('q, 'r) rpc * ('q, 'r) rpc_fn -> rpc_handler
+      | Rpc_handler :
+          { rpc: ('q, 'r) rpc
+          ; f: ('q, 'r) rpc_fn
+          ; cost: 'q -> int
+          ; budget: int * [`Per of Core.Time.Span.t] }
+          -> rpc_handler
 
     type query =
       { query:
@@ -2616,14 +2621,17 @@ module Hooks = struct
         rpc_handler -> (q, r) rpc -> do_:((q, r) rpc_fn -> 'a) -> 'a option =
      fun handler rpc ~do_ ->
       match (rpc, handler) with
-      | Get_epoch_ledger, Rpc_handler (Get_epoch_ledger, f) ->
+      | Get_epoch_ledger, Rpc_handler {rpc= Get_epoch_ledger; f; _} ->
           Some (do_ f)
 
     let rpc_handlers ~logger ~local_state ~genesis_ledger_hash =
       [ Rpc_handler
-          ( Get_epoch_ledger
-          , Get_epoch_ledger.implementation ~logger ~local_state
-              ~genesis_ledger_hash ) ]
+          { rpc= Get_epoch_ledger
+          ; f=
+              Get_epoch_ledger.implementation ~logger ~local_state
+                ~genesis_ledger_hash
+          ; cost= (fun _ -> 1)
+          ; budget= (2, `Per Core.Time.Span.minute) } ]
   end
 
   let is_genesis_epoch ~(constants : Constants.t) time =
@@ -2681,12 +2689,15 @@ module Hooks = struct
       Epoch.equal epoch
         (Epoch.succ (Consensus_state.curr_epoch consensus_state))
     in
-    (* has the first transition in the epoch reached finalization? *)
-    let epoch_is_finalized =
-      consensus_state.next_epoch_data.epoch_length > constants.k
+    (* has the first transition in the epoch (other than the genesis epoch) reached finalization? *)
+    let epoch_is_not_finalized =
+      let is_genesis_epoch = Length.equal epoch Length.zero in
+      let epoch_is_finalized =
+        consensus_state.next_epoch_data.epoch_length > constants.k
+      in
+      (not epoch_is_finalized) && not is_genesis_epoch
     in
-    let is_genesis_epoch = Length.equal epoch Length.zero in
-    if in_next_epoch || ((not epoch_is_finalized) && not is_genesis_epoch) then
+    if in_next_epoch || epoch_is_not_finalized then
       (`Curr, !local_state.Data.next_epoch_snapshot)
     else (`Last, !local_state.staking_epoch_snapshot)
 
@@ -3005,13 +3016,16 @@ module Hooks = struct
             Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger
           in
           [%log debug]
-            !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-            (epoch_snapshot_name source)
-            snapshot_ledger_hash ;
-          (*These are computed using different values but are supposed to be equal*)
-          assert (
+            ~metadata:
+              [ ( "ledger_hash"
+                , Coda_base.Frozen_ledger_hash.to_yojson snapshot_ledger_hash
+                ) ]
+            !"Using %s_epoch_snapshot root hash $ledger_hash"
+            (epoch_snapshot_name source) ;
+          (*TODO: uncomment after #6956 is resolved*)
+          (*assert (
             Coda_base.Frozen_ledger_hash.equal snapshot_ledger_hash
-              epoch_data.ledger.hash ) ;
+              epoch_data.ledger.hash ) ;*)
           snapshot
         in
         let block_data unseen_pks slot =
