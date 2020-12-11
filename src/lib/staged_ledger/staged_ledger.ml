@@ -1024,14 +1024,12 @@ module T = struct
   module Resources = struct
     module Discarded = struct
       type t =
-        { commands_rev: User_command.Valid.t With_status.t Sequence.t
+        { commands: User_command.Valid.t With_status.t Sequence.t
         ; completed_work: Transaction_snark_work.Checked.t Sequence.t }
       [@@deriving sexp_of]
 
       let add_user_command t uc =
-        { t with
-          commands_rev= Sequence.append t.commands_rev (Sequence.singleton uc)
-        }
+        {t with commands= Sequence.append (Sequence.singleton uc) t.commands}
 
       let add_completed_work t cw =
         { t with
@@ -1220,7 +1218,7 @@ module T = struct
         |> Or_error.join
       in
       let discarded =
-        {Discarded.completed_work= Sequence.empty; commands_rev= Sequence.empty}
+        {Discarded.completed_work= Sequence.empty; commands= Sequence.empty}
       in
       { max_space= slots
       ; max_jobs= job_count
@@ -1592,8 +1590,8 @@ module T = struct
       Sequence.length res.commands_rev = 0
     in
     let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
-      one_prediff ~constraint_constants work res.discarded.commands_rev
-        ~receiver partition ~add_coinbase logger ~is_coinbase_reciever_new
+      one_prediff ~constraint_constants work res.discarded.commands ~receiver
+        partition ~add_coinbase logger ~is_coinbase_reciever_new
         ~supercharge_coinbase `Second
     in
     let isEmpty (res : Resources.t) =
