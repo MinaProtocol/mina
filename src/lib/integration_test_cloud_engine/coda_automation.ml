@@ -105,6 +105,7 @@ module Network_config = struct
                   { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                       t.initial_minimum_balance
                   ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
                   ; vesting_period= t.vesting_period
                   ; vesting_increment= t.vesting_increment }
           in
@@ -344,17 +345,19 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id =
+    let cons_node pod_id port =
       { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
-      ; pod_id }
+      ; Kubernetes_network.Node.pod_id
+      ; Kubernetes_network.Node.node_graphql_port= port }
     in
+    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
-          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
+          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
+      )
     in
-    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
       { logger
       ; cluster= network_config.cluster_id

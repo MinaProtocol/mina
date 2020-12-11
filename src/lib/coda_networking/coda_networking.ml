@@ -337,7 +337,9 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.t
+        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
+        type query =
+          (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
         [@@deriving sexp, to_yojson]
 
         type response =
@@ -362,7 +364,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
+        type query =
+          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -526,6 +531,7 @@ module Rpcs = struct
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+            ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -535,7 +541,10 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
                   [@to_yojson yojson_of_ban_statuses]
-            ; k_block_hashes: State_hash.Stable.V1.t list }
+            ; k_block_hashes_and_timestamps:
+                (State_hash.Stable.V1.t * string) list
+            ; git_commit: string
+            ; uptime: string }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id
@@ -626,7 +635,12 @@ module Rpcs = struct
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
-    | Rpc_handler : ('q, 'r) rpc * ('q, 'r) Rpc_intf.rpc_fn -> rpc_handler
+    | Rpc_handler :
+        { rpc: ('q, 'r) rpc
+        ; f: ('q, 'r) Rpc_intf.rpc_fn
+        ; cost: 'q -> int
+        ; budget: int * [`Per of Time.Span.t] }
+        -> rpc_handler
 
   let implementation_of_rpc : type q r.
       (q, r) rpc -> (q, r) Rpc_intf.rpc_implementation = function
@@ -656,29 +670,29 @@ module Rpcs = struct
       -> (q, r) rpc
       -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
       -> 'a option =
-   fun handler rpc ~do_ ->
-    match (rpc, handler) with
-    | Get_some_initial_peers, Rpc_handler (Get_some_initial_peers, f) ->
+   fun (Rpc_handler {rpc= impl_rpc; f; cost; budget}) rpc ~do_ ->
+    match (rpc, impl_rpc) with
+    | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
     | ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
-      , Rpc_handler (Get_staged_ledger_aux_and_pending_coinbases_at_hash, f) )
-      ->
+      , Get_staged_ledger_aux_and_pending_coinbases_at_hash ) ->
         Some (do_ f)
-    | Answer_sync_ledger_query, Rpc_handler (Answer_sync_ledger_query, f) ->
+    | Answer_sync_ledger_query, Answer_sync_ledger_query ->
         Some (do_ f)
-    | Get_transition_chain, Rpc_handler (Get_transition_chain, f) ->
+    | Get_transition_chain, Get_transition_chain ->
         Some (do_ f)
-    | Get_transition_chain_proof, Rpc_handler (Get_transition_chain_proof, f)
-      ->
+    | Get_transition_chain_proof, Get_transition_chain_proof ->
         Some (do_ f)
-    | Get_ancestry, Rpc_handler (Get_ancestry, f) ->
+    | Get_ancestry, Get_ancestry ->
         Some (do_ f)
-    | Ban_notify, Rpc_handler (Ban_notify, f) ->
+    | Ban_notify, Ban_notify ->
         Some (do_ f)
-    | Get_best_tip, Rpc_handler (Get_best_tip, f) ->
+    | Get_best_tip, Get_best_tip ->
         Some (do_ f)
-    | Consensus_rpc rpc_a, Rpc_handler (Consensus_rpc rpc_b, f) ->
-        Consensus.Hooks.Rpcs.match_handler (Rpc_handler (rpc_b, f)) rpc_a ~do_
+    | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
+        Consensus.Hooks.Rpcs.match_handler
+          (Rpc_handler {rpc= rpc_b; f; cost; budget})
+          rpc_a ~do_
     (* TODO: Why is there a catch-all here? *)
     | _ ->
         None
@@ -1019,25 +1033,63 @@ let create (config : Config.t)
   in
   let rpc_handlers =
     let open Rpcs in
-    [ Rpc_handler (Get_some_initial_peers, get_some_initial_peers_rpc)
+    let open Time.Span in
+    let unit _ = 1 in
+    [ Rpc_handler
+        { rpc= Get_some_initial_peers
+        ; f= get_some_initial_peers_rpc
+        ; budget= (1, `Per minute)
+        ; cost= unit }
     ; Rpc_handler
-        ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
-        , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
-    ; Rpc_handler (Answer_sync_ledger_query, answer_sync_ledger_query_rpc)
-    ; Rpc_handler (Get_best_tip, get_best_tip_rpc)
-    ; Rpc_handler (Get_telemetry_data, get_telemetry_data_rpc)
-    ; Rpc_handler (Get_ancestry, get_ancestry_rpc)
-    ; Rpc_handler (Get_transition_chain, get_transition_chain_rpc)
-    ; Rpc_handler (Get_transition_chain_proof, get_transition_chain_proof_rpc)
-    ; Rpc_handler (Ban_notify, ban_notify_rpc) ]
+        { rpc= Get_staged_ledger_aux_and_pending_coinbases_at_hash
+        ; f= get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc
+        ; budget= (4, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Answer_sync_ledger_query
+        ; f= answer_sync_ledger_query_rpc
+        ; budget=
+            (Int.pow 2 17, `Per minute)
+            (* Not that confident about this one. *)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_best_tip
+        ; f= get_best_tip_rpc
+        ; budget= (3, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_telemetry_data
+        ; f= get_telemetry_data_rpc
+        ; budget= (12, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_ancestry
+        ; f= get_ancestry_rpc
+        ; budget= (5, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_transition_chain
+        ; f= get_transition_chain_rpc
+        ; budget= (1, `Per second) (* Not that confident about this one. *)
+        ; cost= (fun x -> Int.max 1 (List.length x)) }
+    ; Rpc_handler
+        { rpc= Get_transition_chain_proof
+        ; f= get_transition_chain_proof_rpc
+        ; budget= (3, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Ban_notify
+        ; f= ban_notify_rpc
+        ; budget= (1, `Per minute)
+        ; cost= unit } ]
     @ Consensus.Hooks.Rpcs.(
         List.map
           (rpc_handlers ~logger:config.logger
              ~local_state:config.consensus_local_state
              ~genesis_ledger_hash:
                (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash))
-          ~f:(fun (Rpc_handler (rpc, f)) ->
-            Rpcs.(Rpc_handler (Consensus_rpc rpc, f)) ))
+          ~f:(fun (Rpc_handler {rpc; f; cost; budget}) ->
+            Rpcs.(Rpc_handler {rpc= Consensus_rpc rpc; f; cost; budget}) ))
   in
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
@@ -1125,10 +1177,11 @@ let create (config : Config.t)
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              [%str_log debug]
-                (Snark_work_received
-                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
-                   ; sender= Envelope.Incoming.sender envelope }) ;
+              Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
+                ~f:(fun work ->
+                  [%str_log debug]
+                    (Snark_work_received
+                       {work; sender= Envelope.Incoming.sender envelope}) ) ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
@@ -1211,7 +1264,9 @@ let broadcast_snark_pool_diff t diff =
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
     ~log_msg:
       (Gossip_snark_pool_diff
-         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
+         { work=
+             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+         })
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =
@@ -1313,7 +1368,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
     try_non_preferred_peers t input peers ~rpc
   in
   match%bind query_peer t peer_id rpc input with
-  | Connected {data= Ok (Some response); sender} ->
+  | Connected {data= Ok (Some response); sender; _} ->
       let%bind () =
         match sender with
         | Local ->
@@ -1326,7 +1381,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   , Some ("Preferred peer returned valid response", []) ))
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
-  | Connected {data= Ok None; sender} ->
+  | Connected {data= Ok None; sender; _} ->
       let%bind () =
         match sender with
         | Remote peer ->
@@ -1340,7 +1395,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             return ()
       in
       retry ()
-  | Connected {data= Error e; sender} ->
+  | Connected {data= Error e; sender; _} ->
       (* FIXME #4094: determine if more specific actions apply here *)
       let%bind () =
         match sender with
@@ -1398,7 +1453,7 @@ let glue_sync_ledger :
           match%map
             query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
           with
-          | Connected {data= Ok (Ok answer); sender} ->
+          | Connected {data= Ok (Ok answer); sender; _} ->
               [%log' trace t.logger]
                 !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                   %{sexp: Ledger_hash.t}"
