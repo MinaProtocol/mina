@@ -145,6 +145,8 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
+          ; max_connections= 50
+          ; validation_queue_size= 150
           ; keypair= None }
       in
       let net_config =
