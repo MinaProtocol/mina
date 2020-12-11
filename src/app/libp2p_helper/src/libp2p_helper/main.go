@@ -999,8 +999,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			Upcall: "peerConnected",
 		})
 
-		// go app.checkBandwidth(id)
-		// go app.checkLatency(id)
+		go app.checkBandwidth(id)
+		go app.checkLatency(id)
 	}
 
 	return "beginAdvertising success", nil
