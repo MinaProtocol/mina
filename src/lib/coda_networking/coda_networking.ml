@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Network_peer
@@ -1370,11 +1370,11 @@ let get_ancestry t inet_addr input =
 
 let glue_sync_ledger :
        t
-    -> (Coda_base.Ledger_hash.t * Coda_base.Sync_ledger.Query.t)
+    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
-    -> ( Coda_base.Ledger_hash.t
-       * Coda_base.Sync_ledger.Query.t
-       * Coda_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+    -> ( Mina_base.Ledger_hash.t
+       * Mina_base.Sync_ledger.Query.t
+       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t query_reader response_writer ->

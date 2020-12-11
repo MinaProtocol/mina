@@ -2,6 +2,6 @@
  (name transaction_status)
  (public_name transaction_status)
  (inline_tests)
- (libraries core_kernel coda_base transition_frontier network_pool)
+ (libraries core_kernel mina_base transition_frontier network_pool)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version)))

@@ -3,7 +3,7 @@ open Coda_numbers
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 
 module type Constants = sig
   [%%versioned:
@@ -223,8 +223,8 @@ module type State_hooks = sig
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
-    -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-    -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
+    -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -237,7 +237,7 @@ module type State_hooks = sig
   val next_state_checked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> prev_state:protocol_state_var
-    -> prev_state_hash:Coda_base.State_hash.var
+    -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
     -> ( [`Success of Snark_params.Tick.Boolean.var]
@@ -254,9 +254,9 @@ module type State_hooks = sig
       -> constants:Constants.t
       -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:( protocol_state
-                                     , Coda_base.State_hash.t )
+                                     , Mina_base.State_hash.t )
                                      With_hash.t
-          -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+          -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> consensus_state)
          Quickcheck.Generator.t
   end
@@ -298,7 +298,7 @@ module type S = sig
 
   module Genesis_epoch_data : sig
     module Data : sig
-      type t = {ledger: Coda_base.Ledger.t Lazy.t; seed: Coda_base.Epoch_seed.t}
+      type t = {ledger: Mina_base.Ledger.t Lazy.t; seed: Mina_base.Epoch_seed.t}
     end
 
     type tt = {staking: Data.t; next: Data.t option}
@@ -315,12 +315,12 @@ module type S = sig
       module Snapshot : sig
         module Ledger_snapshot : sig
           type t =
-            | Genesis_epoch_ledger of Coda_base.Ledger.t
-            | Ledger_db of Coda_base.Ledger.Db.t
+            | Genesis_epoch_ledger of Mina_base.Ledger.t
+            | Ledger_db of Mina_base.Ledger.Db.t
 
           val close : t -> unit
 
-          val merkle_root : t -> Coda_base.Ledger_hash.t
+          val merkle_root : t -> Mina_base.Ledger_hash.t
         end
       end
 
@@ -340,12 +340,12 @@ module type S = sig
 
       val current_epoch_delegatee_table :
            local_state:t
-        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+        -> Mina_base.Account.t Mina_base.Account.Index.Table.t
            Public_key.Compressed.Table.t
 
       val last_epoch_delegatee_table :
            local_state:t
-        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+        -> Mina_base.Account.t Mina_base.Account.Index.Table.t
            Public_key.Compressed.Table.t
            option
 
@@ -377,13 +377,13 @@ module type S = sig
 
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> genesis_epoch_ledger:Coda_base.Ledger.t Lazy.t
+        -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
         -> Snark_params.Tick.Handler.t
 
       val handler :
            t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
+        -> pending_coinbase:Mina_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
 
       val ledger_depth : t -> int
@@ -464,7 +464,7 @@ module type S = sig
         -> Value.t
 
       val create_genesis_from_transition :
-           negative_one_protocol_state_hash:Coda_base.State_hash.t
+           negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
@@ -473,7 +473,7 @@ module type S = sig
         -> Value.t
 
       val create_genesis :
-           negative_one_protocol_state_hash:Coda_base.State_hash.t
+           negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -501,13 +501,13 @@ module type S = sig
 
       val total_currency_var : var -> Amount.Checked.t
 
-      val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
+      val staking_epoch_data_var : var -> Mina_base.Epoch_data.var
 
-      val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+      val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-      val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+      val next_epoch_data_var : var -> Mina_base.Epoch_data.var
 
-      val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+      val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
@@ -524,7 +524,7 @@ module type S = sig
     module Block_data : sig
       type t
 
-      val epoch_ledger : t -> Coda_base.Sparse_ledger.t
+      val epoch_ledger : t -> Mina_base.Sparse_ledger.t
 
       val global_slot : t -> Coda_numbers.Global_slot.t
 
@@ -547,7 +547,7 @@ module type S = sig
       type query =
         { query:
             'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
+            -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -608,8 +608,8 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Coda_base.Ledger.Db.t
-      -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
+      -> snarked_ledger:Mina_base.Ledger.Db.t
+      -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
       -> unit
 
     (**

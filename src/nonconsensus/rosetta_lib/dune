@@ -3,7 +3,7 @@
  (public_name rosetta_lib_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel caqti rosetta_models coda_base_nonconsensus currency_nonconsensus
+ (libraries core_kernel caqti rosetta_models mina_base_nonconsensus currency_nonconsensus
             snark_params_nonconsensus signature_lib_nonconsensus unsigned_extended_nonconsensus)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

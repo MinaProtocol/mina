@@ -246,11 +246,11 @@ module Node = struct
       ~metadata:
         [ ("namespace", `String t.namespace)
         ; ("pod_id", `String t.pod_id)
-        ; ("account_id", Coda_base.Account_id.to_yojson account_id) ] ;
+        ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     let graphql_port = 3085 in
     Deferred.don't_wait_for (set_port_forwarding_exn ~logger t graphql_port) ;
-    let pk = Coda_base.Account_id.public_key account_id in
-    let token = Coda_base.Account_id.token_id account_id in
+    let pk = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
     let get_balance () =
       let get_balance_obj =
         Graphql.Get_balance.make
@@ -266,7 +266,7 @@ module Node = struct
       | None ->
           Malleable_error.of_string_hard_error
             (sprintf
-               !"Account with %{sexp:Coda_base.Account_id.t} not found"
+               !"Account with %{sexp:Mina_base.Account_id.t} not found"
                account_id)
       | Some acc ->
           Malleable_error.return (acc#balance)#total

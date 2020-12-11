@@ -3,7 +3,7 @@ open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signature_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Frontier_base
 open Deferred.Let_syntax

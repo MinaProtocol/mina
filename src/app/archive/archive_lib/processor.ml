@@ -4,7 +4,7 @@ module Archive_rpc = Rpc
 open Async
 open Core
 open Caqti_async
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Pipe_lib
@@ -126,13 +126,13 @@ module Epoch_data = struct
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
-      (t : Coda_base.Epoch_data.Value.t) =
+      (t : Mina_base.Epoch_data.Value.t) =
     let open Deferred.Result.Let_syntax in
-    let Coda_base.Epoch_ledger.Poly.{hash; _} =
-      Coda_base.Epoch_data.Poly.ledger t
+    let Mina_base.Epoch_ledger.Poly.{hash; _} =
+      Mina_base.Epoch_data.Poly.ledger t
     in
     let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
-    let seed = Coda_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
+    let seed = Mina_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -319,12 +319,12 @@ module User_command = struct
       user_command_id
   end
 
-  let as_signed_command (t : User_command.t) : Coda_base.Signed_command.t =
+  let as_signed_command (t : User_command.t) : Mina_base.Signed_command.t =
     match t with
     | Signed_command c ->
         c
     | Snapp_command c ->
-        let module S = Coda_base.Snapp_command in
+        let module S = Mina_base.Snapp_command in
         let ({source; receiver; amount} : S.transfer) = S.as_transfer c in
         let fee_payer = S.fee_payer c in
         { signature= Signature.dummy
@@ -651,10 +651,10 @@ module Block = struct
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->
             function
-            | { Coda_base.With_status.status
-              ; data= Coda_base.Transaction.Command command } ->
+            | { Mina_base.With_status.status
+              ; data=  Mina_base.Transaction.Command command } ->
                 let user_command =
-                  {Coda_base.With_status.status; data= command}
+                  {Mina_base.With_status.status; data= command}
                 in
                 let%bind id =
                   User_command.add_with_status
@@ -670,7 +670,7 @@ module Block = struct
                 sequence_no + 1
             | {data= Fee_transfer fee_transfer_bundled; status= _} ->
                 let fee_transfers =
-                  Coda_base.Fee_transfer.to_numbered_list fee_transfer_bundled
+                  Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
                 let%bind fee_transfer_ids =
                   deferred_result_list_fold fee_transfers ~init:[]
@@ -694,12 +694,12 @@ module Block = struct
                 sequence_no + 1
             | {data= Coinbase coinbase; status= _} ->
                 let%bind () =
-                  match Coda_base.Coinbase.fee_transfer coinbase with
+                  match Mina_base.Coinbase.fee_transfer coinbase with
                   | None ->
                       return ()
                   | Some {receiver_pk; fee} ->
                       let fee_transfer =
-                        Coda_base.Fee_transfer.Single.create ~receiver_pk ~fee
+                        Mina_base.Fee_transfer.Single.create ~receiver_pk ~fee
                           ~fee_token:Token_id.default
                       in
                       let%bind id =

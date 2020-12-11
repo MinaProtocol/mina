@@ -48,7 +48,7 @@ for pkg in async_kernel graphql_ppx ocaml-extlib rpc_parallel ; do
 done
 
 # not submodules
-for pkg in ocaml-sodium coda_base58 ; do
+for pkg in ocaml-sodium mina_base58 ; do
     CURRENT_COMMIT=$(git log --format=oneline -n 1 src/external/$pkg | awk '{print $1}')
     DOCKER_COMMIT=$(cat ~opam/opam-repository/$pkg.commit)
     if [ $CURRENT_COMMIT != $DOCKER_COMMIT ] ; then

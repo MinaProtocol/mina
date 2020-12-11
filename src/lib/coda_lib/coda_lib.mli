@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Pipe_lib
@@ -40,10 +40,10 @@ val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
-  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+  t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
 val last_epoch_delegators :
-  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+  t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t

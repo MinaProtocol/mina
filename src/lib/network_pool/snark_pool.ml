@@ -278,7 +278,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
           Coda_metrics.(
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-              ( fee.Coda_base.Fee_with_prover.fee |> Currency.Fee.to_int
+              ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
           `Added )
         else
@@ -315,7 +315,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let message = Coda_base.Sok_message.create ~fee ~prover in
+        let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
           let%bind statement_check =
@@ -511,7 +511,7 @@ end
 
 let%test_module "random set test" =
   ( module struct
-    open Coda_base
+    open Mina_base
 
     let trust_system = Mocks.trust_system
 

@@ -2,7 +2,7 @@
  (name genesis_proof)
  (public_name coda_genesis_proof)
  (libraries
-   coda_base
+   mina_base
    coda_state
    blockchain_snark
    genesis_constants

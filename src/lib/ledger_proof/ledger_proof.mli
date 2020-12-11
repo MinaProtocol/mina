@@ -6,7 +6,7 @@ module Prod : S with type t = Transaction_snark.t
 
 module Debug :
   S
-  with type t = Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.t
+  with type t = Transaction_snark.Statement.t * Mina_base.Sok_message.Digest.t
 
 [%%if proof_level = "full"]
 

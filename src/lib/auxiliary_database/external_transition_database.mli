@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 include
   Intf.External_transition

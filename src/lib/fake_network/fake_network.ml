@@ -1,6 +1,6 @@
 open Async
 open Core
-open Coda_base
+open Mina_base
 open Gadt_lib
 open Signature_lib
 open Network_peer

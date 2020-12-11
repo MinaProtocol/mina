@@ -61,7 +61,7 @@ opam pin add src/external/ocaml-extlib
 sudo chmod -R u+rw ~/.opam
 
 opam pin add src/external/async_kernel
-opam pin add src/external/coda_base58
+opam pin add src/external/mina_base58
 opam pin add src/external/graphql_ppx
 eval $(opam config env)
 
