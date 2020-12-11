@@ -40,7 +40,9 @@ external endo_scalar :
   unit -> Marlin_plonk_bindings_tweedle_fp.t
   = "caml_tweedle_dee_endo_scalar"
 
-external affine_deep_copy : Affine.t -> Affine.t = "caml_tweedle_dee_affine_deep_copy"
+external affine_deep_copy :
+  Affine.t -> Affine.t
+  = "caml_tweedle_dee_affine_deep_copy"
 
 let%test "affine deep_copy" =
   let x = random () |> to_affine in
