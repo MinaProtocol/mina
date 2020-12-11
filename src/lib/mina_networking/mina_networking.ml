@@ -711,15 +711,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
       ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }

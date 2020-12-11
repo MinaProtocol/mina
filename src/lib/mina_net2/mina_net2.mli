@@ -14,28 +14,28 @@ this module/the helper, and not misuse.
 Some errors can arise from calling certain functions before [configure] has been
 called. In general, anything that returns an [Or_error] can fail in this manner.
 
-A [Coda_net2.t] has the following lifecycle:
+A [Mina_net2.t] has the following lifecycle:
 
-- Fresh: the result of [Coda_net2.create]. This spawns the helper process but
+- Fresh: the result of [Mina_net2.create]. This spawns the helper process but
   does not connect to any network. Few operations can be done on fresh nets,
   only [Keypair.random] for now.
 
-- Configured: after calling [Coda_net2.configure]. Configure creates the libp2p
+- Configured: after calling [Mina_net2.configure]. Configure creates the libp2p
   objects and can start listening on network sockets. This doesn't join any DHT
   or attempt peer connections. Configured networks can do everything but any
   pubsub messages may have very limited reach without being in the DHT.
 
-- Active: after calling [Coda_net2.begin_advertising]. This joins the DHT,
+- Active: after calling [Mina_net2.begin_advertising]. This joins the DHT,
   announcing our existence to our peers and initiating local mDNS discovery.
 
-- Closed: after calling [Coda_net2.shutdown]. This flushes all the pending RPC
+- Closed: after calling [Mina_net2.shutdown]. This flushes all the pending RPC
 
 TODO: consider encoding the network state in the types.
 
 A note about connection limits:
 
 In the original coda_net, connection limits were enforced synchronously on
-every received connection. Right now with coda_net2, connection management is
+every received connection. Right now with mina_net2, connection management is
 asynchronous and post-hoc. In the background, once per minute it checks the
 connection count. If it is above the "high water mark", it will close
 ("trim") eligible connections until it reaches the "low water mark". All

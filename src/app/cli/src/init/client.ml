@@ -1408,18 +1408,18 @@ let generate_libp2p_keypair =
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
-            Coda_net2.create ~logger ~conf_dir:tmpd
+            Mina_net2.create ~logger ~conf_dir:tmpd
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
           | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%bind () = Coda_net2.shutdown net in
+              let%bind me = Mina_net2.Keypair.random net in
+              let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
                   me
               in
-              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", Error_json.error_to_yojson e)] ;
@@ -1513,8 +1513,8 @@ let add_peers_graphql =
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
                match
-                 Coda_net2.Multiaddr.of_string peer
-                 |> Coda_net2.Multiaddr.to_peer
+                 Mina_net2.Multiaddr.of_string peer
+                 |> Mina_net2.Multiaddr.to_peer
                  |> Option.map ~f:Network_peer.Peer.to_display
                with
                | Some peer ->

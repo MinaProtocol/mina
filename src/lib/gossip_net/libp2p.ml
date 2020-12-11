@@ -21,7 +21,7 @@ end
 module Config = struct
   type t =
     { timeout: Time.Span.t
-    ; initial_peers: Coda_net2.Multiaddr.t list
+    ; initial_peers: Mina_net2.Multiaddr.t list
     ; addrs_and_ports: Node_addrs_and_ports.t
     ; metrics_port: string option
     ; conf_dir: string
@@ -31,9 +31,9 @@ module Config = struct
     ; isolate: bool
     ; trust_system: Trust_system.t
     ; flooding: bool
-    ; direct_peers: Coda_net2.Multiaddr.t list
+    ; direct_peers: Mina_net2.Multiaddr.t list
     ; peer_exchange: bool
-    ; mutable keypair: Coda_net2.Keypair.t option }
+    ; mutable keypair: Mina_net2.Keypair.t option }
   [@@deriving make]
 end
 
@@ -52,15 +52,15 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   module T = struct
     type t =
       { config: Config.t
-      ; net2: Coda_net2.net Deferred.t ref
+      ; net2: Mina_net2.net Deferred.t ref
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
-          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
+          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; subscription:
-          Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
+          Message.msg Mina_net2.Pubsub.Subscription.t Deferred.t ref }
 
     let create_rpc_implementations (Rpc_handler (rpc, handler)) =
       let (module Impl) = implementation_of_rpc rpc in
@@ -68,7 +68,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let prepare_stream_transport stream =
       (* Closing the connection calls close_read on the read
-          pipe, which coda_net2 does not expect. To avoid this, add
+          pipe, which mina_net2 does not expect. To avoid this, add
           an extra pipe and don't propagate the close. We still want
           to close the connection because it flushes all the internal
           state machines and fills the `closed` ivar.
@@ -77,7 +77,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           real_r when read_w is closed, precisely what we don't want.
           *)
       let read_r, read_w = Pipe.create () in
-      let underlying_r, underlying_w = Coda_net2.Stream.pipes stream in
+      let underlying_r, underlying_w = Mina_net2.Stream.pipes stream in
       don't_wait_for
         (Pipe.iter underlying_r ~f:(fun msg ->
              Pipe.write_without_pushback_if_open read_w msg ;
@@ -98,16 +98,16 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
       in
-      let conf_dir = config.conf_dir ^/ "coda_net2" in
+      let conf_dir = config.conf_dir ^/ "mina_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
         Monitor.try_with ~rest:`Raise (fun () ->
-            trace "coda_net2" (fun () ->
-                Coda_net2.create ~logger:config.logger ~conf_dir
+            trace "mina_net2" (fun () ->
+                Mina_net2.create ~logger:config.logger ~conf_dir
                   ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
-          let open Coda_net2 in
+          let open Mina_net2 in
           (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
           let%bind me =
             match config.keypair with
@@ -140,7 +140,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
           in
           let initial_peers =
-            List.dedup_and_sort ~compare:Coda_net2.Multiaddr.compare
+            List.dedup_and_sort ~compare:Mina_net2.Multiaddr.compare
               (List.rev_append config.initial_peers !peers_snapshot)
           in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
@@ -166,7 +166,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~seed_peers:initial_peers ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange ~flooding:config.flooding
                 ~initial_gating_config:
-                  Coda_net2.
+                  Mina_net2.
                     { banned_peers=
                         Trust_system.peer_statuses config.trust_system
                         |> List.filter_map ~f:(fun (peer, status) ->
@@ -176,7 +176,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                                | _ ->
                                    None )
                     ; trusted_peers=
-                        List.filter_map ~f:Coda_net2.Multiaddr.to_peer
+                        List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
                     ; isolate= config.isolate }
                 ~on_peer_connected:(fun _ ->
@@ -192,7 +192,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                            peers_snapshot :=
                              List.map peers
                                ~f:
-                                 (Fn.compose Coda_net2.Multiaddr.of_string
+                                 (Fn.compose Mina_net2.Multiaddr.of_string
                                     Peer.to_multiaddr_string) ;
                            Coda_metrics.(
                              Gauge.set Network.peers
@@ -224,9 +224,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             in
             (* We could keep this around to close just this listener if we wanted. We don't. *)
             let%bind _rpc_handler =
-              Coda_net2.handle_protocol net2 ~on_handler_error:`Raise
+              Mina_net2.handle_protocol net2 ~on_handler_error:`Raise
                 ~protocol:rpc_transport_proto (fun stream ->
-                  let peer = Coda_net2.Stream.remote_peer stream in
+                  let peer = Mina_net2.Stream.remote_peer stream in
                   let transport = prepare_stream_transport stream in
                   let open Deferred.Let_syntax in
                   match%bind
@@ -241,7 +241,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       let%bind () =
                         Async_rpc_kernel.Rpc.Transport.close transport
                       in
-                      don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
+                      don't_wait_for (Mina_net2.Stream.reset stream >>| ignore) ;
                       Trust_system.(
                         record config.trust_system config.logger peer
                           Actions.
@@ -261,7 +261,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                           ~reason:(Info.of_string "connection completed")
                           rpc_connection
                       in
-                      match%map Coda_net2.Stream.reset stream with
+                      match%map Mina_net2.Stream.reset stream with
                       | Error e ->
                           [%log' warn config.logger]
                             "failed to reset stream (this means it was \
@@ -277,7 +277,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   Synchronous)
             in
             let%bind subscription =
-              Coda_net2.Pubsub.subscribe_encode net2
+              Mina_net2.Pubsub.subscribe_encode net2
                 "coda/consensus-messages/0.0.1"
                 (* Fix for #4097: validation is tied into a lot of complex control flow.
                    Instead of refactoring it to have validation up-front and decoupled,
@@ -287,7 +287,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Coda_net2.Validation_callback.fire_exn
+                      Mina_net2.Validation_callback.fire_exn
                         validation_callback `Accept ;
                       Deferred.unit
                   | Remote sender ->
@@ -295,7 +295,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                         Strict_pipe.Writer.write message_writer
                           (envelope, validation_callback)
                       else (
-                        Coda_net2.Validation_callback.fire_exn
+                        Mina_net2.Validation_callback.fire_exn
                           validation_callback `Accept ;
                         Deferred.unit ) )
                 ~bin_prot:Message.Latest.T.bin_msg
@@ -322,7 +322,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             (* #4097 fix: drain the published message pipe, which we don't care about. *)
             don't_wait_for
               (Strict_pipe.Reader.iter
-                 (Coda_net2.Pubsub.Subscription.message_pipe subscription)
+                 (Mina_net2.Pubsub.Subscription.message_pipe subscription)
                  ~f:(fun _envelope -> Deferred.unit)) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
@@ -349,11 +349,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                          (List.map
                             ~f:(fun x ->
                               let open Deferred.Let_syntax in
-                              Coda_net2.add_peer net2 x >>| ignore )
+                              Mina_net2.add_peer net2 x >>| ignore )
                             initial_peers))
                       ~f:(fun () -> Ok ())
                   in
-                  let%bind () = Coda_net2.begin_advertising net2 in
+                  let%bind () = Mina_net2.begin_advertising net2 in
                   return ())
                  ~f:(function
                    | Ok () ->
@@ -406,7 +406,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                     in
                     upon (after restart_after) (fun () ->
                         don't_wait_for
-                          (let%bind () = Coda_net2.shutdown n in
+                          (let%bind () = Mina_net2.shutdown n in
                            on_unexpected_termination ()) )
                 | None ->
                     () ) ;
@@ -434,7 +434,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ()
       in
       let ban_configuration =
-        ref {Coda_net2.banned_peers= []; trusted_peers= []; isolate= false}
+        ref {Mina_net2.banned_peers= []; trusted_peers= []; isolate= false}
       in
       let do_ban (banned_peer, expiration) =
         don't_wait_for
@@ -446,13 +446,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               banned_peers=
                 List.filter !ban_configuration.banned_peers ~f:(fun p ->
                     not (Peer.equal p banned_peer) ) } ;
-          Coda_net2.set_connection_gating_config net2 !ban_configuration
+          Mina_net2.set_connection_gating_config net2 !ban_configuration
           |> Deferred.ignore ) ;
         (let%bind net2 = !net2_ref in
          ban_configuration :=
            { !ban_configuration with
              banned_peers= banned_peer :: !ban_configuration.banned_peers } ;
-         Coda_net2.set_connection_gating_config net2 !ban_configuration)
+         Mina_net2.set_connection_gating_config net2 !ban_configuration)
         |> Deferred.ignore
       in
       let%map () =
@@ -481,12 +481,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; message_reader
       ; ban_reader }
 
-    let peers t = !(t.net2) >>= Coda_net2.peers
+    let peers t = !(t.net2) >>= Mina_net2.peers
 
     let initial_peers t = t.config.initial_peers
 
     let add_peer t p =
-      let open Coda_net2 in
+      let open Mina_net2 in
       !(t.net2)
       >>= Fn.flip add_peer (Multiaddr.of_string (Peer.to_multiaddr_string p))
 
@@ -626,10 +626,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let query_peer ?timeout t (peer_id : Peer.Id.t) rpc rpc_input =
       let%bind net2 = !(t.net2) in
       match%bind
-        Coda_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
+        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
       with
       | Ok stream ->
-          let peer = Coda_net2.Stream.remote_peer stream in
+          let peer = Mina_net2.Stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
           try_call_rpc ?timeout t peer transport rpc rpc_input
           >>| fun data ->
@@ -647,7 +647,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let broadcast t msg =
       don't_wait_for
         (let%bind subscription = !(t.subscription) in
-         Coda_net2.Pubsub.Subscription.publish subscription msg)
+         Mina_net2.Pubsub.Subscription.publish subscription msg)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
@@ -660,16 +660,16 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let ip_for_peer t peer_id =
       let%bind net2 = !(t.net2) in
-      Coda_net2.lookup_peerid net2 peer_id
+      Mina_net2.lookup_peerid net2 peer_id
       >>| function Ok p -> Some p | Error _ -> None
 
     let connection_gating t =
       let%bind net2 = !(t.net2) in
-      Coda_net2.connection_gating_config net2
+      Mina_net2.connection_gating_config net2
 
     let set_connection_gating t config =
       let%bind net2 = !(t.net2) in
-      Coda_net2.set_connection_gating_config net2 config
+      Mina_net2.set_connection_gating_config net2 config
   end
 
   include T

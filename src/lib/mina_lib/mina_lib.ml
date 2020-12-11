@@ -71,7 +71,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -1115,7 +1115,7 @@ let create ?wallets (config : Config.t) =
                              breadcrumb
                          in
                          let validation_callback =
-                           Coda_net2.Validation_callback
+                           Mina_net2.Validation_callback
                            .create_without_expiration ()
                          in
                          External_transition.Validated.poke_validation_callback
@@ -1123,7 +1123,7 @@ let create ?wallets (config : Config.t) =
                          don't_wait_for
                            (* this will never throw since the callback was created without expiration *)
                            (let%map v =
-                              Coda_net2.Validation_callback.await_exn
+                              Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
                             if v = `Accept then

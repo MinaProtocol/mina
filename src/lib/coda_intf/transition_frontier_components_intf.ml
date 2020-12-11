@@ -321,7 +321,7 @@ module type Initial_validator_intf = sig
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t]
                          * [ `Valid_cb of
-                             Coda_net2.Validation_callback.t -> unit ] )
+                             Mina_net2.Validation_callback.t -> unit ] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -366,7 +366,7 @@ module type Transition_router_intf = sig
                                    ]
                                  * [`Time_received of Block_time.t]
                                  * [ `Valid_cb of
-                                     Coda_net2.Validation_callback.t ] )
+                                     Mina_net2.Validation_callback.t ] )
                                  Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t

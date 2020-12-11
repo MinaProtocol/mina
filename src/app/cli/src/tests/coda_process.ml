@@ -29,7 +29,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
     | Some dir ->
         dir
         ^/ Network_peer.Peer.Id.to_string
-             (Coda_net2.Keypair.to_peer_id libp2p_keypair)
+             (Mina_net2.Keypair.to_peer_id libp2p_keypair)
     | None ->
         Filename.temp_dir_name
         ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])

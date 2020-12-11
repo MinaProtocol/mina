@@ -341,7 +341,7 @@ let setup_daemon logger =
     let%bind libp2p_keypair =
       let libp2p_keypair_old_format =
         Option.bind libp2p_keypair ~f:(fun s ->
-            match Coda_net2.Keypair.of_string s with
+            match Mina_net2.Keypair.of_string s with
             | Ok kp ->
                 Some kp
             | Error _ ->
@@ -849,7 +849,7 @@ let setup_daemon logger =
             | Ok contents ->
                 String.split ~on:'\n' contents
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
-                |> List.map ~f:Coda_net2.Multiaddr.of_string
+                |> List.map ~f:Mina_net2.Multiaddr.of_string
                 |> return
             | Error _ ->
                 Mina_user_error.raisef
@@ -861,16 +861,16 @@ let setup_daemon logger =
       in
       let initial_peers =
         List.concat
-          [ List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+          [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
           ; peer_list_file_contents_or_empty
-          ; List.map ~f:Coda_net2.Multiaddr.of_string
+          ; List.map ~f:Mina_net2.Multiaddr.of_string
             @@ or_from_config
                  (Fn.compose Option.some
                     (YJ.Util.convert_each YJ.Util.to_string))
                  "peers" None ~default:[] ]
       in
       let direct_peers =
-        List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
+        List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
       in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"

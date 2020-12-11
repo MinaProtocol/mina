@@ -145,7 +145,7 @@ module Go_log = struct
 
   let record_of_yojson (json : Yojson.Safe.t) =
     let open Result.Let_syntax in
-    let prefix = "Coda_net2.Go_log.record_of_yojson: " in
+    let prefix = "Mina_net2.Go_log.record_of_yojson: " in
     match json with
     | `Assoc fields ->
         let set_field field_name prev_value parse json =

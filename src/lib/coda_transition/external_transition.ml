@@ -4,11 +4,11 @@ open Mina_base
 open Mina_state
 
 module Validate_content = struct
-  type t = Coda_net2.Validation_callback.t
+  type t = Mina_net2.Validation_callback.t
 
   let bin_read_t buf ~pos_ref =
     bin_read_unit buf ~pos_ref ;
-    Coda_net2.Validation_callback.create_without_expiration ()
+    Mina_net2.Validation_callback.create_without_expiration ()
 
   let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
@@ -16,7 +16,7 @@ module Validate_content = struct
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Coda_net2.Validation_callback.create_without_expiration ()
+  let t_of_sexp _ = Mina_net2.Validation_callback.create_without_expiration ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -169,10 +169,10 @@ let payments t =
         None )
 
 let broadcast t =
-  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
 
 let don't_broadcast t =
-  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -944,7 +944,7 @@ let genesis ~precomputed_values =
            create ~protocol_state ~protocol_state_proof
              ~staged_ledger_diff:empty_diff
              ~validation_callback:
-               (Coda_net2.Validation_callback.create_without_expiration ())
+               (Mina_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              () ))

@@ -9,10 +9,10 @@ open Init
 module Input = struct
   type t =
     { addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t
-    ; libp2p_keypair: Coda_net2.Keypair.Stable.Latest.t
+    ; libp2p_keypair: Mina_net2.Keypair.Stable.Latest.t
     ; net_configs:
         ( Node_addrs_and_ports.Display.Stable.Latest.t
-        * Coda_net2.Keypair.Stable.Latest.t )
+        * Mina_net2.Keypair.Stable.Latest.t )
         list
         * Node_addrs_and_ports.Display.Stable.Latest.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.Latest.t option
@@ -476,7 +476,7 @@ module T = struct
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; initial_peers= List.map ~f:Mina_net2.Multiaddr.of_string peers
               ; addrs_and_ports=
                   Node_addrs_and_ports.of_display addrs_and_ports
               ; metrics_port= None

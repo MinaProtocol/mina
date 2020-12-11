@@ -110,7 +110,7 @@ let%test_module "network pool test" =
         List.map (List.take works per_reader) ~f:create_work
         |> List.map ~f:(fun work ->
                ( Envelope.Incoming.local work
-               , Coda_net2.Validation_callback.create_without_expiration () )
+               , Mina_net2.Validation_callback.create_without_expiration () )
            )
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff
