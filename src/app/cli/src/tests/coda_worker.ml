@@ -488,6 +488,8 @@ module T = struct
               ; trust_system
               ; flooding= false
               ; direct_peers= []
+              ; max_connections= 50
+              ; validation_queue_size= 150
               ; peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
