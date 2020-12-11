@@ -31,6 +31,7 @@ module Poly : sig
 end
 
 module Value : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
@@ -38,13 +39,9 @@ module Value : sig
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, to_yojson, version]
+      [@@deriving sexp, to_yojson]
     end
-
-    module Latest : module type of V1
-  end
-
-  type t = Stable.Latest.t [@@deriving to_yojson, sexp]
+  end]
 end
 
 type value = Value.t

@@ -38,7 +38,7 @@ val max_rate : float -> float
 
 type Structured_log_events.t +=
   | Peer_banned of
-      { peer: Network_peer.Peer.t
+      { sender_id: Network_peer.Peer.t
       ; expiration: Time.t
       ; action: string }
   [@@deriving register_event]

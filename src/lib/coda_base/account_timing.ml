@@ -31,6 +31,7 @@ module Poly = struct
         | Timed of
             { initial_minimum_balance: 'balance
             ; cliff_time: 'slot
+            ; cliff_amount: 'amount
             ; vesting_period: 'slot
             ; vesting_increment: 'amount }
       [@@deriving sexp, eq, hash, compare, yojson]
@@ -57,6 +58,7 @@ type ('slot, 'balance, 'amount) tt = ('slot, 'balance, 'amount) Poly.t =
   | Timed of
       { initial_minimum_balance: 'balance
       ; cliff_time: 'slot
+      ; cliff_amount: 'amount
       ; vesting_period: 'slot
       ; vesting_increment: 'amount }
 [@@deriving sexp, eq, hash, compare, yojson]
@@ -66,6 +68,7 @@ module As_record = struct
     { is_timed: 'bool
     ; initial_minimum_balance: 'balance
     ; cliff_time: 'slot
+    ; cliff_amount: 'amount
     ; vesting_period: 'slot
     ; vesting_increment: 'amount }
   [@@deriving hlist]
@@ -83,15 +86,20 @@ let to_record t =
         { is_timed= false
         ; initial_minimum_balance= balance_unused
         ; cliff_time= slot_unused
+        ; cliff_amount= amount_unused
         ; vesting_period= slot_one (* avoid division by zero *)
         ; vesting_increment= amount_unused }
   | Timed
-      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-    ->
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment } ->
       As_record.
         { is_timed= true
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment }
 
@@ -100,6 +108,7 @@ let to_bits t =
         { is_timed
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment } =
     to_record t
@@ -107,6 +116,7 @@ let to_bits t =
   is_timed
   :: ( Balance.to_bits initial_minimum_balance
      @ Global_slot.to_bits cliff_time
+     @ Amount.to_bits cliff_amount
      @ Global_slot.to_bits vesting_period
      @ Amount.to_bits vesting_increment )
 
@@ -121,6 +131,7 @@ let var_to_bits
       { is_timed
       ; initial_minimum_balance
       ; cliff_time
+      ; cliff_amount
       ; vesting_period
       ; vesting_increment } =
   let open Bitstring_lib.Bitstring.Lsb_first in
@@ -128,11 +139,12 @@ let var_to_bits
     to_list @@ Balance.var_to_bits initial_minimum_balance
   in
   let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
+  let cliff_amount = to_list @@ Amount.var_to_bits cliff_amount in
   let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
   let vesting_increment = to_list @@ Amount.var_to_bits vesting_increment in
   of_list
     ( is_timed
-    :: ( initial_minimum_balance @ cliff_time @ vesting_period
+    :: ( initial_minimum_balance @ cliff_time @ cliff_amount @ vesting_period
        @ vesting_increment ) )
 
 let var_of_t (t : t) : var =
@@ -140,6 +152,7 @@ let var_of_t (t : t) : var =
         { is_timed
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment } =
     to_record t
@@ -148,6 +161,7 @@ let var_of_t (t : t) : var =
     { is_timed= Boolean.var_of_value is_timed
     ; initial_minimum_balance= Balance.var_of_t initial_minimum_balance
     ; cliff_time= Global_slot.Checked.constant cliff_time
+    ; cliff_amount= Amount.var_of_t cliff_amount
     ; vesting_period= Global_slot.Checked.constant vesting_period
     ; vesting_increment= Amount.var_of_t vesting_increment }
 
@@ -156,7 +170,12 @@ let untimed_var = var_of_t Untimed
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
-    [Boolean.typ; Balance.typ; Global_slot.typ; Global_slot.typ; Amount.typ]
+    [ Boolean.typ
+    ; Balance.typ
+    ; Global_slot.typ
+    ; Amount.typ
+    ; Global_slot.typ
+    ; Amount.typ ]
   in
   (* because we represent the types t (a sum type) and var (a record) differently,
       we can't use the trick, used elsewhere, of polymorphic to_hlist and of_hlist
@@ -167,6 +186,7 @@ let typ : (var, t) Typ.t =
          ,    Boolean.value
            -> Balance.t
            -> Global_slot.t
+           -> Amount.t
            -> Global_slot.t
            -> Amount.t
            -> unit )
@@ -176,12 +196,14 @@ let typ : (var, t) Typ.t =
     fun [ is_timed
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment ] ->
       if is_timed then
         Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment }
       else Untimed
@@ -191,6 +213,7 @@ let typ : (var, t) Typ.t =
           { is_timed
           ; initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } =
       to_record t
@@ -199,6 +222,7 @@ let typ : (var, t) Typ.t =
       [ is_timed
       ; initial_minimum_balance
       ; cliff_time
+      ; cliff_amount
       ; vesting_period
       ; vesting_increment ]
   in
@@ -221,6 +245,9 @@ let if_ b ~(then_ : var) ~(else_ : var) =
   let%bind cliff_time =
     Global_slot.Checked.if_ b ~then_:then_.cliff_time ~else_:else_.cliff_time
   in
+  let%bind cliff_amount =
+    Amount.Checked.if_ b ~then_:then_.cliff_amount ~else_:else_.cliff_amount
+  in
   let%bind vesting_period =
     Global_slot.Checked.if_ b ~then_:then_.vesting_period
       ~else_:else_.vesting_period
@@ -233,6 +260,7 @@ let if_ b ~(then_ : var) ~(else_ : var) =
     { is_timed
     ; initial_minimum_balance
     ; cliff_time
+    ; cliff_amount
     ; vesting_period
     ; vesting_increment }
 

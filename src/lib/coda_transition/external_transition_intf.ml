@@ -32,6 +32,12 @@ module type External_transition_common_intf = sig
 
   val block_producer : t -> Public_key.Compressed.t
 
+  val block_winner : t -> Public_key.Compressed.t
+
+  val coinbase_receiver : t -> Public_key.Compressed.t
+
+  val supercharge_coinbase : t -> bool
+
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> t
@@ -53,8 +59,7 @@ module type External_transition_common_intf = sig
 
   val don't_broadcast : t -> unit
 
-  val poke_validation_callback :
-    t -> (Coda_net2.validation_result -> unit) -> unit
+  val poke_validation_callback : t -> Coda_net2.Validation_callback.t -> unit
 end
 
 module type External_transition_base_intf = sig
@@ -286,7 +291,7 @@ module type S = sig
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-    -> validation_callback:(Coda_net2.validation_result -> unit)
+    -> validation_callback:Coda_net2.Validation_callback.t
     -> ?proposed_protocol_version_opt:Protocol_version.t
     -> unit
     -> t
@@ -299,7 +304,7 @@ module type S = sig
       -> protocol_state_proof:Proof.t
       -> staged_ledger_diff:Staged_ledger_diff.t
       -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-      -> validation_callback:(Coda_net2.validation_result -> unit)
+      -> validation_callback:Coda_net2.Validation_callback.t
       -> ?proposed_protocol_version_opt:Protocol_version.t
       -> unit
       -> t

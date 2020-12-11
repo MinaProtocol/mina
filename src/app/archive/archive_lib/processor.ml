@@ -517,21 +517,37 @@ end
 module Block = struct
   type t =
     { state_hash: string
-    ; parent_id: int
+    ; parent_id: int option
+    ; parent_hash: string
     ; creator_id: int
+    ; block_winner_id: int
     ; snarked_ledger_hash_id: int
     ; staking_epoch_data_id: int
     ; next_epoch_data_id: int
     ; ledger_hash: string
     ; height: int64
     ; global_slot: int64
+    ; global_slot_since_genesis: int64
     ; timestamp: int64 }
   [@@deriving hlist]
 
   let typ =
     let open Caqti_type_spec in
     let spec =
-      Caqti_type.[string; int; int; int; int; int; string; int64; int64; int64]
+      Caqti_type.
+        [ string
+        ; option int
+        ; string
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; string
+        ; int64
+        ; int64
+        ; int64
+        ; int64 ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -552,9 +568,10 @@ module Block = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
-          staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, \
-          global_slot, timestamp FROM blocks WHERE id = ?")
+         "SELECT state_hash, parent_id, parent_hash, creator_id, \
+          block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, \
+          next_epoch_data_id, ledger_hash, height, global_slot, \
+          global_slot_since_genesis, timestamp FROM blocks WHERE id = ?")
       id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
@@ -565,20 +582,19 @@ module Block = struct
         return block_id
     | None ->
         let%bind parent_id =
-          if
-            External_transition.blockchain_length t <> Unsigned.UInt32.of_int 1
-          then
-            find (module Conn) ~state_hash:(External_transition.parent_hash t)
-          else
-            Conn.find
-              (Caqti_request.find Caqti_type.unit Caqti_type.int
-                 "SELECT count(id) + 1 FROM blocks")
-              ()
+          find_opt
+            (module Conn)
+            ~state_hash:(External_transition.parent_hash t)
         in
         let%bind creator_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
             (External_transition.block_producer t)
+        in
+        let%bind block_winner_id =
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (External_transition.block_winner t)
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -601,25 +617,19 @@ module Block = struct
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               ( if
-                 Unsigned.UInt32.equal
-                   (External_transition.blockchain_length t)
-                   Unsigned.UInt32.one
-               then
-                 "INSERT INTO blocks (id, state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  timestamp) VALUES (" ^ string_of_int parent_id
-                 ^ ", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"
-               else
-                 "INSERT INTO blocks (state_hash, parent_id, creator_id, \
-                  snarked_ledger_hash_id, staking_epoch_data_id, \
-                  next_epoch_data_id, ledger_hash, height, global_slot, \
-                  timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \
-                  id" ))
+               {| INSERT INTO blocks (state_hash, parent_id, parent_hash,
+                  creator_id, block_winner_id,
+                  snarked_ledger_hash_id, staking_epoch_data_id,
+                  next_epoch_data_id, ledger_hash, height, global_slot,
+                  global_slot_since_genesis, timestamp)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+               |})
             { state_hash= hash |> State_hash.to_string
             ; parent_id
+            ; parent_hash=
+                External_transition.parent_hash t |> State_hash.to_string
             ; creator_id
+            ; block_winner_id
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
@@ -632,18 +642,12 @@ module Block = struct
                 |> Unsigned.UInt32.to_int64
             ; global_slot=
                 External_transition.global_slot t |> Unsigned.UInt32.to_int64
+            ; global_slot_since_genesis=
+                External_transition.consensus_state t
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
+                |> Unsigned.UInt32.to_int64
             ; timestamp= External_transition.timestamp t |> Block_time.to_int64
             }
-        in
-        let%bind () =
-          if External_transition.blockchain_length t = Unsigned.UInt32.of_int 1
-          then
-            Conn.exec
-              (Caqti_request.exec Caqti_type.unit
-                 ( "ALTER SEQUENCE blocks_id_seq RESTART WITH "
-                 ^ string_of_int (block_id + 1) ))
-              ()
-          else return ()
         in
         let transactions =
           External_transition.transactions ~constraint_constants t
@@ -897,8 +901,12 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
 module For_test = struct
   let assert_parent_exist ~parent_id ~parent_hash conn =
     let open Deferred.Result.Let_syntax in
-    let%map Block.{state_hash= actual; _} = Block.load conn ~id:parent_id in
-    [%test_result: string]
-      ~expect:(parent_hash |> State_hash.to_base58_check)
-      actual
+    match parent_id with
+    | Some id ->
+        let%map Block.{state_hash= actual; _} = Block.load conn ~id in
+        [%test_result: string]
+          ~expect:(parent_hash |> State_hash.to_base58_check)
+          actual
+    | None ->
+        failwith "Failed to find parent block in database"
 end

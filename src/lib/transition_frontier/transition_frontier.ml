@@ -12,6 +12,7 @@ module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
+module Catchup_hash_tree = Catchup_hash_tree
 
 let max_catchup_chunk_length = 20
 
@@ -22,6 +23,7 @@ type t =
   { logger: Logger.t
   ; verifier: Verifier.t
   ; consensus_local_state: Consensus.Data.Local_state.t
+  ; catchup_hash_tree: Catchup_hash_tree.t
   ; full_frontier: Full_frontier.t
   ; persistent_root: Persistent_root.t
   ; persistent_root_instance: Persistent_root.Instance.t
@@ -29,6 +31,8 @@ type t =
   ; persistent_frontier_instance: Persistent_frontier.Instance.t
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
+
+let catchup_hash_tree t = t.catchup_hash_tree
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
@@ -118,6 +122,8 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       )
   in
   { logger
+  ; catchup_hash_tree=
+      Catchup_hash_tree.create ~root:(Full_frontier.root full_frontier)
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -171,9 +177,11 @@ let rec load_with_max_length :
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
   in
-  let reset_and_continue () =
+  let reset_and_continue ?(destroy_frontier_instance = true) () =
     let%bind () =
-      Persistent_frontier.Instance.destroy persistent_frontier_instance
+      if destroy_frontier_instance then
+        Persistent_frontier.Instance.destroy persistent_frontier_instance
+      else return ()
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
@@ -235,8 +243,22 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok () ->
-      continue persistent_frontier_instance ~ignore_consensus_local_state:true
+  | Ok () -> (
+      match%bind
+        continue persistent_frontier_instance
+          ~ignore_consensus_local_state:true
+      with
+      | Error (`Failure err) when retry_with_fresh_db ->
+          [%log error]
+            "Failed to initialize transition frontier: $err. Destroying old \
+             persistent frontier database and retrying."
+            ~metadata:[("err", `String err)] ;
+          (* The frontier instance is already destroyed by [continue] before it
+             returns an [Error], don't attempt to do it again.
+          *)
+          reset_and_continue ~destroy_frontier_instance:false ()
+      | res ->
+          return res )
 
 let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~precomputed_values () =
@@ -249,10 +271,11 @@ let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
-let close
+let close ~loc
     { logger
     ; verifier= _
     ; consensus_local_state= _
+    ; catchup_hash_tree= _
     ; full_frontier
     ; persistent_root= _safe_to_ignore_1
     ; persistent_root_instance
@@ -261,7 +284,7 @@ let close
     ; extensions
     ; genesis_state_hash= _ } =
   [%log trace] "Closing transition frontier" ;
-  Full_frontier.close full_frontier ;
+  Full_frontier.close ~loc full_frontier ;
   Extensions.close extensions ;
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
@@ -293,10 +316,13 @@ let add_breadcrumb_exn t breadcrumb =
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
     (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
+  Catchup_hash_tree.apply_diffs t.catchup_hash_tree diffs ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
+      ~has_long_catchup_job:
+        (Catchup_hash_tree.max_catchup_chain_length t.catchup_hash_tree > 5)
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   Option.iter new_root_identifier
@@ -453,6 +479,7 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
+        let transition_receipt_time = Some (Time.now ()) in
         let genesis_transition =
           External_transition.For_tests.genesis ~precomputed_values
         in
@@ -484,7 +511,8 @@ module For_tests = struct
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) ))
         in
         Breadcrumb.create ~validated_transition:genesis_transition
-          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false )
+          ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
+          ~transition_receipt_time )
 
   let gen_persistence ?(logger = Logger.null ()) ?verifier
       ~(precomputed_values : Precomputed_values.t) () =

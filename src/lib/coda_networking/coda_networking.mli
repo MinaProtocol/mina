@@ -55,7 +55,8 @@ module Rpcs : sig
   end
 
   module Get_ancestry : sig
-    type query = Consensus.Data.Consensus_state.Value.t
+    type query =
+      (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
       ( External_transition.t
@@ -88,6 +89,7 @@ module Rpcs : sig
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
             ; node_peer_id: Peer.Id.Stable.V1.t
+            ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -96,7 +98,10 @@ module Rpcs : sig
                 ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
-            ; k_block_hashes: State_hash.Stable.V1.t list }
+            ; k_block_hashes_and_timestamps:
+                (State_hash.Stable.V1.t * string) list
+            ; git_commit: string
+            ; uptime: string }
         end
       end]
     end
@@ -165,7 +170,7 @@ val states :
      t
   -> ( External_transition.t Envelope.Incoming.t
      * Block_time.t
-     * (Coda_net2.validation_result -> unit) )
+     * Coda_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
@@ -187,7 +192,7 @@ val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 val get_ancestry :
      t
   -> Peer.Id.t
-  -> Consensus.Data.Consensus_state.Value.t
+  -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
@@ -230,13 +235,13 @@ val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 val snark_pool_diffs :
      t
   -> ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * (Coda_net2.validation_result -> unit) )
+     * Coda_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val transaction_pool_diffs :
      t
   -> ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * (Coda_net2.validation_result -> unit) )
+     * Coda_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val broadcast_state :

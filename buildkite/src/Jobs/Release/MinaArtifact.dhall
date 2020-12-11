@@ -30,6 +30,7 @@ Pipeline.build
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
+          S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
         path = "Release",

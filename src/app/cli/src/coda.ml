@@ -191,10 +191,6 @@ let setup_daemon logger =
       ~doc:
         "true|false Log snark-pool diff received from peers (default: false)"
       (optional bool)
-  and log_received_blocks =
-    flag "log-received-blocks"
-      ~doc:"true|false Log blocks received from peers (default: false)"
-      (optional bool)
   and log_transaction_pool_diff =
     flag "log-txn-pool-gossip"
       ~doc:
@@ -313,8 +309,7 @@ let setup_daemon logger =
       [ ("commit", `String Coda_version.commit_id)
       ; ("branch", `String Coda_version.branch)
       ; ("commit_date", `String Coda_version.commit_date)
-      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id) ]
     in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
@@ -647,10 +642,6 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_bool_option "log-snark-work-gossip"
           ~default:false log_received_snark_pool_diff
       in
-      let log_received_blocks =
-        or_from_config YJ.Util.to_bool_option "log-received-blocks"
-          ~default:false log_received_blocks
-      in
       let log_transaction_pool_diff =
         or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
           ~default:false log_transaction_pool_diff
@@ -662,7 +653,7 @@ let setup_daemon logger =
       let log_gossip_heard =
         { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
-        ; new_state= log_received_blocks }
+        ; new_state= true }
       in
       let json_to_publickey_compressed_option which json =
         YJ.Util.to_string_option json
@@ -844,7 +835,8 @@ let setup_daemon logger =
           ~genesis_state_hash:
             (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
-      trace_database_initialization "consensus local state" __LOC__ trust_dir ;
+      trace_database_initialization "epoch ledger" __LOC__
+        epoch_ledger_location ;
       let%bind peer_list_file_contents_or_empty =
         match libp2p_peer_list_file with
         | None ->
@@ -921,29 +913,9 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in
-      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-      let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let transaction_database_dir = conf_dir ^/ "transaction" in
-      let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        transaction_database_dir ;
-      let external_transition_database_dir =
-        conf_dir ^/ "external_transition_database"
-      in
-      let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
-      let coinbase_receiver =
+      let coinbase_receiver : Consensus.Coinbase_receiver.t =
         Option.value_map coinbase_receiver_flag ~default:`Producer
           ~f:(fun pk -> `Other pk)
       in
@@ -956,6 +928,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
+      let start_time = Time.now () in
       let%map coda =
         Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
@@ -978,10 +951,9 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ~start_time ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
@@ -1342,14 +1314,12 @@ let coda_commands logger =
         ; (module Coda_restart_node_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in

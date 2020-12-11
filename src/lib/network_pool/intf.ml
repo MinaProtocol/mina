@@ -11,6 +11,8 @@ open Network_peer
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
+  val label : string
+
   type transition_frontier_diff
 
   type transition_frontier
@@ -52,12 +54,22 @@ module type Resource_pool_diff_intf = sig
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
 
+  val empty : t
+
+  val reject_overloaded_diff : verified -> rejected
+
   (** Used to check whether or not information was filtered out of diffs
    *  during diff application. Assumes that diff size will be the equal or
    *  smaller after application is completed. *)
   val size : t -> int
 
   val verified_size : verified -> int
+
+  (** How big to consider this diff for purposes of metering. *)
+  val score : t -> int
+
+  (** The maximum "diff score" permitted per IP/peer-id per second. *)
+  val max_per_second : int
 
   val summary : t -> string
 
@@ -128,7 +140,7 @@ module type Network_pool_base_intf = sig
   module Broadcast_callback : sig
     type t =
       | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-      | External of (Coda_net2.validation_result -> unit)
+      | External of Coda_net2.Validation_callback.t
   end
 
   val create :
@@ -137,7 +149,7 @@ module type Network_pool_base_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * (Coda_net2.validation_result -> unit) )
+                      * Coda_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -153,7 +165,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * (Coda_net2.validation_result -> unit) )
+                      * Coda_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -220,6 +232,7 @@ module type Snark_pool_diff_intf = sig
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Empty
   [@@deriving compare, sexp]
 
   type verified = t [@@deriving compare, sexp]
@@ -236,9 +249,9 @@ module type Snark_pool_diff_intf = sig
      and type verified := t
      and type pool := resource_pool
 
-  val to_compact : t -> compact
+  val to_compact : t -> compact option
 
-  val compact_json : t -> Yojson.Safe.t
+  val compact_json : t -> Yojson.Safe.t option
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
@@ -266,6 +279,7 @@ module type Transaction_pool_diff_intf = sig
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 

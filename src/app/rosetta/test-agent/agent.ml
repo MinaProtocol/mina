@@ -110,7 +110,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Found block index $index" ;
   (* Start staking so we get blocks *)
   let%bind _res = Poke.Staking.enable ~graphql_uri in
-  (* Wait until the newest-block is at least index>last_block_index and there is at least not a coinbase *)
+  (* Wait until the newest block has index > last_block_index and has at least one user command *)
   let%bind block =
     keep_trying
       ~step:(fun () ->
@@ -125,14 +125,15 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
                     .block_identifier
                     .index > last_block_index)
               in
-              let at_least_txn_not_coinbase : bool =
+              let has_user_command : bool =
+                (* HACK: First transaction is always an internal command and second, if present, is always a user
+                 * command, so we can just check that length > 1 *)
                 Int.(
                   List.length
                     (Option.value_exn block.Block_response.block).transactions
                   > 1)
               in
-              if newer_block && at_least_txn_not_coinbase then Some block
-              else None )
+              if newer_block && has_user_command then Some block else None )
         with
         | Error _ ->
             `Failed
@@ -165,7 +166,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     ~expected:
       ( List.map ~f:succesful operation_expectations
       @ Operation_expectation.
-          [ { amount= Some 20_000_000_000
+          [ { amount= Some 40_000_000_000
             ; account=
                 Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
             ; status= "Success"
@@ -361,7 +362,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
   in
   let%bind metadata_res =
     Peek.Construction.metadata ~rosetta_uri ~network_response ~logger
-      ~options:(Option.value_exn preprocess_res.options)
+      ~options:preprocess_res.options
   in
   [%log debug]
     ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]

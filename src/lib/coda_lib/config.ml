@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Auxiliary_database
 open Signature_lib
 
 (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
@@ -23,7 +22,7 @@ type t =
   ; is_seed: bool
   ; disable_telemetry: bool
   ; initial_block_production_keypairs: Keypair.Set.t
-  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; snark_coordinator_key: Public_key.Compressed.t option [@default None]
@@ -40,8 +39,6 @@ type t =
   ; epoch_ledger_location: string
   ; staged_ledger_transition_backup_capacity: int [@default 10]
   ; time_controller: Block_time.Controller.t
-  ; transaction_database: Transaction_database.t
-  ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; is_archive_rocksdb: bool [@default false]
@@ -50,5 +47,6 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; log_block_creation: bool [@default false]
-  ; precomputed_values: Precomputed_values.t }
+  ; precomputed_values: Precomputed_values.t
+  ; start_time: Time.t }
 [@@deriving make]

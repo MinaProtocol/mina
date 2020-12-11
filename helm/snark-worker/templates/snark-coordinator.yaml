@@ -34,7 +34,6 @@ spec:
           "-log-level", "Debug",
           "-log-json",
           "-config-directory", "/root/.coda-config",
-          "-log-received-blocks", "true",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -96,4 +95,5 @@ spec:
         configMap:
           name: snark-coordinator-daemon-config
       {{- end }}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{- end }}

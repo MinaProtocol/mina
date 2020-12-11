@@ -24,16 +24,19 @@ apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
 TESTNET_NAME="turbo-pickles"
 
+
 if [ ! -d coda-automation ]; then
   # Somebody ran this without the mina repo checked out...
   echo "WARNING: Connecting to testnet without a checked-out coda-automation repo. Attempting to pull data from github's master branch (fallback branch is 3a4e5ce2d)."
   mkdir -p coda-automation/terraform/testnets/$TESTNET_NAME
   # Fetch the files we need from coda-automation's master instead
   # Fall through to a known-good file
-  curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/genesis_ledger.json --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.txt \
+  curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/genesis_ledger.json --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/genesis_ledger.json  --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json
   curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/peers.txt --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
   || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/peers.txt  --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt
+else
+  cd coda-automation && git pull origin master && cd -
 fi
 
 # Generate genesis proof and then crash due to no peers
@@ -54,9 +57,12 @@ coda daemon \
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 num_status_retries=24
-for i in {1..$num_status_retries}; do
+for ((i=1;i<=$num_status_retries;i++)); do
   sleep 10s
-  status_exit_code=$(coda client status; echo $?)
+  set +e
+  coda client status
+  status_exit_code=$?
+  set -e
   if [ $status_exit_code -eq 0 ]; then
     break
   elif [ $i -eq $num_status_retries ]; then
