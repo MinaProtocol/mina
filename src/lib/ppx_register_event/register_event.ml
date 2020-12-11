@@ -211,9 +211,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   if checked_interpolations then stris
   else
     let msg_loc_str =
-      (* same formatting as in Ppxlib.Location.print
-         avoid adding Ppxlib as runtime dependency
-      *)
+      (* same formatting as in Ppxlib.Location.print *)
       estring
         (sprintf "File \"%s\", line %d, characters %d-%d:"
            msg_loc.loc_start.pos_fname msg_loc.loc_start.pos_lnum
