@@ -4,7 +4,7 @@
  (inline_tests)
  (library_flags -linkall)
  (libraries
-   coda_numbers_nonconsensus
+   mina_numbers_nonconsensus
    coda_compile_config_nonconsensus
    currency_nonconsensus
    data_hash_lib_nonconsensus

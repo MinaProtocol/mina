@@ -167,7 +167,7 @@ val create_diff :
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
   -> epoch_ledger:Mina_base.Sparse_ledger.t
-  -> global_slot:Coda_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> bool
 
 val statement_exn :

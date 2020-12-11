@@ -213,8 +213,8 @@ module Compact_display = struct
     | Node of
         { current: State_hash.t
         ; parent: State_hash.t
-        ; blockchain_length: Coda_numbers.Length.t
-        ; global_slot: Coda_numbers.Global_slot.t }
+        ; blockchain_length: Mina_numbers.Length.t
+        ; global_slot: Mina_numbers.Global_slot.t }
   [@@deriving yojson]
 
   type node = {state: state; peers: int} [@@deriving yojson]
@@ -249,8 +249,8 @@ module Graph_node = struct
     | Root of State_hash.t
     | Node of
         { current: State_hash.t
-        ; length: Coda_numbers.Length.t
-        ; slot: Coda_numbers.Global_slot.t }
+        ; length: Mina_numbers.Length.t
+        ; slot: Mina_numbers.Global_slot.t }
   [@@deriving yojson, eq, hash]
 
   type t = {state: state; peers: int} [@@deriving yojson, eq, hash]
@@ -272,8 +272,8 @@ module Graph_node = struct
       | Root _ ->
           ("NA", "NA")
       | Node s ->
-          ( Coda_numbers.Length.to_string s.length
-          , Coda_numbers.Global_slot.to_string s.slot )
+          ( Mina_numbers.Length.to_string s.length
+          , Mina_numbers.Global_slot.to_string s.slot )
     in
     {state; slot; length; peers= t.peers}
 

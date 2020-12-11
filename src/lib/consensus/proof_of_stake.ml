@@ -13,7 +13,7 @@ open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
-module Length = Coda_numbers.Length
+module Length = Mina_numbers.Length
 
 let m = Snark_params.Tick.m
 
@@ -81,7 +81,7 @@ let compute_delegatee_table_genesis_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Mina_base.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
-module Segment_id = Coda_numbers.Nat.Make32 ()
+module Segment_id = Mina_numbers.Nat.Make32 ()
 
 module Typ = Snark_params.Tick.Typ
 
@@ -163,7 +163,7 @@ module Data = struct
   module Block_data = struct
     type t =
       { stake_proof: Stake_proof.t
-      ; global_slot: Coda_numbers.Global_slot.t
+      ; global_slot: Mina_numbers.Global_slot.t
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
@@ -604,7 +604,7 @@ module Data = struct
     end
 
     module Message = struct
-      module Global_slot = Coda_numbers.Global_slot
+      module Global_slot = Mina_numbers.Global_slot
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
@@ -1157,7 +1157,7 @@ module Data = struct
                 ~typ:(non_null @@ Graphql_base_types.uint32 ())
                 ~args:Arg.[]
                 ~resolve:(fun _ {Poly.epoch_length; _} ->
-                  Coda_numbers.Length.to_uint32 epoch_length ) ] )
+                  Mina_numbers.Length.to_uint32 epoch_length ) ] )
 
       let to_input
           ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
@@ -1320,8 +1320,8 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Coda_numbers.Global_slot
-    module Value = Coda_numbers.Global_slot
+    include Mina_numbers.Global_slot
+    module Value = Mina_numbers.Global_slot
 
     type var = Checked.t
 
@@ -1617,7 +1617,7 @@ module Data = struct
             (Global_slot.t * Global_slot.t list) Quickcheck.Generator.t =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
-          let module GS = Coda_numbers.Global_slot in
+          let module GS = Mina_numbers.Global_slot in
           let%bind prev_global_slot = small_positive_int in
           let%bind slot_diffs =
             Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
@@ -2042,7 +2042,7 @@ module Data = struct
         ~next:(slot2 : Global_slot.Checked.t) =
       let open Snarky_integer in
       let open Run in
-      let module Slot = Coda_numbers.Global_slot in
+      let module Slot = Mina_numbers.Global_slot in
       let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
       let checkpoint_window_size_in_slots =
         Length.Checked.to_integer constants.checkpoint_window_size_in_slots
@@ -2138,11 +2138,11 @@ module Data = struct
     (* Check that both epoch and slot are zero.
     *)
     let is_genesis_state (t : Value.t) =
-      Coda_numbers.Global_slot.(
+      Mina_numbers.Global_slot.(
         equal zero (Global_slot.slot_number t.curr_global_slot))
 
     let is_genesis (global_slot : Global_slot.Checked.t) =
-      let open Coda_numbers.Global_slot in
+      let open Mina_numbers.Global_slot in
       Checked.equal (Checked.constant zero)
         (Global_slot.slot_number global_slot)
 
@@ -2375,20 +2375,20 @@ module Data = struct
               ~deprecated:(Deprecated (Some "use blockHeight instead"))
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "blockHeight" ~typ:(non_null uint32)
               ~doc:"Height of the blockchain at this block"
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "epochCount" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.epoch_count; _} ->
-                Coda_numbers.Length.to_uint32 epoch_count )
+                Mina_numbers.Length.to_uint32 epoch_count )
           ; field "minWindowDensity" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.min_window_density; _} ->
-                Coda_numbers.Length.to_uint32 min_window_density )
+                Mina_numbers.Length.to_uint32 min_window_density )
           ; field "lastVrfOutput" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:
@@ -3252,7 +3252,7 @@ module Hooks = struct
         global_slot =
       if
         not
-          (Coda_numbers.Global_slot.equal
+          (Mina_numbers.Global_slot.equal
              (Global_slot.slot_number global_slot)
              block_data.global_slot)
       then

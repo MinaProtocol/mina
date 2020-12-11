@@ -54,7 +54,7 @@ end
 module Fee = Make_numeric (Currency.Fee)
 module Amount = Make_numeric (Currency.Amount)
 module Nonce = Make_numeric (Account.Nonce)
-module Length = Make_numeric (Coda_numbers.Length)
+module Length = Make_numeric (Mina_numbers.Length)
 
 module Block_time = Make_numeric (struct
   type t = Block_time.t

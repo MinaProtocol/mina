@@ -224,12 +224,12 @@ module User_command = struct
               (Signed_command.receiver_pk t)
           in
           let valid_until =
-            let open Coda_numbers in
+            let open Mina_numbers in
             let slot = Signed_command.valid_until t in
             if Global_slot.equal slot Global_slot.max_value then None
             else
               Some
-                ( slot |> Coda_numbers.Global_slot.to_uint32
+                ( slot |> Mina_numbers.Global_slot.to_uint32
                 |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int can overflow; see #5419 *)
@@ -336,8 +336,8 @@ module User_command = struct
                 ; fee_payer_pk= Account_id.public_key fee_payer
                 ; nonce=
                     Option.value (S.nonce c)
-                      ~default:Coda_numbers.Account_nonce.zero
-                ; valid_until= Coda_numbers.Global_slot.max_value
+                      ~default:Mina_numbers.Account_nonce.zero
+                ; valid_until= Mina_numbers.Global_slot.max_value
                 ; memo= Signed_command_memo.create_from_string_exn "snapp" }
             ; body=
                 Payment

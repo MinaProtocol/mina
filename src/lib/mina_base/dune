@@ -13,7 +13,7 @@
    coda_compile_config
    genesis_constants
    digestif
-   coda_numbers
+   mina_numbers
    codable
    core
    crypto_params

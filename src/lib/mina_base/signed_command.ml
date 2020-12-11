@@ -7,13 +7,13 @@ open Import
 [%%ifndef
 consensus_mechanism]
 
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Currency = Currency_nonconsensus.Currency
 module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
 
 [%%endif]
 
-open Coda_numbers
+open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
 
@@ -237,7 +237,7 @@ module Gen = struct
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t
+         * Mina_numbers.Account_nonce.t
          * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t =

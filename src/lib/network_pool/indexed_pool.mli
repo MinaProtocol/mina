@@ -6,7 +6,7 @@
 open Core
 
 open Mina_base
-open Coda_numbers
+open Mina_numbers
 
 module Command_error : sig
   type t =
@@ -22,8 +22,8 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [`Valid_until of Coda_numbers.Global_slot.t]
-        * [`Current_global_slot of Coda_numbers.Global_slot.t]
+        [`Valid_until of Mina_numbers.Global_slot.t]
+        * [`Current_global_slot of Mina_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
   [@@deriving sexp_of, to_yojson]
 end
@@ -132,7 +132,7 @@ val revalidate :
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the current global slot according to the pool's time controller. *)
-val current_global_slot : t -> Coda_numbers.Global_slot.t
+val current_global_slot : t -> Mina_numbers.Global_slot.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

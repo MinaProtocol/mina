@@ -231,7 +231,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                      External_transition.Initial_validated.consensus_state
                        verified_transition
                      |> Consensus.Data.Consensus_state.blockchain_length
-                     |> Coda_numbers.Length.to_int
+                     |> Mina_numbers.Length.to_int
                    in
                    Coda_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;

@@ -9,12 +9,12 @@ open Core_kernel
 [%%ifdef
 consensus_mechanism]
 
-open Coda_numbers
+open Mina_numbers
 open Snark_params.Tick
 
 [%%else]
 
-open Coda_numbers_nonconsensus.Coda_numbers
+open Mina_numbers_nonconsensus.Mina_numbers
 open Snark_params_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 
@@ -84,7 +84,7 @@ module type Gen_intf = sig
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t
+         * Mina_numbers.Account_nonce.t
          * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t

@@ -12,7 +12,7 @@ open Tick
 [%%else]
 
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Coda_compile_config =
   Coda_compile_config_nonconsensus.Coda_compile_config
@@ -20,7 +20,7 @@ module Coda_compile_config =
 [%%endif]
 
 open Currency
-open Coda_numbers
+open Mina_numbers
 
 module Poly = struct
   [%%versioned

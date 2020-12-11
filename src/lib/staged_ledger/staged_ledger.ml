@@ -1878,7 +1878,7 @@ let%test_module "test" =
       sl := sl' ;
       (ledger_proof, diff', is_new_stack, pc_update)
 
-    let dummy_state_view ?(slot = Coda_numbers.Global_slot.zero) () =
+    let dummy_state_view ?(slot = Mina_numbers.Global_slot.zero) () =
       let state_body =
         let consensus_constants =
           let genesis_constants = Genesis_constants.for_unit_tests in
@@ -2995,8 +2995,8 @@ let%test_module "test" =
       let acc =
         Account.create_timed account_id balance
           ~initial_minimum_balance:balance
-          ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
-          ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
+          ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
+          ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
           ~vesting_increment:(Amount.of_int 50_000_000_000)
         |> Or_error.ok_exn
       in
@@ -3043,7 +3043,7 @@ let%test_module "test" =
               ~coinbase_receiver:coinbase_receiver.public_key sl logger pids
               ~current_state_view:
                 (dummy_state_view
-                   ~slot:(Coda_numbers.Global_slot.of_int block_count)
+                   ~slot:(Mina_numbers.Global_slot.of_int block_count)
                    ())
               ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
               Sequence.empty

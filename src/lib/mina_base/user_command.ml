@@ -231,7 +231,7 @@ let valid_until (t : t) =
   | Signed_command x ->
       Signed_command.valid_until x
   | Snapp_command _ ->
-      Coda_numbers.Global_slot.max_value
+      Mina_numbers.Global_slot.max_value
 
 let forget_check (t : Valid.t) : t = (t :> t)
 

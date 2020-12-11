@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_numbers
+open Mina_numbers
 open Async
 open Currency
 open Signature_lib
@@ -431,7 +431,7 @@ module type S = sig
 
       val end_time : constants:Constants.t -> t -> Block_time.t
 
-      val to_global_slot : t -> Coda_numbers.Global_slot.t
+      val to_global_slot : t -> Mina_numbers.Global_slot.t
     end
 
     module Consensus_state : sig
@@ -514,7 +514,7 @@ module type S = sig
 
       val curr_slot : Value.t -> Slot.t
 
-      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
+      val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 
       val is_genesis_state : Value.t -> bool
 
@@ -526,7 +526,7 @@ module type S = sig
 
       val epoch_ledger : t -> Mina_base.Sparse_ledger.t
 
-      val global_slot : t -> Coda_numbers.Global_slot.t
+      val global_slot : t -> Mina_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
     end

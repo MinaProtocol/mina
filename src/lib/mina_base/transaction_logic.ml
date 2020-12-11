@@ -1,7 +1,7 @@
 open Core
 open Currency
 open Signature_lib
-module Global_slot = Coda_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot
 
 module type Ledger_intf = sig
   type t

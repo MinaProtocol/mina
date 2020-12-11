@@ -66,7 +66,7 @@ module T = struct
     ; get_nonce:
         ( 'worker
         , Account_id.t
-        , Coda_numbers.Account_nonce.t option )
+        , Mina_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_user_command:
@@ -136,7 +136,7 @@ module T = struct
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
-        Account_id.t -> Coda_numbers.Account_nonce.t option Deferred.t
+        Account_id.t -> Mina_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Signed_command.t Or_error.t Deferred.t
@@ -276,7 +276,7 @@ module T = struct
       C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
         ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
-          [%bin_type_class: Coda_numbers.Account_nonce.Stable.Latest.t option]
+          [%bin_type_class: Mina_numbers.Account_nonce.Stable.Latest.t option]
         ()
 
     let root_length =

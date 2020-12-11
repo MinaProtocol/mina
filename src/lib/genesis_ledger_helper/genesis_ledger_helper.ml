@@ -1151,7 +1151,7 @@ let make_constraint_constants
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length } )
+            ; previous_length= Mina_numbers.Length.of_int previous_length } )
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)

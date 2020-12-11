@@ -732,7 +732,7 @@ let%test_module "Bootstrap_controller tests" =
           let open Result.Let_syntax in
           let%map () =
             Result.ok_if_true
-              Coda_numbers.Length.(
+              Mina_numbers.Length.(
                 blockchain_length max_acc <= blockchain_length transition)
               ~error:
                 (Error.of_string
