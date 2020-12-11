@@ -1743,7 +1743,7 @@ module T = struct
                    of their snarks are purchased and their accounts get
                    created
                 *)
-                (* TODO: This should be checked in the pool.
+                (* TODO(#7034): This should be checked in the pool.
                    Running the check here allows block production to be blocked
                    by low-fee snark work for a pk that isn't in the ledger.
                 *)
