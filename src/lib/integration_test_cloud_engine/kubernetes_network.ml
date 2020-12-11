@@ -10,7 +10,7 @@ module Node = struct
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
   let base_kube_cmd t =
-    Printf.sprintf "kubectl --cluster %s -n %s" t.cluster t.namespace
+    Printf.sprintf "kubectl --cluster %s --namespace %s" t.cluster t.namespace
 
   let run_in_container node cmd =
     let base = base_kube_cmd node in
@@ -77,7 +77,8 @@ module Node = struct
     let set_port_forwarding ~logger t port =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
-      let args = ["port-forward"; name; string_of_int port] in
+      let portmap = string_of_int port ^ ":3085" in
+      let args = ["port-forward"; name; portmap] in
       [%log info] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
       let%bind proc =
@@ -87,7 +88,10 @@ module Node = struct
       Exit_handlers.register_handler ~logger
         ~description:
           (sprintf "Kubectl port forwarder on pod %s, port %d" t.pod_id port)
-        (fun () -> ignore Signal.(send kill (`Pid (Process.pid proc)))) ;
+        (fun () ->
+          [%log info]
+            "Port forwarding being killed, no longer occupying port %d " port ;
+          ignore Signal.(send kill (`Pid (Process.pid proc))) ) ;
       Deferred.bind ~f:Malleable_error.of_or_error_hard
         (Process.collect_stdout_and_wait proc)
 
