@@ -1383,7 +1383,7 @@ module Data = struct
   end
 
   [%%if
-  false]
+  true]
 
   module Min_window_density = struct
     (* Three cases for updating the lengths of sub_windows
@@ -1589,7 +1589,7 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
-        let constants = Constants.for_unit_tests
+        let constants = Lazy.force Constants.for_unit_tests
 
         (* converting the input for actual implementation to the input required by the
            reference implementation *)
