@@ -138,14 +138,14 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
-                (Coda_lib.config coda).precomputed_values.consensus_constants
+                (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
-                (Coda_lib.config coda).precomputed_values.consensus_constants
+                (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
@@ -164,7 +164,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
-                (Coda_lib.config coda).precomputed_values.consensus_constants
+                (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               function
               | `Check_again _time ->
@@ -173,7 +173,7 @@ module Types = struct
                   [of_time time ~consensus_constants]
               | `Produce_now ->
                   [ of_time ~consensus_constants
-                    @@ Block_time.now (Coda_lib.config coda).time_controller ]
+                    @@ Block_time.now (Mina_lib.config coda).time_controller ]
               ) ] )
 
   module DaemonStatus = struct
@@ -391,7 +391,7 @@ module Types = struct
               (fun {ctx= coda; _}
                    {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string_system_time
-                (Coda_lib.time_controller coda)
+                (Mina_lib.time_controller coda)
                 timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the snarked ledger"
@@ -439,14 +439,14 @@ module Types = struct
             ~doc:"The fee charged to create a new account"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} () ->
-              (Coda_lib.config coda).precomputed_values.constraint_constants
+              (Mina_lib.config coda).precomputed_values.constraint_constants
                 .account_creation_fee |> Currency.Fee.to_uint64 )
         ; field "coinbase" ~typ:(non_null uint64)
             ~doc:
               "The amount received as a coinbase reward for producing a block"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} () ->
-              (Coda_lib.config coda).precomputed_values.constraint_constants
+              (Mina_lib.config coda).precomputed_values.constraint_constants
                 .coinbase_amount |> Currency.Amount.to_uint64 ) ] )
 
   module AccountObj = struct
@@ -559,7 +559,7 @@ module Types = struct
 
       let of_account_id coda account_id =
         let account =
-          coda |> Coda_lib.best_tip |> Participating_state.active
+          coda |> Mina_lib.best_tip |> Participating_state.active
           |> Option.bind ~f:(fun tip ->
                  let ledger =
                    Transition_frontier.Breadcrumb.staged_ledger tip
@@ -612,8 +612,8 @@ module Types = struct
       ; path: string }
 
     let lift coda pk account =
-      let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
-      let accounts = Coda_lib.wallets coda in
+      let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
+      let accounts = Mina_lib.wallets coda in
       { account
       ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking=
@@ -669,7 +669,7 @@ module Types = struct
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let account_id = account_id account in
                    match
-                     Coda_lib
+                     Mina_lib
                      .get_inferred_nonce_from_transaction_pool_and_ledger coda
                        account_id
                    with
@@ -685,7 +685,7 @@ module Types = struct
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
                    let account_id = account_id account in
-                   match%bind Coda_lib.staking_ledger coda with
+                   match%bind Mina_lib.staking_ledger coda with
                    | Genesis_epoch_ledger staking_ledger -> (
                      match
                        let open Option.Let_syntax in
@@ -697,7 +697,7 @@ module Types = struct
                          let delegate_key = delegate_account.public_key in
                          Some (get_best_ledger_account_pk coda delegate_key)
                      | None ->
-                         [%log' warn (Coda_lib.top_level_logger coda)]
+                         [%log' warn (Mina_lib.top_level_logger coda)]
                            "Could not retrieve delegate account from the \
                             genesis ledger. The account was not present in \
                             the ledger." ;
@@ -715,7 +715,7 @@ module Types = struct
                        let delegate_key = delegate_account.public_key in
                        Some (get_best_ledger_account_pk coda delegate_key)
                      with e ->
-                       [%log' warn (Coda_lib.top_level_logger coda)]
+                       [%log' warn (Mina_lib.top_level_logger coda)]
                          ~metadata:[("error", `String (Exn.to_string e))]
                          "Could not retrieve delegate account from sparse \
                           ledger. The account may not be in the ledger: $error" ;
@@ -754,7 +754,7 @@ module Types = struct
                    let open Option.Let_syntax in
                    let pk = account.Account.Poly.public_key in
                    let%map delegators =
-                     Coda_lib.current_epoch_delegators coda ~pk
+                     Mina_lib.current_epoch_delegators coda ~pk
                    in
                    List.map
                      ~f:(fun a ->
@@ -775,7 +775,7 @@ module Types = struct
                    let open Option.Let_syntax in
                    let pk = account.Account.Poly.public_key in
                    let%map delegators =
-                     Coda_lib.last_epoch_delegators coda ~pk
+                     Mina_lib.last_epoch_delegators coda ~pk
                    in
                    List.map
                      ~f:(fun a ->
@@ -929,7 +929,7 @@ module Types = struct
               ~deprecated:(Deprecated (Some "use receiver field instead")) ] )
 
     let user_command_shared_fields :
-        (Coda_lib.t, (Signed_command.t, Transaction_hash.t) With_hash.t) field
+        (Mina_lib.t, (Signed_command.t, Transaction_hash.t) With_hash.t) field
         list =
       [ field "id" ~typ:(non_null guid) ~args:[]
           ~resolve:(fun _ user_command ->
@@ -1167,12 +1167,12 @@ module Types = struct
                 ~f:(AccountObj.get_best_ledger_account_pk coda)
                 coinbase_receiver ) ] )
 
-  let protocol_state_proof : (Coda_lib.t, Proof.t option) typ =
+  let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
     (* TODO *)
     obj "protocolStateProof" ~fields:(fun _ -> [])
 
   let block :
-      ( Coda_lib.t
+      ( Mina_lib.t
       , ( Auxiliary_database.Filtered_external_transition.t
         , State_hash.t )
         With_hash.t
@@ -1224,7 +1224,7 @@ module Types = struct
             ~doc:"Public key of current snark worker"
             ~deprecated:(Deprecated (Some "use account field instead"))
             ~args:Arg.[]
-            ~resolve:(fun (_ : Coda_lib.t resolve_info) (key, _) -> key)
+            ~resolve:(fun (_ : Mina_lib.t resolve_info) (key, _) -> key)
         ; field "account"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the current snark worker"
@@ -1234,7 +1234,7 @@ module Types = struct
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that snark worker is charging to generate a snark proof"
             ~args:Arg.[]
-            ~resolve:(fun (_ : Coda_lib.t resolve_info) (_, fee) ->
+            ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) ->
               Currency.Fee.to_uint64 fee ) ] )
 
   module Payload = struct
@@ -1252,7 +1252,7 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port) ] )
 
-    let create_account : (Coda_lib.t, Account.key option) typ =
+    let create_account : (Mina_lib.t, Account.key option) typ =
       obj "AddAccountPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the created account"
@@ -1266,7 +1266,7 @@ module Types = struct
               ~resolve:(fun {ctx= coda; _} key ->
                 AccountObj.get_best_ledger_account_pk coda key ) ] )
 
-    let unlock_account : (Coda_lib.t, Account.key option) typ =
+    let unlock_account : (Mina_lib.t, Account.key option) typ =
       obj "UnlockPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the unlocked account"
@@ -1280,7 +1280,7 @@ module Types = struct
               ~resolve:(fun {ctx= coda; _} key ->
                 AccountObj.get_best_ledger_account_pk coda key ) ] )
 
-    let lock_account : (Coda_lib.t, Account.key option) typ =
+    let lock_account : (Mina_lib.t, Account.key option) typ =
       obj "LockPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the locked account"
@@ -1812,7 +1812,7 @@ module Types = struct
         module Type = struct
           type t = (Signed_command.t, Transaction_hash.t) With_hash.t
 
-          type repr = (Coda_lib.t, t) abstract_value
+          type repr = (Mina_lib.t, t) abstract_value
 
           let conv = UserCommand.mk_user_command
 
@@ -1840,7 +1840,7 @@ module Types = struct
 
         module Pagination_database = Auxiliary_database.Transaction_database
 
-        let get_database = Coda_lib.transaction_database
+        let get_database = Mina_lib.transaction_database
 
         let filter_argument = Input.user_command_filter_input
 
@@ -1885,7 +1885,7 @@ module Types = struct
         module Pagination_database =
           Auxiliary_database.External_transition_database
 
-        let get_database = Coda_lib.external_transition_database
+        let get_database = Mina_lib.external_transition_database
 
         let filter_argument = Input.block_filter_input
 
@@ -1909,7 +1909,7 @@ module Subscriptions = struct
       ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
-        Coda_lib.sync_status coda |> Coda_incremental.Status.to_pipe
+        Mina_lib.sync_status coda |> Coda_incremental.Status.to_pipe
         |> Deferred.Result.return )
 
   let new_block =
@@ -1948,9 +1948,9 @@ module Mutations = struct
   let create_account_resolver {ctx= t; _} () password =
     let password = lazy (return (Bytes.of_string password)) in
     let%map pk =
-      Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
+      Mina_lib.wallets t |> Secrets.Wallets.generate_new ~password
     in
-    Coda_lib.subscriptions t |> Coda_lib.Subscriptions.add_new_subscription ~pk ;
+    Mina_lib.subscriptions t |> Mina_lib.Subscriptions.add_new_subscription ~pk ;
     Result.return pk
 
   let add_wallet =
@@ -1972,18 +1972,18 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
       ~resolve:create_account_resolver
 
-  let create_hd_account : (Coda_lib.t, unit) field =
+  let create_hd_account : (Mina_lib.t, unit) field =
     io_field "createHDAccount"
       ~doc:Secrets.Hardware_wallets.create_hd_account_summary
       ~typ:(non_null Types.Payload.create_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_hd_account)]
       ~resolve:(fun {ctx= coda; _} () hd_index ->
-        Coda_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index )
+        Mina_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index )
 
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
     match%map
-      Coda_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
+      Mina_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
     with
     | Error `Not_found ->
         Error "Could not find owned account associated with provided key"
@@ -2008,7 +2008,7 @@ module Mutations = struct
       ~resolve:unlock_account_resolver
 
   let lock_account_resolver {ctx= t; _} () pk =
-    Coda_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
+    Mina_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
     pk
 
   let lock_wallet =
@@ -2028,7 +2028,7 @@ module Mutations = struct
 
   let delete_account_resolver {ctx= coda; _} () public_key =
     let open Deferred.Result.Let_syntax in
-    let wallets = Coda_lib.wallets coda in
+    let wallets = Mina_lib.wallets coda in
     let%map () =
       Deferred.Result.map_error
         ~f:(fun `Not_found ->
@@ -2054,7 +2054,7 @@ module Mutations = struct
 
   let reload_account_resolver {ctx= coda; _} () =
     let%map _ =
-      Secrets.Wallets.reload ~logger:(Logger.create ()) (Coda_lib.wallets coda)
+      Secrets.Wallets.reload ~logger:(Logger.create ()) (Mina_lib.wallets coda)
     in
     Ok true
 
@@ -2101,7 +2101,7 @@ module Mutations = struct
 
   let find_identity ~public_key coda =
     Result.of_option
-      (Secrets.Wallets.find_identity (Coda_lib.wallets coda) ~needle:public_key)
+      (Secrets.Wallets.find_identity (Mina_lib.wallets coda) ~needle:public_key)
       ~error:
         "Couldn't find an unlocked key for specified `sender`. Did you unlock \
          the account you're making a transaction from?"
@@ -2171,8 +2171,8 @@ module Mutations = struct
     ; hash= Transaction_hash.hash_command (Signed_command cmd) }
 
   let export_logs ~coda basename_opt =
-    let open Coda_lib in
-    let Config.{conf_dir; _} = Coda_lib.config coda in
+    let open Mina_lib in
+    let Config.{conf_dir; _} = Mina_lib.config coda in
     Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
 
   let send_delegation =
@@ -2357,7 +2357,7 @@ module Mutations = struct
           Types.Pagination.Signed_command.Inputs.Cursor.deserialize
             ~error:"Invaid `payment` provided" payment
         in
-        let transaction_database = Coda_lib.transaction_database coda in
+        let transaction_database = Mina_lib.transaction_database coda in
         Auxiliary_database.Transaction_database.add transaction_database
           payment added_time ;
         Some (Types.UserCommand.mk_user_command payment) )
@@ -2368,9 +2368,9 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
         let old_block_production_keys =
-          Coda_lib.block_production_pubkeys coda
+          Mina_lib.block_production_pubkeys coda
         in
-        let wallet = Coda_lib.wallets coda in
+        let wallet = Mina_lib.wallets coda in
         let unlocked, locked =
           List.partition_map pks ~f:(fun pk ->
               match Secrets.Wallets.find_unlocked ~needle:pk wallet with
@@ -2379,7 +2379,7 @@ module Mutations = struct
               | None ->
                   `Snd pk )
         in
-        [%log' info (Coda_lib.top_level_logger coda)]
+        [%log' info (Mina_lib.top_level_logger coda)]
           ~metadata:
             [ ( "old"
               , [%to_yojson: Public_key.Compressed.t list]
@@ -2388,7 +2388,7 @@ module Mutations = struct
             ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
           !"Block production key replacement; old: $old, new: $new" ;
         ignore
-        @@ Coda_lib.replace_block_production_keypairs coda
+        @@ Mina_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
         ( Public_key.Compressed.Set.to_list old_block_production_keys
         , locked
@@ -2400,8 +2400,8 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
       ~typ:(non_null Types.Payload.set_snark_worker)
       ~resolve:(fun {ctx= coda; _} () pk ->
-        let old_snark_worker_key = Coda_lib.snark_worker_key coda in
-        let%map () = Coda_lib.replace_snark_worker_key coda pk in
+        let old_snark_worker_key = Mina_lib.snark_worker_key coda in
+        let%map () = Mina_lib.replace_snark_worker_key coda pk in
         Ok old_snark_worker_key )
 
   let set_snark_work_fee =
@@ -2415,8 +2415,8 @@ module Mutations = struct
           result_of_exn Currency.Fee.of_uint64 raw_fee
             ~error:"Invalid snark work `fee` provided."
         in
-        let last_fee = Coda_lib.snark_work_fee coda in
-        Coda_lib.set_snark_work_fee coda fee ;
+        let last_fee = Mina_lib.snark_work_fee coda in
+        Mina_lib.set_snark_work_fee coda fee ;
         Currency.Fee.to_uint64 last_fee )
 
   let set_connection_gating_config =
@@ -2432,7 +2432,7 @@ module Mutations = struct
         let open Deferred.Result.Let_syntax in
         let%bind config = Deferred.return config in
         let open Deferred.Let_syntax in
-        Coda_networking.set_connection_gating_config (Coda_lib.net coda) config
+        Coda_networking.set_connection_gating_config (Mina_lib.net coda) config
         >>| Result.return )
 
   let add_peer =
@@ -2450,7 +2450,7 @@ module Mutations = struct
                  Option.value ~default:"Empty peers list" (List.hd errs) )
           |> Deferred.return
         in
-        let net = Coda_lib.net coda in
+        let net = Mina_lib.net coda in
         let%bind.Async maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
@@ -2512,7 +2512,7 @@ module Queries = struct
           ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
               ~typ:(list (non_null string)) ]
       ~resolve:(fun {ctx= coda; _} () opt_pk opt_hashes ->
-        let transaction_pool = Coda_lib.transaction_pool coda in
+        let transaction_pool = Mina_lib.transaction_pool coda in
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
@@ -2562,7 +2562,7 @@ module Queries = struct
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
         Result.map_error
-          (Coda_incremental.Status.Observer.value @@ Coda_lib.sync_status coda)
+          (Coda_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
           ~f:Error.to_string_hum )
 
   let daemon_status =
@@ -2597,8 +2597,8 @@ module Queries = struct
       ~resolve:(fun _ _ -> Some Coda_version.commit_id)
 
   let tracked_accounts_resolver {ctx= coda; _} () =
-    let wallets = Coda_lib.wallets coda in
-    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
+    let wallets = Mina_lib.wallets coda in
+    let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
     wallets |> Secrets.Wallets.pks
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account=
@@ -2663,7 +2663,7 @@ module Queries = struct
               ~typ:(non_null Types.Input.public_key_arg) ]
       ~resolve:(fun {ctx= coda; _} () pk ->
         match
-          coda |> Coda_lib.best_tip |> Participating_state.active
+          coda |> Mina_lib.best_tip |> Participating_state.active
           |> Option.map ~f:(fun tip ->
                  ( Transition_frontier.Breadcrumb.staged_ledger tip
                    |> Staged_ledger.ledger
@@ -2692,7 +2692,7 @@ module Queries = struct
           [ arg "token" ~doc:"Token to find the owner for"
               ~typ:(non_null Types.Input.token_id_arg) ]
       ~resolve:(fun {ctx= coda; _} () token ->
-        coda |> Coda_lib.best_tip |> Participating_state.active
+        coda |> Mina_lib.best_tip |> Participating_state.active
         |> Option.bind ~f:(fun tip ->
                let ledger =
                  Transition_frontier.Breadcrumb.staged_ledger tip
@@ -2710,8 +2710,8 @@ module Queries = struct
           Types.Pagination.Signed_command.Inputs.Cursor.deserialize
             ~error:"Invalid payment provided" serialized_payment
         in
-        let frontier_broadcast_pipe = Coda_lib.transition_frontier coda in
-        let transaction_pool = Coda_lib.transaction_pool coda in
+        let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
+        let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
           (Transaction_status.get_status ~frontier_broadcast_pipe
              ~transaction_pool payment.data)
@@ -2722,8 +2722,8 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"Get information about the current snark worker"
       ~resolve:(fun {ctx= coda; _} _ ->
-        Option.map (Coda_lib.snark_worker_key coda) ~f:(fun k ->
-            (k, Coda_lib.snark_work_fee coda) ) )
+        Option.map (Mina_lib.snark_worker_key coda) ~f:(fun k ->
+            (k, Mina_lib.snark_work_fee coda) ) )
 
   let user_command = Types.Pagination.Signed_command.query
 
@@ -2738,7 +2738,7 @@ module Queries = struct
       ~doc:
         "Get information about a single block or null if no block can be found"
       ~resolve:(fun {ctx= coda; _} () state_hash_str ->
-        let db = Coda_lib.external_transition_database coda in
+        let db = Mina_lib.external_transition_database coda in
         Deferred.return
           (let open Result.Let_syntax in
           let%map state_hash =
@@ -2759,7 +2759,7 @@ module Queries = struct
             ; genesis_proof
             ; genesis_epoch_data
             ; _ } =
-          (Coda_lib.config coda).precomputed_values
+          (Mina_lib.config coda).precomputed_values
         in
         let {With_hash.data= genesis_state; hash} =
           Genesis_protocol_state.t
@@ -2802,7 +2802,7 @@ module Queries = struct
               ~typ:int ]
       ~resolve:(fun {ctx= coda; _} () max_length ->
         let open Option.Let_syntax in
-        let%map best_chain = Coda_lib.best_chain ?max_length coda in
+        let%map best_chain = Mina_lib.best_chain ?max_length coda in
         List.map best_chain ~f:(fun breadcrumb ->
             let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
             let transition =
@@ -2811,7 +2811,7 @@ module Queries = struct
             let transactions =
               Coda_transition.External_transition.Validated.transactions
                 ~constraint_constants:
-                  (Coda_lib.config coda).precomputed_values
+                  (Mina_lib.config coda).precomputed_values
                     .constraint_constants transition
             in
             With_hash.Stable.Latest.
@@ -2826,7 +2826,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Coda_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
+        List.map (Mina_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
         )
 
   let get_peers =
@@ -2835,7 +2835,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
       ~resolve:(fun {ctx= coda; _} () ->
-        let%map peers = Coda_networking.peers (Coda_lib.net coda) in
+        let%map peers = Coda_networking.peers (Mina_lib.net coda) in
         Ok (List.map ~f:Network_peer.Peer.to_display peers) )
 
   let snark_pool =
@@ -2844,7 +2844,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.completed_work)
       ~resolve:(fun {ctx= coda; _} () ->
-        Coda_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
+        Mina_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
         |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
 
   let pending_snark_work =
@@ -2852,13 +2852,13 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
       ~resolve:(fun {ctx= coda; _} () ->
-        let snark_job_state = Coda_lib.snark_job_state coda in
-        let snark_pool = Coda_lib.snark_pool coda in
+        let snark_job_state = Mina_lib.snark_job_state coda in
+        let snark_pool = Mina_lib.snark_pool coda in
         let fee_opt =
-          Coda_lib.(
+          Mina_lib.(
             Option.map (snark_worker_key coda) ~f:(fun _ -> snark_work_fee coda))
         in
-        let (module S) = Coda_lib.work_selection_method coda in
+        let (module S) = Mina_lib.work_selection_method coda in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
   let genesis_constants =
@@ -2879,7 +2879,7 @@ module Queries = struct
       ~typ:(non_null int)
       ~resolve:(fun {ctx= coda; _} () ->
         Block_time.Controller.get_time_offset
-          ~logger:(Coda_lib.config coda).logger
+          ~logger:(Mina_lib.config coda).logger
         |> Time.Span.to_sec |> Float.to_int )
 
   let next_available_token =
@@ -2890,7 +2890,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null Types.token_id)
       ~resolve:(fun {ctx= coda; _} () ->
-        coda |> Coda_lib.best_tip |> Participating_state.active
+        coda |> Mina_lib.best_tip |> Participating_state.active
         |> Option.map ~f:(fun tip ->
                Transition_frontier.Breadcrumb.staged_ledger tip
                |> Staged_ledger.ledger |> Ledger.next_available_token )
@@ -2904,7 +2904,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun {ctx= coda; _} _ ->
-        let net = Coda_lib.net coda in
+        let net = Mina_lib.net coda in
         let%map config = Coda_networking.connection_gating_config net in
         Ok config )
 

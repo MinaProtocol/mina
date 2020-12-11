@@ -278,7 +278,7 @@ let setup_daemon logger =
   and plugins = plugin_flag in
   fun () ->
     let open Deferred.Let_syntax in
-    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
@@ -315,7 +315,7 @@ let setup_daemon logger =
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
-    let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
+    let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
@@ -966,8 +966,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           proposed_protocol_version
       in
       let%map coda =
-        Coda_lib.create ~wallets
-          (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
+        Mina_lib.create ~wallets
+          (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
              ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
              ~net_config ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
@@ -976,7 +976,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
                (Cli_lib.Arg_type.work_selection_method_to_module
                   work_selection_method)
              ~snark_worker_config:
-               { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
+               { Mina_lib.Config.Snark_worker_config.initial_snark_worker_key=
                    run_snark_worker_flag
                ; shutdown_on_disconnect= true
                ; num_threads= snark_worker_parallelism_flag }
@@ -995,7 +995,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
-    let coda_ref : Coda_lib.t option ref = ref None in
+    let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
       ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
@@ -1007,7 +1007,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
     (*This pipe is consumed only by integration tests*)
     don't_wait_for
       (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-         (Coda_lib.validated_transitions coda)
+         (Mina_lib.validated_transitions coda)
          ~f:ignore) ;
     Coda_run.setup_local_server ?client_trustlist ~rest_server_port
       ~insecure_rest_server coda ;
@@ -1025,7 +1025,7 @@ let daemon logger =
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
-         let%bind () = Coda_lib.start coda in
+         let%bind () = Mina_lib.start coda in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ))
 
@@ -1054,7 +1054,7 @@ let replay_blocks logger =
                    None )
          in
          let%bind coda = setup_daemon () in
-         let%bind () = Coda_lib.start_with_precomputed_blocks coda blocks in
+         let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
            "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
          Async.never () ))

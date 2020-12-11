@@ -49,7 +49,7 @@ module type Inputs_intf = sig
 
     val conv : t -> repr
 
-    val typ : (Coda_lib.t, repr option) typ
+    val typ : (Mina_lib.t, repr option) typ
 
     val name : string
   end
@@ -70,7 +70,7 @@ module type Inputs_intf = sig
      and type cursor := Cursor.t
      and type time := Block_time.Time.Stable.V1.t
 
-  val get_database : Coda_lib.t -> Pagination_database.t
+  val get_database : Mina_lib.t -> Pagination_database.t
 
   val filter_argument : Account.key option Schema.Arg.arg_typ
 
@@ -82,7 +82,7 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
-  let edge : (Coda_lib.t, Type.t Edge.t option) typ =
+  let edge : (Mina_lib.t, Type.t Edge.t option) typ =
     obj (Type.name ^ "Edge")
       ~doc:"Connection Edge as described by the Relay connections spec"
       ~fields:(fun _ ->
@@ -93,7 +93,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Edge.node; _} -> Type.conv node) ] )
 
-  let connection : (Coda_lib.t, Type.t Connection.t option) typ =
+  let connection : (Mina_lib.t, Type.t Connection.t option) typ =
     obj (Type.name ^ "Connection")
       ~doc:"Connection as described by the Relay connections spec"
       ~fields:(fun _ ->
