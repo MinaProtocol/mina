@@ -1029,10 +1029,29 @@ func (a *app) checkBandwidth(id peer.ID) {
 		Help: "The bandwidth used by the given peer.",
 	})
 
-	prometheus.MustRegister(totalIn)
-	prometheus.MustRegister(totalOut)
-	prometheus.MustRegister(rateIn)
-	prometheus.MustRegister(rateOut)
+	err := prometheus.Register(totalIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(totalOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
 
 	for {
 		stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
@@ -1051,7 +1070,11 @@ func (a *app) checkLatency(id peer.ID) {
 		Help: "The latency for the given peer.",
 	})
 
-	prometheus.MustRegister(latencyGauge)
+	err := prometheus.Register(latencyGauge)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register latency gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
 
 	for {
 		a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
