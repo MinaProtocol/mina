@@ -1,6 +1,6 @@
 (library
  (name full_frontier)
  (public_name transition_frontier_full_frontier)
- (libraries transition_frontier_base consensus core_kernel mina_base coda_state coda_transition staged_ledger)
+ (libraries transition_frontier_base consensus core_kernel mina_base mina_state coda_transition staged_ledger)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))

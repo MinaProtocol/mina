@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Coda_transition
 open Network_peer
 open Network_pool
@@ -124,7 +124,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.t
           * Ledger_hash.t
           * Pending_coinbase.t
-          * Coda_state.Protocol_state.value list )
+          * Mina_state.Protocol_state.value list )
           option
       end
 
@@ -149,7 +149,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t
-          * Coda_state.Protocol_state.Value.Stable.V1.t list )
+          * Mina_state.Protocol_state.Value.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 

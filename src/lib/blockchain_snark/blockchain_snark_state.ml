@@ -2,7 +2,7 @@ open Core_kernel
 open Snark_params
 open Tick
 open Mina_base
-open Coda_state
+open Mina_state
 open Pickles_types
 
 include struct

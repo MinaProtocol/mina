@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 open Coda_transition
 open Network_peer

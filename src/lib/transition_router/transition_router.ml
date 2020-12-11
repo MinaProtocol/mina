@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_state
+open Mina_state
 open Pipe_lib
 open Coda_transition
 open O1trace

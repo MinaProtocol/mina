@@ -5,7 +5,7 @@
    ; opam deps
    async core
    ; libs
-   mina_base coda_graphql coda_lib coda_state coda_net2
+   mina_base coda_graphql coda_lib mina_state coda_net2
    coda_transition coda_version parallel protocol_version
    node_addrs_and_ports transition_frontier
    ; internal deps

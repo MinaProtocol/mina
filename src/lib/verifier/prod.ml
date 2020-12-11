@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Blockchain_snark
 
 type ledger_proof = Ledger_proof.Prod.t

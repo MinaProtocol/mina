@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 
 module Validate_content = struct
   type t = Coda_net2.Validation_callback.t
@@ -1075,7 +1075,7 @@ module Staged_ledger_validation = struct
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
         ~current_state_view:
-          Coda_state.Protocol_state.(Body.view @@ body parent_protocol_state)
+          Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
         ~state_and_body_hash:
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)

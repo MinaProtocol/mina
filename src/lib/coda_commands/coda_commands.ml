@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Mina_numbers
 open Mina_base
-open Coda_state
+open Mina_state
 
 (** For status *)
 let txn_count = ref 0

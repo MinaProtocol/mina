@@ -32,7 +32,7 @@ module Rpcs : sig
       ( Staged_ledger.Scan_state.t
       * Ledger_hash.t
       * Pending_coinbase.t
-      * Coda_state.Protocol_state.value list )
+      * Mina_state.Protocol_state.value list )
       option
   end
 
@@ -222,7 +222,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
   -> ( Staged_ledger.Scan_state.t
      * Ledger_hash.t
      * Pending_coinbase.t
-     * Coda_state.Protocol_state.value list )
+     * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t

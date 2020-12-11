@@ -230,7 +230,7 @@ module type Sync_handler_intf = sig
     -> ( Staged_ledger.Scan_state.t
        * Ledger_hash.t
        * Pending_coinbase.t
-       * Coda_state.Protocol_state.value list )
+       * Mina_state.Protocol_state.value list )
        Option.t
 
   val get_transition_chain :

@@ -1,6 +1,6 @@
 (library
- (name coda_state)
- (public_name coda_state)
+ (name mina_state)
+ (public_name mina_state)
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

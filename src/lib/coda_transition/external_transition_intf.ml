@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 
 module type External_transition_common_intf = sig

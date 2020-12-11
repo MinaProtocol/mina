@@ -203,7 +203,7 @@ module T = struct
   let scan_state {scan_state; _} = scan_state
 
   let all_work_pairs t
-      ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+      ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       =
     Scan_state.all_work_pairs t.scan_state ~get_state
 
@@ -323,7 +323,7 @@ module T = struct
           let%bind.Or_error.Let_syntax txn_with_info =
             Ledger.apply_transaction ~constraint_constants
               ~txn_state_view:
-                (Coda_state.Protocol_state.Body.view protocol_state.body)
+                (Mina_state.Protocol_state.Body.view protocol_state.body)
               snarked_ledger tx.data
           in
           let computed_status =
@@ -1887,14 +1887,14 @@ let%test_module "test" =
         in
         let compile_time_genesis =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-          Coda_state.Genesis_protocol_state.t
+          Mina_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
         in
-        compile_time_genesis.data |> Coda_state.Protocol_state.body
+        compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
-      { (Coda_state.Protocol_state.Body.view state_body) with
+      { (Mina_state.Protocol_state.Body.view state_body) with
         curr_global_slot= slot }
 
     let create_and_apply ?(self = self_pk)

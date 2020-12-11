@@ -377,7 +377,7 @@ module Types = struct
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
             ~args:Arg.[]
-            ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun _ {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
@@ -389,7 +389,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun {ctx= coda; _}
-                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+                   {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string_system_time
                 (Coda_lib.time_controller coda)
                 timestamp )
@@ -397,13 +397,13 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
               Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
@@ -2752,7 +2752,7 @@ module Queries = struct
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
-        let open Coda_state in
+        let open Mina_state in
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants

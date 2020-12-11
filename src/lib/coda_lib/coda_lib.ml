@@ -894,7 +894,7 @@ let create ?wallets (config : Config.t) =
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
-                          Coda_state.Protocol_state.hash state
+                          Mina_state.Protocol_state.hash state
                         in
                         let k_block_hashes =
                           List.map

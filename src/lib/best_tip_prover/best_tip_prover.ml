@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 open Async_kernel
 open Coda_transition
 

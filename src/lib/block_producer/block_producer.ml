@@ -2,7 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
-open Coda_state
+open Mina_state
 open Coda_transition
 open Signature_lib
 open O1trace
@@ -120,7 +120,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.view
+    |> Mina_state.Protocol_state.Body.view
   in
   let%bind res =
     Interruptible.uninterruptible
