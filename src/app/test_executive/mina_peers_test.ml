@@ -60,6 +60,11 @@ module Make (Engine : Engine_intf) = struct
           expected_peers
         (* expected_peers_of_node is just expected_peers but with the peer_id of the given node removed from the list *)
       in
+      [%log info] "node_peer_id: %s" node_peer_id ;
+      [%log info] "expected_peers_of_node: %s"
+        (String.concat ~sep:" " expected_peers_of_node) ;
+      [%log info] "visible_peers_of_node: %s"
+        (String.concat ~sep:" " visible_peers_of_node) ;
       List.iter visible_peers_of_node ~f:(fun p ->
           assert (List.exists expected_peers_of_node ~f:(String.equal p)) )
       (* loop through visible_peers_of_node and make sure everything in that list is also in expected_peers_of_node *)

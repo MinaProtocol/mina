@@ -58,7 +58,7 @@ module Make (Engine : Engine_intf) = struct
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
     let%bind () = Log_engine.wait_for_init block_producer2 log_engine in
     [%log info] "Block producer 2 (of 2) initialized" ;
-    let graphql_port = 3085 in
+    let graphql_port = block_producer2.node_graphql_port in
     Async_kernel.Deferred.don't_wait_for
       (Node.set_port_forwarding_exn ~logger block_producer2 graphql_port) ;
     let sender = pk_of_keypair network.keypairs 1 in
