@@ -212,7 +212,11 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers" ~to_string:Fn.id
+    (* let peers = list_entry "Peers" ~to_string:Fn.id *)
+
+    let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
+
+    let ids_of_peers = list_entry "Libp2p PeerIDs of peers" ~to_string:Fn.id
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -316,7 +320,8 @@ module Status = struct
     ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
-    ; peers: string list
+    ; addrs_of_peers: string list
+    ; ids_of_peers: string list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int
@@ -345,10 +350,11 @@ module Status = struct
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
-      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
-      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-      ~next_block_production ~snark_work_fee ~addrs_and_ports
+      ~state_hash ~chain_id ~commit_id ~conf_dir ~addrs_of_peers ~ids_of_peers
+      ~user_commands_sent ~snark_worker ~block_production_keys ~histograms
+      ~consensus_time_best_tip ~consensus_time_now ~consensus_mechanism
+      ~consensus_configuration ~next_block_production ~snark_work_fee
+      ~addrs_and_ports
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

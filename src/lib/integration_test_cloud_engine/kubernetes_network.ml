@@ -155,7 +155,7 @@ module Node = struct
               peerId
             }
           }
-          peers
+          ids_of_peers
         }
       }
     |}]
