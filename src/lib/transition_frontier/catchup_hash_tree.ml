@@ -217,8 +217,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         Hashtbl.change t.nodes h ~f:(function
           | None ->
               [%log' debug t.logger]
-                ~metadata:
-                  [("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
+                ~metadata:[("hash", State_hash.to_yojson h)]
                 "hash tree invariant broken: new root $hash not present. \
                  Diffs may have been applied out of order" ;
               None
