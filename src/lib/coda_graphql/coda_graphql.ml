@@ -264,7 +264,11 @@ module Types = struct
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~addrs_of_peers:
+                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~ids_of_peers:
+                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+                 (* ~peers:(id ~typ:Schema.(non_null @@ list (non_null string))) *)
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
