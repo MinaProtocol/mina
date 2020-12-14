@@ -99,7 +99,7 @@ let create ~root =
 let check_for_parent t h ~parent:p ~check_has_breadcrumb =
   match Hashtbl.find t.nodes p with
   | None ->
-      [%log' warn t.logger]
+      [%log' debug t.logger]
         ~metadata:
           [ ("parent", State_hash.to_yojson p)
           ; ("hash", State_hash.to_yojson h)
@@ -107,7 +107,7 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
         "hash tree invariant broken: $parent not found in $tree for $hash"
   | Some x ->
       if check_has_breadcrumb && x.state <> Have_breadcrumb then
-        [%log' warn t.logger]
+        [%log' debug t.logger]
           ~metadata:
             [ ("parent", State_hash.to_yojson p)
             ; ("hash", State_hash.to_yojson h)
@@ -208,7 +208,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         let h = Root_data.Limited.hash new_root in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
-              [%log' warn t.logger]
+              [%log' debug t.logger]
                 ~metadata:
                   [("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
                 "hash $tree invariant broken: new root $hash not present. \
