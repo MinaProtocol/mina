@@ -820,7 +820,41 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
-            Strict_pipe.create Synchronous
+            let log_rate_limiter_occasionally rl =
+              let t = Time.Span.of_min 1. in
+              every t (fun () ->
+                  [%log' debug config.logger]
+                    ~metadata:
+                      [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+                    !"new_block $rate_limiter" )
+            in
+            let rl =
+              Network_pool.Rate_limiter.create
+                ~capacity:
+                  ( (* Max of 20 transitions per slot per peer. *)
+                    20
+                  , `Per
+                      (Block_time.Span.to_time_span
+                         consensus_constants.slot_duration_ms) )
+            in
+            log_rate_limiter_occasionally rl ;
+            let r, w = Strict_pipe.create Synchronous in
+            ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
+                  let sender = Envelope.Incoming.sender e in
+                  match
+                    Network_pool.Rate_limiter.add rl sender ~now:(Time.now ())
+                      ~score:1
+                  with
+                  | `Capacity_exceeded ->
+                      [%log' warn config.logger]
+                        "$sender has sent many blocks. This is very unusual."
+                        ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
+                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                        cb `Reject ;
+                      None
+                  | `Within_capacity ->
+                      Some x )
+            , w )
           in
           let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
@@ -1175,7 +1209,7 @@ let create ?wallets (config : Config.t) =
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
                       if not (source = `Internal) then
-                        [%str_log' trace config.logger]
+                        [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
                               , External_transition.Validated.to_yojson
