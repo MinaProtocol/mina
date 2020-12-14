@@ -92,9 +92,9 @@ module Network_config = struct
       ^ string_of_int time_now.tm_min
     in
     (* append the first 5 chars of the username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
-    (* intntest-username-testname-DaymonthHrMin *)
-    (* ex: intntest-adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
-    let testnet_name = "intntest-" ^ user ^ "-" ^ test_name ^ "-" ^ timestr in
+    (* username-testname-DaymonthHrMin *)
+    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
