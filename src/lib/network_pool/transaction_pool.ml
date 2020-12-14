@@ -5,7 +5,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Signature_lib
 open Network_peer
@@ -1223,12 +1223,12 @@ end
 module Make (Staged_ledger : sig
   type t
 
-  val ledger : t -> Coda_base.Ledger.t
+  val ledger : t -> Mina_base.Ledger.t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+  Make0 (Mina_base.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make

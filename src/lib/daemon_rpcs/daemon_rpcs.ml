@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-open Coda_base
+open Mina_base
 open Signature_lib
 module Types = Types
 module Client = Client

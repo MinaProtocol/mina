@@ -3,4 +3,4 @@
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (libraries core_kernel consensus coda_intf coda_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler test_genesis_ledger coda_networking ledger_catchup))
+ (libraries core_kernel consensus coda_intf mina_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler test_genesis_ledger coda_networking ledger_catchup))

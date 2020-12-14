@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 open Snark_params
 module Global_slot = Coda_numbers.Global_slot
 open Currency
@@ -694,7 +694,7 @@ module Base = struct
                 | Ok _ ->
                     false
                 | Error err ->
-                    let open Coda_base in
+                    let open Mina_base in
                     User_command_status.Failure.equal
                       (Transaction_logic.timing_error_to_user_command_status
                          err)
@@ -3703,7 +3703,7 @@ let%test_module "transaction_snark" =
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants
             ~sok_message:
-              (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+              (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty)
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger_after)

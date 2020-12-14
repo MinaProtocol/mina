@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants =

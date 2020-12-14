@@ -11,13 +11,13 @@ module Field = Snark_params.Tick.Field
 [%%else]
 
 module Field = Snark_params_nonconsensus.Field
-module Coda_base = Coda_base_nonconsensus
+module Mina_base = Coda_base_nonconsensus
 module Hex = Hex_nonconsensus.Hex
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
-module Token_id = Coda_base.Token_id
+module Token_id = Mina_base.Token_id
 
 module Unsigned = struct
   type t =
@@ -255,8 +255,8 @@ module Unsigned = struct
     ; source= `Pk r.delegator
     ; kind= `Delegation
     ; fee_payer= `Pk r.delegator
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= Coda_base.Token_id.(default |> to_uint64)
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= Mina_base.Token_id.(default |> to_uint64)
     ; fee= r.fee
     ; amount= None }
 
@@ -266,8 +266,8 @@ module Unsigned = struct
     ; source= `Pk r.receiver
     ; kind= `Create_token
     ; fee_payer= `Pk r.receiver (* TODO: reviewer, please check! *)
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= Coda_base.Token_id.(default |> to_uint64)
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= Mina_base.Token_id.(default |> to_uint64)
     ; fee= r.fee
     ; amount= None }
 
@@ -277,8 +277,8 @@ module Unsigned = struct
     ; source= `Pk r.token_owner
     ; kind= `Create_token
     ; fee_payer= `Pk r.receiver
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= r.token |> Coda_base.Token_id.to_uint64
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= r.token |> Mina_base.Token_id.to_uint64
     ; fee= r.fee
     ; amount= None }
 
@@ -288,8 +288,8 @@ module Unsigned = struct
     ; source= `Pk r.token_owner
     ; kind= `Mint_tokens
     ; fee_payer= `Pk r.token_owner
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= r.token |> Coda_base.Token_id.to_uint64
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= r.token |> Mina_base.Token_id.to_uint64
     ; fee= r.fee
     ; amount= Some r.amount }
 

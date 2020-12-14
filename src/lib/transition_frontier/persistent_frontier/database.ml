@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Coda_base
+open Mina_base
 open Coda_transition
 open Frontier_base
 

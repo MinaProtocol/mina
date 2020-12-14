@@ -2,7 +2,7 @@ open Core
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
 open Unix
 

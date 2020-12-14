@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 
 (* TODO: Remove Transaction functor when we need to query transactions other
    than user_commands *)

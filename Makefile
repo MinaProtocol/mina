@@ -261,8 +261,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build

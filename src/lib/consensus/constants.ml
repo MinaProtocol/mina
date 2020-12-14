@@ -226,7 +226,7 @@ let create' (type a b c)
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   let protocol_constants =
-    Coda_base.Protocol_constants_checked.value_of_t protocol_constants
+    Mina_base.Protocol_constants_checked.value_of_t protocol_constants
   in
   let constants =
     create' (module Constants_UInt32) ~constraint_constants ~protocol_constants
@@ -263,7 +263,7 @@ let to_protocol_constants
      ; slots_per_epoch
      ; sub_windows_per_window= _ } :
       _ Poly.t) =
-  { Coda_base.Protocol_constants_checked.Poly.k
+  { Mina_base.Protocol_constants_checked.Poly.k
   ; delta
   ; genesis_state_timestamp
   ; slots_per_sub_window
@@ -370,7 +370,7 @@ module Checked = struct
           ; genesis_state_timestamp |])
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(protocol_constants : Coda_base.Protocol_constants_checked.var) :
+      ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :
       (var, _) Checked.t =
     let open Snarky_integer in
     let%bind constants =
@@ -408,7 +408,7 @@ module Checked = struct
 end
 
 let%test_unit "checked = unchecked" =
-  let open Coda_base in
+  let open Mina_base in
   let for_unit_tests = Genesis_constants.for_unit_tests.protocol in
   let constraint_constants =
     Genesis_constants.Constraint_constants.for_unit_tests

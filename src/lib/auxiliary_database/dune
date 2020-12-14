@@ -3,7 +3,7 @@
  (public_name auxiliary_database)
  (library_flags -linkall)
  (inline_tests)
- (libraries core rocksdb coda_base coda_transition secrets staged_ledger)
+ (libraries core rocksdb mina_base coda_transition secrets staged_ledger)
  (preprocess
   (pps ppx_jane ppx_coda ppx_version ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

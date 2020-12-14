@@ -1,7 +1,7 @@
 open Core
 open Async
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Signature_lib

@@ -1,7 +1,7 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Coda_base
+open Mina_base
 open Coda_state
 open Pickles_types
 
@@ -392,7 +392,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
     , digest
         (let main x =
            let open Tick in
-           let%bind x1 = exists Coda_base.State_hash.typ in
+           let%bind x1 = exists Mina_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
              step ~proof_level ~constraint_constants ~logger:(Logger.create ())
@@ -400,4 +400,4 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~exposing:[Coda_base.State_hash.typ] main) ) ]
+         Tick.constraint_system ~exposing:[Mina_base.State_hash.typ] main) ) ]

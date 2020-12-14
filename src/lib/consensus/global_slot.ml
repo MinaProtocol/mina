@@ -1,6 +1,6 @@
 open Unsigned
 open Core
-open Coda_base
+open Mina_base
 open Snark_params.Tick
 module T = Coda_numbers.Global_slot
 module Length = Coda_numbers.Length

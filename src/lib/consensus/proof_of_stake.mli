@@ -24,9 +24,9 @@ module Exported : sig
 
     val min_window_density : Value.t -> Coda_numbers.Length.t
 
-    val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+    val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-    val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+    val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
     (* unsafe modules for creating dummy states when doing vrf evaluations *)
     (* TODO: refactor code so that [Hooks.next_proposal] does not require a full [Consensus_state] *)

@@ -5,6 +5,6 @@
    ; opam deps
    core
    ; libs
-   coda_base signature_lib secrets participating_state)
+   mina_base signature_lib secrets participating_state)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.make)))

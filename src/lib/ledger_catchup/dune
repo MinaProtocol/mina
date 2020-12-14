@@ -15,7 +15,7 @@
    pipe_lib
    syncable_ledger
    merkle_address
-   coda_base
+   mina_base
    coda_metrics
    transition_chain_verifier
    coda_networking

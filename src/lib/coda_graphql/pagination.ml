@@ -2,7 +2,7 @@ open Core
 open Async
 open Graphql_async
 open Schema
-open Coda_base
+open Mina_base
 open Auxiliary_database
 
 module Page_info = struct

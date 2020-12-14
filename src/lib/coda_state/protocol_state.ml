@@ -2,7 +2,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Coda_base
+open Mina_base
 
 [%%ifdef
 consensus_mechanism]
@@ -286,9 +286,9 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       { Body.Poly.blockchain_state=
           Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
-              (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+              (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:
-              (Coda_base.Ledger.next_available_token
+              (Mina_base.Ledger.next_available_token
                  (Lazy.force genesis_ledger))
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=

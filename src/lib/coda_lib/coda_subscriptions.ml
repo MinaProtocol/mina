@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Signature_lib
 open Auxiliary_database
 open O1trace

@@ -4,7 +4,7 @@ open Core
 open Async
 open Cache_lib
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 

@@ -2,7 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Coda_numbers
-open Coda_base
+open Mina_base
 open Coda_state
 
 (** For status *)

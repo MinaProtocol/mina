@@ -117,7 +117,7 @@ module Verifiable = struct
       type t =
         ( Signed_command.Stable.V1.t
         , Snapp_command.Stable.V1.t
-          * (* TODO: Should be Coda_base.Side_loaded_verification_key *)
+          * (* TODO: Should be Mina_base.Side_loaded_verification_key *)
           Pickles.Side_loaded.Verification_key.Stable.V1.t
           Zero_one_or_two.Stable.V1.t )
         Poly.Stable.V1.t

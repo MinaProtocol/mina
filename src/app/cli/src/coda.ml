@@ -3,7 +3,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Cli_lib
 open Signature_lib
 open Init
