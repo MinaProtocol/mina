@@ -557,24 +557,31 @@ module Block = struct
           global_slot, timestamp FROM blocks WHERE id = ?")
       id
 
-  let add_if_doesn't_exist (module Conn : CONNECTION) ~constraint_constants
+  let add_if_doesn't_exist ?transactions_override (module Conn : CONNECTION)
+      ~constraint_constants
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
+    Core.printf "hi\n%!" ;
     match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
-        return block_id
+        Core.printf "found\n%!" ; return block_id
     | None ->
+        Core.printf "not found\n%!" ;
         let%bind parent_id =
           if
             External_transition.blockchain_length t <> Unsigned.UInt32.of_int 1
-          then
-            find (module Conn) ~state_hash:(External_transition.parent_hash t)
+          then (
+            Core.printf "trying %s (parent=%s)\n%!"
+              (State_hash.to_base58_check hash)
+              (State_hash.to_base58_check (External_transition.parent_hash t)) ;
+            find (module Conn) ~state_hash:(External_transition.parent_hash t) )
           else
             Conn.find
               (Caqti_request.find Caqti_type.unit Caqti_type.int
                  "SELECT count(id) + 1 FROM blocks")
               ()
         in
+        Core.printf "no problem\n%!" ;
         let%bind creator_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
@@ -646,7 +653,11 @@ module Block = struct
           else return ()
         in
         let transactions =
-          External_transition.transactions ~constraint_constants t
+          match transactions_override with
+          | Some x ->
+              x
+          | None ->
+              External_transition.transactions ~constraint_constants t
         in
         let%bind (_ : int) =
           deferred_result_list_fold transactions ~init:0 ~f:(fun sequence_no ->

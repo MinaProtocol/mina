@@ -3625,6 +3625,9 @@ let%test_module "Proof of stake tests" =
         failwithf "actual vs. expected: %d vs %f" actual expected ()
   end )
 
+module Consensus_state = Data.Consensus_state
+module Vrf_output = Data.Vrf.Output
+
 module Exported = struct
   module Global_slot = Global_slot
   module Block_data = Data.Block_data
