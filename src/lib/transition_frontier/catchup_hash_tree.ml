@@ -96,7 +96,15 @@ let create ~root =
   ; nodes
   ; logger= Logger.create () }
 
-let check_for_parent t h ~parent:p ~check_has_breadcrumb =
+let check_for_parent t h ~parent:p ~check_has_breadcrumb ~caller =
+  let log s =
+    [%log' debug t.logger]
+      ~metadata:
+        [ ("parent", State_hash.to_yojson p)
+        ; ("hash", State_hash.to_yojson h)
+        ; ("caller", `String caller) ]
+      "($caller) hash tree invariant broken: %s" s
+  in
   match Hashtbl.find t.nodes p with
   | None ->
       [%log' warn t.logger]
@@ -131,7 +139,7 @@ let add t h ~parent ~job =
     | Part_of_catchups s ->
         Hash_set.add s job
   else (
-    check_for_parent t h ~parent ~check_has_breadcrumb:false ;
+    check_for_parent t h ~parent ~check_has_breadcrumb:false ~caller:__LOC__ ;
     if not (Hashtbl.mem t.children h) then Hash_set.add t.tips h ;
     add_child t h ~parent ;
     Hash_set.remove t.tips parent ;
@@ -142,7 +150,7 @@ let add t h ~parent ~job =
 let breadcrumb_added (t : t) b =
   let h = Breadcrumb.state_hash b in
   let parent = Breadcrumb.parent_hash b in
-  check_for_parent t h ~parent ~check_has_breadcrumb:true ;
+  check_for_parent t h ~parent ~check_has_breadcrumb:true ~caller:__LOC__ ;
   Hashtbl.update t.nodes h ~f:(function
     | None ->
         (* New child *)
@@ -208,10 +216,9 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         let h = Root_data.Limited.hash new_root in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
-              [%log' warn t.logger]
-                ~metadata:
-                  [("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
-                "hash $tree invariant broken: new root $hash not present. \
+              [%log' debug t.logger]
+                ~metadata:[("hash", State_hash.to_yojson h)]
+                "hash tree invariant broken: new root $hash not present. \
                  Diffs may have been applied out of order" ;
               None
           | Some x ->
