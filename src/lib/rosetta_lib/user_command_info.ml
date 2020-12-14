@@ -6,7 +6,7 @@ open Core_kernel
 [%%ifndef
 consensus_mechanism]
 
-module Mina_base = Coda_base_nonconsensus
+module Mina_base = Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Signature_lib = Signature_lib_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended

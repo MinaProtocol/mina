@@ -64,7 +64,7 @@ public_key,
 2. Recursively traverse the chain backward from that point until you find the first transaction that involves the public key (either via fee, sender, receiver) specified in the `/account/balance` parameter
 3. Use the join-tables to find the relevant data in the `balances` table and look at the amount
 
-- For `/account/balance` queries involving the time-locked accounts, use the time-locking functions that already exist https://github.com/MinaProtocol/mina/blob/92ea2c06523559b9980658d15b9e5271400ac856/src/lib/mina_base/account.ml#L561 using the timing info in the database and the balance we found above.
+- For `/account/balance` queries involving the time-locked accounts, use the time-locking functions that already exist https://github.com/MinaProtocol/mina/blob/92ea2c06523559b9980658d15b9e5271400ac856/src/lib/coda_base/account.ml#L561 using the timing info in the database and the balance we found above.
 
 ## Drawbacks
 
