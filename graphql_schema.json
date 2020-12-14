@@ -7694,9 +7694,9 @@
                   "ofType": {
                     "kind": "NON_NULL",
                     "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
+                    "type": {
+                      "kind": "OBJECT",
+                      "name": "Peer",
                       "ofType": null
                     }
                   }

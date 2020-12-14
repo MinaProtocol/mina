@@ -103,6 +103,13 @@ module Status = struct
       digest_entries ~title:"RPCs" entries
   end
 
+  (* module Peer = struct
+    type t = {
+       id : string
+      ; address : string
+    }
+  end *)
+
   module Histograms = struct
     type t =
       { rpc_timings: Rpc_timings.t
@@ -183,10 +190,10 @@ module Status = struct
     let int_option_entry = option_entry ~f:Int.to_string
 
     let list_entry name ~to_string =
-      map_entry name ~f:(fun keys ->
-          let len = List.length keys in
+      map_entry name ~f:(fun list ->
+          let len = List.length list in
           let list_str =
-            if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
+            if len > 0 then " " ^ List.to_string ~f:to_string list else ""
           in
           Printf.sprintf "%d%s" len list_str )
 
@@ -212,11 +219,12 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    (* let peers = list_entry "Peers" ~to_string:Fn.id *)
+    let peers = list_entry "Peers" ~to_string:Network_peer.Peer.to_string
 
+    (*
     let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
 
-    let ids_of_peers = list_entry "Libp2p PeerIDs of peers" ~to_string:Fn.id
+    let ids_of_peers = list_entry "Libp2p PeerIDs of peers" ~to_string:Fn.id *)
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -320,8 +328,7 @@ module Status = struct
     ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
-    ; addrs_of_peers: string list
-    ; ids_of_peers: string list
+    ; peers: Network_peer.Peer.t list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int
@@ -350,11 +357,10 @@ module Status = struct
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~chain_id ~commit_id ~conf_dir ~addrs_of_peers ~ids_of_peers
-      ~user_commands_sent ~snark_worker ~block_production_keys ~histograms
-      ~consensus_time_best_tip ~consensus_time_now ~consensus_mechanism
-      ~consensus_configuration ~next_block_production ~snark_work_fee
-      ~addrs_and_ports
+      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
+      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =
