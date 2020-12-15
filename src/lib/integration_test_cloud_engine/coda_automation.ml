@@ -4,6 +4,7 @@ open Currency
 open Signature_lib
 open Coda_base
 open Integration_test_lib
+open Unix
 
 module Network_config = struct
   type block_producer_config =
@@ -79,14 +80,28 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let testnet_name = "integration-test-" ^ test_name in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_sanitized =
+      Str.global_replace (Str.regexp "\\W|_") "" user_from_env
+    in
+    let user = String.sub user_sanitized ~pos:0 ~len:5 in
+    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
+    let timestr =
+      string_of_int time_now.tm_mday
+      ^ string_of_int time_now.tm_hour
+      ^ string_of_int time_now.tm_min
+    in
+    (* append the first 5 chars of the local system username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* username-testname-DaymonthHrMin *)
+    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
-    let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
-    let cluster_name = "coda-infra-east" in
-    let cluster_region = "us-east1" in
-    let seed_zone = "us-east1-b" in
-    let seed_region = "us-east1" in
+    let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
+    let cluster_name = "mina-integration-west1" in
+    let cluster_region = "us-west1" in
+    let seed_zone = "us-west1-a" in
+    let seed_region = "us-west1" in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -346,7 +361,9 @@ module Network_manager = struct
       Network_config.testnet_log_filter network_config
     in
     let cons_node pod_id port =
-      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
+      { Kubernetes_network.Node.cluster= network_config.cluster_id
+      ; Kubernetes_network.Node.namespace=
+          network_config.terraform.testnet_name
       ; Kubernetes_network.Node.pod_id
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
