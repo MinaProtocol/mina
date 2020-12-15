@@ -17,6 +17,7 @@ affinity:
           operator: In
           values:
           - "true"
+      topologyKey: failure-domain.beta.kubernetes.io/region
 {{- end }}
 {{- end }}
 
