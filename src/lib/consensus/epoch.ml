@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Signed
 open Unsigned
 open Num_util

@@ -67,6 +67,7 @@ module Diff_versioned = struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -85,6 +86,7 @@ module Diff_versioned = struct
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -175,6 +177,8 @@ struct
   module Resource_pool = struct
     type transition_frontier_diff =
       Transition_frontier.best_tip_diff * Base_ledger.t
+
+    let label = "transaction_pool"
 
     module Config = struct
       type t =
@@ -346,12 +350,14 @@ struct
       | Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
             (Currency.Balance.to_amount
                (Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
     let handle_transition_frontier_diff
@@ -754,6 +760,7 @@ struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
       end
 
@@ -765,7 +772,17 @@ struct
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
 
+      let reject_overloaded_diff diffs =
+        List.map diffs ~f:(fun cmd ->
+            (User_command.forget_check cmd, Diff_error.Overloaded) )
+
+      let empty = []
+
       let size = List.length
+
+      let score x = Int.max 1 (List.length x)
+
+      let max_per_second = 2
 
       let verified_size = List.length
 

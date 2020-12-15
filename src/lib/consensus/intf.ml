@@ -223,6 +223,7 @@ module type State_hooks = sig
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
+    -> supercharge_coinbase:bool
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
@@ -240,9 +241,7 @@ module type State_hooks = sig
     -> prev_state_hash:Coda_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var]
-         * [`Supercharge_coinbase of Snark_params.Tick.Boolean.var]
-         * consensus_state_var
+    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -444,7 +443,8 @@ module type S = sig
         end]
 
         module For_tests : sig
-          val with_curr_global_slot : t -> Global_slot.t -> t
+          val with_global_slot_since_genesis :
+            t -> Coda_numbers.Global_slot.t -> t
         end
       end
 
@@ -493,6 +493,14 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val block_stake_winner : Value.t -> Public_key.Compressed.t
+
+      val block_creator : Value.t -> Public_key.Compressed.t
+
+      val coinbase_receiver : Value.t -> Public_key.Compressed.t
+
+      val coinbase_receiver_var : var -> Public_key.Compressed.var
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t
@@ -516,9 +524,18 @@ module type S = sig
 
       val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
 
+      val global_slot_since_genesis : Value.t -> Coda_numbers.Global_slot.t
+
+      val global_slot_since_genesis_var :
+        var -> Coda_numbers.Global_slot.Checked.t
+
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
+
+      val supercharge_coinbase_var : var -> Boolean.var
+
+      val supercharge_coinbase : Value.t -> bool
     end
 
     module Block_data : sig
@@ -529,7 +546,19 @@ module type S = sig
       val global_slot : t -> Coda_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
+
+      val global_slot_since_genesis : t -> Coda_numbers.Global_slot.t
+
+      val coinbase_receiver : t -> Public_key.Compressed.t
     end
+  end
+
+  module Coinbase_receiver : sig
+    (* Producer: block producer receives coinbases
+       Other: specified account (with default token) receives coinbases
+    *)
+
+    type t = [`Producer | `Other of Public_key.Compressed.t]
   end
 
   module Hooks : sig
@@ -569,20 +598,16 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> [`Keep | `Take]
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Produce_now of
-        Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
-      | `Produce of
-        Unix_timestamp.t
-        * Signature_lib.Keypair.t
-        * Block_data.t
-        * Public_key.Compressed.t ]
+      | `Produce_now of Block_data.t * Public_key.Compressed.t
+      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
+      ]
 
     (**
      * Determine if and when to next produce a block. Either informs the callee
@@ -598,6 +623,7 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
+      -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
       -> block_producer_timing
 
@@ -617,8 +643,8 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> bool
 

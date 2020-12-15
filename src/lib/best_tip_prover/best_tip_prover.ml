@@ -65,7 +65,8 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
     let best_tip =
-      External_transition.Validation.forget_validation best_verified_tip
+      External_transition.Validation.forget_validation_with_hash
+        best_verified_tip
     in
     let root =
       Transition_frontier.root frontier

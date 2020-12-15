@@ -6,4 +6,5 @@
    marlin_plonk_bindings_tweedle_fp_verifier_index
    marlin_plonk_bindings_tweedle_fp_vector)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (inline_tests)
+ (preprocess (pps ppx_version ppx_inline_test)))

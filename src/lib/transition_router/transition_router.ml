@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Coda_state
 open Pipe_lib
 open Coda_transition
 open O1trace
@@ -18,17 +17,17 @@ let create_bufferred_pipe ?name () =
 
 let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
-  let root_state =
+  let root_consensus_state =
     Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.protocol_state
+    |> Transition_frontier.Breadcrumb.consensus_state_with_hash
   in
-  let new_state =
-    External_transition.Initial_validated.protocol_state new_transition
+  let new_consensus_state =
+    External_transition.Validation.forget_validation_with_hash new_transition
+    |> With_hash.map ~f:External_transition.consensus_state
   in
   let constants = precomputed_values.consensus_constants in
-  Consensus.Hooks.should_bootstrap ~constants
-    ~existing:(Protocol_state.consensus_state root_state)
-    ~candidate:(Protocol_state.consensus_state new_state)
+  Consensus.Hooks.should_bootstrap ~constants ~existing:root_consensus_state
+    ~candidate:new_consensus_state
     ~logger:
       (Logger.extend logger
          [ ( "selection_context"
@@ -466,11 +465,15 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                    Consensus.Hooks.select
                      ~constants:precomputed_values.consensus_constants
                      ~existing:
-                       (External_transition.Initial_validated.consensus_state
-                          current_transition)
+                       ( External_transition.Validation
+                         .forget_validation_with_hash current_transition
+                       |> With_hash.map ~f:External_transition.consensus_state
+                       )
                      ~candidate:
-                       (External_transition.Initial_validated.consensus_state
-                          incoming_transition)
+                       ( External_transition.Validation
+                         .forget_validation_with_hash incoming_transition
+                       |> With_hash.map ~f:External_transition.consensus_state
+                       )
                      ~logger
                    = `Take
                  then

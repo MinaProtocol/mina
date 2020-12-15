@@ -39,7 +39,8 @@ module Fork_constants = struct
     module V1 = struct
       type t =
         { previous_state_hash: Pickles.Backend.Tick.Field.Stable.V1.t
-        ; previous_length: Coda_numbers.Length.Stable.V1.t }
+        ; previous_length: Coda_numbers.Length.Stable.V1.t
+        ; previous_global_slot: Coda_numbers.Global_slot.Stable.V1.t }
       [@@deriving sexp, eq, yojson]
 
       let to_latest = Fn.id
@@ -87,11 +88,13 @@ module Constraint_constants = struct
     ; account_creation_fee= Currency.Fee.to_uint64 t.account_creation_fee
     ; fork=
         ( match t.fork with
-        | Some {previous_length; previous_state_hash} ->
+        | Some {previous_length; previous_state_hash; previous_global_slot} ->
             Some
               { previous_length= Unsigned.UInt32.to_int previous_length
               ; previous_state_hash=
-                  Pickles.Backend.Tick.Field.to_string previous_state_hash }
+                  Pickles.Backend.Tick.Field.to_string previous_state_hash
+              ; previous_global_slot=
+                  Unsigned.UInt32.to_int previous_global_slot }
         | None ->
             None ) }
 
@@ -192,13 +195,18 @@ module Constraint_constants = struct
         [%%inject
         "fork_previous_state_hash", fork_previous_state_hash]
 
+        [%%inject
+        "fork_previous_global_slot", fork_previous_global_slot]
+
         let fork =
           Some
             { Fork_constants.previous_length=
                 Coda_numbers.Length.of_int fork_previous_length
             ; previous_state_hash=
                 Data_hash_lib.State_hash.of_base58_check_exn
-                  fork_previous_state_hash }
+                  fork_previous_state_hash
+            ; previous_global_slot=
+                Coda_numbers.Global_slot.of_int fork_previous_global_slot }
 
         [%%endif]
 

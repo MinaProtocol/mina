@@ -222,6 +222,29 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
+  and max_connections =
+    flag "max-connections"
+      ~doc:
+        (Printf.sprintf
+           "NN max number of connections that this peer will have to \
+            neighbors in the gossip network. Tuning this higher will \
+            strengthen your connection to the network in exchange for using \
+            more RAM (default: %d)"
+           Cli_lib.Default.max_connections)
+      (optional int)
+  and validation_queue_size =
+    flag "validation-queue-size"
+      ~doc:
+        (Printf.sprintf
+           "NN size of the validation queue in the p2p network used to buffer \
+            messages (like blocks and transactions received on the gossip \
+            network) while validation is pending. If a transaction, for \
+            example, is invalid, we don't forward the message on the gossip \
+            net. If this queue is too small, we will drop messages without \
+            validating them. If it is too large, we are susceptible to DoS \
+            attacks on memory. (default: %d)"
+           Cli_lib.Default.validation_queue_size)
+      (optional int)
   and direct_peers_raw =
     flag "direct-peer"
       ~doc:
@@ -309,8 +332,7 @@ let setup_daemon logger =
       [ ("commit", `String Coda_version.commit_id)
       ; ("branch", `String Coda_version.branch)
       ; ("commit_date", `String Coda_version.commit_date)
-      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id) ]
     in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
@@ -872,6 +894,14 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
       in
+      let max_connections =
+        or_from_config YJ.Util.to_int_option "max-connections"
+          ~default:Cli_lib.Default.max_connections max_connections
+      in
+      let validation_queue_size =
+        or_from_config YJ.Util.to_int_option "validation-queue-size"
+          ~default:Cli_lib.Default.validation_queue_size validation_queue_size
+      in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
@@ -897,6 +927,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
           ; peer_exchange= Option.value ~default:false peer_exchange
+          ; max_connections
+          ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
           ; keypair= libp2p_keypair }
       in
@@ -914,45 +946,9 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in
-      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-      let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let transaction_database_dir = conf_dir ^/ "transaction" in
-      let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        transaction_database_dir ;
-      let external_transition_database_dir =
-        conf_dir ^/ "external_transition_database"
-      in
-      let%bind external_transition_database =
-        let create_db () =
-          let%map () =
-            Async.Unix.mkdir ~p:() external_transition_database_dir
-          in
-          Auxiliary_database.External_transition_database.create ~logger
-            external_transition_database_dir
-        in
-        match%bind Deferred.Or_error.try_with create_db with
-        | Ok res ->
-            return res
-        | Error err ->
-            [%log warn]
-              "Encountered an error $err while creating the external \
-               transition database. Retrying."
-              ~metadata:[("err", Error_json.error_to_yojson err)] ;
-            let%bind () =
-              File_system.remove_dir external_transition_database_dir
-            in
-            create_db ()
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
-      let coinbase_receiver =
+      let coinbase_receiver : Consensus.Coinbase_receiver.t =
         Option.value_map coinbase_receiver_flag ~default:`Producer
           ~f:(fun pk -> `Other pk)
       in
@@ -965,6 +961,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
+      let start_time = Time.now () in
       let%map coda =
         Coda_lib.create ~wallets
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
@@ -987,10 +984,9 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ~start_time ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
@@ -1351,14 +1347,12 @@ let coda_commands logger =
         ; (module Coda_restart_node_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in
