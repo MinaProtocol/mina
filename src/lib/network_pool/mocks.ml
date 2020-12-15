@@ -7,13 +7,44 @@ let trust_system = Trust_system.null ()
 module Transaction_snark_work = Transaction_snark_work
 module Ledger_proof = Ledger_proof.Debug
 
+module Base_ledger = struct
+  open Coda_base
+
+  type t = Account.t Account_id.Map.t [@@deriving sexp]
+
+  module Location = struct
+    type t = Account_id.t
+  end
+
+  let location_of_account _t k = Some k
+
+  let get t l = Map.find t l
+
+  let detached_signal _ = Deferred.never ()
+end
+
+module Staged_ledger = struct
+  type t = Base_ledger.t [@@deriving sexp]
+
+  let ledger = Fn.id
+end
+
 module Transition_frontier = struct
   type table = int Transaction_snark_work.Statement.Table.t [@@deriving sexp]
 
   type diff = int * table [@@deriving sexp]
 
+  type best_tip_diff = unit
+
+  module Breadcrumb = struct
+    type t = Staged_ledger.t
+
+    let staged_ledger = Fn.id
+  end
+
   type t =
     { refcount_table: table
+    ; mutable ledger: Base_ledger.t
     ; diff_writer: diff Broadcast_pipe.Writer.t sexp_opaque
     ; diff_reader: diff Broadcast_pipe.Reader.t sexp_opaque }
   [@@deriving sexp]
@@ -31,7 +62,12 @@ module Transition_frontier = struct
     let table = Transaction_snark_work.Statement.Table.create () in
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer = Broadcast_pipe.create (0, table) in
-    {refcount_table= table; diff_writer; diff_reader}
+    { refcount_table= table
+    ; ledger= Coda_base.Account_id.Map.empty
+    ; diff_writer
+    ; diff_reader }
+
+  let best_tip t = t.ledger
 
   module Extensions = struct
     module Work = Transaction_snark_work.Statement
@@ -41,6 +77,10 @@ module Transition_frontier = struct
       (int * int Transaction_snark_work.Statement.Table.t)
       Broadcast_pipe.Reader.t =
     t.diff_reader
+
+  let best_tip_diff_pipe _ =
+    let r, _ = Broadcast_pipe.create () in
+    r
 
   (*Adds statements to the table of referenced work. Snarks for only the referenced statements are added to the pool*)
   let refer_statements (t : t) stmts =

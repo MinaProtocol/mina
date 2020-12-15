@@ -19,7 +19,9 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
+    module Mock_snark_pool =
+      Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
+        (Mocks.Transition_frontier)
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
