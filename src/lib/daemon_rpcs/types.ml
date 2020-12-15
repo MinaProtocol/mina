@@ -223,12 +223,16 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers"
-
-    (*
-    let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
-
-    let ids_of_peers = list_entry "Libp2p PeerIDs of peers" ~to_string:Fn.id *)
+    let peers =
+      let render display_peer =
+        let open Network_peer.Peer in
+        of_display display_peer |> to_multiaddr_string
+      in
+      map_entry "Peers" ~f:(fun peers ->
+          List.mapi peers ~f:(fun i peer ->
+              let rendered = "\t" ^ render peer in
+              if i = 0 then "\n" ^ rendered else rendered )
+          |> String.concat ~sep:"\n" )
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -332,7 +336,7 @@ module Status = struct
     ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
-    ; peers: Network_peer.Peer.t list
+    ; peers: Network_peer.Peer.Display.Stable.Latest.t list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int

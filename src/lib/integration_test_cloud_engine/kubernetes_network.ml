@@ -155,7 +155,7 @@ module Node = struct
               peerId
             }
           }
-          idsOfPeers
+          peers { peerId }
         }
       }
     |}]
@@ -245,8 +245,9 @@ module Node = struct
       | Some peer ->
           Malleable_error.return peer#peerId
     in
-    let peers_ids = (query_result_obj#daemonStatus)#peers in
-    return (self_id, Array.to_list peers_ids)
+    let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
+    let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    return (self_id, peer_ids)
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
