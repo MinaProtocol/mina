@@ -281,7 +281,7 @@ module Status = struct
           ~acceptable_network_delay:
             (fmt_field "Acceptable network delay" ms_to_string)
           ~genesis_state_timestamp:
-            (fmt_field "Genesis state timestamp" time_to_string)
+            (fmt_field "Chain start timestamp" time_to_string)
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in

@@ -372,8 +372,8 @@ let wait_till_genesis ~logger ~time_controller
       ~metadata:
         [ ( "time_till_genesis"
           , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) ) ]
-      "Node started before genesis: waiting $time_till_genesis milliseconds \
-       before running transition router" ;
+      "Node started before the chain start time: waiting $time_till_genesis \
+       milliseconds before starting participation" ;
     let rec logger_loop () =
       let%bind () = after (Time_ns.Span.of_sec 30.) in
       let now = Time.now time_controller in
@@ -382,9 +382,9 @@ let wait_till_genesis ~logger ~time_controller
         |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining = Time.diff genesis_state_timestamp now in
-        [%log warn]
-          "Time before genesis. Waiting $tm_remaining milliseconds before \
-           running transition router"
+        [%log debug]
+          "Time before the chain start time. Waiting $tm_remaining \
+           milliseconds before starting participation"
           ~metadata:
             [ ( "tm_remaining"
               , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) ) ] ;

@@ -199,8 +199,12 @@ let get_status ~flag t =
   let consensus_mechanism = Consensus.name in
   let time_controller = config.time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
-      (Block_time.now time_controller)
+    try
+      Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
+        (Block_time.now time_controller)
+    with Invalid_argument _ ->
+      (*setting 0 for the time before genesis timestamp*)
+      Consensus.Data.Consensus_time.zero ~constants:consensus_constants
   in
   let consensus_configuration =
     Consensus.Configuration.t ~constraint_constants ~protocol_constants
