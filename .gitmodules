@@ -19,9 +19,6 @@
 [submodule "src/external/graphql_ppx"]
 	path = src/external/graphql_ppx
 	url = https://github.com/o1-labs/graphql_ppx.git
-[submodule "src/lib/zexe"]
-	path = src/lib/zexe
-	url = https://github.com/o1-labs/zexe.git
 [submodule "src/lib/marlin"]
 	path = src/lib/marlin
 	url = https://github.com/o1-labs/marlin.git
