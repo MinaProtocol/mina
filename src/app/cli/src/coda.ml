@@ -674,7 +674,7 @@ let setup_daemon logger =
           ~default:true log_block_creation
       in
       let log_gossip_heard =
-        { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
+        { Mina_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= true }
       in
@@ -933,7 +933,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; keypair= libp2p_keypair }
       in
       let net_config =
-        { Coda_networking.Config.logger
+        { Mina_networking.Config.logger
         ; trust_system
         ; time_controller
         ; consensus_local_state
@@ -942,7 +942,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         ; log_gossip_heard
         ; is_seed
         ; creatable_gossip_net=
-            Coda_networking.Gossip_net.(
+            Mina_networking.Gossip_net.(
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in

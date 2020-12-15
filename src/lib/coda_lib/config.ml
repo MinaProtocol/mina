@@ -28,7 +28,7 @@ type t =
   ; snark_coordinator_key: Public_key.Compressed.t option [@default None]
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
-  ; net_config: Coda_networking.Config.t
+  ; net_config: Mina_networking.Config.t
   ; initial_protocol_version: Protocol_version.t
         (* Option.t instead of option, so that the derived `make' requires an argument *)
   ; proposed_protocol_version_opt: Protocol_version.t Option.t
