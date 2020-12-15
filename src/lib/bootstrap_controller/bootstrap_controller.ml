@@ -19,7 +19,7 @@ type t =
   ; precomputed_values: Precomputed_values.t
   ; mutable best_seen_transition: External_transition.Initial_validated.t
   ; mutable current_root: External_transition.Initial_validated.t
-  ; network: Coda_networking.t }
+  ; network: Mina_networking.t }
 
 type time = Time.Span.t
 
@@ -124,7 +124,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     Deferred.return `Ignored
   else
     match%bind
-      Coda_networking.get_ancestry t.network sender.Peer.peer_id
+      Mina_networking.get_ancestry t.network sender.Peer.peer_id
         candidate_state
     with
     | Error e ->
@@ -152,7 +152,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
     ~genesis_constants =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
-  Coda_networking.glue_sync_ledger t.network query_reader response_writer ;
+  Mina_networking.glue_sync_ledger t.network query_reader response_writer ;
   Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
       let ({With_hash.data= transition; hash}, _)
             : External_transition.Initial_validated.t =
@@ -253,7 +253,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       let%bind ( staged_ledger_data_download_time
                , staged_ledger_data_download_result ) =
         time_deferred
-          (Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
+          (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
              t.network sender.peer_id hash)
       in
       match staged_ledger_data_download_result with
@@ -424,13 +424,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~random_peers:(fun n ->
                       (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
                       let%map peers =
-                        Coda_networking.random_peers t.network n
+                        Mina_networking.random_peers t.network n
                       in
                       sender :: peers )
                     ~query_peer:
                       { Consensus.Hooks.Rpcs.query=
                           (fun peer rpc query ->
-                            Coda_networking.(
+                            Mina_networking.(
                               query_peer t.network peer.peer_id
                                 (Rpcs.Consensus_rpc rpc) query) ) }
                     ~ledger_depth:
@@ -612,7 +612,7 @@ let%test_module "Bootstrap_controller tests" =
       let branch_size = (max_frontier_length * 2) + 2 in
       Quickcheck.test ~trials:1
         (let open Quickcheck.Generator.Let_syntax in
-        (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
+        (* we only need one node for this test, but we need more than one peer so that mina_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~max_frontier_length

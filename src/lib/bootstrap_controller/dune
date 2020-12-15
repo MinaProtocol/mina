@@ -12,6 +12,6 @@
    pipe_lib
    consensus
    transition_frontier
-   coda_networking
+   mina_networking
    sync_handler
    fake_network))

@@ -9,10 +9,10 @@ type peer_state =
   ; consensus_local_state: Consensus.Data.Local_state.t }
 
 type peer_network =
-  {peer: Network_peer.Peer.t; state: peer_state; network: Coda_networking.t}
+  {peer: Network_peer.Peer.t; state: peer_state; network: Mina_networking.t}
 
 type nonrec 'n t =
-  { fake_gossip_network: Coda_networking.Gossip_net.Fake.network
+  { fake_gossip_network: Mina_networking.Gossip_net.Fake.network
   ; peer_networks: (peer_network, 'n) Vect.t }
   constraint 'n = _ num_peers
 
