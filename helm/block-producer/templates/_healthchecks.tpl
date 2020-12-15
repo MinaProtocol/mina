@@ -21,6 +21,8 @@ block-producer readiness settings
 readinessProbe:
   exec:
     command: [
+      "/bin/bash",
+      "-c",
       "source /healthcheck/utilities.sh && isDaemonSynced && hasPeersGreaterThan 3 && ownsFunds"
     ]
 {{- end }}
