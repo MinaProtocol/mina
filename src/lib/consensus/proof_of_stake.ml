@@ -1383,7 +1383,7 @@ module Data = struct
   end
 
   [%%if
-  false]
+  true]
 
   module Min_window_density = struct
     (* Three cases for updating the lengths of sub_windows
@@ -1453,9 +1453,6 @@ module Data = struct
       (min_window_density, sub_window_densities)
 
     module Checked = struct
-      open Tick.Checked
-      open Tick.Checked.Let_syntax
-
       let%snarkydef update_min_window_density ~(constants : Constants.var)
           ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
           ~prev_min_window_density =
@@ -1589,7 +1586,7 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
-        let constants = Constants.for_unit_tests
+        let constants = Lazy.force Constants.for_unit_tests
 
         (* converting the input for actual implementation to the input required by the
            reference implementation *)
@@ -1616,7 +1613,6 @@ module Data = struct
            1/n^2  | [n*slots_per_sub_window, (n+1)*slots_per_sub_window)
         *)
         let gen_slot_diff =
-          let open Quickcheck.Generator in
           let to_int = Length.to_int in
           Quickcheck.Generator.weighted_union
           @@ List.init
