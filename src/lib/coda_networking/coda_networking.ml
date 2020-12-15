@@ -1376,7 +1376,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             Trust_system.(
               record t.trust_system t.logger peer
                 Actions.
-                  ( Violated_protocol
+                  ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
                   ))
         | Local ->

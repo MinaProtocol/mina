@@ -54,6 +54,10 @@ module Actions = struct
           date, etc.
       *)
     | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
+    | No_reply_from_preferred_peer
+        (** A peer that should have had the response to a query did not provide it. *)
+    | Unknown_rpc  (** A peer made an unknown RPC. *)
+    | Decoding_failed  (** A gossip message could not be decoded. *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -123,6 +127,8 @@ module Actions = struct
         Trust_decrease 0.05
     | Outgoing_connection_error ->
         Trust_decrease 0.05
+    | No_reply_from_preferred_peer ->
+        Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
     | Made_request ->
@@ -147,6 +153,11 @@ module Actions = struct
         Trust_decrease (old_gossip_increment *. 3.)
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
+    | Unknown_rpc ->
+        (* TODO: Should do a soft ban of some kind if this happens enough. *)
+        Trust_decrease 0.05
+    | Decoding_failed ->
+        Insta_ban
 
   (* Disabling everything except insta-ban *)
   let to_trust_response t =

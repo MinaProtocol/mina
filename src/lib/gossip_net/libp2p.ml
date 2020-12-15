@@ -234,7 +234,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Trust_system.(
                     record config.trust_system config.logger conn_state
                       Actions.
-                        ( Violated_protocol
+                        ( Unknown_rpc
                         , Some
                             ( "Attempt to make unknown (fixed-version) RPC \
                                call \"$rpc\" with version $version"
@@ -337,7 +337,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       Trust_system.(
                         record config.trust_system config.logger peer
                           Actions.
-                            ( Violated_protocol
+                            ( Decoding_failed
                             , Some ("failed to decode gossip message", metadata)
                             ))
                       |> don't_wait_for ;
