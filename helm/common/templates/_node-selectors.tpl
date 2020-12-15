@@ -7,6 +7,16 @@ Node selector: preemptible node affinity
 {{- if .nodeSelector.preemptible }}
 nodeSelector:
   cloud.google.com/gke-preemptible: "true"
+{{- else }}
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: "cloud.google.com/gke-preemptible"
+          operator: In
+          values:
+          - "true"
 {{- end }}
 {{- end }}
 
