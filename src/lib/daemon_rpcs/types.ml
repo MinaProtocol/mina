@@ -172,7 +172,7 @@ module Status = struct
     val get : 'a t -> 'a
   end) =
   struct
-    let map_entry ~f (name : string) field = Some (name, f @@ FieldT.get field)
+    let map_entry (name : string) ~f field = Some (name, f @@ FieldT.get field)
 
     let string_entry (name : string) (field : string FieldT.t) =
       map_entry ~f:Fn.id name field
@@ -189,7 +189,11 @@ module Status = struct
 
     let int_option_entry = option_entry ~f:Int.to_string
 
-    let list_entry name ~to_string =
+    let list_entry name =
+      map_entry name ~f:(fun list ->
+          List.map list ~f:(fun obj -> FieldT.get obj) )
+
+    let list_string_entry name ~to_string =
       map_entry name ~f:(fun list ->
           let len = List.length list in
           let list_str =
@@ -219,7 +223,7 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers" ~to_string:Network_peer.Peer.to_string
+    let peers = list_entry "Peers"
 
     (*
     let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
@@ -236,7 +240,7 @@ module Status = struct
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
     let block_production_keys =
-      list_entry "Block producers running" ~to_string:Fn.id
+      list_string_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
