@@ -189,9 +189,9 @@ module Status = struct
 
     let int_option_entry = option_entry ~f:Int.to_string
 
-    let list_entry name =
+    (* let list_entry name ~f =
       map_entry name ~f:(fun list ->
-          List.map list ~f:(fun obj -> FieldT.get obj) )
+          List.map list ~f:(fun obj -> f @@ FieldT.get obj) ) *)
 
     let list_string_entry name ~to_string =
       map_entry name ~f:(fun list ->
@@ -223,7 +223,10 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers"
+    let peers =
+      list_string_entry "Peers" ~to_string:Network_peer.Peer.to_string
+
+    let peer = map_entry "Peer" ~f:Network_peer.Peer.to_string
 
     (*
     let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
