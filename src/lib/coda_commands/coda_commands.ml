@@ -181,13 +181,8 @@ let get_status ~flag t =
   in
   let commit_id = Coda_version.commit_id in
   let conf_dir = config.conf_dir in
-  let%map peers = Coda_lib.peers t in
-  let addrs_of_peers =
-    List.map peers ~f:(fun peer ->
-        Network_peer.Peer.to_discovery_host_and_port peer
-        |> Host_and_port.to_string )
-  in
-  let ids_of_peers = List.map peers ~f:(fun peer -> peer.peer_id) in
+  let%map raw_peers = Coda_lib.peers t in
+  let peers = List.map raw_peers ~f:Network_peer.Peer.to_display in
   let user_commands_sent = !txn_count in
   let snark_worker =
     Option.map
@@ -331,8 +326,7 @@ let get_status ~flag t =
   ; consensus_time_best_tip
   ; commit_id
   ; conf_dir
-  ; addrs_of_peers
-  ; ids_of_peers
+  ; peers
   ; user_commands_sent
   ; snark_worker
   ; snark_work_fee
