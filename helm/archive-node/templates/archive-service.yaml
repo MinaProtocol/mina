@@ -12,6 +12,6 @@ spec:
   selector:
     app: {{ tpl .Values.archive.fullname . }}
   ports:
-  - name: tcp-external
+  - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
