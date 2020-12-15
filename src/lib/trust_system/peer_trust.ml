@@ -2,7 +2,7 @@ open Core
 open Async
 open Pipe_lib
 
-let tmp_bans_are_disabled = true
+let tmp_bans_are_disabled = false
 
 module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
