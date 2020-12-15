@@ -12,4 +12,4 @@ include
    and type transition_frontier_persistent_frontier :=
               Transition_frontier.Persistent_frontier.t
    and type breadcrumb := Transition_frontier.Breadcrumb.t
-   and type network := Coda_networking.t
+   and type network := Mina_networking.t

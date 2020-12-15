@@ -168,4 +168,4 @@ val top_level_logger : t -> Logger.t
 
 val config : t -> Config.t
 
-val net : t -> Coda_networking.t
+val net : t -> Mina_networking.t
