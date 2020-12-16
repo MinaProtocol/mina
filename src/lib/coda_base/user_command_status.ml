@@ -676,6 +676,24 @@ module Failure = struct
   [%%endif]
 end
 
+module Balance_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { fee_payer_balance: Currency.Balance.Stable.V1.t option
+        ; source_balance: Currency.Balance.Stable.V1.t option
+        ; receiver_balance: Currency.Balance.Stable.V1.t option }
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let empty =
+    {fee_payer_balance= None; source_balance= None; receiver_balance= None}
+end
+
 module Auxiliary_data = struct
   [%%versioned
   module Stable = struct
@@ -702,8 +720,8 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      | Applied of Auxiliary_data.Stable.V1.t
-      | Failed of Failure.Stable.V1.t
+      | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
+      | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
     [@@deriving sexp, yojson, eq, compare]
 
     let to_latest = Fn.id

@@ -1656,11 +1656,12 @@ let telemetry =
              List.iter all_telem_data ~f:(fun peer_telem_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Coda_networking.Rpcs.Get_telemetry_data
+                   @@ Mina_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
-               (Error.to_string_hum err) ))
+             printf "%s\n%!"
+               (Yojson.Safe.to_string
+                  (`Assoc [("error", Error_json.error_to_yojson err)])) ))
 
 let next_available_token_cmd =
   Command.async

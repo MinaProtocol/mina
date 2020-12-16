@@ -16,7 +16,6 @@ val ( >= ) : t -> t -> bool
 
 module Checked : sig
   open Snark_params.Tick
-  open Snarky_integer
 
   type t
 

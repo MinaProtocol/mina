@@ -418,18 +418,16 @@ module Checked = struct
           hash ~init:crypto_hash_prefix
             (pack_input (Run.run_checked (to_input t)))) )
 
-  let min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
-      ~vesting_increment ~initial_minimum_balance =
-    let%bind before_or_at_cliff =
-      Global_slot.Checked.(global_slot <= cliff_time)
-    in
+  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance =
+    let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
     let balance_to_int balance =
       Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
     in
     let open Snarky_integer.Integer in
     let initial_minimum_balance_int = balance_to_int initial_minimum_balance in
     make_checked (fun () ->
-        if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
+        if_ ~m before_cliff ~then_:initial_minimum_balance_int
           ~else_:
             (let global_slot_int =
                Global_slot.Checked.to_integer global_slot
@@ -438,6 +436,13 @@ module Checked = struct
              let _, slot_diff =
                subtract_unpacking_or_zero ~m global_slot_int cliff_time_int
              in
+             let cliff_decrement_int =
+               Amount.var_to_bits cliff_amount |> of_bits ~m
+             in
+             let _, min_balance_less_cliff_decrement =
+               subtract_unpacking_or_zero ~m initial_minimum_balance_int
+                 cliff_decrement_int
+             in
              let vesting_period_int =
                Global_slot.Checked.to_integer vesting_period
              in
@@ -445,27 +450,28 @@ module Checked = struct
              let vesting_increment_int =
                Amount.var_to_bits vesting_increment |> of_bits ~m
              in
-             let min_balance_decrement =
+             let vesting_decrement =
                mul ~m num_periods vesting_increment_int
              in
-             let _, min_balance_less_decrement =
-               subtract_unpacking_or_zero ~m initial_minimum_balance_int
-                 min_balance_decrement
+             let _, min_balance_less_cliff_and_vesting_decrements =
+               subtract_unpacking_or_zero ~m min_balance_less_cliff_decrement
+                 vesting_decrement
              in
-             min_balance_less_decrement) )
+             min_balance_less_cliff_and_vesting_decrements) )
 
   let has_locked_tokens ~global_slot (t : var) =
     let open Timing.As_record in
     let { is_timed= _
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment } =
       t.timing
     in
     let%bind cur_min_balance =
       min_balance_at_slot ~global_slot ~initial_minimum_balance ~cliff_time
-        ~vesting_period ~vesting_increment
+        ~cliff_amount ~vesting_period ~vesting_increment
     in
     let%map zero_min_balance =
       let zero_int =
@@ -520,7 +526,7 @@ let create account_id balance =
   ; snapp= None }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period ~vesting_increment =
+    ~cliff_amount ~vesting_period ~vesting_increment =
   if Global_slot.(equal vesting_period zero) then
     Or_error.errorf
       !"Error creating timed account for account id %{sexp: Account_id.t}: \
@@ -548,6 +554,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
           Timing.Timed
             { initial_minimum_balance
             ; cliff_time
+            ; cliff_amount
             ; vesting_period
             ; vesting_increment } }
 
@@ -558,37 +565,44 @@ let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
-let min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
+let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
   if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
   else
-    (* take advantage of fact that global slots are uint32's *)
-    let num_periods =
-      UInt32.(
-        Infix.((global_slot - cliff_time) / vesting_period)
-        |> to_int64 |> UInt64.of_int64)
-    in
-    let min_balance_decrement =
-      UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
-      |> Amount.of_uint64
-    in
-    match Balance.(initial_minimum_balance - min_balance_decrement) with
+    match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
         Balance.zero
-    | Some amt ->
-        amt
+    | Some min_balance_past_cliff -> (
+        (* take advantage of fact that global slots are uint32's *)
+        let num_periods =
+          UInt32.(
+            Infix.((global_slot - cliff_time) / vesting_period)
+            |> to_int64 |> UInt64.of_int64)
+        in
+        let vesting_decrement =
+          UInt64.Infix.(num_periods * Amount.to_uint64 vesting_increment)
+          |> Amount.of_uint64
+        in
+        match Balance.(min_balance_past_cliff - vesting_decrement) with
+        | None ->
+            Balance.zero
+        | Some amt ->
+            amt )
 
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
       false
   | Timed
-      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-    ->
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment } ->
       let curr_min_balance =
-        min_balance_at_slot ~global_slot ~cliff_time ~vesting_period
-          ~vesting_increment ~initial_minimum_balance
+        min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+          ~vesting_period ~vesting_increment ~initial_minimum_balance
       in
       Balance.(curr_min_balance > zero)
 
@@ -605,17 +619,13 @@ let gen_timed =
   let%bind token_id = Token_id.gen in
   let account_id = Account_id.create public_key token_id in
   let%bind balance = Currency.Balance.gen in
-  (* initial min balance <= balance *)
-  let%bind min_diff_int = Int.gen_incl 0 (Balance.to_int balance) in
-  let min_diff = Amount.of_int min_diff_int in
-  let initial_minimum_balance =
-    Option.value_exn Balance.(balance - min_diff)
-  in
+  let%bind initial_minimum_balance = Currency.Balance.gen in
   let%bind cliff_time = Global_slot.gen in
+  let%bind cliff_amount = Amount.gen in
   (* vesting period must be at least one to avoid division by zero *)
   let%bind vesting_period =
     Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
   in
   let%map vesting_increment = Amount.gen in
   create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period ~vesting_increment
+    ~cliff_amount ~vesting_period ~vesting_increment

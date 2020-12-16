@@ -23,6 +23,7 @@ module Network_config = struct
     { cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
+    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -91,14 +92,15 @@ module Network_config = struct
       ^ string_of_int time_now.tm_hour
       ^ string_of_int time_now.tm_min
     in
-    (* append the first 5 chars of the username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
-    (* intntest-username-testname-DaymonthHrMin *)
-    (* ex: intntest-adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
-    let testnet_name = "intntest-" ^ user ^ "-" ^ test_name ^ "-" ^ timestr in
+    (* append the first 5 chars of the local system username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* username-testname-DaymonthHrMin *)
+    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
     let cluster_name = "mina-integration-west1" in
+    let k8s_context = cluster_id in
     let cluster_region = "us-west1" in
     let seed_zone = "us-west1-a" in
     let seed_region = "us-west1" in
@@ -120,6 +122,7 @@ module Network_config = struct
                   { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                       t.initial_minimum_balance
                   ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
                   ; vesting_period= t.vesting_period
                   ; vesting_increment= t.vesting_increment }
           in
@@ -216,6 +219,7 @@ module Network_config = struct
         ; testnet_name
         ; seed_zone
         ; seed_region
+        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
