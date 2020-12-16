@@ -303,7 +303,7 @@ let setup_daemon logger =
     flag "precomputed-blocks-file" (optional string)
       ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
   and log_precomputed_blocks =
-    flag "log-precomputed_blocks"
+    flag "log-precomputed-blocks"
       (optional_with_default true bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
   in
