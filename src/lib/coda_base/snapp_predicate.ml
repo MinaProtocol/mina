@@ -609,6 +609,7 @@ module Protocol_state = struct
           ; last_vrf_output: 'vrf_output
           ; total_currency: 'amount
           ; curr_global_slot: 'global_slot
+          ; global_slot_since_genesis: 'global_slot
           ; staking_epoch_data: 'epoch_data
           ; next_epoch_data: 'epoch_data }
         [@@deriving hlist, sexp, eq, yojson, hash, compare, fields]
@@ -644,6 +645,7 @@ module Protocol_state = struct
        ; last_vrf_output
        ; total_currency
        ; curr_global_slot
+       ; global_slot_since_genesis
        ; staking_epoch_data
        ; next_epoch_data } :
         t) =
@@ -658,6 +660,7 @@ module Protocol_state = struct
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
       ; Numeric.(to_input Tc.global_slot curr_global_slot)
+      ; Numeric.(to_input Tc.global_slot global_slot_since_genesis)
       ; Epoch_data.to_input staking_epoch_data
       ; Epoch_data.to_input next_epoch_data ]
 
@@ -733,6 +736,7 @@ module Protocol_state = struct
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
+         ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data } :
           t) =
@@ -747,6 +751,7 @@ module Protocol_state = struct
         ; length min_window_density
         ; Numeric.(Checked.to_input Tc.amount total_currency)
         ; Numeric.(Checked.to_input Tc.global_slot curr_global_slot)
+        ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_genesis)
         ; Epoch_data.Checked.to_input staking_epoch_data
         ; Epoch_data.Checked.to_input next_epoch_data ]
 
@@ -765,6 +770,7 @@ module Protocol_state = struct
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
+         ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data } :
           t) (s : View.Checked.t) =
@@ -798,7 +804,9 @@ module Protocol_state = struct
               min_window_density s.min_window_density
           ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
           ; Numeric.(Checked.check Tc.global_slot)
-              curr_global_slot s.curr_global_slot ]
+              curr_global_slot s.curr_global_slot
+          ; Numeric.(Checked.check Tc.global_slot)
+              global_slot_since_genesis s.global_slot_since_genesis ]
         @ epoch_data staking_epoch_data s.staking_epoch_data
         @ epoch_data next_epoch_data s.next_epoch_data )
   end
@@ -836,6 +844,7 @@ module Protocol_state = struct
       ; Typ.unit
       ; amount
       ; global_slot
+      ; global_slot
       ; epoch_data
       ; epoch_data ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
@@ -857,6 +866,7 @@ module Protocol_state = struct
     ; last_vrf_output= ()
     ; total_currency= Ignore
     ; curr_global_slot= Ignore
+    ; global_slot_since_genesis= Ignore
     ; staking_epoch_data= epoch_data
     ; next_epoch_data= epoch_data }
 
@@ -870,6 +880,7 @@ module Protocol_state = struct
        ; last_vrf_output
        ; total_currency
        ; curr_global_slot
+       ; global_slot_since_genesis
        ; staking_epoch_data
        ; next_epoch_data } :
         t) (s : View.t) =
@@ -934,6 +945,10 @@ module Protocol_state = struct
     let%bind () =
       Numeric.(check ~label:"curr_global_slot" Tc.global_slot)
         curr_global_slot s.curr_global_slot
+    in
+    let%bind () =
+      Numeric.(check ~label:"global_slot_since_genesis" Tc.global_slot)
+        global_slot_since_genesis s.global_slot_since_genesis
     in
     let%bind () =
       epoch_data "staking_epoch_data" staking_epoch_data s.staking_epoch_data
