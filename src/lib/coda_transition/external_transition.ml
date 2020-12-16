@@ -154,6 +154,16 @@ module Precomputed_block = struct
     ; protocol_state_proof= t.protocol_state_proof
     ; staged_ledger_diff= t.staged_ledger_diff
     ; delta_transition_chain_proof= t.delta_transition_chain_proof }
+
+  (* NOTE: This serialization is used externally and MUST NOT change.
+     If the underlying types change, you should write a conversion, or add
+     optional fields and handle them appropriately.
+  *)
+  let%test_unit "Serialization is stable" =
+    let serialized_block =
+      External_transition_sample_precomputed_block.sample_block
+    in
+    ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
 end
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
