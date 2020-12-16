@@ -17,4 +17,7 @@ spec:
   - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
+  - name: tcp-client
+    port: {{ .Values.coda.ports.client }}
+    targetPort: client-port
 {{ end }}
