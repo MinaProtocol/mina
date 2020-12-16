@@ -37,5 +37,5 @@ spec:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
-{{- include "nodeSelector.preemptible" .Values | nindent 6 }}
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{ end }}

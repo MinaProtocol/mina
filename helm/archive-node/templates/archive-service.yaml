@@ -1,10 +1,8 @@
-{{- if .Values.coordinator.active }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ tpl .Values.coordinator.fullname . }}
-  labels:
-    app: {{ tpl .Values.coordinator.fullname . }}
+  name: {{ tpl .Values.archive.fullname . }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -12,9 +10,8 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ tpl .Values.coordinator.fullname . }}
+    app: {{ tpl .Values.archive.fullname . }}
   ports:
   - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
-{{ end }}
