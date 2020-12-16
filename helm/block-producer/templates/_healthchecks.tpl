@@ -23,7 +23,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 1 && ownsFunds"
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
     ]
 {{- end }}
 
@@ -61,7 +61,7 @@ user-agent readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 1"
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 0"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
@@ -100,7 +100,7 @@ Mina testnet bot readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 1 && ownsFunds"
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
