@@ -3017,10 +3017,7 @@ module Hooks = struct
     in
     if slot_diff < 0L then Error `Too_early
     else if slot_diff >= UInt32.(to_int64 (add constants.delta (of_int 1)))
-    then
-      Error
-        (`Too_late
-          (sub slot_diff UInt32.(to_int64 (add constants.delta (of_int 1)))))
+    then Error (`Too_late (sub slot_diff UInt32.(to_int64 constants.delta)))
     else Ok ()
 
   let received_at_valid_time ~(constants : Constants.t)
