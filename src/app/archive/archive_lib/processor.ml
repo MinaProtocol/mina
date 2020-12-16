@@ -269,32 +269,49 @@ module User_command = struct
         (t : Signed_command.t) (status : User_command_status.t) =
       let open Deferred.Result.Let_syntax in
       let%bind user_command_id = add_if_doesn't_exist ~via (module Conn) t in
+      let amount_to_int64 x =
+        Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+      in
+      let balance_to_int64 x =
+        amount_to_int64 (Currency.Balance.to_amount x)
+      in
+      let balances_to_int64s
+          { User_command_status.Balance_data.fee_payer_balance
+          ; source_balance
+          ; receiver_balance } =
+        ( Option.map ~f:balance_to_int64 fee_payer_balance
+        , Option.map ~f:balance_to_int64 source_balance
+        , Option.map ~f:balance_to_int64 receiver_balance )
+      in
       let ( status_str
           , failure_reason
           , fee_payer_account_creation_fee_paid
           , receiver_account_creation_fee_paid
-          , created_token ) =
+          , created_token
+          , (fee_payer_balance, source_balance, receiver_balance) ) =
         match status with
         | Applied
-            { fee_payer_account_creation_fee_paid
-            ; receiver_account_creation_fee_paid
-            ; created_token } ->
-            let amount_to_int64 x =
-              Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
-            in
+            ( { fee_payer_account_creation_fee_paid
+              ; receiver_account_creation_fee_paid
+              ; created_token }
+            , balances ) ->
             ( "applied"
             , None
             , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
             , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
             , Option.map created_token ~f:(fun tid ->
-                  Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) ) )
-        | Failed failure ->
+                  Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) )
+            , balances_to_int64s balances )
+        | Failed (failure, balances) ->
             ( "failed"
             , Some (User_command_status.Failure.to_string failure)
             , None
             , None
-            , None )
+            , None
+            , balances_to_int64s balances )
       in
+      (* TODO: Record these with the transaction *)
+      ignore (fee_payer_balance, source_balance, receiver_balance) ;
       let%map () =
         Conn.exec
           (Caqti_request.exec
