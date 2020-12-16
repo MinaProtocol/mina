@@ -28,7 +28,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced --db-host {{ .Values.testnetName }}-archive-node-postgresql"
+      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced --db-host {{ .testnetName }}-archive-node-postgresql"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
