@@ -7,7 +7,7 @@ function isDaemonSynced() {
             jq '.data.syncStatus'
     )
     
-    [[ status == \"SYNCED\" ]] && return 0 || (echo "Daemon is out of sync with status: ${status}" && return 1) 
+    [[ "${status}" == \"SYNCED\" ]] && return 0 || (echo "Daemon is out of sync with status: ${status}" && return 1)
 }
 
 #
@@ -25,7 +25,7 @@ function isChainlengthHighestReceived() {
     )
     
     [[ "${chainLength}" == "${highestReceived}" ]] && return 0 ||
-        (echo "Daemon chain length[${chainLength}] is not at highest received[${highestReceived}]." && return 1) 
+        (echo "Daemon chain length[${chainLength}] is not at highest received[${highestReceived}]." && return 1)
 }
 
 #
@@ -70,7 +70,7 @@ function hasSentUserCommandsGreaterThan() {
     )
     
     [[ $userCmdSent -gt $userCmdMinThreshold ]] && return 0 ||
-        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1) 
+        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1)
 }
 
 #
@@ -83,8 +83,8 @@ function hasSnarkWorker() {
     )
     rc=$?
     
-    [[ "$rc" == 0 ]] && [[ -n "$snarkWorker" ]] && return 0 ||
-        (echo "Snark worker error: ${rc} - $snarkWorker" && return 1) 
+    [[ $rc == 0 ]] && [[ -n "$snarkWorker" ]] && return 0 ||
+        (echo "Snark worker error: ${rc} - $snarkWorker" && return 1)
 }
 
 #
@@ -110,5 +110,5 @@ function isArchiveSynced() {
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
-    [[ highestObserved == highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1) 
+    [[ highestObserved == highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1)
 }
