@@ -164,7 +164,7 @@ struct
 
       type t =
         { snark_tables: Snark_tables.t
-        ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option
+        ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
         ; mutable ref_table: int Statement_table.t option
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
@@ -181,9 +181,17 @@ struct
 
       let removed_breadcrumb_wait = 10
 
-      let of_serializable tables ~constraint_constants ~config ~logger : t =
+      let get_best_tip_ledger ~frontier_broadcast_pipe () =
+        Option.map (Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
+          ~f:(fun tf ->
+            Transition_frontier.best_tip tf
+            |> Transition_frontier.Breadcrumb.staged_ledger
+            |> Staged_ledger.ledger )
+
+      let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
+          ~config ~logger : t =
         { snark_tables= Snark_tables.of_serializable tables
-        ; best_tip_ledger= None
+        ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
         ; batcher= Batcher.Snark_pool.create config.verifier
         ; account_creation_fee=
             constraint_constants
@@ -228,10 +236,31 @@ struct
           | Some _ ->
               true )
 
+      let fee_is_sufficient t ~fee ~prover ~best_tip_ledger =
+        let open Coda_base in
+        Currency.Fee.(fee >= t.account_creation_fee)
+        ||
+        match best_tip_ledger with
+        | None ->
+            false
+        | Some l ->
+            Option.(
+              is_some
+                ( Base_ledger.location_of_account l
+                    (Account_id.create prover Token_id.default)
+                >>= Base_ledger.get l ))
+
       let handle_transition_frontier_diff u t =
         match u with
-        | `New_best_tip x ->
-            t.best_tip_ledger <- Some x ;
+        | `New_best_tip l ->
+            Statement_table.filteri_inplace t.snark_tables.all
+              ~f:(fun ~key ~data:{fee= {fee; prover}; _} ->
+                let keep =
+                  fee_is_sufficient t ~fee ~prover ~best_tip_ledger:(Some l)
+                in
+                if not keep then
+                  Hashtbl.remove t.snark_tables.rebroadcastable key ;
+                keep ) ;
             return ()
         | `New_refcount_table (removed, refcount_table) ->
             t.ref_table <- Some refcount_table ;
@@ -239,13 +268,12 @@ struct
             if t.removed_counter < removed_breadcrumb_wait then return ()
             else (
               t.removed_counter <- 0 ;
-              Statement_table.filter_keys_inplace
-                t.snark_tables.rebroadcastable ~f:(fun work ->
-                  (* Rebroadcastable should always be a subset of all. *)
-                  assert (Hashtbl.mem t.snark_tables.all work) ;
-                  work_is_referenced t work ) ;
               Statement_table.filter_keys_inplace t.snark_tables.all
-                ~f:(work_is_referenced t) ;
+                ~f:(fun k ->
+                  let keep = work_is_referenced t k in
+                  if not keep then
+                    Hashtbl.remove t.snark_tables.rebroadcastable k ;
+                  keep ) ;
               return
                 (*when snark works removed from the pool*)
                 Coda_metrics.(
@@ -291,7 +319,7 @@ struct
           { snark_tables=
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
-          ; best_tip_ledger= None
+          ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
           ; batcher= Batcher.Snark_pool.create config.verifier
           ; logger
           ; config
@@ -343,6 +371,7 @@ struct
           `Statement_not_referenced
 
       let verify_and_act t ~work ~sender =
+        let best_tip_ledger = t.best_tip_ledger () in
         let statements, priced_proof = work in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
         let trust_record =
@@ -368,18 +397,7 @@ struct
         in
         let message = Coda_base.Sok_message.create ~fee ~prover in
         let prover_account_ok =
-          let open Coda_base in
-          Currency.Fee.(fee >= t.account_creation_fee)
-          ||
-          match t.best_tip_ledger with
-          | None ->
-              false
-          | Some l ->
-              Option.(
-                is_some
-                  ( Base_ledger.location_of_account l
-                      (Account_id.create prover Token_id.default)
-                  >>= Base_ledger.get l ))
+          fee_is_sufficient t ~fee ~prover ~best_tip_ledger
         in
         let verify proofs =
           let open Deferred.Let_syntax in
@@ -529,7 +547,7 @@ struct
       | Ok snark_table ->
           let pool =
             Resource_pool.of_serializable snark_table ~constraint_constants
-              ~config ~logger
+              ~config ~logger ~frontier_broadcast_pipe
           in
           let network_pool =
             of_resource_pool_and_diffs pool ~logger ~constraint_constants

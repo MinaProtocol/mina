@@ -1646,7 +1646,7 @@ let%test_module _ =
             Signed_command.forget_check x
         | _ ->
             failwith
-              "when snapp commands are enabled, [independent_signed_cmds'] \
+              "when snapp commands are enabled, [extract_signed_commands] \
                should be removed." )
 
     let%test_unit "expired transactions are not accepted" =
