@@ -10,6 +10,6 @@ val add :
   -> Envelope.Sender.t
   -> now:Time.t
   -> score:int
-  -> [`Ok | `Capacity_exceeded]
+  -> [`Within_capacity | `Capacity_exceeded]
 
 val summary : t -> Yojson.Safe.t

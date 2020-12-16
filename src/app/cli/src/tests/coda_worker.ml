@@ -488,11 +488,13 @@ module T = struct
               ; trust_system
               ; flooding= false
               ; direct_peers= []
+              ; max_connections= 50
+              ; validation_queue_size= 150
               ; peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =
-            { Coda_networking.Config.logger
+            { Mina_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
@@ -505,7 +507,7 @@ module T = struct
                 ; transaction_pool_diff= true
                 ; new_state= true }
             ; creatable_gossip_net=
-                Coda_networking.Gossip_net.(
+                Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params)) }
           in

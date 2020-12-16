@@ -10,7 +10,7 @@ val run :
      logger:Logger.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
-  -> network:Coda_networking.t
+  -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> transition_reader:External_transition.Initial_validated.t
                        Envelope.Incoming.t

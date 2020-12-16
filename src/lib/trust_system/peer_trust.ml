@@ -46,7 +46,7 @@ module type Input_intf = sig
   module Action : Action_intf
 
   type Structured_log_events.t +=
-    | Peer_banned of {peer: Peer_id.t; expiration: Time.t; action: string}
+    | Peer_banned of {sender_id: Peer_id.t; expiration: Time.t; action: string}
     [@@deriving register_event]
 end
 
@@ -75,7 +75,7 @@ module Log_events = struct
   (* TODO: Split per action. *)
   type Structured_log_events.t +=
     | Peer_banned of
-        { peer: Network_peer.Peer.t
+        { sender_id: Network_peer.Peer.t
         ; expiration: Time_with_json.t
         ; action: string }
     [@@deriving register_event {msg= ban_message}]
@@ -183,7 +183,7 @@ module Make0 (Inputs : Input_intf) = struct
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
           [%str_log faulty_peer_without_punishment] ~metadata:action_metadata
-            (Peer_banned {peer; expiration; action= action_fmt}) ;
+            (Peer_banned {sender_id= peer; expiration; action= action_fmt}) ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
             if tmp_bans_are_disabled then Deferred.unit
@@ -254,7 +254,7 @@ let%test_module "peer_trust" =
 
       type Structured_log_events.t +=
         | Peer_banned of
-            { peer: Peer_id.t
+            { sender_id: Peer_id.t
             ; expiration: Time_with_json.t
             ; action: string }
         [@@deriving register_event {msg= "Peer banned"}]

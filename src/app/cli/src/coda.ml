@@ -222,6 +222,29 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
+  and max_connections =
+    flag "max-connections"
+      ~doc:
+        (Printf.sprintf
+           "NN max number of connections that this peer will have to \
+            neighbors in the gossip network. Tuning this higher will \
+            strengthen your connection to the network in exchange for using \
+            more RAM (default: %d)"
+           Cli_lib.Default.max_connections)
+      (optional int)
+  and validation_queue_size =
+    flag "validation-queue-size"
+      ~doc:
+        (Printf.sprintf
+           "NN size of the validation queue in the p2p network used to buffer \
+            messages (like blocks and transactions received on the gossip \
+            network) while validation is pending. If a transaction, for \
+            example, is invalid, we don't forward the message on the gossip \
+            net. If this queue is too small, we will drop messages without \
+            validating them. If it is too large, we are susceptible to DoS \
+            attacks on memory. (default: %d)"
+           Cli_lib.Default.validation_queue_size)
+      (optional int)
   and direct_peers_raw =
     flag "direct-peer"
       ~doc:
@@ -309,8 +332,7 @@ let setup_daemon logger =
       [ ("commit", `String Coda_version.commit_id)
       ; ("branch", `String Coda_version.branch)
       ; ("commit_date", `String Coda_version.commit_date)
-      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id) ]
     in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
@@ -652,7 +674,7 @@ let setup_daemon logger =
           ~default:true log_block_creation
       in
       let log_gossip_heard =
-        { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
+        { Mina_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= true }
       in
@@ -872,6 +894,14 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
       in
+      let max_connections =
+        or_from_config YJ.Util.to_int_option "max-connections"
+          ~default:Cli_lib.Default.max_connections max_connections
+      in
+      let validation_queue_size =
+        or_from_config YJ.Util.to_int_option "validation-queue-size"
+          ~default:Cli_lib.Default.validation_queue_size validation_queue_size
+      in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
@@ -897,11 +927,13 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
           ; peer_exchange= Option.value ~default:false peer_exchange
+          ; max_connections
+          ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
           ; keypair= libp2p_keypair }
       in
       let net_config =
-        { Coda_networking.Config.logger
+        { Mina_networking.Config.logger
         ; trust_system
         ; time_controller
         ; consensus_local_state
@@ -910,7 +942,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         ; log_gossip_heard
         ; is_seed
         ; creatable_gossip_net=
-            Coda_networking.Gossip_net.(
+            Mina_networking.Gossip_net.(
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in

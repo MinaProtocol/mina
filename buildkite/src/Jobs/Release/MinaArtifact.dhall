@@ -31,6 +31,7 @@ Pipeline.build
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
           S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
+          S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
         path = "Release",

@@ -26,6 +26,8 @@ archive-node readiness check settings
 readinessProbe:
   exec:
     command: [
+      "/bin/bash",
+      "-c",
       "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}

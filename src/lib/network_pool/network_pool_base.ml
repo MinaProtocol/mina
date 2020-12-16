@@ -146,7 +146,7 @@ end)
                 Broadcast_callback.error
                   (Error.of_string "exceeded capacity")
                   cb
-            | `Ok -> (
+            | `Within_capacity -> (
                 match%bind Resource_pool.Diff.verify t.resource_pool diff with
                 | Error err ->
                     [%log' trace t.logger]

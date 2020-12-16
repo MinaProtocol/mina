@@ -166,10 +166,12 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
+          ; max_connections= 50
+          ; validation_queue_size= 150
           ; keypair= None }
       in
       let net_config =
-        Coda_networking.Config.
+        Mina_networking.Config.
           { logger
           ; trust_system
           ; time_controller
@@ -183,7 +185,7 @@ let run_test () : unit Deferred.t =
               ; transaction_pool_diff= false
               ; new_state= false }
           ; creatable_gossip_net=
-              Coda_networking.Gossip_net.(
+              Mina_networking.Gossip_net.(
                 Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
           }
       in
