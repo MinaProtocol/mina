@@ -1656,7 +1656,7 @@ let telemetry =
              List.iter all_telem_data ~f:(fun peer_telem_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Coda_networking.Rpcs.Get_telemetry_data
+                   @@ Mina_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
              printf "%s\n%!"

@@ -268,10 +268,16 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
     List.map commands ~f:(With_status.map ~f:(fun t -> Transaction.Command t))
     @ List.map coinbase_parts ~f:(fun t ->
           { With_status.data= Transaction.Coinbase t
-          ; status= Applied User_command_status.Auxiliary_data.empty } )
+          ; status=
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Balance_data.empty ) } )
     @ List.map fee_transfers ~f:(fun t ->
           { With_status.data= Transaction.Fee_transfer t
-          ; status= Applied User_command_status.Auxiliary_data.empty } )
+          ; status=
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Balance_data.empty ) } )
   in
   { transactions
   ; work= completed_works
