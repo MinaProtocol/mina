@@ -25,7 +25,7 @@ RUN apt-get -y update && \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
+RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
 # archive-node package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
