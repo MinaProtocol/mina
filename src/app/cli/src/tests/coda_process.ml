@@ -130,10 +130,6 @@ let new_block_exn (conn, _, _) key =
   in
   Linear_pipe.wrap_reader r
 
-let get_all_transitions (conn, _, _) key =
-  Coda_worker.Connection.run_exn conn
-    ~f:Coda_worker.functions.get_all_transitions ~arg:key
-
 let root_diff_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
@@ -154,10 +150,6 @@ let start_exn (conn, _, _) =
 let new_user_command_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_user_command
     ~arg:pk
-
-let get_all_user_commands_exn (conn, _, _) pk =
-  Coda_worker.Connection.run_exn conn
-    ~f:Coda_worker.functions.get_all_user_commands ~arg:pk
 
 let dump_tf (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
