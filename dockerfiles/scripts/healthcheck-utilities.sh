@@ -110,5 +110,5 @@ function isArchiveSynced() {
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
-    [[ highestObserved == highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1)
+    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1)
 }
