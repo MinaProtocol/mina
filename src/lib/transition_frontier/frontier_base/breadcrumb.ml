@@ -408,6 +408,7 @@ module For_tests = struct
           ~previous_protocol_state:
             With_hash.
               {data= previous_protocol_state; hash= previous_state_hash}
+          ~coinbase_receiver
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
