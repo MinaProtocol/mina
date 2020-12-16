@@ -639,7 +639,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -751,7 +751,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -886,7 +886,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -998,7 +998,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1133,7 +1133,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1213,7 +1213,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1320,7 +1320,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1404,7 +1404,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1593,7 +1593,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1705,7 +1705,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -3782,7 +3782,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3830,7 +3830,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4103,7 +4103,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+	      "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4151,7 +4151,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4424,7 +4424,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4472,7 +4472,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4745,7 +4745,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4793,7 +4793,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5070,7 +5070,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5118,7 +5118,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5359,7 +5359,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5407,7 +5407,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+		"description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

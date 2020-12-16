@@ -968,9 +968,8 @@ module Types = struct
             Signed_command.token cmd.With_hash.data )
       ; field "amount" ~typ:(non_null uint64) ~args:[]
           ~doc:
-            "Amount that the source is sending to receiver - this is 0 for \
-             commands that are not associated with an amount"
-          ~resolve:(fun _ cmd ->
+            "Amount that the source is sending to receiver; 0 for commands \
+             without an associated amount" ~resolve:(fun _ cmd ->
             match Signed_command.amount cmd.With_hash.data with
             | Some amount ->
                 Currency.Amount.to_uint64 amount
@@ -985,15 +984,18 @@ module Types = struct
              transaction" ~resolve:(fun _ cmd ->
             Signed_command.fee cmd.With_hash.data |> Currency.Fee.to_uint64 )
       ; field "memo" ~typ:(non_null string) ~args:[]
-          ~doc:"Short arbitrary message provided by the sender"
+          ~doc:
+            (sprintf
+               "A short message from the sender, encoded with Base58Check, \
+                version byte=0x%02X; byte 2 of the decoding is the message \
+                length"
+               (Char.to_int Base58_check.Version_bytes.user_command_memo))
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
             |> Signed_command_memo.to_string )
       ; field "isDelegation" ~typ:(non_null bool) ~args:[]
-          ~doc:
-            "If true, this represents a delegation of stake, otherwise it is \
-             a payment"
+          ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
           ~resolve:(fun _ user_command ->
             match
