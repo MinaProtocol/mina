@@ -603,7 +603,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
       don't_wait_for
         (let%bind () =
            match Monitor.extract_exn exn with
-           | Coda_networking.No_initial_peers ->
+           | Mina_networking.No_initial_peers ->
                let message =
                  coda_crash_message
                    ~error:"failed to connect to any initial peers"

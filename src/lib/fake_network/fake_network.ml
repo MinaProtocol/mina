@@ -4,7 +4,7 @@ open Mina_base
 open Gadt_lib
 open Signature_lib
 open Network_peer
-module Gossip_net = Coda_networking.Gossip_net
+module Gossip_net = Mina_networking.Gossip_net
 
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1
@@ -15,7 +15,7 @@ type peer_state =
   ; consensus_local_state: Consensus.Data.Local_state.t }
 
 type peer_network =
-  {peer: Network_peer.Peer.t; state: peer_state; network: Coda_networking.t}
+  {peer: Network_peer.Peer.t; state: peer_state; network: Mina_networking.t}
 
 type nonrec 'n t =
   { fake_gossip_network: Gossip_net.Fake.network
@@ -52,7 +52,7 @@ let setup (type n) ?(logger = Logger.null ())
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
   let config peer consensus_local_state =
-    let open Coda_networking.Config in
+    let open Mina_networking.Config in
     { logger
     ; trust_system
     ; time_controller
@@ -76,7 +76,7 @@ let setup (type n) ?(logger = Logger.null ())
         let network =
           Thread_safe.block_on_async_exn (fun () ->
               (* TODO: merge implementations with coda_lib *)
-              Coda_networking.create
+              Mina_networking.create
                 (config peer state.consensus_local_state)
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   (fun query_env ->
@@ -120,7 +120,7 @@ let setup (type n) ?(logger = Logger.null ())
                             ~error:
                               (Error.createf
                                  !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                                 Coda_networking.refused_answer_query_string
+                                 Mina_networking.refused_answer_query_string
                                  ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return

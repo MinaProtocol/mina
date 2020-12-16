@@ -56,7 +56,7 @@ type processes =
       [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t] }
 
 type components =
-  { net: Coda_networking.t
+  { net: Mina_networking.t
   ; transaction_pool: Network_pool.Transaction_pool.t
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -505,9 +505,9 @@ let external_transition_database t = t.config.external_transition_database
 
 let snark_pool t = t.components.snark_pool
 
-let peers t = Coda_networking.peers t.components.net
+let peers t = Mina_networking.peers t.components.net
 
-let initial_peers t = Coda_networking.initial_peers t.components.net
+let initial_peers t = Mina_networking.initial_peers t.components.net
 
 let snark_work_fee t =
   match t.processes.snark_worker with `On (_, fee) -> fee | `Off fee -> fee
@@ -938,7 +938,7 @@ let create ?wallets (config : Config.t) =
                         in
                         (protocol_state_hash, k_block_hashes)
                   in
-                  let%map peers = Coda_networking.peers net in
+                  let%map peers = Mina_networking.peers net in
                   let block_producers =
                     config.initial_block_production_keypairs
                     |> Keypair.Set.to_list
@@ -949,7 +949,7 @@ let create ?wallets (config : Config.t) =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
                   Ok
-                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                    Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.
                       { node_ip_addr
                       ; node_peer_id
                       ; peers
@@ -966,10 +966,10 @@ let create ?wallets (config : Config.t) =
                   "Network not instantiated when initial peers requested" ;
                 Deferred.return []
             | Some net ->
-                Coda_networking.peers net
+                Mina_networking.peers net
           in
           let%bind net =
-            Coda_networking.create config.net_config ~get_some_initial_peers
+            Mina_networking.create config.net_config ~get_some_initial_peers
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                 (fun query_env ->
                 trace_recurring
@@ -1023,7 +1023,7 @@ let create ?wallets (config : Config.t) =
                               ~error:
                                 (Error.createf
                                    !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                                   Coda_networking.refused_answer_query_string
+                                   Mina_networking.refused_answer_query_string
                                    ledger_hash)) ) )
               ~get_ancestry:
                 (handle_request "get_ancestry"
@@ -1063,7 +1063,7 @@ let create ?wallets (config : Config.t) =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
-              ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
+              ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -1161,7 +1161,7 @@ let create ?wallets (config : Config.t) =
                                 validation_callback
                             in
                             if v = `Accept then
-                              Coda_networking.broadcast_state net
+                              Mina_networking.broadcast_state net
                                 (External_transition.Validation
                                  .forget_validation_with_hash et)) ;
                          breadcrumb ))
@@ -1184,7 +1184,7 @@ let create ?wallets (config : Config.t) =
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
-                  Coda_networking.broadcast_transaction_pool_diff net x ;
+                  Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
@@ -1246,23 +1246,23 @@ let create ?wallets (config : Config.t) =
                              was received $timing" ) ) ) ;
           don't_wait_for
             (Strict_pipe.transfer
-               (Coda_networking.states net)
+               (Mina_networking.states net)
                external_transitions_writer ~f:ident) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
-              Linear_pipe.iter (Coda_networking.ban_notification_reader net)
+              Linear_pipe.iter (Mina_networking.ban_notification_reader net)
                 ~f:(fun notification ->
                   let open Gossip_net in
                   let peer = notification.banned_peer in
                   let banned_until = notification.banned_until in
                   (* if RPC call fails, will be logged in gossip net code *)
                   let%map _ =
-                    Coda_networking.ban_notify net peer banned_until
+                    Mina_networking.ban_notify net peer banned_until
                   in
                   () ) ) ; *)
           don't_wait_for
             (Linear_pipe.iter
-               (Coda_networking.ban_notification_reader net)
+               (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit)) ;
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
@@ -1273,7 +1273,7 @@ let create ?wallets (config : Config.t) =
             Network_pool.Snark_pool.load ~config:snark_pool_config
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
-              ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
+              ~incoming_diffs:(Mina_networking.snark_pool_diffs net)
               ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
@@ -1294,7 +1294,7 @@ let create ?wallets (config : Config.t) =
           trace_task "snark pool broadcast loop" (fun () ->
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
                 ~f:(fun x ->
-                  Coda_networking.broadcast_snark_pool_diff net x ;
+                  Mina_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
           let block_production_keypairs =
             Agent.create
@@ -1347,13 +1347,13 @@ let create ?wallets (config : Config.t) =
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
-                @@ Coda_networking.online_status net )
+                @@ Mina_networking.online_status net )
               ~first_connection_incr:
                 ( Var.watch @@ of_deferred
-                @@ Coda_networking.on_first_connect net ~f:Fn.id )
+                @@ Mina_networking.on_first_connect net ~f:Fn.id )
               ~first_message_incr:
                 ( Var.watch @@ of_deferred
-                @@ Coda_networking.on_first_received_message net ~f:Fn.id )
+                @@ Mina_networking.on_first_received_message net ~f:Fn.id )
           in
           Deferred.return
             { config
