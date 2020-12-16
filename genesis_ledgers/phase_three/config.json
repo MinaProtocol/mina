@@ -1,9 +1,9 @@
 {
   "genesis": {
-     "genesis_state_timestamp": "2020-12-15 18:00:00-08:00"
+     "genesis_state_timestamp": "2020-12-16T12:00:00Z"
   },
   "ledger": {
-     "name": "turbo-pickles",
+     "name": "turbo-pickles-forked",
      "accounts": [
         {
            "pk": "B62qom56dHZvJvuZRZ2cCGRqB2UdCjoDRQjQRKfZyxX1SBTbF24L7Pt",
