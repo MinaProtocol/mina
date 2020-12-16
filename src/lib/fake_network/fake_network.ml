@@ -75,7 +75,7 @@ let setup (type n) ?(logger = Logger.null ())
         let frontier = state.frontier in
         let network =
           Thread_safe.block_on_async_exn (fun () ->
-              (* TODO: merge implementations with coda_lib *)
+              (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
