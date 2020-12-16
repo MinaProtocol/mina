@@ -299,12 +299,13 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
-    let%map make_next_consensus_state =
+    let%bind make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
         ~constraint_constants:
           precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
     in
+    let%map supercharge_coinbase = Quickcheck.Generator.bool in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
       let parent_staged_ledger = staged_ledger parent_breadcrumb in
@@ -346,7 +347,6 @@ module For_tests = struct
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let coinbase_receiver = largest_account_public_key in
-      let supercharge_coinbase = true in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
@@ -408,7 +408,7 @@ module For_tests = struct
           ~previous_protocol_state:
             With_hash.
               {data= previous_protocol_state; hash= previous_state_hash}
-          ~coinbase_receiver
+          ~coinbase_receiver ~supercharge_coinbase
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash

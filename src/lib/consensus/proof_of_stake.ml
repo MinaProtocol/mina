@@ -3552,6 +3552,7 @@ module Hooks = struct
                                       With_hash.t
            -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
            -> coinbase_receiver:Public_key.Compressed.t
+           -> supercharge_coinbase:bool
            -> Consensus_state.Value.t)
           Quickcheck.Generator.t =
         let open Consensus_state in
@@ -3562,12 +3563,11 @@ module Hooks = struct
         in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
-        let%bind supercharge_coinbase = Quickcheck.Generator.bool in
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t)
             ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-            ~coinbase_receiver ->
+            ~coinbase_receiver ~supercharge_coinbase ->
           let prev =
             Protocol_state.consensus_state
               (With_hash.data previous_protocol_state)
