@@ -8,7 +8,7 @@ function isDaemonSynced() {
     )
 
     case ${status} in
-      SYNCED)
+      \"SYNCED\")
         return 0
         ;;
       *)
@@ -61,12 +61,14 @@ function ownsFunds() {
             jq '.data.ownedWallets | length'
     )
     balanceTotal=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets { publicKey { balance { total } } } }" }' localhost:3085/graphql | \
-            jq '.data.ownedWallets[].balance.total'
+        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' localhost:3085/graphql | \
+            jq '.data.ownedWallets[0].balance.total'
     )
+    # remove leading and trailing quotes for integer interpretation
+    balanceTotal=$(echo $balanceTotal | sed -e 's/^"//' -e 's/"$//')
     
-    [[ $ownedWalletCount -gt 1 ]] && [[ $balanceTotal -gt 0 ]] && return 0 ||
-        (echo "Owned wallet count[${ownedWalletCount}] and/or balance total[${peerCountMinThreshold}] is insufficient." && return 1) 
+    [[ $ownedWalletCount -gt 0 ]] && [[ $balanceTotal -gt 0 ]] && return 0 ||
+        (echo "Owned wallet count[${ownedWalletCount}] and/or balance total[${balanceTotal}] is insufficient." && return 1) 
 }
 
 #
