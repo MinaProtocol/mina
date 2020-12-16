@@ -328,14 +328,7 @@ let generate_statuses (type c) ~constraint_constants coinbase_parts ~receiver
     Or_error.try_with (fun () ->
         let coinbases =
           List.map coinbases ~f:(fun t ->
-              Or_error.ok_exn (generate_status (Transaction.Coinbase t))
-              |> fun status ->
-              [%log' info (Logger.create ())]
-                "got status value $status_value"
-                ~metadata:
-                  [ ("status_value", User_command_status.to_yojson status)
-                  ; ("coinbase", Coinbase.to_yojson t) ] ;
-              status )
+              Or_error.ok_exn (generate_status (Transaction.Coinbase t)) )
         in
         let fee_transfers =
           List.map fee_transfers ~f:(fun t ->
