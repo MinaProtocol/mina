@@ -102,7 +102,7 @@ let export_logs_to_tar ?basename ~conf_dir =
       Core.Unix.mkdir export_dir
   | _ ->
       () ) ;
-  let tarfile = export_dir ^/ basename ^ ".tgz" in
+  let tarfile = export_dir ^/ basename ^ ".tar.gz" in
   let log_files =
     Core.Sys.ls_dir conf_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
@@ -121,19 +121,27 @@ let export_logs_to_tar ?basename ~conf_dir =
   let%bind.Deferred.Let_syntax hw_info_opt =
     if Option.is_some linux_info then
       let open Deferred.Let_syntax in
-      let linux_hw_progs = ["lscpu"; "lsgpu"; "lsmem"; "lsblk"] in
+      let linux_hw_progs =
+        [ ("cat", ["/etc/os-release"])
+        ; ("lscpu", [])
+        ; ("lsgpu", [])
+        ; ("lsmem", [])
+        ; ("lsblk", []) ]
+      in
       let%map outputs =
-        Deferred.List.map linux_hw_progs ~f:(fun prog ->
-            let header = sprintf "*** Output from '%s' ***\n" prog in
+        Deferred.List.map linux_hw_progs ~f:(fun (prog, args) ->
+            let header =
+              sprintf "*** Output from '%s' ***\n"
+                (String.concat ~sep:" " (prog :: args))
+            in
             let%bind output =
-              (* no args, otherwise might not be consistent across Linuxes *)
-              match%map Process.run_lines ~prog ~args:[] () with
+              match%map Process.run_lines ~prog ~args () with
               | Ok lines ->
                   lines
               | Error err ->
                   [sprintf "Error: %s" (Error.to_string_hum err)]
             in
-            return (header :: output) )
+            return ((header :: output) @ [""]) )
       in
       Some (Option.value_exn linux_info :: List.concat outputs)
     else (* TODO: Mac, other Unixes *)
