@@ -334,8 +334,11 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
       (* no time restrictions *)
       Or_error.return (Untimed, `Min_balance Balance.zero)
   | Timed
-      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-    ->
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment } ->
       let open Or_error.Let_syntax in
       let%map curr_min_balance =
         let account_balance = account.balance in
@@ -366,7 +369,7 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
         | Some proposed_new_balance ->
             let curr_min_balance =
               Account.min_balance_at_slot ~global_slot:txn_global_slot
-                ~cliff_time ~vesting_period ~vesting_increment
+                ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
                 ~initial_minimum_balance
             in
             if Balance.(proposed_new_balance < curr_min_balance) then
@@ -474,10 +477,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               Transaction.Command (User_command.Snapp_command c) )
       | Fee_transfer f ->
           { data= Fee_transfer f.fee_transfer
-          ; status= Applied User_command_status.Auxiliary_data.empty }
+          ; status=
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Balance_data.empty ) }
       | Coinbase c ->
           { data= Coinbase c.coinbase
-          ; status= Applied User_command_status.Auxiliary_data.empty }
+          ; status=
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Balance_data.empty ) }
 
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
@@ -487,9 +496,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Command (Snapp_command c) ->
           c.command.status
       | Fee_transfer _ ->
-          Applied User_command_status.Auxiliary_data.empty
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty )
       | Coinbase _ ->
-          Applied User_command_status.Auxiliary_data.empty
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty )
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
@@ -595,7 +608,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let undo_common : Undo.Signed_command_undo.Common.t =
       { user_command=
           { data= user_command
-          ; status= Applied User_command_status.Auxiliary_data.empty }
+          ; status=
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Balance_data.empty ) }
       ; previous_receipt_chain_hash= account.receipt_chain_hash
       ; fee_payer_timing= account.timing
       ; source_timing= None }
@@ -974,6 +990,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , User_command_status.Auxiliary_data.empty
           , Undo.Signed_command_undo.Body.Mint_tokens )
     in
+    let compute_balances () =
+      let compute_balance account_id =
+        match get_user_account_with_location ledger account_id with
+        | Ok (`Existing _, account) ->
+            Some account.balance
+        | _ ->
+            None
+      in
+      { User_command_status.Balance_data.fee_payer_balance=
+          compute_balance fee_payer
+      ; source_balance= compute_balance source
+      ; receiver_balance= compute_balance receiver }
+    in
     match compute_updates () with
     | Ok
         ( located_accounts
@@ -986,8 +1015,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let undo_common =
           { undo_common with
             source_timing= Some source_timing
-          ; user_command= {data= user_command; status= Applied auxiliary_data}
-          }
+          ; user_command=
+              { data= user_command
+              ; status= Applied (auxiliary_data, compute_balances ()) } }
         in
         return
           ({common= undo_common; body= undo_body} : Undo.Signed_command_undo.t)
@@ -995,7 +1025,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         (* Do not update the ledger. *)
         let undo_common =
           { undo_common with
-            user_command= {data= user_command; status= Failed failure} }
+            user_command=
+              { data= user_command
+              ; status= Failed (failure, compute_balances ()) } }
         in
         return
           ({common= undo_common; body= Failed} : Undo.Signed_command_undo.t)
@@ -1058,7 +1090,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Ok a.timing
       | Neg ->
           validate_timing ~txn_amount:delta.magnitude
-            ~txn_global_slot:state_view.curr_global_slot ~account:a
+            ~txn_global_slot:state_view.global_slot_since_genesis ~account:a
           |> Result.map_error ~f:timing_error_to_user_command_status
     in
     let init =
@@ -1104,7 +1136,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t)
       (c : Snapp_command.t) =
     let open Snapp_command in
-    let current_global_slot = state_view.curr_global_slot in
+    let current_global_slot = state_view.global_slot_since_genesis in
     let open Result.Let_syntax in
     with_return (fun ({return} : _ Result.t return) ->
         let ok_or_reject = function
@@ -1126,7 +1158,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           | Error failure ->
               Ok
                 { Undo.Snapp_command_undo.command=
-                    {data= c; status= Failed failure}
+                    { data= c
+                    ; status=
+                        Failed
+                          ( failure
+                          , (* TODO: This needs to contain the correct data when
+                                we update the archive db to handle snapp
+                                commands.
+                            *)
+                            User_command_status.Balance_data.empty ) }
                 ; accounts= [Set_once.get_exn fee_payer_account [%here]] }
           | Ok (accts, undo) ->
               List.iter accts ~f:(fun (location, account) ->
@@ -1159,7 +1199,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         let undo accounts =
           { Undo.Snapp_command_undo.command=
               { data= c
-              ; status= Applied User_command_status.Auxiliary_data.empty }
+              ; status=
+                  Applied
+                    ( User_command_status.Auxiliary_data.empty
+                    , (* TODO: This needs to contain the correct data when we
+                         update the archive db to handle snapp commands.
+                      *)
+                      User_command_status.Balance_data.empty ) }
           ; accounts }
         in
         let pay_fee ({pk; nonce; fee; _} : Other_fee_payer.Payload.t) =
@@ -1860,7 +1906,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
-        let txn_global_slot = txn_state_view.curr_global_slot in
+        let txn_global_slot = txn_state_view.global_slot_since_genesis in
         Or_error.map
           ( match t with
           | Command (Signed_command txn) ->

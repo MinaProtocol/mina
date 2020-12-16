@@ -75,6 +75,7 @@ module Diff_versioned = struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -93,6 +94,7 @@ module Diff_versioned = struct
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -348,12 +350,14 @@ struct
       | Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
             (Currency.Balance.to_amount
                (Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
     let check_command (t : User_command.t) : User_command.Valid.t option =
@@ -765,6 +769,7 @@ struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
       end
 
@@ -775,6 +780,12 @@ struct
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
+
+      let reject_overloaded_diff (diffs : verified) =
+        List.map diffs ~f:(fun cmd ->
+            (User_command.Signed_command cmd, Diff_error.Overloaded) )
+
+      let empty = []
 
       let size = List.length
 
@@ -1436,7 +1447,10 @@ let%test_module _ =
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data= cmd
-      ; status= Applied User_command_status.Auxiliary_data.empty }
+      ; status=
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty ) }
 
     let independent_signed_cmds' =
       List.map independent_cmds' ~f:(function
