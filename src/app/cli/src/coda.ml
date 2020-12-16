@@ -298,7 +298,15 @@ let setup_daemon logger =
     flag "proof-level"
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
       ~doc:"full|check|none"
-  and plugins = plugin_flag in
+  and plugins = plugin_flag
+  and precomputed_blocks_path =
+    flag "precomputed-blocks-file" (optional string)
+      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+  and log_precomputed_blocks =
+    flag "log-precomputed_blocks"
+      (optional_with_default true bool)
+      ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  in
   fun () ->
     let open Deferred.Let_syntax in
     let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
@@ -986,7 +994,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~time_controller ~initial_block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
-             ~start_time ())
+             ~start_time ?precomputed_blocks_path ~log_precomputed_blocks ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in

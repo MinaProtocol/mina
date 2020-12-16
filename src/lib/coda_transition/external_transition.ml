@@ -113,6 +113,49 @@ type t_ = Raw_versioned__.t =
   ; mutable validation_callback: Validate_content.t }
 *)
 
+module Precomputed_block = struct
+  module Proof = struct
+    type t = Proof.t
+
+    let sexp_of_t proof =
+      let proof_string =
+        Binable.to_string (module Proof.Stable.Latest) proof
+      in
+      (* We use base64 with the uri-safe alphabet to ensure that encoding and
+         decoding is cheap, and that the proof can be easily sent over http
+         etc. without escaping or re-encoding.
+      *)
+      Sexp.Atom
+        (Base64.encode_string ~alphabet:Base64.uri_safe_alphabet proof_string)
+
+    let _sexp_of_t_structured = Proof.sexp_of_t
+
+    (* Supports decoding base64-encoded and structure encoded proofs. *)
+    let t_of_sexp = function
+      | Sexp.Atom str ->
+          let str = Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet str in
+          Binable.of_string (module Proof.Stable.Latest) str
+      | sexp ->
+          Proof.t_of_sexp sexp
+  end
+
+  type t =
+    { scheduled_time: Block_time.t
+    ; protocol_state: Protocol_state.value
+    ; protocol_state_proof: Proof.t
+    ; staged_ledger_diff: Staged_ledger_diff.t
+    ; delta_transition_chain_proof:
+        Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+  [@@deriving sexp]
+
+  let of_external_transition ~scheduled_time (t : external_transition) =
+    { scheduled_time
+    ; protocol_state= t.protocol_state
+    ; protocol_state_proof= t.protocol_state_proof
+    ; staged_ledger_diff= t.staged_ledger_diff
+    ; delta_transition_chain_proof= t.delta_transition_chain_proof }
+end
+
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
 let blockchain_state =

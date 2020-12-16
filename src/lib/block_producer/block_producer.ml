@@ -281,14 +281,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed_block = struct
-  type t =
+  type t = External_transition.Precomputed_block.t =
     { scheduled_time: Time.t
     ; protocol_state: Protocol_state.value
     ; protocol_state_proof: Proof.t
     ; staged_ledger_diff: Staged_ledger_diff.t
     ; delta_transition_chain_proof:
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-  [@@deriving sexp, to_yojson]
+
+  let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
+
+  let t_of_sexp = External_transition.Precomputed_block.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~previous_protocol_state

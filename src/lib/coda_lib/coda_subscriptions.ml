@@ -37,7 +37,8 @@ let add_new_subscription (t : t) ~pk =
   |> ignore
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
-    ~transition_frontier ~is_storing_all =
+    ~transition_frontier ~is_storing_all ~time_controller
+    ~precomputed_block_writer =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -100,6 +101,30 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             new_block
             |> Coda_transition.External_transition.Validated.state_hash
           in
+          (let path, log = !precomputed_block_writer in
+           let precomputed_block =
+             let open Coda_transition in
+             lazy
+               (let scheduled_time = Block_time.now time_controller in
+                let precomputed_block =
+                  new_block |> External_transition.Validated.erase |> fst
+                  |> With_hash.data
+                  |> External_transition.Precomputed_block
+                     .of_external_transition ~scheduled_time
+                in
+                External_transition.Precomputed_block.sexp_of_t
+                  precomputed_block)
+           in
+           Option.iter path ~f:(fun (`Path path) ->
+               Out_channel.with_file ~append:true path ~f:(fun out_channel ->
+                   Out_channel.output_lines out_channel
+                     [Sexp.to_string (Lazy.force precomputed_block)] ) ) ;
+           Option.iter log ~f:(fun `Log ->
+               [%log info] "Saw block $precomputed_block"
+                 ~metadata:
+                   [ ( "precomputed_block"
+                     , Error_json.sexp_to_yojson (Lazy.force precomputed_block)
+                     ) ] )) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block

@@ -204,7 +204,7 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
-             ~precomputed_values ~start_time ())
+             ~precomputed_values ~start_time ~log_precomputed_blocks:false ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

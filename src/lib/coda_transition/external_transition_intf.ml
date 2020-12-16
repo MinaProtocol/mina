@@ -82,6 +82,20 @@ module type S = sig
 
   type external_transition = t
 
+  module Precomputed_block : sig
+    type t =
+      { scheduled_time: Block_time.Time.t
+      ; protocol_state: Protocol_state.value
+      ; protocol_state_proof: Proof.t
+      ; staged_ledger_diff: Staged_ledger_diff.t
+      ; delta_transition_chain_proof:
+          Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+    [@@deriving sexp]
+
+    val of_external_transition :
+      scheduled_time:Block_time.Time.t -> external_transition -> t
+  end
+
   module Validation : sig
     type ( 'time_received
          , 'genesis_state
