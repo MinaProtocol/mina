@@ -21,7 +21,9 @@ snark-coordinator readiness settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && ownsFunds && hasSnarkWorker"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSnarkWorker"
     ]
 {{- end }}
 

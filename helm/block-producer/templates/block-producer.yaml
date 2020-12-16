@@ -106,7 +106,7 @@ spec:
         ports: 
         - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
-{{- include "healthcheck.userAgent.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
       {{ if $config.runWithBots -}}
@@ -147,7 +147,7 @@ spec:
         ports:
         - name: graphql-port
           containerPort: {{ $.Values.bots.ports.graphql }}
-{{- include "healthcheck.bots.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
       {{- end }}
       - name: coda
@@ -193,17 +193,19 @@ spec:
         - name: DAEMON_REST_PORT
           value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ $.Values.coda.ports.p2p | quote }}
+          value: {{ $.Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $.Values.coda.ports.external | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
         ports:
-        - name: p2p-port
+        - name: client-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.p2p }}
+          containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.graphql }}
@@ -212,9 +214,9 @@ spec:
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.external }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
           hostPort: {{ $.Values.coda.ports.external }}
-{{- include "healthcheck.daemon.allChecks" $.Values | nindent 8 }}
+{{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys
@@ -265,5 +267,22 @@ spec:
         configMap:
           name: block-producer-daemon-config
       {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ $.Values.coda.ports.p2p }}
+    targetPort: external-port
 ---
 {{ end }}
