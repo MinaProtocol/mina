@@ -14,9 +14,7 @@ affinity:
     - labelSelector:
         matchExpressions:
         - key: "cloud.google.com/gke-preemptible"
-          operator: In
-          values:
-          - "true"
+          operator: Exists
       topologyKey: failure-domain.beta.kubernetes.io/region
 {{- end }}
 {{- end }}
