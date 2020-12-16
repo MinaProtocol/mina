@@ -1,6 +1,6 @@
 (library
- (name coda_metrics)
- (public_name coda_metrics)
+ (name mina_metrics)
+ (public_name mina_metrics)
  (libraries async cohttp cohttp-async logger jemalloc prometheus)
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

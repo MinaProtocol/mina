@@ -804,7 +804,7 @@ let setup_daemon logger =
           [%log debug]
             ~metadata:[("long_async_cycle", `Float secs)]
             "Long async cycle, $long_async_cycle seconds" ;
-          Coda_metrics.(
+          Mina_metrics.(
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
       Stream.iter
@@ -822,7 +822,7 @@ let setup_daemon logger =
                              (Execution_context.backtrace_history context)
                              2))) ) ]
             "Long async job, $long_async_job seconds" ;
-          Coda_metrics.(
+          Mina_metrics.(
             Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
       let trace_database_initialization typ location =
         (* can't use %log ppx here, because we're using the passed-in location *)
@@ -1045,7 +1045,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       ~insecure_rest_server coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
-          Coda_metrics.server ~port ~logger >>| ignore )
+          Mina_metrics.server ~port ~logger >>| ignore )
       |> Option.value ~default:Deferred.unit
     in
     let () = Coda_plugins.init_plugins ~logger coda plugins in

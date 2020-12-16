@@ -546,7 +546,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       [ ("time_elapsed", time_to_yojson time_elapsed)
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) ) ] ;
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.set Bootstrap.bootstrap_time_ms
       Core.Time.(Span.to_ms @@ time_elapsed)) ;
   result

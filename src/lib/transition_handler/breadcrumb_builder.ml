@@ -106,7 +106,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   match result with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
-                      Coda_metrics.(
+                      Mina_metrics.(
                         Counter.inc_one
                           Transition_frontier_controller
                           .breadcrumbs_built_by_builder) ;

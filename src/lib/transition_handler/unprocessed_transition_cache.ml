@@ -30,11 +30,11 @@ module Registry = struct
   type element = State_hash.t
 
   let element_added _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
 
   let element_removed _ _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
 end
 

@@ -392,11 +392,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             [%log trace]
               ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
-          Coda_metrics.(
+          Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           [%log trace] "received completed work from a snark worker"
             ~metadata:

@@ -1262,14 +1262,14 @@ let update_metrics t =
       List.rev (Non_empty_list.to_list t.trees)
       |> List.iteri ~f:(fun i t ->
              let name = sprintf "tree%d" i in
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
                (Int.to_float @@ Tree.available_space t) ;
              let base_job_count, merge_job_count = Tree.todo_job_count t in
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
                (Int.to_float @@ base_job_count) ;
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
                (Int.to_float @@ merge_job_count) ) )
 
