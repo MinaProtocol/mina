@@ -265,14 +265,14 @@ module Get_trustlist = struct
 end
 
 (** daemon-level Get_telemetry_data; implementation invokes
-    Coda_networking's Get_telemetry_data for each provided peer
+    Mina_networking's Get_telemetry_data for each provided peer
 *)
 module Get_telemetry_data = struct
   type query = Network_peer.Peer.Id.Stable.Latest.t list option
   [@@deriving bin_io_unversioned]
 
   type response =
-    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
+    Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
     Or_error.t
     list
   [@@deriving bin_io_unversioned]
