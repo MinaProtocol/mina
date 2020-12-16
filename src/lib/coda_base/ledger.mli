@@ -147,7 +147,8 @@ module Undo : sig
     type t = Undo.Fee_transfer_undo.t =
       { fee_transfer: Fee_transfer.t
       ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t }
+      ; receiver_timing: Account.Timing.t
+      ; balances: User_command_status.Balance_data.t }
     [@@deriving sexp]
   end
 
@@ -155,7 +156,8 @@ module Undo : sig
     type t = Undo.Coinbase_undo.t =
       { coinbase: Coinbase.t
       ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t }
+      ; receiver_timing: Account.Timing.t
+      ; balances: User_command_status.Balance_data.t }
     [@@deriving sexp]
   end
 

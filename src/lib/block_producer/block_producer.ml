@@ -141,8 +141,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation ~supercharge_coinbase )
+        |> Result.map_error ~f:(fun err ->
+               Staged_ledger.Staged_ledger_error.Pre_diff err )
       in
       match%map
+        let%bind.Deferred.Result.Let_syntax diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
@@ -160,7 +163,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
-            ( diff
+            ( (match diff with Ok diff -> diff | Error _ -> assert false)
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
@@ -168,14 +171,23 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
-          [%log error]
-            ~metadata:
-              [ ( "error"
-                , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-              ; ( "diff"
-                , Staged_ledger_diff.With_valid_signatures_and_proofs.to_yojson
-                    diff ) ]
-            "Error applying the diff $diff: $error" ;
+          ( match diff with
+          | Ok diff ->
+              [%log error]
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    )
+                  ; ( "diff"
+                    , Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .to_yojson diff ) ]
+                "Error applying the diff $diff: $error"
+          | Error e ->
+              [%log error] "Error building the diff: $error"
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    ) ] ) ;
           None)
   in
   match res with

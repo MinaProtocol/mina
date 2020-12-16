@@ -143,7 +143,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                           make_actions Sent_invalid_signature_or_proof
                       | Pre_diff _
                       | Non_zero_fee_excess _
-                      | Insufficient_work _ ->
+                      | Insufficient_work _
+                      | Mismatched_statuses _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -351,6 +352,8 @@ module For_tests = struct
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
+        |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
+        |> Or_error.ok_exn
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
