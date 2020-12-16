@@ -8,7 +8,7 @@ function isDaemonSynced() {
     )
 
     case ${status} in
-      SYNCED)
+      \"SYNCED\")
         return 0
         ;;
       *)
