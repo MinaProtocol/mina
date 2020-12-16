@@ -261,7 +261,7 @@ let to_protocol_constants
      ; genesis_state_timestamp
      ; slots_per_sub_window
      ; slots_per_epoch
-     ; sub_windows_per_window= _ } :
+     ; _ } :
       _ Poly.t) =
   { Coda_base.Protocol_constants_checked.Poly.k
   ; delta

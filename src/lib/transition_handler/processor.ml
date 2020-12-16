@@ -87,6 +87,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
   in
+  let transition_receipt_time =
+    Some
+      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
+  in
   let sender =
     Envelope.Incoming.sender enveloped_initially_validated_transition
   in
@@ -175,8 +179,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb
+            ~verifier ~trust_system ~transition_receipt_time
+            ~sender:(Some sender) ~parent:parent_breadcrumb
             ~transition:
               mostly_validated_transition (* TODO: Can we skip here? *)
             ~skip_staged_ledger_verification:false () )
@@ -262,7 +266,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
   ignore
     (Reader.Merge.iter
        (* It is fine to skip the cache layer on blocks produced by this node
-        * because it is extradornarily unlikely we would write an internal bug
+        * because it is extraordinarily unlikely we would write an internal bug
         * triggering this case, and the external case (where we received an
         * identical external transition from the network) can happen iff there
         * is another node with the exact same private key and view of the

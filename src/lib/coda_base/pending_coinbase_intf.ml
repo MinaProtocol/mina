@@ -186,8 +186,8 @@ module type S = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('action, 'coinbase_data) t =
-            {action: 'action; coinbase_data: 'coinbase_data}
+          type ('action, 'coinbase_amount) t =
+            {action: 'action; coinbase_amount: 'coinbase_amount}
           [@@deriving sexp]
         end
       end]
@@ -196,13 +196,12 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t =
-          (Action.Stable.V1.t, Coinbase_data.Stable.V1.t) Poly.Stable.V1.t
+        type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
       end
     end]
 
-    type var = (Action.var, Coinbase_data.var) Poly.t
+    type var = (Action.var, Amount.var) Poly.t
 
     val genesis : t
 
@@ -271,6 +270,7 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> Update.var
+      -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
       -> (var, 's) Tick.Checked.t
