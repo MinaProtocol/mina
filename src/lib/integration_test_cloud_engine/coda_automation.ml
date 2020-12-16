@@ -23,6 +23,7 @@ module Network_config = struct
     { cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
+    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -99,6 +100,7 @@ module Network_config = struct
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
     let cluster_name = "mina-integration-west1" in
+    let k8s_context = cluster_id in
     let cluster_region = "us-west1" in
     let seed_zone = "us-west1-a" in
     let seed_region = "us-west1" in
@@ -216,6 +218,7 @@ module Network_config = struct
         ; testnet_name
         ; seed_zone
         ; seed_region
+        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
