@@ -23,8 +23,8 @@ RUN apt-get -y update && \
     apt-transport-https \
     ca-certificates \
     dnsutils \
-    tzdata && \
-    postgresql \
+    tzdata \
+    postgresql && \
   rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
