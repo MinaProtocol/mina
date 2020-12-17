@@ -155,7 +155,7 @@ module Node = struct
               peerId
             }
           }
-          peers { peer { peerId }}
+          peers {  peerId }
 
         }
       }
@@ -179,7 +179,9 @@ module Node = struct
       ?(initial_delay_sec = 30.0) ~logger ~graphql_port
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
-    [%log info] "Will now attempt to make GraphQL request: %s" query_name ;
+    [%log info]
+      "exec_graphql_request, Will now attempt to make GraphQL request: %s"
+      query_name ;
     let err_str str = sprintf "%s: %s" query_name str in
     let rec retry n =
       if n <= 0 then (
@@ -193,13 +195,15 @@ module Node = struct
         with
         | Ok result ->
             let err_str = err_str "succeeded" in
-            [%log info] "%s" err_str ;
+            [%log info] "exec_graphql_request %s" err_str ;
             return result
         | Error (`Failed_request err_string) ->
             let err_str =
               err_str
-                (sprintf "Failed GraphQL request: %s, %d tries left" err_string
-                   (n - 1))
+                (sprintf
+                   "exec_graphql_request, Failed GraphQL request: %s, %d \
+                    tries left"
+                   err_string (n - 1))
             in
             [%log warn] "%s" err_str ;
             let%bind () =
@@ -208,14 +212,19 @@ module Node = struct
             in
             retry (n - 1)
         | Error (`Graphql_error err_string) ->
-            let err_str = err_str (sprintf "GraphQL error: %s" err_string) in
+            let err_str =
+              err_str
+                (sprintf "exec_graphql_request, GraphQL error: %s" err_string)
+            in
             [%log error] "%s" err_str ;
             if retry_on_graphql_error then (
               let%bind () =
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log info] "After GraphQL error, %d tries left" (n - 1) ;
+              [%log info]
+                "exec_graphql_request, After GraphQL error, %d tries left"
+                (n - 1) ;
               retry (n - 1) )
             else Malleable_error.of_string_hard_error err_string
     in
@@ -249,6 +258,7 @@ module Node = struct
     in
     [%log info] "get_peer_id, self_id is: %s" self_id ;
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
+    [%log info] "get_peer_id, got the list of peers" ;
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
     [%log info] "result of graphql querry (%s,%s)" self_id
       (String.concat ~sep:" " peer_ids) ;
