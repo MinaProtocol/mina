@@ -1,7 +1,7 @@
 open Core
 open Async
 open Graphql_async
-open Coda_base
+open Mina_base
 open Signature_lib
 open Currency
 
@@ -405,7 +405,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
-              Coda_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
   let protocol_state =
@@ -706,11 +706,11 @@ module Types = struct
                    | Ledger_db staking_ledger -> (
                      try
                        let index =
-                         Coda_base.Ledger.Db.index_of_account_exn
+                         Mina_base.Ledger.Db.index_of_account_exn
                            staking_ledger account_id
                        in
                        let delegate_account =
-                         Coda_base.Ledger.Db.get_at_index_exn staking_ledger
+                         Mina_base.Ledger.Db.get_at_index_exn staking_ledger
                            index
                        in
                        let delegate_key = delegate_account.public_key in
@@ -791,7 +791,7 @@ module Types = struct
                     voting for"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   Option.map ~f:Coda_base.State_hash.to_base58_check
+                   Option.map ~f:Mina_base.State_hash.to_base58_check
                      account.Account.Poly.voting_for )
              ; field "stakingActive" ~typ:(non_null bool)
                  ~doc:

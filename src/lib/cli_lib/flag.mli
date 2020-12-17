@@ -66,7 +66,7 @@ end
 type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
-  ; nonce: Coda_base.Account.Nonce.t option
+  ; nonce: Mina_base.Account.Nonce.t option
   ; memo: string option }
 
 val signed_command_common : signed_command_common Command.Param.t

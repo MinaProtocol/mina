@@ -1,6 +1,6 @@
 open Async
 open Core
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_pool
 open Pipe_lib
@@ -267,7 +267,7 @@ val query_peer :
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
-  -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t
+  -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
 
 val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t

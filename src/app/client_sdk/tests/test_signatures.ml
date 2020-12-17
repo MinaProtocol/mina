@@ -15,14 +15,14 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
-module Coda_base = Coda_base_nonconsensus
+module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 
 [%%endif]
 
-open Coda_base
+open Mina_base
 open Signature_lib
 
 let signer_pk =

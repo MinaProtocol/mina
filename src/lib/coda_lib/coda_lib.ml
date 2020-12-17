@@ -4,7 +4,7 @@
 open Core_kernel
 open Async
 open Unsigned
-open Coda_base
+open Mina_base
 open Coda_transition
 open Pipe_lib
 open Strict_pipe
@@ -79,7 +79,7 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (Account_id.t -> (Coda_base.Account.Nonce.t, string) Result.t)
+        * (Account_id.t -> (Mina_base.Account.Nonce.t, string) Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -708,7 +708,7 @@ let staking_ledger t =
 let find_delegators table pk =
   Option.value_map
     (Public_key.Compressed.Table.find table pk)
-    ~default:[] ~f:Coda_base.Account.Index.Table.data
+    ~default:[] ~f:Mina_base.Account.Index.Table.data
 
 let current_epoch_delegators t ~pk =
   let open Option.Let_syntax in
