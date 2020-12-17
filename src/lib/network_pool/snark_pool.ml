@@ -237,7 +237,7 @@ struct
               true )
 
       let fee_is_sufficient t ~fee ~prover ~best_tip_ledger =
-        let open Coda_base in
+        let open Mina_base in
         Currency.Fee.(fee >= t.account_creation_fee)
         ||
         match best_tip_ledger with
@@ -357,7 +357,7 @@ struct
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
           Coda_metrics.(
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-              ( fee.Coda_base.Fee_with_prover.fee |> Currency.Fee.to_int
+              ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
           `Added )
         else
@@ -395,7 +395,7 @@ struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let message = Coda_base.Sok_message.create ~fee ~prover in
+        let message = Mina_base.Sok_message.create ~fee ~prover in
         let prover_account_ok =
           fee_is_sufficient t ~fee ~prover ~best_tip_ledger
         in
@@ -566,7 +566,7 @@ struct
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
-include Make (Coda_base.Ledger) (Staged_ledger)
+include Make (Mina_base.Ledger) (Staged_ledger)
           (struct
             include Transition_frontier
 
@@ -607,7 +607,7 @@ end
 
 let%test_module "random set test" =
   ( module struct
-    open Coda_base
+    open Mina_base
 
     let trust_system = Mocks.trust_system
 

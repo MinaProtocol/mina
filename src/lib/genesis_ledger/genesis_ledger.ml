@@ -1,7 +1,7 @@
 open Core_kernel
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
@@ -45,7 +45,7 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
         (None, {base_acct with delegate= Option.value ~default:pk delegate}) )
 end
 
-(** Generate a ledger using the sample keypairs from [Coda_base] with the given
+(** Generate a ledger using the sample keypairs from [Mina_base] with the given
     balances.
 *)
 module Balances (Balances : Intf.Named_balances_intf) = struct
@@ -57,7 +57,7 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Coda_base.Sample_keypairs.keypairs in
+      and keypairs = Mina_base.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
           { balance= b
           ; pk= fst keypairs.(i)

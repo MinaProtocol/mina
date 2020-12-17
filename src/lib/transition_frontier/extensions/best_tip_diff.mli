@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 type view =
   { new_commands: User_command.Valid.t With_status.t list

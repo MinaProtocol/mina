@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
+open Mina_base
 
 let trust_system = Trust_system.null ()
 
@@ -8,8 +9,6 @@ module Transaction_snark_work = Transaction_snark_work
 module Ledger_proof = Ledger_proof.Debug
 
 module Base_ledger = struct
-  open Coda_base
-
   type t = Account.t Account_id.Map.t [@@deriving sexp]
 
   module Location = struct
@@ -63,7 +62,7 @@ module Transition_frontier = struct
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer = Broadcast_pipe.create (0, table) in
     { refcount_table= table
-    ; ledger= Coda_base.Account_id.Map.empty
+    ; ledger= Account_id.Map.empty
     ; diff_writer
     ; diff_reader }
 

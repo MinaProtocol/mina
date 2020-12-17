@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 val t :
      genesis_ledger:Ledger.t Lazy.t

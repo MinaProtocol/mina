@@ -1,6 +1,6 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
-open Coda_base
+open Mina_base
 open Coda_numbers
 open Signature_lib
 

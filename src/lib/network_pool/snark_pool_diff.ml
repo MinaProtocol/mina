@@ -70,7 +70,7 @@ module Make
         Printf.sprintf
           !"Snark_pool_diff for work %s added with fee-prover %s"
           (Yojson.Safe.to_string @@ Work.compact_json work)
-          (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
+          (Yojson.Safe.to_string @@ Mina_base.Fee_with_prover.to_yojson fee)
     | Empty ->
         "empty Snark_pool_diff"
 

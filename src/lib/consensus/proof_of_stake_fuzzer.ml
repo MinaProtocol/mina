@@ -5,7 +5,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Signature_lib
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Snark_params

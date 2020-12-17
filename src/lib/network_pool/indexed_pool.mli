@@ -5,7 +5,7 @@
 *)
 open Core
 
-open Coda_base
+open Mina_base
 open Coda_numbers
 
 module Command_error : sig
