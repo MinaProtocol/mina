@@ -1,6 +1,6 @@
 (library
- (name coda_lib)
- (public_name coda_lib)
+ (name mina_lib)
+ (public_name mina_lib)
  (library_flags -linkall)
  (inline_tests)
  (libraries core coda_intf coda_version pipe_lib user_command_input logger async async_extra
