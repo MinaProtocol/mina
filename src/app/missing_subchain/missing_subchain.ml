@@ -15,6 +15,7 @@ module Extensional_block = struct
     { state_hash: State_hash.t
     ; parent_hash: State_hash.t
     ; creator: Public_key.Compressed.t
+    ; block_winner: Public_key.Compressed.t
     ; snarked_ledger_hash: Frozen_ledger_hash.t
     ; staking_epoch_data: Epoch_seed.t
     ; next_epoch_data: Epoch_seed.t
@@ -78,6 +79,12 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
       ~item:"creator public key"
   in
   let creator = public_key_of_base58_check creator_str in
+  let%bind block_winner_str =
+    query_db
+      ~f:(fun db -> Sql.Public_key.run db block.creator_id)
+      ~item:"block winner public key"
+  in
+  let block_winner = public_key_of_base58_check block_winner_str in
   let%bind snarked_ledger_hash_str =
     query_db
       ~f:(fun db ->
@@ -110,6 +117,7 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
     { Extensional_block.state_hash
     ; parent_hash
     ; creator
+    ; block_winner
     ; snarked_ledger_hash
     ; staking_epoch_data
     ; next_epoch_data
