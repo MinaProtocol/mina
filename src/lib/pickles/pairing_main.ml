@@ -966,7 +966,7 @@ struct
       let b_used = Shifted_value.to_field (module Field) ~shift b in
       equal b_used b_actual
     in
-    let marlin_checks_passed =
+    let plonk_checks_passed =
       let e = Fn.flip actual_evaluation in
       Plonk_checks.checked
         (module Impl)
@@ -974,16 +974,17 @@ struct
         ~domain ~shift plonk ~mds:sponge_params.mds
         ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
         , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 )
+        x_hat1
     in
     print_bool "xi_correct" xi_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
-    print_bool "marlin_checks_passed" marlin_checks_passed ;
+    print_bool "plonk_checks_passed" plonk_checks_passed ;
     print_bool "b_correct" b_correct ;
     ( Boolean.all
         [ xi_correct
         ; b_correct
         ; combined_inner_product_correct
-        ; marlin_checks_passed ]
+        ; plonk_checks_passed ]
     , bulletproof_challenges )
 
   let hash_me_only (type s) ~index
@@ -1085,6 +1086,7 @@ struct
         ( _
         , _
         , _ Shifted_value.t
+        , _
         , _
         , _ )
         Types.Pairing_based.Proof_state.Per_proof.In_circuit.t) =

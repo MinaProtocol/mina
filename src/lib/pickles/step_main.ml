@@ -239,10 +239,11 @@ let step_main
                 | ( p :: proofs
                   , d :: datas
                   , pass_through :: pass_throughs
-                  , (unfinalized, b) :: unfinalizeds
+                  , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
                   , S pi ) ->
-                    Boolean.Assert.(b = should_verify) ;
+                    Boolean.Assert.( = ) unfinalized.should_finalize
+                      should_verify ;
                     let ( app_state
                         , state
                         , prev_evals
@@ -311,7 +312,7 @@ let step_main
                             ~messages ~wrap_verification_key:d.wrap_key
                             statement unfinalized )
                     in
-                    if debug then
+                    if true then
                       as_prover
                         As_prover.(
                           fun () ->

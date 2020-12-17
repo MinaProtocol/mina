@@ -9,7 +9,6 @@ type ('local_statement, 'local_max_branching, 'local_num_branches) t =
   * ( Challenge.Make(Impl).t
     , Challenge.Make(Impl).t Scalar_challenge.t
     , Impl.Field.t Shifted_value.t
-    , Impl.Boolean.var
     , Pairing_main.Make(Step_main_inputs).Other_field.t
     , unit
     , Digest.Make(Impl).t
@@ -31,7 +30,6 @@ module Constant = struct
     * ( Challenge.Constant.t
       , Challenge.Constant.t Scalar_challenge.t
       , Tick.Field.t Shifted_value.t
-      , bool
       , Tock.Field.t
       , unit
       , Digest.Constant.t
@@ -62,7 +60,7 @@ let typ (type n avar aval m) (statement : (avar, aval) Impls.Step.Typ.t)
     (Types.Dlog_based.Proof_state.In_circuit.typ
        ~challenge:(Challenge.typ' `Constrained)
        ~scalar_challenge:(Challenge.typ' `Unconstrained)
-       (Shifted_value.typ Fp.typ) Boolean.typ Other_field.typ
+       (Shifted_value.typ Fp.typ) Other_field.typ
        (Snarky_backendless.Typ.unit ())
        Digest.typ index)
     (let lengths =

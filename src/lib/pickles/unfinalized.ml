@@ -15,9 +15,11 @@ type t =
   , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
     , Tock.Rounds.n )
     Pickles_types.Vector.t
-  , Field.t )
+  , Field.t
+  , Boolean.var )
   Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
-  * Boolean.var
+
+(*   * Boolean.var *)
 
 module Constant = struct
   type t =
@@ -27,7 +29,8 @@ module Constant = struct
     , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
       , Tock.Rounds.n )
       Vector.t
-    , Digest.Constant.t )
+    , Digest.Constant.t
+    , bool )
     Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
 
   let shift = Shifted_value.Shift.create (module Tock.Field)
@@ -41,20 +44,21 @@ module Constant = struct
     let zeta = scalar_chal () in
     { deferred_values=
         { plonk=
-            { (Plonk_checks.derive_plonk
-                 (module Tock.Field)
-                 ~shift ~endo:Endo.Dum.base (* I think this is right *)
-                 ~mds:Tock_field_sponge.params.mds
-                 ~domain:
-                   (Plonk_checks.domain
-                      (module Tock.Field)
-                      wrap_domains.h ~shifts:Common.tock_shifts
-                      ~domain_generator:Tock.Field.domain_generator)
-                 { alpha= Common.Ipa.Wrap.endo_to_field alpha
-                 ; beta= Challenge.Constant.to_tock_field beta
-                 ; gamma= Challenge.Constant.to_tock_field gamma
-                 ; zeta= Common.Ipa.Wrap.endo_to_field zeta }
-                 Dummy.evals_combined)
+            { ( Plonk_checks.derive_plonk
+                  (module Tock.Field)
+                  ~shift ~endo:Endo.Dum.base (* I think this is right *)
+                  ~mds:Tock_field_sponge.params.mds
+                  ~domain:
+                    (Plonk_checks.domain
+                       (module Tock.Field)
+                       wrap_domains.h ~shifts:Common.tock_shifts
+                       ~domain_generator:Tock.Field.domain_generator)
+                  { alpha= Common.Ipa.Wrap.endo_to_field alpha
+                  ; beta= Challenge.Constant.to_tock_field beta
+                  ; gamma= Challenge.Constant.to_tock_field gamma
+                  ; zeta= Common.Ipa.Wrap.endo_to_field zeta }
+                  Dummy.evals_combined Tock.Field.zero
+              |> fst )
               with
               alpha
             ; beta
@@ -64,5 +68,6 @@ module Constant = struct
         ; xi= Scalar_challenge one_chal
         ; bulletproof_challenges= Dummy.Ipa.Wrap.challenges
         ; b= Shifted_value (tock ()) }
+    ; should_finalize= false
     ; sponge_digest_before_evaluations= Digest.Constant.dummy }
 end

@@ -76,27 +76,6 @@ struct
       in
       branch_data.rule.main_value prevs next_state
     in
-    (*
-    let prev_with_proofs =
-      let rec go
-        : type a b c.
-          (a, b, c) H3.T(P.With_data).t
-          -> (a, b, c) H3.T(E03(Bool)).t
-          -> (a, b, c) H3.T(P.With_data).t
-        =
-        fun ps must_verifys ->
-          match ps, must_verifys with
-          | [], [] -> []
-          | T p :: ps, must_verify :: must_verifys ->
-            let sg =
-              if not must_verify then
-                Ipa.Wrap.compute_sg u.deferred_values.bulletproof_challenges
-              else sg 
-            in
-      in
-      go
-    in
-*)
     let module X_hat = struct
       type t = Tock.Field.t Double.t
     end in
@@ -105,7 +84,6 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.t
-        , bool
         , Tock.Field.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -150,23 +128,27 @@ struct
               zeta * domain_generator ~log2_size:(Domain.log2_size domain))
           in
           time "plonk_checks" (fun () ->
-              Plonk_checks.derive_plonk
-                (module Tick.Field)
-                ~endo:Endo.Dee.base ~shift:Shifts.tick
-                ~mds:Tick_field_sponge.params.mds
-                ~domain:
-                  (Plonk_checks.domain
+              let p, _ =
+                Plonk_checks.derive_plonk
+                  (module Tick.Field)
+                  ~endo:Endo.Dee.base ~shift:Shifts.tick
+                  ~mds:Tick_field_sponge.params.mds
+                  ~domain:
+                    (Plonk_checks.domain
+                       (module Tick.Field)
+                       domain ~shifts:Common.tick_shifts
+                       ~domain_generator:Backend.Tick.Field.domain_generator)
+                  { zeta
+                  ; alpha
+                  ; beta= Challenge.Constant.to_tick_field plonk0.beta
+                  ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
+                  (Plonk_checks.evals_of_split_evals
                      (module Tick.Field)
-                     domain ~shifts:Common.tick_shifts
-                     ~domain_generator:Backend.Tick.Field.domain_generator)
-                { zeta
-                ; alpha
-                ; beta= Challenge.Constant.to_tick_field plonk0.beta
-                ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
-                (Plonk_checks.evals_of_split_evals
-                   (module Tick.Field)
-                   t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
-          )
+                     t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta
+                     ~zetaw)
+                  (fst t.prev_x_hat)
+              in
+              p )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
@@ -328,20 +310,24 @@ struct
         in
         let chal = Challenge.Constant.of_tock_field in
         let plonk =
-          Plonk_checks.derive_plonk
-            (module Tock.Field)
-            ~shift:Shifts.tock ~endo:Endo.Dum.base
-            ~mds:Tock_field_sponge.params.mds
-            ~domain:
-              (Plonk_checks.domain
+          let p, _ =
+            Plonk_checks.derive_plonk
+              (module Tock.Field)
+              ~shift:Shifts.tock ~endo:Endo.Dum.base
+              ~mds:Tock_field_sponge.params.mds
+              ~domain:
+                (Plonk_checks.domain
+                   (module Tock.Field)
+                   data.wrap_domains.h ~shifts:Common.tock_shifts
+                   ~domain_generator:Backend.Tock.Field.domain_generator)
+              {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
+              (Plonk_checks.evals_of_split_evals
                  (module Tock.Field)
-                 data.wrap_domains.h ~shifts:Common.tock_shifts
-                 ~domain_generator:Backend.Tock.Field.domain_generator)
-            {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
-            (Plonk_checks.evals_of_split_evals
-               (module Tock.Field)
-               t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
-               ~zeta:As_field.zeta ~zetaw)
+                 t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
+                 ~zeta:As_field.zeta ~zetaw)
+              x_hat_1
+          in
+          p
         in
         let shifted_value =
           Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
@@ -358,6 +344,7 @@ struct
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
               ; b= shifted_value b }
+          ; should_finalize= must_verify
           ; sponge_digest_before_evaluations=
               Digest.Constant.of_tock_field sponge_digest_before_evaluations }
         , prev_statement_with_hashes
@@ -396,17 +383,10 @@ struct
       go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
         prev_vars_length
     in
-    let inners_must_verify =
-      let module V = H1.To_vector (Bool) in
-      V.f prev_vars_length inners_must_verify
-    in
     let next_statement : _ Types.Pairing_based.Statement.t =
-      let unfinalized_proofs =
-        Vector.zip unfinalized_proofs inners_must_verify
-      in
       let unfinalized_proofs_extended =
         Vector.extend unfinalized_proofs lte Max_branching.n
-          (Unfinalized.Constant.dummy, false)
+          Unfinalized.Constant.dummy
       in
       let pass_through =
         let module M =
