@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
 

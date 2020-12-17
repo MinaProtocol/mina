@@ -1,7 +1,7 @@
 (**  Low-level dependency make graphql_query.ml compile less often, which takes a long time **)
 open Core
 
-open Coda_base
+open Mina_base
 
 module Make_numeric (Input : sig
   type t

@@ -3,7 +3,7 @@
 open Inline_test_quiet_logs
 open Core
 open Async
-open Coda_base
+open Mina_base
 
 let%test_module "Root_history and Transition_frontier" =
   ( module struct

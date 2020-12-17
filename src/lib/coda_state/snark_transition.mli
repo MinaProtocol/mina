@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module Poly : sig
   type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t =
