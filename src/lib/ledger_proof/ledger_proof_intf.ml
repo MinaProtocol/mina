@@ -9,7 +9,7 @@ module type S = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type nonrec t = t [@@deriving compare, sexp, to_yojson]
+      type nonrec t = t [@@deriving compare, sexp, yojson]
 
       val to_latest : t -> t
 
