@@ -876,7 +876,7 @@ let create ?wallets (config : Config.t) =
                 in
                 f ~frontier input )
           in
-          (* knot-tying hacks so we can pass a get_telemetry function before net, Coda_lib.t created *)
+          (* knot-tying hacks so we can pass a get_telemetry function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
           let get_telemetry_data _env =
