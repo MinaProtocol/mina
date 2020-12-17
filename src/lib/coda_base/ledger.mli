@@ -148,7 +148,7 @@ module Undo : sig
       { fee_transfer: Fee_transfer.t
       ; previous_empty_accounts: Account_id.t list
       ; receiver_timing: Account.Timing.t
-      ; balances: User_command_status.Balance_data.t }
+      ; balances: User_command_status.Fee_transfer_balance_data.t }
     [@@deriving sexp]
   end
 
@@ -157,7 +157,7 @@ module Undo : sig
       { coinbase: Coinbase.t
       ; previous_empty_accounts: Account_id.t list
       ; receiver_timing: Account.Timing.t
-      ; balances: User_command_status.Balance_data.t }
+      ; balances: User_command_status.Coinbase_balance_data.t }
     [@@deriving sexp]
   end
 

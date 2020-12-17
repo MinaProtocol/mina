@@ -1067,7 +1067,7 @@ let genesis ~precomputed_values =
         ( { completed_works= []
           ; commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero
-          ; internal_command_statuses= [] }
+          ; internal_command_balances= [] }
         , None ) }
   in
   (* the genesis transition is assumed to be valid *)
