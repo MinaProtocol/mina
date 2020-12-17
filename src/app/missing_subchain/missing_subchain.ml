@@ -21,6 +21,7 @@ module Extensional_block = struct
     ; ledger_hash: Ledger_hash.t
     ; height: Unsigned.UInt32.t
     ; global_slot: Coda_numbers.Global_slot.t
+    ; global_slot_since_genesis: Coda_numbers.Global_slot.t
     ; timestamp: Block_time.t }
 end
 
@@ -100,7 +101,10 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
   let next_epoch_data = epoch_seed_of_base58_check next_epoch_data_str in
   let ledger_hash = ledger_hash_of_base58_check block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
-  let global_slot = Unsigned.UInt32.of_int64 block.height in
+  let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
+  let global_slot_since_genesis =
+    Unsigned.UInt32.of_int64 block.global_slot_since_genesis
+  in
   let timestamp = Block_time.of_int64 block.timestamp in
   return
     { Extensional_block.state_hash
@@ -112,6 +116,7 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
     ; ledger_hash
     ; height
     ; global_slot
+    ; global_slot_since_genesis
     ; timestamp }
 
 let main ~archive_uri ~state_hash () =
