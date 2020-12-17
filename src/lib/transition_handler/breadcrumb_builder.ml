@@ -12,7 +12,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
       "Transition frontier already garbage-collected the parent of %s"
       (Mina_base.State_hash.to_base58_check initial_hash)
   in
-  (* If the breadcrumb we are targetting is removed from the transition
+  (* If the breadcrumb we are targeting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
    * critical path that has been chosen in the frontier. As such, we should
    * drop it on the floor. *)
@@ -61,6 +61,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 let transition_with_initial_validation =
                   Envelope.Incoming.data enveloped_transition
                 in
+                let transition_receipt_time = Some (Time.now ()) in
                 let transition_with_hash, _ =
                   transition_with_initial_validation
                 in
@@ -98,7 +99,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                           Transition_frontier.Breadcrumb.build ~logger
                             ~precomputed_values ~verifier ~trust_system ~parent
                             ~transition:mostly_validated_transition
-                            ~sender:(Some sender) () ) )
+                            ~sender:(Some sender) ~transition_receipt_time ()
+                      ) )
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg

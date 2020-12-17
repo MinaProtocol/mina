@@ -13,12 +13,17 @@ module Timing = struct
         Quickcheck.Generator.small_non_negative_int
       in
       let%bind cliff_time = Quickcheck.Generator.small_non_negative_int in
+      let%bind cliff_amount = Quickcheck.Generator.small_non_negative_int in
       let%bind vesting_increment =
         Quickcheck.Generator.small_non_negative_int
       in
       let%map vesting_period = Quickcheck.Generator.small_positive_int in
       Account_timing.Poly.Timed
-        {initial_minimum_balance; cliff_time; vesting_increment; vesting_period}
+        { initial_minimum_balance
+        ; cliff_time
+        ; cliff_amount
+        ; vesting_increment
+        ; vesting_period }
 end
 
 module Public_accounts = struct

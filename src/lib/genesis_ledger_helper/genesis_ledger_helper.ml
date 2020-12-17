@@ -83,11 +83,12 @@ module Accounts = struct
         | Some
             { initial_minimum_balance
             ; cliff_time
+            ; cliff_amount
             ; vesting_period
             ; vesting_increment } ->
             Mina_base.Account.create_timed account_id t.balance
-              ~initial_minimum_balance ~cliff_time ~vesting_period
-              ~vesting_increment
+              ~initial_minimum_balance ~cliff_time ~cliff_amount
+              ~vesting_period ~vesting_increment
             |> Or_error.ok_exn
         | None ->
             Mina_base.Account.create account_id t.balance
@@ -209,6 +210,7 @@ module Accounts = struct
               { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                   t.initial_minimum_balance
               ; cliff_time= t.cliff_time
+              ; cliff_amount= t.cliff_amount
               ; vesting_period= t.vesting_period
               ; vesting_increment= t.vesting_increment }
       in
@@ -1147,12 +1149,13 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some {previous_state_hash; previous_length} ->
+      | Some {previous_state_hash; previous_length; previous_global_slot} ->
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length } )
-  }
+            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_global_slot=
+                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =

@@ -3,7 +3,6 @@
  (public_name consensus)
  (inline_tests)
  (modules (:standard \ proof_of_stake_fuzzer))
- (flags (-w -37))
  (library_flags (-linkall))
  (libraries
    snarky_taylor

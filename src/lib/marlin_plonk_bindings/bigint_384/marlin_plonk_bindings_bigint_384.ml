@@ -21,3 +21,9 @@ external of_decimal_string : string -> t = "caml_bigint_384_of_decimal_string"
 external to_bytes : t -> Bytes.t = "caml_bigint_384_to_bytes"
 
 external of_bytes : Bytes.t -> t = "caml_bigint_384_of_bytes"
+
+external deep_copy : t -> t = "caml_bigint_384_deep_copy"
+
+let%test "deep_copy" =
+  let x = of_decimal_string "12345" in
+  deep_copy x = x

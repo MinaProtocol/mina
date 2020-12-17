@@ -122,6 +122,7 @@ module Network_config = struct
                   { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                       t.initial_minimum_balance
                   ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
                   ; vesting_period= t.vesting_period
                   ; vesting_increment= t.vesting_increment }
           in

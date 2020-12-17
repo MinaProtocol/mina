@@ -1,5 +1,4 @@
 open Core
-open Mina_base
 open Signed
 open Unsigned
 open Num_util

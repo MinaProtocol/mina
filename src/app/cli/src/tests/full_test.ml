@@ -110,27 +110,6 @@ let run_test () : unit Deferred.t =
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
-      let%bind receipt_chain_dir_name =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
-      in
-      let%bind transaction_database_dir =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        receipt_chain_dir_name ;
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      let%bind external_transition_database_dir =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "external_transition_database")
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
-      in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
@@ -201,6 +180,7 @@ let run_test () : unit Deferred.t =
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
+      let start_time = Time.now () in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
@@ -223,9 +203,8 @@ let run_test () : unit Deferred.t =
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values ())
+             ~consensus_local_state ~work_reassignment_wait:420000
+             ~precomputed_values ~start_time ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

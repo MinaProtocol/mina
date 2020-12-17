@@ -2,8 +2,12 @@ module Or_infinity = struct
   type 'a t = Infinity | Finite of 'a
 end
 
+module Scalar_challenge = struct
+  type 'a t = Scalar_challenge of 'a
+end
+
 module Poly_comm = struct
-  type 'a t = {shifted: 'a option; unshifted: 'a array}
+  type 'a t = {unshifted: 'a array; shifted: 'a option}
 end
 
 module Plonk_domain = struct
@@ -118,14 +122,14 @@ module Oracles = struct
     type 'field t =
       { beta: 'field
       ; gamma: 'field
-      ; alpha_chal: 'field
+      ; alpha_chal: 'field Scalar_challenge.t
       ; alpha: 'field
       ; zeta: 'field
       ; v: 'field
       ; u: 'field
-      ; zeta_chal: 'field
-      ; v_chal: 'field
-      ; u_chal: 'field }
+      ; zeta_chal: 'field Scalar_challenge.t
+      ; v_chal: 'field Scalar_challenge.t
+      ; u_chal: 'field Scalar_challenge.t }
   end
 
   type 'field t =

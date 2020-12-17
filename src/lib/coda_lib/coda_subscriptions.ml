@@ -3,7 +3,6 @@ open Async_kernel
 open Pipe_lib
 open Mina_base
 open Signature_lib
-open Auxiliary_database
 open O1trace
 
 type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
@@ -37,9 +36,8 @@ let add_new_subscription (t : t) ~pk =
     ~default:Pipe.create
   |> ignore
 
-let create ~logger ~constraint_constants ~wallets ~time_controller
-    ~external_transition_database ~new_blocks ~transition_frontier
-    ~is_storing_all =
+let create ~logger ~constraint_constants ~wallets ~new_blocks
+    ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -51,11 +49,6 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
            let reader, writer = Pipe.create () in
            (wallet, (reader, writer)) )
-  in
-  let update_external_transition_database
-      filtered_external_transition_with_hash block_time =
-    External_transition_database.add external_transition_database
-      filtered_external_transition_with_hash block_time
   in
   let update_payment_subscriptions filtered_external_transition participants =
     Set.iter participants ~f:(fun participant ->
@@ -128,16 +121,10 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
                       ))
                     verified_transactions
               in
-              let filtered_external_transition_with_hash =
-                {With_hash.hash; data= filtered_external_transition}
-              in
               let participants =
                 Filtered_external_transition.participant_pks
                   filtered_external_transition
               in
-              let block_time = Block_time.now time_controller in
-              update_external_transition_database
-                filtered_external_transition_with_hash block_time ;
               update_payment_subscriptions filtered_external_transition
                 participants ;
               update_block_subscriptions
@@ -188,7 +175,7 @@ let create ~logger ~constraint_constants ~wallets ~time_controller
   |> don't_wait_for ;
   t
 
-(* When you subscribe to a block, you will also subscribe to it's payments *)
+(* When you subscribe to a block, you also subscribe to its payments *)
 let add_block_subscriber t public_key =
   let block_reader, block_writer = Pipe.create () in
   let rw_pair = (block_reader, block_writer) in

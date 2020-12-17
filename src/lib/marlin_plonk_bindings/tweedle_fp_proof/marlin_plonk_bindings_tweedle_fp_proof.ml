@@ -16,13 +16,6 @@ external create :
   -> t
   = "caml_tweedle_fp_plonk_proof_create"
 
-external verify_raw :
-     Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array
-  -> Marlin_plonk_bindings_tweedle_fp_verifier_index.Raw.t
-  -> t
-  -> bool
-  = "caml_tweedle_fp_plonk_proof_verify_raw"
-
 external verify :
      Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array
   -> Marlin_plonk_bindings_tweedle_fp_verifier_index.t
@@ -30,16 +23,17 @@ external verify :
   -> bool
   = "caml_tweedle_fp_plonk_proof_verify"
 
-external batch_verify_raw :
-     Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array array
-  -> Marlin_plonk_bindings_tweedle_fp_verifier_index.Raw.t array
-  -> t array
-  -> bool
-  = "caml_tweedle_fp_plonk_proof_batch_verify_raw"
-
 external batch_verify :
      Marlin_plonk_bindings_tweedle_fp_urs.Poly_comm.t array array
   -> Marlin_plonk_bindings_tweedle_fp_verifier_index.t array
   -> t array
   -> bool
   = "caml_tweedle_fp_plonk_proof_batch_verify"
+
+external dummy : unit -> t = "caml_tweedle_fp_plonk_proof_dummy"
+
+external deep_copy : t -> t = "caml_tweedle_fp_plonk_proof_deep_copy"
+
+let%test "deep_copy" =
+  let x = dummy () in
+  deep_copy x = x

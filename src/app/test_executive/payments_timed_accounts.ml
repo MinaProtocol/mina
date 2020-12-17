@@ -15,20 +15,21 @@ module Make (Engine : Engine_intf) = struct
     let open Test_config in
     let open Test_config.Block_producer in
     let open Currency in
-    let make_timing ~min_balance ~cliff_time ~vesting_period ~vesting_increment
-        : Mina_base.Account_timing.t =
+    let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
+        ~vesting_increment : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= Balance.of_int min_balance
         ; cliff_time= Coda_numbers.Global_slot.of_int cliff_time
+        ; cliff_amount= Amount.of_int cliff_amount
         ; vesting_period= Coda_numbers.Global_slot.of_int vesting_period
         ; vesting_increment= Amount.of_int vesting_increment }
     in
     let timing1 =
-      make_timing ~min_balance:100_000_000_000 ~cliff_time:4 ~vesting_period:2
-        ~vesting_increment:50_000_000_000
+      make_timing ~min_balance:100_000_000_000 ~cliff_time:4 ~cliff_amount:0
+        ~vesting_period:2 ~vesting_increment:50_000_000_000
     in
     let timing2 =
-      make_timing ~min_balance:650_000_000_000 ~cliff_time:2000
+      make_timing ~min_balance:650_000_000_000 ~cliff_time:2000 ~cliff_amount:0
         ~vesting_period:1 ~vesting_increment:500_000_000_000
     in
     { default with

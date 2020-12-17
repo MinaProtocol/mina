@@ -13,10 +13,11 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
         Currency.Balance.of_int t.initial_minimum_balance
       in
       let cliff_time = Coda_numbers.Global_slot.of_int t.cliff_time in
+      let cliff_amount = Currency.Amount.of_int t.cliff_amount in
       let vesting_increment = Currency.Amount.of_int t.vesting_increment in
       let vesting_period = Coda_numbers.Global_slot.of_int t.vesting_period in
       Account.create_timed account_id balance ~initial_minimum_balance
-        ~cliff_time ~vesting_period ~vesting_increment
+        ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct

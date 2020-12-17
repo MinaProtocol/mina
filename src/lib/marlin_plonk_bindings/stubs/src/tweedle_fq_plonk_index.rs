@@ -159,8 +159,8 @@ pub fn caml_tweedle_fq_plonk_index_create(
             .unwrap())?,
             Some(cs) => cs,
         };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -223,8 +223,8 @@ pub fn caml_tweedle_fq_plonk_index_read(
         }
         None => (),
     };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.

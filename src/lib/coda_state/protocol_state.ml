@@ -136,6 +136,7 @@ module Body = struct
     ; last_vrf_output= ()
     ; total_currency= C.total_currency_var cs
     ; curr_global_slot= C.curr_global_slot_var cs
+    ; global_slot_since_genesis= C.global_slot_since_genesis_var cs
     ; staking_epoch_data= C.staking_epoch_data_var cs
     ; next_epoch_data= C.next_epoch_data_var cs }
 
@@ -158,6 +159,7 @@ module Body = struct
     ; last_vrf_output= ()
     ; total_currency= C.total_currency cs
     ; curr_global_slot= C.curr_global_slot cs
+    ; global_slot_since_genesis= C.global_slot_since_genesis cs
     ; staking_epoch_data= C.staking_epoch_data cs
     ; next_epoch_data= C.next_epoch_data cs }
 end

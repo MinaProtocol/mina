@@ -1,8 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Mina_base
-open Unsigned
 
 module Poly : sig
   [%%versioned:
@@ -32,6 +30,8 @@ val of_slot_number : constants:Constants.t -> Coda_numbers.Global_slot.t -> t
 val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
 val ( + ) : t -> int -> t
+
+val ( - ) : t -> t -> Coda_numbers.Global_slot.t option
 
 val ( < ) : t -> t -> bool
 
@@ -86,6 +86,9 @@ module Checked : sig
        Checked.t
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
+
+  (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
+  val sub : t -> t -> (Coda_numbers.Global_slot.Checked.t, _) Checked.t
 end
 
 val typ : (Checked.t, t) Typ.t

@@ -1,9 +1,0 @@
-(executable
- (name mock_wallet_data)
- (public_name mock_wallet_data)
- (package mock_wallet_data)
- (libraries core async auxiliary_database mina_base secrets base58_check)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane))
- (modes native)
-)
