@@ -1,5 +1,5 @@
 open Core
-open Coda_base
+open Mina_base
 open Coda_state
 
 module Merkle_list_verifier = Merkle_list_verifier.Make (struct

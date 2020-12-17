@@ -2,7 +2,7 @@
 open Inline_test_quiet_logs
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Pipe_lib.Strict_pipe
 open Coda_transition

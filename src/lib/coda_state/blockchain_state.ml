@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Snark_params.Tick
 
 module Poly = struct

@@ -9,7 +9,7 @@ end
 
 module Test_config = struct
   module Block_producer = struct
-    type t = {balance: string; timing: Coda_base.Account_timing.t}
+    type t = {balance: string; timing: Mina_base.Account_timing.t}
   end
 
   type t =
@@ -35,7 +35,7 @@ module Test_config = struct
     ; block_producers= []
     ; snark_worker_fee= "0.025"
     ; snark_worker_public_key=
-        (let pk, _ = (Lazy.force Coda_base.Sample_keypairs.keypairs).(0) in
+        (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
@@ -82,7 +82,7 @@ module type Engine_intf = sig
     val get_balance :
          logger:Logger.t
       -> t
-      -> account_id:Coda_base.Account_id.t
+      -> account_id:Mina_base.Account_id.t
       -> Currency.Balance.t Malleable_error.t
 
     val get_peer_id :

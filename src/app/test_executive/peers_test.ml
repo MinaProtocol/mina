@@ -13,7 +13,7 @@ module Make (Engine : Engine_intf) = struct
   let config =
     let open Test_config in
     let open Test_config.Block_producer in
-    let timing : Coda_base.Account_timing.t =
+    let timing : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= Balance.of_int 1000
         ; cliff_time= Coda_numbers.Global_slot.of_int 4

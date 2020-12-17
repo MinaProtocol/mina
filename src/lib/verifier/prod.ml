@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Blockchain_snark
 
@@ -14,12 +14,12 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
-         Coda_base.User_command.Verifiable.t list
-      -> [ `Valid of Coda_base.User_command.Valid.t
+         Mina_base.User_command.Verifiable.t list
+      -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Coda_base.Snapp_statement.t
+           * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list ]
          list
@@ -125,7 +125,7 @@ module Worker = struct
             | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
-              * Coda_base.Snapp_statement.t
+              * Mina_base.Snapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list ]
             list )
@@ -189,7 +189,7 @@ module Worker = struct
                   | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
-                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Mina_base.Snapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list ]
                   list]

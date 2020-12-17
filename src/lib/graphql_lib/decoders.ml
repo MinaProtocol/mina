@@ -24,7 +24,7 @@ let amount json = Yojson.Basic.Util.to_string json |> Currency.Amount.of_string
 let fee json = Yojson.Basic.Util.to_string json |> Currency.Fee.of_string
 
 let nonce json =
-  Yojson.Basic.Util.to_string json |> Coda_base.Account.Nonce.of_string
+  Yojson.Basic.Util.to_string json |> Mina_base.Account.Nonce.of_string
 
 let token json =
-  Yojson.Basic.Util.to_string json |> Coda_base.Token_id.of_string
+  Yojson.Basic.Util.to_string json |> Mina_base.Token_id.of_string

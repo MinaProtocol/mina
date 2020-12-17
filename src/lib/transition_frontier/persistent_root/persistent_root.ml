@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Coda_base
+open Mina_base
 open Frontier_base
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 

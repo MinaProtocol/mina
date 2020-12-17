@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Frontier_base

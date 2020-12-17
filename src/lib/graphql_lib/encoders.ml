@@ -8,11 +8,11 @@ let amount value = `String (Currency.Amount.to_string value)
 
 let fee value = `String (Currency.Fee.to_string value)
 
-let nonce value = `String (Coda_base.Account.Nonce.to_string value)
+let nonce value = `String (Mina_base.Account.Nonce.to_string value)
 
 let uint32 value = `String (Unsigned.UInt32.to_string value)
 
 let public_key value =
   `String (Signature_lib.Public_key.Compressed.to_base58_check value)
 
-let token value = `String (Coda_base.Token_id.to_string value)
+let token value = `String (Mina_base.Token_id.to_string value)

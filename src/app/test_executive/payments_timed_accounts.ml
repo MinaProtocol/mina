@@ -16,7 +16,7 @@ module Make (Engine : Engine_intf) = struct
     let open Test_config.Block_producer in
     let open Currency in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
-        ~vesting_increment : Coda_base.Account_timing.t =
+        ~vesting_increment : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= Balance.of_int min_balance
         ; cliff_time= Coda_numbers.Global_slot.of_int cliff_time

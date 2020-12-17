@@ -8,7 +8,7 @@
    caqti
    caqti-async
    caqti-driver-postgresql
-   coda_base
+   mina_base
    coda_state
    genesis_constants
    genesis_ledger_helper
