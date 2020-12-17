@@ -125,3 +125,8 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<BigInteger256, ocaml::Error>
     let x = unsafe { *(x.as_ptr() as *const BigInteger256) };
     Ok(x)
 }
+
+#[ocaml::func]
+pub fn caml_bigint_256_deep_copy(x: BigInteger256) -> BigInteger256 {
+    x
+}

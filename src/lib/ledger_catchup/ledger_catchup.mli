@@ -14,7 +14,7 @@ val run :
   -> precomputed_values:Precomputed_values.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
-  -> network:Coda_networking.t
+  -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:( State_hash.t
                         * ( External_transition.Initial_validated.t

@@ -26,7 +26,9 @@ archive-node readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced --db-host {{ .testnetName }}-archive-node-postgresql"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}

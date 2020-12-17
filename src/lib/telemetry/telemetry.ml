@@ -3,14 +3,14 @@
 open Core_kernel
 open Async
 
-let get_telemetry_data_from_peers (net : Coda_networking.t)
+let get_telemetry_data_from_peers (net : Mina_networking.t)
     (peer_ids : Network_peer.Peer.Id.t list option) =
   let open Deferred.Let_syntax in
   let run peer_id =
     let open Coda_base.Rpc_intf in
     match%map
-      Coda_networking.(
-        query_peer net peer_id Coda_networking.Rpcs.Get_telemetry_data ())
+      Mina_networking.(
+        query_peer net peer_id Mina_networking.Rpcs.Get_telemetry_data ())
     with
     | Failed_to_connect err ->
         Error err
@@ -28,7 +28,7 @@ let get_telemetry_data_from_peers (net : Coda_networking.t)
         return ids
     | None ->
         (* use daemon peers *)
-        let%bind peers = Coda_networking.peers net in
+        let%bind peers = Mina_networking.peers net in
         Deferred.List.map peers ~f:(fun {peer_id; _} -> return peer_id)
   in
   Deferred.List.map ~how:`Parallel peer_ids ~f:run

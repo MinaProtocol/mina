@@ -68,17 +68,17 @@ spec:
         - name: DAEMON_REST_PORT
           value: {{ .Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ .Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.coda.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.external | quote }}
+          value: {{ .Values.coda.ports.p2p | quote }}
         ports:
-        - name: p2p-port
+        - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
+          containerPort: {{ .Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.graphql }}
@@ -87,8 +87,8 @@ spec:
           containerPort: {{ .Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.external }}
-          hostPort: {{ $.Values.coda.ports.external }}
+          containerPort: {{ .Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.p2p }}
 {{- include "healthcheck.seed.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
       {{- if .Values.coda.runtimeConfig }}

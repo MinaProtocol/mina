@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Coda_base
 open Coda_transition
 open Signature_lib
@@ -41,6 +41,7 @@ module Stable = struct
   module V1 = struct
     type t =
       { creator: Public_key.Compressed.Stable.V1.t
+      ; winner: Public_key.Compressed.Stable.V1.t
       ; protocol_state: Protocol_state.Stable.V1.t
       ; transactions: Transactions.Stable.V1.t
       ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
@@ -51,7 +52,7 @@ module Stable = struct
 end]
 
 let participants ~next_available_token
-    {transactions= {commands; fee_transfers; _}; creator; _} =
+    {transactions= {commands; fee_transfers; _}; creator; winner; _} =
   let open Account_id.Set in
   let _next_available_token, user_command_set =
     List.fold commands ~init:(next_available_token, empty)
@@ -68,10 +69,13 @@ let participants ~next_available_token
         add set (Fee_transfer.Single.receiver ft) )
   in
   add
-    (union user_command_set fee_transfer_participants)
-    (Account_id.create creator Token_id.default)
+    (add
+       (union user_command_set fee_transfer_participants)
+       (Account_id.create creator Token_id.default))
+    (Account_id.create winner Token_id.default)
 
-let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
+let participant_pks
+    {transactions= {commands; fee_transfers; _}; creator; winner; _} =
   let open Public_key.Compressed.Set in
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
@@ -84,20 +88,29 @@ let participant_pks {transactions= {commands; fee_transfers; _}; creator; _} =
     List.fold fee_transfers ~init:empty ~f:(fun set ft ->
         add set ft.receiver_pk )
   in
-  add (union user_command_set fee_transfer_participants) creator
+  add (add (union user_command_set fee_transfer_participants) creator) winner
 
 let commands {transactions= {Transactions.commands; _}; _} = commands
 
-let validate_transactions external_transition =
+let validate_transactions ((transition_with_hash, _validity) as transition) =
   let staged_ledger_diff =
-    External_transition.Validated.staged_ledger_diff external_transition
+    External_transition.Validated.staged_ledger_diff transition
   in
-  Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
+  let external_transition = With_hash.data transition_with_hash in
+  let coinbase_receiver =
+    External_transition.coinbase_receiver external_transition
+  in
+  let supercharge_coinbase =
+    External_transition.supercharge_coinbase external_transition
+  in
+  Staged_ledger.Pre_diff_info.get_transactions ~coinbase_receiver
+    ~supercharge_coinbase staged_ledger_diff
 
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t With_status.t list) =
   let open External_transition.Validated in
   let creator = block_producer external_transition in
+  let winner = block_winner external_transition in
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
@@ -190,4 +203,4 @@ let of_transition external_transition tracked_participants
   let proof =
     External_transition.Validated.protocol_state_proof external_transition
   in
-  {creator; protocol_state; transactions; snark_jobs; proof}
+  {creator; winner; protocol_state; transactions; snark_jobs; proof}
