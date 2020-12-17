@@ -118,7 +118,8 @@ module Undo = struct
           { fee_transfer: Fee_transfer.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list
           ; receiver_timing: Account.Timing.Stable.V1.t
-          ; balances: User_command_status.Balance_data.Stable.V1.t }
+          ; balances: User_command_status.Fee_transfer_balance_data.Stable.V1.t
+          }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -134,7 +135,7 @@ module Undo = struct
           { coinbase: Coinbase.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list
           ; receiver_timing: Account.Timing.Stable.V1.t
-          ; balances: User_command_status.Balance_data.Stable.V1.t }
+          ; balances: User_command_status.Coinbase_balance_data.Stable.V1.t }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -218,7 +219,7 @@ module type S = sig
         { fee_transfer: Fee_transfer.t
         ; previous_empty_accounts: Account_id.t list
         ; receiver_timing: Account.Timing.t
-        ; balances: User_command_status.Balance_data.t }
+        ; balances: User_command_status.Fee_transfer_balance_data.t }
       [@@deriving sexp]
     end
 
@@ -227,7 +228,7 @@ module type S = sig
         { coinbase: Coinbase.t
         ; previous_empty_accounts: Account_id.t list
         ; receiver_timing: Account.Timing.t
-        ; balances: User_command_status.Balance_data.t }
+        ; balances: User_command_status.Coinbase_balance_data.t }
       [@@deriving sexp]
     end
 
@@ -482,11 +483,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Fee_transfer f ->
           { data= Fee_transfer f.fee_transfer
           ; status=
-              Applied (User_command_status.Auxiliary_data.empty, f.balances) }
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Fee_transfer_balance_data.to_balance_data
+                    f.balances ) }
       | Coinbase c ->
           { data= Coinbase c.coinbase
           ; status=
-              Applied (User_command_status.Auxiliary_data.empty, c.balances) }
+              Applied
+                ( User_command_status.Auxiliary_data.empty
+                , User_command_status.Coinbase_balance_data.to_balance_data
+                    c.balances ) }
 
     let user_command_status : t -> User_command_status.t =
      fun {varying; _} ->
@@ -496,9 +503,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Command (Snapp_command c) ->
           c.command.status
       | Fee_transfer f ->
-          Applied (User_command_status.Auxiliary_data.empty, f.balances)
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Fee_transfer_balance_data.to_balance_data
+                f.balances )
       | Coinbase c ->
-          Applied (User_command_status.Auxiliary_data.empty, c.balances)
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Coinbase_balance_data.to_balance_data
+                c.balances )
   end
 
   let previous_empty_accounts action pk = if action = `Added then [pk] else []
@@ -1522,15 +1535,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let balances =
       match Fee_transfer.to_singles transfer with
       | `One ft ->
-          { User_command_status.Balance_data.fee_payer_balance=
-              compute_balance (Fee_transfer.Single.receiver ft)
-          ; source_balance= None
-          ; receiver_balance= None }
+          { User_command_status.Fee_transfer_balance_data.receiver1_balance=
+              Option.value_exn
+                (compute_balance (Fee_transfer.Single.receiver ft))
+          ; receiver2_balance= None }
       | `Two (ft1, ft2) ->
-          { User_command_status.Balance_data.fee_payer_balance=
-              compute_balance (Fee_transfer.Single.receiver ft1)
-          ; source_balance= None
-          ; receiver_balance=
+          { User_command_status.Fee_transfer_balance_data.receiver1_balance=
+              Option.value_exn
+                (compute_balance (Fee_transfer.Single.receiver ft1))
+          ; receiver2_balance=
               compute_balance (Fee_transfer.Single.receiver ft2) }
     in
     Undo.Fee_transfer_undo.
@@ -1638,10 +1651,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; previous_empty_accounts= emptys1 @ emptys2
       ; receiver_timing= receiver_timing_for_undo
       ; balances=
-          { User_command_status.Balance_data.fee_payer_balance=
-              Some receiver_balance
-          ; source_balance= None
-          ; receiver_balance=
+          { User_command_status.Coinbase_balance_data.coinbase_receiver_balance=
+              receiver_balance
+          ; fee_transfer_receiver_balance=
               Option.map transferee_update ~f:(fun (_, a) -> a.balance) } }
 
   (* Don't have to be atomic here because these should never fail. In fact, none of

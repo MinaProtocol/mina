@@ -1591,7 +1591,7 @@ module T = struct
               Sequence.to_list_rev res.commands_rev
           ; completed_works= Sequence.to_list_rev res.completed_work_rev
           ; coinbase= to_at_most_one res.coinbase
-          ; internal_command_statuses=
+          ; internal_command_balances=
               (* These will get filled in by the caller. *) [] } )
     in
     let pre_diff_with_two (res : Resources.t) :
@@ -1601,7 +1601,7 @@ module T = struct
       { commands= Sequence.to_list_rev res.commands_rev
       ; completed_works= Sequence.to_list_rev res.completed_work_rev
       ; coinbase= res.coinbase
-      ; internal_command_statuses=
+      ; internal_command_balances=
           (* These will get filled in by the caller. *) [] }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
@@ -2415,7 +2415,7 @@ let%test_module "test" =
                 @@ ( { completed_works= List.take completed_works job_count1
                      ; commands= List.take txns slots
                      ; coinbase= Zero
-                     ; internal_command_statuses= [] }
+                     ; internal_command_balances= [] }
                    , None ) }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
@@ -2423,14 +2423,14 @@ let%test_module "test" =
               ( { completed_works= List.take completed_works job_count1
                 ; commands= List.take txns slots
                 ; coinbase= Zero
-                ; internal_command_statuses= [] }
+                ; internal_command_balances= [] }
               , Some
                   { completed_works=
                       ( if List.is_empty txns_in_second_diff then []
                       else List.drop completed_works job_count1 )
                   ; commands= txns_in_second_diff
                   ; coinbase= Zero
-                  ; internal_command_statuses= [] } )
+                  ; internal_command_balances= [] } )
             in
             {diff= compute_statuses ~ledger ~coinbase_amount diff}
       in
@@ -2439,7 +2439,7 @@ let%test_module "test" =
             ( { completed_works= []
               ; commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero
-              ; internal_command_statuses= [] }
+              ; internal_command_balances= [] }
             , None ) }
       in
       Quickcheck.test (gen_below_capacity ())

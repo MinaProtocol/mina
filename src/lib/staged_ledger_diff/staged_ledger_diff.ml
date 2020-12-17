@@ -82,7 +82,9 @@ module Pre_diff_two = struct
         { completed_works: 'a list
         ; commands: 'b list
         ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t
-        ; internal_command_statuses: User_command_status.Stable.V1.t list }
+        ; internal_command_balances:
+            User_command_status.Internal_command_balance_data.Stable.V1.t list
+        }
       [@@deriving sexp, to_yojson]
     end
   end]
@@ -91,7 +93,8 @@ module Pre_diff_two = struct
     { completed_works: 'a list
     ; commands: 'b list
     ; coinbase: Ft.t At_most_two.t
-    ; internal_command_statuses: User_command_status.t list }
+    ; internal_command_balances:
+        User_command_status.Internal_command_balance_data.t list }
   [@@deriving sexp, to_yojson]
 end
 
@@ -105,7 +108,9 @@ module Pre_diff_one = struct
         { completed_works: 'a list
         ; commands: 'b list
         ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t
-        ; internal_command_statuses: User_command_status.Stable.V1.t list }
+        ; internal_command_balances:
+            User_command_status.Internal_command_balance_data.Stable.V1.t list
+        }
       [@@deriving sexp, to_yojson]
     end
   end]
@@ -114,7 +119,8 @@ module Pre_diff_one = struct
     { completed_works: 'a list
     ; commands: 'b list
     ; coinbase: Ft.t At_most_one.t
-    ; internal_command_statuses: User_command_status.t list }
+    ; internal_command_balances:
+        User_command_status.Internal_command_balance_data.t list }
   [@@deriving sexp, to_yojson]
 end
 
@@ -301,7 +307,7 @@ let validate_commands (t : t)
         { completed_works= d1.completed_works
         ; commands= commands1
         ; coinbase= d1.coinbase
-        ; internal_command_statuses= d1.internal_command_statuses }
+        ; internal_command_balances= d1.internal_command_balances }
       in
       let p2 =
         Option.value_map ~default:None d2 ~f:(fun d2 ->
@@ -309,7 +315,7 @@ let validate_commands (t : t)
               { Pre_diff_one.completed_works= d2.completed_works
               ; commands= commands2
               ; coinbase= d2.coinbase
-              ; internal_command_statuses= d2.internal_command_statuses } )
+              ; internal_command_balances= d2.internal_command_balances } )
       in
       ({diff= (p1, p2)} : With_valid_signatures.t) )
 
@@ -320,14 +326,14 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     { completed_works= forget_cw d1.completed_works
     ; commands= d1.commands
     ; coinbase= d1.coinbase
-    ; internal_command_statuses= d1.internal_command_statuses }
+    ; internal_command_balances= d1.internal_command_balances }
   in
   let p2 =
     Option.map (snd d.diff) ~f:(fun d2 ->
         ( { completed_works= forget_cw d2.completed_works
           ; commands= d2.commands
           ; coinbase= d2.coinbase
-          ; internal_command_statuses= d2.internal_command_statuses }
+          ; internal_command_balances= d2.internal_command_balances }
           : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
   in
   {diff= (p1, p2)}
@@ -339,7 +345,7 @@ let forget_pre_diff_with_at_most_two
   { completed_works= forget_cw pre_diff.completed_works
   ; commands= (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase= pre_diff.coinbase
-  ; internal_command_statuses= pre_diff.internal_command_statuses }
+  ; internal_command_balances= pre_diff.internal_command_balances }
 
 let forget_pre_diff_with_at_most_one
     (pre_diff :
@@ -347,7 +353,7 @@ let forget_pre_diff_with_at_most_one
   { Pre_diff_one.completed_works= forget_cw pre_diff.completed_works
   ; commands= (pre_diff.commands :> User_command.t With_status.t list)
   ; coinbase= pre_diff.coinbase
-  ; internal_command_statuses= pre_diff.internal_command_statuses }
+  ; internal_command_balances= pre_diff.internal_command_balances }
 
 let forget (t : With_valid_signatures_and_proofs.t) =
   { diff=
