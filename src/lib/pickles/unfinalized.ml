@@ -19,8 +19,6 @@ type t =
   , Boolean.var )
   Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
 
-(*   * Boolean.var *)
-
 module Constant = struct
   type t =
     ( Challenge.Constant.t
