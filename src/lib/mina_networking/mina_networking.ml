@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Network_peer
@@ -338,7 +338,9 @@ module Rpcs = struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.t
+        (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
+        type query =
+          (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
         [@@deriving sexp, to_yojson]
 
         type response =
@@ -363,7 +365,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
+        type query =
+          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -527,6 +532,7 @@ module Rpcs = struct
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+            ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -536,7 +542,10 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
                   [@to_yojson yojson_of_ban_statuses]
-            ; k_block_hashes: State_hash.Stable.V1.t list }
+            ; k_block_hashes_and_timestamps:
+                (State_hash.Stable.V1.t * string) list
+            ; git_commit: string
+            ; uptime: string }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id
@@ -1136,10 +1145,11 @@ let create (config : Config.t)
               , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
-              [%str_log debug]
-                (Snark_work_received
-                   { work= Snark_pool.Resource_pool.Diff.to_compact diff
-                   ; sender= Envelope.Incoming.sender envelope }) ;
+              Option.iter (Snark_pool.Resource_pool.Diff.to_compact diff)
+                ~f:(fun work ->
+                  [%str_log debug]
+                    (Snark_work_received
+                       {work; sender= Envelope.Incoming.sender envelope}) ) ;
             Mina_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
@@ -1222,7 +1232,9 @@ let broadcast_snark_pool_diff t diff =
   broadcast t (Gossip_net.Message.Snark_pool_diff diff)
     ~log_msg:
       (Gossip_snark_pool_diff
-         {work= Snark_pool.Resource_pool.Diff.to_compact diff})
+         { work=
+             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+         })
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =
@@ -1324,7 +1336,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
     try_non_preferred_peers t input peers ~rpc
   in
   match%bind query_peer t peer_id rpc input with
-  | Connected {data= Ok (Some response); sender} ->
+  | Connected {data= Ok (Some response); sender; _} ->
       let%bind () =
         match sender with
         | Local ->
@@ -1337,7 +1349,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   , Some ("Preferred peer returned valid response", []) ))
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
-  | Connected {data= Ok None; sender} ->
+  | Connected {data= Ok None; sender; _} ->
       let%bind () =
         match sender with
         | Remote peer ->
@@ -1351,7 +1363,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             return ()
       in
       retry ()
-  | Connected {data= Error e; sender} ->
+  | Connected {data= Error e; sender; _} ->
       (* FIXME #4094: determine if more specific actions apply here *)
       let%bind () =
         match sender with
@@ -1381,11 +1393,11 @@ let get_ancestry t inet_addr input =
 
 let glue_sync_ledger :
        t
-    -> (Coda_base.Ledger_hash.t * Coda_base.Sync_ledger.Query.t)
+    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
-    -> ( Coda_base.Ledger_hash.t
-       * Coda_base.Sync_ledger.Query.t
-       * Coda_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+    -> ( Mina_base.Ledger_hash.t
+       * Mina_base.Sync_ledger.Query.t
+       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t query_reader response_writer ->
@@ -1409,7 +1421,7 @@ let glue_sync_ledger :
           match%map
             query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
           with
-          | Connected {data= Ok (Ok answer); sender} ->
+          | Connected {data= Ok (Ok answer); sender; _} ->
               [%log' trace t.logger]
                 !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                   %{sexp: Ledger_hash.t}"

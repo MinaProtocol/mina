@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -1011,7 +1011,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Coda_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_string
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id
@@ -1659,8 +1659,9 @@ let telemetry =
                    @@ Mina_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
-               (Error.to_string_hum err) ))
+             printf "%s\n%!"
+               (Yojson.Safe.to_string
+                  (`Assoc [("error", Error_json.error_to_yojson err)])) ))
 
 let next_available_token_cmd =
   Command.async

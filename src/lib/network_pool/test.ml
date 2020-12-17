@@ -143,6 +143,8 @@ let%test_module "network pool test" =
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)
                    ->
                      work
+                 | Mock_snark_pool.Resource_pool.Diff.Empty ->
+                     assert false
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

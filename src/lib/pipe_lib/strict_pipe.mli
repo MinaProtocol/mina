@@ -8,19 +8,27 @@ type crash = Overflow_behavior_crash
 
 type drop_head = Overflow_behavior_drop_head
 
-type _ overflow_behavior =
-  | Crash : crash overflow_behavior
-  | Drop_head : drop_head overflow_behavior
+type call = Overflow_behavior_call
+
+type (_, _, _) overflow_behavior =
+  | Crash : ('a, crash, unit) overflow_behavior
+  | Drop_head : ('a, drop_head, unit) overflow_behavior
+  | Call : ('a -> 'r) -> ('a, call, 'r option) overflow_behavior
 
 type synchronous = Type_synchronous
 
 type _ buffered = Type_buffered
 
-type (_, _) type_ =
-  | Synchronous : (synchronous, unit Deferred.t) type_
+(** A [('a, 'behavior, 'write_result) type_] is a representation of strict pipe types.
+ *  ['a] is the type of data written over the pipe, ['behavior] is a type parameter for classifying
+ *  which overflow behavior the pipe exhibits, and ['write_result] determines the return type of
+ *  writing to the pipe.
+ *)
+type (_, _, _) type_ =
+  | Synchronous : ('a, synchronous, unit Deferred.t) type_
   | Buffered :
-      [`Capacity of int] * [`Overflow of 'b overflow_behavior]
-      -> ('b buffered, unit) type_
+      [`Capacity of int] * [`Overflow of ('a, 'b, 'r) overflow_behavior]
+      -> ('a, 'b buffered, 'r) type_
 
 module Reader : sig
   type 't t
@@ -117,7 +125,7 @@ end
 
 val create :
      ?name:string
-  -> ('type_, 'write_return) type_
+  -> ('t, 'type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 
 val transfer :

@@ -31,14 +31,12 @@ simple_tests = [
 compile_config_agnostic_tests = [
     'coda-bootstrap-test',
     'coda-shared-state-test',
-    'coda-batch-payment-test',
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
     'coda-shared-prefix-test -who-produces 0',
     'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
-    'coda-archive-node-test',
     'coda-delegation-test',
 ]
 
@@ -48,7 +46,6 @@ required_config_agnostic_tests = {
     'dev': [
         'coda-bootstrap-test',
         'coda-shared-state-test',
-        'coda-batch-payment-test',
         'coda-delegation-test',
     ]
 }
@@ -105,7 +102,6 @@ extra_required_status_checks = ['buildkite/mina/pr']
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
     "ci/circleci: build-macos",
-    "ci/circleci: test--dev--coda-batch-payment-test"
 ]
 
 #########

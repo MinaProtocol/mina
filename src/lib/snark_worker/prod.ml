@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -56,7 +56,7 @@ module Inputs = struct
   let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
-    let sok_digest = Coda_base.Sok_message.digest message in
+    let sok_digest = Mina_base.Sok_message.digest message in
     fun (single : single_spec) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
@@ -130,7 +130,7 @@ module Inputs = struct
                             input
                               .Transaction_snark.Statement
                                .pending_coinbase_stack_state
-                          (unstage (Coda_base.Sparse_ledger.handler w.ledger))
+                          (unstage (Mina_base.Sparse_ledger.handler w.ledger))
                     ) )
             | Merge (_, proof1, proof2) ->
                 process (fun () -> M.merge ~sok_digest proof1 proof2) ) )

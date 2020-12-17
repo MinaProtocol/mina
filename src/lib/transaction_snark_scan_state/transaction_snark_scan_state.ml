@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Currency
 
 let option lab =
@@ -40,12 +40,12 @@ module Transaction_with_witness = struct
         { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
               (* TODO: It's inefficient to store this here. Optimize it someday. *)
-        ; state_view: Coda_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
+        ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness: Coda_base.Sparse_ledger.Stable.V1.t sexp_opaque }
+        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -832,7 +832,7 @@ let check_required_protocol_states t ~protocol_states =
   (*Don't check further if the lengths dont match*)
   let%bind () = check_length protocol_states in
   let received_state_map =
-    List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
+    List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
         State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps
     )

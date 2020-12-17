@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Signature_lib
 
@@ -31,6 +31,12 @@ module type External_transition_common_intf = sig
   val consensus_time_produced_at : t -> Consensus.Data.Consensus_time.t
 
   val block_producer : t -> Public_key.Compressed.t
+
+  val block_winner : t -> Public_key.Compressed.t
+
+  val coinbase_receiver : t -> Public_key.Compressed.t
+
+  val supercharge_coinbase : t -> bool
 
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t

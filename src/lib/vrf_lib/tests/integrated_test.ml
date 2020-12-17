@@ -26,11 +26,11 @@ end
 module Message = struct
   type 'state_hash t = {state_hash: 'state_hash} [@@deriving hlist]
 
-  type value = Coda_base.State_hash.t t
+  type value = Mina_base.State_hash.t t
 
-  type var = Coda_base.State_hash.var t
+  type var = Mina_base.State_hash.var t
 
-  let data_spec = Tick.Data_spec.[Coda_base.State_hash.typ]
+  let data_spec = Tick.Data_spec.[Mina_base.State_hash.typ]
 
   let typ =
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -38,12 +38,12 @@ module Message = struct
 
   let gen =
     let open Quickcheck.Let_syntax in
-    let%map state_hash = Coda_base.State_hash.gen in
+    let%map state_hash = Mina_base.State_hash.gen in
     {state_hash}
 
   let hash_to_group ~constraint_constants:_ msg =
     Group_map.to_group
-      (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+      (Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_message
          [|msg.state_hash|])
     |> Tick.Inner_curve.of_affine
 
@@ -51,9 +51,9 @@ module Message = struct
     let hash_to_group msg =
       Tick.make_checked (fun () ->
           Group_map.Checked.to_group
-            (Random_oracle.Checked.hash ~init:Coda_base.Hash_prefix.vrf_message
+            (Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_message
                (Random_oracle.Checked.pack_input
-                  (Coda_base.State_hash.var_to_input msg.state_hash))) )
+                  (Mina_base.State_hash.var_to_input msg.state_hash))) )
   end
 end
 
@@ -73,7 +73,7 @@ module Output_hash = struct
       Snark_params.Tick.make_checked (fun () ->
           let x, y = g in
           Random_oracle.Checked.hash
-            [|Coda_base.State_hash.var_to_hash_packed state_hash; x; y|] )
+            [|Mina_base.State_hash.var_to_hash_packed state_hash; x; y|] )
   end
 end
 

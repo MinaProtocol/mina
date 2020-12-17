@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
+open Mina_base
 open Coda_state
 open Cache_lib
 open Coda_transition
@@ -11,16 +11,13 @@ let validate_transition ~consensus_constants ~logger ~frontier
     ~unprocessed_transition_cache
     (enveloped_transition :
       External_transition.Initial_validated.t Envelope.Incoming.t) =
-  let open Protocol_state in
   let open Result.Let_syntax in
-  let {With_hash.hash= transition_hash; data= transition}, _ =
+  let transition =
     Envelope.Incoming.data enveloped_transition
+    |> External_transition.Validation.forget_validation_with_hash
   in
-  let protocol_state = External_transition.protocol_state transition in
-  let root_protocol_state =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.protocol_state
-  in
+  let transition_hash = With_hash.hash transition in
+  let root_breadcrumb = Transition_frontier.root frontier in
   let%bind () =
     Option.fold (Transition_frontier.find frontier transition_hash)
       ~init:Result.ok_unit ~f:(fun _ _ ->
@@ -39,8 +36,12 @@ let validate_transition ~consensus_constants ~logger ~frontier
           ~logger:
             (Logger.extend logger
                [("selection_context", `String "Transition_handler.Validator")])
-          ~existing:(consensus_state root_protocol_state)
-          ~candidate:(consensus_state protocol_state) )
+          ~existing:
+            (Transition_frontier.Breadcrumb.consensus_state_with_hash
+               root_breadcrumb)
+          ~candidate:
+            (With_hash.map ~f:External_transition.consensus_state transition)
+      )
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)

@@ -20,10 +20,10 @@ let command =
        let open Async in
        let%bind worker_state = Prod.Worker_state.create ~proof_level () in
        let public_key =
-         fst (Lazy.force Coda_base.Sample_keypairs.keypairs).(0)
+         fst (Lazy.force Mina_base.Sample_keypairs.keypairs).(0)
        in
        let fee = Currency.Fee.of_int 10 in
-       let message = Coda_base.Sok_message.create ~fee ~prover:public_key in
+       let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
        match Prod.perform_single worker_state ~message spec with
        | Ok (proof, time) ->
            Caml.Format.printf

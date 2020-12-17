@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Pipe_lib
@@ -40,10 +40,10 @@ val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val current_epoch_delegators :
-  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+  t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
 val last_epoch_delegators :
-  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+  t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
@@ -51,10 +51,7 @@ val replace_snark_worker_key :
 val add_block_subscriber :
      t
   -> Public_key.Compressed.t option
-  -> ( Auxiliary_database.Filtered_external_transition.t
-     , State_hash.t )
-     With_hash.t
-     Pipe.Reader.t
+  -> (Filtered_external_transition.t, State_hash.t) With_hash.t Pipe.Reader.t
 
 val add_payment_subscriber : t -> Account.key -> Signed_command.t Pipe.Reader.t
 
@@ -132,11 +129,6 @@ val best_chain :
   ?max_length:int -> t -> Transition_frontier.Breadcrumb.t list option
 
 val transaction_pool : t -> Network_pool.Transaction_pool.t
-
-val transaction_database : t -> Auxiliary_database.Transaction_database.t
-
-val external_transition_database :
-  t -> Auxiliary_database.External_transition_database.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 

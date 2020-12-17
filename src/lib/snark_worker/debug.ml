@@ -20,6 +20,6 @@ module Inputs = struct
   let perform_single () ~message s =
     Deferred.Or_error.return
       ( ( Snark_work_lib.Work.Single.Spec.statement s
-        , Coda_base.Sok_message.digest message )
+        , Mina_base.Sok_message.digest message )
       , Time.Span.zero )
 end

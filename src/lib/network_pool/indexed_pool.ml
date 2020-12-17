@@ -1,6 +1,6 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
-open Coda_base
+open Mina_base
 open Coda_numbers
 open Signature_lib
 
@@ -324,8 +324,16 @@ let find_by_hash :
 
 let current_global_slot t =
   let current_time = Block_time.now t.time_controller in
-  Consensus.Data.Consensus_time.(
-    of_time_exn ~constants:t.consensus_constants current_time |> to_global_slot)
+  let current_slot =
+    Consensus.Data.Consensus_time.(
+      of_time_exn ~constants:t.consensus_constants current_time
+      |> to_global_slot)
+  in
+  match t.constraint_constants.fork with
+  | Some {previous_global_slot; _} ->
+      Coda_numbers.Global_slot.(add previous_global_slot current_slot)
+  | None ->
+      current_slot
 
 let check_expiry t (cmd : User_command.t) =
   let current_global_slot = current_global_slot t in

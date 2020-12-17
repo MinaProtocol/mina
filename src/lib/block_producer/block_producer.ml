@@ -1,7 +1,7 @@
 open Core
 open Async
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Signature_lib
@@ -106,11 +106,9 @@ end
 
 let generate_next_state ~constraint_constants ~previous_protocol_state
     ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~coinbase_receiver ~(keypair : Keypair.t)
     ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
     ~log_block_creation =
   let open Interruptible.Let_syntax in
-  let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
@@ -122,18 +120,23 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.body previous_protocol_state
     |> Coda_state.Protocol_state.Body.view
   in
+  let supercharge_coinbase =
+    let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+    let global_slot =
+      Consensus.Data.Block_data.global_slot_since_genesis block_data
+    in
+    Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+      ~epoch_ledger ~global_slot
+  in
   let%bind res =
     Interruptible.uninterruptible
       (let open Deferred.Let_syntax in
-      let supercharge_coinbase =
-        let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-        let global_slot = Consensus.Data.Block_data.global_slot block_data in
-        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
-          ~epoch_ledger ~global_slot
+      let coinbase_receiver =
+        Consensus.Data.Block_data.coinbase_receiver block_data
       in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff ~constraint_constants staged_ledger ~self
+            Staged_ledger.create_diff ~constraint_constants staged_ledger
               ~coinbase_receiver ~logger
               ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
@@ -144,6 +147,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
+          ~coinbase_receiver ~supercharge_coinbase
       with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
@@ -235,7 +239,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data ~snarked_ledger_hash:previous_ledger_hash
+                  ~block_data ~supercharge_coinbase
+                  ~snarked_ledger_hash:previous_ledger_hash
                   ~genesis_ledger_hash ~supply_increase ~logger
                   ~constraint_constants ) )
       in
@@ -362,9 +367,9 @@ let time ~logger ~time_controller label f =
   x
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
-    ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
-    ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation
+    ~transaction_resource_pool ~time_controller ~keypairs
+    ~consensus_local_state ~coinbase_receiver ~frontier_reader
+    ~transition_writer ~set_next_producer_timing ~log_block_creation
     ~(precomputed_values : Precomputed_values.t) =
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
@@ -373,7 +378,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         [%log info] "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let produce ivar (keypair, scheduled_time, block_data, winner_pk) =
+      let produce ivar (scheduled_time, block_data, winner_pk) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -389,13 +394,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             [%log info]
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
               "Producing new block with parent $breadcrumb%!" ;
-            let previous_protocol_state, previous_protocol_state_proof =
-              let transition : External_transition.Validated.t =
-                Breadcrumb.validated_transition crumb
-              in
-              ( External_transition.Validated.protocol_state transition
-              , External_transition.Validated.protocol_state_proof transition
-              )
+            let previous_transition =
+              Breadcrumb.validated_transition crumb
+              |> External_transition.Validation.forget_validation_with_hash
+            in
+            let previous_protocol_state =
+              External_transition.protocol_state
+                (With_hash.data previous_transition)
+            in
+            let previous_protocol_state_proof =
+              External_transition.protocol_state_proof
+                (With_hash.data previous_transition)
             in
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
@@ -409,11 +418,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             in
             let%bind next_state_opt =
               generate_next_state ~constraint_constants ~scheduled_time
-                ~coinbase_receiver ~block_data ~previous_protocol_state
-                ~time_controller
+                ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
-                ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation ~winner_pk
+                ~transactions ~get_completed_work ~logger ~log_block_creation
+                ~winner_pk
             in
             trace_event "next state generated" ;
             match next_state_opt with
@@ -422,29 +430,32 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             | Some
                 (protocol_state, internal_transition, pending_coinbase_witness)
               ->
+                let protocol_state_hash = Protocol_state.hash protocol_state in
+                let consensus_state_with_hash =
+                  { With_hash.hash= protocol_state_hash
+                  ; data= Protocol_state.consensus_state protocol_state }
+                in
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [`Take | `Keep]]
                       (Consensus.Hooks.select ~constants:consensus_constants
                          ~existing:
-                           (Protocol_state.consensus_state
-                              previous_protocol_state)
-                         ~candidate:
-                           (Protocol_state.consensus_state protocol_state)
-                         ~logger)
+                           (With_hash.map
+                              ~f:External_transition.consensus_state
+                              previous_transition)
+                         ~candidate:consensus_state_with_hash ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
                          over their parent" ;
-                    let root_consensus_state =
+                    let root_consensus_state_with_hash =
                       Transition_frontier.root frontier
-                      |> Breadcrumb.consensus_state
+                      |> Breadcrumb.consensus_state_with_hash
                     in
                     [%test_result: [`Take | `Keep]]
-                      (Consensus.Hooks.select ~existing:root_consensus_state
+                      (Consensus.Hooks.select
+                         ~existing:root_consensus_state_with_hash
                          ~constants:consensus_constants
-                         ~candidate:
-                           (Protocol_state.consensus_state protocol_state)
-                         ~logger)
+                         ~candidate:consensus_state_with_hash ~logger)
                       ~expect:`Take
                       ~message:
                         "newly generated consensus states should be selected \
@@ -473,7 +484,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       Internal_transition.staged_ledger_diff
                         internal_transition
                     in
-                    let transition_hash = Protocol_state.hash protocol_state in
                     let previous_state_hash =
                       Protocol_state.hash previous_protocol_state
                     in
@@ -487,7 +497,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let%bind transition =
                       let open Result.Let_syntax in
                       External_transition.Validation.wrap
-                        { With_hash.hash= transition_hash
+                        { With_hash.hash= protocol_state_hash
                         ; data=
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
@@ -514,13 +524,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ~consensus_constants
                       |> Deferred.return
                     in
+                    let transition_receipt_time =
+                      Some (Core_kernel.Time.now ())
+                    in
                     let%bind breadcrumb =
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values
                             ~verifier ~trust_system ~parent:crumb ~transition
                             ~sender:None (* Consider skipping here *)
-                            ~skip_staged_ledger_verification:false () )
+                            ~skip_staged_ledger_verification:false
+                            ~transition_receipt_time () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
                                `Invalid_staged_ledger_diff
@@ -538,7 +552,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         [("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
                       Block_produced ;
                     let metadata =
-                      [("state_hash", State_hash.to_yojson transition_hash)]
+                      [("state_hash", State_hash.to_yojson protocol_state_hash)]
                     in
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
@@ -551,7 +565,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Deferred.choose
                       [ Deferred.choice
                           (Transition_registry.register transition_registry
-                             transition_hash)
+                             protocol_state_hash)
                           (Fn.const (Ok `Transition_accepted))
                       ; Deferred.choice
                           ( Time.Timeout.create time_controller
@@ -637,21 +651,22 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       Consensus.Hooks.next_producer_timing
                         ~constraint_constants ~constants:consensus_constants
                         (time_to_ms now) consensus_state
-                        ~local_state:consensus_local_state ~keypairs ~logger )
+                        ~local_state:consensus_local_state ~keypairs
+                        ~coinbase_receiver ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
-                | `Produce_now (keypair, data, winner_pk) ->
+                | `Produce_now (data, winner_pk) ->
                     Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
-                         (keypair, now, data, winner_pk))
+                         (now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
-                | `Produce (time, keypair, data, winner_pk) ->
+                | `Produce (time, data, winner_pk) ->
                     Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
@@ -660,7 +675,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch
                                 production_supervisor
-                                (keypair, scheduled_time, data, winner_pk))
+                                (scheduled_time, data, winner_pk))
                              ~f:check_next_block_timing) ) ) )
       in
       let start () =
@@ -710,6 +725,11 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof } =
+    let protocol_state_hash = Protocol_state.hash protocol_state in
+    let consensus_state_with_hash =
+      { With_hash.hash= protocol_state_hash
+      ; data= Protocol_state.consensus_state protocol_state }
+    in
     match Broadcast_pipe.Reader.peek frontier_reader with
     | None ->
         log_bootstrap_mode () ; return ()
@@ -724,45 +744,46 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         [%log trace]
           ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
           "Emitting precomputed block with parent $breadcrumb%!" ;
+        let previous_transition =
+          Breadcrumb.validated_transition crumb
+          |> External_transition.Validation.forget_validation_with_hash
+        in
         let previous_protocol_state =
-          let transition : External_transition.Validated.t =
-            Breadcrumb.validated_transition crumb
-          in
-          External_transition.Validated.protocol_state transition
+          External_transition.protocol_state
+            (With_hash.data previous_transition)
         in
         Debug_assert.debug_assert (fun () ->
             [%test_result: [`Take | `Keep]]
               (Consensus.Hooks.select ~constants:consensus_constants
                  ~existing:
-                   (Protocol_state.consensus_state previous_protocol_state)
-                 ~candidate:(Protocol_state.consensus_state protocol_state)
-                 ~logger)
+                   (With_hash.map ~f:External_transition.consensus_state
+                      previous_transition)
+                 ~candidate:consensus_state_with_hash ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over \
                  their parent" ;
-            let root_consensus_state =
-              Transition_frontier.root frontier |> Breadcrumb.consensus_state
+            let root_consensus_state_with_hash =
+              Transition_frontier.root frontier
+              |> Breadcrumb.consensus_state_with_hash
             in
             [%test_result: [`Take | `Keep]]
-              (Consensus.Hooks.select ~existing:root_consensus_state
+              (Consensus.Hooks.select ~existing:root_consensus_state_with_hash
                  ~constants:consensus_constants
-                 ~candidate:(Protocol_state.consensus_state protocol_state)
-                 ~logger)
+                 ~candidate:consensus_state_with_hash ~logger)
               ~expect:`Take
               ~message:
                 "newly generated consensus states should be selected over the \
                  tf root" ) ;
         let emit_breadcrumb () =
           let open Deferred.Result.Let_syntax in
-          let transition_hash = Protocol_state.hash protocol_state in
-          let previous_state_hash =
-            Protocol_state.hash previous_protocol_state
+          let previous_protocol_state_hash =
+            With_hash.hash previous_transition
           in
           let%bind transition =
             let open Result.Let_syntax in
             External_transition.Validation.wrap
-              { With_hash.hash= transition_hash
+              { With_hash.hash= protocol_state_hash
               ; data=
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
@@ -777,7 +798,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             |> External_transition.validate_genesis_protocol_state
                  ~genesis_state_hash:
                    (Protocol_state.genesis_state_hash
-                      ~state_hash:(Some previous_state_hash)
+                      ~state_hash:(Some previous_protocol_state_hash)
                       previous_protocol_state)
             >>| External_transition.skip_proof_validation
                   `This_transition_was_generated_internally
@@ -787,12 +808,14 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   ~logger ~frontier ~consensus_constants
             |> Deferred.return
           in
+          let transition_receipt_time = None in
           let%bind breadcrumb =
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
                   ~trust_system ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:false ()
+                  ~skip_staged_ledger_verification:false
+                  ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)
@@ -807,7 +830,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
             Block_produced ;
           let metadata =
-            [("state_hash", State_hash.to_yojson transition_hash)]
+            [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async () =
@@ -818,7 +841,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           Deferred.choose
             [ Deferred.choice
                 (Transition_registry.register transition_registry
-                   transition_hash)
+                   protocol_state_hash)
                 (Fn.const (Ok `Transition_accepted))
             ; Deferred.choice
                 ( Time.Timeout.create time_controller (Time.Span.of_ms 20000L)

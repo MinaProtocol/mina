@@ -16,7 +16,7 @@ open Async_kernel
 open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 
@@ -196,7 +196,7 @@ let watch t ~timeout_duration ~cached_transition =
         remove_tree t parent_hash ;
         [%log' info t.logger]
           ~metadata:
-            [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
+            [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
             ; ( "duration"
               , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
             ; ( "cached_transition"
