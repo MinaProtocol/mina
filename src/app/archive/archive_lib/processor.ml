@@ -125,13 +125,17 @@ module Epoch_data = struct
     let rep = Caqti_type.(tup2 string int) in
     Caqti_type.custom ~encode ~decode rep
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist ~is_genesis_block (module Conn : CONNECTION)
       (t : Coda_base.Epoch_data.Value.t) =
     let open Deferred.Result.Let_syntax in
     let Coda_base.Epoch_ledger.Poly.{hash; _} =
       Coda_base.Epoch_data.Poly.ledger t
     in
-    let%bind ledger_hash_id = Snarked_ledger_hash.find (module Conn) hash in
+    let%bind ledger_hash_id =
+      if is_genesis_block then
+        Snarked_ledger_hash.add_if_doesn't_exist (module Conn) hash
+      else Snarked_ledger_hash.find (module Conn) hash
+    in
     let seed = Coda_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
     match%bind
       Conn.find_opt
@@ -619,14 +623,18 @@ module Block = struct
             ( External_transition.blockchain_state t
             |> Blockchain_state.snarked_ledger_hash )
         in
+        let is_genesis_block =
+          External_transition.consensus_state t
+          |> Consensus.Data.Consensus_state.is_genesis_state
+        in
         let%bind staking_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist
+          Epoch_data.add_if_doesn't_exist ~is_genesis_block
             (module Conn)
             ( External_transition.consensus_state t
             |> Consensus.Data.Consensus_state.staking_epoch_data )
         in
         let%bind next_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist
+          Epoch_data.add_if_doesn't_exist ~is_genesis_block
             (module Conn)
             ( External_transition.consensus_state t
             |> Consensus.Data.Consensus_state.next_epoch_data )
