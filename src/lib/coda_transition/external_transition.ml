@@ -959,7 +959,8 @@ let genesis ~precomputed_values =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+          ; coinbase= Staged_ledger_diff.At_most_two.Zero
+          ; internal_command_balances= [] }
         , None ) }
   in
   (* the genesis transition is assumed to be valid *)
