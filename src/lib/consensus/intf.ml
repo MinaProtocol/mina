@@ -256,6 +256,8 @@ module type State_hooks = sig
                                      , Coda_base.State_hash.t )
                                      With_hash.t
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+          -> coinbase_receiver:Public_key.Compressed.t
+          -> supercharge_coinbase:bool
           -> consensus_state)
          Quickcheck.Generator.t
   end
