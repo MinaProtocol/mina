@@ -1039,20 +1039,43 @@ let replay_blocks logger =
     flag "-blocks-filename" (required string)
       ~doc:"PATH The file to read the precomputed blocks from"
   in
+  let read_kind =
+    let open Command.Param in
+    flag "-format" (optional string)
+      ~doc:"json|sexp The format to read lines of the file in (default: json)"
+  in
   Command.async ~summary:"Start coda daemon with blocks replayed from a file"
-    (Command.Param.map2 replay_flag (setup_daemon logger)
-       ~f:(fun blocks_filename setup_daemon () ->
+    (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
+       ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
+         let read_block_line =
+           match Option.map ~f:String.lowercase read_kind with
+           | Some "json" | None -> (
+               fun line ->
+                 match
+                   Yojson.Safe.from_string line
+                   |> Coda_transition.External_transition.Precomputed_block
+                      .of_yojson
+                 with
+                 | Ok block ->
+                     block
+                 | Error err ->
+                     failwithf "Could not read block: %s" err () )
+           | Some "sexp" ->
+               fun line ->
+                 Sexp.of_string_conv_exn line
+                   Coda_transition.External_transition.Precomputed_block
+                   .t_of_sexp
+           | _ ->
+               failwith "Expected one of 'json', 'sexp' for -format flag"
+         in
          let blocks =
            Sequence.unfold ~init:(In_channel.create blocks_filename)
              ~f:(fun blocks_file ->
                match In_channel.input_line blocks_file with
                | Some line ->
-                   Some
-                     ( Sexp.of_string_conv_exn line
-                         Block_producer.Precomputed_block.t_of_sexp
-                     , blocks_file )
+                   Some (read_block_line line, blocks_file)
                | None ->
                    In_channel.close blocks_file ;
                    None )

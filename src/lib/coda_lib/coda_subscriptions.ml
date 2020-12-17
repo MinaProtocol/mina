@@ -112,19 +112,18 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                   |> External_transition.Precomputed_block
                      .of_external_transition ~scheduled_time
                 in
-                External_transition.Precomputed_block.sexp_of_t
+                External_transition.Precomputed_block.to_yojson
                   precomputed_block)
            in
            Option.iter path ~f:(fun (`Path path) ->
                Out_channel.with_file ~append:true path ~f:(fun out_channel ->
                    Out_channel.output_lines out_channel
-                     [Sexp.to_string (Lazy.force precomputed_block)] ) ) ;
+                     [Yojson.Safe.to_string (Lazy.force precomputed_block)] )
+           ) ;
            Option.iter log ~f:(fun `Log ->
                [%log info] "Saw block $precomputed_block"
-                 ~metadata:
-                   [ ( "precomputed_block"
-                     , Error_json.sexp_to_yojson (Lazy.force precomputed_block)
-                     ) ] )) ;
+                 ~metadata:[("precomputed_block", Lazy.force precomputed_block)]
+           )) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block

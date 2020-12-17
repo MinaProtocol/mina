@@ -90,7 +90,7 @@ module type S = sig
       ; staged_ledger_diff: Staged_ledger_diff.t
       ; delta_transition_chain_proof:
           Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     val of_external_transition :
       scheduled_time:Block_time.Time.t -> external_transition -> t
