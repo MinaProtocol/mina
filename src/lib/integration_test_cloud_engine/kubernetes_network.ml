@@ -155,7 +155,8 @@ module Node = struct
               peerId
             }
           }
-          peers { peerId }
+          peers { peer { peerId }}
+
         }
       }
     |}]
@@ -174,7 +175,7 @@ module Node = struct
         failwith "Could not run k8s port forwarding"
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
-  let exec_graphql_reqest ?(num_tries = 10) ?(retry_delay_sec = 30.0)
+  let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 30.0) ~logger ~graphql_port
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
@@ -234,9 +235,10 @@ module Node = struct
       (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~retry_on_graphql_error:true ~query_name:"query_peer_id" query_obj
     in
+    [%log info] "get_peer_id, finished exec_graphql_request" ;
     let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
     let%bind self_id =
       match self_id_obj with
@@ -245,8 +247,11 @@ module Node = struct
       | Some peer ->
           Malleable_error.return peer#peerId
     in
+    [%log info] "get_peer_id, self_id is: %s" self_id ;
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    [%log info] "result of graphql querry (%s,%s)" self_id
+      (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
   let get_balance ~logger t ~account_id =
@@ -269,7 +274,7 @@ module Node = struct
           ()
       in
       let%bind balance_obj =
-        exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+        exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
           ~retry_on_graphql_error:true ~query_name:"get_balance_graphql"
           get_balance_obj
       in
@@ -301,7 +306,7 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
@@ -315,7 +320,7 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~retry_on_graphql_error ~query_name:"send_payment_graphql"
         send_payment_obj
     in
