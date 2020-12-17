@@ -4,7 +4,7 @@ open Core
 open Async
 open Cache_lib
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 
@@ -411,7 +411,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
       | Ok tvs ->
           return
             (Ok
-               (List.map2_exn transitions tvs ~f:(fun e data -> {e with data})))
+               (List.map2_exn transitions tvs ~f:(fun e data ->
+                    (* this does not update the envelope timestamps *)
+                    {e with data} )))
       | Error (`Verifier_error error) ->
           [%log warn]
             ~metadata:[("error", Error_json.error_to_yojson error)]

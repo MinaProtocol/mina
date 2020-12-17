@@ -1,7 +1,7 @@
 open Core
 open Async
 open Graphql_async
-open Coda_base
+open Mina_base
 open Signature_lib
 open Currency
 
@@ -272,6 +272,7 @@ module Types = struct
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~global_slot_since_genesis_best_tip:int
                ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
@@ -404,11 +405,11 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
-              Coda_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
   let protocol_state =
-    let open Auxiliary_database.Filtered_external_transition.Protocol_state in
+    let open Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
         [ field "previousStateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the previous state"
@@ -705,11 +706,11 @@ module Types = struct
                    | Ledger_db staking_ledger -> (
                      try
                        let index =
-                         Coda_base.Ledger.Db.index_of_account_exn
+                         Mina_base.Ledger.Db.index_of_account_exn
                            staking_ledger account_id
                        in
                        let delegate_account =
-                         Coda_base.Ledger.Db.get_at_index_exn staking_ledger
+                         Mina_base.Ledger.Db.get_at_index_exn staking_ledger
                            index
                        in
                        let delegate_key = delegate_account.public_key in
@@ -790,7 +791,7 @@ module Types = struct
                     voting for"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   Option.map ~f:Coda_base.State_hash.to_base58_check
+                   Option.map ~f:Mina_base.State_hash.to_base58_check
                      account.Account.Poly.voting_for )
              ; field "stakingActive" ~typ:(non_null bool)
                  ~doc:
@@ -968,9 +969,8 @@ module Types = struct
             Signed_command.token cmd.With_hash.data )
       ; field "amount" ~typ:(non_null uint64) ~args:[]
           ~doc:
-            "Amount that the source is sending to receiver - this is 0 for \
-             commands that are not associated with an amount"
-          ~resolve:(fun _ cmd ->
+            "Amount that the source is sending to receiver; 0 for commands \
+             without an associated amount" ~resolve:(fun _ cmd ->
             match Signed_command.amount cmd.With_hash.data with
             | Some amount ->
                 Currency.Amount.to_uint64 amount
@@ -985,15 +985,18 @@ module Types = struct
              transaction" ~resolve:(fun _ cmd ->
             Signed_command.fee cmd.With_hash.data |> Currency.Fee.to_uint64 )
       ; field "memo" ~typ:(non_null string) ~args:[]
-          ~doc:"Short arbitrary message provided by the sender"
+          ~doc:
+            (sprintf
+               "A short message from the sender, encoded with Base58Check, \
+                version byte=0x%02X; byte 2 of the decoding is the message \
+                length"
+               (Char.to_int Base58_check.Version_bytes.user_command_memo))
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
             |> Signed_command_memo.to_string )
       ; field "isDelegation" ~typ:(non_null bool) ~args:[]
-          ~doc:
-            "If true, this represents a delegation of stake, otherwise it is \
-             a payment"
+          ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
           ~resolve:(fun _ user_command ->
             match
@@ -1133,7 +1136,7 @@ module Types = struct
   let user_command = UserCommand.user_command_interface
 
   let transactions =
-    let open Auxiliary_database.Filtered_external_transition.Transactions in
+    let open Filtered_external_transition.Transactions in
     obj "Transactions" ~doc:"Different types of transactions in a block"
       ~fields:(fun _ ->
         [ field "userCommands"
@@ -1173,12 +1176,9 @@ module Types = struct
 
   let block :
       ( Mina_lib.t
-      , ( Auxiliary_database.Filtered_external_transition.t
-        , State_hash.t )
-        With_hash.t
-        option )
+      , (Filtered_external_transition.t, State_hash.t) With_hash.t option )
       typ =
-    let open Auxiliary_database.Filtered_external_transition in
+    let open Filtered_external_transition in
     obj "Block" ~fields:(fun _ ->
         [ field "creator" ~typ:(non_null public_key)
             ~doc:"Public key of account that produced this block"
@@ -1191,6 +1191,12 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
               AccountObj.get_best_ledger_account_pk coda data.creator )
+        ; field "winnerAccount"
+            ~typ:(non_null AccountObj.account)
+            ~doc:"Account that won the slot (Delegator/Staker)"
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
+              AccountObj.get_best_ledger_account_pk coda data.winner )
         ; field "stateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
@@ -1805,98 +1811,6 @@ module Types = struct
                   "If true, no connections will be allowed unless they are \
                    from a trusted peer" ]
   end
-
-  module Pagination = struct
-    module Signed_command = struct
-      module Inputs = struct
-        module Type = struct
-          type t = (Signed_command.t, Transaction_hash.t) With_hash.t
-
-          type repr = (Mina_lib.t, t) abstract_value
-
-          let conv = UserCommand.mk_user_command
-
-          let typ = user_command
-
-          let name = "UserCommand"
-        end
-
-        module Cursor = struct
-          type t = (Signed_command.t, Transaction_hash.t) With_hash.t
-
-          let serialize ({data; _} : t) = Signed_command.to_base58_check data
-
-          let deserialize ?error serialized_payment =
-            result_of_or_error
-              (Signed_command.of_base58_check serialized_payment)
-              ~error:(Option.value error ~default:"Invalid cursor")
-            |> Result.map ~f:(fun cmd ->
-                   { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_command (Signed_command cmd)
-                   } )
-
-          let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
-        end
-
-        module Pagination_database = Auxiliary_database.Transaction_database
-
-        let get_database = Mina_lib.transaction_database
-
-        let filter_argument = Input.user_command_filter_input
-
-        let query_name = "userCommands"
-
-        let to_cursor = Fn.id
-      end
-
-      include Pagination.Make (Inputs)
-    end
-
-    module Blocks = struct
-      module Inputs = struct
-        module Type = struct
-          type t =
-            ( Auxiliary_database.Filtered_external_transition.t
-            , State_hash.t )
-            With_hash.t
-
-          type repr = t
-
-          let conv = Fn.id
-
-          let typ = block
-
-          let name = "Block"
-        end
-
-        module Cursor = struct
-          type t = State_hash.t
-
-          let serialize = State_hash.to_base58_check
-
-          let deserialize ?error data =
-            result_of_or_error
-              (State_hash.of_base58_check data)
-              ~error:(Option.value error ~default:"Invalid state hash data")
-
-          let doc = Doc.bin_prot "Opaque pagination cursor for a block"
-        end
-
-        module Pagination_database =
-          Auxiliary_database.External_transition_database
-
-        let get_database = Mina_lib.external_transition_database
-
-        let filter_argument = Input.block_filter_input
-
-        let query_name = "blocks"
-
-        let to_cursor {With_hash.hash; _} = hash
-      end
-
-      include Pagination.Make (Inputs)
-    end
-  end
 end
 
 module Subscriptions = struct
@@ -2340,28 +2254,6 @@ module Mutations = struct
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
 
-  let add_payment_receipt =
-    result_field "addPaymentReceipt"
-      ~doc:"Add payment into transaction database"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.AddPaymentReceipt.typ)]
-      ~typ:Types.Payload.add_payment_receipt
-      ~resolve:
-        (fun {ctx= coda; _} ()
-             {Types.Input.AddPaymentReceipt.payment; added_time} ->
-        let open Result.Let_syntax in
-        let%bind added_time =
-          result_of_exn Block_time.Time.of_string_exn added_time
-            ~error:"Invalid `time` provided"
-        in
-        let%map payment =
-          Types.Pagination.Signed_command.Inputs.Cursor.deserialize
-            ~error:"Invaid `payment` provided" payment
-        in
-        let transaction_database = Mina_lib.transaction_database coda in
-        Auxiliary_database.Transaction_database.add transaction_database
-          payment added_time ;
-        Some (Types.UserCommand.mk_user_command payment) )
-
   let set_staking =
     field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
@@ -2487,7 +2379,6 @@ module Mutations = struct
     ; create_token_account
     ; mint_tokens
     ; export_logs
-    ; add_payment_receipt
     ; set_staking
     ; set_snark_worker
     ; set_snark_work_fee
@@ -2706,10 +2597,16 @@ module Queries = struct
       ~args:Arg.[arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand"]
       ~resolve:(fun {ctx= coda; _} () serialized_payment ->
         let open Result.Let_syntax in
-        let%bind payment =
-          Types.Pagination.Signed_command.Inputs.Cursor.deserialize
-            ~error:"Invalid payment provided" serialized_payment
+        let deserialize_payment serialized_payment =
+          result_of_or_error
+            (Signed_command.of_base58_check serialized_payment)
+            ~error:"Invalid payment provided"
+          |> Result.map ~f:(fun cmd ->
+                 { With_hash.data= cmd
+                 ; hash= Transaction_hash.hash_command (Signed_command cmd) }
+             )
         in
+        let%bind payment = deserialize_payment serialized_payment in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
@@ -2724,30 +2621,6 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} _ ->
         Option.map (Mina_lib.snark_worker_key coda) ~f:(fun k ->
             (k, Mina_lib.snark_work_fee coda) ) )
-
-  let user_command = Types.Pagination.Signed_command.query
-
-  let blocks = Types.Pagination.Blocks.query
-
-  let block =
-    io_field "block" ~typ:Types.block
-      ~args:
-        Arg.
-          [ arg "stateHash" ~doc:"State hash of the block"
-              ~typ:(non_null string) ]
-      ~doc:
-        "Get information about a single block or null if no block can be found"
-      ~resolve:(fun {ctx= coda; _} () state_hash_str ->
-        let db = Mina_lib.external_transition_database coda in
-        Deferred.return
-          (let open Result.Let_syntax in
-          let%map state_hash =
-            result_of_or_error
-              (State_hash.of_base58_check state_hash_str)
-              ~error:"Invalid state hash"
-          in
-          Auxiliary_database.External_transition_database.get_value db
-            state_hash) )
 
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
@@ -2766,9 +2639,10 @@ module Queries = struct
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
         in
+        let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data=
-            { Auxiliary_database.Filtered_external_transition.creator=
-                fst Consensus_state_hooks.genesis_winner
+            { Filtered_external_transition.creator= winner
+            ; winner
             ; protocol_state=
                 { previous_state_hash=
                     Protocol_state.previous_state_hash genesis_state
@@ -2816,8 +2690,8 @@ module Queries = struct
             in
             With_hash.Stable.Latest.
               { data=
-                  Auxiliary_database.Filtered_external_transition.of_transition
-                    transition `All transactions
+                  Filtered_external_transition.of_transition transition `All
+                    transactions
               ; hash } ) )
 
   let initial_peers =
@@ -2921,8 +2795,6 @@ module Queries = struct
     ; token_owner
     ; current_snark_worker
     ; best_chain
-    ; blocks
-    ; block
     ; genesis_block
     ; initial_peers
     ; get_peers
