@@ -3,7 +3,7 @@
  *  [2*k] historical roots.
  *)
 
-open Coda_base
+open Mina_base
 open Frontier_base
 
 type t

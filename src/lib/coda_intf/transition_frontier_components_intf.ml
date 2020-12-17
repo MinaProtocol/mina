@@ -2,7 +2,7 @@ open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 
@@ -165,7 +165,7 @@ module type Best_tip_prover_intf = sig
   val prove :
        logger:Logger.t
     -> transition_frontier
-    -> ( External_transition.t
+    -> ( (External_transition.t, State_hash.t) With_hash.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
        option
@@ -192,7 +192,7 @@ module type Consensus_best_tip_prover_intf = sig
        logger:Logger.t
     -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
-    -> Consensus.Data.Consensus_state.Value.t
+    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -204,7 +204,7 @@ module type Consensus_best_tip_prover_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> Consensus.Data.Consensus_state.Value.t
+    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t

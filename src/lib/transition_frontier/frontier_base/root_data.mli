@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 open Coda_transition
 
 (* Historical root data is similar to Limited root data, except that it also
@@ -77,7 +77,7 @@ module Minimal : sig
   val upgrade :
        t
     -> transition:External_transition.Validated.t
-    -> protocol_states:( Coda_base.State_hash.t
+    -> protocol_states:( Mina_base.State_hash.t
                        * Coda_state.Protocol_state.Value.t )
                        list
     -> Limited.t
@@ -93,7 +93,7 @@ type t =
   { transition: External_transition.Validated.t
   ; staged_ledger: Staged_ledger.t
   ; protocol_states:
-      (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+      (Mina_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
 val minimize : t -> Minimal.t
 

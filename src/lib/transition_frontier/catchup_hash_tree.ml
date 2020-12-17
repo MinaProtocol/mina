@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 
 module Catchup_job_id = Unique_id.Int ()

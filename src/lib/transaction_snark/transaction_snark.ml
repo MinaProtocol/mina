@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 open Snark_params
 module Global_slot = Coda_numbers.Global_slot
 open Currency
@@ -694,7 +694,7 @@ module Base = struct
                 | Ok _ ->
                     false
                 | Error err ->
-                    let open Coda_base in
+                    let open Mina_base in
                     User_command_status.Failure.equal
                       (Transaction_logic.timing_error_to_user_command_status
                          err)
@@ -983,6 +983,7 @@ module Base = struct
     let { is_timed
         ; initial_minimum_balance
         ; cliff_time
+        ; cliff_amount
         ; vesting_period
         ; vesting_increment } =
       account.timing
@@ -1001,7 +1002,8 @@ module Base = struct
     let balance_int = balance_to_int account.balance in
     let%bind curr_min_balance =
       Account.Checked.min_balance_at_slot ~global_slot:txn_global_slot
-        ~cliff_time ~vesting_period ~vesting_increment ~initial_minimum_balance
+        ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+        ~initial_minimum_balance
     in
     let%bind `Underflow underflow, proposed_balance_int =
       make_checked (fun () ->
@@ -1655,7 +1657,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let root = s.source in
         let ( (root as root_after_fee_payer)
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
@@ -1779,7 +1781,7 @@ module Base = struct
           Snapp_command.Payload.Digested.Checked.digest payload
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -1920,7 +1922,7 @@ module Base = struct
               (Zero_proved (Zero_proved.Checked.digested payload)))
         in
         let (module S) = !(Tick.Inner_curve.Checked.Shifted.create ()) in
-        let txn_global_slot = curr_state.curr_global_slot in
+        let txn_global_slot = curr_state.global_slot_since_genesis in
         let ( root_after_fee_payer
             , (fee_payer_nonce, fee_payer_receipt_chain_hash) ) =
           !(pay_fee ~constraint_constants
@@ -2113,7 +2115,7 @@ module Base = struct
     in
     let current_global_slot =
       Coda_state.Protocol_state.Body.consensus_state state_body
-      |> Consensus.Data.Consensus_state.curr_global_slot_var
+      |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
     let%bind creating_new_token =
       Boolean.(is_create_account &&& token_invalid)
@@ -3619,7 +3621,7 @@ let%test_module "transaction_snark" =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
         Coda_state.Protocol_state.Body.consensus_state state_body
-        |> Consensus.Data.Consensus_state.curr_slot
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
       in
       let next_available_token_before = Ledger.next_available_token ledger in
       let target, `Next_available_token next_available_token_after =
@@ -3703,7 +3705,7 @@ let%test_module "transaction_snark" =
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants
             ~sok_message:
-              (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+              (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty)
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
@@ -3745,7 +3747,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let next_available_token_before =
                 Ledger.next_available_token ledger
@@ -3919,7 +3921,7 @@ let%test_module "transaction_snark" =
               in
               let consensus_state_at_slot =
                 Consensus.Data.Consensus_state.Value.For_tests
-                .with_curr_global_slot
+                .with_global_slot_since_genesis
                   (Coda_state.Protocol_state.consensus_state state)
                   txn_global_slot
               in
@@ -4207,7 +4209,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body1
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
@@ -4258,7 +4260,7 @@ let%test_module "transaction_snark" =
               in
               let current_global_slot =
                 Coda_state.Protocol_state.Body.consensus_state state_body2
-                |> Consensus.Data.Consensus_state.curr_slot
+                |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn ~constraint_constants
@@ -4768,6 +4770,7 @@ let%test_module "transaction_snark" =
           let balance = Balance.of_int 100_000_000_000_000 in
           let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
           let cliff_time = Global_slot.of_int 1000 in
+          let cliff_amount = Amount.of_int 10000 in
           let vesting_period = Global_slot.of_int 10 in
           let vesting_increment = Amount.of_int 1 in
           let txn_global_slot = Global_slot.of_int 1002 in
@@ -4777,7 +4780,7 @@ let%test_module "transaction_snark" =
                 Or_error.ok_exn
                 @@ Account.create_timed
                      (Account.identifier sender.account)
-                     balance ~initial_minimum_balance ~cliff_time
+                     balance ~initial_minimum_balance ~cliff_time ~cliff_amount
                      ~vesting_period ~vesting_increment }
           in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -5703,11 +5706,12 @@ let%test_module "transaction_snark" =
             let balance = Balance.of_int 100_000_000_000_000 in
             let initial_minimum_balance = Balance.of_int 80_000_000_000 in
             let cliff_time = Global_slot.of_int 2 in
+            let cliff_amount = Amount.of_int 5_000_000_000 in
             let vesting_period = Global_slot.of_int 2 in
             let vesting_increment = Amount.of_int 40_000_000_000 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
-                 ~cliff_time ~vesting_period ~vesting_increment
+                 ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
           in
           let timed_account1 = timed_account receivers.(0) in
           let timed_account2 = timed_account receivers.(1) in
@@ -5853,6 +5857,7 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1000 in
+      let cliff_amount = Amount.of_int 500_000_000 in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 1_000_000_000 in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
@@ -5860,7 +5865,7 @@ let%test_module "account timing check" =
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
@@ -5879,12 +5884,13 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1000 in
+      let cliff_amount = Amount.zero in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_900 in
@@ -5911,12 +5917,13 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1_000 in
+      let cliff_amount = Amount.of_int 900_000_000 in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
       let txn_global_slot = Global_slot.of_int 2_000 in
@@ -5941,12 +5948,13 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 10_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1_000 in
+      let cliff_amount = Amount.zero in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 101_000_000_000 in
       let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
@@ -5967,12 +5975,13 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1000 in
+      let cliff_amount = Amount.zero in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_001_000_000_000 in
       let txn_global_slot = Global_slot.of_int 2000_000_000_000 in
@@ -5993,16 +6002,63 @@ let%test_module "account timing check" =
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
       let cliff_time = Global_slot.of_int 1000 in
+      let cliff_amount = Amount.zero in
       let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
         @@ Account.create_timed account_id balance ~initial_minimum_balance
-             ~cliff_time ~vesting_period ~vesting_increment
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
       let txn_global_slot = Global_slot.of_int 3000 in
+      let timing_with_min_balance =
+        validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
+      in
+      match timing_with_min_balance with
+      | Ok ((Untimed as unchecked_timing), `Min_balance unchecked_min_balance)
+        ->
+          run_checked_timing_and_compare account txn_amount txn_global_slot
+            unchecked_timing unchecked_min_balance
+      | _ ->
+          false
+
+    let make_cliff_amount_test slot =
+      let pk = Public_key.Compressed.empty in
+      let account_id = Account_id.create pk Token_id.default in
+      let balance = Balance.of_int 100_000_000_000_000 in
+      let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let cliff_amount =
+        Balance.to_uint64 initial_minimum_balance |> Amount.of_uint64
+      in
+      let vesting_period = Global_slot.of_int 1 in
+      let vesting_increment = Amount.zero in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed account_id balance ~initial_minimum_balance
+             ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
+      in
+      let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
+      let txn_global_slot = Global_slot.of_int slot in
+      (txn_amount, txn_global_slot, account)
+
+    let%test "before cliff, cliff_amount doesn't affect min balance" =
+      let txn_amount, txn_global_slot, account = make_cliff_amount_test 999 in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      match timing with
+      | Error err ->
+          assert (
+            User_command_status.Failure.equal
+              (Transaction_logic.timing_error_to_user_command_status err)
+              User_command_status.Failure.Source_minimum_balance_violation ) ;
+          checked_timing_should_fail account txn_amount txn_global_slot
+      | Ok _ ->
+          false
+
+    let%test "at exactly cliff time, cliff amount allows spending" =
+      let txn_amount, txn_global_slot, account = make_cliff_amount_test 1000 in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
       in

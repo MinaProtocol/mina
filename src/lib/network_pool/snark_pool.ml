@@ -280,7 +280,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
           Coda_metrics.(
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-              ( fee.Coda_base.Fee_with_prover.fee |> Currency.Fee.to_int
+              ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
           `Added )
         else
@@ -317,7 +317,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
               , Some ("Error verifying transaction snark: $error", metadata) )
           else Deferred.return ()
         in
-        let message = Coda_base.Sok_message.create ~fee ~prover in
+        let message = Mina_base.Sok_message.create ~fee ~prover in
         let verify proofs =
           let open Deferred.Let_syntax in
           let%bind statement_check =
@@ -354,9 +354,9 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                     ~f:(fun (_, s) -> log_and_punish ?punish s e)
                 in
                 let proof_env =
-                  { Envelope.Incoming.data=
-                      (One_or_two.map proofs ~f:fst, message)
-                  ; sender }
+                  Envelope.Incoming.wrap
+                    ~data:(One_or_two.map proofs ~f:fst, message)
+                    ~sender
                 in
                 match%bind Batcher.Snark_pool.verify t.batcher proof_env with
                 | Ok true ->
@@ -498,6 +498,7 @@ module Diff_versioned = struct
             Transaction_snark_work.Statement.Stable.V1.t
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
+        | Empty
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -508,12 +509,13 @@ module Diff_versioned = struct
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Empty
   [@@deriving compare, sexp, to_yojson]
 end
 
 let%test_module "random set test" =
   ( module struct
-    open Coda_base
+    open Mina_base
 
     let trust_system = Mocks.trust_system
 
@@ -539,7 +541,7 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      let enveloped_diff = {Envelope.Incoming.data= diff; sender} in
+      let enveloped_diff = Envelope.Incoming.wrap ~data:diff ~sender in
       match%bind
         Mock_snark_pool.Resource_pool.Diff.verify resource_pool enveloped_diff
       with
@@ -879,6 +881,8 @@ let%test_module "random set test" =
                      | Mock_snark_pool.Resource_pool.Diff.Add_solved_work
                          (work, _) ->
                          work
+                     | Mock_snark_pool.Resource_pool.Diff.Empty ->
+                         assert false
                    in
                    assert (List.mem works work ~equal:( = )) ;
                    Deferred.unit ) ;

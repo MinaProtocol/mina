@@ -157,7 +157,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   (* ledger visualization *)
   [%log debug] "%s"
     (Visualization_message.success "registered masks" mask_file) ;
-  Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
+  Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
       [%log trace]
@@ -342,7 +342,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
-        (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
+        (fun () filename -> return (Mina_base.Ledger.Debug.visualize ~filename)
       )
     ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
           let keypair_and_compressed_key =

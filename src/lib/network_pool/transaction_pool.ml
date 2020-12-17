@@ -5,7 +5,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Signature_lib
 open Network_peer
@@ -67,6 +67,7 @@ module Diff_versioned = struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -85,6 +86,7 @@ module Diff_versioned = struct
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -348,12 +350,14 @@ struct
       | Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
             (Currency.Balance.to_amount
                (Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
     let handle_transition_frontier_diff
@@ -756,6 +760,7 @@ struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
       end
 
@@ -766,6 +771,12 @@ struct
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
+
+      let reject_overloaded_diff diffs =
+        List.map diffs ~f:(fun cmd ->
+            (User_command.forget_check cmd, Diff_error.Overloaded) )
+
+      let empty = []
 
       let size = List.length
 
@@ -1223,12 +1234,12 @@ end
 module Make (Staged_ledger : sig
   type t
 
-  val ledger : t -> Coda_base.Ledger.t
+  val ledger : t -> Mina_base.Ledger.t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+  Make0 (Mina_base.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
@@ -1427,7 +1438,10 @@ let%test_module _ =
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data= cmd
-      ; status= Applied User_command_status.Auxiliary_data.empty }
+      ; status=
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty ) }
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->

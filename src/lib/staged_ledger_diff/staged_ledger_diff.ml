@@ -1,6 +1,5 @@
 open Core_kernel
-open Coda_base
-open Signature_lib
+open Mina_base
 
 module At_most_two = struct
   [%%versioned
@@ -172,23 +171,13 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V1 = struct
-    type t =
-      { diff: Diff.Stable.V1.t
-      ; creator: Public_key.Compressed.Stable.V1.t
-      ; coinbase_receiver: Public_key.Compressed.Stable.V1.t
-      ; supercharge_coinbase: bool }
-    [@@deriving sexp, to_yojson]
+    type t = {diff: Diff.Stable.V1.t} [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t =
-  { diff: Diff.t
-  ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.t
-  ; supercharge_coinbase: bool }
-[@@deriving sexp, to_yojson, fields]
+type t = Stable.Latest.t = {diff: Diff.t} [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
   type pre_diff_with_at_most_two_coinbase =
@@ -208,12 +197,7 @@ module With_valid_signatures_and_proofs = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t
-    ; supercharge_coinbase: bool }
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   let commands t =
     (fst t.diff).commands
@@ -231,11 +215,10 @@ let coinbase_amount
   else Some constraint_constants.coinbase_amount
 
 let coinbase ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    t =
+    ~supercharge_coinbase t =
   let first_pre_diff, second_pre_diff_opt = t.diff in
   let coinbase_amount =
-    coinbase_amount ~constraint_constants
-      ~supercharge_coinbase:t.supercharge_coinbase
+    coinbase_amount ~constraint_constants ~supercharge_coinbase
   in
   match
     ( first_pre_diff.coinbase
@@ -265,20 +248,14 @@ module With_valid_signatures = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; coinbase_receiver: Public_key.Compressed.t
-    ; supercharge_coinbase: bool }
-  [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, to_yojson]
 
   let coinbase
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      (t : t) =
+      ~supercharge_coinbase (t : t) =
     let first_pre_diff, second_pre_diff_opt = t.diff in
     let coinbase_amount =
-      coinbase_amount ~constraint_constants
-        ~supercharge_coinbase:t.supercharge_coinbase
+      coinbase_amount ~constraint_constants ~supercharge_coinbase
     in
     match
       ( first_pre_diff.coinbase
@@ -324,11 +301,7 @@ let validate_commands (t : t)
               ; commands= commands2
               ; coinbase= d2.coinbase } )
       in
-      ( { creator= t.creator
-        ; coinbase_receiver= t.coinbase_receiver
-        ; diff= (p1, p2)
-        ; supercharge_coinbase= t.supercharge_coinbase }
-        : With_valid_signatures.t ) )
+      ({diff= (p1, p2)} : With_valid_signatures.t) )
 
 let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     With_valid_signatures.t =
@@ -345,10 +318,7 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
           ; coinbase= d2.coinbase }
           : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
   in
-  { creator= d.creator
-  ; coinbase_receiver= d.coinbase_receiver
-  ; diff= (p1, p2)
-  ; supercharge_coinbase= d.supercharge_coinbase }
+  {diff= (p1, p2)}
 
 let forget_pre_diff_with_at_most_two
     (pre_diff :
@@ -368,10 +338,7 @@ let forget_pre_diff_with_at_most_one
 let forget (t : With_valid_signatures_and_proofs.t) =
   { diff=
       ( forget_pre_diff_with_at_most_two (fst t.diff)
-      , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-  ; coinbase_receiver= t.coinbase_receiver
-  ; creator= t.creator
-  ; supercharge_coinbase= t.supercharge_coinbase }
+      , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one ) }
 
 let commands (t : t) =
   (fst t.diff).commands

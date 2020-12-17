@@ -126,6 +126,11 @@ replayer :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+missing_blocks_auditor :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -261,8 +266,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build

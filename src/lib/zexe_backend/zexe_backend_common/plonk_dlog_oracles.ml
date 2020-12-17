@@ -39,19 +39,19 @@ module Make (Inputs : Inputs_intf) = struct
 
   let scalar_challenge t = Pickles_types.Scalar_challenge.create t
 
-  let alpha (t : t) = scalar_challenge t.o.alpha_chal
+  let alpha (t : t) = t.o.alpha_chal
 
   let beta (t : t) = t.o.beta
 
   let gamma (t : t) = t.o.gamma
 
-  let zeta (t : t) = scalar_challenge t.o.zeta_chal
+  let zeta (t : t) = t.o.zeta_chal
 
   let digest_before_evaluations (t : t) = t.digest_before_evaluations
 
-  let v (t : t) = scalar_challenge t.o.v_chal
+  let v (t : t) = t.o.v_chal
 
-  let u (t : t) = scalar_challenge t.o.u_chal
+  let u (t : t) = t.o.u_chal
 
   let p_eval_1 (t : t) = fst t.p_eval
 
