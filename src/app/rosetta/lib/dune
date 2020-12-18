@@ -26,6 +26,7 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
+               h_list.ppx
                ppx_coda
                ppx_deriving.eq
                ppx_deriving.show
