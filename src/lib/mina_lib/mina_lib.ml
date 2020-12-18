@@ -653,7 +653,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
         t.snark_job_state
       |> List.length
     in
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
@@ -1163,9 +1163,9 @@ let create ?wallets (config : Config.t) =
                              (Consensus.Data.Consensus_time.of_time_exn
                                 ~constants:consensus_constants tm)
                          in
-                         Coda_metrics.Block_latency.Gossip_slots.update
+                         Mina_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
-                         Coda_metrics.Block_latency.Gossip_time.update
+                         Mina_metrics.Block_latency.Gossip_time.update
                            Block_time.(
                              Span.to_time_span @@ diff tm tn_production_time) ;
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
