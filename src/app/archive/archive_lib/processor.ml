@@ -967,7 +967,7 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
     | _ ->
         failwith "No accounts found in runtime config file"
   in
-  let%bind () =
+  let%map () =
     Deferred.List.iter accounts ~f:(fun (_, acc) ->
         match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
         | Error e ->
@@ -981,7 +981,7 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
         | Ok _ ->
             () )
   in
-  Conn.commit ()
+  Conn.commit () >>| ignore
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     ~delete_older_than ~runtime_config =
@@ -999,50 +999,43 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
         "Failed to connect to postgresql database, see error: $error"
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
-  | Ok conn -> (
-      match%bind add_genesis_accounts conn ~logger ~runtime_config with
-      | Error e ->
-          [%log error]
-            ~metadata:[("error", `String (Caqti_error.show e))]
-            "Failed to add genesis accounts, see $error" ;
-          Deferred.unit
-      | Ok () ->
-          run ~constraint_constants conn reader ~logger ~delete_older_than
-          |> don't_wait_for ;
-          Deferred.ignore
-          @@ Tcp.Server.create
-               ~on_handler_error:
+  | Ok conn ->
+      let%bind () = add_genesis_accounts conn ~logger ~runtime_config in
+      run ~constraint_constants conn reader ~logger ~delete_older_than
+      |> don't_wait_for ;
+      Deferred.ignore
+      @@ Tcp.Server.create
+           ~on_handler_error:
+             (`Call
+               (fun _net exn ->
+                 [%log error]
+                   "Exception while handling TCP server request: $error"
+                   ~metadata:
+                     [ ("error", `String (Core.Exn.to_string_mach exn))
+                     ; ("context", `String "rpc_tcp_server") ] ))
+           where_to_listen
+           (fun address reader writer ->
+             let address = Socket.Address.Inet.addr address in
+             Async.Rpc.Connection.server_with_close reader writer
+               ~implementations:
+                 (Async.Rpc.Implementations.create_exn ~implementations
+                    ~on_unknown_rpc:`Raise)
+               ~connection_state:(fun _ -> ())
+               ~on_handshake_error:
                  (`Call
-                   (fun _net exn ->
+                   (fun exn ->
                      [%log error]
-                       "Exception while handling TCP server request: $error"
+                       "Exception while handling RPC server request from \
+                        $address: $error"
                        ~metadata:
                          [ ("error", `String (Core.Exn.to_string_mach exn))
-                         ; ("context", `String "rpc_tcp_server") ] ))
-               where_to_listen
-               (fun address reader writer ->
-                 let address = Socket.Address.Inet.addr address in
-                 Async.Rpc.Connection.server_with_close reader writer
-                   ~implementations:
-                     (Async.Rpc.Implementations.create_exn ~implementations
-                        ~on_unknown_rpc:`Raise)
-                   ~connection_state:(fun _ -> ())
-                   ~on_handshake_error:
-                     (`Call
-                       (fun exn ->
-                         [%log error]
-                           "Exception while handling RPC server request from \
-                            $address: $error"
-                           ~metadata:
-                             [ ("error", `String (Core.Exn.to_string_mach exn))
-                             ; ("context", `String "rpc_server")
-                             ; ( "address"
-                               , `String (Unix.Inet_addr.to_string address) )
-                             ] ;
-                         Deferred.unit )) )
-          |> don't_wait_for ;
-          [%log info] "Archive process ready. Clients can now connect" ;
-          Async.never () )
+                         ; ("context", `String "rpc_server")
+                         ; ( "address"
+                           , `String (Unix.Inet_addr.to_string address) ) ] ;
+                     Deferred.unit )) )
+      |> don't_wait_for ;
+      [%log info] "Archive process ready. Clients can now connect" ;
+      Async.never ()
 
 module For_test = struct
   let assert_parent_exist ~parent_id ~parent_hash conn =
