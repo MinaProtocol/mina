@@ -312,7 +312,7 @@ let step_main
                             ~messages ~wrap_verification_key:d.wrap_key
                             statement unfinalized )
                     in
-                    if true then
+                    if debug then
                       as_prover
                         As_prover.(
                           fun () ->
