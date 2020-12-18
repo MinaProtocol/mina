@@ -949,42 +949,48 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         ) )
 
 let add_genesis_accounts (module Conn : CONNECTION) ~logger
-    ~(runtime_config : Runtime_config.t) =
-  let accounts =
-    match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
-    | Some (Accounts accounts) ->
-        Genesis_ledger_helper.Accounts.to_full accounts
-    | Some (Named name) -> (
-      match Genesis_ledger.fetch_ledger name with
-      | Some (module M) ->
-          [%log info] "Found ledger with name $ledger_name"
-            ~metadata:[("ledger_name", `String name)] ;
-          Lazy.force M.accounts
-      | None ->
-          [%log error] "Could not find a built-in ledger named $ledger_name"
-            ~metadata:[("ledger_name", `String name)] ;
-          failwith "Could not add genesis accounts: Named ledger not found" )
-    | _ ->
-        failwith "No accounts found in runtime config file"
-  in
-  let%bind () =
-    Deferred.List.iter accounts ~f:(fun (_, acc) ->
-        match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
-        | Error e ->
-            [%log error]
-              ~metadata:
-                [ ("account", Account.to_yojson acc)
-                ; ("error", `String (Caqti_error.show e)) ]
-              "Failed to add genesis account: $account, see $error" ;
-            Conn.rollback () |> ignore ;
-            failwith "Failed to add genesis account"
-        | Ok _ ->
-            () )
-  in
-  Conn.commit () >>| ignore
+    ~(runtime_config_opt : Runtime_config.t option) =
+  match runtime_config_opt with
+  | None ->
+      Deferred.unit
+  | Some runtime_config ->
+      let accounts =
+        match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
+        | Some (Accounts accounts) ->
+            Genesis_ledger_helper.Accounts.to_full accounts
+        | Some (Named name) -> (
+          match Genesis_ledger.fetch_ledger name with
+          | Some (module M) ->
+              [%log info] "Found ledger with name $ledger_name"
+                ~metadata:[("ledger_name", `String name)] ;
+              Lazy.force M.accounts
+          | None ->
+              [%log error]
+                "Could not find a built-in ledger named $ledger_name"
+                ~metadata:[("ledger_name", `String name)] ;
+              failwith "Could not add genesis accounts: Named ledger not found"
+          )
+        | _ ->
+            failwith "No accounts found in runtime config file"
+      in
+      let%bind () =
+        Deferred.List.iter accounts ~f:(fun (_, acc) ->
+            match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
+            | Error e ->
+                [%log error]
+                  ~metadata:
+                    [ ("account", Account.to_yojson acc)
+                    ; ("error", `String (Caqti_error.show e)) ]
+                  "Failed to add genesis account: $account, see $error" ;
+                Conn.rollback () |> ignore ;
+                failwith "Failed to add genesis account"
+            | Ok _ ->
+                () )
+      in
+      Conn.commit () >>| ignore
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
-    ~delete_older_than ~runtime_config =
+    ~delete_older_than ~runtime_config_opt =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -1000,7 +1006,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      let%bind () = add_genesis_accounts conn ~logger ~runtime_config in
+      let%bind () = add_genesis_accounts conn ~logger ~runtime_config_opt in
       run ~constraint_constants conn reader ~logger ~delete_older_than
       |> don't_wait_for ;
       Deferred.ignore
