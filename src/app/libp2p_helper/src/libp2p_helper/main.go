@@ -914,20 +914,6 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	l := &mdnsListener{FoundPeer: foundPeerCh}
 	mdns.RegisterNotifee(l)
 
-	validPeer := func(who peer.ID) bool {
-		return who.Validate() == nil && who != app.P2p.Me
-	}
-
-	// report local discovery peers
-	go func() {
-		for info := range l.FoundPeer {
-			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-			}
-		}
-	}()
-
 	return nil
 }
 
@@ -946,6 +932,27 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	foundPeerCh := make(chan peer.AddrInfo)
+
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
+	// report discovery peers local and remote
+	go func() {
+		for info := range foundPeerCh {
+			if validPeer(info.ID) {
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+
+				// now connect to the peer we discovered
+				err := app.P2p.Host.Connect(app.Ctx, info)
+				if err != nil {
+					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", info, err.Error())
+					continue
+				}
+			}
+		}
+	}()
 
 	if !app.NoMDNS {
 		app.P2p.Logger.Debugf("beginning mDNS discovery")
