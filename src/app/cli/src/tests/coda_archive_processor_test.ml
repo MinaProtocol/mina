@@ -22,6 +22,7 @@ let main () =
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
     ~delete_older_than:None
+    ~runtime_config:(Lazy.force Runtime_config.Test_configs.transactions)
   |> don't_wait_for ;
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values

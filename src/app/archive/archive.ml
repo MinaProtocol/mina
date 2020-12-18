@@ -10,11 +10,18 @@ let command_run =
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
      and postgres = Flag.Uri.Archive.postgres
+     and runtime_config_file =
+       flag "-config-file" (required string)
+         ~doc:"PATH to the configuration file containing the genesis ledger"
      and delete_older_than =
        flag "-delete-older-than" (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     in
+     let runtime_config =
+       Yojson.Safe.from_file runtime_config_file
+       |> Runtime_config.of_yojson |> Result.ok_or_failwith
      in
      fun () ->
        let logger = Logger.create () in
@@ -24,7 +31,7 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than)
+         ~delete_older_than ~runtime_config)
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

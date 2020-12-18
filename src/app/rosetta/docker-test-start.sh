@@ -27,15 +27,6 @@ pg_ctlcluster 11 main start
 # wait for it to settle
 sleep 3
 
-# archive
-/mina-bin/archive/archive.exe run \
-  -postgres-uri $PG_CONN \
-  -log-json \
-  -server-port 3086 &
-
-# wait for it to settle
-sleep 3
-
 # Setup and run demo-node
 PK=${PK:-B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g}
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
@@ -44,6 +35,17 @@ export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export CODA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 MINA_CONFIG_DIR=/root/.coda-config
+
+
+# archive
+/mina-bin/archive/archive.exe run \
+  -postgres-uri $PG_CONN \
+  -log-json \
+  -config-file "$MINA_CONFIG_DIR/daemon.json" \
+  -server-port 3086 &
+
+# wait for it to settle
+sleep 3
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 /mina-bin/cli/src/coda.exe daemon \

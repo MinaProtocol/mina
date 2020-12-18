@@ -70,23 +70,109 @@ let rec deferred_result_list_fold ls ~init ~f =
       deferred_result_list_fold t ~init ~f
 
 module Public_key = struct
+  let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
+    let public_key = Public_key.Compressed.to_base58_check t in
+    Conn.find
+      (Caqti_request.find Caqti_type.string Caqti_type.int
+         "SELECT id FROM public_keys WHERE value = ?")
+      public_key
+
+  let find_opt (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
+    let public_key = Public_key.Compressed.to_base58_check t in
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+         "SELECT id FROM public_keys WHERE value = ?")
+      public_key
+
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Public_key.Compressed.t) =
     let open Deferred.Result.Let_syntax in
-    let public_key = Public_key.Compressed.to_base58_check t in
-    match%bind
-      Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-           "SELECT id FROM public_keys WHERE value = ?")
-        public_key
-    with
+    match%bind find_opt (module Conn) t with
     | Some id ->
         return id
     | None ->
+        let public_key = Public_key.Compressed.to_base58_check t in
         Conn.find
           (Caqti_request.find Caqti_type.string Caqti_type.int
              "INSERT INTO public_keys (value) VALUES (?) RETURNING id")
           public_key
+end
+
+module Timing_info = struct
+  type t =
+    { public_key_id: int
+    ; initial_balance: int64
+    ; initial_minimum_balance: int64
+    ; cliff_time: int64
+    ; cliff_amount: int64
+    ; vesting_period: int64
+    ; vesting_increment: int64 }
+  [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec = Caqti_type.[int; int64; int64; int64; int64; int64; int64] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let find (module Conn : CONNECTION) (acc : Account.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind pk_id = Public_key.find (module Conn) acc.public_key in
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.int
+         "SELECT id FROM timing_info WHERE public_key_id = ?")
+      pk_id
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
+    let open Deferred.Result.Let_syntax in
+    let amount_to_int64 x =
+      Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
+    in
+    let balance_to_int64 x = amount_to_int64 (Currency.Balance.to_amount x) in
+    let slot_to_int64 x =
+      Coda_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
+    in
+    let%bind public_key_id =
+      Public_key.add_if_doesn't_exist (module Conn) acc.public_key
+    in
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt Caqti_type.int Caqti_type.int
+           "SELECT id FROM timing_info WHERE public_key_id = ?")
+        public_key_id
+    with
+    | Some id ->
+        return id
+    | None ->
+        let values =
+          match acc.timing with
+          | Timed timing ->
+              { public_key_id
+              ; initial_balance= balance_to_int64 acc.balance
+              ; initial_minimum_balance=
+                  balance_to_int64 timing.initial_minimum_balance
+              ; cliff_time= slot_to_int64 timing.cliff_time
+              ; cliff_amount= amount_to_int64 timing.cliff_amount
+              ; vesting_period= slot_to_int64 timing.vesting_period
+              ; vesting_increment= amount_to_int64 timing.vesting_increment }
+          | Untimed ->
+              let zero = Int64.zero in
+              { public_key_id
+              ; initial_balance= balance_to_int64 acc.balance
+              ; initial_minimum_balance= zero
+              ; cliff_time= zero
+              ; cliff_amount= zero
+              ; vesting_period= zero
+              ; vesting_increment= zero }
+        in
+        Conn.find
+          (Caqti_request.find typ Caqti_type.int
+             "INSERT INTO timing_info \
+              (public_key_id,initial_balance,initial_minimum_balance, \
+              cliff_time, cliff_amount, vesting_period, vesting_increment ) \
+              VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
+          values
 end
 
 module Snarked_ledger_hash = struct
@@ -862,8 +948,43 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
             User_command.add_if_doesn't_exist (module Conn) command >>| ignore
         ) )
 
+let add_genesis_accounts (module Conn : CONNECTION) ~logger
+    ~(runtime_config : Runtime_config.t) =
+  let accounts =
+    match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
+    | Some (Accounts accounts) ->
+        Genesis_ledger_helper.Accounts.to_full accounts
+    | Some (Named name) -> (
+      match Genesis_ledger.fetch_ledger name with
+      | Some (module M) ->
+          [%log info] "Found ledger with name $ledger_name"
+            ~metadata:[("ledger_name", `String name)] ;
+          Lazy.force M.accounts
+      | None ->
+          [%log error] "Could not find a built-in ledger named $ledger_name"
+            ~metadata:[("ledger_name", `String name)] ;
+          failwith "Could not add genesis accounts: Named ledger not found" )
+    | _ ->
+        failwith "No accounts found in runtime config file"
+  in
+  let%bind () =
+    Deferred.List.iter accounts ~f:(fun (_, acc) ->
+        match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
+        | Error e ->
+            [%log error]
+              ~metadata:
+                [ ("account", Account.to_yojson acc)
+                ; ("error", `String (Caqti_error.show e)) ]
+              "Failed to add genesis account: $account, see $error" ;
+            Conn.rollback () |> ignore ;
+            failwith "Failed to add genesis account"
+        | Ok _ ->
+            () )
+  in
+  Conn.commit ()
+
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
-    ~delete_older_than =
+    ~delete_older_than ~runtime_config =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -878,42 +999,50 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
         "Failed to connect to postgresql database, see error: $error"
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
-  | Ok conn ->
-      run ~constraint_constants conn reader ~logger ~delete_older_than
-      |> don't_wait_for ;
-      Deferred.ignore
-      @@ Tcp.Server.create
-           ~on_handler_error:
-             (`Call
-               (fun _net exn ->
-                 [%log error]
-                   "Exception while handling TCP server request: $error"
-                   ~metadata:
-                     [ ("error", `String (Core.Exn.to_string_mach exn))
-                     ; ("context", `String "rpc_tcp_server") ] ))
-           where_to_listen
-           (fun address reader writer ->
-             let address = Socket.Address.Inet.addr address in
-             Async.Rpc.Connection.server_with_close reader writer
-               ~implementations:
-                 (Async.Rpc.Implementations.create_exn ~implementations
-                    ~on_unknown_rpc:`Raise)
-               ~connection_state:(fun _ -> ())
-               ~on_handshake_error:
+  | Ok conn -> (
+      match%bind add_genesis_accounts conn ~logger ~runtime_config with
+      | Error e ->
+          [%log error]
+            ~metadata:[("error", `String (Caqti_error.show e))]
+            "Failed to add genesis accounts, see $error" ;
+          Deferred.unit
+      | Ok () ->
+          run ~constraint_constants conn reader ~logger ~delete_older_than
+          |> don't_wait_for ;
+          Deferred.ignore
+          @@ Tcp.Server.create
+               ~on_handler_error:
                  (`Call
-                   (fun exn ->
+                   (fun _net exn ->
                      [%log error]
-                       "Exception while handling RPC server request from \
-                        $address: $error"
+                       "Exception while handling TCP server request: $error"
                        ~metadata:
                          [ ("error", `String (Core.Exn.to_string_mach exn))
-                         ; ("context", `String "rpc_server")
-                         ; ( "address"
-                           , `String (Unix.Inet_addr.to_string address) ) ] ;
-                     Deferred.unit )) )
-      |> don't_wait_for ;
-      [%log info] "Archive process ready. Clients can now connect" ;
-      Async.never ()
+                         ; ("context", `String "rpc_tcp_server") ] ))
+               where_to_listen
+               (fun address reader writer ->
+                 let address = Socket.Address.Inet.addr address in
+                 Async.Rpc.Connection.server_with_close reader writer
+                   ~implementations:
+                     (Async.Rpc.Implementations.create_exn ~implementations
+                        ~on_unknown_rpc:`Raise)
+                   ~connection_state:(fun _ -> ())
+                   ~on_handshake_error:
+                     (`Call
+                       (fun exn ->
+                         [%log error]
+                           "Exception while handling RPC server request from \
+                            $address: $error"
+                           ~metadata:
+                             [ ("error", `String (Core.Exn.to_string_mach exn))
+                             ; ("context", `String "rpc_server")
+                             ; ( "address"
+                               , `String (Unix.Inet_addr.to_string address) )
+                             ] ;
+                         Deferred.unit )) )
+          |> don't_wait_for ;
+          [%log info] "Archive process ready. Clients can now connect" ;
+          Async.never () )
 
 module For_test = struct
   let assert_parent_exist ~parent_id ~parent_hash conn =

@@ -5,6 +5,19 @@ CREATE TABLE public_keys
 
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
+CREATE TABLE timing_info
+( id                      serial    PRIMARY KEY
+, public_key_id           int       NOT NULL REFERENCES public_keys(id)
+, initial_balance         bigint    NOT NULL
+, initial_minimum_balance bigint    NOT NULL
+, cliff_time              bigint    NOT NULL
+, cliff_amount            bigint    NOT NULL
+, vesting_period          bigint    NOT NULL
+, vesting_increment       bigint    NOT NULL
+);
+
+CREATE INDEX idx_public_key_id ON timing_info(public_key_id);
+
 CREATE TABLE snarked_ledger_hashes
 ( id    serial PRIMARY KEY
 , value text   NOT NULL UNIQUE
