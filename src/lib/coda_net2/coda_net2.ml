@@ -1283,7 +1283,8 @@ let list_peers net =
                  ~libp2p_port
                  ~peer_id:(Peer.Id.unsafe_of_string peer_id)) )
   | Error error ->
-      [%log' error net.logger] "Encountered $error while asking libp2p_helper for peers"
+      [%log' error net.logger]
+        "Encountered $error while asking libp2p_helper for peers"
         ~metadata:[("error", error_to_yojson error)] ;
       []
 
