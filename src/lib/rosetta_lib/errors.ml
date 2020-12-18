@@ -109,7 +109,7 @@ end = struct
     | `Network_doesn't_exist (req, conn) ->
         Some
           (sprintf
-             !"You are requesting the status for the network %s but you are \
+             !"You are requesting the status for the network %s, but you are \
                connected to the network %s\n"
              req conn)
     | `Chain_info_missing ->
@@ -121,15 +121,16 @@ end = struct
     | `Account_not_found addr ->
         Some
           (sprintf
-             !"You attempt to lookup %s but we couldn't find it in the ledger."
+             !"You attempted to lookup %s, but we couldn't find it in the \
+               ledger."
              addr)
     | `Invariant_violation ->
         None
     | `Transaction_not_found hash ->
         Some
           (sprintf
-             "You attempt to lookup %s but it is missing from the mempool. \
-              This may be due to it's inclusion in a block -- try looking for \
+             "You attempted to lookup %s, but it is missing from the mempool. \
+              This may be due to its inclusion in a block -- try looking for \
               this transaction in a recent block. It also could be due to the \
               transaction being evicted from the mempool."
              hash)
