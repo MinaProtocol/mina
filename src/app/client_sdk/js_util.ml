@@ -2,7 +2,7 @@
 
 open Js_of_ocaml
 open Snark_params_nonconsensus
-open Coda_base_nonconsensus
+open Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Global_slot = Coda_numbers_nonconsensus.Global_slot

@@ -30,7 +30,7 @@ module Make (Engine : Engine_intf) = struct
     Async_kernel.Deferred.don't_wait_for
       (Node.set_port_forwarding_exn ~logger block_producer graphql_port) ;
     (* same keypairs used by Coda_automation to populate the ledger *)
-    let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs in
+    let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)
     let sender, _sk1 = keypairs.(0) in
     let receiver, _sk2 = keypairs.(1) in

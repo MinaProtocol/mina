@@ -3,7 +3,7 @@
  (public_name mina_networking)
  (library_flags -linkall)
  (libraries core o1trace async coda_intf
-            async_extra gossip_net coda_base unix_timestamp perf_histograms proof_carrying_data
+            async_extra gossip_net mina_base unix_timestamp perf_histograms proof_carrying_data
             consensus network_pool coda_transition transition_frontier staged_ledger
             sync_status)
  (inline_tests)

@@ -16,10 +16,10 @@ spec:
         app: {{tpl .Values.coordinator.fullname .}}
         testnet: {{ .Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: '10000'
+        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:

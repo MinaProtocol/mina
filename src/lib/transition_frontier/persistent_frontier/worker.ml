@@ -1,7 +1,7 @@
 open Async
 open Core
 open Otp_lib
-open Coda_base
+open Mina_base
 open Frontier_base
 
 type input = Diff.Lite.E.t list

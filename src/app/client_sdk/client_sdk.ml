@@ -14,7 +14,7 @@ consensus_mechanism]
 open Js_of_ocaml
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
-open Coda_base_nonconsensus
+open Mina_base_nonconsensus
 open Rosetta_lib_nonconsensus
 open Rosetta_coding_nonconsensus
 open Js_util

@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Frontier_base
@@ -97,7 +97,7 @@ let protocol_states_for_root_scan_state t =
 let best_tip t = find_exn t t.best_tip
 
 let close ~loc t =
-  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+  Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
     (Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
        (Breadcrumb.mask (root t)))
@@ -135,7 +135,7 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
+  Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
   let t =
     { logger
     ; root_ledger
@@ -541,8 +541,8 @@ let update_metrics_with_diff (type mutant) t
     (diff : (Diff.full, mutant) Diff.t) : unit =
   match diff with
   | New_node _ ->
-      Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
-      Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
+      Mina_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
+      Mina_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
       let best_tip_breadcrumb = best_tip t in
@@ -557,7 +557,7 @@ let update_metrics_with_diff (type mutant) t
         |> Consensus.Data.Consensus_time.to_uint32 |> Unsigned.UInt32.to_int
         |> Float.of_int
       in
-      Coda_metrics.(
+      Mina_metrics.(
         let best_tip_user_txns =
           Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
         in

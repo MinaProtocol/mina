@@ -2,7 +2,7 @@ apiVersion: v2
 name: snark-worker
 description: A Helm chart for Mina Protocol's SNARK worker nodes
 type: application
-version: 0.3.1
+version: 0.3.3
 appVersion: 1.16.0
 dependencies:
   - name: common-utilities
