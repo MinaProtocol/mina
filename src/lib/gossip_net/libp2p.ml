@@ -222,7 +222,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                                ~f:
                                  (Fn.compose Coda_net2.Multiaddr.of_string
                                     Peer.to_multiaddr_string) ;
-                           Coda_metrics.(
+                           Mina_metrics.(
                              Gauge.set Network.peers
                                (List.length peers |> Int.to_float)) ;
                            after (Time.Span.of_sec 2.)

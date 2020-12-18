@@ -322,7 +322,7 @@ type user_cmd_status =
 let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
-         | `Root (worker_id, ({commands; root_length} : Coda_lib.Root_diff.t))
+         | `Root (worker_id, ({commands; root_length} : Mina_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
