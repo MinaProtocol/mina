@@ -17,7 +17,7 @@ spec:
         testnet: {{ $.Values.testnetName }}
         role: block-producer
         class: {{ default "undefined" $config.class }}
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
