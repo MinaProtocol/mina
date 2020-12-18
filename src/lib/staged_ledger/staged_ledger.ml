@@ -5,7 +5,7 @@
 open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Currency
 open O1trace
 open Signature_lib
@@ -24,7 +24,7 @@ module T = struct
       | Invalid_proofs of
           ( Ledger_proof.t
           * Transaction_snark.Statement.t
-          * Coda_base.Sok_message.t )
+          * Mina_base.Sok_message.t )
           list
       | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
@@ -917,7 +917,7 @@ module T = struct
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
     Or_error.try_with (fun () ->
-        let open Coda_metrics in
+        let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
           (Int.to_float @@ Fee.to_int total_snark_fee) ;
         Gauge.set Scan_state_metrics.transaction_fees_per_block
@@ -2284,7 +2284,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.Valid.t list
+            * Mina_base.User_command.Valid.t list
             * int option list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
@@ -2297,7 +2297,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.Valid.t list
+            * Mina_base.User_command.Valid.t list
             * int option list] ~trials:15
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
@@ -2336,7 +2336,7 @@ let%test_module "test" =
               in
               assert (
                 Option.is_none
-                  (Coda_base.Ledger.location_of_account test_mask
+                  (Mina_base.Ledger.location_of_account test_mask
                      (Account_id.create snark_worker_pk Token_id.default)) ) )
       )
 
@@ -2815,7 +2815,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.Valid.t list
+            * Mina_base.User_command.Valid.t list
             * int option list
             * (int * Fee.t list) list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
@@ -2875,7 +2875,7 @@ let%test_module "test" =
         -> int option list
         -> int list
         -> (State_hash.t * State_body_hash.t) list
-        -> Coda_base.Snapp_predicate.Protocol_state.View.t
+        -> Mina_base.Snapp_predicate.Protocol_state.View.t
         -> Sl.t ref
         -> Ledger.Mask.Attached.t
         -> [`One_prover | `Many_provers]

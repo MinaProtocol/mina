@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
+open Mina_base
 open Coda_state
 open Cache_lib
 open Coda_transition

@@ -6,7 +6,7 @@ open Async
 open Network_peer
 open O1trace
 open Pipe_lib
-open Coda_base.Rpc_intf
+open Mina_base.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -47,7 +47,7 @@ end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
 
-module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -222,7 +222,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                                ~f:
                                  (Fn.compose Coda_net2.Multiaddr.of_string
                                     Peer.to_multiaddr_string) ;
-                           Coda_metrics.(
+                           Mina_metrics.(
                              Gauge.set Network.peers
                                (List.length peers |> Int.to_float)) ;
                            after (Time.Span.of_sec 2.)

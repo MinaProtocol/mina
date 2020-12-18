@@ -2,7 +2,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 
 (* identify a target block B containing staking and next epoch ledgers
    to be used in a hard fork, by giving its state hash
@@ -276,7 +276,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       [%sexp_of: (string * int64) * (string * int)]
     |> Error.raise
   in
-  let open Coda_base.Ledger in
+  let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
       let fee_transfer =

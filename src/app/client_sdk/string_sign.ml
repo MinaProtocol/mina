@@ -1,6 +1,6 @@
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
-open Coda_base_nonconsensus
+open Mina_base_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 module Message = struct
