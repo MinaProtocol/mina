@@ -129,7 +129,7 @@ type customValidator struct {
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
 type CodaGatingState struct {
-	logger       *logging.Logger
+	logger       logging.EventLogger
 	AddrFilters  *ma.Filters
 	DeniedPeers  *peer.Set
 	AllowedPeers *peer.Set
@@ -186,7 +186,7 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(addr)
 
 	if !allow {
-		gs.logger.Infof("disallowing peer dial from: %v", p)
+		gs.logger.Infof("disallowing peer dial from: %v", id)
 		gs.logGate()
 	}
 
