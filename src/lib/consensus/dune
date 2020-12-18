@@ -20,7 +20,7 @@
    global_signer_private_key
    non_zero_curve_point
    yojson
-   coda_metrics
+   mina_metrics
    graphql_lib
    inline_test_quiet_logs)
  (preprocessor_deps "../../config.mlh")
