@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Signature_lib
 
 let name = "coda-delegation-test"

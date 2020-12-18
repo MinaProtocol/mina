@@ -1,5 +1,5 @@
 open Core
-open Coda_base
+open Mina_base
 open Snark_params
 
 (** For debugging. Logs to stderr the inputs to the top hash. *)
@@ -214,10 +214,10 @@ val create :
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
   -> sok_digest:Sok_message.Digest.t
-  -> proof:Coda_base.Proof.t
+  -> proof:Mina_base.Proof.t
   -> t
 
-val proof : t -> Coda_base.Proof.t
+val proof : t -> Mina_base.Proof.t
 
 val statement : t -> Statement.t
 

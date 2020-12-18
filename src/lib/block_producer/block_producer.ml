@@ -1,7 +1,7 @@
 open Core
 open Async
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Signature_lib
@@ -569,7 +569,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let metadata =
                       [("state_hash", State_hash.to_yojson protocol_state_hash)]
                     in
-                    Coda_metrics.(
+                    Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
                     let%bind.Async () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
@@ -675,14 +675,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
                 | `Produce_now (data, winner_pk) ->
-                    Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
                          (now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
                 | `Produce (time, data, winner_pk) ->
-                    Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->
@@ -847,7 +847,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           let metadata =
             [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
-          Coda_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
+          Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in

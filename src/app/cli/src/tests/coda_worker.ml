@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_transition
 open Signature_lib
 open Pipe_lib
@@ -91,7 +91,7 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Coda_lib.Root_diff.t Pipe.Reader.t )
+        , Mina_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; initialization_finish_signal:
         ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
@@ -136,7 +136,7 @@ module T = struct
     ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
         unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_root_diff: unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_new_block:
            Account.key
@@ -269,7 +269,7 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.Latest.t] ()
+        ~bin_output:[%bin_type_class: Mina_lib.Root_diff.Stable.Latest.t] ()
 
     let initialization_finish_signal =
       C.create_pipe ~name:"initialization_finish_signal"
@@ -450,8 +450,8 @@ module T = struct
           in
           let start_time = Time.now () in
           let coda_deferred () =
-            Coda_lib.create
-              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+            Mina_lib.create
+              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~disable_telemetry:true
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
@@ -460,7 +460,7 @@ module T = struct
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
                  ~snark_worker_config:
-                   Coda_lib.Config.Snark_worker_config.
+                   Mina_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key= snark_worker_key
                      ; shutdown_on_disconnect= true
                      ; num_threads= None }
@@ -480,7 +480,7 @@ module T = struct
                           {name= "dummy"; value= host_and_port} ))
                  ~log_precomputed_blocks:false ())
           in
-          let coda_ref : Coda_lib.t option ref = ref None in
+          let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
             ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
@@ -494,8 +494,8 @@ module T = struct
               ()
           in
           [%log info] "Worker finish setting up coda" ;
-          let coda_peers () = Coda_lib.peers coda in
-          let coda_start () = Coda_lib.start coda in
+          let coda_peers () = Mina_lib.peers coda in
+          let coda_start () = Mina_lib.start coda in
           let coda_get_balance account_id =
             return
               ( Coda_commands.get_balance coda account_id
@@ -507,7 +507,7 @@ module T = struct
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
-            return (Coda_lib.root_length coda |> Participating_state.active_exn)
+            return (Mina_lib.root_length coda |> Participating_state.active_exn)
           in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
@@ -542,10 +542,10 @@ module T = struct
               ~f:Or_error.join
           in
           let coda_replace_snark_worker_key =
-            Coda_lib.replace_snark_worker_key coda
+            Mina_lib.replace_snark_worker_key coda
           in
           let coda_stop_snark_worker () =
-            Coda_lib.stop_snark_worker ~should_wait_kill:true coda
+            Mina_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
             Deferred.return
@@ -559,7 +559,7 @@ module T = struct
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
+              (Strict_pipe.Reader.iter (Mina_lib.validated_transitions coda)
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
@@ -586,7 +586,7 @@ module T = struct
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
+              (Strict_pipe.Reader.iter (Mina_lib.root_diff coda)
                  ~f:(fun diff ->
                    if Pipe.is_closed w then
                      [%log error]
@@ -598,17 +598,17 @@ module T = struct
           let coda_initialization_finish_signal () =
             let r, w = Linear_pipe.create () in
             upon
-              (Ivar.read @@ Coda_lib.initialization_finish_signal coda)
+              (Ivar.read @@ Mina_lib.initialization_finish_signal coda)
               (fun () -> don't_wait_for @@ Linear_pipe.write_if_open w ()) ;
             return r.pipe
           in
           let coda_dump_tf () =
             Deferred.return
-              ( Coda_lib.dump_tf coda |> Or_error.ok
+              ( Mina_lib.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
           in
           let coda_best_path () =
-            let path = Coda_lib.best_path coda in
+            let path = Mina_lib.best_path coda in
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
@@ -621,7 +621,7 @@ module T = struct
                   ()
           in
           let coda_sync_status () =
-            let schema = Coda_graphql.schema in
+            let schema = Mina_graphql.schema in
             match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with

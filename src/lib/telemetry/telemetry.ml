@@ -7,7 +7,7 @@ let get_telemetry_data_from_peers (net : Mina_networking.t)
     (peer_ids : Network_peer.Peer.Id.t list option) =
   let open Deferred.Let_syntax in
   let run peer_id =
-    let open Coda_base.Rpc_intf in
+    let open Mina_base.Rpc_intf in
     match%map
       Mina_networking.(
         query_peer net peer_id Mina_networking.Rpcs.Get_telemetry_data ())

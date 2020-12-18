@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Signature_lib
 

@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 
 (* WARNING: don't use this code until @nholland has landed a PR that
