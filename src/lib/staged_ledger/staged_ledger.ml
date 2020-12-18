@@ -917,7 +917,7 @@ module T = struct
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
     Or_error.try_with (fun () ->
-        let open Coda_metrics in
+        let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
           (Int.to_float @@ Fee.to_int total_snark_fee) ;
         Gauge.set Scan_state_metrics.transaction_fees_per_block
