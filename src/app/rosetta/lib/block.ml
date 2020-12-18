@@ -22,7 +22,7 @@ module Get_coinbase_and_genesis =
       stateHash
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }

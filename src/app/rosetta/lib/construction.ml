@@ -22,7 +22,7 @@ module Get_nonce =
         nonce
       }
       daemonStatus {
-        peers
+        peers { peerId }
       }
       initialPeers
      }
