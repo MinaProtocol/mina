@@ -135,8 +135,9 @@ end = struct
               transaction being evicted from the mempool."
              hash)
     | `Block_missing ->
-        (* TODO: Add context around the query made *)
-        None
+        Some
+          "We couldn't find the block you specified in the archive node. Ask \
+           a friend for the missing data."
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -210,7 +211,8 @@ end = struct
     | `Transaction_not_found _ ->
         "That transaction could not be found."
     | `Block_missing ->
-        "That block could not be found."
+        "We couldn't find the block you specified in the archive node. Ask a \
+         friend for the missing data."
     | `Malformed_public_key ->
         "The public key you provided was malformed."
     | `Operations_not_valid _ ->
