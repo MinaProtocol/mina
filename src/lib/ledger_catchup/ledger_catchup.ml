@@ -351,7 +351,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                           "$error from downloading $n blocks from $peer" ;
                         Error e
                   in
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set
                       Transition_frontier_controller
                       .transitions_downloaded_from_catchup
@@ -640,7 +640,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   notify_hash_tree_of_failure () ;
                   garbage_collect_subtrees ~logger
                     ~subtrees:trees_of_breadcrumbs ;
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set Transition_frontier_controller.catchup_time_ms
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr () )
@@ -649,7 +649,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   Strict_pipe.Writer.write catchup_breadcrumbs_writer
                     (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
                   let%bind () = Ivar.read ivar in
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set Transition_frontier_controller.catchup_time_ms
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr ()
@@ -661,7 +661,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                    catchup data received. See error for details: $error" ;
                 notify_hash_tree_of_failure () ;
                 garbage_collect_subtrees ~logger ~subtrees ;
-                Coda_metrics.(
+                Mina_metrics.(
                   Gauge.set Transition_frontier_controller.catchup_time_ms
                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                 Catchup_jobs.decr ()) ))
