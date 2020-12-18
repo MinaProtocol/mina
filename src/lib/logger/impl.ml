@@ -331,7 +331,7 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     | [] ->
         m
     | dups ->
-        ("$dup", `List (List.map ~f:(fun (s, _) -> `String s) dups))
+        ("$duplicated_keys", `List (List.map ~f:(fun (s, _) -> `String s) dups))
         :: List.dedup_and_sort m ~compare:key_cmp
   in
   { Message.timestamp= Time.now ()
