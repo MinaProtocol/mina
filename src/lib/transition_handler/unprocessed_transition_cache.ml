@@ -4,7 +4,7 @@
  * being handled by various threads in the transition frontier controller. *)
 
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 

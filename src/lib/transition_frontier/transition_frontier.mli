@@ -6,7 +6,7 @@
  *)
 
 open Async_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 module Breadcrumb = Breadcrumb
 module Diff = Diff
@@ -106,7 +106,7 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Coda_base.State_hash.t
+                            * ( Mina_base.State_hash.t
                               * Coda_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t
@@ -124,7 +124,7 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Coda_base.State_hash.t
+                            * ( Mina_base.State_hash.t
                               * Coda_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t

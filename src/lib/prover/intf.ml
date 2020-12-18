@@ -1,5 +1,5 @@
 open Async_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Blockchain_snark

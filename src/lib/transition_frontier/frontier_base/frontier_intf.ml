@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 (** This is the base signature for a full frontier, shared by any implementation
  *  of a full frontier. Currently, this includes the internal [Full_frontier]

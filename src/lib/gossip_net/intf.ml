@@ -2,7 +2,7 @@ open Async
 open Core_kernel
 open Network_peer
 open Pipe_lib
-open Coda_base.Rpc_intf
+open Mina_base.Rpc_intf
 
 type ban_creator = {banned_peer: Peer.t; banned_until: Time.t}
 [@@deriving fields]

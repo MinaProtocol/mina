@@ -3,7 +3,7 @@
  (public_name gossip_net)
  (library_flags -linkall)
  (inline_tests)
- (libraries perf_histograms core coda_base coda_transition coda_net2 network_pool trust_system pipe_lib logger async
+ (libraries perf_histograms core mina_base coda_transition coda_net2 network_pool trust_system pipe_lib logger async
             async_extra o1trace node_addrs_and_ports coda_metrics)
  (preprocessor_deps ../../config.mlh)
  (preprocess

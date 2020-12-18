@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module type S = sig
   type t [@@deriving compare, sexp, yojson]
