@@ -213,7 +213,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             ~f:(work_is_referenced t) ;
           return
             (*when snark works removed from the pool*)
-            Coda_metrics.(
+            Mina_metrics.(
               Gauge.set Snark_work.snark_pool_size
                 (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
 
@@ -275,10 +275,10 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                statement. *)
             Hashtbl.remove t.snark_tables.rebroadcastable work ;
           (*when snark work is added to the pool*)
-          Coda_metrics.(
+          Mina_metrics.(
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
-          Coda_metrics.(
+          Mina_metrics.(
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
@@ -436,7 +436,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             (Snark_tables.to_serializable t.snark_tables)
         in
         let elapsed = Time.(diff (now ()) before |> Span.to_ms) in
-        Coda_metrics.(
+        Mina_metrics.(
           Snark_work.Snark_pool_serialization_ms_histogram.observe
             Snark_work.snark_pool_serialization_ms elapsed) ;
         [%log' debug t.logger] "SNARK pool serialization took $time ms"
