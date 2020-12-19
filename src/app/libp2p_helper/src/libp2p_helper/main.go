@@ -254,7 +254,7 @@ type configureMsg struct {
 	ValidationQueueSize int                `json:"validation_queue_size"`
 }
 
-type peerConnectedUpcall struct {
+type peerConnectionUpcall struct {
 	ID     string `json:"peer_id"`
 	Upcall string `json:"upcall"`
 }
@@ -1001,7 +1001,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
 		id := c.RemotePeer()
 
-		app.writeMsg(peerConnectedUpcall{
+		app.writeMsg(peerConnectionUpcall{
 			ID:     peer.Encode(id),
 			Upcall: "peerConnected",
 		})
@@ -1010,6 +1010,15 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		//       caused by this prometheus issues.
 		// go app.checkBandwidth(id)
 		// go app.checkLatency(id)
+	}
+
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		id := c.RemotePeer()
+
+		app.writeMsg(peerConnectionUpcall{
+			ID:     peer.Encode(id),
+			Upcall: "peerDisconnected",
+		})
 	}
 
 	return "beginAdvertising success", nil
