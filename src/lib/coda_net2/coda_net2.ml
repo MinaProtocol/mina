@@ -514,16 +514,24 @@ module Helper = struct
   end
 
   let gating_config_to_helper_format (config : connection_gating) =
+    let trusted_ips =
+      List.map
+        ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+        config.trusted_peers
+    in
+    let banned_ips =
+      let trusted = String.Set.of_list trusted_ips in
+      List.filter_map
+        ~f:(fun p ->
+          let p = Unix.Inet_addr.to_string p.host in
+          (* Trusted peers cannot be banned. *)
+          if Set.mem trusted p then None else Some p )
+        config.banned_peers
+    in
     Rpcs.Set_gater_config.
-      { banned_ips=
-          List.map
-            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
-            config.banned_peers
+      { banned_ips
       ; banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers
-      ; trusted_ips=
-          List.map
-            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
-            config.trusted_peers
+      ; trusted_ips
       ; trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers
       ; isolate= config.isolate }
 
