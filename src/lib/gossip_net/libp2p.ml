@@ -172,6 +172,30 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
+            let record_peer_connection () =
+              [%log' trace config.logger] "Fired peer_connected callback" ;
+              Ivar.fill_if_empty first_peer_ivar () ;
+              if !ctr < 4 then incr ctr
+              else Ivar.fill_if_empty high_connectivity_ivar ()
+            in
+            let reload_peers_snapshot () =
+              if Throttle.num_jobs_waiting_to_start throttle = 0 then
+                don't_wait_for
+                  (Throttle.enqueue throttle (fun () ->
+                       let open Deferred.Let_syntax in
+                       let%bind peers = peers net2 in
+                       peers_snapshot :=
+                         List.map peers
+                           ~f:
+                             (Fn.compose Coda_net2.Multiaddr.of_string
+                                Peer.to_multiaddr_string) ;
+                       Mina_metrics.(
+                         Gauge.set Network.peers
+                           (List.length peers |> Int.to_float)) ;
+                       after (Time.Span.of_sec 2.)
+                       (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                   ))
+            in
             let%bind () =
               configure net2 ~me ~logger:config.logger
                 ~metrics_port:config.metrics_port
@@ -208,26 +232,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                           config.initial_peers
                     ; isolate= config.isolate }
                 ~on_peer_connected:(fun _ ->
-                  [%log' trace config.logger] "Fired peer_connected callback" ;
-                  Ivar.fill_if_empty first_peer_ivar () ;
-                  if !ctr < 4 then incr ctr
-                  else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
-                    don't_wait_for
-                      (Throttle.enqueue throttle (fun () ->
-                           let open Deferred.Let_syntax in
-                           let%bind peers = peers net2 in
-                           peers_snapshot :=
-                             List.map peers
-                               ~f:
-                                 (Fn.compose Coda_net2.Multiaddr.of_string
-                                    Peer.to_multiaddr_string) ;
-                           Mina_metrics.(
-                             Gauge.set Network.peers
-                               (List.length peers |> Int.to_float)) ;
-                           after (Time.Span.of_sec 2.)
-                           (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
-                       )) )
+                  record_peer_connection () ; reload_peers_snapshot () )
+                ~on_peer_disconnected:(fun _ -> reload_peers_snapshot ())
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
