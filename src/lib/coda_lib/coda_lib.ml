@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Async
 open Unsigned
@@ -16,6 +13,7 @@ module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
+module Timeout = Timeout_lib.Core_time
 
 type Structured_log_events.t += Connecting
   [@@deriving register_event {msg= "Coda daemon is connecting"}]
@@ -334,39 +332,7 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-[%%if
-mock_frontend_data]
-
-let create_sync_status_observer ~logger ~demo_mode:_
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
-    ~first_connection_incr ~first_message_incr =
-  let variable = Coda_incremental.Status.Var.create `Offline in
-  let incr = Coda_incremental.Status.Var.watch variable in
-  let rec loop () =
-    let%bind () = Async.after (Core.Time.Span.of_sec 5.0) in
-    let current_value = Coda_incremental.Status.Var.value variable in
-    let new_sync_status =
-      List.random_element_exn
-        ( match current_value with
-        | `Offline ->
-            [`Bootstrap; `Synced]
-        | `Synced ->
-            [`Offline; `Bootstrap]
-        | `Bootstrap ->
-            [`Offline; `Synced] )
-    in
-    Coda_incremental.Status.Var.set variable new_sync_status ;
-    Coda_incremental.Status.stabilize () ;
-    loop ()
-  in
-  let observer = Coda_incremental.Status.observe incr in
-  Coda_incremental.Status.stabilize () ;
-  don't_wait_for @@ loop () ;
-  observer
-
-[%%else]
-
-let create_sync_status_observer ~logger ~demo_mode
+let create_sync_status_observer ~logger ~is_seed ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
@@ -402,9 +368,46 @@ let create_sync_status_observer ~logger ~demo_mode
                   `Synced ) ) )
   in
   let observer = observe incremental_status in
-  stabilize () ; observer
-
-[%%endif]
+  (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
+  ( if not is_seed then
+    let offline_shutdown_timeout_duration = Time.Span.of_min 15.0 in
+    let shutdown_timeout = ref None in
+    let shutdown _ =
+      Mina_user_error.raisef "Node has been offline for %s; shutting down"
+        (Time.Span.to_string_hum offline_shutdown_timeout_duration)
+    in
+    let start_shutdown_timeout () =
+      match !shutdown_timeout with
+      | Some _ ->
+          ()
+      | None ->
+          shutdown_timeout :=
+            Some
+              (Timeout.create () offline_shutdown_timeout_duration ~f:shutdown)
+    in
+    let stop_shutdown_timeout () =
+      match !shutdown_timeout with
+      | Some timeout ->
+          Timeout.cancel () timeout () ;
+          shutdown_timeout := None
+      | None ->
+          ()
+    in
+    let handle_status_change status =
+      if status = `Offline then start_shutdown_timeout ()
+      else stop_shutdown_timeout ()
+    in
+    Observer.on_update_exn observer ~f:(function
+      | Initialized value ->
+          handle_status_change value
+      | Changed (_, value) ->
+          handle_status_change value
+      | Invalidated ->
+          () ) ) ;
+  (* recompute coda status on an interval *)
+  stabilize () ;
+  every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
+  observer
 
 let sync_status t = t.sync_status
 
@@ -1369,7 +1372,7 @@ let create ?wallets (config : Config.t) =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
-              ~demo_mode:config.demo_mode
+              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
