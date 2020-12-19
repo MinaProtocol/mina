@@ -1285,7 +1285,7 @@ let list_peers net =
   | Error error ->
       [%log' error net.logger]
         "Encountered $error while asking libp2p_helper for peers"
-        ~metadata:[("error", error_to_yojson error)] ;
+        ~metadata:[("error", Error_json.error_to_yojson error)] ;
       []
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
