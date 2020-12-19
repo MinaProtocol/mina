@@ -1290,7 +1290,10 @@ let list_peers net =
                  (Unix.Inet_addr.of_string host)
                  ~libp2p_port
                  ~peer_id:(Peer.Id.unsafe_of_string peer_id)) )
-  | Error _ ->
+  | Error error ->
+      [%log' error net.logger]
+        "Encountered $error while asking libp2p_helper for peers"
+        ~metadata:[("error", Error_json.error_to_yojson error)] ;
       []
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
