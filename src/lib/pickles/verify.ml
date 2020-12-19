@@ -44,7 +44,7 @@ let verify_heterogenous (ts : Instance.t list) =
                 , app_state
                 , T
                     { statement
-                    ; prev_x_hat= (x_hat_beta_1, _) as prev_x_hat
+                    ; prev_x_hat= (x_hat1, _) as prev_x_hat
                     ; prev_evals= evals } ))
          ->
         Timer.start __LOC__ ;
@@ -75,7 +75,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let zetaw = Tick.Field.mul zeta w in
         let plonk =
           let chal = Challenge.Constant.to_tick_field in
-          let p =
+          let p, `Check_equal (lin1, lin2) =
             Plonk_checks.derive_plonk
               (module Tick.Field)
               ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
@@ -90,7 +90,9 @@ let verify_heterogenous (ts : Instance.t list) =
               (Plonk_checks.evals_of_split_evals
                  (module Tick.Field)
                  evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+              x_hat1
           in
+          check (lazy "linearization_check", Tick.Field.equal lin1 lin2) ;
           { p with
             zeta= plonk0.zeta
           ; alpha= plonk0.alpha

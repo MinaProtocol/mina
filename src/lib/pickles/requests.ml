@@ -35,9 +35,9 @@ module Wrap = struct
                   Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
-              , Digest.Constant.t )
+              , Digest.Constant.t
+              , bool )
               Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
-              * bool
             , max_branching )
             Vector.t
           , Digest.Constant.t )
@@ -88,9 +88,9 @@ module Wrap = struct
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
                   Vector.t
-                , Digest.Constant.t )
+                , Digest.Constant.t
+                , bool )
                 Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
-                * bool
               , max_branching )
               Vector.t
             , Digest.Constant.t )
