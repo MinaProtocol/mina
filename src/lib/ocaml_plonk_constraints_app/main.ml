@@ -46,14 +46,13 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Impl.Field.of_int 5)));
           let x2, y2 = Ecc.scale_pack (x, y) x in
           assert_ (Snarky.Constraint.equal (y2*y2) (x2*x2*x2 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal x1 x2);
+          assert_ (Snarky.Constraint.equal y1 y2);
 
           let x3, y3 = Ecc.scale_pack (x2, y2) y in
           assert_ (Snarky.Constraint.equal (y3*y3) (x3*x3*x3 + (Impl.Field.of_int 5)));
           let x4, y4 = Ecc.endoscale (x3, y3) bits in
           assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Impl.Field.of_int 5)));
-
-          assert_ (Snarky.Constraint.equal x1 x2);
-          assert_ (Snarky.Constraint.equal y1 y2);
 
         done;
 
@@ -61,7 +60,7 @@ let%test_module "backend test" =
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
       let keys = Impl.generate_keypair ~exposing:(input ()) computation
-      let statement = Impl.Field.Constant.of_int 13579
+      let statement = Impl.Field.Constant.of_int 97531
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) computation () statement
       let%test_unit "check backend ComputationExample proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)

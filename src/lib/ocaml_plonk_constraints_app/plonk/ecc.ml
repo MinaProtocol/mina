@@ -91,7 +91,13 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
                 Array.of_list !state
               ))
           in
-          Array.iteri state ~f:(fun i s -> (s.xt <- xt; s.yt <- yt; s.b <- scalar.(Int.(n-i-1))));
+          Array.iteri state ~f:(fun i s -> 
+          (
+            s.xt <- xt;
+            s.yt <- yt;
+            s.b <- scalar.(Int.(n-i-1));
+            if i > 0 then (s.xp <- state.(Int.(i-1)).xs; s.yp <- state.(Int.(i-1)).ys)
+          ));
           state.(0).xp <- xp;
           state.(0).yp <- yp;
           Intf.assert_
@@ -155,6 +161,15 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
             Array.of_list !state
           ))
       in
+      Array.iteri state ~f:(fun i s ->
+      (
+        if i > 0 then
+        (
+          s.n1 <- state.(Int.(i-1)).n2;
+          s.xp <- state.(Int.(i-1)).xs;
+          s.yp <- state.(Int.(i-1)).ys;
+        )
+      ));
       state.(0).xp <- xp;
       state.(0).yp <- yp;
       Intf.assert_
@@ -218,7 +233,8 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     (
       s.xt <- xt; s.yt <- yt;
       s.b1 <- scalar.(Int.(2*(n-i-1)));
-      s.b2 <- Int.(if 2*(n-i-1)+1 < (Array.length scalar) then scalar.(2*(n-i-1)+1) else Field.zero)
+      s.b2 <- Int.(if 2*(n-i-1)+1 < (Array.length scalar) then scalar.(2*(n-i-1)+1) else Field.zero);
+      if i > 0 then (s.xp <- state.(Int.(i-1)).xs; s.yp <- state.(Int.(i-1)).ys)
     ));
     state.(0).xp <- xp;
     state.(0).yp <- yp;
