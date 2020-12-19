@@ -2,7 +2,7 @@ open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
-open Coda_base
+open Mina_base
 open Coda_transition
 open Network_peer
 
@@ -165,7 +165,7 @@ module type Best_tip_prover_intf = sig
   val prove :
        logger:Logger.t
     -> transition_frontier
-    -> ( External_transition.t
+    -> ( (External_transition.t, State_hash.t) With_hash.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
        option
@@ -192,7 +192,7 @@ module type Consensus_best_tip_prover_intf = sig
        logger:Logger.t
     -> consensus_constants:Consensus.Constants.t
     -> frontier:transition_frontier
-    -> Consensus.Data.Consensus_state.Value.t
+    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -204,7 +204,7 @@ module type Consensus_best_tip_prover_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> Consensus.Data.Consensus_state.Value.t
+    -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -320,8 +320,8 @@ module type Initial_validator_intf = sig
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t]
-                         * [`Valid_cb of Coda_net2.validation_result -> unit]
-                         )
+                         * [ `Valid_cb of
+                             Coda_net2.Validation_callback.t -> unit ] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -366,7 +366,7 @@ module type Transition_router_intf = sig
                                    ]
                                  * [`Time_received of Block_time.t]
                                  * [ `Valid_cb of
-                                     Coda_net2.validation_result -> unit ] )
+                                     Coda_net2.Validation_callback.t ] )
                                  Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t

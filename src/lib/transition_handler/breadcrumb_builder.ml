@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 open Core
 open Async
 open Cache_lib
@@ -10,9 +10,9 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
-      (Coda_base.State_hash.to_base58_check initial_hash)
+      (Mina_base.State_hash.to_base58_check initial_hash)
   in
-  (* If the breadcrumb we are targetting is removed from the transition
+  (* If the breadcrumb we are targeting is removed from the transition
    * frontier while we're catching up, it means this path is not on the
    * critical path that has been chosen in the frontier. As such, we should
    * drop it on the floor. *)
@@ -21,7 +21,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     | None ->
         [%log error]
           ~metadata:
-            [ ("state_hash", Coda_base.State_hash.to_yojson initial_hash)
+            [ ("state_hash", Mina_base.State_hash.to_yojson initial_hash)
             ; ( "transition_hashes"
               , `List
                   (List.map subtrees_of_enveloped_transitions
@@ -31,7 +31,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                            Cached.peek enveloped_transitions
                            |> Envelope.Incoming.data
                            |> External_transition.Initial_validated.state_hash
-                           |> Coda_base.State_hash.to_yojson )
+                           |> Mina_base.State_hash.to_yojson )
                          subtree )) ) ]
           "Transition frontier already garbage-collected the parent of \
            $state_hash" ;
@@ -61,6 +61,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 let transition_with_initial_validation =
                   Envelope.Incoming.data enveloped_transition
                 in
+                let transition_receipt_time = Some (Time.now ()) in
                 let transition_with_hash, _ =
                   transition_with_initial_validation
                 in
@@ -98,7 +99,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                           Transition_frontier.Breadcrumb.build ~logger
                             ~precomputed_values ~verifier ~trust_system ~parent
                             ~transition:mostly_validated_transition
-                            ~sender:(Some sender) () ) )
+                            ~sender:(Some sender) ~transition_receipt_time ()
+                      ) )
                 with
                 | Error _ ->
                     Deferred.return @@ Or_error.error_string missing_parent_msg
@@ -106,7 +108,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                   match result with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
-                      Coda_metrics.(
+                      Mina_metrics.(
                         Counter.inc_one
                           Transition_frontier_controller
                           .breadcrumbs_built_by_builder) ;

@@ -5,7 +5,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Signature_lib
 open Network_peer
@@ -67,6 +67,7 @@ module Diff_versioned = struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -85,6 +86,7 @@ module Diff_versioned = struct
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -160,6 +162,8 @@ module Make0 (Base_ledger : sig
   val location_of_account : t -> Account_id.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
+
+  val detached_signal : t -> unit Deferred.t
 end) (Staged_ledger : sig
   type t
 
@@ -173,6 +177,8 @@ struct
   module Resource_pool = struct
     type transition_frontier_diff =
       Transition_frontier.best_tip_diff * Base_ledger.t
+
+    let label = "transaction_pool"
 
     module Config = struct
       type t =
@@ -191,8 +197,29 @@ struct
 
     module Batcher = Batcher.Transaction_pool
 
+    module Lru_cache = struct
+      let max_size = 2048
+
+      module T = struct
+        type t = User_command.t list [@@deriving hash]
+      end
+
+      module Q = Hash_queue.Make_with_table (Int) (Int.Table)
+
+      type t = unit Q.t
+
+      let mem t h = Q.mem t h
+
+      let add t h =
+        if not (Q.mem t h) then (
+          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
+          Q.enqueue_back_exn t h () )
+        else Q.lookup_and_move_to_back t h |> ignore
+    end
+
     type t =
       { mutable pool: Indexed_pool.t
+      ; recently_seen: Lru_cache.t sexp_opaque
       ; locally_generated_uncommitted:
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t )
@@ -323,12 +350,14 @@ struct
       | Timed
           { initial_minimum_balance
           ; cliff_time
+          ; cliff_amount
           ; vesting_period
           ; vesting_increment } ->
           Currency.Balance.sub_amount account.balance
             (Currency.Balance.to_amount
                (Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~vesting_period ~vesting_increment ~initial_minimum_balance))
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance))
           |> Option.value ~default:Currency.Balance.zero
 
     let handle_transition_frontier_diff
@@ -604,6 +633,7 @@ struct
         ; logger
         ; batcher= Batcher.create config.verifier
         ; best_tip_diff_relay= None
+        ; recently_seen= Lru_cache.Q.create ()
         ; best_tip_ledger= None }
       in
       don't_wait_for
@@ -612,6 +642,7 @@ struct
              match frontier_opt with
              | None -> (
                  [%log debug] "no frontier" ;
+                 t.best_tip_ledger <- None ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
                  match t.best_tip_diff_relay with
@@ -619,7 +650,6 @@ struct
                      Deferred.unit
                  | Some hdl ->
                      let is_finished = ref false in
-                     t.best_tip_ledger <- None ;
                      Deferred.any_unit
                        [ (let%map () = hdl in
                           t.best_tip_diff_relay <- None ;
@@ -730,6 +760,7 @@ struct
           | Bad_token
           | Unwanted_fee_token
           | Expired
+          | Overloaded
         [@@deriving sexp, yojson]
       end
 
@@ -741,7 +772,17 @@ struct
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
 
+      let reject_overloaded_diff diffs =
+        List.map diffs ~f:(fun cmd ->
+            (User_command.forget_check cmd, Diff_error.Overloaded) )
+
+      let empty = []
+
       let size = List.length
+
+      let score x = Int.max 1 (List.length x)
+
+      let max_per_second = 2
 
       let verified_size = List.length
 
@@ -776,7 +817,7 @@ struct
           verified Envelope.Incoming.t Deferred.Or_error.t =
         let open Deferred.Let_syntax in
         let sender = Envelope.Incoming.sender diffs in
-        let diffs_are_valid =
+        let diffs_are_valid () =
           List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
               let is_valid = not (User_command.has_insufficient_fee cmd) in
               if not is_valid then
@@ -790,7 +831,11 @@ struct
                     ] ;
               is_valid )
         in
-        if not diffs_are_valid then
+        let h = Lru_cache.T.hash diffs.data in
+        let already_mem = Lru_cache.mem t.recently_seen h in
+        Lru_cache.add t.recently_seen h ;
+        if already_mem then Deferred.Or_error.error_string "already saw this"
+        else if not (diffs_are_valid ()) then
           Deferred.Or_error.error_string
             "at least one user command had an insufficient fee"
         else
@@ -846,16 +891,17 @@ struct
             Deferred.Or_error.error_string
               "Got transaction pool diff when transition frontier is \
                unavailable, ignoring."
-        | Some ledger ->
+        | Some ledger -> (
             let trust_record =
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
             in
             let rec go txs' pool (accepted, rejected) =
+              let open Interruptible.Deferred_let_syntax in
               match txs' with
               | [] ->
                   t.pool <- pool ;
-                  Deferred.Or_error.return
+                  Interruptible.Or_error.return
                   @@ (List.rev accepted, List.rev rejected)
               | tx' :: txs'' -> (
                   let tx = User_command.forget_check tx' in
@@ -1111,7 +1157,22 @@ struct
                             , (tx, Diff_versioned.Diff_error.Insufficient_fee)
                               :: rejected ) )
             in
-            go txs t.pool ([], [])
+            match%map
+              Interruptible.force
+              @@
+              let open Interruptible.Let_syntax in
+              let signal =
+                Deferred.map (Base_ledger.detached_signal ledger) ~f:(fun () ->
+                    Error.createf "Ledger was detatched"
+                    |> Error.tag ~tag:"Transaction_pool.apply" )
+              in
+              let%bind () = Interruptible.lift Deferred.unit signal in
+              go txs t.pool ([], [])
+            with
+            | Ok res ->
+                res
+            | Error err ->
+                Error err )
 
       let unsafe_apply t diff =
         match%map apply t diff with
@@ -1173,12 +1234,12 @@ end
 module Make (Staged_ledger : sig
   type t
 
-  val ledger : t -> Coda_base.Ledger.t
+  val ledger : t -> Mina_base.Ledger.t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+  Make0 (Mina_base.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
@@ -1207,6 +1268,8 @@ let%test_module _ =
       let location_of_account _t k = Some k
 
       let get t l = Map.find t l
+
+      let detached_signal _ = Deferred.never ()
     end
 
     module Mock_staged_ledger = struct
@@ -1375,7 +1438,10 @@ let%test_module _ =
 
     let mk_with_status (cmd : User_command.Valid.t) =
       { With_status.data= cmd
-      ; status= Applied User_command_status.Auxiliary_data.empty }
+      ; status=
+          Applied
+            ( User_command_status.Auxiliary_data.empty
+            , User_command_status.Balance_data.empty ) }
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->

@@ -4,12 +4,69 @@ open Async_unix
 open Deferred.Let_syntax
 open Pipe_lib
 open Network_peer
+module Timeout = Timeout_lib.Core_time_ns
+
+module Validation_callback = struct
+  type validation_result = [`Accept | `Reject | `Ignore]
+
+  type t = {expiration: Time_ns.t option; signal: validation_result Ivar.t}
+
+  let create expiration = {expiration= Some expiration; signal= Ivar.create ()}
+
+  let create_without_expiration () = {expiration= None; signal= Ivar.create ()}
+
+  let is_expired cb =
+    match cb.expiration with
+    | None ->
+        false
+    | Some expires_at ->
+        Time_ns.(now () >= expires_at)
+
+  let await_timeout cb =
+    if is_expired cb then Deferred.return ()
+    else
+      match cb.expiration with
+      | None ->
+          Deferred.never ()
+      | Some expires_at ->
+          after
+            ( Time_ns.Span.to_span_float_round_nearest
+            @@ Time_ns.diff expires_at (Time_ns.now ()) )
+
+  let await cb =
+    if is_expired cb then Deferred.return None
+    else
+      match cb.expiration with
+      | None ->
+          Ivar.read cb.signal >>| Option.some
+      | Some expires_at -> (
+          match%map
+            Timeout.await ()
+              ~timeout_duration:(Time_ns.diff expires_at (Time_ns.now ()))
+              (Ivar.read cb.signal)
+          with
+          | `Ok result ->
+              Some result
+          | `Timeout ->
+              None )
+
+  let await_exn cb =
+    match%map await cb with
+    | None ->
+        failwith "timeout"
+    | Some result ->
+        result
+
+  let fire_if_not_already_fired cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+
+  let fire_exn cb result =
+    if not (is_expired cb) then Ivar.fill cb.signal result
+end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
-
-type validation_result = [`Accept | `Reject | `Ignore]
 
 type connection_gating =
   {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
@@ -175,16 +232,16 @@ module Helper = struct
     ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.t Or_error.t Ivar.t) Hashtbl.t
           (**
-      seqno is used to assign unique IDs to our outbound requests and index the
-      tables below.
+       seqno is used to assign unique IDs to our outbound requests and index the
+       tables below.
 
-      The helper can also generate sequence numbers- but they are not the same space
-      of sequence numbers!
+       The helper can also generate sequence numbers- but they are not the same space
+       of sequence numbers!
 
-      In general, if a message contains a seqno/idx, the response should contain the
-      same seqno/idx.
+       In general, if a message contains a seqno/idx, the response should contain the
+       same seqno/idx.
 
-      Some types would make it harder to misuse these integers.
+       Some types would make it harder to misuse these integers.
     *)
     ; mutable seqno: int
     ; mutable connection_gating: connection_gating
@@ -194,7 +251,7 @@ module Helper = struct
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
-    ; mutable new_peer_callback: (string -> string list -> unit) option
+    ; mutable peer_connected_callback: (string -> unit) option
     ; mutable finished: bool }
 
   and 'a subscription =
@@ -202,7 +259,8 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+    ; validator:
+        'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
         [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -292,7 +350,7 @@ module Helper = struct
       type output = string [@@deriving yojson]
 
       (* This RPC remains unused, see below for the commented out
-      Close_stream usage *)
+         Close_stream usage *)
       let[@warning "-32"] name = "closeStream"
     end
 
@@ -364,7 +422,9 @@ module Helper = struct
         ; direct_peers: string list
         ; peer_exchange: bool
         ; gating_config: Set_gater_config.input
-        ; seed_peers: string list }
+        ; seed_peers: string list
+        ; max_connections: int
+        ; validation_queue_size: int }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -553,8 +613,8 @@ module Helper = struct
           match who_closed with
           | `Us ->
               (* FIXME related to https://github.com/libp2p/go-libp2p-circuit/issues/18
-                 "preemptive" or half-closing a stream doesn't actually seem supported:
-                 after closing it we can't read anymore.*)
+                "preemptive" or half-closing a stream doesn't actually seem supported:
+                after closing it we can't read anymore.*)
               (*
               match%map
                 do_rpc net (module Rpcs.Close_stream) {stream_idx= stream.idx}
@@ -616,11 +676,11 @@ module Helper = struct
 
   (** Track a new stream.
 
-    This is used for both newly created outbound streams and incoming streams, and
-    spawns the task that sends outbound messages to the helper.
+      This is used for both newly created outbound streams and incoming streams, and
+      spawns the task that sends outbound messages to the helper.
 
-    Our writing end of the stream will be automatically be closed once the
-    write pipe is closed.
+      Our writing end of the stream will be automatically be closed once the
+      write pipe is closed.
   *)
   let make_stream net idx protocol remote_peer_info =
     let incoming_r, incoming_w = Pipe.create () in
@@ -701,7 +761,7 @@ module Helper = struct
 
   (** Parses an "upcall" and performs it.
 
-    An upcall is like an RPC from the helper to us.*)
+      An upcall is like an RPC from the helper to us.*)
 
   module Upcall = struct
     module Publish = struct
@@ -717,6 +777,7 @@ module Helper = struct
       type t =
         { sender: peer_info option
         ; data: Data.t
+        ; expiration: int64
         ; seqno: int
         ; upcall: string
         ; subscription_idx: int }
@@ -743,9 +804,8 @@ module Helper = struct
       [@@deriving yojson]
     end
 
-    module Discovered_peer = struct
-      type t = {upcall: string; peer_id: string; multiaddrs: string list}
-      [@@deriving yojson]
+    module Peer_connected = struct
+      type t = {upcall: string; peer_id: string} [@@deriving yojson]
     end
 
     let or_error (t : ('a, string) Result.t) =
@@ -796,11 +856,11 @@ module Helper = struct
         (*if
           Option.fold m.sender ~init:false ~f:(fun _ sender ->
               Peer.Id.equal sender.peer_id me.peer_id )
-        then (
+          then (
           [%log trace]
             "not handling published message originated from me";
           (* elide messages that we sent *) return () )
-        else*)
+          else*)
         let idx = m.subscription_idx in
         let data = m.data in
         match Hashtbl.find t.subscriptions idx with
@@ -811,9 +871,9 @@ module Helper = struct
               match decoded with
               | Ok data ->
                   (* TAKE CARE: doing anything with the return
-                          value here except ignore is UNSOUND because
-                          write_pipe has a cast type. We don't remember
-                          what the original 'return was. *)
+                      value here except ignore is UNSOUND because
+                      write_pipe has a cast type. We don't remember
+                      what the original 'return was. *)
                   if Strict_pipe.Writer.is_closed sub.write_pipe then
                     [%log' error t.logger]
                       "subscription writer for $topic unexpectedly closed. \
@@ -858,10 +918,20 @@ module Helper = struct
             (let open Deferred.Let_syntax in
             let raw_data = Data.to_string m.data in
             let decoded = sub.decode raw_data in
-            let%bind action =
+            let%bind action_opt =
               match decoded with
               | Ok data ->
-                  sub.validator (wrap m.sender data)
+                  let expiration_time =
+                    Int63.of_int64_exn m.expiration
+                    |> Time_ns.Span.of_int63_ns |> Time_ns.of_span_since_epoch
+                  in
+                  let validation_callback =
+                    Validation_callback.create expiration_time
+                  in
+                  let%bind () =
+                    sub.validator (wrap m.sender data) validation_callback
+                  in
+                  Validation_callback.await validation_callback
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -875,31 +945,38 @@ module Helper = struct
                       [ ("topic", `String sub.topic)
                       ; ("idx", `Int idx)
                       ; ("error", Error_json.error_to_yojson e) ] ;
-                  return `Reject
+                  return (Some `Reject)
             in
-            match%map
-              do_rpc t
-                (module Rpcs.Validation_complete)
-                { seqno
-                ; is_valid=
-                    ( match action with
-                    | `Accept ->
-                        "accept"
-                    | `Reject ->
-                        "reject"
-                    | `Ignore ->
-                        "ignore" ) }
-            with
-            | Ok "validationComplete success" ->
-                ()
-            | Ok v ->
-                failwithf
-                  "helper broke RPC protocol: validationComplete got %s" v ()
-            | Error e ->
-                [%log' error t.logger]
-                  "error during validationComplete, ignoring and continuing: \
-                   $error"
-                  ~metadata:[("error", Error_json.error_to_yojson e)])
+            match action_opt with
+            | None ->
+                [%log' warn t.logger]
+                  "validation callback timed out before we could respond" ;
+                Deferred.unit
+            | Some action -> (
+                match%map
+                  do_rpc t
+                    (module Rpcs.Validation_complete)
+                    { seqno
+                    ; is_valid=
+                        ( match action with
+                        | `Accept ->
+                            "accept"
+                        | `Reject ->
+                            "reject"
+                        | `Ignore ->
+                            "ignore" ) }
+                with
+                | Ok "validationComplete success" ->
+                    ()
+                | Ok v ->
+                    failwithf
+                      "helper broke RPC protocol: validationComplete got %s" v
+                      ()
+                | Error e ->
+                    [%log' error t.logger]
+                      "error during validationComplete, ignoring and \
+                       continuing: $error"
+                      ~metadata:[("error", Error_json.error_to_yojson e)] ))
             |> don't_wait_for ;
             Ok ()
         | None ->
@@ -919,9 +996,9 @@ module Helper = struct
               don't_wait_for
                 (let open Deferred.Let_syntax in
                 (* Call the protocol handler. If it throws an exception,
-                   handle it according to [on_handler_error]. Mimics
+                  handle it according to [on_handler_error]. Mimics
                   [Tcp.Server.create]. See [handle_protocol] doc comment.
-                *)
+               *)
                 match%map
                   Monitor.try_with ~extract_exn:true (fun () -> ph.f stream)
                 with
@@ -946,17 +1023,17 @@ module Helper = struct
               Ok () )
             else
               (* silently ignore new streams for closed protocol handlers.
-                 these are buffered stream open RPCs that were enqueued before
-                 our close went into effect. *)
+               these are buffered stream open RPCs that were enqueued before
+               our close went into effect. *)
               (* TODO: we leak the new pipes here*)
               Ok ()
         | None ->
             (* TODO: punish *)
             Or_error.errorf "incoming stream for protocol we don't know about?"
         )
-    | "discoveredPeer" ->
-        let%map p = Discovered_peer.of_yojson v |> or_error in
-        Option.iter t.new_peer_callback ~f:(fun cb -> cb p.peer_id p.multiaddrs)
+    | "peerConnected" ->
+        let%map p = Peer_connected.of_yojson v |> or_error in
+        Option.iter t.peer_connected_callback ~f:(fun cb -> cb p.peer_id)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -991,8 +1068,8 @@ module Helper = struct
     | s ->
         Or_error.errorf "unknown upcall %s" s
 end [@(* Warning 30 is about field labels being defined in multiple types.
-     It means more disambiguation has to happen sometimes but it doesn't
-     seem to be a big deal. *)
+         It means more disambiguation has to happen sometimes but it doesn't
+         seem to be a big deal. *)
       warning
       "-30"]
 
@@ -1080,7 +1157,8 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: 'a Envelope.Incoming.t -> validation_result Deferred.t
+      ; validator:
+          'a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
           [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
@@ -1209,14 +1287,11 @@ let list_peers net =
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~metrics_port ~on_new_peer ~unsafe_no_trust_ip ~flooding ~direct_peers
-    ~peer_exchange ~seed_peers ~initial_gating_config =
-  net.Helper.new_peer_callback
-  <- Some
-       (fun peer_id peer_addrs ->
-         on_new_peer
-           { id= Peer.Id.unsafe_of_string peer_id
-           ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
+    ~metrics_port ~on_peer_connected ~unsafe_no_trust_ip ~flooding
+    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
+    ~max_connections ~validation_queue_size =
+  net.Helper.peer_connected_callback
+  <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1231,6 +1306,8 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
+      ; max_connections
+      ; validation_queue_size
       ; gating_config=
           Helper.gating_config_to_helper_format initial_gating_config }
   with
@@ -1260,7 +1337,7 @@ let listening_addrs net =
       Error e
 
 (** TODO: graceful shutdown. Reset all our streams, sync the databases, then
-shutdown. Replace kill invocation with an RPC. *)
+    shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
   net.finished <- true ;
   Deferred.ignore (Child_processes.kill net.subprocess)
@@ -1272,8 +1349,8 @@ module Stream = struct
 
   let reset ({net; idx; _} : t) =
     (* NOTE: do not close the pipes here. Reset_stream should end up
-    notifying us that streamReadComplete. We can reset the stream (telling
-    the remote peer to stop writing) and still be sending data ourselves. *)
+       notifying us that streamReadComplete. We can reset the stream (telling
+       the remote peer to stop writing) and still be sending data ourselves. *)
     match%map Helper.do_rpc net (module Helper.Rpcs.Reset_stream) {idx} with
     | Ok "resetStream success" ->
         Ok ()
@@ -1462,7 +1539,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
-        ; new_peer_callback= None
+        ; peer_connected_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
         ; seqno= 1
         ; finished= false }
@@ -1533,6 +1610,7 @@ let%test_module "coda network tests" =
     let setup_two_nodes network_id =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
+      let%bind c_tmp = Unix.mkdtemp "p2p_helper_test_c" in
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
@@ -1549,48 +1627,152 @@ let%test_module "coda network tests" =
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
       in
+      let%bind c =
+        create
+          ~logger:(Logger.extend logger [("name", `String "c")])
+          ~conf_dir:c_tmp
+          ~on_unexpected_termination:(fun () ->
+            raise Child_processes.Child_died )
+        >>| Or_error.ok_exn
+      in
       let%bind kp_a = Keypair.random a in
-      let%bind kp_b = Keypair.random a in
+      let%bind kp_b = Keypair.random b in
+      let%bind kp_c = Keypair.random c in
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true
-          ~initial_gating_config:
-            {trusted_peers= []; banned_peers= []; isolate= false}
-        >>| Or_error.ok_exn
-      and () =
-        configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_new_peer:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true
+          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
         >>| Or_error.ok_exn
       in
-      let%bind a_advert = begin_advertising a
-      and b_advert = begin_advertising b in
-      Or_error.ok_exn a_advert ;
+      let%bind raw_seed_peers = listening_addrs a >>| Or_error.ok_exn in
+      let seed_peer =
+        Printf.sprintf "%s/p2p/%s"
+          (List.hd_exn raw_seed_peers)
+          (Keypair.to_peer_id kp_a)
+      in
+      [%log error] ~metadata:[("peer", `String seed_peer)] "Seed_peer: $peer" ;
+      let%bind () =
+        configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
+          ~initial_gating_config:
+            {trusted_peers= []; banned_peers= []; isolate= false}
+        >>| Or_error.ok_exn
+      and () =
+        configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
+          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
+          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore ~flooding:false
+          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~validation_queue_size:150
+          ~initial_gating_config:
+            {trusted_peers= []; banned_peers= []; isolate= false}
+        >>| Or_error.ok_exn
+      in
+      let%bind b_advert = begin_advertising b in
       Or_error.ok_exn b_advert ;
+      let%bind c_advert = begin_advertising c in
+      Or_error.ok_exn c_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
       let%map () = after (Time.Span.of_sec 2.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
+        let%bind () = shutdown c in
         let%bind () = File_system.remove_dir a_tmp in
-        File_system.remove_dir b_tmp
+        let%bind () = File_system.remove_dir b_tmp in
+        File_system.remove_dir c_tmp
       in
-      (a, b, shutdown)
+      (b, c, shutdown)
 
-    let%test_unit "stream" =
+    (*
+    let%test_unit "does_b_see_c" =
+      let () = Core.Backtrace.elide := false in
+      ignore testmsg ;
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a, b, shutdown = setup_two_nodes "test_stream" in
-        let%bind a_peerid = me a >>| Keypair.to_peer_id in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peers = peers b in
+        let%bind c_peerid = me c >>| Keypair.to_peer_id in
+        assert (
+          b_peers
+          |> List.map ~f:(fun p -> p.Peer.peer_id)
+          |> fun l -> List.mem l c_peerid ~equal:Peer.Id.equal ) ;
+        let%bind c_peers = peers c in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        assert (
+          c_peers
+          |> List.map ~f:(fun p -> p.Peer.peer_id)
+          |> fun l -> List.mem l b_peerid ~equal:Peer.Id.equal ) ;
+        shutdown ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    let%test_unit "b_stream_c" =
+      let () = Core.Backtrace.elide := false in
+      ignore testmsg ;
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
+        let handler_finished = ref false in
+        let%bind _echo_handler =
+          handle_protocol b ~on_handler_error:`Raise ~protocol:"read_bytes"
+            (fun stream ->
+              let r, w = Stream.pipes stream in
+              let rec go i =
+                if i = 0 then return ()
+                else
+                  let%bind _s =
+                    match%map Pipe.read' ~max_queue_length:1 r with
+                    | `Eof ->
+                        failwith "Eof"
+                    | `Ok q ->
+                        Base.Queue.peek_exn q
+                  in
+                  go (i - 1)
+              in
+              let%map () = go 1000 in
+              Pipe.write_without_pushback w "done" ;
+              Pipe.close w ;
+              handler_finished := true )
+          |> Deferred.Or_error.ok_exn
+        in
+        let%bind stream =
+          open_stream c ~protocol:"read_bytes" b_peerid >>| Or_error.ok_exn
+        in
+        let r, w = Stream.pipes stream in
+        for i = 0 to 999 do
+          Pipe.write_without_pushback w (Printf.sprintf "%d" i)
+        done ;
+        Pipe.close w ;
+        (* HACK: let our messages send before we reset.
+           It would be more principled to add flushing to
+           the stream interface. *)
+        let%bind () = after (Time.Span.of_sec 5.) in
+        let%bind _ = Stream.reset stream in
+        let%bind _msgs = Pipe.read_all r in
+        assert !handler_finished ;
+        shutdown ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+  *)
+
+    let%test_unit "stream" =
+      let () = Core.Backtrace.elide := false in
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind b, c, shutdown = setup_two_nodes "test_stream" in
+        let%bind b_peerid = me b >>| Keypair.to_peer_id in
         let handler_finished = ref false in
         let%bind echo_handler =
-          handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
+          handle_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
@@ -1599,14 +1781,14 @@ let%test_module "coda network tests" =
           |> Deferred.Or_error.ok_exn
         in
         let%bind stream =
-          open_stream b ~protocol:"echo" a_peerid >>| Or_error.ok_exn
+          open_stream c ~protocol:"echo" b_peerid >>| Or_error.ok_exn
         in
         let r, w = Stream.pipes stream in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
-          It would be more principled to add flushing to
-          the stream interface. *)
+           It would be more principled to add flushing to
+           the stream interface. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let%bind _ = Stream.reset stream in
         let%bind msg = Pipe.read_all r in
@@ -1616,64 +1798,65 @@ let%test_module "coda network tests" =
         assert (msg = testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in
-        shutdown ()
+        let%map () = shutdown () in
+        ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
     (* NOTE: these tests are not relevant in the current libp2p setup
              due to how validation is implemented (see #4796)
 
-    let unwrap_eof = function
-      | `Eof ->
+       let unwrap_eof = function
+       | `Eof ->
           failwith "unexpected EOF"
-      | `Ok a ->
+       | `Ok a ->
           Envelope.Incoming.data a
 
-    module type Pubsub_config = sig
-      type msg [@@deriving equal, compare, sexp, bin_io]
+       module type Pubsub_config = sig
+       type msg [@@deriving equal, compare, sexp, bin_io]
 
-      val subscribe :
+       val subscribe :
         net -> string -> msg Pubsub.Subscription.t Deferred.Or_error.t
 
-      val a_sent : msg
+       val a_sent : msg
 
-      val b_sent : msg
-    end
+       val b_sent : msg
+       end
 
-    let make_pubsub_test name (module M : Pubsub_config) =
-      let open Deferred.Let_syntax in
-      let%bind a, b, shutdown = setup_two_nodes ("test_pubsub_" ^ name) in
-      let%bind a_sub = M.subscribe a "test" |> Deferred.Or_error.ok_exn in
-      let%bind b_sub = M.subscribe b "test" |> Deferred.Or_error.ok_exn in
-      let%bind a_peers = peers a in
-      let%bind b_peers = peers b in
-      [%log fatal] "a peers = $apeers, b peers = $bpeers"
+       let make_pubsub_test name (module M : Pubsub_config) =
+       let open Deferred.Let_syntax in
+       let%bind a, b, shutdown = setup_two_nodes ("test_pubsub_" ^ name) in
+       let%bind a_sub = M.subscribe a "test" |> Deferred.Or_error.ok_exn in
+       let%bind b_sub = M.subscribe b "test" |> Deferred.Or_error.ok_exn in
+       let%bind a_peers = peers a in
+       let%bind b_peers = peers b in
+       [%log fatal] "a peers = $apeers, b peers = $bpeers"
         ~metadata:
           [ ("apeers", `List (List.map ~f:Peer.to_yojson a_peers))
           ; ("bpeers", `List (List.map ~f:Peer.to_yojson b_peers)) ] ;
-      let a_r = Pubsub.Subscription.message_pipe a_sub in
-      let b_r = Pubsub.Subscription.message_pipe b_sub in
-      (* Give the subscriptions time to propagate *)
-      let%bind () = after (sec 2.) in
-      let%bind () = Pubsub.Subscription.publish a_sub M.a_sent in
-      (* Give the publish time to propagate *)
-      let%bind () = after (sec 2.) in
-      let%bind a_recv = Strict_pipe.Reader.read a_r in
-      let%bind b_recv = Strict_pipe.Reader.read b_r in
-      [%test_eq: M.msg] M.a_sent (unwrap_eof a_recv) ;
-      [%test_eq: M.msg] M.a_sent (unwrap_eof b_recv) ;
-      let%bind () = Pubsub.Subscription.publish b_sub M.b_sent in
-      let%bind () = after (sec 2.) in
-      let%bind a_recv = Strict_pipe.Reader.read a_r in
-      let%bind b_recv = Strict_pipe.Reader.read b_r in
-      [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
-      [%test_eq: M.msg] M.b_sent (unwrap_eof b_recv) ;
-      shutdown ()
+       let a_r = Pubsub.Subscription.message_pipe a_sub in
+       let b_r = Pubsub.Subscription.message_pipe b_sub in
+       (* Give the subscriptions time to propagate *)
+       let%bind () = after (sec 2.) in
+       let%bind () = Pubsub.Subscription.publish a_sub M.a_sent in
+       (* Give the publish time to propagate *)
+       let%bind () = after (sec 2.) in
+       let%bind a_recv = Strict_pipe.Reader.read a_r in
+       let%bind b_recv = Strict_pipe.Reader.read b_r in
+       [%test_eq: M.msg] M.a_sent (unwrap_eof a_recv) ;
+       [%test_eq: M.msg] M.a_sent (unwrap_eof b_recv) ;
+       let%bind () = Pubsub.Subscription.publish b_sub M.b_sent in
+       let%bind () = after (sec 2.) in
+       let%bind a_recv = Strict_pipe.Reader.read a_r in
+       let%bind b_recv = Strict_pipe.Reader.read b_r in
+       [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
+       [%test_eq: M.msg] M.b_sent (unwrap_eof b_recv) ;
+       shutdown ()
 
-    let should_forward_message _ = return true
+       let should_forward_message _ = return true
 
-    let%test_unit "pubsub_raw" =
-      let test_def =
+       let%test_unit "pubsub_raw" =
+       let test_def =
         make_pubsub_test "raw"
           ( module struct
             type msg = string [@@deriving equal, compare, sexp, bin_io]
@@ -1685,11 +1868,11 @@ let%test_module "coda network tests" =
 
             let b_sent = "msg from b"
           end )
-      in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+       in
+       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
-    let%test_unit "pubsub_bin_prot" =
-      let test_def =
+       let%test_unit "pubsub_bin_prot" =
+       let test_def =
         make_pubsub_test "bin_prot"
           ( module struct
             type msg = {a: int; b: string option}
@@ -1703,7 +1886,7 @@ let%test_module "coda network tests" =
 
             let b_sent = {a= 1; b= Some "foo"}
           end )
-      in
-      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+       in
+       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
     *)
   end )

@@ -2,7 +2,7 @@ open Core
 open Async
 open Signature_lib
 open Coda_numbers
-open Coda_base
+open Mina_base
 open Coda_state
 
 (** For status *)
@@ -10,14 +10,14 @@ let txn_count = ref 0
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
-  let%map ledger = Coda_lib.best_ledger t in
+  let%map ledger = Mina_lib.best_ledger t in
   let open Option.Let_syntax in
   let%bind loc = Ledger.location_of_account ledger addr in
   Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
-  let%map ledger = Coda_lib.best_ledger t in
+  let%map ledger = Mina_lib.best_ledger t in
   Ledger.to_list ledger
 
 let string_of_public_key =
@@ -47,17 +47,17 @@ let get_balance t (addr : Account_id.t) =
   account.Account.Poly.balance
 
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
-  let config = Coda_lib.config t in
+  let config = Mina_lib.config t in
   let trust_system = config.trust_system in
   Trust_system.lookup_ip trust_system ip_address
 
 let get_trust_status_all t =
-  let config = Coda_lib.config t in
+  let config = Mina_lib.config t in
   let trust_system = config.trust_system in
   Trust_system.peer_statuses trust_system
 
 let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
-  let config = Coda_lib.config t in
+  let config = Mina_lib.config t in
   let trust_system = config.trust_system in
   Trust_system.reset_ip trust_system ip_address
 
@@ -66,11 +66,11 @@ let replace_block_production_keys keys pks =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
         let%map kps =
-          Coda_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
+          Mina_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
         in
         (kps, pk) )
   in
-  Coda_lib.replace_block_production_keypairs keys
+  Mina_lib.replace_block_production_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
@@ -80,7 +80,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Coda_lib.add_transactions t [user_command_input] in
+  let%map result = Mina_lib.add_transactions t [user_command_input] in
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [failed_txn]) ->
@@ -91,12 +91,12 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([Signed_command txn], []) ->
-      [%log' info (Coda_lib.top_level_logger t)]
+      [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
         "Scheduled payment $command" ;
       Ok txn
   | Ok (valid_commands, invalid_commands) ->
-      [%log' info (Coda_lib.top_level_logger t)]
+      [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:
           [ ( "valid_commands"
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
@@ -116,12 +116,12 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
-  let%map _is_active = Coda_lib.active_or_bootstrapping t in
-  [%log' warn (Coda_lib.top_level_logger t)]
+  let%map _is_active = Mina_lib.active_or_bootstrapping t in
+  [%log' warn (Mina_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
       [("coda_command", `String "scheduling a batch of user transactions")] ;
-  Coda_lib.add_transactions t user_command_list
+  Mina_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t
@@ -166,11 +166,12 @@ type active_state_fields =
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; state_hash: string option
-  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option }
+  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option
+  ; global_slot_since_genesis_best_tip: int option }
 
 let get_status ~flag t =
-  let open Coda_lib.Config in
-  let config = Coda_lib.config t in
+  let open Mina_lib.Config in
+  let config = Mina_lib.config t in
   let precomputed_values = config.precomputed_values in
   let protocol_constants = precomputed_values.genesis_constants.protocol in
   let constraint_constants = precomputed_values.constraint_constants in
@@ -181,7 +182,7 @@ let get_status ~flag t =
   in
   let commit_id = Coda_version.commit_id in
   let conf_dir = config.conf_dir in
-  let%map peers = Coda_lib.peers t in
+  let%map peers = Mina_lib.peers t in
   let peers =
     List.map peers ~f:(fun peer ->
         Network_peer.Peer.to_discovery_host_and_port peer
@@ -190,16 +191,20 @@ let get_status ~flag t =
   let user_commands_sent = !txn_count in
   let snark_worker =
     Option.map
-      (Coda_lib.snark_worker_key t)
+      (Mina_lib.snark_worker_key t)
       ~f:Public_key.Compressed.to_base58_check
   in
-  let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
-  let block_production_keys = Coda_lib.block_production_pubkeys t in
+  let snark_work_fee = Currency.Fee.to_int @@ Mina_lib.snark_work_fee t in
+  let block_production_keys = Mina_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
   let time_controller = config.time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
-      (Block_time.now time_controller)
+    try
+      Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
+        (Block_time.now time_controller)
+    with Invalid_argument _ ->
+      (*setting 0 for the time before genesis timestamp*)
+      Consensus.Data.Consensus_time.zero ~constants:consensus_constants
   in
   let consensus_configuration =
     Consensus.Configuration.t ~constraint_constants ~protocol_constants
@@ -245,16 +250,16 @@ let get_status ~flag t =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
     @@ Coda_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
-         (Coda_lib.most_recent_valid_transition t)
+         (Mina_lib.most_recent_valid_transition t)
   in
   let active_status () =
     let open Participating_state.Let_syntax in
-    let%bind ledger = Coda_lib.best_ledger t in
+    let%bind ledger = Mina_lib.best_ledger t in
     let ledger_merkle_root =
       Ledger.merkle_root ledger |> Ledger_hash.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
-    let%bind state = Coda_lib.best_protocol_state t in
+    let%bind state = Mina_lib.best_protocol_state t in
     let state_hash = Protocol_state.hash state |> State_hash.to_base58_check in
     let consensus_state = state |> Protocol_state.consensus_state in
     let blockchain_length =
@@ -264,7 +269,7 @@ let get_status ~flag t =
     let%map sync_status =
       Coda_incremental.Status.stabilize () ;
       match
-        Coda_incremental.Status.Observer.value_exn @@ Coda_lib.sync_status t
+        Coda_incremental.Status.Observer.value_exn @@ Mina_lib.sync_status t
       with
       | `Bootstrap ->
           `Bootstrapping
@@ -282,19 +287,26 @@ let get_status ~flag t =
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.consensus_time consensus_state
     in
+    let global_slot_since_genesis =
+      Coda_numbers.Global_slot.to_int
+      @@ Consensus.Data.Consensus_state.global_slot_since_genesis
+           consensus_state
+    in
     ( sync_status
     , { num_accounts= Some num_accounts
       ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
       ; state_hash= Some state_hash
-      ; consensus_time_best_tip= Some consensus_time_best_tip } )
+      ; consensus_time_best_tip= Some consensus_time_best_tip
+      ; global_slot_since_genesis_best_tip= Some global_slot_since_genesis } )
   in
   let ( sync_status
       , { num_accounts
         ; blockchain_length
         ; ledger_merkle_root
         ; state_hash
-        ; consensus_time_best_tip } ) =
+        ; consensus_time_best_tip
+        ; global_slot_since_genesis_best_tip } ) =
     match active_status () with
     | `Active result ->
         result
@@ -304,14 +316,15 @@ let get_status ~flag t =
           ; blockchain_length= None
           ; ledger_merkle_root= None
           ; state_hash= None
-          ; consensus_time_best_tip= None } )
+          ; consensus_time_best_tip= None
+          ; global_slot_since_genesis_best_tip= None } )
   in
   let next_block_production =
     let open Block_time in
-    Option.map (Coda_lib.next_producer_timing t) ~f:(function
+    Option.map (Mina_lib.next_producer_timing t) ~f:(function
       | `Produce_now _ ->
           `Produce_now
-      | `Produce (time, _, _, _) ->
+      | `Produce (time, _, _) ->
           `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
@@ -328,6 +341,7 @@ let get_status ~flag t =
   ; state_hash
   ; chain_id= config.chain_id
   ; consensus_time_best_tip
+  ; global_slot_since_genesis_best_tip
   ; commit_id
   ; conf_dir
   ; peers
@@ -348,35 +362,17 @@ let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
 module Subscriptions = struct
   let new_block t public_key =
-    let subscription = Coda_lib.subscription t in
-    Coda_lib.Subscriptions.add_block_subscriber subscription public_key
+    let subscription = Mina_lib.subscription t in
+    Mina_lib.Subscriptions.add_block_subscriber subscription public_key
 
   let reorganization t =
-    let subscription = Coda_lib.subscription t in
-    Coda_lib.Subscriptions.add_reorganization_subscriber subscription
+    let subscription = Mina_lib.subscription t in
+    Mina_lib.Subscriptions.add_reorganization_subscriber subscription
 end
 
 module For_tests = struct
-  let get_all_commands coda public_key =
-    let account_id = Account_id.create public_key Token_id.default in
-    let external_transition_database =
-      Coda_lib.external_transition_database coda
-    in
-    let commands =
-      List.concat_map ~f:(fun transition ->
-          transition |> With_hash.data
-          |> Auxiliary_database.Filtered_external_transition.commands
-          |> List.map ~f:With_hash.data )
-      @@ Auxiliary_database.External_transition_database.get_all_values
-           external_transition_database (Some account_id)
-    in
-    let participants_commands =
-      User_command.filter_by_participant commands public_key
-    in
-    List.dedup_and_sort participants_commands ~compare:User_command.compare
-
   module Subscriptions = struct
     let new_user_commands coda public_key =
-      Coda_lib.add_payment_subscriber coda public_key
+      Mina_lib.add_payment_subscriber coda public_key
   end
 end

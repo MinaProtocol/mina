@@ -5,3 +5,5 @@ healthcheck:
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
+nodeSelector:
+  preemptible: false

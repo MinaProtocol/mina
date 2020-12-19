@@ -6,7 +6,7 @@
 open Async_kernel
 open Core_kernel
 open Signature_lib
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Network_peer
@@ -24,6 +24,7 @@ val create :
      validated_transition:External_transition.Validated.t
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
+  -> transition_receipt_time:Time.t option
   -> t
 
 val build :
@@ -35,6 +36,7 @@ val build :
   -> parent:t
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
+  -> transition_receipt_time:Time.t option
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
@@ -49,6 +51,8 @@ val staged_ledger : t -> Staged_ledger.t
 
 val just_emitted_a_proof : t -> bool
 
+val transition_receipt_time : t -> Time.t option
+
 val hash : t -> int
 
 val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
@@ -56,6 +60,9 @@ val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
 val protocol_state : t -> Coda_state.Protocol_state.Value.t
 
 val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
+val consensus_state_with_hash :
+  t -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
 val blockchain_length : t -> Unsigned.UInt32.t
 

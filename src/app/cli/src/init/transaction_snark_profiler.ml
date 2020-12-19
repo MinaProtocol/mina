@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 
 let name = "transaction-snark-profiler"
 
@@ -298,7 +298,7 @@ let generate_base_snarks_witness sparse_ledger0
 let run profiler num_transactions repeats preeval =
   let ledger, transactions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
+    Mina_base.Sparse_ledger.of_ledger_subset_exn ledger
       ( fst
       @@ List.fold
            ~init:([], Ledger.next_available_token ledger)

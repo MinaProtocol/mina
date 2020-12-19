@@ -1,6 +1,6 @@
 open Core_kernel
 open Pipe_lib
-open Coda_base
+open Mina_base
 
 module State : sig
   module Stable : sig

@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 [%%versioned:
 module Stable : sig

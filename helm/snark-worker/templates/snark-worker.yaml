@@ -16,7 +16,7 @@ spec:
         app: {{tpl .Values.worker.fullname .}}
         testnet: {{ .Values.testnetName }}
         role: snark-worker
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '10000'
@@ -37,4 +37,5 @@ spec:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
+{{- include "nodeSelector.preemptible" .Values | indent 6 }}
 {{ end }}

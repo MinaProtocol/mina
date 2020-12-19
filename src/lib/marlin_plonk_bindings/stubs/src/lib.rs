@@ -1,5 +1,7 @@
 extern crate libc;
 
+/* Caml pointers */
+pub mod caml_pointer;
 /* Bigints */
 pub mod bigint_256;
 pub mod bigint_384;

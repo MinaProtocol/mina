@@ -11,7 +11,7 @@ open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
+open Mina_base
 open Coda_state
 open Cache_lib
 open O1trace
@@ -74,7 +74,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
              transition_time)
       in
-      Coda_metrics.Block_latency.Inclusion_time.update
+      Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
@@ -86,6 +86,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     ~transition:cached_initially_validated_transition ~precomputed_values =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
+  in
+  let transition_receipt_time =
+    Some
+      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
   in
   let sender =
     Envelope.Incoming.sender enveloped_initially_validated_transition
@@ -175,8 +179,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb
+            ~verifier ~trust_system ~transition_receipt_time
+            ~sender:(Some sender) ~parent:parent_breadcrumb
             ~transition:
               mostly_validated_transition (* TODO: Can we skip here? *)
             ~skip_staged_ledger_verification:false () )
@@ -206,7 +210,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Ok breadcrumb ->
               Deferred.return (Ok breadcrumb) )
     in
-    Coda_metrics.(
+    Mina_metrics.(
       Counter.inc_one
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
@@ -262,13 +266,13 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
   ignore
     (Reader.Merge.iter
        (* It is fine to skip the cache layer on blocks produced by this node
-        * because it is extradornarily unlikely we would write an internal bug
+        * because it is extraordinarily unlikely we would write an internal bug
         * triggering this case, and the external case (where we received an
         * identical external transition from the network) can happen iff there
         * is another node with the exact same private key and view of the
         * transaction pool. *)
        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.inc_one
                  Transition_frontier_controller.transitions_being_processed) ;
              `Local_breadcrumb (Cached.pure breadcrumb) )
@@ -344,7 +348,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        in
                        ()
                  in
-                 Coda_metrics.(
+                 Mina_metrics.(
                    Gauge.dec_one
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->

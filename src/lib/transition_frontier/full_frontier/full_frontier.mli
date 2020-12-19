@@ -9,7 +9,7 @@
  *  externally available [Transition_frontier] module.
  *)
 
-open Coda_base
+open Mina_base
 open Frontier_base
 open Coda_state
 
@@ -34,7 +34,7 @@ val create :
   -> precomputed_values:Precomputed_values.t
   -> t
 
-val close : t -> unit
+val close : loc:string -> t -> unit
 
 val root_data : t -> Root_data.t
 
@@ -47,6 +47,7 @@ val apply_diffs :
      t
   -> Diff.Full.E.t list
   -> enable_epoch_ledger_sync:[`Enabled of Ledger.Db.t | `Disabled]
+  -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 

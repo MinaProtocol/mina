@@ -7,6 +7,7 @@
  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
  (libraries
    digestif
+   coda_version
    zexe_backend
    random_oracle_input
    pickles_base
@@ -23,4 +24,5 @@
    snarky_curve
    snarky.backendless
    key_cache
-   core_kernel))
+   core_kernel
+   snark_keys_header))

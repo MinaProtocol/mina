@@ -77,7 +77,7 @@ echo "========================= STARTING DAEMON ==========================="
 
 
 # wait for it to settle
-sleep 3
+sleep 4
 
 # rosetta
 echo "========================= STARTING ROSETTA API on PORT 3087 ==========================="

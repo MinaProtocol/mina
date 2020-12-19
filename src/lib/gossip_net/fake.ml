@@ -17,7 +17,7 @@ module type S = sig
     network -> Peer.t -> Rpc_intf.rpc_handler list -> t Deferred.t
 end
 
-module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Intf
   open Rpc_intf
@@ -26,12 +26,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     type rpc_hook =
       { hook:
           'q 'r.    Peer.Id.t -> ('q, 'r) rpc -> 'q
-          -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
+          -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t }
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t
-            * (Coda_net2.validation_result -> unit)
+          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -84,7 +83,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
                     in
                     Strict_pipe.Writer.write intf.broadcast_message_writer
-                      (msg, Fn.const ()) ) ) )
+                      ( msg
+                      , Coda_net2.Validation_callback.create_without_expiration
+                          () ) ) ) )
 
     let call_rpc : type q r.
            t
@@ -93,7 +94,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         -> responder_id:Peer.Id.t
         -> (q, r) rpc
         -> q
-        -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
+        -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
      fun t peer_table ~sender_id ~responder_id rpc query ->
       let responder =
         Option.value_exn
@@ -105,7 +106,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       | Ok intf ->
           intf.rpc_hook.hook sender_id rpc query
       | Error e ->
-          Deferred.return (Coda_base.Rpc_intf.Failed_to_connect e)
+          Deferred.return (Mina_base.Rpc_intf.Failed_to_connect e)
   end
 
   module Instance = struct
@@ -117,12 +118,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; initial_peers: Peer.t list
       ; connection_gating: Coda_net2.connection_gating ref
       ; received_message_reader:
-          ( Message.msg Envelope.Incoming.t
-          * (Coda_net2.validation_result -> unit) )
+          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t
-            * (Coda_net2.validation_result -> unit)
+          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -134,7 +133,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
              Peer.Id.t
           -> (q, r) rpc
           -> q
-          -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
+          -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
        fun peer rpc query ->
         let (module Impl) = implementation_of_rpc rpc in
         let latest_version =
@@ -155,7 +154,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             failwith "fake gossip net error: rpc not implemented"
         | Some deferred ->
             let%map response = deferred in
-            Coda_base.Rpc_intf.Connected
+            Mina_base.Rpc_intf.Connected
               (Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender)
       in
       Network.{hook}
