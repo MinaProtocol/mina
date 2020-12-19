@@ -152,7 +152,9 @@ module Error = struct
 
   type not_found = [`Not_found of not_found_member]
 
-  type t = [not_found | `Invalid_version]
+  type raised = [`Raised of Error.t]
+
+  type t = [not_found | raised | `Invalid_version]
 
   let not_found_message (`Not_found member) =
     let member_name, member_id =
@@ -192,6 +194,8 @@ module Error = struct
         "invalid version"
     | `Not_found _ as err ->
         not_found_message err
+    | `Raised err ->
+        sprintf "Raised %s" (Error.to_string_hum err)
 end
 
 module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
@@ -219,61 +223,66 @@ let get db ~key ~error =
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
 let check t ~genesis_state_hash =
-  let check_version () =
-    match get_if_exists t.db ~key:Db_version ~default:0 with
-    | 0 ->
-        Error `Not_initialized
-    | v when v = version ->
-        Ok ()
-    | _ ->
-        Error `Invalid_version
-  in
-  (* checks the pointers, frontier hash, and checks pointer references *)
-  let check_base () =
-    let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
-    let root_hash = Root_data.Minimal.hash root in
-    let%bind best_tip =
-      get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
-    in
-    let%bind root_transition =
-      get t.db ~key:(Transition root_hash)
-        ~error:(`Corrupt (`Not_found `Root_transition))
-    in
-    let%bind _ =
-      get t.db ~key:Protocol_states_for_root_scan_state
-        ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
-    in
-    let%map _ =
-      get t.db ~key:(Transition best_tip)
-        ~error:(`Corrupt (`Not_found `Best_tip_transition))
-    in
-    (root_hash, root_transition)
-  in
-  let rec check_arcs pred_hash =
-    let%bind successors =
-      get t.db ~key:(Arcs pred_hash)
-        ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
-    in
-    List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
-        let%bind () = acc in
-        let%bind _ =
-          get t.db ~key:(Transition succ_hash)
-            ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+  Or_error.try_with (fun () ->
+      let check_version () =
+        match get_if_exists t.db ~key:Db_version ~default:0 with
+        | 0 ->
+            Error `Not_initialized
+        | v when v = version ->
+            Ok ()
+        | _ ->
+            Error `Invalid_version
+      in
+      (* checks the pointers, frontier hash, and checks pointer references *)
+      let check_base () =
+        let%bind root =
+          get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
         in
-        check_arcs succ_hash )
-  in
-  let%bind () = check_version () in
-  let%bind root_hash, root_transition = check_base () in
-  let%bind () =
-    let persisted_genesis_state_hash =
-      External_transition.protocol_state root_transition
-      |> Coda_state.Protocol_state.genesis_state_hash
-    in
-    if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
-      Ok ()
-    else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
-  in
-  check_arcs root_hash
+        let root_hash = Root_data.Minimal.hash root in
+        let%bind best_tip =
+          get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
+        in
+        let%bind root_transition =
+          get t.db ~key:(Transition root_hash)
+            ~error:(`Corrupt (`Not_found `Root_transition))
+        in
+        let%bind _ =
+          get t.db ~key:Protocol_states_for_root_scan_state
+            ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
+        in
+        let%map _ =
+          get t.db ~key:(Transition best_tip)
+            ~error:(`Corrupt (`Not_found `Best_tip_transition))
+        in
+        (root_hash, root_transition)
+      in
+      let rec check_arcs pred_hash =
+        let%bind successors =
+          get t.db ~key:(Arcs pred_hash)
+            ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
+        in
+        List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
+            let%bind () = acc in
+            let%bind _ =
+              get t.db ~key:(Transition succ_hash)
+                ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+            in
+            check_arcs succ_hash )
+      in
+      let%bind () = check_version () in
+      let%bind root_hash, root_transition = check_base () in
+      let%bind () =
+        let persisted_genesis_state_hash =
+          External_transition.protocol_state root_transition
+          |> Coda_state.Protocol_state.genesis_state_hash
+        in
+        if State_hash.equal persisted_genesis_state_hash genesis_state_hash
+        then Ok ()
+        else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
+      in
+      check_arcs root_hash )
+  |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
+  |> Result.join
 
 let initialize t ~root_data =
   let open Root_data.Limited in
