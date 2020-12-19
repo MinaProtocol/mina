@@ -7,4 +7,5 @@
    marlin_plonk_bindings_pasta_fp
    marlin_plonk_bindings_pasta_fq)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (inline_tests)
+ (preprocess (pps ppx_version ppx_inline_test)))

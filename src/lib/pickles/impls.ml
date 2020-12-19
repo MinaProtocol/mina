@@ -42,10 +42,6 @@ module Step = struct
           let lo = B.shift_right x 1 in
           (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi) )
 
-    let () =
-      Core.printf "step forb vals %d\n%!"
-        (List.length forbidden_shifted_values)
-
     let (typ_unchecked : (t, Constant.t) Typ.t), check =
       let t0 =
         Typ.transport
@@ -114,10 +110,6 @@ module Wrap = struct
       forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
         ~modulus:(Step.Impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
           Impl.Bigint.(to_field (of_bignum_bigint x)) )
-
-    let () =
-      Core.printf "wrap forb vals %d\n%!"
-        (List.length forbidden_shifted_values)
 
     let typ_unchecked, check =
       let t0 =
