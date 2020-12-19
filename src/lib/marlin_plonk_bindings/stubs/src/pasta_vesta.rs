@@ -1,161 +1,92 @@
-use crate::pasta_fp::{CamlPastaFp, CamlPastaFpPtr};
-use crate::pasta_fq::{CamlPastaFq, CamlPastaFqPtr};
 use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
     pasta::{
         vesta::{Affine as GAffine, Projective as GProjective},
+        fp::Fp,
         fq::Fq,
     },
-    One, UniformRand, Zero,
+    One, UniformRand,
 };
 use rand::rngs::StdRng;
 
-use commitment_dlog::commitment::PolyComm;
-
-/* Projective representation is raw bytes on the OCaml heap. */
-
-pub struct CamlPastaVesta(pub GProjective);
-pub type CamlPastaVestaPtr = ocaml::Pointer<CamlPastaVesta>;
-
-ocaml::custom!(CamlPastaVesta);
-
 #[ocaml::func]
-pub fn caml_pasta_vesta_one() -> CamlPastaVesta {
-    CamlPastaVesta(GProjective::prime_subgroup_generator())
+pub fn caml_pasta_vesta_one() -> GProjective {
+    GProjective::prime_subgroup_generator()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_add(x: CamlPastaVestaPtr, y: CamlPastaVestaPtr) -> CamlPastaVesta {
-    CamlPastaVesta(x.as_ref().0 + y.as_ref().0)
+pub fn caml_pasta_vesta_add(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
+    (*x.as_ref()) + (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_sub(x: CamlPastaVestaPtr, y: CamlPastaVestaPtr) -> CamlPastaVesta {
-    CamlPastaVesta(x.as_ref().0 - y.as_ref().0)
+pub fn caml_pasta_vesta_sub(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
+    (*x.as_ref()) - (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_negate(x: CamlPastaVestaPtr) -> CamlPastaVesta {
-    CamlPastaVesta(-x.as_ref().0)
+pub fn caml_pasta_vesta_negate(x: ocaml::Pointer<GProjective>) -> GProjective {
+    -(*x.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_double(x: CamlPastaVestaPtr) -> CamlPastaVesta {
-    CamlPastaVesta(x.as_ref().0.double())
+pub fn caml_pasta_vesta_double(x: ocaml::Pointer<GProjective>) -> GProjective {
+    x.as_ref().double()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_scale(x: CamlPastaVestaPtr, y: CamlPastaFpPtr) -> CamlPastaVesta {
-    CamlPastaVesta(x.as_ref().0.mul(y.as_ref().0))
+pub fn caml_pasta_vesta_scale(x: ocaml::Pointer<GProjective>, y: Fp) -> GProjective {
+    x.as_ref().mul(y)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_random() -> CamlPastaVesta {
+pub fn caml_pasta_vesta_random() -> GProjective {
     let rng = &mut rand_core::OsRng;
-    CamlPastaVesta(UniformRand::rand(rng))
+    UniformRand::rand(rng)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_rng(i: ocaml::Int) -> CamlPastaVesta {
+pub fn caml_pasta_vesta_rng(i: ocaml::Int) -> GProjective {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    CamlPastaVesta(UniformRand::rand(&mut rng))
+    UniformRand::rand(&mut rng)
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_pasta_vesta_endo_base() -> CamlPastaFq {
+pub extern "C" fn caml_pasta_vesta_endo_base() -> Fq {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlPastaFq(endo_q)
+    endo_q
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_pasta_vesta_endo_scalar() -> CamlPastaFp {
+pub extern "C" fn caml_pasta_vesta_endo_scalar() -> Fp {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlPastaFp(endo_r)
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub enum CamlPastaVestaAffine<T> {
-    Infinity,
-    Finite((T, T)),
+    endo_r
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_to_affine(x: CamlPastaVestaPtr) -> CamlPastaVestaAffine<CamlPastaFq> {
-    x.as_ref().0.into_affine().into()
+pub fn caml_pasta_vesta_to_affine(x: ocaml::Pointer<GProjective>) -> GAffine {
+    x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_of_affine(x: CamlPastaVestaAffine<CamlPastaFqPtr>) -> CamlPastaVesta {
-    CamlPastaVesta(Into::<GAffine>::into(x).into_projective())
+pub fn caml_pasta_vesta_of_affine(x: GAffine) -> GProjective {
+    Into::<GAffine>::into(x).into_projective()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_of_affine_coordinates(
-    x: CamlPastaFqPtr,
-    y: CamlPastaFqPtr,
-) -> CamlPastaVesta {
-    CamlPastaVesta(GProjective::new(x.as_ref().0, y.as_ref().0, Fq::one()))
+pub fn caml_pasta_vesta_of_affine_coordinates(x: Fq, y: Fq) -> GProjective {
+    GProjective::new(x, y, Fq::one())
 }
 
-impl From<GAffine> for CamlPastaVestaAffine<CamlPastaFq> {
-    fn from(p: GAffine) -> Self {
-        if p.is_zero() {
-            CamlPastaVestaAffine::Infinity
-        } else {
-            CamlPastaVestaAffine::Finite((CamlPastaFq(p.x), CamlPastaFq(p.y)))
-        }
-    }
-}
-
-impl From<CamlPastaVestaAffine<CamlPastaFq>> for GAffine {
-    fn from(p: CamlPastaVestaAffine<CamlPastaFq>) -> Self {
-        match p {
-            CamlPastaVestaAffine::Infinity => GAffine::zero(),
-            CamlPastaVestaAffine::Finite((x, y)) => GAffine::new(x.0, y.0, false),
-        }
-    }
-}
-
-impl From<CamlPastaVestaAffine<CamlPastaFqPtr>> for GAffine {
-    fn from(p: CamlPastaVestaAffine<CamlPastaFqPtr>) -> Self {
-        match p {
-            CamlPastaVestaAffine::Infinity => GAffine::zero(),
-            CamlPastaVestaAffine::Finite((x, y)) => GAffine::new(x.as_ref().0, y.as_ref().0, false),
-        }
-    }
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlPastaVestaPolyComm<T> {
-    shifted: Option<CamlPastaVestaAffine<T>>,
-    unshifted: Vec<CamlPastaVestaAffine<CamlPastaFq>>,
-}
-
-impl From<PolyComm<GAffine>> for CamlPastaVestaPolyComm<CamlPastaFq> {
-    fn from(c: PolyComm<GAffine>) -> Self {
-        CamlPastaVestaPolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlPastaVestaPolyComm<CamlPastaFq>> for PolyComm<GAffine> {
-    fn from(c: CamlPastaVestaPolyComm<CamlPastaFq>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlPastaVestaPolyComm<CamlPastaFqPtr>> for PolyComm<GAffine> {
-    fn from(c: CamlPastaVestaPolyComm<CamlPastaFqPtr>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
+#[ocaml::func]
+pub fn caml_pasta_vesta_affine_deep_copy(x: GAffine) -> GAffine {
+    x
 }

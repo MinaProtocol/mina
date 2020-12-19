@@ -22,7 +22,6 @@ use std::{
 
 use crate::index_serialization;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
-use crate::pasta_fq::CamlPastaFq;
 use crate::pasta_fq_urs::CamlPastaFqUrs;
 
 pub struct CamlPastaFqPlonkGateVector(Vec<Gate<Fq>>);
@@ -45,13 +44,12 @@ pub fn caml_pasta_fq_plonk_gate_vector_create() -> CamlPastaFqPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_gate_vector_add(
     mut v: CamlPastaFqPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<CamlPastaFq>>,
+    gate: CamlPlonkGate<Vec<Fq>>,
 ) {
-    let c = gate.c.iter().map(|x| x.0).collect();
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c,
+        c: gate.c,
     });
 }
 
@@ -59,16 +57,14 @@ pub fn caml_pasta_fq_plonk_gate_vector_add(
 pub fn caml_pasta_fq_plonk_gate_vector_get(
     v: CamlPastaFqPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<CamlPastaFq>> {
-    ocaml::frame!((array_value) {
-        let gate = &(v.as_ref().0)[i as usize];
-        let c = gate.c.iter().map(|x| CamlPastaFq(*x)).collect();
-        CamlPlonkGate {
-            typ: (&gate.typ).into(),
-            wires: (&gate.wires).into(),
-            c,
-        }
-    })
+) -> CamlPlonkGate<Vec<Fq>> {
+    let gate = &(v.as_ref().0)[i as usize];
+    let c = gate.c.iter().map(|x| *x).collect();
+    CamlPlonkGate {
+        typ: (&gate.typ).into(),
+        wires: (&gate.wires).into(),
+        c,
+    }
 }
 
 #[ocaml::func]
@@ -163,8 +159,8 @@ pub fn caml_pasta_fq_plonk_index_create(
             .unwrap())?,
             Some(cs) => cs,
         };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -227,8 +223,8 @@ pub fn caml_pasta_fq_plonk_index_read(
         }
         None => (),
     };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.

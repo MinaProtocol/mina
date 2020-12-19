@@ -22,7 +22,6 @@ use std::{
 
 use crate::index_serialization;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
-use crate::pasta_fp::CamlPastaFp;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
 
 pub struct CamlPastaFpPlonkGateVector(Vec<Gate<Fp>>);
@@ -45,13 +44,12 @@ pub fn caml_pasta_fp_plonk_gate_vector_create() -> CamlPastaFpPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_gate_vector_add(
     mut v: CamlPastaFpPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<CamlPastaFp>>,
+    gate: CamlPlonkGate<Vec<Fp>>,
 ) {
-    let c = gate.c.iter().map(|x| x.0).collect();
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c,
+        c: gate.c,
     });
 }
 
@@ -59,9 +57,9 @@ pub fn caml_pasta_fp_plonk_gate_vector_add(
 pub fn caml_pasta_fp_plonk_gate_vector_get(
     v: CamlPastaFpPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<CamlPastaFp>> {
+) -> CamlPlonkGate<Vec<Fp>> {
     let gate = &(v.as_ref().0)[i as usize];
-    let c = gate.c.iter().map(|x| CamlPastaFp(*x)).collect();
+    let c = gate.c.iter().map(|x| *x).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
         wires: (&gate.wires).into(),
@@ -161,8 +159,8 @@ pub fn caml_pasta_fp_plonk_index_create(
             .unwrap())?,
             Some(cs) => cs,
         };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -225,8 +223,8 @@ pub fn caml_pasta_fp_plonk_index_read(
         }
         None => (),
     };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.

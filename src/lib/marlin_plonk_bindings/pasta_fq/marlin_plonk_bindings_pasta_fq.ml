@@ -67,3 +67,9 @@ external domain_generator : int -> t = "caml_pasta_fq_domain_generator"
 external to_bytes : t -> Bytes.t = "caml_pasta_fq_to_bytes"
 
 external of_bytes : Bytes.t -> t = "caml_pasta_fq_of_bytes"
+
+external deep_copy : t -> t = "caml_pasta_fq_deep_copy"
+
+let%test "deep_copy" =
+  let x = random () in
+  deep_copy x = x
