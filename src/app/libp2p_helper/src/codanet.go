@@ -183,7 +183,7 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(addr)
+	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(addr))
 
 	if !allow {
 		gs.logger.Infof("disallowing peer dial from: %v", id)
@@ -220,7 +220,7 @@ func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, add
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(remoteAddr)
+	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(remoteAddr))
 
 	if !allow {
 		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
