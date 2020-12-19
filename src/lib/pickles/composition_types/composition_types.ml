@@ -24,7 +24,14 @@ let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
       ; g15
       ; g16
       ; g17
-      ; g18 ] =
+      ; g18
+      ; g19
+      ; g20
+      ; g21
+      ; g22
+      ; g23
+      ; g24
+      ] =
     Plonk_verification_key_evals.to_hlist k
   in
   List.map
@@ -45,7 +52,14 @@ let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
     ; g15
     ; g16
     ; g17
-    ; g18 ]
+    ; g18
+    ; g19
+    ; g20
+    ; g21
+    ; g22
+    ; g23
+    ; g24
+    ]
     ~f:g
   |> Array.concat
 

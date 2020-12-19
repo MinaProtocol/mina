@@ -1,24 +1,17 @@
 use plonk_circuits::gate::{GateType, GateType::*};
-use plonk_circuits::wires::{Col, Col::*, Wire, Wires};
+use plonk_circuits::wires::{Wire, GateWires};
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub enum CamlPlonkGateType {
-    Zero,    // zero gate
-    Generic, // generic arithmetic gate
-
-    Poseidon, // Poseidon permutation gate
-
-    Add1, // Gate constraining EC addition in Affine form
-    Add2, // Gate constraining EC point abscissa distinctness
-
-    Vbmul1, // Gate constraining EC variable base scalar multiplication
-    Vbmul2, // Gate constraining EC variable base scalar multiplication
-    Vbmul3, // Gate constraining EC variable base scalar multiplication
-
-    Endomul1, // Gate constraining EC variable base scalar multiplication with group endomorphim optimization
-    Endomul2, // Gate constraining EC variable base scalar multiplication with group endomorphim optimization
-    Endomul3, // Gate constraining EC variable base scalar multiplication with group endomorphim optimization
-    Endomul4, // Gate constraining EC variable base scalar multiplication with group endomorphim optimization
+    Zero,       // zero gate
+    Generic,    // generic arithmetic gate
+    Poseidon,   // Poseidon permutation gate
+    Add,        // Gate constraining EC addition in Affine form
+    Double,     // Gate constraining EC point doubling in Affine form
+    Vbmul1,     // Gate constraining EC variable base scalar multiplication 
+    Vbmul2,     // Gate constraining unpacking EC variable base scalar multiplication 
+    Endomul,    // Gate constraining EC variable base scalar multiplication with group endomorphim optimization
+    Pack,       // Gate constraining packing
 }
 
 impl From<&GateType> for CamlPlonkGateType {
@@ -27,15 +20,12 @@ impl From<&GateType> for CamlPlonkGateType {
             Zero => CamlPlonkGateType::Zero,
             Generic => CamlPlonkGateType::Generic,
             Poseidon => CamlPlonkGateType::Poseidon,
-            Add1 => CamlPlonkGateType::Add1,
-            Add2 => CamlPlonkGateType::Add2,
+            Add => CamlPlonkGateType::Add,
+            Double => CamlPlonkGateType::Double,
             Vbmul1 => CamlPlonkGateType::Vbmul1,
             Vbmul2 => CamlPlonkGateType::Vbmul2,
-            Vbmul3 => CamlPlonkGateType::Vbmul3,
-            Endomul1 => CamlPlonkGateType::Endomul1,
-            Endomul2 => CamlPlonkGateType::Endomul2,
-            Endomul3 => CamlPlonkGateType::Endomul3,
-            Endomul4 => CamlPlonkGateType::Endomul4,
+            Endomul => CamlPlonkGateType::Endomul,
+            Pack => CamlPlonkGateType::Pack,
         }
     }
 }
@@ -51,15 +41,12 @@ impl From<&CamlPlonkGateType> for GateType {
             CamlPlonkGateType::Zero => Zero,
             CamlPlonkGateType::Generic => Generic,
             CamlPlonkGateType::Poseidon => Poseidon,
-            CamlPlonkGateType::Add1 => Add1,
-            CamlPlonkGateType::Add2 => Add2,
+            CamlPlonkGateType::Add => Add,
+            CamlPlonkGateType::Double => Double,
             CamlPlonkGateType::Vbmul1 => Vbmul1,
             CamlPlonkGateType::Vbmul2 => Vbmul2,
-            CamlPlonkGateType::Vbmul3 => Vbmul3,
-            CamlPlonkGateType::Endomul1 => Endomul1,
-            CamlPlonkGateType::Endomul2 => Endomul2,
-            CamlPlonkGateType::Endomul3 => Endomul3,
-            CamlPlonkGateType::Endomul4 => Endomul4,
+            CamlPlonkGateType::Endomul => Endomul,
+            CamlPlonkGateType::Pack => Pack,
         }
     }
 }
@@ -70,55 +57,16 @@ impl From<CamlPlonkGateType> for GateType {
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
-pub enum CamlPlonkCol {
-    L,
-    R,
-    O,
-}
-
-impl From<&Col> for CamlPlonkCol {
-    fn from(col: &Col) -> Self {
-        match col {
-            L => CamlPlonkCol::L,
-            R => CamlPlonkCol::R,
-            O => CamlPlonkCol::O,
-        }
-    }
-}
-
-impl From<Col> for CamlPlonkCol {
-    fn from(col: Col) -> Self {
-        Self::from(&col)
-    }
-}
-
-impl From<&CamlPlonkCol> for Col {
-    fn from(col: &CamlPlonkCol) -> Self {
-        match col {
-            CamlPlonkCol::L => L,
-            CamlPlonkCol::R => R,
-            CamlPlonkCol::O => O,
-        }
-    }
-}
-
-impl From<CamlPlonkCol> for Col {
-    fn from(col: CamlPlonkCol) -> Self {
-        Self::from(&col)
-    }
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPlonkWire {
-    pub row: ocaml::Int,   // wire row
-    pub col: CamlPlonkCol, // wire column
+    pub row: ocaml::Int,    // wire row
+    pub col: ocaml::Int,    // wire column
 }
 
 impl From<&Wire> for CamlPlonkWire {
     fn from(wire: &Wire) -> Self {
         CamlPlonkWire {
             row: wire.row as isize,
-            col: (&wire.col).into(),
+            col: wire.col as isize,
         }
     }
 }
@@ -132,7 +80,7 @@ impl From<&CamlPlonkWire> for Wire {
     fn from(wire: &CamlPlonkWire) -> Self {
         Wire {
             row: wire.row as usize,
-            col: (&wire.col).into(),
+            col: wire.col as usize,
         }
     }
 }
@@ -144,39 +92,43 @@ impl From<CamlPlonkWire> for Wire {
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPlonkWires {
-    pub row: ocaml::Int,  // gate wire row
-    pub l: CamlPlonkWire, // left input wire permutation
-    pub r: CamlPlonkWire, // right input wire permutation
-    pub o: CamlPlonkWire, // output input wire permutation
+    pub l: CamlPlonkWire,
+    pub r: CamlPlonkWire,
+    pub o: CamlPlonkWire,
+    pub q: CamlPlonkWire,
+    pub p: CamlPlonkWire,
 }
 
-impl From<&Wires> for CamlPlonkWires {
-    fn from(wires: &Wires) -> Self {
+impl From<&GateWires> for CamlPlonkWires {
+    fn from(wires: &GateWires) -> Self {
         CamlPlonkWires {
-            row: wires.row as isize,
-            l: (&wires.l).into(),
-            r: (&wires.r).into(),
-            o: (&wires.o).into(),
+            l: wires[0].into(),
+            r: wires[1].into(),
+            o: wires[2].into(),
+            q: wires[3].into(),
+            p: wires[4].into(),
         }
     }
 }
-impl From<Wires> for CamlPlonkWires {
-    fn from(wires: Wires) -> Self {
+impl From<GateWires> for CamlPlonkWires {
+    fn from(wires: GateWires) -> Self {
         Self::from(&wires)
     }
 }
 
-impl From<&CamlPlonkWires> for Wires {
+impl From<&CamlPlonkWires> for GateWires {
     fn from(wires: &CamlPlonkWires) -> Self {
-        Wires {
-            row: wires.row as usize,
-            l: (&wires.l).into(),
-            r: (&wires.r).into(),
-            o: (&wires.o).into(),
-        }
+        [
+            (&wires.l).into(),
+            (&wires.r).into(),
+            (&wires.o).into(),
+            (&wires.q).into(),
+            (&wires.p).into(),
+        ]
     }
 }
-impl From<CamlPlonkWires> for Wires {
+
+impl From<CamlPlonkWires> for GateWires {
     fn from(wires: CamlPlonkWires) -> Self {
         Self::from(&wires)
     }
@@ -185,6 +137,7 @@ impl From<CamlPlonkWires> for Wires {
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPlonkGate<T> {
     pub typ: CamlPlonkGateType, // type of the gate
-    pub wires: CamlPlonkWires,  // gate wires
+    pub row: isize,
+    pub wires: CamlPlonkWires,
     pub c: T,                   // constraints vector
 }

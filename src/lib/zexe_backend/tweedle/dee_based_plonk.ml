@@ -35,7 +35,7 @@ module R1CS_constraint_system =
     (struct
       let params =
         Sponge.Params.(
-          map tweedle_p ~f:(fun x ->
+          map tweedle_p5 ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x) ))
     end)
 
@@ -102,17 +102,37 @@ module Proof = Plonk_dlog_proof.Make (struct
         else if i - 1 < length primary then get primary (i - 1)
         else get auxiliary (i - 1 - length primary)
       in
-      let w = R1CS_constraint_system.compute_witness pk.cs external_values in
+      let witness = R1CS_constraint_system.compute_witness pk.cs external_values in
       let n = Tweedle_fp_index.domain_d1_size pk.index in
-      let witness = Field.Vector.create () in
-      for i = 0 to Array.length w.(0) - 1 do
-        for j = 0 to n - 1 do
-          Field.Vector.emplace_back witness
-            (if j < Array.length w then w.(j).(i) else Field.zero)
-        done
-      done ;
+      let pad = Array.init (n - (Array.length witness)) ~f:(fun _ -> Array.init (Array.length witness.(0)) ~f:(fun _ -> Field.random ())) in
+      let wtn = Array.append witness pad in
+
+      printf "DOMAIN SIZE %d" n;
+      print_endline "";
+      printf "WITNESS LENGTH %d" (Array.length witness);
+      print_endline "";
+      print_endline "";
+      print_endline "";
+
+(*
+      print_endline "*****WITNESS*****";
+      Array.iteri witness ~f:(fun i x ->
+      (
+        print_endline (Sexp.to_string ([%sexp_of:  int] i));
+        print_endline (Sexp.to_string ([%sexp_of:  Fp.t array] x))
+      ));
+*)
+      let w = Array.init (Array.length wtn.(0)) ~f:
+      (
+        fun i ->
+        (
+          let wt = Array.map wtn ~f:(fun x -> (x.(i))) in
+          wt
+        )
+      ) in
+
       create pk.index ~primary_input:(Field.Vector.create ())
-        ~auxiliary_input:witness ~prev_challenges:prev_chals
+        ~auxiliary_input:(w.(0), w.(1), w.(2), w.(3), w.(4)) ~prev_challenges:prev_chals
         ~prev_sgs:prev_comms
 
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =

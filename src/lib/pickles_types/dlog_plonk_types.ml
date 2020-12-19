@@ -27,39 +27,47 @@ module Evals = struct
   module Stable = struct
     module V1 = struct
       type 'a t =
-        {l: 'a; r: 'a; o: 'a; z: 'a; t: 'a; f: 'a; sigma1: 'a; sigma2: 'a}
+        {l: 'a; r: 'a; o: 'a; q: 'a; p: 'a; z: 'a; t: 'a; f: 'a; sigma1: 'a; sigma2: 'a; sigma3: 'a; sigma4: 'a}
       [@@deriving fields, sexp, compare, yojson, hash, eq]
     end
   end]
 
-  let map (type a b) ({l; r; o; z; t; f= f'; sigma1; sigma2} : a t)
+  let map (type a b) ({l; r; o; q; p; z; t; f= f'; sigma1; sigma2; sigma3; sigma4} : a t)
       ~(f : a -> b) : b t =
     { l= f l
     ; r= f r
     ; o= f o
+    ; q= f q
+    ; p= f p
     ; z= f z
     ; t= f t
     ; f= f f'
     ; sigma1= f sigma1
-    ; sigma2= f sigma2 }
+    ; sigma2= f sigma2
+    ; sigma3= f sigma3
+    ; sigma4= f sigma4 }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
     { l= f t1.l t2.l
     ; r= f t1.r t2.r
     ; o= f t1.o t2.o
+    ; q= f t1.q t2.q
+    ; p= f t1.p t2.p
     ; z= f t1.z t2.z
     ; t= f t1.t t2.t
     ; f= f t1.f t2.f
     ; sigma1= f t1.sigma1 t2.sigma1
-    ; sigma2= f t1.sigma2 t2.sigma2 }
+    ; sigma2= f t1.sigma2 t2.sigma2
+    ; sigma3= f t1.sigma3 t2.sigma3
+    ; sigma4= f t1.sigma4 t2.sigma4 }
 
-  let to_vectors {l; r; o; z; t; f; sigma1; sigma2} =
-    (Vector.[l; r; o; z; f; sigma1; sigma2], Vector.[t])
+  let to_vectors {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4} =
+    (Vector.[l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4], Vector.[t])
 
   let of_vectors
-      (([l; r; o; z; f; sigma1; sigma2] : ('a, _) Vector.t), Vector.[t]) : 'a t
+      (([l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4] : ('a, _) Vector.t), Vector.[t]) : 'a t
       =
-    {l; r; o; z; t; f; sigma1; sigma2}
+    {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4}
 
   let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t)
       ~default : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
@@ -204,6 +212,8 @@ module Messages = struct
         { l_comm: 'g Without_degree_bound.Stable.V1.t
         ; r_comm: 'g Without_degree_bound.Stable.V1.t
         ; o_comm: 'g Without_degree_bound.Stable.V1.t
+        ; q_comm: 'g Without_degree_bound.Stable.V1.t
+        ; p_comm: 'g Without_degree_bound.Stable.V1.t
         ; z_comm: 'g Without_degree_bound.Stable.V1.t
         ; t_comm: 'g_opt With_degree_bound.Stable.V1.t }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
@@ -213,7 +223,7 @@ module Messages = struct
   let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t)
       ~bool =
     let open Snarky_backendless.Typ in
-    let {Evals.l; r; o; z; t; _} = commitment_lengths in
+    let {Evals.l; r; o; q; p; z; t; _} = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
     let w n =
@@ -222,7 +232,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     of_hlistable
-      [wo l; wo r; wo o; wo z; w t]
+      [wo l; wo r; wo o; wo q; wo p; wo z; w t]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -245,10 +255,10 @@ module Shifts = struct
     module V1 = struct
       type 'field t =
             'field Marlin_plonk_bindings_types.Plonk_verification_shifts.t =
-        {r: 'field; o: 'field}
+        {r: 'field; o: 'field; q: 'field; p: 'field}
       [@@deriving sexp, compare, yojson, hash, eq]
     end
   end]
 
-  let map ~f {r; o} = {r= f r; o= f o}
+  let map ~f {r; o; q; p} = {r= f r; o= f o; q= f q; p= f p}
 end

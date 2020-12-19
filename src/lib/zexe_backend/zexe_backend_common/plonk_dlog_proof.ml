@@ -216,11 +216,16 @@ module Make (Inputs : Inputs_intf) = struct
              { Dlog_plonk_types.Evals.l= e.l
              ; r= e.r
              ; o= e.o
+             ; q= e.q
+             ; p= e.p
              ; z= e.z
              ; t= e.t
              ; f= e.f
              ; sigma1= e.sigma1
-             ; sigma2= e.sigma2 } )
+             ; sigma2= e.sigma2
+             ; sigma3= e.sigma3
+             ; sigma4= e.sigma4
+             } )
     in
     let wo x =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -241,13 +246,15 @@ module Make (Inputs : Inputs_intf) = struct
         { l_comm= wo t.messages.l_comm
         ; r_comm= wo t.messages.r_comm
         ; o_comm= wo t.messages.o_comm
+        ; q_comm= wo t.messages.q_comm
+        ; p_comm= wo t.messages.p_comm
         ; z_comm= wo t.messages.z_comm
         ; t_comm= w t.messages.t_comm }
       ~openings:{proof; evals}
 
-  let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; z; t; f; sigma1; sigma2}
+  let eval_to_backend {Dlog_plonk_types.Evals.l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4}
       : Evaluations_backend.t =
-    {l; r; o; z; t; f; sigma1; sigma2}
+    {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4}
 
   let vec_to_array (type t elt)
       (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
@@ -255,7 +262,7 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages= {l_comm; r_comm; o_comm; z_comm; t_comm}
+      ({ messages= {l_comm; r_comm; o_comm; q_comm; p_comm; z_comm; t_comm}
        ; openings= {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1} } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Or_infinity.Finite x) in
@@ -266,6 +273,8 @@ module Make (Inputs : Inputs_intf) = struct
         { l_comm= pcwo l_comm
         ; r_comm= pcwo r_comm
         ; o_comm= pcwo o_comm
+        ; q_comm= pcwo q_comm
+        ; p_comm= pcwo p_comm
         ; z_comm= pcwo z_comm
         ; t_comm= pcw t_comm }
     ; proof= {lr; delta= g delta; z1= z_1; z2= z_2; sg= g sg}

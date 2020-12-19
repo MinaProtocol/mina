@@ -6,10 +6,10 @@ use algebra::tweedle::{
 };
 
 use plonk_circuits::constraints::ConstraintSystem;
-use plonk_circuits::gate::{CircuitGate, Gate};
-use plonk_circuits::wires::{Col::*, GateWires, Wire};
+use plonk_circuits::gate::CircuitGate;
+use plonk_circuits::wires::Wire;
 
-use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use ff_fft::EvaluationDomain;
 
 use commitment_dlog::srs::SRS;
 use plonk_protocol_dlog::index::{Index as DlogIndex, SRSSpec};
@@ -21,10 +21,10 @@ use std::{
 };
 
 use crate::index_serialization;
-use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
+use crate::plonk_gate::{CamlPlonkGate, CamlPlonkWire, CamlPlonkWires};
 use crate::tweedle_fp_urs::CamlTweedleFpUrs;
 
-pub struct CamlTweedleFpPlonkGateVector(Vec<Gate<Fp>>);
+pub struct CamlTweedleFpPlonkGateVector(Vec<CircuitGate<Fp>>);
 pub type CamlTweedleFpPlonkGateVectorPtr = ocaml::Pointer<CamlTweedleFpPlonkGateVector>;
 
 extern "C" fn caml_tweedle_fp_plonk_gate_vector_finalize(v: ocaml::Value) {
@@ -46,9 +46,16 @@ pub fn caml_tweedle_fp_plonk_gate_vector_add(
     mut v: CamlTweedleFpPlonkGateVectorPtr,
     gate: CamlPlonkGate<Vec<Fp>>,
 ) {
-    v.as_mut().0.push(Gate {
+    v.as_mut().0.push(CircuitGate {
         typ: gate.typ.into(),
-        wires: gate.wires.into(),
+        row: gate.row as usize,
+        wires: [
+            gate.wires.l.into(),
+            gate.wires.r.into(),
+            gate.wires.o.into(),
+            gate.wires.q.into(),
+            gate.wires.p.into()
+        ],
         c: gate.c,
     });
 }
@@ -62,37 +69,33 @@ pub fn caml_tweedle_fp_plonk_gate_vector_get(
     let c = gate.c.iter().map(|x| *x).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
-        wires: (&gate.wires).into(),
+        row: gate.row as isize,
+        wires: CamlPlonkWires
+        {
+            l: (&gate.wires[0]).into(),
+            r: (&gate.wires[1]).into(),
+            o: (&gate.wires[2]).into(),
+            q: (&gate.wires[3]).into(),
+            p: (&gate.wires[4]).into(),
+        },
         c,
     }
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_plonk_gate_vector_wrap(
+pub fn caml_tweedle_fp_plonk_gate_vector_wrap
+(
     mut v: CamlTweedleFpPlonkGateVectorPtr,
     t: CamlPlonkWire,
     h: CamlPlonkWire,
-) {
-    match t.col {
-        CamlPlonkCol::L => {
-            (v.as_mut().0)[t.row as usize].wires.l = Wire {
-                row: h.row as usize,
-                col: h.col.into(),
-            }
-        }
-        CamlPlonkCol::R => {
-            (v.as_mut().0)[t.row as usize].wires.r = Wire {
-                row: h.row as usize,
-                col: h.col.into(),
-            }
-        }
-        CamlPlonkCol::O => {
-            (v.as_mut().0)[t.row as usize].wires.o = Wire {
-                row: h.row as usize,
-                col: h.col.into(),
-            }
-        }
-    }
+)
+{
+    (v.as_mut().0)[t.row as usize].wires[t.col as usize] =
+        Wire
+        {
+            row: h.row as usize,
+            col: h.col as usize,
+        };
 }
 
 /* Boxed so that we don't store large proving indexes in the OCaml heap. */
@@ -117,40 +120,10 @@ pub fn caml_tweedle_fp_plonk_index_create(
     public: ocaml::Int,
     urs: CamlTweedleFpUrs,
 ) -> Result<CamlTweedleFpPlonkIndex<'static>, ocaml::Error> {
-    let n = match Domain::<Fp>::compute_size_of_domain(gates.as_ref().0.len()) {
-        None => Err(
-            ocaml::Error::invalid_argument("caml_tweedle_fp_plonk_index_create")
-                .err()
-                .unwrap(),
-        )?,
-        Some(n) => n,
-    };
-    let wire = |w: Wire| -> usize {
-        match w.col {
-            L => w.row,
-            R => w.row + n,
-            O => w.row + 2 * n,
-        }
-    };
-
-    let gates: Vec<_> = gates
-        .as_ref()
-        .0
-        .iter()
-        .map(|gate| CircuitGate::<Fp> {
-            typ: gate.typ.clone(),
-            wires: GateWires {
-                l: (gate.wires.row, wire(gate.wires.l)),
-                r: (gate.wires.row + n, wire(gate.wires.r)),
-                o: (gate.wires.row + 2 * n, wire(gate.wires.o)),
-            },
-            c: gate.c.clone(),
-        })
-        .collect();
-
+    let gates: Vec<_> = gates.as_ref().0.clone();
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
     let cs =
-        match ConstraintSystem::<Fp>::create(gates, oracle::tweedle::fp::params(), public as usize)
+        match ConstraintSystem::<Fp>::create(gates, oracle::tweedle::fp5::params(), public as usize)
         {
             None => Err(ocaml::Error::failwith(
                 "caml_tweedle_fp_plonk_index_create: could not create constraint system",
@@ -169,7 +142,7 @@ pub fn caml_tweedle_fp_plonk_index_create(
     Ok(CamlTweedleFpPlonkIndex(
         Box::new(DlogIndex::<GAffine>::create(
             cs,
-            oracle::tweedle::fq::params(),
+            oracle::tweedle::fq5::params(),
             endo_q,
             srs,
         )),

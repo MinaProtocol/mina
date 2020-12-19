@@ -15,25 +15,31 @@ module Plonk_verification_evals = struct
     { sigma_comm_0: 'poly_comm
     ; sigma_comm_1: 'poly_comm
     ; sigma_comm_2: 'poly_comm
+    ; sigma_comm_3: 'poly_comm
+    ; sigma_comm_4: 'poly_comm
     ; ql_comm: 'poly_comm
     ; qr_comm: 'poly_comm
     ; qo_comm: 'poly_comm
+    ; qq_comm: 'poly_comm
+    ; qp_comm: 'poly_comm
     ; qm_comm: 'poly_comm
     ; qc_comm: 'poly_comm
     ; rcm_comm_0: 'poly_comm
     ; rcm_comm_1: 'poly_comm
     ; rcm_comm_2: 'poly_comm
+    ; rcm_comm_3: 'poly_comm
+    ; rcm_comm_4: 'poly_comm
     ; psm_comm: 'poly_comm
     ; add_comm: 'poly_comm
+    ; double_comm: 'poly_comm
     ; mul1_comm: 'poly_comm
     ; mul2_comm: 'poly_comm
-    ; emul1_comm: 'poly_comm
-    ; emul2_comm: 'poly_comm
-    ; emul3_comm: 'poly_comm }
+    ; emul_comm: 'poly_comm
+    ; pack_comm: 'poly_comm }
 end
 
 module Plonk_verification_shifts = struct
-  type 'field t = {r: 'field; o: 'field}
+  type 'field t = {r: 'field; o: 'field; q: 'field; p: 'field}
 end
 
 module Plonk_verifier_index = struct
@@ -52,19 +58,16 @@ module Plonk_gate = struct
       | Zero
       | Generic
       | Poseidon
-      | Add1
-      | Add2
+      | Add
+      | Double
       | Vbmul1
       | Vbmul2
-      | Vbmul3
-      | Endomul1
-      | Endomul2
-      | Endomul3
-      | Endomul4
+      | Endomul
+      | Pack
   end
 
   module Col = struct
-    type t = L | R | O
+    type t = L | R | O | Q | P
   end
 
   module Wire = struct
@@ -72,10 +75,10 @@ module Plonk_gate = struct
   end
 
   module Wires = struct
-    type t = {row: int; l: Wire.t; r: Wire.t; o: Wire.t}
+    type t = {l: Wire.t; r: Wire.t; o: Wire.t; q: Wire.t; p: Wire.t}
   end
 
-  type 'a t = {kind: Kind.t; wires: Wires.t; c: 'a array}
+  type 'a t = {kind: Kind.t; row: int; wires: Wires.t; c: 'a array}
 end
 
 module Plonk_proof = struct
@@ -84,11 +87,16 @@ module Plonk_proof = struct
       { l: 'field array
       ; r: 'field array
       ; o: 'field array
+      ; q: 'field array
+      ; p: 'field array
       ; z: 'field array
       ; t: 'field array
       ; f: 'field array
       ; sigma1: 'field array
-      ; sigma2: 'field array }
+      ; sigma2: 'field array
+      ; sigma3: 'field array
+      ; sigma4: 'field array
+      }
   end
 
   module Opening_proof = struct
@@ -101,6 +109,8 @@ module Plonk_proof = struct
       { l_comm: 'poly_comm
       ; r_comm: 'poly_comm
       ; o_comm: 'poly_comm
+      ; q_comm: 'poly_comm
+      ; p_comm: 'poly_comm
       ; z_comm: 'poly_comm
       ; t_comm: 'poly_comm }
   end

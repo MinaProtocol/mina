@@ -36,10 +36,14 @@ module Gate_spec = struct
     ; rcol: Plonk_gate.Col.t
     ; orow: 'row
     ; ocol: Plonk_gate.Col.t
+    ; qrow: 'row
+    ; qcol: Plonk_gate.Col.t
+    ; prow: 'row
+    ; pcol: Plonk_gate.Col.t
     ; coeffs: 'f array }
 
   let map_rows t ~f =
-    {t with row= f t.row; lrow= f t.lrow; rrow= f t.rrow; orow= f t.orow}
+    {t with row= f t.row; lrow= f t.lrow; rrow= f t.rrow; orow= f t.orow; qrow= f t.qrow; prow= f t.prow}
 end
 
 module Hash_state = struct
@@ -58,25 +62,34 @@ module Plonk_constraint = struct
 
   module T = struct
     type ('v, 'f) t =
-      | Basic of {l: 'f * 'v; r: 'f * 'v; o: 'f * 'v; m: 'f; c: 'f}
+      | Basic of {l: 'f * 'v; r: 'f * 'v; o: 'f * 'v; q: 'f * 'v; p: 'f * 'v; m: 'f; c: 'f}
+      | Pack of {state: 'v array array}
       | Poseidon of {state: 'v array array}
-      | EC_add of {p1: 'v * 'v; p2: 'v * 'v; p3: 'v * 'v}
+      | EC_add of {p1: 'v * 'v; p2: 'v * 'v; p3: 'v * 'v; r: 'v}
+      | EC_double of {p1: 'v * 'v; p2: 'v * 'v; r: 'v}
       | EC_scale of {state: 'v Scale_round.t array}
+      | EC_scale_pack of {state: 'v Scale_pack_round.t array}
       | EC_endoscale of {state: 'v Endoscale_round.t array}
     [@@deriving sexp]
 
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
       let fp (x, y) = (f x, f y) in
       match t with
-      | Basic {l; r; o; m; c} ->
-          let p (x, y) = (x, f y) in
-          Basic {l= p l; r= p r; o= p o; m; c}
+      | Basic {l; r; o; q; p; m; c} ->
+          let pp (x, y) = (x, f y) in
+          Basic {l= pp l; r= pp r; o= pp o; q= pp q; p= pp p; m; c}
+      | Pack {state} ->
+          Pack {state= Array.map ~f:(fun x -> Array.map ~f x) state}
       | Poseidon {state} ->
           Poseidon {state= Array.map ~f:(fun x -> Array.map ~f x) state}
-      | EC_add {p1; p2; p3} ->
-          EC_add {p1= fp p1; p2= fp p2; p3= fp p3}
+      | EC_add {p1; p2; p3; r} ->
+          EC_add {p1= fp p1; p2= fp p2; p3= fp p3; r= f r}
+      | EC_double {p1; p2; r} ->
+          EC_double {p1= fp p1; p2= fp p2; r= f r}
       | EC_scale {state} ->
           EC_scale {state= Array.map ~f:(fun x -> Scale_round.map ~f x) state}
+      | EC_scale_pack {state} ->
+          EC_scale_pack {state= Array.map ~f:(fun x -> Scale_pack_round.map ~f x) state}
       | EC_endoscale {state} ->
           EC_endoscale
             {state= Array.map ~f:(fun x -> Endoscale_round.map ~f x) state}
@@ -86,14 +99,16 @@ module Plonk_constraint = struct
         (eval_one : v -> f) (t : (v, f) t) =
       match t with
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
-      | Basic {l= cl, vl; r= cr, vr; o= co, vo; m; c} ->
+      | Basic {l= cl, vl; r= cr, vr; o= co, vo; q= cq, vq; p= cp, vp; m; c} ->
           let vl = eval_one vl in
           let vr = eval_one vr in
           let vo = eval_one vo in
+          let vq = eval_one vq in
+          let vp = eval_one vp in
           let open F in
           let res =
             List.reduce_exn ~f:add
-              [mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c]
+              [mul cl vl; mul cr vr; mul co vo; mul cq vq; mul cp vp; mul m (mul vl vr); c]
           in
           if not (equal zero res) then (
             Core.eprintf
@@ -101,9 +116,11 @@ module Plonk_constraint = struct
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t} * %{sexp:t}\n\
+                + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t}\n\
                 = %{sexp:t}%!"
-              cl vl cr vr co vo m (mul vl vr) c res ;
+              cl vl cr vr co vo cq vq cp vp m (mul vl vr) c res ;
             false )
           else true
       | _ ->
@@ -165,7 +182,8 @@ module Hash = Core.Md5
 
 let digest (t : _ t) = Hash_state.digest t.hash
 
-let zk_rows = 2
+(*this padding seems broken, should no be done here*)
+let zk_rows = 0
 
 module Make
     (Fp : Field.S)
@@ -218,28 +236,41 @@ struct
         cvars [a; b; c] t
     | Plonk_constraint.T constr -> (
       match constr with
-      | Basic {l; r; o; m; c} ->
+      | Basic {l; r; o; q; p; m; c} ->
           let t = H.feed_string t "basic" in
           let pr (s, x) acc = fp s acc |> cvars [x] in
-          t |> pr l |> pr r |> pr o |> fp m |> fp c
+          t |> pr l |> pr r |> pr o |> pr q |> pr p |> fp m |> fp c
+      | Pack {state} ->
+          let t = H.feed_string t "pack" in
+          let row a = cvars (Array.to_list a) in
+          Array.fold state ~init:t ~f:(fun acc a -> row a acc)
       | Poseidon {state} ->
           let t = H.feed_string t "poseidon" in
           let row a = cvars (Array.to_list a) in
           Array.fold state ~init:t ~f:(fun acc a -> row a acc)
-      | EC_add {p1; p2; p3} ->
+      | EC_add {p1; p2; p3; r} ->
           let t = H.feed_string t "ec_add" in
           let pr (x, y) = cvars [x; y] in
-          t |> pr p1 |> pr p2 |> pr p3
+          cvars [r] t |> pr p1 |> pr p2 |> pr p3
+      | EC_double {p1; p2; r} ->
+          let t = H.feed_string t "ec_double" in
+          let pr (x, y) = cvars [x; y] in
+          cvars [r] t |> pr p1 |> pr p2
       | EC_scale {state} ->
           let t = H.feed_string t "ec_scale" in
           Array.fold state ~init:t
-            ~f:(fun acc {xt; b; yt; xp; l1; yp; xs; ys} ->
-              cvars [xt; b; yt; xp; l1; yp; xs; ys] acc )
+            ~f:(fun acc {xt; b; yt; xp; l1; l2; yp; xs; ys} ->
+              cvars [xt; b; yt; xp; l1; l2; yp; xs; ys] acc )
+      | EC_scale_pack {state} ->
+          let t = H.feed_string t "ec_scale_pack" in
+          Array.fold state ~init:t
+            ~f:(fun acc {xt; b; yt; xp; l1; yp; xs; ys; n1; n2} ->
+              cvars [xt; b; yt; xp; l1; yp; xs; ys; n1; n2] acc )
       | EC_endoscale {state} ->
           let t = H.feed_string t "ec_endoscale" in
           Array.fold state ~init:t
-            ~f:(fun acc {b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys} ->
-              cvars [b2i1; xt; b2i; xq; yt; xp; l1; yp; xs; ys] acc ) )
+            ~f:(fun acc {b2; xt; b1; xq; yt; xp; l1; yp; xs; ys} ->
+              cvars [b2; xt; b1; xq; yt; xp; l1; yp; xs; ys] acc ) )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -249,7 +280,7 @@ struct
     in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     let num_rows = zk_rows + public_input_size + sys.next_row in
-    let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:3 Fp.zero) in
+    let res = Array.init num_rows ~f:(fun _ -> Array.create ~len:5 Fp.zero) in
     for i = 0 to public_input_size - 1 do
       res.(i).(0) <- external_values (i + 1)
     done ;
@@ -345,7 +376,7 @@ struct
         let g = Gates.create () in
         let n = Set_once.get_exn sys.public_input_size [%here] in
         (* First, add gates for public input *)
-        let pub = [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero|] in
+        let pub = [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|] in
         let pub_input_gate_specs_rev = ref [] in
         for row = 0 to n - 1 do
           let lp = wire' sys (V.External (row + 1)) (Row.Public_input row) L in
@@ -360,6 +391,10 @@ struct
             ; rcol= R
             ; orow= row
             ; ocol= O
+            ; qrow= row
+            ; qcol= Q
+            ; prow= row
+            ; pcol= P
             ; coeffs= pub }
             :: !pub_input_gate_specs_rev
         done ;
@@ -370,7 +405,7 @@ struct
           in
           let offset = Gate_spec.map_rows ~f:offset_row in
           let random_rows =
-            let zeroes = Array.init 5 ~f:(fun _ -> Fp.zero) in
+            let zeroes = Array.init 7 ~f:(fun _ -> Fp.zero) in
             List.init zk_rows ~f:(fun i ->
                 let row = Row.After_public_input (n + sys.next_row + i) in
                 offset
@@ -382,20 +417,27 @@ struct
                   ; rcol= R
                   ; orow= row
                   ; ocol= O
+                  ; qrow= row
+                  ; qcol= Q
+                  ; prow= row
+                  ; pcol= P
                   ; coeffs= zeroes } )
           in
           List.rev_append !pub_input_gate_specs_rev
             (rev_map_append gates random_rows ~f:offset)
         in
         List.iter all_gates
-          ~f:(fun {kind; row; lrow; lcol; rrow; rcol; orow; ocol; coeffs} ->
-            Gates.add g
+          ~f:(fun {kind; row; lrow; lcol; rrow; rcol; orow; ocol; qrow; qcol; prow; pcol; coeffs} ->
+          Gates.add g
               { kind
+              ; row
               ; wires=
-                  { row
-                  ; l= {row= lrow; col= lcol}
+                  { l= {row= lrow; col= lcol}
                   ; r= {row= rrow; col= rcol}
-                  ; o= {row= orow; col= ocol} }
+                  ; o= {row= orow; col= ocol}
+                  ; q= {row= qrow; col= qcol}
+                  ; p= {row= prow; col= pcol}
+                  }
               ; c= coeffs } ) ;
         g
 
@@ -428,7 +470,12 @@ struct
 
   open Position
 
-  let add_row sys row t l r o c =
+  let add_row sys row t l r o q p c =
+(*
+    print_endline "*****GATES*****";
+    print_endline (Sexp.to_string ([%sexp_of:  int] sys.next_row));
+    print_endline (Sexp.to_string ([%sexp_of:  Fp.t array] c));
+*)
     match sys.gates with
     | `Finalized ->
         failwith "add_row called on finalized constraint system"
@@ -443,12 +490,16 @@ struct
                ; rcol= r.col
                ; orow= o.row
                ; ocol= o.col
+               ; qrow= q.row
+               ; qcol= q.col
+               ; prow= p.row
+               ; pcol= p.col
                ; coeffs= c }
              :: gates ) ;
         sys.next_row <- sys.next_row + 1 ;
         sys.rows_rev <- row :: sys.rows_rev
 
-  let add_generic_constraint ?l ?r ?o c sys : unit =
+  let add_generic_constraint ?l ?r ?o ?q ?p c sys : unit =
     let next_row = sys.next_row in
     let lp =
       match l with
@@ -471,7 +522,21 @@ struct
       | None ->
           {row= After_public_input next_row; col= O}
     in
-    add_row sys [|l; r; o|] Generic lp rp op c
+    let qp =
+      match q with
+      | Some qx ->
+          wire sys qx next_row Q
+      | None ->
+          {row= After_public_input next_row; col= Q}
+    in
+    let pp =
+      match p with
+      | Some px ->
+          wire sys px next_row P
+      | None ->
+          {row= After_public_input next_row; col= P}
+    in
+    add_row sys [|l; r; o; q; p|] Generic lp rp op qp pp c
 
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -485,7 +550,7 @@ struct
           let rs, rx = go t in
           let s1x1_plus_s2x2 = create_internal sys [(ls, lx); (rs, rx)] in
           add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
-            [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero|]
+            [|ls; rs; Fp.(negate one); Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
             sys ;
           (Fp.one, s1x1_plus_s2x2)
     in
@@ -522,7 +587,7 @@ struct
               (* res = ls * lx + c *)
               let res = create_internal ~constant:c sys [(ls, External lx)] in
               add_generic_constraint ~l:(External lx) ~o:res
-                [|ls; Fp.zero; Fp.(negate one); Fp.zero; c|]
+                [|ls; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero; Fp.zero; c|]
                 (* Could be here *)
                 sys ;
               (Fp.one, `Var res) )
@@ -537,6 +602,8 @@ struct
                ; rs
                ; Fp.(negate one)
                ; Fp.zero
+               ; Fp.zero
+               ; Fp.zero
                ; (match constant with Some x -> x | None -> Fp.zero) |]
               (* Could be here *)
               sys ;
@@ -547,6 +614,12 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
+
+(*
+    let deb = Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr) in
+    print_endline deb;
+*)
+
     let index_to_col = function
       | 0 ->
           Plonk_gate.Col.L
@@ -554,6 +627,10 @@ struct
           Plonk_gate.Col.R
       | 2 ->
           Plonk_gate.Col.O
+      | 3 ->
+          Plonk_gate.Col.Q
+      | 4 ->
+          Plonk_gate.Col.P
       | _ ->
           assert false
     in
@@ -568,13 +645,13 @@ struct
             let sx = create_internal sys [(s, x)] in
             (* s * x - sx = 0 *)
             add_generic_constraint ~l:x ~o:sx
-              [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero|]
+              [|s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
               sys ;
             sx
       | `Constant ->
           let x = create_internal sys ~constant:s [] in
           add_generic_constraint ~l:x
-            [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]
+            [|Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s|]
             sys ;
           x
     in
@@ -587,16 +664,16 @@ struct
                sl^2 * xl * xl - so * xo = 0
             *)
             add_generic_constraint ~l:xl ~r:xl ~o:xo
-              [|Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero|]
+              [|Fp.zero; Fp.zero; Fp.negate so; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.zero|]
               sys
         | `Var xl, `Constant ->
             add_generic_constraint ~l:xl ~r:xl
-              [|Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
+              [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so|]
               sys
         | `Constant, `Var xo ->
             (* sl^2 = so * xo *)
             add_generic_constraint ~o:xo
-              [|Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl)|]
+              [|Fp.zero; Fp.zero; so; Fp.zero; Fp.zero; Fp.zero; Fp.negate (Fp.square sl)|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal (square sl) so)) )
@@ -608,33 +685,33 @@ struct
                - s1 s2 (x1 x2) + s3 x3 = 0
             *)
             add_generic_constraint ~l:x1 ~r:x2 ~o:x3
-              [|Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero|]
+              [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.zero; Fp.(negate s1 * s2); Fp.zero|]
               sys
         | `Var x1, `Var x2, `Constant ->
             add_generic_constraint ~l:x1 ~r:x2
-              [|Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
+              [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3|]
               sys
         | `Var x1, `Constant, `Var x3 ->
             (* s1 x1 * s2 = s3 x3
             *)
             add_generic_constraint ~l:x1 ~o:x3
-              [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero|]
+              [|Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
               sys
         | `Constant, `Var x2, `Var x3 ->
             add_generic_constraint ~r:x2 ~o:x3
-              [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero|]
+              [|Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
               sys
         | `Var x1, `Constant, `Constant ->
             add_generic_constraint ~l:x1
-              [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
+              [|Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Var x2, `Constant ->
             add_generic_constraint ~r:x2
-              [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3|]
+              [|Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s3|]
               sys
         | `Constant, `Constant, `Var x3 ->
             add_generic_constraint ~o:x3
-              [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2)|]
+              [|Fp.zero; Fp.zero; s3; Fp.zero; Fp.zero; Fp.zero; Fp.(negate s1 * s2)|]
               sys
         | `Constant, `Constant, `Constant ->
             assert (Fp.(equal s3 Fp.(s1 * s2))) )
@@ -644,7 +721,7 @@ struct
         | `Var x ->
             (* -x + x * x = 0  *)
             add_generic_constraint ~l:x ~r:x
-              [|Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero|]
+              [|Fp.(negate one); Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.one; Fp.zero|]
               sys
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
@@ -656,20 +733,20 @@ struct
           *)
             if s1 <> s2 then
               add_generic_constraint ~l:x1 ~r:x2
-                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
+                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
                 sys
               (* TODO: optimize by not adding generic costraint but rather permuting the vars *)
             else
               add_generic_constraint ~l:x1 ~r:x2
-                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero|]
+                [|s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
                 sys
         | `Var x1, `Constant ->
             add_generic_constraint ~l:x1
-              [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]
+              [|s1; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2|]
               sys
         | `Constant, `Var x2 ->
             add_generic_constraint ~r:x2
-              [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1|]
+              [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s1|]
               sys
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
@@ -731,8 +808,39 @@ struct
               failwith "Must use non-constant cvar in plonk constraints"
         in
         add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
-          [|coeff l; coeff r; coeff o; m; !c|]
+          [|coeff l; coeff r; coeff o; Fp.zero; Fp.zero; m; !c|]
           sys
+
+    | Plonk_constraint.T (Pack {state}) ->
+        let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
+            V.t array array =
+          Array.map ~f:(Array.map ~f:reduce_to_v) s
+        in
+        let state = reduce_state sys state in
+        let add_round_state array ind =
+          let prev =
+            Array.mapi array ~f:(fun i x ->
+                wire sys x sys.next_row (index_to_col i) )
+          in
+          add_row sys
+            (Array.map array ~f:(fun x -> Some x))
+            Pack prev.(0) prev.(1) prev.(2) prev.(3) prev.(4)
+            [||]
+        in
+        Array.iteri
+          ~f:(fun i perm ->
+            if i = Array.length state - 1 then
+              let prev =
+                Array.mapi perm ~f:(fun i x ->
+                    wire sys x sys.next_row (index_to_col i) )
+              in
+              add_row sys
+                (Array.map perm ~f:(fun x -> Some x))
+                Zero prev.(0) prev.(1) prev.(2) prev.(3) prev.(4)
+                [||]
+            else add_round_state perm i )
+          state
+
     | Plonk_constraint.T (Poseidon {state}) ->
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =
@@ -746,8 +854,8 @@ struct
           in
           add_row sys
             (Array.map array ~f:(fun x -> Some x))
-            Poseidon prev.(0) prev.(1) prev.(2)
-            Params.params.round_constants.(ind + 1)
+            Poseidon prev.(0) prev.(1) prev.(2) prev.(3) prev.(4)
+            Params.params.round_constants.(ind)
         in
         Array.iteri
           ~f:(fun i perm ->
@@ -758,85 +866,125 @@ struct
               in
               add_row sys
                 (Array.map perm ~f:(fun x -> Some x))
-                Zero prev.(0) prev.(1) prev.(2)
-                [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.zero|]
+                Zero prev.(0) prev.(1) prev.(2) prev.(3) prev.(4)
+                [||]
             else add_round_state perm i )
           state
-    | Plonk_constraint.T (EC_add {p1; p2; p3}) ->
-        let red =
-          Array.map [|p1; p2; p3|] ~f:(fun (x, y) ->
-              (reduce_to_v x, reduce_to_v y) )
-        in
-        let y =
-          Array.mapi
-            ~f:(fun i (x, y) -> wire sys y sys.next_row (index_to_col i))
-            red
-        in
+
+    | Plonk_constraint.T (EC_add {p1; p2; p3; r}) ->
+        let row = Array.map [|fst p1; snd p1; fst p2; snd p2; r|] ~f:(fun x -> reduce_to_v x) in
         add_row sys
-          (Array.map red ~f:(fun (_, y) -> Some y))
-          Add1 y.(0) y.(1) y.(2) [||] ;
-        let x =
-          Array.mapi
-            ~f:(fun i (x, y) -> wire sys x sys.next_row (index_to_col i))
-            red
-        in
+          (Array.map row ~f:(fun x -> Some x))
+          Add
+          (wire sys row.(0) sys.next_row L)
+          (wire sys row.(1) sys.next_row R)
+          (wire sys row.(2) sys.next_row O)
+          (wire sys row.(3) sys.next_row Q)
+          (wire sys row.(4) sys.next_row P)
+          [||] ;
+        let x3 = reduce_to_v (fst p3) in
+        let y3 = reduce_to_v (snd p3) in
         add_row sys
-          (Array.map red ~f:(fun (x, _) -> Some x))
-          Add2 x.(0) x.(1) x.(2) [||] ;
+          [|Some x3; Some y3; None; None; None|]
+          Zero
+          (wire sys x3 sys.next_row L)
+          (wire sys y3 sys.next_row R)
+          {row= After_public_input sys.next_row; col= O}
+          {row= After_public_input sys.next_row; col= Q}
+          {row= After_public_input sys.next_row; col= P}
+          [||] ;
         ()
+
+    | Plonk_constraint.T (EC_double {p1; p2; r}) ->
+        let row = Array.map [|fst p1; snd p1; fst p2; snd p2; r|] ~f:(fun x -> reduce_to_v x) in
+        add_row sys
+          (Array.map row ~f:(fun x -> Some x))
+          Double
+          (wire sys row.(0) sys.next_row L)
+          (wire sys row.(1) sys.next_row R)
+          (wire sys row.(2) sys.next_row O)
+          (wire sys row.(3) sys.next_row Q)
+          (wire sys row.(4) sys.next_row P)
+          [||] ;
+        ()
+
     | Plonk_constraint.T (EC_scale {state}) ->
-        let i = ref 0 in
         let add_ecscale_round (round : V.t Scale_round.t) =
           let xt = wire sys round.xt sys.next_row L in
-          let b = wire sys round.b sys.next_row R in
-          let yt = wire sys round.yt sys.next_row O in
-          let xp = wire sys round.xp (sys.next_row + 1) L in
-          let l1 = wire sys round.l1 (sys.next_row + 1) R in
-          let yp = wire sys round.yp (sys.next_row + 1) O in
-          let xs = wire sys round.xs (sys.next_row + 2) L in
-          let xt1 = wire sys round.xt (sys.next_row + 2) R in
-          let ys = wire sys round.ys (sys.next_row + 2) O in
+          let yt = wire sys round.yt sys.next_row R in
+          let l1 = wire sys round.l1 sys.next_row O in
+          let l2 = wire sys round.l2 sys.next_row Q in
+          let b = wire sys round.b sys.next_row P in
+          let xs = wire sys round.xs (sys.next_row + 1) L in
+          let ys = wire sys round.ys (sys.next_row + 1) R in
+          let xp = wire sys round.xp (sys.next_row + 1) O in
+          let yp = wire sys round.yp (sys.next_row + 1) Q in
+
           add_row sys
-            [|Some round.xt; Some round.b; Some round.yt|]
-            Vbmul1 xt b yt [||] ;
+            [|Some round.xt; Some round.yt; Some round.l1; Some round.l2; Some round.b|]
+            Vbmul1 xt yt l1 l2 b [||] ;
           add_row sys
-            [|Some round.xp; Some round.l1; Some round.yp|]
-            Vbmul2 xp l1 yp [||] ;
-          add_row sys
-            [|Some round.xs; Some round.xt; Some round.ys|]
-            Vbmul3 xs xt1 ys [||]
+            [|Some round.xs; Some round.ys; Some round.xp; Some round.yp; None|]
+            Zero xs ys xp yp
+            {row= After_public_input sys.next_row; col= P}
+            [||]
         in
         Array.iter
-          ~f:(fun round -> add_ecscale_round round ; incr i)
+          ~f:(fun round -> add_ecscale_round round)
           (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
         ()
+        
+    | Plonk_constraint.T (EC_scale_pack {state}) ->
+        let add_ecscale_pack_round (round : V.t Scale_pack_round.t) (last : bool) =
+          let xt = wire sys round.xt sys.next_row L in
+          let yt = wire sys round.yt sys.next_row R in
+          let l1 = wire sys round.l1 sys.next_row O in
+          let b = wire sys round.b sys.next_row Q in          
+          let n1 = wire sys round.n1 sys.next_row P in
+          let xs = wire sys round.xs (sys.next_row + 1) L in
+          let ys = wire sys round.ys (sys.next_row + 1) R in
+          let xp = wire sys round.xp (sys.next_row + 1) O in
+          let yp = wire sys round.yp (sys.next_row + 1) Q in
+          let n2 = wire sys round.n2 (sys.next_row + 1) P in
+
+          add_row sys
+            [|Some round.xt; Some round.yt; Some round.l1; Some round.b; Some round.n1|]
+            Vbmul2 xt yt l1 b n1 [||] ;
+          if last = false then
+            add_row sys
+              [|Some round.xs; Some round.ys; Some round.xp; Some round.yp; Some round.n2|]
+              Zero xs ys xp yp n2
+              [||]
+          else
+            add_row sys
+              [|Some round.xs; Some round.ys; Some round.xp; Some round.yp; Some round.n2|]
+              Generic xs ys xp yp n2
+              [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.one; Fp.zero; Fp.zero|]
+        in
+        Array.iteri
+          ~f:(fun i round -> add_ecscale_pack_round round (i = Array.length state - 1))
+          (Array.map state ~f:(Scale_pack_round.map ~f:reduce_to_v)) ;
+        ()
+        
     | Plonk_constraint.T (EC_endoscale {state}) ->
         let add_endoscale_round (round : V.t Endoscale_round.t) =
-          let b2i1 = wire sys round.b2i1 sys.next_row L in
-          let xt = wire sys round.xt sys.next_row R in
-          let b2i = wire sys round.b2i (sys.next_row + 1) L in
-          let xq = wire sys round.xq (sys.next_row + 1) R in
-          let yt = wire sys round.yt (sys.next_row + 1) O in
-          let xp = wire sys round.xp (sys.next_row + 2) L in
-          let l1 = wire sys round.l1 (sys.next_row + 2) R in
-          let yp = wire sys round.yp (sys.next_row + 2) O in
-          let xs = wire sys round.xs (sys.next_row + 3) L in
-          let xq1 = wire sys round.xq (sys.next_row + 3) R in
-          let ys = wire sys round.ys (sys.next_row + 3) O in
+          let xt = wire sys round.xt sys.next_row L in
+          let yt = wire sys round.yt sys.next_row R in
+          let l1 = wire sys round.l1 sys.next_row O in
+          let l2 = wire sys round.l2 sys.next_row Q in
+          let b1 = wire sys round.b1 sys.next_row P in
+          let xs = wire sys round.xs (sys.next_row + 1) L in
+          let ys = wire sys round.ys (sys.next_row + 1) R in
+          let xp = wire sys round.xp (sys.next_row + 1) O in
+          let yp = wire sys round.yp (sys.next_row + 1) Q in
+          let b2 = wire sys round.b2 (sys.next_row + 1) P in
+
           add_row sys
-            [|Some round.b2i1; Some round.xt; None|]
-            Endomul1 b2i1 xt
-            {row= After_public_input sys.next_row; col= O}
-            [||] ;
+            [|Some round.xt; Some round.yt; Some round.l1; Some round.l2; Some round.b1|]
+            Endomul xt yt l1 l2 b1 [||] ;
           add_row sys
-            [|Some round.b2i; Some round.xq; Some round.yt|]
-            Endomul2 b2i xq yt [||] ;
-          add_row sys
-            [|Some round.xp; Some round.l1; Some round.yp|]
-            Endomul3 xp l1 yp [||] ;
-          add_row sys
-            [|Some round.xs; Some round.xq; Some round.ys|]
-            Endomul4 xs xq1 ys [||]
+            [|Some round.xs; Some round.ys; Some round.xp; Some round.yp; Some round.b2|]
+            Zero xs ys xp yp b2 [||]
         in
         Array.iter
           ~f:(fun round -> add_endoscale_round round)

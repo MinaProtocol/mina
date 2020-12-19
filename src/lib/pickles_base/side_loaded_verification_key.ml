@@ -139,7 +139,14 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) =
         ; g15
         ; g16
         ; g17
-        ; g18 ] =
+        ; g18
+        ; g19
+        ; g20
+        ; g21
+        ; g22
+        ; g23
+        ; g24
+        ] =
       Plonk_verification_key_evals.to_hlist t
     in
     List.map
@@ -160,7 +167,14 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) =
       ; g15
       ; g16
       ; g17
-      ; g18 ]
+      ; g18
+      ; g19
+      ; g20
+      ; g21
+      ; g22
+      ; g23
+      ; g24
+      ]
       ~f:(Fn.compose field_elements g)
     |> List.reduce_exn ~f:append
 

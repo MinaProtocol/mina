@@ -6,7 +6,7 @@ use crate::plonk_verifier_index::{
 use crate::tweedle_dum::CamlTweedleDumPolyComm;
 use crate::tweedle_fq_plonk_index::CamlTweedleFqPlonkIndexPtr;
 use crate::tweedle_fq_urs::CamlTweedleFqUrs;
-use algebra::tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fp::Fp, fq::Fq};
+use algebra::{One, tweedle::{dee::Affine as GAffineOther, dum::Affine as GAffine, fp::Fp, fq::Fq}};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
@@ -45,8 +45,8 @@ pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
     vi: DlogVerifierIndex<'a, GAffine>,
 ) -> CamlTweedleFqPlonkVerifierIndex {
-    let [sigma_comm0, sigma_comm1, sigma_comm2] = vi.sigma_comm;
-    let [rcm_comm0, rcm_comm1, rcm_comm2] = vi.rcm_comm;
+    let [sigma_comm0, sigma_comm1, sigma_comm2, sigma_comm3, sigma_comm4] = vi.sigma_comm;
+    let [rcm_comm0, rcm_comm1, rcm_comm2, rcm_comm3, rcm_comm4] = vi.rcm_comm;
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -59,25 +59,34 @@ pub fn to_ocaml<'a>(
             sigma_comm0: sigma_comm0.into(),
             sigma_comm1: sigma_comm1.into(),
             sigma_comm2: sigma_comm2.into(),
-            ql_comm: vi.ql_comm.into(),
-            qr_comm: vi.qr_comm.into(),
-            qo_comm: vi.qo_comm.into(),
+            sigma_comm3: sigma_comm3.into(),
+            sigma_comm4: sigma_comm4.into(),
+            ql_comm: vi.qw_comm[0].clone().into(),
+            qr_comm: vi.qw_comm[1].clone().into(),
+            qo_comm: vi.qw_comm[2].clone().into(),
+            qq_comm: vi.qw_comm[3].clone().into(),
+            qp_comm: vi.qw_comm[4].clone().into(),
             qm_comm: vi.qm_comm.into(),
             qc_comm: vi.qc_comm.into(),
             rcm_comm0: rcm_comm0.into(),
             rcm_comm1: rcm_comm1.into(),
             rcm_comm2: rcm_comm2.into(),
+            rcm_comm3: rcm_comm3.into(),
+            rcm_comm4: rcm_comm4.into(),
             psm_comm: vi.psm_comm.into(),
             add_comm: vi.add_comm.into(),
+            double_comm: vi.double_comm.into(),
             mul1_comm: vi.mul1_comm.into(),
             mul2_comm: vi.mul2_comm.into(),
-            emul1_comm: vi.emul1_comm.into(),
-            emul2_comm: vi.emul2_comm.into(),
-            emul3_comm: vi.emul3_comm.into(),
+            emul_comm: vi.emul_comm.into(),
+            pack_comm: vi.pack_comm.into(),
         },
         shifts: CamlPlonkVerificationShifts {
-            r: vi.r,
-            o: vi.o,
+            s0: vi.shift[0],
+            s1: vi.shift[1],
+            s2: vi.shift[2],
+            s3: vi.shift[3],
+            s4: vi.shift[4],
         },
     }
 }
@@ -86,8 +95,8 @@ pub fn to_ocaml_copy<'a>(
     urs: &Rc<SRS<GAffine>>,
     vi: &DlogVerifierIndex<'a, GAffine>,
 ) -> CamlTweedleFqPlonkVerifierIndex {
-    let [sigma_comm0, sigma_comm1, sigma_comm2] = &vi.sigma_comm;
-    let [rcm_comm0, rcm_comm1, rcm_comm2] = &vi.rcm_comm;
+    let [sigma_comm0, sigma_comm1, sigma_comm2, sigma_comm3, sigma_comm4] = &vi.sigma_comm;
+    let [rcm_comm0, rcm_comm1, rcm_comm2, rcm_comm3, rcm_comm4] = &vi.rcm_comm;
     CamlPlonkVerifierIndex {
         domain: CamlPlonkDomain {
             log_size_of_group: vi.domain.log_size_of_group as isize,
@@ -100,25 +109,34 @@ pub fn to_ocaml_copy<'a>(
             sigma_comm0: sigma_comm0.clone().into(),
             sigma_comm1: sigma_comm1.clone().into(),
             sigma_comm2: sigma_comm2.clone().into(),
-            ql_comm: vi.ql_comm.clone().into(),
-            qr_comm: vi.qr_comm.clone().into(),
-            qo_comm: vi.qo_comm.clone().into(),
+            sigma_comm3: sigma_comm3.clone().into(),
+            sigma_comm4: sigma_comm4.clone().into(),
+            ql_comm: vi.qw_comm[0].clone().into(),
+            qr_comm: vi.qw_comm[1].clone().into(),
+            qo_comm: vi.qw_comm[2].clone().into(),
+            qq_comm: vi.qw_comm[3].clone().into(),
+            qp_comm: vi.qw_comm[4].clone().into(),
             qm_comm: vi.qm_comm.clone().into(),
             qc_comm: vi.qc_comm.clone().into(),
             rcm_comm0: rcm_comm0.clone().into(),
             rcm_comm1: rcm_comm1.clone().into(),
             rcm_comm2: rcm_comm2.clone().into(),
+            rcm_comm3: rcm_comm3.clone().into(),
+            rcm_comm4: rcm_comm4.clone().into(),
             psm_comm: vi.psm_comm.clone().into(),
             add_comm: vi.add_comm.clone().into(),
+            double_comm: vi.double_comm.clone().into(),
             mul1_comm: vi.mul1_comm.clone().into(),
             mul2_comm: vi.mul2_comm.clone().into(),
-            emul1_comm: vi.emul1_comm.clone().into(),
-            emul2_comm: vi.emul2_comm.clone().into(),
-            emul3_comm: vi.emul3_comm.clone().into(),
+            emul_comm: vi.emul_comm.clone().into(),
+            pack_comm: vi.pack_comm.clone().into(),
         },
         shifts: CamlPlonkVerificationShifts {
-            r: vi.r,
-            o: vi.o,
+            s0: vi.shift[0],
+            s1: vi.shift[1],
+            s2: vi.shift[2],
+            s3: vi.shift[3],
+            s4: vi.shift[4],
         },
     }
 }
@@ -151,28 +169,35 @@ pub fn of_ocaml<'a>(
             evals.sigma_comm0.into(),
             evals.sigma_comm1.into(),
             evals.sigma_comm2.into(),
+            evals.sigma_comm3.into(),
+            evals.sigma_comm4.into(),
         ],
-        ql_comm: evals.ql_comm.into(),
-        qr_comm: evals.qr_comm.into(),
-        qo_comm: evals.qo_comm.into(),
+        qw_comm: [
+            evals.ql_comm.into(),
+            evals.qr_comm.into(),
+            evals.qo_comm.into(),
+            evals.qq_comm.into(),
+            evals.qp_comm.into(),
+        ],
         qm_comm: evals.qm_comm.into(),
         qc_comm: evals.qc_comm.into(),
         rcm_comm: [
             evals.rcm_comm0.into(),
             evals.rcm_comm1.into(),
             evals.rcm_comm2.into(),
+            evals.rcm_comm3.into(),
+            evals.rcm_comm4.into(),
         ],
         psm_comm: evals.psm_comm.into(),
         add_comm: evals.add_comm.into(),
+        double_comm: evals.double_comm.into(),
         mul1_comm: evals.mul1_comm.into(),
         mul2_comm: evals.mul2_comm.into(),
-        emul1_comm: evals.emul1_comm.into(),
-        emul2_comm: evals.emul2_comm.into(),
-        emul3_comm: evals.emul3_comm.into(),
-        r: shifts.r,
-        o: shifts.o,
-        fr_sponge_params: oracle::tweedle::fq::params(),
-        fq_sponge_params: oracle::tweedle::fp::params(),
+        emul_comm: evals.emul_comm.into(),
+        pack_comm: evals.pack_comm.into(),
+        shift: [shifts.s0, shifts.s1, shifts.s2, shifts.s3, shifts.s4],
+        fr_sponge_params: oracle::tweedle::fq5::params(),
+        fq_sponge_params: oracle::tweedle::fp5::params(),
         endo: endo_q,
     };
     CamlTweedleFqPlonkVerifierIndexRaw(index, urs_copy_outer)
@@ -355,9 +380,12 @@ pub fn caml_tweedle_fq_plonk_verifier_index_create(
 pub fn caml_tweedle_fq_plonk_verifier_index_shifts(
     log2_size: ocaml::Int,
 ) -> CamlPlonkVerificationShifts<Fq> {
-    let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
+    let sh = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap(), 4);
     CamlPlonkVerificationShifts {
-        r: a,
-        o: b,
+        s0: Fq::one(),
+        s1: sh[0],
+        s2: sh[1],
+        s3: sh[2],
+        s4: sh[3],
     }
 }

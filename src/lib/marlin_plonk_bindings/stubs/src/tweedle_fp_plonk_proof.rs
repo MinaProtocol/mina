@@ -29,11 +29,15 @@ pub struct CamlTweedleFpPlonkProofEvaluations {
     pub l: Vec<Fp>,
     pub r: Vec<Fp>,
     pub o: Vec<Fp>,
+    pub q: Vec<Fp>,
+    pub p: Vec<Fp>,
     pub z: Vec<Fp>,
     pub t: Vec<Fp>,
     pub f: Vec<Fp>,
     pub sigma1: Vec<Fp>,
     pub sigma2: Vec<Fp>,
+    pub sigma3: Vec<Fp>,
+    pub sigma4: Vec<Fp>,
 }
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -54,6 +58,8 @@ pub struct CamlTweedleFpPlonkMessages {
     pub l_comm: CamlTweedleDeePolyComm<Fq>,
     pub r_comm: CamlTweedleDeePolyComm<Fq>,
     pub o_comm: CamlTweedleDeePolyComm<Fq>,
+    pub q_comm: CamlTweedleDeePolyComm<Fq>,
+    pub p_comm: CamlTweedleDeePolyComm<Fq>,
     pub z_comm: CamlTweedleDeePolyComm<Fq>,
     pub t_comm: CamlTweedleDeePolyComm<Fq>,
 }
@@ -90,9 +96,14 @@ impl From<CamlTweedleFpPlonkProof> for DlogProof<GAffine> {
                 delta: x.proof.delta.into(),
                 sg: x.proof.sg.into(),
             },
-            l_comm: x.messages.l_comm.into(),
-            r_comm: x.messages.r_comm.into(),
-            o_comm: x.messages.o_comm.into(),
+            w_comm:
+            [
+                x.messages.l_comm.into(),
+                x.messages.r_comm.into(),
+                x.messages.o_comm.into(),
+                x.messages.q_comm.into(),
+                x.messages.p_comm.into(),
+            ],
             z_comm: x.messages.z_comm.into(),
             t_comm: x.messages.t_comm.into(),
             public: x.public.into_iter().map(From::from).collect(),
@@ -100,24 +111,44 @@ impl From<CamlTweedleFpPlonkProof> for DlogProof<GAffine> {
                 let (evals0, evals1) = x.evals;
                 [
                     DlogProofEvaluations {
-                        l: evals0.l.into_iter().map(From::from).collect(),
-                        r: evals0.r.into_iter().map(From::from).collect(),
-                        o: evals0.o.into_iter().map(From::from).collect(),
+                        w:
+                        [
+                            evals0.l.into_iter().map(From::from).collect(),
+                            evals0.r.into_iter().map(From::from).collect(),
+                            evals0.o.into_iter().map(From::from).collect(),
+                            evals0.q.into_iter().map(From::from).collect(),
+                            evals0.p.into_iter().map(From::from).collect(),
+                        ],
                         z: evals0.z.into_iter().map(From::from).collect(),
                         t: evals0.t.into_iter().map(From::from).collect(),
                         f: evals0.f.into_iter().map(From::from).collect(),
-                        sigma1: evals0.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals0.sigma2.into_iter().map(From::from).collect(),
+                        s:
+                        [
+                            evals0.sigma1.into_iter().map(From::from).collect(),
+                            evals0.sigma2.into_iter().map(From::from).collect(),
+                            evals0.sigma3.into_iter().map(From::from).collect(),
+                            evals0.sigma4.into_iter().map(From::from).collect(),
+                        ],
                     },
                     DlogProofEvaluations {
-                        l: evals1.l.into_iter().map(From::from).collect(),
-                        r: evals1.r.into_iter().map(From::from).collect(),
-                        o: evals1.o.into_iter().map(From::from).collect(),
+                        w:
+                        [
+                            evals1.l.into_iter().map(From::from).collect(),
+                            evals1.r.into_iter().map(From::from).collect(),
+                            evals1.o.into_iter().map(From::from).collect(),
+                            evals1.q.into_iter().map(From::from).collect(),
+                            evals1.p.into_iter().map(From::from).collect(),
+                        ],
                         z: evals1.z.into_iter().map(From::from).collect(),
                         t: evals1.t.into_iter().map(From::from).collect(),
                         f: evals1.f.into_iter().map(From::from).collect(),
-                        sigma1: evals1.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals1.sigma2.into_iter().map(From::from).collect(),
+                        s:
+                        [
+                            evals1.sigma1.into_iter().map(From::from).collect(),
+                            evals1.sigma2.into_iter().map(From::from).collect(),
+                            evals1.sigma3.into_iter().map(From::from).collect(),
+                            evals1.sigma4.into_iter().map(From::from).collect(),
+                        ],
                     },
                 ]
             },
@@ -146,9 +177,11 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
                 sg: x.proof.sg.into(),
             },
             messages: CamlTweedleFpPlonkMessages {
-                l_comm: x.l_comm.into(),
-                r_comm: x.r_comm.into(),
-                o_comm: x.o_comm.into(),
+                l_comm: x.w_comm[0].clone().into(),
+                r_comm: x.w_comm[1].clone().into(),
+                o_comm: x.w_comm[2].clone().into(),
+                q_comm: x.w_comm[3].clone().into(),
+                p_comm: x.w_comm[4].clone().into(),
                 z_comm: x.z_comm.into(),
                 t_comm: x.t_comm.into(),
             },
@@ -157,24 +190,32 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
                 let [evals0, evals1] = x.evals;
                 (
                     CamlTweedleFpPlonkProofEvaluations {
-                        l: evals0.l.into_iter().map(From::from).collect(),
-                        r: evals0.r.into_iter().map(From::from).collect(),
-                        o: evals0.o.into_iter().map(From::from).collect(),
+                        l: evals0.w[0].clone().into_iter().map(From::from).collect(),
+                        r: evals0.w[1].clone().into_iter().map(From::from).collect(),
+                        o: evals0.w[2].clone().into_iter().map(From::from).collect(),
+                        q: evals0.w[3].clone().into_iter().map(From::from).collect(),
+                        p: evals0.w[4].clone().into_iter().map(From::from).collect(),
                         z: evals0.z.into_iter().map(From::from).collect(),
                         t: evals0.t.into_iter().map(From::from).collect(),
                         f: evals0.f.into_iter().map(From::from).collect(),
-                        sigma1: evals0.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals0.sigma2.into_iter().map(From::from).collect(),
+                        sigma1: evals0.s[0].clone().into_iter().map(From::from).collect(),
+                        sigma2: evals0.s[1].clone().into_iter().map(From::from).collect(),
+                        sigma3: evals0.s[2].clone().into_iter().map(From::from).collect(),
+                        sigma4: evals0.s[3].clone().into_iter().map(From::from).collect(),
                     },
                     CamlTweedleFpPlonkProofEvaluations {
-                        l: evals1.l.into_iter().map(From::from).collect(),
-                        r: evals1.r.into_iter().map(From::from).collect(),
-                        o: evals1.o.into_iter().map(From::from).collect(),
+                        l: evals1.w[0].clone().into_iter().map(From::from).collect(),
+                        r: evals1.w[1].clone().into_iter().map(From::from).collect(),
+                        o: evals1.w[2].clone().into_iter().map(From::from).collect(),
+                        q: evals1.w[3].clone().into_iter().map(From::from).collect(),
+                        p: evals1.w[4].clone().into_iter().map(From::from).collect(),
                         z: evals1.z.into_iter().map(From::from).collect(),
                         t: evals1.t.into_iter().map(From::from).collect(),
                         f: evals1.f.into_iter().map(From::from).collect(),
-                        sigma1: evals1.sigma1.into_iter().map(From::from).collect(),
-                        sigma2: evals1.sigma2.into_iter().map(From::from).collect(),
+                        sigma1: evals1.s[0].clone().into_iter().map(From::from).collect(),
+                        sigma2: evals1.s[1].clone().into_iter().map(From::from).collect(),
+                        sigma3: evals1.s[2].clone().into_iter().map(From::from).collect(),
+                        sigma4: evals1.s[3].clone().into_iter().map(From::from).collect(),
                     },
                 )
             },
@@ -186,7 +227,7 @@ impl From<DlogProof<GAffine>> for CamlTweedleFpPlonkProof {
 pub fn caml_tweedle_fp_plonk_proof_create(
     index: CamlTweedleFpPlonkIndexPtr<'static>,
     primary_input: CamlTweedleFpVector,
-    auxiliary_input: CamlTweedleFpVector,
+    auxiliary_input: (Vec<Fp>, Vec<Fp>, Vec<Fp>, Vec<Fp>, Vec<Fp>),
     prev_challenges: Vec<Fp>,
     prev_sgs: Vec<CamlTweedleDeeAffine<Fq>>,
 ) -> CamlTweedleFpPlonkProof {
@@ -217,7 +258,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
         }
     };
 
-    let auxiliary_input: &Vec<Fp> = auxiliary_input.into();
+    let witness = [auxiliary_input.0, auxiliary_input.1, auxiliary_input.2, auxiliary_input.3, auxiliary_input.4];
     let index: &DlogIndex<GAffine> = &index.as_ref().0;
 
     ocaml::runtime::release_lock();
@@ -226,7 +267,7 @@ pub fn caml_tweedle_fp_plonk_proof_create(
     let proof = DlogProof::create::<
         DefaultFqSponge<TweedledeeParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fp, PlonkSpongeConstants>,
-    >(&map, auxiliary_input, index, prev)
+    >(&map, &witness, index, prev)
     .unwrap();
 
     ocaml::runtime::acquire_lock();

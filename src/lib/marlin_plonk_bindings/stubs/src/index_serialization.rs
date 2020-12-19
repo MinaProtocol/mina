@@ -1,4 +1,5 @@
 use algebra::{
+    One,
     curves::AffineCurve,
     fields::{Field, PrimeField},
     FromBytes, ToBytes,
@@ -11,6 +12,7 @@ use commitment_dlog::{
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
 use plonk_circuits::{
+    wires::COLUMNS,
     constraints::{zk_polynomial, zk_w, ConstraintSystem as PlonkConstraintSystem},
     domains::EvaluationDomains as PlonkEvaluationDomains,
 };
@@ -163,31 +165,20 @@ where
     u64::write(&(vk.max_poly_size as u64), &mut w)?;
     u64::write(&(vk.max_quot_size as u64), &mut w)?;
 
-    {
-        write_poly_comm(&vk.sigma_comm[0], &mut w)?;
-        write_poly_comm(&vk.sigma_comm[1], &mut w)?;
-        write_poly_comm(&vk.sigma_comm[2], &mut w)?;
-    };
-    write_poly_comm(&vk.ql_comm, &mut w)?;
-    write_poly_comm(&vk.qr_comm, &mut w)?;
-    write_poly_comm(&vk.qo_comm, &mut w)?;
+    for i in 0..COLUMNS {write_poly_comm(&vk.sigma_comm[i], &mut w)?};
+    for i in 0..COLUMNS {write_poly_comm(&vk.qw_comm[i], &mut w)?};
     write_poly_comm(&vk.qm_comm, &mut w)?;
     write_poly_comm(&vk.qc_comm, &mut w)?;
-    {
-        write_poly_comm(&vk.rcm_comm[0], &mut w)?;
-        write_poly_comm(&vk.rcm_comm[1], &mut w)?;
-        write_poly_comm(&vk.rcm_comm[2], &mut w)?;
-    };
+    for i in 0..COLUMNS {write_poly_comm(&vk.rcm_comm[i], &mut w)?};
     write_poly_comm(&vk.psm_comm, &mut w)?;
     write_poly_comm(&vk.add_comm, &mut w)?;
+    write_poly_comm(&vk.double_comm, &mut w)?;
     write_poly_comm(&vk.mul1_comm, &mut w)?;
     write_poly_comm(&vk.mul2_comm, &mut w)?;
-    write_poly_comm(&vk.emul1_comm, &mut w)?;
-    write_poly_comm(&vk.emul2_comm, &mut w)?;
-    write_poly_comm(&vk.emul3_comm, &mut w)?;
+    write_poly_comm(&vk.emul_comm, &mut w)?;
+    write_poly_comm(&vk.pack_comm, &mut w)?;
 
-    G::ScalarField::write(&vk.r, &mut w)?;
-    G::ScalarField::write(&vk.o, &mut w)?;
+    for i in 1..COLUMNS {G::ScalarField::write(&vk.shift[i], &mut w)?};
 
     Ok(())
 }
@@ -207,32 +198,48 @@ where
     let max_quot_size = u64::read(&mut r)? as usize;
 
     let sigma_comm = {
-        let s0 = read_poly_comm(&mut r)?;
-        let s1 = read_poly_comm(&mut r)?;
-        let s2 = read_poly_comm(&mut r)?;
-        [s0, s1, s2]
+        let c0 = read_poly_comm(&mut r)?;
+        let c1 = read_poly_comm(&mut r)?;
+        let c2 = read_poly_comm(&mut r)?;
+        let c3 = read_poly_comm(&mut r)?;
+        let c4 = read_poly_comm(&mut r)?;
+        [c0, c1, c2, c3, c4]
     };
-    let ql_comm = read_poly_comm(&mut r)?;
-    let qr_comm = read_poly_comm(&mut r)?;
-    let qo_comm = read_poly_comm(&mut r)?;
+    let qw_comm = {
+        let c0 = read_poly_comm(&mut r)?;
+        let c1 = read_poly_comm(&mut r)?;
+        let c2 = read_poly_comm(&mut r)?;
+        let c3 = read_poly_comm(&mut r)?;
+        let c4 = read_poly_comm(&mut r)?;
+        [c0, c1, c2, c3, c4]
+    };
+
     let qm_comm = read_poly_comm(&mut r)?;
     let qc_comm = read_poly_comm(&mut r)?;
     let rcm_comm = {
-        let s0 = read_poly_comm(&mut r)?;
-        let s1 = read_poly_comm(&mut r)?;
-        let s2 = read_poly_comm(&mut r)?;
-        [s0, s1, s2]
+        let c0 = read_poly_comm(&mut r)?;
+        let c1 = read_poly_comm(&mut r)?;
+        let c2 = read_poly_comm(&mut r)?;
+        let c3 = read_poly_comm(&mut r)?;
+        let c4 = read_poly_comm(&mut r)?;
+        [c0, c1, c2, c3, c4]
     };
     let psm_comm = read_poly_comm(&mut r)?;
     let add_comm = read_poly_comm(&mut r)?;
+    let double_comm = read_poly_comm(&mut r)?;
     let mul1_comm = read_poly_comm(&mut r)?;
     let mul2_comm = read_poly_comm(&mut r)?;
-    let emul1_comm = read_poly_comm(&mut r)?;
-    let emul2_comm = read_poly_comm(&mut r)?;
-    let emul3_comm = read_poly_comm(&mut r)?;
+    let emul_comm = read_poly_comm(&mut r)?;
+    let pack_comm = read_poly_comm(&mut r)?;
 
-    let r_value = G::ScalarField::read(&mut r)?;
-    let o = G::ScalarField::read(&mut r)?;
+    let shift = {
+        let c1 = G::ScalarField::read(&mut r)?;
+        let c2 = G::ScalarField::read(&mut r)?;
+        let c3 = G::ScalarField::read(&mut r)?;
+        let c4 = G::ScalarField::read(&mut r)?;
+        [G::ScalarField::one(), c1, c2, c3, c4]
+    };
+
     let srs = PlonkSRSValue::Ref(unsafe { &(*srs) });
     let vk = PlonkVerifierIndex {
         domain,
@@ -242,21 +249,18 @@ where
         max_quot_size,
         srs,
         sigma_comm,
-        ql_comm,
-        qr_comm,
-        qo_comm,
+        qw_comm,
         qm_comm,
         qc_comm,
         rcm_comm,
         psm_comm,
         add_comm,
+        double_comm,
         mul1_comm,
         mul2_comm,
-        emul1_comm,
-        emul2_comm,
-        emul3_comm,
-        r: r_value,
-        o,
+        emul_comm,
+        pack_comm,
+        shift,
         fr_sponge_params,
         fq_sponge_params,
         endo,
@@ -281,57 +285,46 @@ where
 
     write_vec(&c.gates, &mut w)?;
 
-    write_dense_polynomial(&c.sigmam[0], &mut w)?;
-    write_dense_polynomial(&c.sigmam[1], &mut w)?;
-    write_dense_polynomial(&c.sigmam[2], &mut w)?;
+    for i in 0..COLUMNS {write_dense_polynomial(&c.sigmam[i], &mut w)?};
+    for i in 0..COLUMNS {write_dense_polynomial(&c.qwm[i], &mut w)?};
 
-    write_dense_polynomial(&c.qlm, &mut w)?;
-    write_dense_polynomial(&c.qrm, &mut w)?;
-    write_dense_polynomial(&c.qom, &mut w)?;
     write_dense_polynomial(&c.qmm, &mut w)?;
     write_dense_polynomial(&c.qc, &mut w)?;
 
-    write_dense_polynomial(&c.rcm[0], &mut w)?;
-    write_dense_polynomial(&c.rcm[1], &mut w)?;
-    write_dense_polynomial(&c.rcm[2], &mut w)?;
+    for i in 0..COLUMNS {write_dense_polynomial(&c.rcm[i], &mut w)?};
 
     write_dense_polynomial(&c.psm, &mut w)?;
     write_dense_polynomial(&c.addm, &mut w)?;
+    write_dense_polynomial(&c.doublem, &mut w)?;
     write_dense_polynomial(&c.mul1m, &mut w)?;
     write_dense_polynomial(&c.mul2m, &mut w)?;
-    write_dense_polynomial(&c.emul1m, &mut w)?;
-    write_dense_polynomial(&c.emul2m, &mut w)?;
-    write_dense_polynomial(&c.emul3m, &mut w)?;
+    write_dense_polynomial(&c.emulm, &mut w)?;
+    write_dense_polynomial(&c.packm, &mut w)?;
 
-    write_plonk_evaluations(&c.qll, &mut w)?;
-    write_plonk_evaluations(&c.qrl, &mut w)?;
-    write_plonk_evaluations(&c.qol, &mut w)?;
+    for i in 0..COLUMNS {write_plonk_evaluations(&c.qwl[i], &mut w)?};
     write_plonk_evaluations(&c.qml, &mut w)?;
 
-    write_vec(&c.sigmal1[0], &mut w)?;
-    write_vec(&c.sigmal1[1], &mut w)?;
-    write_vec(&c.sigmal1[2], &mut w)?;
-
-    write_plonk_evaluations(&c.sigmal4[0], &mut w)?;
-    write_plonk_evaluations(&c.sigmal4[1], &mut w)?;
-    write_plonk_evaluations(&c.sigmal4[2], &mut w)?;
+    for i in 0..COLUMNS {write_vec(&c.sigmal1[i], &mut w)?};
+    for i in 0..COLUMNS {write_plonk_evaluations(&c.sigmal8[i], &mut w)?};
 
     write_vec(&c.sid, &mut w)?;
 
     write_plonk_evaluations(&c.ps4, &mut w)?;
     write_plonk_evaluations(&c.ps8, &mut w)?;
-    write_plonk_evaluations(&c.addl4, &mut w)?;
+    write_plonk_evaluations(&c.addl, &mut w)?;
+    write_plonk_evaluations(&c.doublel, &mut w)?;
     write_plonk_evaluations(&c.mul1l, &mut w)?;
     write_plonk_evaluations(&c.mul2l, &mut w)?;
-    write_plonk_evaluations(&c.emul1l, &mut w)?;
-    write_plonk_evaluations(&c.emul2l, &mut w)?;
-    write_plonk_evaluations(&c.emul3l, &mut w)?;
+    write_plonk_evaluations(&c.emull, &mut w)?;
+    write_plonk_evaluations(&c.packl, &mut w)?;
+
+    write_plonk_evaluations(&c.l1, &mut w)?;
     write_plonk_evaluations(&c.l04, &mut w)?;
     write_plonk_evaluations(&c.l08, &mut w)?;
-    write_plonk_evaluations(&c.l1, &mut w)?;
+    write_plonk_evaluations(&c.zero4, &mut w)?;
+    write_plonk_evaluations(&c.zero8, &mut w)?;
 
-    c.r.write(&mut w)?;
-    c.o.write(&mut w)?;
+    for i in 1..COLUMNS {G::ScalarField::write(&c.shift[i], &mut w)?};
     c.endo.write(&mut w)?;
 
     Ok(())
@@ -358,47 +351,65 @@ where
         let s0 = read_dense_polynomial(&mut r)?;
         let s1 = read_dense_polynomial(&mut r)?;
         let s2 = read_dense_polynomial(&mut r)?;
-        [s0, s1, s2]
+        let s3 = read_dense_polynomial(&mut r)?;
+        let s4 = read_dense_polynomial(&mut r)?;
+        [s0, s1, s2, s3, s4]
     };
 
-    let qlm = read_dense_polynomial(&mut r)?;
-    let qrm = read_dense_polynomial(&mut r)?;
-    let qom = read_dense_polynomial(&mut r)?;
-    let qmm = read_dense_polynomial(&mut r)?;
-    let qc = read_dense_polynomial(&mut r)?;
-
-    let rcm = {
+    let qwm = {
         let s0 = read_dense_polynomial(&mut r)?;
         let s1 = read_dense_polynomial(&mut r)?;
         let s2 = read_dense_polynomial(&mut r)?;
-        [s0, s1, s2]
+        let s3 = read_dense_polynomial(&mut r)?;
+        let s4 = read_dense_polynomial(&mut r)?;
+        [s0, s1, s2, s3, s4]
+    };
+    let qmm = read_dense_polynomial(&mut r)?;
+    let qc = read_dense_polynomial(&mut r)?;
+
+    let rcm =  {
+        let s0 = read_dense_polynomial(&mut r)?;
+        let s1 = read_dense_polynomial(&mut r)?;
+        let s2 = read_dense_polynomial(&mut r)?;
+        let s3 = read_dense_polynomial(&mut r)?;
+        let s4 = read_dense_polynomial(&mut r)?;
+        [s0, s1, s2, s3, s4]
     };
 
     let psm = read_dense_polynomial(&mut r)?;
     let addm = read_dense_polynomial(&mut r)?;
+    let doublem = read_dense_polynomial(&mut r)?;
     let mul1m = read_dense_polynomial(&mut r)?;
     let mul2m = read_dense_polynomial(&mut r)?;
-    let emul1m = read_dense_polynomial(&mut r)?;
-    let emul2m = read_dense_polynomial(&mut r)?;
-    let emul3m = read_dense_polynomial(&mut r)?;
+    let emulm = read_dense_polynomial(&mut r)?;
+    let packm = read_dense_polynomial(&mut r)?;
 
-    let qll = read_plonk_evaluations(&mut r)?;
-    let qrl = read_plonk_evaluations(&mut r)?;
-    let qol = read_plonk_evaluations(&mut r)?;
+    let qwl = {
+        let s0 = read_plonk_evaluations(&mut r)?;
+        let s1 = read_plonk_evaluations(&mut r)?;
+        let s2 = read_plonk_evaluations(&mut r)?;
+        let s3 = read_plonk_evaluations(&mut r)?;
+        let s4 = read_plonk_evaluations(&mut r)?;
+        [s0, s1, s2, s3, s4]
+    };
     let qml = read_plonk_evaluations(&mut r)?;
 
     let sigmal1 = {
         let s0 = read_vec(&mut r)?;
         let s1 = read_vec(&mut r)?;
         let s2 = read_vec(&mut r)?;
-        [s0, s1, s2]
+        let s3 = read_vec(&mut r)?;
+        let s4 = read_vec(&mut r)?;
+        [s0, s1, s2, s3, s4]
     };
 
-    let sigmal4 = {
+    let sigmal8 = {
         let s0 = read_plonk_evaluations(&mut r)?;
         let s1 = read_plonk_evaluations(&mut r)?;
         let s2 = read_plonk_evaluations(&mut r)?;
-        [s0, s1, s2]
+        let s3 = read_plonk_evaluations(&mut r)?;
+        let s4 = read_plonk_evaluations(&mut r)?;
+        [s0, s1, s2, s3, s4]
     };
 
     let sid = read_vec(&mut r)?;
@@ -406,19 +417,26 @@ where
     let ps4 = read_plonk_evaluations(&mut r)?;
     let ps8 = read_plonk_evaluations(&mut r)?;
 
-    let addl4 = read_plonk_evaluations(&mut r)?;
+    let addl = read_plonk_evaluations(&mut r)?;
+    let doublel = read_plonk_evaluations(&mut r)?;
     let mul1l = read_plonk_evaluations(&mut r)?;
     let mul2l = read_plonk_evaluations(&mut r)?;
-    let emul1l = read_plonk_evaluations(&mut r)?;
-    let emul2l = read_plonk_evaluations(&mut r)?;
-    let emul3l = read_plonk_evaluations(&mut r)?;
+    let emull = read_plonk_evaluations(&mut r)?;
+    let packl = read_plonk_evaluations(&mut r)?;
 
+    let l1 = read_plonk_evaluations(&mut r)?;
     let l04 = read_plonk_evaluations(&mut r)?;
     let l08 = read_plonk_evaluations(&mut r)?;
-    let l1 = read_plonk_evaluations(&mut r)?;
+    let zero4 = read_plonk_evaluations(&mut r)?;
+    let zero8 = read_plonk_evaluations(&mut r)?;
 
-    let r_value = G::ScalarField::read(&mut r)?;
-    let o = G::ScalarField::read(&mut r)?;
+    let shift = {
+        let c1 = G::ScalarField::read(&mut r)?;
+        let c2 = G::ScalarField::read(&mut r)?;
+        let c3 = G::ScalarField::read(&mut r)?;
+        let c4 = G::ScalarField::read(&mut r)?;
+        [G::ScalarField::one(), c1, c2, c3, c4]
+    };
     let endo = G::ScalarField::read(&mut r)?;
 
     let zkpm = zk_polynomial(domain.d1);
@@ -430,39 +448,36 @@ where
         domain,
         gates,
         sigmam,
-        qlm,
-        qrm,
-        qom,
+        qwm,
         qmm,
         qc,
         rcm,
         psm,
         addm,
+        doublem,
         mul1m,
         mul2m,
-        emul1m,
-        emul2m,
-        emul3m,
-        qll,
-        qrl,
-        qol,
+        emulm,
+        packm,
+        qwl,
         qml,
         sigmal1,
-        sigmal4,
+        sigmal8,
         sid,
         ps4,
         ps8,
-        addl4,
+        addl,
+        doublel,
         mul1l,
         mul2l,
-        emul1l,
-        emul2l,
-        emul3l,
+        emull,
+        packl,
         l04,
         l08,
         l1,
-        r: r_value,
-        o,
+        zero4,
+        zero8,
+        shift,
         endo,
         fr_sponge_params,
     })

@@ -107,7 +107,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     (* x^5 *)
     square (square x) * x
   in
-  let {Marlin_plonk_bindings.Types.Plonk_verification_shifts.r; o} =
+  let {Marlin_plonk_bindings.Types.Plonk_verification_shifts.r; o; q; p} =
     domain#shifts
   in
   fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
@@ -147,6 +147,8 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             (e0.l + bz + gamma)
             * (e0.r + (bz * r) + gamma)
             * (e0.o + (bz * o) + gamma)
+            * (e0.q + (bz * q) + gamma)
+            * (e0.p + (bz * p) + gamma)
             * alpha * zkp
             + (alphas Range.perm 0 * vp_zeta / (zeta - one))
             + (alphas Range.perm 1 * vp_zeta / (zeta - w3)) )
