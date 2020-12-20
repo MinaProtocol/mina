@@ -3563,7 +3563,7 @@ module Hooks = struct
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Mina_base.State_hash.t) With_hash.t)
-            ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
+            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
             ~coinbase_receiver ~supercharge_coinbase ->
           let prev =
             Protocol_state.consensus_state
