@@ -1,0 +1,24 @@
+#!/bin/sh
+
+for LAST; do true; done
+
+ARGS=
+for param in "$@"
+do
+##    echo COUNT: $#
+    if [ $# -ne 1 ]
+    then
+        ARGS="$ARGS $1"
+    fi
+    shift
+done
+
+# if no dir arg is passed:
+if [[ $LAST == -* ]]
+then
+    ARGS="$ARGS $LAST"
+    LAST=
+fi
+
+ls --color $ARGS `bazel info output_base`/external/$LAST
+echo OUTPUT_BASE: `bazel info output_base`/external

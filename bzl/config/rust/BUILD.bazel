@@ -1,0 +1,93 @@
+## Rust Build Configuration
+
+## Rust profiles are determined by Cargo, not the language, so we need
+## to implement them in Bazel.
+## https://doc.rust-lang.org/cargo/reference/profiles.html
+
+## DEV profile defaults
+# [profile.dev]
+# opt-level = 0
+# debug = true  # 2
+# debug-assertions = true
+# overflow-checks = true
+# lto = false
+# panic = 'unwind'
+# incremental = true
+# codegen-units = 256
+# rpath = false
+
+## RELEASE profile defaults
+# [profile.release]
+# opt-level = 3
+# debug = false  # 0
+# debug-assertions = false
+# overflow-checks = false
+# lto = false
+# panic = 'unwind'
+# incremental = false
+# codegen-units = 16
+# rpath = false
+
+## TEST profile defaults
+# [profile.test]
+# opt-level = 0
+# debug = 2
+# debug-assertions = true
+# overflow-checks = true
+# lto = false
+# panic = 'unwind'    # This setting is always ignored.
+# incremental = true
+# codegen-units = 256
+# rpath = false
+
+## BENCH profile defaults
+# [profile.bench]
+# opt-level = 3
+# debug = false # 0
+# debug-assertions = false
+# overflow-checks = false
+# lto = false
+# panic = 'unwind'    # This setting is always ignored.
+# incremental = false
+# codegen-units = 16
+# rpath = false
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_setting")
+load("//bzl/config:BUILD.bzl", "int_enum_flag")
+
+string_flag( name = "profile", build_setting_default = "release",
+             values = ["debug", "dev", "release", "test", "bench"],
+             visibility = ["//visibility:public"])
+config_setting( name = "profile_debug", flag_values = { ":profile": "debug" })
+config_setting( name = "profile_dev", flag_values = { ":profile": "dev" })
+config_setting( name = "profile_release", flag_values = { ":profile": "release" })
+config_setting( name = "profile_test", flag_values = { ":profile": "test" })
+config_setting( name = "profile_bench", flag_values = { ":profile": "bench" })
+
+################################################################
+#### Individual flags
+## defaults from dev profile
+int_enum_flag( name = "debug", build_setting_default = 2,
+               values = [0, 1, 2], visibility = ["//visibility:public"])
+config_setting( name = "debug-disable", flag_values = {":debug": str(0)} )
+config_setting( name = "debug-line-tables", flag_values = {":debug": str(1)} )
+config_setting( name = "debug-full", flag_values = {":debug": str(2)} )
+
+config_setting( name = "debug-dev", flag_values = {":debug": str(2)} )
+config_setting( name = "debug-release", flag_values = {":debug": str(0)} )
+
+int_enum_flag( name = "opt-level", build_setting_default = 0,
+               values = [0, 1, 2, 3, 99, 98],
+               visibility = ["//visibility:public"])
+
+config_setting( name = "opt-level-disable", flag_values = {":opt-level": str(0)} )
+config_setting( name = "opt-level-basic", flag_values = {":opt-level": str(1)} )
+config_setting( name = "opt-level-some", flag_values = {":opt-level": str(2)} )
+config_setting( name = "opt-level-all", flag_values = {":opt-level": str(3)} )
+config_setting( name = "opt-level-binary", flag_values = {":opt-level": str(99)} )
+config_setting( name = "opt-level-binary-no-loops", flag_values = {":opt-level": str(98)} )
+
+config_setting( name = "opt-level-dev", flag_values = {":opt-level": str(0)} )
+config_setting( name = "opt-level-release", flag_values = {":opt-level": str(3)} )
+config_setting( name = "opt-level-test", flag_values = {":opt-level": str(0)} )
+config_setting( name = "opt-level-bench", flag_values = {":opt-level": str(3)} )

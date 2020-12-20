@@ -1,0 +1,21 @@
+_build
+buildkite
+coda-automation
+dockerfiles
+docs
+genesis_ledgers
+helm
+maintenance
+rfcs
+
+# not yet converted to snarky.backendless:
+src/lib/vrf_lib/tests
+
+# depends on src/lib/vrf_lib/tests:
+src/app/benchmarks
+
+# depends on javascript:
+src/app/client_sdk
+
+# build fails on unexpected type:
+src/app/display_public_key
