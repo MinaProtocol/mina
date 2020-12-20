@@ -1,0 +1,9 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_setting")
+
+string_flag( name = "digestif", build_setting_default = "c",
+             values = ["c", "ocaml"],
+             visibility = ["//visibility:public"])
+config_setting( name = "digestif.c",     flag_values = { ":digestif": "c" })
+config_setting( name = "digestif.ocaml", flag_values = { ":digestif": "ocaml" })
+
+

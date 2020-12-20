@@ -49,7 +49,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
-		50
+		50,
 	)
 	require.NoError(t, err)
 
