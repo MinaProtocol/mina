@@ -1,0 +1,419 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY ZEXE_BACKEND_COMMON
+################################################################
+ZEXE_BACKEND_COMMON_INTERFACE_OPTS = []
+
+ZEXE_BACKEND_COMMON_MODULE_OPTS = []
+
+ZEXE_BACKEND_COMMON_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:digestif",
+    "@opam//pkg:core",
+    "@opam//pkg:integers",
+    "@mina//src/lib/hex",
+    "@mina//src/lib/pickles_types",
+    "@mina//src/lib/marlin_plonk_bindings",
+    "@mina//src/lib/key_cache",
+    "@mina//src/lib/sgn_type",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//sponge",
+    "@snarky//snarkette",
+]
+
+##############
+ocaml_archive(
+    name = "zexe_backend_common",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Bigint",
+        ":_Curve",
+        ":_Dlog_plonk_based_keypair",
+        ":_Dlog_urs",
+        ":_Endoscale_round",
+        ":_Field",
+        ":_Intf",
+        ":_Plonk_constraint_system",
+        ":_Plonk_dlog_oracles",
+        ":_Plonk_dlog_proof",
+        ":_Poly_comm",
+        ":_Scale_round",
+        ":_Var",
+        ":_Version",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Zexe_backend_common_ns",
+    ns = "zexe_backend_common",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "bigint.ml",
+        "curve.ml",
+        "dlog_plonk_based_keypair.ml",
+        "dlog_urs.ml",
+        "endoscale_round.ml",
+        "field.ml",
+        "intf.ml",
+        "plonk_constraint_system.ml",
+        "plonk_dlog_oracles.ml",
+        "plonk_dlog_proof.ml",
+        "poly_comm.ml",
+        "scale_round.ml",
+        "var.ml",
+        ":version.ml",  # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bigint",
+    src = "bigint.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Curve",
+    src = "curve.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        # Error (warning 22): Cannot include Stable.Latest
+        # Error (warning 22): Binable.Of_binable applied outside of stable-versioned module
+        # Error (warning 22): First argument to Binable.Of_binable must be a stable-versioned module
+        "-w", "-22", # Preprocessor warning.
+        "-w", "-33", # Unused open statement.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_plonk_based_keypair",
+    src = "dlog_plonk_based_keypair.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        "-w", "-33" # Unused open statement.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Curve",
+        ":_Intf",
+        ":_Plonk_constraint_system",
+        ":_Poly_comm",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_urs",
+    src = "dlog_urs.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        "-w", "-33", # Error (warning 33): unused open Zexe_backend_common.Intf.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Version",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Endoscale_round",
+    src = "endoscale_round.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Field",
+    src = "field.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        # Error (warning 22): Deriving bin_io and deriving version disallowed for types in functor body
+        # Error (warning 22): Versioned type must be in %%versioned extension
+        # Error (warning 22): First argument to Binable.Of_binable must be a stable-versioned module
+        # Error (warning 22): Versioned type must be in %%versioned extension
+        "-w", "-22", # Preprocessor warning.
+        "-w", "-6",  # Error (warning 6): label over was omitted in the application of this function.
+        "-w", "-32", # Error (warning 32): unused value domain_generator.
+        "-w", "-33", # Error (warning 33): unused open Zexe_backend_common.Intf.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Bigint",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_constraint_system",
+    src = "plonk_constraint_system.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        # line 35, characters 0-20: Error (warning 33): unused open Unsigned.Size_t.
+        # line 38, characters 4-17: Error (warning 33): unused open Unsigned.
+        # line 1458, characters 4-22: Error (warning 33): unused open Pickles_types.
+        "-w", "-33",
+        # line 2252, characters 31-34: Error (warning 27): unused variable sys.
+        # line 2317, characters 32-33:Error (warning 27): unused variable x.
+        # line 2332, characters 36-37:Error (warning 27): unused variable y.
+        "-w", "-27",
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Endoscale_round",
+        ":_Field",
+        ":_Scale_round",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_dlog_oracles",
+    src = "plonk_dlog_oracles.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_dlog_proof",
+    src = "plonk_dlog_proof.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        "-w", "-22", # Error (warning 22): Cannot include Stable.Latest
+        "-w", "-33", # Unused open statement.
+        "-w", "-34"  # Unused type declaration.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        "//src/lib/allocation_functor",
+        ":_Curve",
+        ":_Intf",
+        ":_Poly_comm",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Poly_comm",
+    src = "poly_comm.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS + [
+        "-w", "-33", # Unused open stmts Zexe_backend_common.Intf, Pickles_types.Dlog_plonk_types.Poly_comm.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS + [
+        # do not sort (buildifier)
+        ":_Curve",
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Scale_round",
+    src = "scale_round.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Var",
+    src = "var.ml",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Version.cmi",
+    src = "version.mli",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+    deps = ZEXE_BACKEND_COMMON_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Version", # obazl:retain
+    src = ":version.ml", # obazl:retain
+    intf = ":_Version.cmi",
+    ns = ":Zexe_backend_common_ns",
+    opts = ZEXE_BACKEND_COMMON_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend_common",
+    ],
+)
+
+######## WARNING ########
+## This is temporary, until stamping is implemented.
+genrule(
+    name       = "gensrc",
+    outs       = ["version.ml"],
+    cmd        = "\n".join([
+        "echo 'let marlin_repo_sha = \"00000000\"' > $@"
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = ["-w", "-27"],
+    visibility = [
+        "//src/lib/zexe_backend/zexe_backend_common:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@mina//src/lib/ppx_coda",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)

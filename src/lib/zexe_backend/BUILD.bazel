@@ -1,0 +1,31 @@
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "zexe_backend",
+    src = "zexe_backend.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving_yojson__ppx_deriving.std",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "zexe_backend",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/hex",
+        "@mina//src/lib/key_cache",
+        "@mina//src/lib/marlin_plonk_bindings",
+        "@mina//src/lib/pickles_types",
+        "@mina//src/lib/sgn_type",
+        "@mina//src/lib/zexe_backend/tweedle",
+        "@opam//pkg:core",
+        "@opam//pkg:integers",
+        "@snarky//snarkette",
+        "@snarky//sponge",
+        "@snarky//src/base:snarky_backendless",
+    ],
+)

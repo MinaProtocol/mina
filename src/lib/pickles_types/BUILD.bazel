@@ -1,0 +1,416 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+PPX_PRINT = "@ppx//print:binary" # FIXME: modules needing this break if ppx_print == text
+
+################################################################
+## STANZA 1: LIBRARY PICKLES_TYPES
+################################################################
+PICKLES_TYPES_INTERFACE_OPTS = []
+
+PICKLES_TYPES_MODULE_OPTS = []
+
+PICKLES_TYPES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/marlin_plonk_bindings:types"
+    # "@mina//src/lib/marlin_plonk_bindings/types:marlin_plonk_bindings_types",
+]
+
+##############
+ocaml_archive(
+    name = "pickles_types",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Abc",
+        ":_At_most",
+        ":_Dlog_marlin_types",
+        ":_Dlog_plonk_types",
+        ":_Hlist",
+        ":_Hlist0",
+        ":_Matrix_evals",
+        ":_Nat",
+        ":_Or_infinity",
+        ":_Pairing_marlin_types",
+        ":_Pcs_batch",
+        ":_Plonk_verification_key_evals",
+        ":_Scalar_challenge",
+        ":_Shifted_value",
+        ":_Vector",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Pickles_types_ns",
+    ns = "pickles_types",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "abc.ml",
+        "at_most.ml",
+        "dlog_marlin_types.ml",
+        "dlog_plonk_types.ml",
+        "hlist.ml",
+        "hlist0.ml",
+        "matrix_evals.ml",
+        "nat.ml",
+        "or_infinity.ml",
+        "pairing_marlin_types.ml",
+        "pcs_batch.ml",
+        "plonk_verification_key_evals.ml",
+        "scalar_challenge.ml",
+        "shifted_value.ml",
+        "vector.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Abc",
+    src = "abc.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_At_most",
+    src = "at_most.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_marlin_types",
+    src = "dlog_marlin_types.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Abc",
+        ":_Dlog_plonk_types",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_plonk_types",
+    src = "dlog_plonk_types.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Or_infinity",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hlist",
+    src = "hlist.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Hlist0",
+        ":_Nat",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hlist0",
+    src = "hlist0.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Matrix_evals",
+    src = "matrix_evals.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Nat",
+    src = "nat.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Or_infinity",
+    src = "or_infinity.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Pairing_marlin_types",
+    src = "pairing_marlin_types.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Abc",                # obazl:retain
+        ":_Nat",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pcs_batch",
+    src = "pcs_batch.ml",
+    intf = ":_Pcs_batch.cmi",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Dlog_plonk_types",
+        ":_Nat",
+        ":_Vector",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Pcs_batch.cmi",
+    src = "pcs_batch.mli",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Dlog_plonk_types",
+        ":_Nat",
+        ":_Vector",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_verification_key_evals",
+    src = "plonk_verification_key_evals.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Scalar_challenge",
+    src = "scalar_challenge.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Shifted_value",
+    src = "shifted_value.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Vector",
+    src = "vector.ml",
+    ns = ":Pickles_types_ns",
+    opts = PICKLES_TYPES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-lint-version-syntax-warnings",
+        "-inline-test-lib",
+        "pickles_types",
+    ],
+    deps = PICKLES_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Hlist0",
+        ":_Nat",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/pickles_types:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)

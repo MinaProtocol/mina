@@ -1,0 +1,147 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY ALLOCATION_FUNCTOR
+################################################################
+ALLOCATION_FUNCTOR_INTERFACE_OPTS = []
+
+ALLOCATION_FUNCTOR_MODULE_OPTS = []
+
+ALLOCATION_FUNCTOR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_metrics",
+]
+
+##############
+ocaml_archive(
+    name = "allocation_functor",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ALLOCATION_FUNCTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Make",
+        ":_Table",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Allocation_functor_ns",
+    ns = "allocation_functor",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "make.ml",
+        "table.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Allocation_functor_ns",
+    opts = ALLOCATION_FUNCTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "allocation_functor",
+    ],
+    deps = ALLOCATION_FUNCTOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Make",
+    src = "make.ml",
+    ns = ":Allocation_functor_ns",
+    opts = ALLOCATION_FUNCTOR_MODULE_OPTS + [
+        "-w", "-22" # Error (warning 22): Versioned type used outside a versioned type declaration
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "allocation_functor",
+    ],
+    deps = ALLOCATION_FUNCTOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Table",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Table",
+    src = "table.ml",
+    intf = ":_Table.cmi",
+    ns = ":Allocation_functor_ns",
+    opts = ALLOCATION_FUNCTOR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "allocation_functor",
+    ],
+    deps = ALLOCATION_FUNCTOR_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Table.cmi",
+    src = "table.mli",
+    ns = ":Allocation_functor_ns",
+    opts = ALLOCATION_FUNCTOR_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "allocation_functor",
+    ],
+    deps = ALLOCATION_FUNCTOR_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/allocation_functor:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

@@ -1,0 +1,43 @@
+load("@io_bazel_rules_rust//rust:rust.bzl", "rust_library")
+load("//bzl/config/rust:BUILD.bzl", "RUST_CRATE_TYPE", "RUST_PROFILE")
+
+rust_library(
+    name = "marlin_plonk_stubs",
+    visibility = ["//visibility:public"],
+    edition = "2018",
+    crate_type = "staticlib", # RUST_CRATE_TYPE,
+    rustc_flags = RUST_PROFILE + [
+        "-C", "target-feature=+bmi2,+adx",
+    ] + select({
+        "//bzl/host:macos": ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
+        "//bzl/host:linux": []
+    }, no_match_error = "Uknown platform. Only MacOS and Linux supported."),
+    srcs = glob(["src/**/*.rs"]),
+    deps = [
+        "//bzl/external/rust:libc",
+        "//bzl/external/rust:num_bigint",
+        "//bzl/external/rust:ocaml",
+        "//bzl/external/rust:rand",
+        "//bzl/external/rust:rand_core",
+        "//bzl/external/rust:rayon",
+        "//bzl/external/rust:sprs",
+
+        "@zexe//algebra",
+        "@zexe//ff-fft",
+        "@zexe//groupmap",
+
+        "@marlin//oracle",
+        "@marlin//dlog/commitment:commitment_dlog",
+        "@marlin//dlog/marlin:marlin_protocol_dlog",
+        "@marlin//dlog/plonk:plonk_protocol_dlog",
+        "@marlin//dlog_solver",
+        "@marlin//circuits/marlin:marlin_circuits",
+        "@marlin//circuits/plonk:plonk_circuits",
+        "@marlin//pairing/commitment:commitment_pairing",
+        "@marlin//pairing/marlin:marlin_protocol_pairing",
+    ],
+    # crate_features = [
+    #     "std",
+    #     "ocaml::func"
+    # ]
+)
