@@ -1,0 +1,104 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_GROUP_MAP
+################################################################
+SNARKY_GROUP_MAP_INTERFACE_OPTS = []
+
+SNARKY_GROUP_MAP_MODULE_OPTS = []
+
+SNARKY_GROUP_MAP_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//group_map",
+    "@snarky//src/base:snarky_backendless",
+]
+
+SNARKY_GROUP_MAP_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+SNARKY_GROUP_MAP_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "snarky_group_map",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_group_map",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARKY_GROUP_MAP_DEPS + [
+        # do not sort (buildifier)
+        ":_Checked_map",
+        ":_Snarky_group_map",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_group_map_ns",
+    ns = "snarky_group_map",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "checked_map.ml",
+        "snarky_group_map.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Checked_map",
+    src = "checked_map.ml",
+    intf = ":_Checked_map.cmi",
+    ns = ":Snarky_group_map_ns",
+    opts = SNARKY_GROUP_MAP_MODULE_OPTS,
+    ppx = SNARKY_GROUP_MAP_PPX,
+    ppx_args = SNARKY_GROUP_MAP_PPX_ARGS,
+    deps = SNARKY_GROUP_MAP_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Checked_map.cmi",
+    src = "checked_map.mli",
+    ns = ":Snarky_group_map_ns",
+    opts = SNARKY_GROUP_MAP_INTERFACE_OPTS,
+    ppx = SNARKY_GROUP_MAP_PPX,
+    ppx_args = SNARKY_GROUP_MAP_PPX_ARGS,
+    deps = SNARKY_GROUP_MAP_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snarky_group_map",
+    src = "snarky_group_map.ml",
+    intf = ":_Snarky_group_map.cmi",
+    ns = ":Snarky_group_map_ns",
+    opts = SNARKY_GROUP_MAP_MODULE_OPTS,
+    ppx = SNARKY_GROUP_MAP_PPX,
+    ppx_args = SNARKY_GROUP_MAP_PPX_ARGS,
+    deps = SNARKY_GROUP_MAP_DEPS + [
+        # do not sort (buildifier)
+        ":_Checked_map",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snarky_group_map.cmi",
+    src = "snarky_group_map.mli",
+    ns = ":Snarky_group_map_ns",
+    opts = SNARKY_GROUP_MAP_INTERFACE_OPTS,
+    ppx = SNARKY_GROUP_MAP_PPX,
+    ppx_args = SNARKY_GROUP_MAP_PPX_ARGS,
+    deps = SNARKY_GROUP_MAP_DEPS,
+)

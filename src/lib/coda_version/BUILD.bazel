@@ -1,0 +1,78 @@
+load( "@obazl_rules_ocaml//ocaml:rules.bzl", "ocaml_interface", "ocaml_module")
+load( "@obazl_tools_bazel//tools:rules.bzl", "stamped_filegroup")
+
+## Only stamp if --stamp flag is pased.  Otherwise use generic defaults.
+
+#############
+ocaml_module(
+    name = "coda_version",
+    module_name = "coda_version",
+    src  = select({
+        "//:stampit": "coda_version.ml",
+        "//conditions:default": "coda_version_defaults.ml"
+    }),
+    opts = [
+        "-w", "-32" # Error (warning 32): unused value marlin_branch.
+    ],
+    intf = ":_Coda_version.cmi",
+    ppx = "//bzl/ppx/exe:ppx_version",
+    visibility = ["//visibility:public"],
+)
+
+################
+ocaml_interface(
+    name = "_Coda_version.cmi",
+    src = "coda_version.mli",
+    ppx = "//bzl/ppx/exe:ppx_version"
+)
+
+########
+genrule(
+    name = "gensrc",
+    stamp = True,
+    srcs = ["coda_version.ml.template"],
+    outs = ["coda_version.ml"],
+    cmd = "\n".join([
+        "exec <bazel-out/stable-status.txt",
+        "while read -r K V LINE",  # -r "backslash does not act as an escape char"
+        "do",
+        "    echo $$K",
+        "    eval $$K=$$V",
+        "done",
+        "exec 3>$@",
+        "exec <$<",
+        "while read -r LINE",
+        "do",
+        "    LINE=\"$${LINE//\\{MINA_COMMIT_ID\\}/$$STABLE_MINA_COMMIT_ID}\"",
+        "    LINE=\"$${LINE//\\{MINA_COMMIT_ID_SHORT\\}/$$STABLE_MINA_COMMIT_ID_SHORT}\"",
+        "    LINE=\"$${LINE//\\{MINA_BRANCH\\}/$$STABLE_MINA_BRANCH}\"",
+        "    LINE=\"$${LINE//\\{MINA_COMMIT_DATE\\}/$$STABLE_MINA_COMMIT_DATE}\"",
+        "    echo",
+        "    LINE=\"$${LINE//\\{MARLIN_COMMIT_ID\\}/$$STABLE_MARLIN_COMMIT_ID}\"",
+        "    LINE=\"$${LINE//\\{MARLIN_COMMIT_ID_SHORT\\}/$$STABLE_MARLIN_COMMIT_ID_SHORT}\"",
+        "    LINE=\"$${LINE//\\{MARLIN_COMMIT_DATE\\}/$$STABLE_MARLIN_COMMIT_DATE}\"",
+        "    echo",
+        "    LINE=\"$${LINE//\\{ZEXE_COMMIT_ID\\}/$$STABLE_ZEXE_COMMIT_ID}\"",
+        "    LINE=\"$${LINE//\\{ZEXE_COMMIT_ID_SHORT\\}/$$STABLE_ZEXE_COMMIT_ID_SHORT}\"",
+        "    LINE=\"$${LINE//\\{ZEXE_COMMIT_DATE\\}/$$STABLE_ZEXE_COMMIT_DATE}\"",
+        "    echo $$LINE 1>&3",
+        "done",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+# stamped_filegroup(
+#     name = "gensrcx",
+#     output   = "coda_version.ml",
+#     template = "coda_version.template",
+#     stamp = True,
+#     substitutions = {
+#         "{BRANCH}": "STABLE_GIT_BRANCH",
+#         "{COMMIT_ID}": "STABLE_GIT_COMMIT_ID",
+#         "{COMMIT_ID_SHORT}": "STABLE_GIT_COMMIT_ID_SHORT",
+#         "{COMMIT_DATE}": "STABLE_GIT_COMMIT_DATE"
+#         # "{BRANCH}": "bazel-base",
+#         # "{COMMIT_ID}": "79517ccd5a026663449ab8433b91264eac0eb570",
+#         # "{COMMIT_ID_SHORT}": "79517ccd"
+#     }
+# )

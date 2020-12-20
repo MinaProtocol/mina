@@ -1,0 +1,155 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY COMPOSITION_TYPES
+################################################################
+COMPOSITION_TYPES_INTERFACE_OPTS = []
+
+COMPOSITION_TYPES_MODULE_OPTS = []
+
+COMPOSITION_TYPES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/pickles/limb_vector",
+    "@mina//src/lib/zexe_backend",
+    "@mina//src/lib/pickles_types",
+    "@mina//src/lib/pickles_base",
+    "@snarky//src/base:snarky_backendless",
+]
+
+COMPOSITION_TYPES_PPX = "@//bzl/ppx/exe:ppx_version__ppx_coda__ppx_jane__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx"
+
+COMPOSITION_TYPES_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "composition_types",
+]
+
+##############
+ocaml_archive(
+    name = "composition_types",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = COMPOSITION_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Bulletproof_challenge",
+        ":_Composition_types",
+        ":_Digest",
+        ":_Index",
+        ":_Spec",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Composition_types_ns",
+    ns = "composition_types",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "bulletproof_challenge.ml",
+        "composition_types.ml",
+        "digest.ml",
+        "index.ml",
+        "spec.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bulletproof_challenge",
+    src = "bulletproof_challenge.ml",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_MODULE_OPTS,
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    ppx_print = PPX_PRINT,
+    deps = COMPOSITION_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Composition_types",
+    src = "composition_types.ml",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_MODULE_OPTS + [
+        "-w", "-22", # Error (warning 22): Must have deriving version if deriving bin_io
+        "-w", "-27", # Error (warning 27): unused variable
+        "-w", "-33", # Error (warning 33): unused open Snarky_backendless.H_list.
+    ],
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    ppx_print = PPX_PRINT,
+    deps = COMPOSITION_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Bulletproof_challenge",
+        ":_Digest",
+        ":_Index",
+        ":_Spec",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Digest",
+    src = "digest.ml",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_MODULE_OPTS + [
+        "-w",
+        "-22", # Error (warning 22): Deriving bin_io and deriving version disallowed for types in functor body
+        "-w",
+        "-32"  # Error (warning 32): unused value of_tick_field.
+    ],
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    deps = COMPOSITION_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Index",
+    src = "index.ml",
+    intf = ":_Index.cmi",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_MODULE_OPTS,
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    deps = COMPOSITION_TYPES_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Index.cmi",
+    src = "index.mli",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_INTERFACE_OPTS,
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    deps = COMPOSITION_TYPES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Spec",
+    src = "spec.ml",
+    ns = ":Composition_types_ns",
+    opts = COMPOSITION_TYPES_MODULE_OPTS,
+    ppx = COMPOSITION_TYPES_PPX,
+    ppx_args = COMPOSITION_TYPES_PPX_ARGS,
+    deps = COMPOSITION_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Bulletproof_challenge",
+        ":_Digest",
+        ":_Index",
+    ],
+)
