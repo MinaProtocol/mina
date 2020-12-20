@@ -159,7 +159,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                  let name = sprintf "%s-%s.json" network hash_string in
                  ignore
                    (Core.Sys.command
-                      (sprintf "echo %s | gsutil cp -n - gs://%s/%s" json
+                      (sprintf "echo '%s' | gsutil cp -n - gs://%s/%s" json
                          bucket name))
              | _ ->
                  () ) ;
