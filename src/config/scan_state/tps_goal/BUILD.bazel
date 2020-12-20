@@ -1,0 +1,39 @@
+""" config/scan_state/tps_goal
+
+Configuration constants for medium scan_state tps goal.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_setting")
+
+bool_setting( name = "standard", build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "medium", build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "small", build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "tiny", build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "1tps", build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "point1tps", build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "point2tps", build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+bool_setting( name = "point5tps", build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+

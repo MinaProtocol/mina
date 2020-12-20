@@ -1,0 +1,5 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_setting")
+
+string_setting( name = "current", build_setting_default = "0.1.0",
+                visibility = ["//visibility:public"])
+

@@ -1,0 +1,31 @@
+"""config/scan_state/work_delay
+
+Configuration constants for scan_state work delay parameter.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "int_setting")
+
+int_setting( name = "standard", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "medium", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "small", build_setting_default = 1,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "tiny", build_setting_default = 1,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "1tps", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "point1tps", build_setting_default = 3,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "point2tps", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "point5tps", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
