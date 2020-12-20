@@ -1,6 +1,6 @@
 (library
- (name coda_debug)
- (public_name coda_debug)
+ (name mina_debug)
+ (public_name mina_debug)
  (libraries core_kernel)
  (flags :standard -short-paths)
  (preprocess
