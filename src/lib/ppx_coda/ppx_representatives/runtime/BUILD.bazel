@@ -1,0 +1,15 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "ppx_representatives_runtime",
+    src = "ppx_representatives_runtime.ml",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = [],
+)

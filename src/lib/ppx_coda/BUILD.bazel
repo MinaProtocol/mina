@@ -1,0 +1,214 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ppx_archive",
+    "ppx_executable",
+    "ppx_module",
+    "ppx_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## PPX STANZA 1: PPX_CODA
+################################################################
+PPX_CODA_PPX_MODULE_OPTS = []
+
+PPX_CODA_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:compiler-libs.common",
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:ppx_deriving.api",
+    "@opam//pkg:ppx_bin_prot",
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/ppx_register_event",
+    "@mina//src/lib/ppx_coda/ppx_to_enum",
+    "@mina//src/lib/ppx_coda/ppx_representatives",
+]
+
+PPX_CODA_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+############
+ppx_archive(
+    name = "ppx_coda",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PPX_CODA_DEPS + [
+        # do not sort (buildifier)
+        ":Check_ocaml_word_size",
+        ":Define_from_scope",
+        ":Define_locally",
+        ":Expires_after",
+        ":Getenv_ppx",
+        ":Log",
+    ],
+)
+
+#########
+ppx_ns(
+    name = "Ppx_coda_ns",
+    ns = "ppx_coda",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "check_ocaml_word_size.ml",
+        "define_from_scope.ml",
+        "define_locally.ml",
+        "expires_after.ml",
+        "getenv_ppx.ml",
+        "log.ml",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Check_ocaml_word_size",
+    src = "check_ocaml_word_size.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Define_from_scope",
+    src = "define_from_scope.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Define_locally",
+    src = "define_locally.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Expires_after",
+    src = "expires_after.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Getenv_ppx",
+    src = "getenv_ppx.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Log",
+    src = "log.ml",
+    ns = ":Ppx_coda_ns",
+    opts = PPX_CODA_PPX_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = PPX_CODA_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppx_deriving.api",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:core_kernel",
+        "@mina//src/lib/ppx_register_event",
+        "@mina//src/lib/ppx_coda/ppx_to_enum",
+        "@mina//src/lib/ppx_coda/ppx_representatives",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/ppx_coda:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

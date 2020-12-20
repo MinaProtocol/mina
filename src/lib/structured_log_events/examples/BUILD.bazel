@@ -1,0 +1,93 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY STRUCTURED_LOG_EVENTS_EXAMPLES
+################################################################
+STRUCTURED_LOG_EVENTS_EXAMPLES_MODULE_OPTS = []
+
+STRUCTURED_LOG_EVENTS_EXAMPLES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "//src/lib/structured_log_events" # obazl:retain
+]
+
+##############
+ocaml_archive(
+    name = "structured_log_events_examples",
+    doc = "Events, logging and parsing",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = STRUCTURED_LOG_EVENTS_EXAMPLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Event_declarations",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Structured_log_events_examples_ns",
+    ns = "structured_log_events_examples",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "event_declarations.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Event_declarations",
+    src = "event_declarations.ml",
+    ns = ":Structured_log_events_examples_ns",
+    opts = STRUCTURED_LOG_EVENTS_EXAMPLES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "structured_log_events_examples",
+    ],
+    deps = STRUCTURED_LOG_EVENTS_EXAMPLES_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/structured_log_events/examples:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

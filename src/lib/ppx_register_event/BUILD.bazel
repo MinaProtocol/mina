@@ -1,0 +1,73 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ppx_archive",
+    "ppx_module",
+    "ppx_ns",
+)
+
+################################################################
+## PPX STANZA 1: PPX_REGISTER_EVENT
+################################################################
+PPX_REGISTER_EVENT_PPX_MODULE_OPTS = []
+
+PPX_REGISTER_EVENT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:compiler-libs.common",
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson",
+    "@mina//src/lib/logproc_lib",
+]
+
+PPX_REGISTER_EVENT_PPX = "//bzl/ppx/exe:ppx_version__ppxlib.metaquot"
+
+PPX_REGISTER_EVENT_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+############
+ppx_archive(
+    name = "ppx_register_event",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PPX_REGISTER_EVENT_DEPS + [
+        # do not sort (buildifier)
+        ":Register_event",
+    ],
+)
+
+#########
+ppx_ns(
+    name = "Ppx_register_event_ns",
+    ns = "ppx_register_event",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "register_event.ml",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Register_event",
+    src = "register_event.ml",
+    lazy_deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:yojson",
+        "@mina//src/lib/structured_log_events",
+    ],
+    ns = ":Ppx_register_event_ns",
+    opts = PPX_REGISTER_EVENT_PPX_MODULE_OPTS,
+    ppx = PPX_REGISTER_EVENT_PPX,
+    ppx_args = PPX_REGISTER_EVENT_PPX_ARGS,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:core_kernel",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@mina//src/lib/logproc_lib",
+    ],
+)
