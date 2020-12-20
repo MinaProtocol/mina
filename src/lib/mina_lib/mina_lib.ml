@@ -104,7 +104,8 @@ type t =
   ; snark_job_state: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
-  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
+  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t
+  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -1349,11 +1350,18 @@ let create ?wallets (config : Config.t) =
               Archive_client.run ~logger:config.logger
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          let precomputed_block_writer =
+            ref
+              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
+                    `Path path )
+              , if config.log_precomputed_blocks then Some `Log else None )
+          in
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
+              ~time_controller:config.time_controller ~precomputed_block_writer
           in
           let open Coda_incremental.Status in
           let transition_frontier_incr =
@@ -1410,6 +1418,7 @@ let create ?wallets (config : Config.t) =
             ; coinbase_receiver= config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
-            ; sync_status } ) )
+            ; sync_status
+            ; precomputed_block_writer } ) )
 
 let net {components= {net; _}; _} = net

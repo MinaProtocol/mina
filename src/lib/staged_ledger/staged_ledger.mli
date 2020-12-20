@@ -64,6 +64,8 @@ module Staged_ledger_error : sig
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
+    | Mismatched_statuses of
+        Transaction.t With_status.t * User_command_status.t
     | Unexpected of Error.t
   [@@deriving sexp]
 
@@ -165,7 +167,9 @@ val create_diff :
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
   -> supercharge_coinbase:bool
-  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     , Pre_diff_info.Error.t )
+     Result.t
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
