@@ -1,0 +1,10 @@
+load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "int_setting")
+
+int_flag( name = "curve_size", build_setting_default = 298,
+          visibility = ["//visibility:public"])
+
+int_setting( name = "medium", build_setting_default = 753,
+             visibility = ["//visibility:public"])
+int_setting( name = "small", build_setting_default = 298,
+             visibility = ["//visibility:public"])
+

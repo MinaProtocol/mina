@@ -1,0 +1,115 @@
+load("@obazl_rules_ocaml//ocaml:rules.bzl",
+     "ocaml_library",
+     "ppx_library")
+
+load(":BUILD.bzl",
+     "mina_config",
+     "mina_test_config")
+
+######## BUILD SETTINGS (uncategorized) ########
+load("@bazel_skylib//rules:common_settings.bzl",
+     "bool_flag", "bool_setting",
+     "int_flag", "int_setting",
+     "string_flag", "string_setting")
+
+exports_files(["config.mlh.tpl"])
+
+# default values taken from config/dev.mlh
+
+int_flag( name = "supercharged_coinbase_factor", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+int_setting( name = "supercharged_coinbase_factor_2", build_setting_default = 2,
+                visibility = ["//visibility:public"])
+
+bool_flag( name = "time_offsets", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "time_offsets_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "time_offsets_false", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "plugins", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "plugins_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "plugins_false", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "with_fake_hash", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "fake_hash_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+int_flag( name = "block_window_duration", build_setting_default = 2000,
+             visibility = ["//visibility:public"])
+int_setting( name = "block_window_duration_600", build_setting_default = 600,
+             visibility = ["//visibility:public"])
+int_setting( name = "block_window_duration_20000", build_setting_default = 20000,
+             visibility = ["//visibility:public"])
+
+bool_flag( name = "integration_tests", build_setting_default = True,
+           visibility = ["//visibility:public"])
+bool_setting( name = "integration_tests_false", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "force_updates", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "force_updates_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "download_snark_keys", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "download_snark_keys_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "mock_frontend_data", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "mock_frontend_data_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+bool_flag( name = "print_versioned_types", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "print_versioned_types_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+string_flag( name = "daemon_expiry", build_setting_default = "never",
+             visibility = ["//visibility:public"])
+string_setting( name = "daemon_expiry_never", build_setting_default = "never",
+                visibility = ["//visibility:public"])
+string_setting( name = "daemon_expiry_2024",
+                build_setting_default = "2024-12-10 14:00:00-07:00",
+                visibility = ["//visibility:public"])
+
+bool_flag( name = "test_full_epoch", build_setting_default = False,
+           visibility = ["//visibility:public"])
+bool_setting( name = "test_full_epoch_true", build_setting_default = True,
+              visibility = ["//visibility:public"])
+
+
+################ PROFILE SELECTION ################
+# to support selection by profile we need a config setting for each
+# profile:
+config_setting( name = "config_dev",
+                flag_values = { "//src/profile": "dev" })
+config_setting( name = "config_debug",
+                flag_values = { "//src/profile": "debug" })
+config_setting( name = "config_fake_hash",
+                flag_values = { "//src/profile": "fake_hash" })
+config_setting( name = "config_testnet_public",
+                flag_values = { "//src/profile": "testnet_public" })
+
+# config_setting( name = "config_custom",
+#                 flag_values = { "//dev/profile": "any" })
+
+# build this target to verify that selecting by profile works:
+mina_test_config(
+    name="config",
+    config = select({
+        ":config_dev": ":dev",
+        ":config_debug": ":debug",
+        ":config_fake_hash": ":fake_hash",
+        ":config_testnet_public": ":testnet_public",
+        # "//conditions:default": ":config"
+    }),
+    visibility = ["//visibility:public"],
+)

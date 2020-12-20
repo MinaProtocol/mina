@@ -1,0 +1,35 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag", "string_setting")
+
+string_flag( name = "ledger", build_setting_default = "test",
+             values = [
+                 "fuzz",
+                 "test",
+                 "test_delegation",
+                 "test_five_even_stakes",
+                 "test_three_even_stakes",
+                 "test_split_two_stakers",
+                 "testnet_postake",
+                 "testnet_postake_many_producers",
+             ],
+             visibility = ["//visibility:public"])
+
+## constants:
+string_setting( name = "fuzz", build_setting_default = "fuzz",
+                visibility = ["//visibility:public"])
+string_setting( name = "test_delegation",
+                build_setting_default = "testnet_delegation",
+                visibility = ["//visibility:public"])
+string_setting( name = "test_five_even_stakes",
+                build_setting_default = "test_five_even_stakes",
+                visibility = ["//visibility:public"])
+string_setting( name = "test_three_even_stakes",
+                build_setting_default = "test_three_even_stakes",
+                visibility = ["//visibility:public"])
+string_setting( name = "test_split_two_stakers",
+                build_setting_default = "test_split_two_stakers",
+                visibility = ["//visibility:public"])
+string_setting( name = "testnet_postake", build_setting_default = "testnet_postake",
+                visibility = ["//visibility:public"])
+string_setting( name = "testnet_postake_many_producers",
+                build_setting_default = "testnet_postake_many_producers",
+                visibility = ["//visibility:public"])
