@@ -162,7 +162,6 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    ( Mina_metrics.(
                        Gauge.inc_one
                          Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks) ;
-                     let open Async.Let_syntax in
                      let%map output =
                        Async.Process.run () ~prog:"bash"
                          ~args:
