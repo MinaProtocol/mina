@@ -198,7 +198,7 @@ spec:
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $.Values.coda.ports.p2p | quote }}
+          value: {{ $config.externalPort | quote }}
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         - name: CODA_CLIENT_TRUSTLIST
@@ -215,8 +215,7 @@ spec:
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.external }}
+          containerPort: {{ $config.externalPort }}
 {{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
@@ -283,7 +282,7 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ $.Values.coda.ports.p2p }}
+    port: {{ $config.externalPort }}
     targetPort: external-port
 ---
 {{ end }}
