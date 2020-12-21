@@ -64,8 +64,7 @@ module Staged_ledger_error : sig
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
-    | Mismatched_statuses of
-        Transaction.t With_status.t * User_command_status.t
+    | Mismatched_statuses of Transaction.t With_status.t * Transaction_status.t
     | Unexpected of Error.t
   [@@deriving sexp]
 

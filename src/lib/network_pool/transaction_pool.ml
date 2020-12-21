@@ -1440,8 +1440,8 @@ let%test_module _ =
       { With_status.data= cmd
       ; status=
           Applied
-            ( User_command_status.Auxiliary_data.empty
-            , User_command_status.Balance_data.empty ) }
+            ( Transaction_status.Auxiliary_data.empty
+            , Transaction_status.Balance_data.empty ) }
 
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->

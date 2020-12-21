@@ -65,12 +65,12 @@ let construct_staged_ledger_at_root
            let computed_status =
              Ledger.Undo.user_command_status txn_with_info
            in
-           if User_command_status.equal txn.status computed_status then
+           if Transaction_status.equal txn.status computed_status then
              Or_error.return ()
            else
              Or_error.errorf
                !"Mismatched user command status. Expected: %{sexp: \
-                 User_command_status.t} Got: %{sexp: User_command_status.t}"
+                 Transaction_status.t} Got: %{sexp: Transaction_status.t}"
                txn.status computed_status )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash

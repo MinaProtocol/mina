@@ -30,7 +30,7 @@ module T = struct
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Mismatched_statuses of
-          Transaction.t With_status.t * User_command_status.t
+          Transaction.t With_status.t * Transaction_status.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -63,7 +63,7 @@ module T = struct
           str
       | Mismatched_statuses (transaction, status) ->
           Format.asprintf
-            !"Got a different status %{sexp: User_command_status.t} when \
+            !"Got a different status %{sexp: Transaction_status.t} when \
               applying the transaction %{sexp: Transaction.t With_status.t}"
             status transaction
       | Unexpected e ->
@@ -336,11 +336,11 @@ module T = struct
           let computed_status =
             Ledger.Undo.user_command_status txn_with_info
           in
-          if User_command_status.equal tx.status computed_status then Ok ()
+          if Transaction_status.equal tx.status computed_status then Ok ()
           else
             Or_error.errorf
               !"Mismatched user command status. Expected: %{sexp: \
-                User_command_status.t} Got: %{sexp: User_command_status.t}"
+                Transaction_status.t} Got: %{sexp: Transaction_status.t}"
               tx.status computed_status )
     in
     let%bind () =
@@ -533,7 +533,7 @@ module T = struct
       | Some status ->
           (* Validate that command status matches. *)
           let got_status = Ledger.Undo.user_command_status undo in
-          if User_command_status.equal status got_status then return ()
+          if Transaction_status.equal status got_status then return ()
           else
             Result.fail
               (Staged_ledger_error.Mismatched_statuses
@@ -2474,9 +2474,9 @@ let%test_module "test" =
                              { With_status.data= (cmd :> User_command.t)
                              ; status=
                                  Applied
-                                   ( User_command_status.Auxiliary_data.empty
-                                   , User_command_status.Balance_data.empty )
-                             } )
+                                   ( Transaction_status.Auxiliary_data.empty
+                                   , Transaction_status.Balance_data.empty ) }
+                         )
                     in
                     let diff =
                       create_diff_with_non_zero_fee_excess
