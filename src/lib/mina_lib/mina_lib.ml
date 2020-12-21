@@ -107,7 +107,6 @@ type t =
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
-  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t
   ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
 [@@deriving fields]
 
