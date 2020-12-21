@@ -1823,7 +1823,7 @@ module Subscriptions = struct
       ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
-        Mina_lib.sync_status coda |> Coda_incremental.Status.to_pipe
+        Mina_lib.sync_status coda |> Mina_incremental.Status.to_pipe
         |> Deferred.Result.return )
 
   let new_block =
@@ -2453,7 +2453,7 @@ module Queries = struct
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
         Result.map_error
-          (Coda_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
+          (Mina_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
           ~f:Error.to_string_hum )
 
   let daemon_status =
