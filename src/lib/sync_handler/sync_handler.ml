@@ -9,12 +9,12 @@ module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 
   module Best_tip_prover :
-    Coda_intf.Best_tip_prover_intf
+    Mina_intf.Best_tip_prover_intf
     with type transition_frontier := Transition_frontier.t
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Sync_handler_intf
+  Mina_intf.Sync_handler_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
