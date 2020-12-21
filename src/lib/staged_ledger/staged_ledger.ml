@@ -379,7 +379,7 @@ module T = struct
   call_logger]
 
   let hash t =
-    Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
+    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
   [%%endif]

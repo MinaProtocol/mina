@@ -93,7 +93,7 @@ val best_protocol_state : t -> Protocol_state.Value.t Participating_state.t
 
 val best_tip : t -> Transition_frontier.Breadcrumb.t Participating_state.t
 
-val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
+val sync_status : t -> Sync_status.t Mina_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 

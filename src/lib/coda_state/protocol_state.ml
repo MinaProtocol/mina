@@ -275,7 +275,7 @@ let genesis_state_hash ?(state_hash = None) state =
 call_logger]
 
 let hash s =
-  Coda_debug.Call_logger.record_call "Protocol_state.hash" ;
+  Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
   hash s
 
 [%%endif]
