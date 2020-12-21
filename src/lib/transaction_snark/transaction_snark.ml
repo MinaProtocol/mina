@@ -695,10 +695,10 @@ module Base = struct
                     false
                 | Error err ->
                     let open Mina_base in
-                    User_command_status.Failure.equal
+                    Transaction_status.Failure.equal
                       (Transaction_logic.timing_error_to_user_command_status
                          err)
-                      User_command_status.Failure
+                      Transaction_status.Failure
                       .Source_minimum_balance_violation
               in
               let source_bad_timing =
@@ -5962,9 +5962,9 @@ let%test_module "account timing check" =
       match timing with
       | Error err ->
           assert (
-            User_command_status.Failure.equal
+            Transaction_status.Failure.equal
               (Transaction_logic.timing_error_to_user_command_status err)
-              User_command_status.Failure.Source_minimum_balance_violation ) ;
+              Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -5989,9 +5989,9 @@ let%test_module "account timing check" =
       match timing with
       | Error err ->
           assert (
-            User_command_status.Failure.equal
+            Transaction_status.Failure.equal
               (Transaction_logic.timing_error_to_user_command_status err)
-              User_command_status.Failure.Source_insufficient_balance ) ;
+              Transaction_status.Failure.Source_insufficient_balance ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | _ ->
           false
@@ -6050,9 +6050,9 @@ let%test_module "account timing check" =
       match timing with
       | Error err ->
           assert (
-            User_command_status.Failure.equal
+            Transaction_status.Failure.equal
               (Transaction_logic.timing_error_to_user_command_status err)
-              User_command_status.Failure.Source_minimum_balance_violation ) ;
+              Transaction_status.Failure.Source_minimum_balance_violation ) ;
           checked_timing_should_fail account txn_amount txn_global_slot
       | Ok _ ->
           false

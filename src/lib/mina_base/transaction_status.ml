@@ -623,7 +623,7 @@ module Failure = struct
     | None ->
         failwith
           "Internal error: Could not convert User_command.Status.Failure.t to \
-           User_command_status.Failure.As_record.t"
+           Transaction_status.Failure.As_record.t"
 
   let to_record_opt t =
     match t with None -> As_record.none | Some t -> to_record t

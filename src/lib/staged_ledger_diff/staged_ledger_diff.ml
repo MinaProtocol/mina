@@ -83,7 +83,7 @@ module Pre_diff_two = struct
         ; commands: 'b list
         ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t
         ; internal_command_balances:
-            User_command_status.Internal_command_balance_data.Stable.V1.t list
+            Transaction_status.Internal_command_balance_data.Stable.V1.t list
         }
       [@@deriving sexp, yojson]
     end
@@ -94,7 +94,7 @@ module Pre_diff_two = struct
     ; commands: 'b list
     ; coinbase: Ft.t At_most_two.t
     ; internal_command_balances:
-        User_command_status.Internal_command_balance_data.t list }
+        Transaction_status.Internal_command_balance_data.t list }
   [@@deriving sexp, yojson]
 end
 
@@ -109,7 +109,7 @@ module Pre_diff_one = struct
         ; commands: 'b list
         ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t
         ; internal_command_balances:
-            User_command_status.Internal_command_balance_data.Stable.V1.t list
+            Transaction_status.Internal_command_balance_data.Stable.V1.t list
         }
       [@@deriving sexp, yojson]
     end
@@ -120,7 +120,7 @@ module Pre_diff_one = struct
     ; commands: 'b list
     ; coinbase: Ft.t At_most_one.t
     ; internal_command_balances:
-        User_command_status.Internal_command_balance_data.t list }
+        Transaction_status.Internal_command_balance_data.t list }
   [@@deriving sexp, yojson]
 end
 
