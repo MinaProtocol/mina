@@ -1,0 +1,32 @@
+""" config/scan_state/medium/txn_capacity
+
+Configuration constants for medium scan_state txn capacity.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "int_setting")
+
+int_setting( name = "standard", build_setting_default = 7,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "medium", build_setting_default = 3,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "small", build_setting_default = 2,
+             visibility = ["//visibility:public"])
+
+int_setting( name = "tiny", build_setting_default = 1,
+             visibility = ["//visibility:public"])
+
+# int_setting( name = "1tps", build_setting_default = ,
+#              visibility = ["//visibility:public"])
+
+int_setting( name = "point1tps", build_setting_default = 6,
+             visibility = ["//visibility:public"])
+
+# int_setting( name = "point2tps", build_setting_default = ,
+#              visibility = ["//visibility:public"])
+
+# int_setting( name = "point5tps", build_setting_default = ,
+#              visibility = ["//visibility:public"])
+
+

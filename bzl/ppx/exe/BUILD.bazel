@@ -1,0 +1,1336 @@
+load("@obazl_rules_ocaml//ocaml:rules.bzl", "ppx_executable", "ppx_module")
+
+###############
+ppx_executable(
+    name = "ppx_jane",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//scripts/archive/ocaml:__pkg__",
+        "//src/app/reformat:__pkg__",
+        "@async_kernel//eager_deferred/src:__pkg__",
+        "@async_kernel//limiter_async/src:__pkg__",
+        "@async_kernel//limiter_async/test:__pkg__",
+        "@async_kernel//persistent_connection_kernel/src:__pkg__",
+        "@async_kernel//src:__pkg__",
+        "@async_kernel//weak_hashtbl_async/src:__pkg__",
+        "@async_kernel//weak_hashtbl_async/test:__pkg__",
+        "@rpc_parallel//example:__pkg__",
+        "@rpc_parallel//expect_test:__pkg__",
+        "@rpc_parallel//src:__pkg__",
+        "@snarky//app/reformat-snarky:__pkg__",
+        "@snarky//examples/merkle_update:__pkg__",
+        "@snarky//examples/tutorial:__pkg__",
+        "@snarky//meja/src:__pkg__",
+        "@snarky//src/camlsnark_c/groth16_gpu_prover/test:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_tools_versioned.metaquot_402",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "@graphql_ppx//src/base:__pkg__",
+        "@graphql_ppx//src/bucklescript:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_tools_versioned.metaquot_402",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/benchmarks:__pkg__",
+        "//src/app/decoder:__pkg__",
+        "//src/lib/bash_colors:__pkg__",
+        "//src/lib/coda_incremental:__pkg__",
+        "//src/lib/coda_plugins/examples/do_nothing:__pkg__",
+        "//src/lib/coda_version:__pkg__",
+        "//src/lib/crs:__pkg__",
+        "//src/lib/cstubs_applicative:__pkg__",
+        "//src/lib/debug_assert:__pkg__",
+        "//src/lib/empty_hashes:__pkg__",
+        "//src/lib/hash_prefixes:__pkg__",
+        "//src/lib/immutable_array:__pkg__",
+        "//src/lib/inline_test_quiet_logs:__pkg__",
+        "//src/lib/integers_stubs_js:__pkg__",
+        "//src/lib/integers_stubs_js/test:__pkg__",
+        "//src/lib/marlin_plonk_bindings:__pkg__",
+        "//src/lib/marlin_plonk_bindings/bigint_256/test:__pkg__",
+        "//src/lib/marlin_plonk_bindings/bigint_384/test:__pkg__",
+        "//src/lib/marlin_plonk_bindings/bn_382_fp/vector:__pkg__",
+        "//src/lib/marlin_plonk_bindings/bn_382_fq/vector:__pkg__",
+        "//src/lib/marlin_plonk_bindings/tools/allocation_stress_test:__pkg__",
+        "//src/lib/marlin_plonk_bindings/tweedle_fp/vector:__pkg__",
+        "//src/lib/marlin_plonk_bindings/tweedle_fp_urs/test:__pkg__",
+        "//src/lib/marlin_plonk_bindings/tweedle_fq/vector:__pkg__",
+        "//src/lib/marlin_plonk_bindings/tweedle_fq_urs/test:__pkg__",
+        "//src/lib/mina_user_error:__pkg__",
+        "//src/lib/participating_state:__pkg__",
+        "//src/lib/snark_keys/remove_snark_keys_trigger:__pkg__",
+        "//src/lib/snarky_log:__pkg__",
+        "//src/lib/transition_frontier_controller:__pkg__",
+        "//src/lib/unix_timestamp:__pkg__",
+        "//src/lib/web_request:__pkg__",
+        "//src/lib/webkit_trace_event:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppxlib.metaquot",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/ppx_coda/ppx_representatives:__pkg__",
+        "//src/lib/ppx_coda/ppx_to_enum:__pkg__",
+        "@graphql_ppx//src/native:__pkg__",
+        "@ppx_version//src:__pkg__",
+        "@ppx_version//tools:__pkg__",
+        "@snarky//h_list/ppx:__pkg__",
+        "@snarky//meja/ocaml:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_deriving.enum",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/snarky_log/examples/election:__pkg__",
+        "@snarky//examples/election:__pkg__",
+        "@snarky//examples/election_gpu:__pkg__",
+        "@snarky//examples/elliptic_curve_operations:__pkg__",
+        "@snarky//examples/imperative_test:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.enum",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_deriving.eq",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "@snarky//bitstring_lib:__pkg__", # obazl:retain
+        "@snarky//fold_lib:__pkg__",      # obazl:retain
+        "@snarky//group_map:__pkg__",
+        "@snarky//snarky_curve:__pkg__",
+        "@snarky//snarky_integer:__pkg__",
+        "@snarky//snarky_signature:__pkg__",
+        "@snarky//sponge:__pkg__",
+        "@snarky//tuple_lib:__pkg__",     # obazl:retain
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_version",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/timeout_lib:__pkg__",
+        "//src/lib/transition_frontier/tests:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_inline_test",
+    lazy_deps = [
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/marlin_plonk_bindings:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/bigint_256:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/bigint_384:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/bn_382_fp:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/bn_382_fq:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/stubs:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_dee:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_dum:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp_index:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp_plonk_oracles:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp_plonk_verifier_index:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp_proof:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fp_urs:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq_index:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq_plonk_oracles:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq_plonk_verifier_index:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq_proof:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/tweedle_fq_urs:__pkg__",
+        # "//src/lib/marlin_plonk_bindings/types:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/bignum_bigint:__pkg__",
+        "//src/lib/coda_debug:__pkg__",
+        "//src/lib/consensus:__pkg__",
+        "//src/lib/file_system:__pkg__",
+        "//src/lib/gadt_lib:__pkg__",
+        "//src/lib/key_value_database:__pkg__",
+        "//src/lib/merkle_list_prover:__pkg__",
+        "//src/lib/otp_lib:__pkg__",
+        "//src/lib/pickles/one_hot_vector:__pkg__",
+        "//src/lib/proof_carrying_data:__pkg__",
+        "//src/lib/rocksdb:__pkg__",
+        "//src/lib/snark_keys/remove_snark_keys_trigger/clear_keys:__pkg__",
+        "//src/lib/storage:__pkg__",
+        "//src/lib/transition_chain_prover:__pkg__",
+        "//src/lib/truth:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_let",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/dhall_types:__pkg__",
+        "//src/lib/genesis_proof:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_optcomp",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/o1trace:__pkg__",
+        "//src/lib/outside_hash_image:__pkg__",
+        "//src/lib/rosetta_lib/test:__pkg__",
+        "//src/nonconsensus/outside_hash_image:__pkg__",
+        "//src/nonconsensus/rosetta_lib/test:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppxlib.metaquot",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/ppx_dhall_type:__pkg__",
+        "//src/lib/ppx_register_event:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_jane",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/ledger_catchup:__pkg__",
+        "//src/lib/prover:__pkg__",
+        "//src/lib/sync_handler:__pkg__",
+        "//src/lib/transition_handler:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_let",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/missing_blocks_auditor:__pkg__",
+        "//src/lib/exit_handlers:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_deriving_yojson__ppx_jane__ppx_deriving.std",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "@snarky//examples/anonvote:__pkg__",
+        "@snarky//examples/sfbw/ex_bools:__pkg__",
+        "@snarky//examples/sfbw/ex_merkle_list:__pkg__",
+        "@snarky//examples/sfbw/ex_merkle_tree:__pkg__",
+        "@snarky//examples/sfbw/ex_merkle_tree_with_data:__pkg__",
+        "@snarky//examples/sfbw/ex_preimage:__pkg__",
+        "@snarky//examples/sfbw/ex_small_preimage:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_coda__ppx_version",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/transaction_status:__pkg__",
+        "//src/lib/transition_frontier/extensions:__pkg__",
+        "//src/lib/transition_frontier/persistent_root:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_deriving.eq__bisect_ppx",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:bisect_ppx.runtime",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "@snarky//bitstring_lib:__pkg__",
+        "@snarky//fold_lib:__pkg__",
+        "@snarky//interval_union:__pkg__",
+        "@snarky//tuple_lib:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:bisect_ppx",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_deriving_yojson__ppx_version",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/snark_work_lib:__pkg__",
+        "@ppx_version//test:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_version__ppx_inline_test",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/hex:__pkg__",
+        "//src/nonconsensus/hex:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_base__ppx_optcomp",
+    lazy_deps = [
+        "@opam//pkg:ppx_compare.runtime-lib",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_compile_config:__pkg__",
+        "//src/nonconsensus/coda_compile_config:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppx_deriving.eq",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/bowe_gabizon_hash:__pkg__",
+        "//src/lib/command_line_tests:__pkg__",
+        "//src/lib/direction:__pkg__",
+        "//src/lib/global_signer_private_key:__pkg__",
+        "//src/lib/linked_tree:__pkg__",
+        "//src/lib/merkle_list_verifier:__pkg__",
+        "//src/lib/parallel:__pkg__",
+        "//src/lib/pokolog:__pkg__",
+        "//src/lib/rc_pool:__pkg__",
+        "//src/lib/sha256_lib:__pkg__",
+        "//src/lib/snarky_blake2:__pkg__",
+        "//src/lib/snarky_group_map:__pkg__",
+        "//src/lib/snarky_pairing:__pkg__",
+        "//src/lib/snarky_taylor:__pkg__",
+        "//src/lib/test_util:__pkg__",
+        "//src/lib/time_simulator:__pkg__",
+        "//src/lib/transition_chain_verifier:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppx_deriving.std",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/logproc:__pkg__",
+        "//src/lib/interruptible:__pkg__",
+        "//src/lib/logproc_lib:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/codable:__pkg__",
+        "//src/lib/rose_tree:__pkg__",
+        "//src/lib/snark_keys:__pkg__",
+        "//src/lib/visualization:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppxlib.metaquot",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/dummy_values:__pkg__",
+        "//src/lib/dummy_values/gen_values:__pkg__",
+        "//src/lib/mina_base/gen:__pkg__",
+        "//src/lib/pickles/precomputed:__pkg__",
+        "//src/lib/ppx_util:__pkg__",
+        "//src/lib/precomputed_values:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_optcomp__ppx_let",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/genesis_ledger:__pkg__",
+        "//src/lib/test_genesis_ledger:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_jane__ppx_deriving.eq",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/best_tip_prover:__pkg__",
+        "//src/lib/coda_commands:__pkg__",
+        "//src/lib/non_empty_list:__pkg__",
+        "//src/lib/transition_router:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_jane__ppx_deriving.std",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/fake_network:__pkg__",
+        "//src/lib/web_client_pipe:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_version__ppx_deriving.eq__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/graphql_lib:__pkg__",
+        "//src/lib/sgn_type:__pkg__",
+        "//src/lib/transaction_snark_work:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppx_deriving.eq__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/pedersen_lib:__pkg__",
+        "//src/lib/perf_histograms:__pkg__",
+        "//src/lib/snarky_field_extensions:__pkg__",
+        "//src/lib/syncable_ledger:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_jane__ppx_deriving_yojson__ppx_deriving.std",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/zexe_backend:__pkg__",
+        "//src/lib/zexe_backend/tweedle:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_let__ppx_sexp_conv__ppx_optcomp",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/display_public_key:__pkg__",
+        "//src/app/generate_keypair:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_optcomp__ppx_let__ppxlib.metaquot",
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/pickles/precomputed/gen_values:__pkg__",
+        "//src/lib/precomputed_values/gen_values:__pkg__",
+        "//src/lib/snark_keys/gen_keys:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "h_list.ppx__ppx_bench__ppx_deriving.eq__ppx_jane__ppx_version",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/vrf_lib:__pkg__",
+        "//src/lib/vrf_lib/tests:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_bench",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_jane__ppx_deriving.std__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_transition:__pkg__",
+        "//src/lib/pickles/plonk_checks:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_coda__ppx_version__ppx_deriving.eq__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/blake2:__pkg__",
+        "//src/lib/transition_frontier:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_jane__ppx_coda__ppx_version__ppx_deriving.std__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/transition_frontier/frontier_base:__pkg__",
+        "//src/lib/transition_frontier/full_frontier:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_coda__ppx_jane__ppx_deriving.std__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/logger:__pkg__",
+        "//src/lib/pickles/backend:__pkg__",
+        "//src/lib/pickles/limb_vector:__pkg__",
+        "//src/lib/pickles/pseudo:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_optcomp__ppx_let__ppx_inline_test__ppx_custom_printf",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/quickcheck_lib:__pkg__",
+        "//src/nonconsensus/quickcheck_lib:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_coda__ppx_jane__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/pickles:__pkg__",
+        "//src/lib/pickles/composition_types:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "graphql_ppx__ppx_coda__ppx_deriving.show__ppx_deriving_yojson__ppx_jane__ppx_version__ppx_deriving.eq",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/app/rosetta/ocaml-signer:__pkg__",
+        "//src/app/rosetta/test-agent:__pkg__",
+    ],
+    deps = [
+        "@graphql_ppx//src/native:graphql_ppx",
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_bin_prot__ppx_sexp_conv__ppx_compare__ppx_hash__ppx_optcomp__ppx_deriving.eq__ppx_deriving_yojson",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/sgn:__pkg__",
+        "//src/nonconsensus/sgn:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_version__ppx_optcomp__ppx_sexp_conv__ppx_compare__ppx_inline_test__ppx_assert__ppx_deriving.eq__ppx_deriving_yojson__ppx_let",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/random_oracle:__pkg__",
+        "//src/nonconsensus/random_oracle:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_optcomp__ppx_assert__ppx_let__ppx_sexp_conv__ppx_compare__ppx_deriving.std__ppx_custom_printf__ppx_deriving_yojson__ppx_inline_test",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "//src/lib/ppx_coda/ppx_representatives/runtime:ppx_representatives_runtime"
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/rosetta_lib:__pkg__",
+        "//src/nonconsensus/rosetta_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "//src/lib/ppx_coda/ppx_representatives"
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx_coda__ppx_version__ppx_let__ppx_assert__ppx_bin_prot__ppx_sexp_conv__ppx_compare__ppx_hash__ppx_optcomp__ppx_custom_printf__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx__ppx_inline_test",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = ":Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/currency:__pkg__",
+        "//src/nonconsensus/currency:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)
+
+################################################################
+################################################################
+ppx_module(
+    name = "Driver",
+    src = ":ppxlib_driver.ml",
+    visibility = ["//visibility:public"],
+    deps = ["@opam//pkg:ppxlib"],
+)
+
+########
+genrule(
+    name = "gendriver",
+    outs = ["ppxlib_driver.ml"],
+    cmd = "\n".join([
+        "echo \"(* GENERATED FILE - DO NOT EDIT *)\" > \"$@\"",
+        "echo \"let () = Ppxlib.Driver.standalone ()\" >> \"$@\"",
+    ]),
+)

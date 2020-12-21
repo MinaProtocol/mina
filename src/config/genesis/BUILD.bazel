@@ -1,0 +1,5 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag", "string_setting")
+
+string_flag( name = "state_timestamp",
+             build_setting_default = "2019-01-30 12:00:00-08:00",
+             visibility = ["//visibility:public"])

@@ -1,0 +1,9 @@
+""" config/fees/user_cmd/realistic
+
+Configuration constants for realistic user command fees.
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "string_setting")
+
+string_setting( name = "min", build_setting_default = "0.001",
+                visibility = ["//visibility:public"])

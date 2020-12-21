@@ -1,0 +1,102 @@
+## copy this to <root>/user.bazelrc and customize (do not put under version control)
+## or pass "--bazelrc=bzl/tools/user.bazelrc" as first arg to build cmd.
+
+build --color=yes
+# build --subcommands=pretty_print # omit "=pretty_print" for compact presentation
+# build --verbose_failures
+# build --sandbox_debug
+# build --show_timestamps
+# common --keep_going
+# build --jobs 600
+
+#### config.mlh configuration ####
+# build --//src/config:dev  # default
+# build --//src/config:debug
+# build --//src/config:prod
+
+# to stamp the binaries (via src/lib/coda_version)
+# build:beta --stamp
+# build:beta --workspace_status_command=src/lib/coda_version/coda_version_stamp.sh
+
+################################################################
+## enable both of these to set the macos version
+# build:macos --macos_minimum_os='10.15'
+# build --config=macos
+
+################################################################
+#### Global configurable defaults ####
+# set compilation mode for ocaml_*, ppx_* rules to bytecode or native
+# default is bytecode for both
+# build --@ocaml//mode=native
+# build --@ppx//mode=native
+
+## OCaml rules. similar apply to ppx
+## Similar flags/options apply to ppx rules, just replace @ocaml with @ppx
+# build --@ocaml//verbose                  # enable verbose for all ocaml_* rules
+# build --@ocaml//cmt                      # enable -bin-annot
+# build --no@ocaml//debug                  # disable debug
+# build --no@ocaml//keep-logs              # disable -keep-locs
+# build --no@ocaml//noassert               # disable -noassert
+# build --no@ocaml//opaque                 # disable -opaque
+# build --no@ocaml//short-paths            # disable -short-paths
+# build --no@ocaml//strict-formats         # disable -strict-formats
+# build --no@ocaml//strict-sequence        # disable -strict-sequence
+
+## ocaml_executable configurable defaults
+# build --no@ocaml//executable:linkall    # disable -linkall
+# build --@ocaml//executable:opts=...     # add opts to all
+# build --no@ocaml//executable:threads    # disable -thread
+# build --@ocaml//executable:verbose      # enable -verbose for all ocaml_executable targets
+# build --@ocaml//executable:warnings=... # override defaults "@1..3@5..28@30..39@43@46..47@49..57@61..62-40"
+
+## ocaml_module configurable defaults
+# build --no@ocaml//module:linkall        # disable -linkall
+# build --no@ocaml//module:threads        # disable -thread
+# build --@ocaml//module:verbose          # enable -verbose for all ocaml_module targets
+# build --@ocaml//module:warnings=...     # override defaults "@1..3@5..28@30..39@43@46..47@49..57@61..62-40"
+
+## Not yet fully implemented: 'deps', 'cc_deps', for adding a dep e.g. jemalloc to all targest
+# build --@ocaml//module:deps=@foo//bar:baz # add module to deps to all ocaml_executable targets
+# build --@ocaml//executable:cc_deps=@foo//bar:baz # add cc lib dep to to all ocaml_executable targets
+# e.g.
+# build --@ocaml//executable:cc_deps=@ocaml_jemalloc//src:libjemalloc
+## TODO:
+# build --@ocaml//module:cc_linkstatic=@ocaml_jemalloc//src:libjemalloc
+
+# build --@ppx//print="binary" # make all ppx executables emit binary (-dump-ast) instead of text
+
+## not yet supported:
+# build --@ppx//deps=@opam//pkg:bisect_ppx # add bisect_ppx to all ppx
+# build --@ppx//executable:deps=@opam//pkg:bisect_ppx # add bisect_ppx to all ppx
+
+################################################################
+## override external repos:
+
+## OCaml repos:
+# common --override_repository=async_kernel=/PATH/TO/async_kernel
+# common --override_repository=graphql_ppx=/PATH/TO/graphql_ppx
+# common --override_repository=ppx_optcomp=/PATH/TO/ocaml-extlib
+# common --override_repository=ppx_optcomp=/PATH/TO/ppx_optcomp
+# common --override_repository=ppx_version=/PATH/TO/ppx_version
+# common --override_repository=rpc_parallel=/PATH/TO/rpc_parallel
+# common --override_repository=snarky=/PATH/TO/snarky
+
+## Hybrid OCaml + CC
+# common --override_repository=ocaml_jemalloc=/PATH/TO/ocaml-jemalloc
+# common --override_repository=ocaml_sodium=/PATH/TO/ocaml-sodium
+# common --override_repository=ocaml_rocksdb=/PATH/TO/orocksdb
+
+## Rust repos
+# common --override_repository=zexe=/PATH/TO/zexe
+# common --override_repository=marlin=/PATH/TO/marlin
+
+## OBazl rules
+# common --override_repository=obazl_rules_tools=/PATH/TO/obazl/rules_tools
+# common --override_repository=obazl_rules_opam=/PATH/TO/obazl/rules_opam
+# common --override_repository=obazl_rules_ocaml=/PATH/TO/obazl/rules_ocaml
+
+################################################################
+## Use with caution.  The symlinks may befuddle Bazel in some situations.
+# build --symlink_prefix=.bazel/   # use hidden dir instead of top-level symlinks
+# build --experimental_no_product_name_out_symlink # do not create `bazel-out` symlink
+

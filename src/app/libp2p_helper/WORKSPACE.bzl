@@ -1,6 +1,39 @@
-load("@bazel_gazelle//:deps.bzl", "go_repository")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")  # buildifier: disable=load
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")  # buildifier: disable=load
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")  # buildifier: disable=load
 
-def libp2p_bootstrap():
+def libp2p_fetch_go_rules():
+    maybe(
+        http_archive,
+        name = "io_bazel_rules_go",
+        sha256 = "207fad3e6689135c5d8713e5a17ba9d1290238f47b9ba545b63d9303406209c6",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.24.7/rules_go-v0.24.7.tar.gz",
+            "https://github.com/bazelbuild/rules_go/releases/download/v0.24.7/rules_go-v0.24.7.tar.gz",
+        ],
+    )
+
+    ## protobuf needed by some go deps
+    maybe(
+        http_archive,
+        name = "com_google_protobuf",
+        sha256 = "9748c0d90e54ea09e5e75fb7fac16edce15d2028d4356f32211cfa3c0e956564",
+        strip_prefix = "protobuf-3.11.4",
+        urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.11.4.zip"],
+    )
+
+    maybe(
+        # gazelle:proto disable_global
+        http_archive,
+        name = "bazel_gazelle",
+        sha256 = "b85f48fa105c4403326e9525ad2b2cc437babaa6e15a3fc0b1dbab0ab064bc7c",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.2/bazel-gazelle-v0.22.2.tar.gz",
+            "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.22.2/bazel-gazelle-v0.22.2.tar.gz",
+        ],
+    )
+
+def libp2p_fetch_go_libs(go_repository):
     go_repository(
         name = "co_honnef_go_tools",
         importpath = "honnef.co/go/tools",
@@ -310,8 +343,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_envoyproxy_go_control_plane",
         importpath = "github.com/envoyproxy/go-control-plane",
-        sum = "h1:rEvIZUSZ3fx39WIi3JkQqQBitGwpELBIYWeBVh6wn+E=",
-        version = "v0.9.4",
+        sum = "h1:4cmBvAEBNJaGARUEs3/suWRyfyBfhf7I60WBZq+bv2w=",
+        version = "v0.9.1-0.20191026205805-5f8ba28d4473",
     )
     go_repository(
         name = "com_github_envoyproxy_protoc_gen_validate",
@@ -460,8 +493,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_golang_mock",
         importpath = "github.com/golang/mock",
-        sum = "h1:Rd1kQnQu0Hq3qvJppYSG0HtP+f5LPPUiDswTLiEegLg=",
-        version = "v1.4.0",
+        sum = "h1:G5FRp8JnTd7RQH5kemVNlMeyXQAztQ3mOWV95KxsXH8=",
+        version = "v1.1.1",
     )
     go_repository(
         name = "com_github_golang_protobuf",
@@ -772,8 +805,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_ipfs_go_ipfs_delay",
         importpath = "github.com/ipfs/go-ipfs-delay",
-        sum = "h1:r/UXYyRcddO6thwOnhiznIAiSvxMECGgtv35Xs1IeRQ=",
-        version = "v0.0.1",
+        sum = "h1:NAviDvJ0WXgD+yiL2Rj35AmnfgI11+pHXbdciD917U0=",
+        version = "v0.0.0-20181109222059-70721b86a9a8",
     )
     go_repository(
         name = "com_github_ipfs_go_ipfs_ds_help",
@@ -1084,8 +1117,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_kr_pty",
         importpath = "github.com/kr/pty",
-        sum = "h1:/Um6a/ZmD5tF7peoOJ5oN5KMQ0DrGVQSXLNwyckutPk=",
-        version = "v1.1.3",
+        sum = "h1:VkoXIwSboBpnk99O/KFauAEILuNHv5DVFKZMBN/gUgw=",
+        version = "v1.1.1",
     )
     go_repository(
         name = "com_github_kr_text",
@@ -1179,10 +1212,10 @@ def libp2p_bootstrap():
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_core",
+        build_file_proto_mode = "disable_global",
         importpath = "github.com/libp2p/go-libp2p-core",
         sum = "h1:XS+Goh+QegCDojUZp00CaPMfiEADCrLjNZskWE7pvqs=",
         version = "v0.6.1",
-        build_file_proto_mode = "disable_global",
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_crypto",
@@ -1228,10 +1261,10 @@ def libp2p_bootstrap():
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_kad_dht",
+        build_file_proto_mode = "disable_global",
         importpath = "github.com/libp2p/go-libp2p-kad-dht",
         sum = "h1:Id7B3pBudm/F3hEEn/gQPOSsx7su9o6hoQ+NU02AQ4g=",
         version = "v0.10.0",
-        build_file_proto_mode = "disable_global",
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_kbucket",
@@ -1289,10 +1322,10 @@ def libp2p_bootstrap():
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_peerstore",
+        build_file_proto_mode = "disable_global",
         importpath = "github.com/libp2p/go-libp2p-peerstore",
         sum = "h1:2ACefBX23iMdJU9Ke+dcXt3w86MIryes9v7In4+Qq3U=",
         version = "v0.2.6",
-        build_file_proto_mode = "disable_global",
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_pnet",
@@ -1308,10 +1341,10 @@ def libp2p_bootstrap():
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_pubsub",
+        build_file_proto_mode = "disable_global",
         importpath = "github.com/libp2p/go-libp2p-pubsub",
         sum = "h1:8PollxXtUvzy0DMn5XFMg/JihjaKboWyk3ML6yRW1Lk=",
         version = "v0.3.4",
-        build_file_proto_mode = "disable_global",
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_pubsub_router",
@@ -1327,10 +1360,10 @@ def libp2p_bootstrap():
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_record",
+        build_file_proto_mode = "disable_global",
         importpath = "github.com/libp2p/go-libp2p-record",
         sum = "h1:R27hoScIhQf/A8XJZ8lYpnqh9LatJ5YbHs28kCIfql0=",
         version = "v0.1.3",
-        build_file_proto_mode = "disable_global",
     )
     go_repository(
         name = "com_github_libp2p_go_libp2p_routing",
@@ -1395,8 +1428,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_libp2p_go_mplex",
         importpath = "github.com/libp2p/go-mplex",
-        sum = "h1:noyLUCtHtSsPOLACCo0AO0q79H4pba1UHlLxbfBPv2w=",
-        version = "v0.1.3",
+        sum = "h1:qOg1s+WdGLlpkrczDqmhYzyk3vCfsQ8+RxRTQjOZWwI=",
+        version = "v0.1.2",
     )
     go_repository(
         name = "com_github_libp2p_go_msgio",
@@ -1449,8 +1482,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_libp2p_go_stream_muxer",
         importpath = "github.com/libp2p/go-stream-muxer",
-        sum = "h1:3ToDXUzx8pDC6RfuOzGsUYP5roMDthbUKRdMRRhqAqY=",
-        version = "v0.1.0",
+        sum = "h1:Ce6e2Pyu+b5MC1k3eeFtAax0pW4gc6MosYSLV05UeLw=",
+        version = "v0.0.1",
     )
     go_repository(
         name = "com_github_libp2p_go_stream_muxer_multistream",
@@ -1503,8 +1536,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_mailru_easyjson",
         importpath = "github.com/mailru/easyjson",
-        sum = "h1:W/GaMY0y69G4cFlmsC6B9sbuo2fP8OFP1ABjt4kPz+w=",
-        version = "v0.0.0-20190312143242-1de009706dbe",
+        sum = "h1:2gxZ0XQIU/5z3Z3bUBu+FXuk2pFbkN6tcwi/pjyaDic=",
+        version = "v0.0.0-20180823135443-60711f1a8329",
     )
     go_repository(
         name = "com_github_marten_seemann_qpack",
@@ -1521,14 +1554,14 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_github_mattn_go_colorable",
         importpath = "github.com/mattn/go-colorable",
-        sum = "h1:snbPLB8fVfU9iwbbo30TPtbLRzwWu6aJS6Xh4eaaviA=",
-        version = "v0.1.4",
+        sum = "h1:G1f5SKeVxmagw/IyvzvtZE4Gybcc4Tr1tf7I8z0XgOg=",
+        version = "v0.1.1",
     )
     go_repository(
         name = "com_github_mattn_go_isatty",
         importpath = "github.com/mattn/go-isatty",
-        sum = "h1:FxPOTFNqGkuDUGi3H/qkUbQO4ZiBa2brKq5r0l8TGeM=",
-        version = "v0.0.11",
+        sum = "h1:tHXDdz1cpzGaovsTB+TVB8q90WEokoVmfMqoVcrLUgw=",
+        version = "v0.0.5",
     )
     go_repository(
         name = "com_github_mattn_go_runewidth",
@@ -2211,8 +2244,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "com_google_cloud_go",
         importpath = "cloud.google.com/go",
-        sum = "h1:MZQCQQaRwOrAcuKjiHWHrgKykt4fZyuwF2dtiG3fGW8=",
-        version = "v0.53.0",
+        sum = "h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=",
+        version = "v0.26.0",
     )
     go_repository(
         name = "com_google_cloud_go_bigquery",
@@ -2403,8 +2436,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "org_golang_google_appengine",
         importpath = "google.golang.org/appengine",
-        sum = "h1:tycE03LOZYQNhDpS27tcQdAzLCVMaj7QT2SXxebnpCM=",
-        version = "v1.6.5",
+        sum = "h1:/wp5JvzpHIxhs/dumFmF7BXTf3Z+dd4uXta4kVyO508=",
+        version = "v1.4.0",
     )
     go_repository(
         name = "org_golang_google_genproto",
@@ -2415,8 +2448,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "org_golang_google_grpc",
         importpath = "google.golang.org/grpc",
-        sum = "h1:C1QC6KzgSiLyBabDi87BbjaGreoRgGUF5nOyvfrAZ1k=",
-        version = "v1.28.1",
+        sum = "h1:zvIju4sqAGvwKspUQOhwnpcqSbzi7/H6QomNNjTL4sk=",
+        version = "v1.27.1",
     )
     go_repository(
         name = "org_golang_google_protobuf",
@@ -2439,8 +2472,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "org_golang_x_exp",
         importpath = "golang.org/x/exp",
-        sum = "h1:zkO/Lhoka23X63N9OSzpSeROEUQ5ODw47tM3YWjygbs=",
-        version = "v0.0.0-20200207192155-f17229e696bd",
+        sum = "h1:c2HOrn5iMezYjSlGPncknSEr/8x5LELb/ilJbXi9DEA=",
+        version = "v0.0.0-20190121172915-509febef88a4",
     )
     go_repository(
         name = "org_golang_x_image",
@@ -2475,8 +2508,8 @@ def libp2p_bootstrap():
     go_repository(
         name = "org_golang_x_oauth2",
         importpath = "golang.org/x/oauth2",
-        sum = "h1:TzXSXBo42m9gQenoE3b9BGiEpg5IG2JkU5FkPIawgtw=",
-        version = "v0.0.0-20200107190931-bf48bf16ab8d",
+        sum = "h1:vEDujvNQGv4jgYKudGeI/+DAX4Jffq6hpD55MmoEvKs=",
+        version = "v0.0.0-20180821212333-d2e6202438be",
     )
     go_repository(
         name = "org_golang_x_perf",
