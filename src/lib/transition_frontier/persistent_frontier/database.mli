@@ -10,7 +10,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 
 type t

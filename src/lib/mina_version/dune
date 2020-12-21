@@ -1,10 +1,10 @@
 (library
- (name coda_version)
+ (name mina_version)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (public_name coda_version))
+ (public_name mina_version))
 
 (rule
- (targets coda_version.ml)
+ (targets mina_version.ml)
  (deps (:< gen.sh) (universe))
  (action (run %{<} %{targets})))

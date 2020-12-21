@@ -7,7 +7,7 @@ open Unsigned
 open Signature_lib
 open Mina_base
 open Coda_state
-open Coda_transition
+open Mina_transition
 open Snark_params
 open Blockchain_snark
 open Consensus

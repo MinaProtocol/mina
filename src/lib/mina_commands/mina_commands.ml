@@ -75,7 +75,7 @@ let replace_block_production_keys keys pks =
   kps |> List.map ~f:snd
 
 let setup_and_submit_user_command t (user_command_input : User_command_input.t)
-    =
+  =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
@@ -84,35 +84,35 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
   txn_count := !txn_count + 1 ;
   match result with
   | Ok ([], [failed_txn]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
+    Error
+      (Error.of_string
+         (sprintf !"%s"
+            ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+              .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([Signed_command txn], []) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
-        "Scheduled payment $command" ;
-      Ok txn
+    [%log' info (Mina_lib.top_level_logger t)]
+      ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
+      "Scheduled payment $command" ;
+    Ok txn
   | Ok (valid_commands, invalid_commands) ->
-      [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:
-          [ ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
-          ; ( "invalid_commands"
-            , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd)
-                   invalid_commands) ) ]
-        "Invalid result from scheduling a payment" ;
-      Error (Error.of_string "Internal error while scheduling a payment")
+    [%log' info (Mina_lib.top_level_logger t)]
+      ~metadata:
+        [ ( "valid_commands"
+          , `List (List.map ~f:User_command.to_yojson valid_commands) )
+        ; ( "invalid_commands"
+          , `List
+              (List.map
+                 ~f:
+                   (Fn.compose
+                      Network_pool.Transaction_pool.Resource_pool.Diff
+                      .Diff_error
+                      .to_yojson snd)
+                 invalid_commands) ) ]
+      "Invalid result from scheduling a payment" ;
+    Error (Error.of_string "Internal error while scheduling a payment")
   | Error e ->
-      Error e
+    Error e
 
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
@@ -120,25 +120,25 @@ let setup_and_submit_user_commands t user_command_list =
   [%log' warn (Mina_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
-      [("coda_command", `String "scheduling a batch of user transactions")] ;
+      [("mina_command", `String "scheduling a batch of user transactions")] ;
   Mina_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
-  type proof_elem = User_command.t
+    type proof_elem = User_command.t
 
-  type hash = Receipt.Chain_hash.t [@@deriving eq]
+    type hash = Receipt.Chain_hash.t [@@deriving eq]
 
-  let hash parent_hash (proof_elem : User_command.t) =
-    let p =
-      match proof_elem with
-      | Signed_command c ->
+    let hash parent_hash (proof_elem : User_command.t) =
+      let p =
+        match proof_elem with
+        | Signed_command c ->
           Receipt.Elt.Signed_command (Signed_command.payload c)
-      | Snapp_command x ->
+        | Snapp_command x ->
           Receipt.Elt.Snapp_command
             Snapp_command.(Payload.(Digested.digest (digested (to_payload x))))
-    in
-    Receipt.Chain_hash.cons p parent_hash
-end)
+      in
+      Receipt.Chain_hash.cons p parent_hash
+  end)
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
@@ -180,7 +180,7 @@ let get_status ~flag t =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
-  let commit_id = Coda_version.commit_id in
+  let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
   let%map peers = Mina_lib.peers t in
   let peers =
@@ -213,44 +213,44 @@ let get_status ~flag t =
   let histograms =
     match flag with
     | `Performance ->
-        let rpc_timings =
-          let open Daemon_rpcs.Types.Status.Rpc_timings in
-          { get_staged_ledger_aux=
-              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_staged_ledger_aux"
-              ; impl= r ~name:"rpc_impl_get_staged_ledger_aux" }
-          ; answer_sync_ledger_query=
-              { Rpc_pair.dispatch=
-                  r ~name:"rpc_dispatch_answer_sync_ledger_query"
-              ; impl= r ~name:"rpc_impl_answer_sync_ledger_query" }
-          ; get_ancestry=
-              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
-              ; impl= r ~name:"rpc_impl_get_ancestry" }
-          ; get_transition_chain_proof=
-              { Rpc_pair.dispatch=
-                  r ~name:"rpc_dispatch_get_transition_chain_proof"
-              ; impl= r ~name:"rpc_impl_get_transition_chain_proof" }
-          ; get_transition_chain=
-              { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
-              ; impl= r ~name:"rpc_impl_get_transition_chain" } }
-        in
-        Some
-          { Daemon_rpcs.Types.Status.Histograms.rpc_timings
-          ; external_transition_latency= r ~name:"external_transition_latency"
-          ; accepted_transition_local_latency=
-              r ~name:"accepted_transition_local_latency"
-          ; accepted_transition_remote_latency=
-              r ~name:"accepted_transition_remote_latency"
-          ; snark_worker_transition_time=
-              r ~name:"snark_worker_transition_time"
-          ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
+      let rpc_timings =
+        let open Daemon_rpcs.Types.Status.Rpc_timings in
+        { get_staged_ledger_aux=
+            { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_staged_ledger_aux"
+            ; impl= r ~name:"rpc_impl_get_staged_ledger_aux" }
+        ; answer_sync_ledger_query=
+            { Rpc_pair.dispatch=
+                r ~name:"rpc_dispatch_answer_sync_ledger_query"
+            ; impl= r ~name:"rpc_impl_answer_sync_ledger_query" }
+        ; get_ancestry=
+            { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
+            ; impl= r ~name:"rpc_impl_get_ancestry" }
+        ; get_transition_chain_proof=
+            { Rpc_pair.dispatch=
+                r ~name:"rpc_dispatch_get_transition_chain_proof"
+            ; impl= r ~name:"rpc_impl_get_transition_chain_proof" }
+        ; get_transition_chain=
+            { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_transition_chain"
+            ; impl= r ~name:"rpc_impl_get_transition_chain" } }
+      in
+      Some
+        { Daemon_rpcs.Types.Status.Histograms.rpc_timings
+        ; external_transition_latency= r ~name:"external_transition_latency"
+        ; accepted_transition_local_latency=
+            r ~name:"accepted_transition_local_latency"
+        ; accepted_transition_remote_latency=
+            r ~name:"accepted_transition_remote_latency"
+        ; snark_worker_transition_time=
+            r ~name:"snark_worker_transition_time"
+        ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
     | `None ->
-        None
+      None
   in
   let highest_block_length_received =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Coda_transition.External_transition.Initial_validated.consensus_state
+    @@ Mina_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
-         (Mina_lib.most_recent_valid_transition t)
+      (Mina_lib.most_recent_valid_transition t)
   in
   let active_status () =
     let open Participating_state.Let_syntax in
@@ -272,17 +272,17 @@ let get_status ~flag t =
         Mina_incremental.Status.Observer.value_exn @@ Mina_lib.sync_status t
       with
       | `Bootstrap ->
-          `Bootstrapping
+        `Bootstrapping
       | `Connecting ->
-          `Active `Connecting
+        `Active `Connecting
       | `Listening ->
-          `Active `Listening
+        `Active `Listening
       | `Offline ->
-          `Active `Offline
+        `Active `Offline
       | `Synced | `Catchup ->
-          if abs (highest_block_length_received - blockchain_length) < 5 then
-            `Active `Synced
-          else `Active `Catchup
+        if abs (highest_block_length_received - blockchain_length) < 5 then
+          `Active `Synced
+        else `Active `Catchup
     in
     let consensus_time_best_tip =
       Consensus.Data.Consensus_state.consensus_time consensus_state
@@ -290,7 +290,7 @@ let get_status ~flag t =
     let global_slot_since_genesis =
       Coda_numbers.Global_slot.to_int
       @@ Consensus.Data.Consensus_state.global_slot_since_genesis
-           consensus_state
+        consensus_state
     in
     ( sync_status
     , { num_accounts= Some num_accounts
@@ -309,24 +309,24 @@ let get_status ~flag t =
         ; global_slot_since_genesis_best_tip } ) =
     match active_status () with
     | `Active result ->
-        result
+      result
     | `Bootstrapping ->
-        ( `Bootstrap
-        , { num_accounts= None
-          ; blockchain_length= None
-          ; ledger_merkle_root= None
-          ; state_hash= None
-          ; consensus_time_best_tip= None
-          ; global_slot_since_genesis_best_tip= None } )
+      ( `Bootstrap
+      , { num_accounts= None
+        ; blockchain_length= None
+        ; ledger_merkle_root= None
+        ; state_hash= None
+        ; consensus_time_best_tip= None
+        ; global_slot_since_genesis_best_tip= None } )
   in
   let next_block_production =
     let open Block_time in
     Option.map (Mina_lib.next_producer_timing t) ~f:(function
-      | `Produce_now _ ->
+        | `Produce_now _ ->
           `Produce_now
-      | `Produce (time, _, _) ->
+        | `Produce (time, _, _) ->
           `Produce (time |> Span.of_ms |> of_span_since_epoch)
-      | `Check_again time ->
+        | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
   let addrs_and_ports =

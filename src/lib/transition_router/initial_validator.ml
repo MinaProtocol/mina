@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Coda_state
 open Signature_lib
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type validation_error =

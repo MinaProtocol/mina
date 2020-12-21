@@ -1,6 +1,6 @@
 open Core_kernel
 open Mina_base
-open Coda_transition
+open Mina_transition
 
 module Common = struct
   [%%versioned

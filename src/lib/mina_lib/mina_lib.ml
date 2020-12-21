@@ -5,7 +5,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
@@ -963,7 +963,7 @@ let create ?wallets (config : Config.t) =
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  let git_commit = Coda_version.commit_id_short in
+                  let git_commit = Mina_version.commit_id_short in
                   let uptime =
                     Time.diff (Time.now ()) config.start_time
                     |> Time.Span.to_string_hum ~decimals:1

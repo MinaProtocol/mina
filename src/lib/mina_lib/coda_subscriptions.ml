@@ -98,7 +98,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
             new_block
-            |> Coda_transition.External_transition.Validated.state_hash
+            |> Mina_transition.External_transition.Validated.state_hash
           in
           match
             Filtered_external_transition.validate_transactions

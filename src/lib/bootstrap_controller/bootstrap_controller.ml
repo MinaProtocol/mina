@@ -5,7 +5,7 @@ open Async
 open Mina_base
 open Coda_state
 open Pipe_lib.Strict_pipe
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type Structured_log_events.t += Bootstrap_complete

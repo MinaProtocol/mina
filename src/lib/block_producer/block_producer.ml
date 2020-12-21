@@ -3,7 +3,7 @@ open Async
 open Pipe_lib
 open Mina_base
 open Coda_state
-open Coda_transition
+open Mina_transition
 open Signature_lib
 open O1trace
 open Otp_lib

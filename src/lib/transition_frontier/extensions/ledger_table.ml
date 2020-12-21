@@ -61,7 +61,7 @@ module T = struct
                 in
                 let blockchain_state =
                   Protocol_state.blockchain_state
-                  @@ Coda_transition.External_transition.protocol_state
+                  @@ Mina_transition.External_transition.protocol_state
                        external_transition
                 in
                 let staged_ledger =

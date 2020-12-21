@@ -6,7 +6,7 @@ open Core
 
 open Async_kernel
 open Mina_base
-open Coda_transition
+open Mina_transition
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
