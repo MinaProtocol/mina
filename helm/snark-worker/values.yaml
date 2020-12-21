@@ -35,6 +35,7 @@ coordinator:
   workSelectionAlgorithm: seq # seq OR rand
 
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
