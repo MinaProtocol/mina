@@ -1,0 +1,76 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SGN_TYPE
+################################################################
+SGN_TYPE_INTERFACE_OPTS = []
+
+SGN_TYPE_MODULE_OPTS = []
+
+SGN_TYPE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+]
+
+SGN_TYPE_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_version__ppx_deriving.eq__ppx_deriving_yojson"
+
+SGN_TYPE_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "sgn_type",
+]
+
+##############
+ocaml_archive(
+    name = "sgn_type",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SGN_TYPE_DEPS + [
+        # do not sort (buildifier)
+        ":_Sgn",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Sgn_type_ns",
+    ns = "sgn_type",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "sgn.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sgn",
+    src = "sgn.ml",
+    intf = ":_Sgn.cmi",
+    ns = ":Sgn_type_ns",
+    opts = SGN_TYPE_MODULE_OPTS,
+    ppx = SGN_TYPE_PPX,
+    ppx_args = SGN_TYPE_PPX_ARGS,
+    deps = SGN_TYPE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Sgn.cmi",
+    src = "sgn.mli",
+    ns = ":Sgn_type_ns",
+    opts = SGN_TYPE_INTERFACE_OPTS,
+    ppx = SGN_TYPE_PPX,
+    ppx_args = SGN_TYPE_PPX_ARGS,
+    deps = SGN_TYPE_DEPS,
+)

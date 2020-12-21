@@ -1,0 +1,132 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY LOGGER
+################################################################
+LOGGER_INTERFACE_OPTS = []
+
+LOGGER_MODULE_OPTS = []
+
+LOGGER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:yojson",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:re2",
+    "@mina//src/lib/logproc_lib",
+    "@mina//src/lib/structured_log_events",
+]
+
+LOGGER_PPX = "@//bzl/ppx/exe:ppx_version__ppx_coda__ppx_jane__ppx_deriving.std__ppx_deriving_yojson"
+
+LOGGER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "logger",
+]
+
+##############
+ocaml_archive(
+    name = "logger",
+    doc = "Logging library",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = LOGGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Impl",
+        ":_Logger",
+        ":_Tags",
+        ":_Test",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Logger_ns",
+    ns = "logger",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "impl.ml",
+        "logger.ml",
+        "tags.ml",
+        "test.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Impl",
+    src = "impl.ml",
+    intf = ":_Impl.cmi",
+    ns = ":Logger_ns",
+    opts = LOGGER_MODULE_OPTS,
+    ppx = LOGGER_PPX,
+    ppx_args = LOGGER_PPX_ARGS,
+    deps = LOGGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Tags",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Impl.cmi",
+    src = "impl.mli",
+    ns = ":Logger_ns",
+    opts = LOGGER_INTERFACE_OPTS,
+    ppx = LOGGER_PPX,
+    ppx_args = LOGGER_PPX_ARGS,
+    deps = LOGGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Tags",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Logger",
+    src = "logger.ml",
+    ns = ":Logger_ns",
+    opts = LOGGER_MODULE_OPTS,
+    ppx = LOGGER_PPX,
+    ppx_args = LOGGER_PPX_ARGS,
+    deps = LOGGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Impl",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Tags",
+    src = "tags.ml",
+    ns = ":Logger_ns",
+    opts = LOGGER_MODULE_OPTS,
+    ppx = LOGGER_PPX,
+    ppx_args = LOGGER_PPX_ARGS,
+    deps = LOGGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Logger_ns",
+    opts = LOGGER_MODULE_OPTS,
+    ppx = LOGGER_PPX,
+    ppx_args = LOGGER_PPX_ARGS,
+    deps = LOGGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Impl",
+    ],
+)
