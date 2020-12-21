@@ -1,0 +1,76 @@
+"""
+@generated
+cargo-raze generated Bazel file.
+
+DO NOT EDIT! Replaced on runs of cargo-raze
+"""
+
+package(default_visibility = ["//visibility:public"])
+
+licenses([
+    "notice",  # See individual crates for specific licenses
+])
+
+# Aliased targets
+alias(
+    name = "libc",
+    actual = "@raze__libc__0_2_80//:libc",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "num_bigint",
+    actual = "@raze__num_bigint__0_2_3//:num_bigint",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "ocaml",
+    actual = "@raze__ocaml__0_19_0//:ocaml",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "rand",
+    actual = "@raze__rand__0_7_3//:rand",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "rand_core",
+    actual = "@raze__rand_core__0_5_1//:rand_core",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "rayon",
+    actual = "@raze__rayon__1_5_0//:rayon",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "sprs",
+    actual = "@raze__sprs__0_7_1//:sprs",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)

@@ -1,0 +1,63 @@
+load("//src/config:BUILD.bzl", "mina_config")
+
+mina_config(name="dev", # default values: dev.mlh
+            visibility = ["//visibility:public"])
+
+mina_config(
+    name = "debug", # src/config/debug.mlh
+    visibility = ["//visibility:public"],
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/txn_capacity/log2:standard", # 7,
+    scan_state_work_delay = "//src/config/scan_state/work_delay:standard", # 7, # scan_state/standard.mlh
+    debug_logs = "//src/config/debug/all:logs",  # debug_level/all.mlh
+    call_logger = "//src/config/debug/all:call_logger",
+    record_async_backtraces = "//src/config/debug/all:record_async_backtraces",
+
+    account_creation_fee_int = "//src/config/fees/account_creation:standard",
+    plugins = "//src/config:plugins_false",
+    time_offsets = "//src/config:time_offsets_false"
+)
+
+alias(name = "prod", actual = ":release")
+mina_config(
+    name = "release",
+    visibility = ["//visibility:public"],
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/txn_capacity/log2:standard", # 7,
+    scan_state_work_delay = "//src/config/scan_state/work_delay:standard", # 7, # scan_state/standard.mlh
+    debug_logs = "//src/config/debug/none:logs",  # debug_level/none.mlh
+    tracing = "//src/config/debug/none:tracing",
+    call_logger = "//src/config/debug/none:call_logger",
+    record_async_backtraces = "//src/config/debug/none:record_async_backtraces",
+
+    account_creation_fee_int = "//src/config/fees/account_creation:standard",
+    plugins = "//src/config:plugins_false",
+    time_offsets = "//src/config:time_offsets_false"
+)
+
+mina_config(
+    name = "fake_hash",
+    visibility = ["//visibility:public"],
+    ledger_depth = "//src/config/ledger_depth:tiny",
+    consensus_k = "//src/config/consensus/tiny:k",
+    # scan_state/medium.mlh
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/medium:txn_capacity_log2",
+    proof_level = "//src/config/proof_level:none",
+    fake_hash = ":fake_hash_true", # src/config/fake_hash.mlh
+    block_window_duration = ":block_window_duration_600"
+)
+
+mina_config(
+    name = "testnet_public",    # testnet_public.mlh
+    visibility = ["//visibility:public"],
+    ledger_depth = "//src/config/ledger_depth:full",
+    consensus_k = "//src/config/consensus/tiny:k",
+    # scan_state/std.mlh
+    scan_state_transaction_capacity_log_2 = "//src/config/scan_state/std:txn_capacity_log2",
+    proof_level = "//src/config/proof_level:full",
+    account_creation_fee_int = "//src/config/fees/std:account_creation",
+    time_offsets = "//src/config:time_offsets_false",
+    genesis_ledger = "//src/config/genesis/ledger:testnet_postake",
+    block_window_duration = ":block_window_duration_20000",
+    integration_tests = ":integration_tests_false",
+    force_updates = ":force_updates_true",
+    download_snark_keys = ":download_snark_keys_true"
+)

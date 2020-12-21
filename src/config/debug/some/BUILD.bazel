@@ -1,0 +1,32 @@
+""" config/debug/some
+
+Configuration constants for debug level "some".
+"""
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_setting")
+
+bool_setting( name = "enable_logs", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "disable_logs", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_setting( name = "enable_call_logger", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "disable_call_logger", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_setting( name = "enable_tracing", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "disable_tracing", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_setting( name = "enable_cache_exceptions", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "disable_cache_exceptions", build_setting_default = False,
+              visibility = ["//visibility:public"])
+
+bool_setting( name = "enable_record_async_backtraces", build_setting_default = True,
+              visibility = ["//visibility:public"])
+bool_setting( name = "disable_record_async_backtraces", build_setting_default = False,
+              visibility = ["//visibility:public"])
+

@@ -1,3 +1,39 @@
-load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag", "string_setting")
 
-gazelle(name = "gazelle")
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["graphql_schema.json"])
+
+string_flag( name = "warnings", build_setting_default = "" )
+
+#### configuration profiles ####
+string_flag( name = "profile", build_setting_default = "dev",
+             values = ["dev", "debug", "release",
+                       "fake_hash", "testnet_public"],
+             visibility = ["//visibility:public"])
+config_setting( name = "profile_debug", flag_values = { ":profile": "debug" })
+config_setting( name = "profile_dev", flag_values = { ":profile": "dev" })
+config_setting( name = "profile_release", flag_values = { ":profile": "release" })
+config_setting( name = "profile_fake_hash", flag_values = { ":profile": "fake_hash" })
+config_setting( name = "profile_testnet_public", flag_values = { ":profile": "testnet_public" })
+
+# true if command-line flag --stamp is passed
+config_setting(name = "stampit", values = {"stamp": "true"})
+
+## TEMPORARY - this will be removed once support for proper stamping is implemented.
+## Generate an ml file with the git revision in a string.
+## Used by @mina//src/lib/coda_version
+genrule(
+    name = 'version_ml',
+    srcs = glob(['.git/HEAD', '.git/refs/**']),
+    outs = ['version.ml'],
+    cmd = "\n".join([
+        'pushd `dirname $(rootpath version.ml)`',
+        'branch=$$(git rev-parse --verify --abbrev-ref HEAD || echo "<none found>")',
+        'commit_id_short=$$(git rev-parse --short=8 --verify HEAD)',
+        'echo "let commit_id_short = \"$$commit_id_short\"" >> \"$@\"',
+        'echo "let branch = \"$$branch\"" >> \"$@\"',
+        'popd'
+    ]),
+    visibility = ["//visibility:public"],
+)
