@@ -727,7 +727,6 @@ workflows:
             - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
