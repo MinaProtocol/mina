@@ -256,7 +256,7 @@ let get_status ~flag t =
   in
   let () =
     if new_block_length_received > !max_block_height then
-      max_block_height <- new_block_length_received
+      max_block_height := new_block_length_received
     else ()
   in
   let active_status () =
