@@ -3,7 +3,7 @@
  (public_name time_simulator)
  (library_flags -linkall)
  (inline_tests)
- (libraries coda_intf)
+ (libraries mina_intf)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.eq))
  (instrumentation (backend bisect_ppx))

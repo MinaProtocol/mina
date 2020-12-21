@@ -11,7 +11,7 @@
    transition_handler
    consensus
    core_kernel
-   coda_intf
+   mina_intf
    pipe_lib
    syncable_ledger
    merkle_address
