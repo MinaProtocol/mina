@@ -28,7 +28,7 @@ echo "--- Build runtime_genesis_ledger binary"
 dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
 echo "--- Generate runtime_genesis_ledger with 10k accounts"
-dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json
+dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe # -- --config-file genesis_ledgers/phase_three/config.json
 
 echo "--- Upload genesis data"
 ./scripts/upload-genesis.sh

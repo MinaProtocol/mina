@@ -23,7 +23,7 @@ end
 module Input = Random_oracle_input
 
 let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map tweedle_q ~f:Field.of_string)
+  Sponge.Params.(map pasta_p ~f:Field.of_string)
 
 [%%ifdef
 consensus_mechanism]
