@@ -333,38 +333,6 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-[%%if
-mock_frontend_data]
-
-let create_sync_status_observer ~logger ~is_seed ~demo_mode:_
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
-    ~first_connection_incr ~first_message_incr =
-  let variable = Mina_incremental.Status.Var.create `Offline in
-  let incr = Mina_incremental.Status.Var.watch variable in
-  let rec loop () =
-    let%bind () = Async.after (Core.Time.Span.of_sec 5.0) in
-    let current_value = Mina_incremental.Status.Var.value variable in
-    let new_sync_status =
-      List.random_element_exn
-        ( match current_value with
-        | `Offline ->
-            [`Bootstrap; `Synced]
-        | `Synced ->
-            [`Offline; `Bootstrap]
-        | `Bootstrap ->
-            [`Offline; `Synced] )
-    in
-    Mina_incremental.Status.Var.set variable new_sync_status ;
-    Mina_incremental.Status.stabilize () ;
-    loop ()
-  in
-  let observer = Mina_incremental.Status.observe incr in
-  Mina_incremental.Status.stabilize () ;
-  don't_wait_for @@ loop () ;
-  observer
-
-[%%else]
-
 let create_sync_status_observer ~logger ~is_seed ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
