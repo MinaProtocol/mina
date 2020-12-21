@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ template "archive-node.fullname" . }}
   labels:
-    app: {{ .Release.Name }}
+    app: {{ template "archive-node.fullname" . }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
+      app: {{ template "archive-node.fullname" . }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
+        app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
@@ -109,7 +109,7 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
-{{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
+{{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
       - name: config-dir
