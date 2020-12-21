@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_transition
 open Signature_lib
 
@@ -159,7 +159,7 @@ let of_transition external_transition tracked_participants
                     next_available_token ) )
         | {data= Fee_transfer fee_transfer; _} ->
             let fee_transfer_list =
-              Coda_base.Fee_transfer.to_list fee_transfer
+              Mina_base.Fee_transfer.to_list fee_transfer
             in
             let fee_transfers =
               match tracked_participants with

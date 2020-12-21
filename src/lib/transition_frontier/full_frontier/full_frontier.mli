@@ -9,7 +9,7 @@
  *  externally available [Transition_frontier] module.
  *)
 
-open Coda_base
+open Mina_base
 open Frontier_base
 open Coda_state
 

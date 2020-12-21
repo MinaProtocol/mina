@@ -2,13 +2,13 @@ open Core_kernel
 open Async
 open Rosetta_lib
 open Rosetta_models
-module Signature = Coda_base.Signature
+module Signature = Mina_base.Signature
 module Transaction = Rosetta_lib.Transaction
 module Public_key = Signature_lib.Public_key
-module Signed_command_payload = Coda_base.Signed_command_payload
-module User_command = Coda_base.User_command
-module Signed_command = Coda_base.Signed_command
-module Transaction_hash = Coda_base.Transaction_hash
+module Signed_command_payload = Mina_base.Signed_command_payload
+module User_command = Mina_base.User_command
+module Signed_command = Mina_base.Signed_command
+module Transaction_hash = Mina_base.Transaction_hash
 
 module Get_nonce =
 [%graphql
@@ -231,7 +231,7 @@ module Metadata = struct
                    (* for now, nonce is based on the fee payer's account using the default token,
                     per @mrmr1993
                  *)
-                 ~token_id:(`String Coda_base.Token_id.(default |> to_string))
+                 ~token_id:(`String Mina_base.Token_id.(default |> to_string))
                  (* WAS:
                    ( match token_id with
                    | Some x ->
@@ -649,7 +649,7 @@ module Submit = struct
            Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
-      let token_id x = `String (Coda_base.Token_id.to_string x) in
+      let token_id x = `String (Mina_base.Token_id.to_string x) in
       fun ~graphql_uri ->
         { gql_payment=
             (fun ~payment ~signature () ->

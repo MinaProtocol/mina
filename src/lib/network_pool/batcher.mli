@@ -4,7 +4,7 @@ open Network_peer
 
 module Snark_pool : sig
   type proof_envelope =
-    (Ledger_proof.t One_or_two.t * Coda_base.Sok_message.t) Envelope.Incoming.t
+    (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
   [@@deriving sexp]
 
   type t [@@deriving sexp]
@@ -15,7 +15,7 @@ module Snark_pool : sig
 end
 
 module Transaction_pool : sig
-  open Coda_base
+  open Mina_base
 
   type t [@@deriving sexp]
 

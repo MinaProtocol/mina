@@ -20,8 +20,8 @@ module Pending_snark_work = struct
       { work_id: int
       ; fee_excess: Currency.Fee.Signed.t
       ; supply_increase: Currency.Amount.t
-      ; source_ledger_hash: Coda_base.Frozen_ledger_hash.t
-      ; target_ledger_hash: Coda_base.Frozen_ledger_hash.t }
+      ; source_ledger_hash: Mina_base.Frozen_ledger_hash.t
+      ; target_ledger_hash: Mina_base.Frozen_ledger_hash.t }
     [@@deriving yojson]
   end
 

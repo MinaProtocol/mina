@@ -3,40 +3,40 @@ module Balance = Currency.Balance
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
-  type t = Coda_base.Account.Stable.Latest.t
+  type t = Mina_base.Account.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp, eq, compare, hash, yojson]
 
-  type key = Coda_base.Account.Key.Stable.Latest.t
+  type key = Mina_base.Account.Key.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp, eq, compare, hash]
 
   (* use Account items needed *)
-  let empty = Coda_base.Account.empty
+  let empty = Mina_base.Account.empty
 
-  let public_key = Coda_base.Account.public_key
+  let public_key = Mina_base.Account.public_key
 
-  let identifier = Coda_base.Account.identifier
+  let identifier = Mina_base.Account.identifier
 
-  let key_gen = Coda_base.Account.key_gen
+  let key_gen = Mina_base.Account.key_gen
 
-  let gen = Coda_base.Account.gen
+  let gen = Mina_base.Account.gen
 
-  let create = Coda_base.Account.create
+  let create = Mina_base.Account.create
 
-  let balance Coda_base.Account.Poly.{balance; _} = balance
+  let balance Mina_base.Account.Poly.{balance; _} = balance
 
-  let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
+  let update_balance t bal = {t with Mina_base.Account.Poly.balance= bal}
 
-  let token Coda_base.Account.Poly.{token_id; _} = token_id
+  let token Mina_base.Account.Poly.{token_id; _} = token_id
 
-  let token_owner Coda_base.Account.Poly.{token_permissions; _} =
+  let token_owner Mina_base.Account.Poly.{token_permissions; _} =
     match token_permissions with
-    | Coda_base.Token_permissions.Token_owned _ ->
+    | Mina_base.Token_permissions.Token_owned _ ->
         true
     | Not_owned _ ->
         false
 end
 
-module Receipt = Coda_base.Receipt
+module Receipt = Mina_base.Receipt
 
 module Hash = struct
   module T = struct
@@ -137,7 +137,7 @@ module Key = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Coda_base.Account.Key.Stable.V1.t
+      type t = Mina_base.Account.Key.Stable.V1.t
       [@@deriving sexp, eq, compare, hash]
 
       let to_latest = Fn.id
@@ -158,13 +158,13 @@ module Key = struct
   include Comparable.Make (Stable.Latest)
 end
 
-module Token_id = Coda_base.Token_id
+module Token_id = Mina_base.Token_id
 
 module Account_id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Coda_base.Account_id.Stable.V1.t
+      type t = Mina_base.Account_id.Stable.V1.t
       [@@deriving sexp, eq, compare, hash]
 
       let to_latest = Fn.id
@@ -174,11 +174,11 @@ module Account_id = struct
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
 
-  let create = Coda_base.Account_id.create
+  let create = Mina_base.Account_id.create
 
-  let token_id = Coda_base.Account_id.token_id
+  let token_id = Mina_base.Account_id.token_id
 
-  let public_key = Coda_base.Account_id.public_key
+  let public_key = Mina_base.Account_id.public_key
 
   (* TODO: Non-default tokens *)
   let gen =

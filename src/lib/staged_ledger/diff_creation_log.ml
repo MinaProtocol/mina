@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
 

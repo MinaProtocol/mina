@@ -1,7 +1,0 @@
-(library
- (name coda_metrics)
- (public_name coda_metrics)
- (libraries async cohttp cohttp-async logger jemalloc prometheus)
- (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_pipebang ppx_custom_printf ppx_optcomp)))
