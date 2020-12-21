@@ -138,7 +138,7 @@ ppx_executable(
         "//src/lib/allocation_functor:__pkg__",
     ],
     deps = [
-        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_compare",
         "@opam//pkg:ppx_deriving_yojson",
         "@opam//pkg:ppx_jane",
         "@opam//pkg:ppxlib",
