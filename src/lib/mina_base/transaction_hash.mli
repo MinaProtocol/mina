@@ -53,6 +53,8 @@ module User_command_with_valid_signature : sig
   val forget_check : t -> (User_command.t, hash) With_hash.t
 
   include Comparable.S with type t := t
+
+  val make : User_command.Valid.t -> hash -> t
 end
 
 module User_command : sig
@@ -79,4 +81,6 @@ module User_command : sig
   val hash : t -> hash
 
   include Comparable.S with type t := t
+
+  val of_checked : User_command_with_valid_signature.t -> t
 end
