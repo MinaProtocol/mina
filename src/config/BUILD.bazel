@@ -90,13 +90,13 @@ bool_setting( name = "test_full_epoch_true", build_setting_default = True,
 # to support selection by profile we need a config setting for each
 # profile:
 config_setting( name = "config_dev",
-                flag_values = { "//src/profile": "dev" })
+                flag_values = { "//:profile": "dev" })
 config_setting( name = "config_debug",
-                flag_values = { "//src/profile": "debug" })
+                flag_values = { "//:profile": "debug" })
 config_setting( name = "config_fake_hash",
-                flag_values = { "//src/profile": "fake_hash" })
+                flag_values = { "//:profile": "fake_hash" })
 config_setting( name = "config_testnet_public",
-                flag_values = { "//src/profile": "testnet_public" })
+                flag_values = { "//:profile": "testnet_public" })
 
 # config_setting( name = "config_custom",
 #                 flag_values = { "//dev/profile": "any" })

@@ -1,3 +1,12 @@
+# OBAZL:TRANSISTION: These git submodules are pinned to old versions, which screws up queries.
+# Once all Bazel code is merged and pins are corrected, these lines can be removed.
+src/external
+src/lib/marlin
+src/lib/marlin/zexe
+src/lib/snarky
+# /OBAZL:TRANSITION
+
+## normal:
 _build
 buildkite
 coda-automation
@@ -8,9 +17,11 @@ helm
 maintenance
 rfcs
 
-# not yet converted to snarky.backendless:
+## these have dependencies (direct or indirect) on @snarky//src:snarky, which no longer exists
+src/lib/snarky_blake2/test
+src/lib/snarky_log/examples
+src/lib/snarky_taylor/tests
 src/lib/vrf_lib/tests
-
 # depends on src/lib/vrf_lib/tests:
 src/app/benchmarks
 
