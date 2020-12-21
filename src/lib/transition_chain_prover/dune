@@ -3,4 +3,4 @@
  (public_name transition_chain_prover)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
- (libraries core_kernel coda_intf mina_base transition_frontier merkle_list_prover))
+ (libraries core_kernel mina_intf mina_base transition_frontier merkle_list_prover))
