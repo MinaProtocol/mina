@@ -226,6 +226,8 @@ module Versioned_v1 = struct
     let hash = M.hash
 
     let hash_fold_t = M.hash_fold_t
+
+    let equal = M.equal
   end
 
   module Full (M : Intf.Input.Versioned_v1.Full_intf) : sig
