@@ -1,0 +1,88 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "crypto_params",
+    src = "crypto_params.ml",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "crypto_params",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/bignum_bigint",
+        "@mina//src/lib/bowe_gabizon_hash",
+        "@mina//src/lib/cache_dir",
+        "@mina//src/lib/hash_prefixes",
+        "@mina//src/lib/pickles",
+        "@mina//src/lib/random_oracle",
+        "@snarky//group_map",
+        "@snarky//src/base:snarky_backendless",
+        "@snarky//tuple_lib",
+        ":_Group_map_params"
+    ],
+)
+
+ocaml_module(
+    name     = "_Group_map_params",
+    src      = ":group_map_params.ml",
+    opts     = [],
+    ppx      = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "crypto_params"
+    ],
+    deps = [
+        "@snarky//group_map",
+        "@mina//src/lib/pickles",
+    ]
+)
+
+########
+genrule(
+    name       = "gensrcs",
+    tools      = ["//src/lib/crypto_params/gen:gen.exe"],
+    outs       = ["group_map_params.ml"],
+    cmd        = "\n".join([
+        "$(location //src/lib/crypto_params/gen:gen.exe)",
+        "cp group_map_params.ml \"$@\""
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/crypto_params:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)

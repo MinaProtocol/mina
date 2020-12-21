@@ -1,0 +1,92 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY BLAKE2
+################################################################
+BLAKE2_INTERFACE_OPTS = []
+
+BLAKE2_MODULE_OPTS = []
+
+BLAKE2_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:digestif.c",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+]
+
+BLAKE2_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_coda__ppx_version__ppx_deriving.eq__ppx_deriving_yojson"
+
+BLAKE2_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "blake2",
+]
+
+##############
+ocaml_archive(
+    name = "blake2",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = BLAKE2_DEPS + [
+        # do not sort (buildifier)
+        ":_Blake2",
+        ":_Intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Blake2_ns",
+    ns = "blake2",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "blake2.ml",
+        "intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Blake2",
+    src = "blake2.ml",
+    intf = ":_Blake2.cmi",
+    ns = ":Blake2_ns",
+    opts = BLAKE2_MODULE_OPTS,
+    ppx = BLAKE2_PPX,
+    ppx_args = BLAKE2_PPX_ARGS,
+    deps = BLAKE2_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Blake2.cmi",
+    src = "blake2.mli",
+    ns = ":Blake2_ns",
+    opts = BLAKE2_INTERFACE_OPTS,
+    ppx = BLAKE2_PPX,
+    ppx_args = BLAKE2_PPX_ARGS,
+    deps = BLAKE2_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Blake2_ns",
+    opts = BLAKE2_MODULE_OPTS,
+    ppx = BLAKE2_PPX,
+    ppx_args = BLAKE2_PPX_ARGS,
+    deps = BLAKE2_DEPS,
+)
