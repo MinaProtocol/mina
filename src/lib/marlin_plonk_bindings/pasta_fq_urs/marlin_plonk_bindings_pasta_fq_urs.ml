@@ -19,10 +19,7 @@ external lagrange_commitment :
   = "caml_pasta_fq_urs_lagrange_commitment"
 
 external commit_evaluations :
-     t
-  -> domain_size:int
-  -> Marlin_plonk_bindings_pasta_fq.t array
-  -> Poly_comm.t
+  t -> domain_size:int -> Marlin_plonk_bindings_pasta_fq.t array -> Poly_comm.t
   = "caml_pasta_fq_urs_commit_evaluations"
 
 external b_poly_commitment :

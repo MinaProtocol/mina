@@ -19,8 +19,7 @@ external write :
   = "caml_pasta_fq_plonk_verifier_index_write"
 
 external shifts :
-     log2_size:int
-  -> Marlin_plonk_bindings_pasta_fq.t Plonk_verification_shifts.t
+  log2_size:int -> Marlin_plonk_bindings_pasta_fq.t Plonk_verification_shifts.t
   = "caml_pasta_fq_plonk_verifier_index_shifts"
 
 external dummy : unit -> t = "caml_pasta_fq_plonk_verifier_index_dummy"
