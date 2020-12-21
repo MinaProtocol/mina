@@ -1,0 +1,23 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ppx_module",
+)
+
+###########
+ppx_module(
+    name = "ppx_to_enum",
+    src = "ppx_to_enum.ml",
+    opts = [],
+    ppx = "@//bzl/ppx/exe:ppxlib.metaquot",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+    ],
+)

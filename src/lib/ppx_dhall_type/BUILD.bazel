@@ -1,0 +1,85 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ppx_archive",
+    "ppx_module",
+    "ppx_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## PPX STANZA 1: PPX_DHALL_TYPE
+################################################################
+PPX_DHALL_TYPE_PPX_MODULE_OPTS = []
+
+PPX_DHALL_TYPE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:core_kernel",
+]
+
+PPX_DHALL_TYPE_PPX = "//bzl/ppx/exe:ppx_version__ppxlib.metaquot"
+
+PPX_DHALL_TYPE_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+############
+ppx_archive(
+    name = "ppx_dhall_type",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PPX_DHALL_TYPE_DEPS + [
+        # do not sort (buildifier)
+        ":Deriving",
+        ":Dhall_type",
+    ],
+)
+
+#########
+ppx_ns(
+    name = "Ppx_dhall_type_ns",
+    ns = "ppx_dhall_type",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "deriving.ml",
+        "dhall_type.ml",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Deriving",
+    src = "deriving.ml",
+    ns = ":Ppx_dhall_type_ns",
+    opts = PPX_DHALL_TYPE_PPX_MODULE_OPTS,
+    ppx = PPX_DHALL_TYPE_PPX,
+    ppx_args = PPX_DHALL_TYPE_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+###########
+ppx_module(
+    name = "Dhall_type",
+    src = "dhall_type.ml",
+    ns = ":Ppx_dhall_type_ns",
+    opts = PPX_DHALL_TYPE_PPX_MODULE_OPTS,
+    ppx = PPX_DHALL_TYPE_PPX,
+    ppx_args = PPX_DHALL_TYPE_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:core_kernel",
+    ],
+)

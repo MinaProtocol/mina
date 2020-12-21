@@ -1,0 +1,147 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY LOGPROC_LIB
+################################################################
+LOGPROC_LIB_INTERFACE_OPTS = []
+
+LOGPROC_LIB_MODULE_OPTS = []
+
+LOGPROC_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@opam//pkg:angstrom",
+    "@opam//pkg:re2",
+    "@mina//src/lib/logproc_lib:interpolator_lib",
+]
+
+LOGPROC_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.std"
+
+LOGPROC_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "logproc_lib",
+]
+
+##############
+ocaml_archive(
+    name = "logproc_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = LOGPROC_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Filter",
+        ":_Logproc_lib",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Logproc_lib_ns",
+    ns = "logproc_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "filter.ml",
+        "logproc_lib.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Filter",
+    src = "filter.ml",
+    intf = ":_Filter.cmi",
+    ns = ":Logproc_lib_ns",
+    opts = LOGPROC_LIB_MODULE_OPTS,
+    ppx = LOGPROC_LIB_PPX,
+    ppx_args = LOGPROC_LIB_PPX_ARGS,
+    deps = LOGPROC_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Filter.cmi",
+    src = "filter.mli",
+    ns = ":Logproc_lib_ns",
+    opts = LOGPROC_LIB_INTERFACE_OPTS,
+    ppx = LOGPROC_LIB_PPX,
+    ppx_args = LOGPROC_LIB_PPX_ARGS,
+    deps = LOGPROC_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Logproc_lib",
+    src = "logproc_lib.ml",
+    ns = ":Logproc_lib_ns",
+    opts = LOGPROC_LIB_MODULE_OPTS,
+    ppx = LOGPROC_LIB_PPX,
+    ppx_args = LOGPROC_LIB_PPX_ARGS,
+    deps = LOGPROC_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Filter",
+    ],
+)
+
+################################################################
+## STANZA 2: LIBRARY INTERPOLATOR_LIB
+################################################################
+INTERPOLATOR_LIB_MODULE_OPTS = []
+
+INTERPOLATOR_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@opam//pkg:angstrom",
+]
+
+INTERPOLATOR_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.std"
+
+INTERPOLATOR_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "interpolator_lib",
+]
+
+##############
+ocaml_archive(
+    name = "interpolator_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = INTERPOLATOR_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Interpolator",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Interpolator_lib_ns",
+    ns = "interpolator_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "interpolator.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Interpolator",
+    src = "interpolator.ml",
+    ns = ":Interpolator_lib_ns",
+    opts = INTERPOLATOR_LIB_MODULE_OPTS,
+    ppx = INTERPOLATOR_LIB_PPX,
+    ppx_args = INTERPOLATOR_LIB_PPX_ARGS,
+    deps = INTERPOLATOR_LIB_DEPS,
+)

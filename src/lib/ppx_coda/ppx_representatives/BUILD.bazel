@@ -1,0 +1,27 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ppx_module",
+)
+
+###########
+ppx_module(
+    name = "ppx_representatives",
+    src = "ppx_representatives.ml",
+    lazy_deps = [
+        # do not sort (buildifier)
+        "@mina//src/lib/ppx_coda/ppx_representatives/runtime:ppx_representatives_runtime",
+    ],
+    opts = [],
+    ppx = "@//bzl/ppx/exe:ppxlib.metaquot",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        # do not sort (buildifier)
+        "@opam//pkg:compiler-libs.common",
+        "@opam//pkg:ppxlib",
+    ],
+)
