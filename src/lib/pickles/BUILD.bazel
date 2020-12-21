@@ -1,0 +1,1092 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY PICKLES
+################################################################
+PICKLES_INTERFACE_OPTS = []
+
+PICKLES_MODULE_OPTS = []
+
+PICKLES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/coda_version",
+    "@mina//src/lib/zexe_backend",
+    "@mina//src/lib/random_oracle_input",
+    "@mina//src/lib/pickles_base",
+    "@mina//src/lib/pickles/composition_types",
+    "@mina//src/lib/pickles/limb_vector",
+    "@mina//src/lib/pickles/plonk_checks",
+    "@mina//src/lib/pickles/precomputed",
+    "@mina//src/lib/pickles/one_hot_vector",
+    "@mina//src/lib/pickles/pseudo",
+    "@mina//src/lib/snarky_log",
+    "@snarky//sponge",
+    "@snarky//group_map",
+    "@mina//src/lib/snarky_group_map",
+    "@snarky//snarky_curve",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/key_cache",
+    "@mina//src/lib/snark_keys_header",
+]
+
+PICKLES_PPX = "@//bzl/ppx/exe:ppx_version__ppx_coda__ppx_jane__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx"
+
+PICKLES_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "pickles",
+]
+
+##############
+ocaml_archive(
+    name = "pickles",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Cache",
+        ":_Cache_handle",
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Dirty",
+        ":_Dlog_main",
+        ":_Dummy",
+        ":_Endo",
+        ":_Fix_domains",
+        ":_Full_signature",
+        ":_Impls",
+        ":_Import",
+        ":_Inductive_rule",
+        ":_Intf",
+        ":_Make_sponge",
+        ":_Opt_sponge",
+        ":_Pairing_main",
+        ":_Per_proof_witness",
+        ":_Pickles",
+        ":_Plonk_curve_ops",
+        ":_Proof",
+        ":_Reduced_me_only",
+        ":_Requests",
+        ":_Ro",
+        ":_Scalar_challenge",
+        ":_Side_loaded_verification_key",
+        ":_Sponge_inputs",
+        ":_Step",
+        ":_Step_branch_data",
+        ":_Step_main",
+        ":_Step_main_inputs",
+        ":_Tag",
+        ":_Tick_field_sponge",
+        ":_Timer",
+        ":_Tock_field_sponge",
+        ":_Type",
+        ":_Types_map",
+        ":_Unfinalized",
+        ":_Util",
+        ":_Verification_key",
+        ":_Verify",
+        ":_Wrap",
+        ":_Wrap_domains",
+        ":_Wrap_main",
+        ":_Wrap_main_inputs",
+        ":_Wrap_proof",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Pickles_ns",
+    ns = "pickles",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "cache.ml",
+        "cache_handle.ml",
+        "commitment_lengths.ml",
+        "common.ml",
+        "dirty.ml",
+        "dlog_main.ml",
+        "dummy.ml",
+        "endo.ml",
+        "fix_domains.ml",
+        "full_signature.ml",
+        "impls.ml",
+        "import.ml",
+        "inductive_rule.ml",
+        "intf.ml",
+        "make_sponge.ml",
+        "opt_sponge.ml",
+        "pairing_main.ml",
+        "per_proof_witness.ml",
+        "pickles.ml",
+        "plonk_curve_ops.ml",
+        "proof.ml",
+        "reduced_me_only.ml",
+        "requests.ml",
+        "ro.ml",
+        "scalar_challenge.ml",
+        "side_loaded_verification_key.ml",
+        "sponge_inputs.ml",
+        "step.ml",
+        "step_branch_data.ml",
+        "step_main.ml",
+        "step_main_inputs.ml",
+        "tag.ml",
+        "tick_field_sponge.ml",
+        "timer.ml",
+        "tock_field_sponge.ml",
+        "type.ml",
+        "types_map.ml",
+        "unfinalized.ml",
+        "util.ml",
+        "verification_key.ml",
+        "verify.ml",
+        "wrap.ml",
+        "wrap_domains.ml",
+        "wrap_main.ml",
+        "wrap_main_inputs.ml",
+        "wrap_proof.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cache",
+    src = "cache.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27" # Error (warning 27): unused variable e.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Timer",
+        ":_Verification_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cache_handle",
+    src = "cache_handle.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Dirty",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Commitment_lengths",
+    src = "commitment_lengths.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27" # Error (warning 27): unused variable +.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Common",
+    src = "common.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Endo",
+        ":_Impls",
+        ":_Import",
+        ":_Tick_field_sponge",
+        ":_Tock_field_sponge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dirty",
+    src = "dirty.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Dlog_main",
+    src = "dlog_main.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-34", ## Unused type declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Endo",
+        ":_Import",
+        ":_Intf",
+        ":_Opt_sponge",
+        ":_Plonk_curve_ops",
+        ":_Scalar_challenge",
+        ":_Type",
+        ":_Util",
+        ":_Wrap_main_inputs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dummy",
+    src = "dummy.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Ro",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Endo",
+    src = "endo.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Scalar_challenge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fix_domains",
+    src = "fix_domains.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Full_signature",
+    src = "full_signature.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Impls",
+    src = "impls.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Import",
+    src = "import.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Inductive_rule",
+    src = "inductive_rule.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Impls",
+        ":_Tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Make_sponge",
+    src = "make_sponge.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Opt_sponge",
+    src = "opt_sponge.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Pairing_main",
+    src = "pairing_main.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-9",  # Missing fields in a record pattern.
+        "-w", "-27", # Innocuous unused variable
+        "-w", "-33", # Unused open statement.
+        "-w", "-34", # Unused type declaration.
+        "-w", "-39", # Unused extension constructor.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Dlog_main",
+        ":_Endo",
+        ":_Import",
+        ":_Intf",
+        ":_Opt_sponge",
+        ":_Scalar_challenge",
+        ":_Side_loaded_verification_key",
+        ":_Step_main_inputs",
+        ":_Type",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Per_proof_witness",
+    src = "per_proof_witness.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33", # Unused open statement.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Pairing_main",
+        ":_Scalar_challenge",
+        ":_Step_main_inputs",
+        ":_Wrap_proof",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pickles",
+    src = "pickles.ml",
+    intf = ":_Pickles.cmi",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27", # Innocuous unused variable
+        "-w", "-32", # Unused value declaration.
+        "-w", "-33", # Unused open statement.
+        "-w", "-34", # Unused type declaration.
+        "-w", "-37", # Unused constructor.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Cache",
+        ":_Cache_handle",
+        ":_Common",
+        ":_Dirty",
+        ":_Dummy",
+        ":_Full_signature",
+        ":_Impls",
+        ":_Import",
+        ":_Inductive_rule",
+        ":_Intf",
+        ":_Pairing_main",
+        ":_Proof",
+        ":_Scalar_challenge",
+        ":_Side_loaded_verification_key",
+        ":_Sponge_inputs",
+        ":_Step",
+        ":_Step_branch_data",
+        ":_Step_main_inputs",
+        ":_Tag",
+        ":_Tick_field_sponge",
+        ":_Timer",
+        ":_Types_map",
+        ":_Util",
+        ":_Verification_key",
+        ":_Verify",
+        ":_Wrap_domains",
+        ":_Wrap_main",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Pickles.cmi",
+    src = "pickles.mli",
+    ns = ":Pickles_ns",
+    opts = PICKLES_INTERFACE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Cache",
+        ":_Impls",
+        ":_Inductive_rule",
+        ":_Pairing_main",
+        ":_Sponge_inputs",
+        ":_Step_main_inputs",
+        ":_Tag",
+        ":_Tick_field_sponge",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Plonk_curve_ops",
+    src = "plonk_curve_ops.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33" # Error (warning 33): unused open Impl.Field.Constant.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Proof",
+    src = "proof.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w",
+        "-22"  # Preprocessor warnings
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Dummy",
+        ":_Import",
+        ":_Reduced_me_only",
+        ":_Ro",
+        ":_Scalar_challenge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Reduced_me_only",
+    src = "reduced_me_only.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Requests",
+    src = "requests.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33" # Unused value declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Per_proof_witness",
+        ":_Scalar_challenge",
+        ":_Wrap_main_inputs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ro",
+    src = "ro.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Import",
+        ":_Scalar_challenge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Scalar_challenge",
+    src = "scalar_challenge.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33" # Error (warning 33): unused open Impl.As_prover.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Intf",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Side_loaded_verification_key",
+    src = "side_loaded_verification_key.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-6",  # Label omitted in function application.
+        "-w", "-27", # Innocuous unused variable
+        "-w", "-33"  # Unused open statement.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Step_main_inputs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sponge_inputs",
+    src = "sponge_inputs.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Make_sponge",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Step",
+    src = "step.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27", # Innocuous unused variable
+        "-w", "-34", # Unused type declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Dlog_main",
+        ":_Dummy",
+        ":_Endo",
+        ":_Impls",
+        ":_Import",
+        ":_Per_proof_witness",
+        ":_Proof",
+        ":_Reduced_me_only",
+        ":_Scalar_challenge",
+        ":_Step_branch_data",
+        ":_Tag",
+        ":_Tick_field_sponge",
+        ":_Tock_field_sponge",
+        ":_Types_map",
+        ":_Unfinalized",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Step_branch_data",
+    src = "step_branch_data.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33",  # Unused open statement.
+        "-w", "-34",  # Unused type declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Fix_domains",
+        ":_Impls",
+        ":_Import",
+        ":_Inductive_rule",
+        ":_Requests",
+        ":_Step_main",
+        ":_Tag",
+        ":_Timer",
+        ":_Types_map",
+        ":_Unfinalized",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Step_main",
+    src = "step_main.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-33",  # Unused open statement.
+        "-w", "-34",  # Unused type declaration.
+        "-w", "-37",  # Unused ancestor variable.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    ppx_print = PPX_PRINT,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Inductive_rule",
+        ":_Opt_sponge",
+        ":_Pairing_main",
+        ":_Per_proof_witness",
+        ":_Requests",
+        ":_Side_loaded_verification_key",
+        ":_Step_main_inputs",
+        ":_Tag",
+        ":_Types_map",
+        ":_Unfinalized",
+        ":_Wrap_proof",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Step_main_inputs",
+    src = "step_main_inputs.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-6", # Label omitted in function application.
+        "-w", "-33", # Unused open statement.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Plonk_curve_ops",
+        ":_Sponge_inputs",
+        ":_Tick_field_sponge",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Tag",
+    src = "tag.ml",
+    intf = ":_Tag.cmi",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Tag.cmi",
+    src = "tag.mli",
+    ns = ":Pickles_ns",
+    opts = PICKLES_INTERFACE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Tick_field_sponge",
+    src = "tick_field_sponge.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Make_sponge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Timer",
+    src = "timer.ml",
+    intf = ":_Timer.cmi",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Timer.cmi",
+    src = "timer.mli",
+    ns = ":Pickles_ns",
+    opts = PICKLES_INTERFACE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Tock_field_sponge",
+    src = "tock_field_sponge.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Make_sponge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Type",
+    src = "type.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Types_map",
+    src = "types_map.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-9",  ## Missing fields in a record pattern.
+        "-w", "-27"  ## Innocuous unused variable
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Side_loaded_verification_key",
+        ":_Step_main_inputs",
+        ":_Tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Unfinalized",
+    src = "unfinalized.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Dummy",
+        ":_Endo",
+        ":_Impls",
+        ":_Import",
+        ":_Ro",
+        ":_Scalar_challenge",
+        ":_Tock_field_sponge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Util",
+    src = "util.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Type",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Verification_key",
+    src = "verification_key.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-6" # Error (warning 6): label log2_size was omitted in the application of this function
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Verify",
+    src = "verify.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-9",   # Missing fields in a record pattern.
+        "-w", "-27",  # Innocuous unused variable
+        "-w", "-33",  # Unused open statement.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Dummy",
+        ":_Endo",
+        ":_Import",
+        ":_Intf",
+        ":_Proof",
+        ":_Reduced_me_only",
+        ":_Scalar_challenge",
+        ":_Tick_field_sponge",
+        ":_Timer",
+        ":_Verification_key",
+        ":_Wrap",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Wrap",
+    src = "wrap.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27" # Innocuous unused variable
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Dlog_main",
+        ":_Endo",
+        ":_Import",
+        ":_Proof",
+        ":_Requests",
+        ":_Scalar_challenge",
+        ":_Tick_field_sponge",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Wrap_domains",
+    src = "wrap_domains.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27", # Innocuous unused variable
+        "-w", "-34", # Unused type declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Fix_domains",
+        ":_Impls",
+        ":_Import",
+        ":_Inductive_rule",
+        ":_Tag",
+        ":_Timer",
+        ":_Types_map",
+        ":_Verification_key",
+        ":_Wrap_main",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Wrap_main",
+    src = "wrap_main.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-27",  # Innocuous unused variable
+        "-w", "-34"   # Unused type declaration.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Dlog_main",
+        ":_Full_signature",
+        ":_Impls",
+        ":_Import",
+        ":_Requests",
+        ":_Scalar_challenge",
+        ":_Timer",
+        ":_Util",
+        ":_Wrap_main_inputs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Wrap_main_inputs",
+    src = "wrap_main_inputs.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS + [
+        "-w", "-6", # Label omitted in function application.
+    ],
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Sponge_inputs",
+        ":_Tock_field_sponge",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Wrap_proof",
+    src = "wrap_proof.ml",
+    ns = ":Pickles_ns",
+    opts = PICKLES_MODULE_OPTS,
+    ppx = PICKLES_PPX,
+    ppx_args = PICKLES_PPX_ARGS,
+    deps = PICKLES_DEPS + [
+        # do not sort (buildifier)
+        ":_Commitment_lengths",
+        ":_Common",
+        ":_Impls",
+        ":_Import",
+        ":_Step_main_inputs",
+    ],
+)

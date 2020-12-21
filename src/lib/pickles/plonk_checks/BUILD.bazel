@@ -1,0 +1,28 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "plonk_checks",
+    src = "plonk_checks.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.std__ppx_deriving_yojson",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "plonk_checks",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/pickles/composition_types",
+        "@mina//src/lib/pickles_base",
+        "@mina//src/lib/pickles_types",
+        "@mina//src/lib/zexe_backend",
+        "@opam//pkg:core_kernel",
+        "@snarky//src/base:snarky_backendless",
+    ],
+)

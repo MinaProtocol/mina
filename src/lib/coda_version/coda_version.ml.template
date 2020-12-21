@@ -1,0 +1,12 @@
+let commit_id = "{MINA_COMMIT_ID}"
+let commit_id_short = "{MINA_COMMIT_ID_SHORT}"
+let branch = "{MINA_BRANCH}"
+let commit_date = "{MINA_COMMIT_DATE}"
+
+let marlin_commit_id = "{MARLIN_COMMIT_ID}"
+let marlin_commit_id_short = "{MARLIN_COMMIT_ID_SHORT}"
+let marlin_commit_date = "{MARLIN_COMMIT_DATE}"
+
+let zexe_commit_id = "{ZEXE_COMMIT_ID}"
+let zexe_commit_id_short = "{ZEXE_COMMIT_ID_SHORT}"
+let zexe_commit_date = "{ZEXE_COMMIT_DATE}"
