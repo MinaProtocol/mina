@@ -296,26 +296,26 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
           ~f:(fun cmd balances ->
             match (cmd, balances) with
             | ( Transaction.Coinbase _
-              , User_command_status.Internal_command_balance_data.Coinbase
+              , Transaction_status.Internal_command_balance_data.Coinbase
                   balances ) ->
                 let balances =
-                  User_command_status.Coinbase_balance_data.to_balance_data
+                  Transaction_status.Coinbase_balance_data.to_balance_data
                     balances
                 in
                 { With_status.data= cmd
                 ; status=
-                    Applied (User_command_status.Auxiliary_data.empty, balances)
+                    Applied (Transaction_status.Auxiliary_data.empty, balances)
                 }
             | ( Transaction.Fee_transfer _
-              , User_command_status.Internal_command_balance_data.Fee_transfer
+              , Transaction_status.Internal_command_balance_data.Fee_transfer
                   balances ) ->
                 let balances =
-                  User_command_status.Fee_transfer_balance_data.to_balance_data
+                  Transaction_status.Fee_transfer_balance_data.to_balance_data
                     balances
                 in
                 { With_status.data= cmd
                 ; status=
-                    Applied (User_command_status.Auxiliary_data.empty, balances)
+                    Applied (Transaction_status.Auxiliary_data.empty, balances)
                 }
             | _ ->
                 (* Caught by [try_with] above, it doesn't matter what we throw. *)
@@ -357,7 +357,7 @@ let generate_statuses (type c) ~constraint_constants coinbase_parts ~receiver
               let status =
                 Or_error.ok_exn (generate_status (Transaction.Coinbase t))
               in
-              let open User_command_status in
+              let open Transaction_status in
               Internal_command_balance_data.Coinbase
                 (Coinbase_balance_data.of_balance_data_exn
                    (balance_data status)) )
@@ -367,7 +367,7 @@ let generate_statuses (type c) ~constraint_constants coinbase_parts ~receiver
               let status =
                 Or_error.ok_exn (generate_status (Transaction.Fee_transfer t))
               in
-              let open User_command_status in
+              let open Transaction_status in
               Internal_command_balance_data.Fee_transfer
                 (Fee_transfer_balance_data.of_balance_data_exn
                    (balance_data status)) )

@@ -118,7 +118,7 @@ module Transaction_applied = struct
           { fee_transfer: Fee_transfer.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list
           ; receiver_timing: Account.Timing.Stable.V1.t
-          ; balances: User_command_status.Fee_transfer_balance_data.Stable.V1.t
+          ; balances: Transaction_status.Fee_transfer_balance_data.Stable.V1.t
           }
         [@@deriving sexp]
 
@@ -135,7 +135,7 @@ module Transaction_applied = struct
           { coinbase: Coinbase.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list
           ; receiver_timing: Account.Timing.Stable.V1.t
-          ; balances: User_command_status.Coinbase_balance_data.Stable.V1.t }
+          ; balances: Transaction_status.Coinbase_balance_data.Stable.V1.t }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -220,7 +220,7 @@ module type S = sig
         { fee_transfer: Fee_transfer.t
         ; previous_empty_accounts: Account_id.t list
         ; receiver_timing: Account.Timing.t
-        ; balances: User_command_status.Fee_transfer_balance_data.t }
+        ; balances: Transaction_status.Fee_transfer_balance_data.t }
       [@@deriving sexp]
     end
 
@@ -229,7 +229,7 @@ module type S = sig
         { coinbase: Coinbase.t
         ; previous_empty_accounts: Account_id.t list
         ; receiver_timing: Account.Timing.t
-        ; balances: User_command_status.Coinbase_balance_data.t }
+        ; balances: Transaction_status.Coinbase_balance_data.t }
       [@@deriving sexp]
     end
 
@@ -247,7 +247,7 @@ module type S = sig
 
     val transaction : t -> Transaction.t With_status.t
 
-    val user_command_status : t -> User_command_status.t
+    val user_command_status : t -> Transaction_status.t
   end
 
   val apply_user_command :
@@ -327,9 +327,9 @@ let min_balance_tag = "minbal"
 let timing_error_to_user_command_status err =
   match Error.Internal_repr.of_info err with
   | Tag_t (tag, _) when String.equal tag nsf_tag ->
-      User_command_status.Failure.Source_insufficient_balance
+      Transaction_status.Failure.Source_insufficient_balance
   | Tag_t (tag, _) when String.equal tag min_balance_tag ->
-      User_command_status.Failure.Source_minimum_balance_violation
+      Transaction_status.Failure.Source_minimum_balance_violation
   | _ ->
       failwith "Unexpected timed account validation error"
 
@@ -486,18 +486,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { data= Fee_transfer f.fee_transfer
           ; status=
               Applied
-                ( User_command_status.Auxiliary_data.empty
-                , User_command_status.Fee_transfer_balance_data.to_balance_data
+                ( Transaction_status.Auxiliary_data.empty
+                , Transaction_status.Fee_transfer_balance_data.to_balance_data
                     f.balances ) }
       | Coinbase c ->
           { data= Coinbase c.coinbase
           ; status=
               Applied
-                ( User_command_status.Auxiliary_data.empty
-                , User_command_status.Coinbase_balance_data.to_balance_data
+                ( Transaction_status.Auxiliary_data.empty
+                , Transaction_status.Coinbase_balance_data.to_balance_data
                     c.balances ) }
 
-    let user_command_status : t -> User_command_status.t =
+    let user_command_status : t -> Transaction_status.t =
      fun {varying; _} ->
       match varying with
       | Command (Signed_command {common= {user_command= {status; _}; _}; _}) ->
@@ -506,13 +506,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           c.command.status
       | Fee_transfer f ->
           Applied
-            ( User_command_status.Auxiliary_data.empty
-            , User_command_status.Fee_transfer_balance_data.to_balance_data
+            ( Transaction_status.Auxiliary_data.empty
+            , Transaction_status.Fee_transfer_balance_data.to_balance_data
                 f.balances )
       | Coinbase c ->
           Applied
-            ( User_command_status.Auxiliary_data.empty
-            , User_command_status.Coinbase_balance_data.to_balance_data
+            ( Transaction_status.Auxiliary_data.empty
+            , Transaction_status.Coinbase_balance_data.to_balance_data
                 c.balances )
   end
 
@@ -538,7 +538,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let check_exists t e =
     match t with `Existing _ -> Ok () | `New -> Result.fail e
 
-  let failure (e : User_command_status.Failure.t) = e
+  let failure (e : Transaction_status.Failure.t) = e
 
   let incr_balance (acct : Account.t) amt =
     match add_amount acct.balance amt with
@@ -621,8 +621,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { data= user_command
           ; status=
               Applied
-                ( User_command_status.Auxiliary_data.empty
-                , User_command_status.Balance_data.empty ) }
+                ( Transaction_status.Auxiliary_data.empty
+                , Transaction_status.Balance_data.empty ) }
       ; previous_receipt_chain_hash= account.receipt_chain_hash
       ; fee_payer_timing= account.timing
       ; source_timing= None }
@@ -709,7 +709,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               return predicate_result
           | Payment _ | Stake_delegation _ | Mint_tokens _ ->
               (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
-              Result.fail User_command_status.Failure.Predicate
+              Result.fail Transaction_status.Failure.Predicate
       in
       match payload.body with
       | Stake_delegation _ ->
@@ -725,9 +725,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `Existing _, `Existing _ ->
                 return ()
             | `New, _ ->
-                Result.fail User_command_status.Failure.Source_not_present
+                Result.fail Transaction_status.Failure.Source_not_present
             | _, `New ->
-                Result.fail User_command_status.Failure.Receiver_not_present
+                Result.fail Transaction_status.Failure.Receiver_not_present
           in
           let previous_delegate = source_account.delegate in
           let source_timing = source_account.timing in
@@ -746,7 +746,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           ( [(source_location, source_account)]
           , `Source_timing source_timing
-          , User_command_status.Auxiliary_data.empty
+          , Transaction_status.Auxiliary_data.empty
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               {previous_delegate} )
       | Payment {amount; token_id= token; _} ->
@@ -763,12 +763,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   (* Subtract the creation fee from the transaction amount. *)
                   sub_account_creation_fee ~constraint_constants `Added amount
                   |> Result.map_error ~f:(fun _ ->
-                         User_command_status.Failure
+                         Transaction_status.Failure
                          .Amount_insufficient_to_create_account )
                 else
                   Result.fail
-                    User_command_status.Failure
-                    .Cannot_pay_creation_fee_in_token
+                    Transaction_status.Failure.Cannot_pay_creation_fee_in_token
           in
           let%bind receiver_account =
             incr_balance receiver_account receiver_amount
@@ -781,8 +780,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   | `Existing _ ->
                       return (receiver_location, receiver_account)
                   | `New ->
-                      Result.fail
-                        User_command_status.Failure.Source_not_present
+                      Result.fail Transaction_status.Failure.Source_not_present
                 else return (get_with_location ledger source |> ok_or_reject)
               in
               let%bind () =
@@ -790,7 +788,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 | `Existing _ ->
                     return ()
                 | `New ->
-                    Result.fail User_command_status.Failure.Source_not_present
+                    Result.fail Transaction_status.Failure.Source_not_present
               in
               let source_timing = account.timing in
               let%bind timing =
@@ -801,7 +799,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%map balance =
                 Result.map_error (sub_amount account.balance amount)
                   ~f:(fun _ ->
-                    User_command_status.Failure.Source_insufficient_balance )
+                    Transaction_status.Failure.Source_insufficient_balance )
               in
               (location, source_timing, {account with timing; balance})
             in
@@ -816,16 +814,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   raise
                     (Reject
                        (Error.createf "%s"
-                          (User_command_status.Failure.describe failure)))
+                          (Transaction_status.Failure.describe failure)))
             else ret
           in
           let previous_empty_accounts, auxiliary_data =
             match receiver_location with
             | `Existing _ ->
-                ([], User_command_status.Auxiliary_data.empty)
+                ([], Transaction_status.Auxiliary_data.empty)
             | `New ->
                 ( [receiver]
-                , { User_command_status.Auxiliary_data.empty with
+                , { Transaction_status.Auxiliary_data.empty with
                     receiver_account_creation_fee_paid=
                       Some
                         (Amount.of_fee
@@ -859,7 +857,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ( [ (fee_payer_location, fee_payer_account)
               ; (receiver_location, receiver_account) ]
             , `Source_timing receiver_account.timing
-            , { User_command_status.Auxiliary_data.empty with
+            , { Transaction_status.Auxiliary_data.empty with
                 fee_payer_account_creation_fee_paid=
                   Some
                     (Amount.of_fee constraint_constants.account_creation_fee)
@@ -888,7 +886,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `New ->
                 return ()
             | `Existing _ ->
-                Result.fail User_command_status.Failure.Receiver_already_exists
+                Result.fail Transaction_status.Failure.Receiver_already_exists
           in
           let receiver_account =
             { receiver_account with
@@ -905,7 +903,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             else
               match source_location with
               | `New ->
-                  Result.fail User_command_status.Failure.Source_not_present
+                  Result.fail Transaction_status.Failure.Source_not_present
               | `Existing _ ->
                   return source_account
           in
@@ -918,12 +916,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                     || predicate_passed )
                 then
                   Result.fail
-                    User_command_status.Failure.Mismatched_token_permissions
+                    Transaction_status.Failure.Mismatched_token_permissions
                 else return ()
             | Not_owned _ ->
                 if Token_id.(equal default) (Account_id.token_id receiver) then
                   return ()
-                else Result.fail User_command_status.Failure.Not_token_owner
+                else Result.fail Transaction_status.Failure.Not_token_owner
           in
           let source_timing = source_account.timing in
           let%map source_account =
@@ -946,7 +944,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           ( located_accounts
           , `Source_timing source_timing
-          , { User_command_status.Auxiliary_data.empty with
+          , { Transaction_status.Auxiliary_data.empty with
               fee_payer_account_creation_fee_paid=
                 Some (Amount.of_fee constraint_constants.account_creation_fee)
             }
@@ -955,7 +953,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Mint_tokens {token_id= token; amount; _} ->
           let%bind () =
             if Token_id.(equal default) token then
-              Result.fail User_command_status.Failure.Not_token_owner
+              Result.fail Transaction_status.Failure.Not_token_owner
             else return ()
           in
           let receiver_location, receiver_account =
@@ -966,7 +964,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `Existing _ ->
                 return ()
             | `New ->
-                Result.fail User_command_status.Failure.Receiver_not_present
+                Result.fail Transaction_status.Failure.Receiver_not_present
           in
           let%bind receiver_account = incr_balance receiver_account amount in
           let%map source_location, source_timing, source_account =
@@ -980,14 +978,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               | `Existing _ ->
                   return ()
               | `New ->
-                  Result.fail User_command_status.Failure.Source_not_present
+                  Result.fail Transaction_status.Failure.Source_not_present
             in
             let%bind () =
               match account.token_permissions with
               | Token_owned _ ->
                   return ()
               | Not_owned _ ->
-                  Result.fail User_command_status.Failure.Not_token_owner
+                  Result.fail Transaction_status.Failure.Not_token_owner
             in
             let source_timing = account.timing in
             let%map timing =
@@ -1000,7 +998,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ( [ (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , `Source_timing source_timing
-          , User_command_status.Auxiliary_data.empty
+          , Transaction_status.Auxiliary_data.empty
           , Transaction_applied.Signed_command_applied.Body.Mint_tokens )
     in
     let compute_balances () =
@@ -1011,7 +1009,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         | _ ->
             None
       in
-      { User_command_status.Balance_data.fee_payer_balance=
+      { Transaction_status.Balance_data.fee_payer_balance=
           compute_balance fee_payer
       ; source_balance= compute_balance source
       ; receiver_balance= compute_balance receiver }
@@ -1181,7 +1179,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                                 we update the archive db to handle snapp
                                 commands.
                             *)
-                            User_command_status.Balance_data.empty ) }
+                            Transaction_status.Balance_data.empty ) }
                 ; accounts= [Set_once.get_exn fee_payer_account [%here]] }
           | Ok (accts, applied) ->
               List.iter accts ~f:(fun (location, account) ->
@@ -1216,11 +1214,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               { data= c
               ; status=
                   Applied
-                    ( User_command_status.Auxiliary_data.empty
+                    ( Transaction_status.Auxiliary_data.empty
                     , (* TODO: This needs to contain the correct data when we
                          update the archive db to handle snapp commands.
                       *)
-                      User_command_status.Balance_data.empty ) }
+                      Transaction_status.Balance_data.empty ) }
           ; accounts }
         in
         let pay_fee ({pk; nonce; fee; _} : Other_fee_payer.Payload.t) =
@@ -1542,12 +1540,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let balances =
       match Fee_transfer.to_singles transfer with
       | `One ft ->
-          { User_command_status.Fee_transfer_balance_data.receiver1_balance=
+          { Transaction_status.Fee_transfer_balance_data.receiver1_balance=
               Option.value_exn
                 (compute_balance (Fee_transfer.Single.receiver ft))
           ; receiver2_balance= None }
       | `Two (ft1, ft2) ->
-          { User_command_status.Fee_transfer_balance_data.receiver1_balance=
+          { Transaction_status.Fee_transfer_balance_data.receiver1_balance=
               Option.value_exn
                 (compute_balance (Fee_transfer.Single.receiver ft1))
           ; receiver2_balance=
@@ -1658,7 +1656,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ; previous_empty_accounts= emptys1 @ emptys2
       ; receiver_timing= receiver_timing_for_applied
       ; balances=
-          { User_command_status.Coinbase_balance_data.coinbase_receiver_balance=
+          { Transaction_status.Coinbase_balance_data.coinbase_receiver_balance=
               receiver_balance
           ; fee_transfer_receiver_balance=
               Option.map transferee_update ~f:(fun (_, a) -> a.balance) } }
