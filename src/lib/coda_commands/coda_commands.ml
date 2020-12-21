@@ -274,9 +274,9 @@ let get_status ~flag t =
       @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
     let%map sync_status =
-      Coda_incremental.Status.stabilize () ;
+      Mina_incremental.Status.stabilize () ;
       match
-        Coda_incremental.Status.Observer.value_exn @@ Mina_lib.sync_status t
+        Mina_incremental.Status.Observer.value_exn @@ Mina_lib.sync_status t
       with
       | `Bootstrap ->
           `Bootstrapping

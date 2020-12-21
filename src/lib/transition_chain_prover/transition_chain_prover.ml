@@ -8,7 +8,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_chain_prover_intf
+  Mina_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
