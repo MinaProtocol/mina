@@ -157,10 +157,31 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
              | Some _, Some network, Some bucket ->
                  let hash_string = State_hash.to_string hash in
                  let name = sprintf "%s-%s.json" network hash_string in
-                 ignore
-                   (Core.Sys.command
-                      (sprintf "echo '%s' | gsutil cp -n - gs://%s/%s" json
-                         bucket name))
+                 (* TODO: Use a pipe to queue this if these are building up *)
+                 don't_wait_for
+                   ( Mina_metrics.(
+                       Gauge.inc_one
+                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks) ;
+                     let open Async.Let_syntax in
+                     let%map output =
+                       Async.Process.run () ~prog:"bash"
+                         ~args:
+                           [ "-c"
+                           ; Printf.sprintf
+                               "echo '%s' | gsutil cp -n - gs://%s/%s" json
+                               bucket name ]
+                     in
+                     ( match output with
+                     | Ok _result ->
+                         ()
+                     | Error e ->
+                         [%log warn]
+                           ~metadata:[("error", Error_json.error_to_yojson e)]
+                           "Uploading block to gcloud failed: $error" ) ;
+                     Mina_metrics.(
+                       Gauge.dec_one
+                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks)
+                     )
              | _ ->
                  () ) ;
            Option.iter path ~f:(fun (`Path path) ->
