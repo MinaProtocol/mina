@@ -155,28 +155,33 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
+        let sparse_ledger', redundant =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_state_view sparse_ledger (Transaction.forget t)
-        in
-        let next_available_token_after =
-          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target (Transaction.forget t)
             coinbase_stack_source
         in
+        let statement : Transaction_snark.Statement.With_sok.t =
+          { sok_digest= Sok_message.Digest.default
+          ; source= Sparse_ledger.merkle_root sparse_ledger
+          ; target= Sparse_ledger.merkle_root sparse_ledger'
+          ; supply_increase=
+              Transaction_snark.supply_increase' ~constraint_constants
+                ~redundant
+                (Transaction.supply_increase t |> Or_error.ok_exn)
+              |> Option.value_exn
+          ; fee_excess= Transaction.(fee_excess (forget t)) |> Or_error.ok_exn
+          ; next_available_token_before
+          ; next_available_token_after= redundant.next_available_token
+          ; pending_coinbase_stack_state=
+              {source= coinbase_stack_source; target= coinbase_stack_target} }
+        in
         let span, proof =
           time (fun () ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  T.of_transaction ~sok_digest:Sok_message.Digest.default
-                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                    ~init_stack:coinbase_stack_source
-                    ~next_available_token_before ~next_available_token_after
-                    ~pending_coinbase_stack_state:
-                      { source= coinbase_stack_source
-                      ; target= coinbase_stack_target }
+                  T.of_transaction ~init_stack:coinbase_stack_source ~statement
                     ~snapp_account1:None ~snapp_account2:None
                     { Transaction_protocol_state.Poly.transaction= t
                     ; block_data= Lazy.force state_body }
@@ -220,12 +225,9 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
+        let sparse_ledger', redundant =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_state_view sparse_ledger (Transaction.forget t)
-        in
-        let next_available_token_after =
-          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target (Transaction.forget t)
@@ -237,7 +239,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~init_stack:Pending_coinbase.Stack.empty
-            ~next_available_token_before ~next_available_token_after
+            ~next_available_token_before ~redundant
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
@@ -264,12 +266,9 @@ let generate_base_snarks_witness sparse_ledger0
         let next_available_token_before =
           Sparse_ledger.next_available_token sparse_ledger
         in
-        let sparse_ledger' =
+        let sparse_ledger', redundant =
           Sparse_ledger.apply_transaction_exn ~constraint_constants
             ~txn_state_view sparse_ledger (Transaction.forget t)
-        in
-        let next_available_token_after =
-          Sparse_ledger.next_available_token sparse_ledger'
         in
         let coinbase_stack_target =
           pending_coinbase_stack_target (Transaction.forget t)
@@ -281,7 +280,7 @@ let generate_base_snarks_witness sparse_ledger0
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~init_stack:Pending_coinbase.Stack.empty
-            ~next_available_token_before ~next_available_token_after
+            ~next_available_token_before ~redundant
             ~pending_coinbase_stack_state:
               { Transaction_snark.Pending_coinbase_stack_state.source=
                   Pending_coinbase.Stack.empty
