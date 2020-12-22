@@ -13,7 +13,7 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Transaction_applied.t
     ; state_hash: State_hash.t * State_body_hash.t
     ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement: Transaction_snark.Statement.t

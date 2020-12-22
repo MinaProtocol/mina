@@ -30,6 +30,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
+	gonet "net"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
@@ -310,7 +311,37 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			}
 
 			as = append(as, externalAddr)
-			return as
+			bs := make([]ma.Multiaddr, 0, len(as))
+			isPrivate := func(addr ma.Multiaddr) bool {
+				// get the ip out
+				// filter against the private ips
+				fs := ma.NewFilters()
+				parseCIDR := func(cidr string) gonet.IPNet {
+					_, ipnet, err := gonet.ParseCIDR(cidr)
+					if err != nil {
+						panic(err)
+					}
+					return *ipnet
+				}
+
+				fs.AddFilter(parseCIDR("10.0.0.0/8"), ma.ActionDeny)
+				fs.AddFilter(parseCIDR("172.16.0.0/12"), ma.ActionDeny)
+				fs.AddFilter(parseCIDR("192.168.0.0/16"), ma.ActionDeny)
+				fs.AddFilter(parseCIDR("100.64.0.0/10"), ma.ActionDeny)
+				fs.AddFilter(parseCIDR("198.18.0.0/15"), ma.ActionDeny)
+				fs.AddFilter(parseCIDR("169.254.0.0/16"), ma.ActionDeny)
+
+				return fs.AddrBlocked(addr)
+			}
+
+			for _, a := range as {
+				if isPrivate(a) {
+					continue
+				}
+				bs = append(bs, a)
+			}
+
+			return bs
 		}),
 		p2p.NATPortMap(),
 		p2p.Routing(

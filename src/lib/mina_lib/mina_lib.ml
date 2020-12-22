@@ -104,7 +104,8 @@ type t =
   ; snark_job_state: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
-  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
+  ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
+  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -335,7 +336,7 @@ let active_or_bootstrapping =
 let create_sync_status_observer ~logger ~is_seed ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
-  let open Coda_incremental.Status in
+  let open Mina_incremental.Status in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -955,7 +956,7 @@ let create ?wallets (config : Config.t) =
                         Deferred.return (Ok `Offline)
                     | Some status ->
                         Deferred.return
-                          (Coda_incremental.Status.Observer.value status)
+                          (Mina_incremental.Status.Observer.value status)
                   in
                   let block_producers =
                     config.initial_block_production_keypairs
@@ -967,9 +968,16 @@ let create ?wallets (config : Config.t) =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
                   let git_commit = Coda_version.commit_id_short in
-                  let uptime =
-                    Time.diff (Time.now ()) config.start_time
-                    |> Time.Span.to_string_hum ~decimals:1
+                  let uptime_minutes =
+                    let now = Time.now () in
+                    let minutes_float =
+                      Time.diff now config.start_time |> Time.Span.to_min
+                    in
+                    (* if rounding fails, just convert *)
+                    Option.value_map
+                      (Float.iround_nearest minutes_float)
+                      ~f:Fn.id
+                      ~default:(Float.to_int minutes_float)
                   in
                   Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.
                     { node_ip_addr
@@ -981,7 +989,7 @@ let create ?wallets (config : Config.t) =
                     ; ban_statuses
                     ; k_block_hashes_and_timestamps
                     ; git_commit
-                    ; uptime }
+                    ; uptime_minutes }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1349,13 +1357,21 @@ let create ?wallets (config : Config.t) =
               Archive_client.run ~logger:config.logger
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          let precomputed_block_writer =
+            ref
+              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
+                    `Path path )
+              , if config.log_precomputed_blocks then Some `Log else None )
+          in
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
+              ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
+              ~time_controller:config.time_controller ~precomputed_block_writer
           in
-          let open Coda_incremental.Status in
+          let open Mina_incremental.Status in
           let transition_frontier_incr =
             Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
           in
@@ -1410,6 +1426,7 @@ let create ?wallets (config : Config.t) =
             ; coinbase_receiver= config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
-            ; sync_status } ) )
+            ; sync_status
+            ; precomputed_block_writer } ) )
 
 let net {components= {net; _}; _} = net
