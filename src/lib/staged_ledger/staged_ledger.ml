@@ -334,7 +334,7 @@ module T = struct
               snarked_ledger tx.data
           in
           let computed_status =
-            Ledger.Undo.user_command_status txn_with_info
+            Ledger.Transaction_applied.user_command_status txn_with_info
           in
           if Transaction_status.equal tx.status computed_status then Ok ()
           else
@@ -479,12 +479,12 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let%map undo =
+    let%map applied_txn =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in
     let next_available_token_after = Ledger.next_available_token ledger in
-    ( undo
+    ( applied_txn
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
@@ -525,21 +525,25 @@ module T = struct
             pending_coinbase_stack_state s txn_state_view )
     in
     let open Result.Let_syntax in
-    let%bind undo, statement, updated_pending_coinbase_stack_state = r in
+    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
+      r
+    in
     let%map () =
       match status with
       | None ->
           return ()
       | Some status ->
           (* Validate that command status matches. *)
-          let got_status = Ledger.Undo.user_command_status undo in
+          let got_status =
+            Ledger.Transaction_applied.user_command_status applied_txn
+          in
           if Transaction_status.equal status got_status then return ()
           else
             Result.fail
               (Staged_ledger_error.Mismatched_statuses
                  ({With_status.data= s; status}, got_status))
     in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
+    ( { Scan_state.Transaction_with_witness.transaction_with_info= applied_txn
       ; state_hash= state_and_body_hash
       ; state_view= txn_state_view
       ; ledger_witness
@@ -618,7 +622,9 @@ module T = struct
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let open Or_error.Let_syntax in
           let%map acc = acc in
-          let t = d.transaction_with_info |> Ledger.Undo.transaction in
+          let t =
+            d.transaction_with_info |> Ledger.Transaction_applied.transaction
+          in
           t :: acc )
     in
     let total_fee_excess txns =
