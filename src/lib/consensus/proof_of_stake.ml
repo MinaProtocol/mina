@@ -2334,8 +2334,12 @@ module Data = struct
           ~global_slot:global_slot_since_genesis
       in
       (* TODO: keep track of total_currency in transaction snark. The current_slot
-       * implementation would allow an adversary to make then total_currency incorrect by
-       * not adding the coinbase to their account. *)
+         implementation allows an adversary to make the total_currency in the protocol
+         state in the SNARK incorrect by not adding the coinbase to their account.
+         This could only happen if they made a long fork for that purpose to
+         bypass functioning of enforcement at the consensus level and is equivalent to
+         just burning tokens (which they could do anyway) so it's not really a big deal.
+      *)
       let%bind new_total_currency =
         let%bind x =
           Currency.Amount.Signed.Checked.(
