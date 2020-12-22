@@ -32,14 +32,24 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t option
-  [@@deriving bin_io_unversioned]
+  type query = State_hash.Stable.Latest.t [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_staking_ledger = struct
+  type query = Current | Next [@@deriving bin_io_unversioned]
+
+  type response = Account.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_staking_ledger" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_balance = struct

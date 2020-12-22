@@ -427,18 +427,8 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash_opt =
+let get_ledger t state_hash =
   let open Deferred.Or_error.Let_syntax in
-  let%bind staged_ledger_hash =
-    Option.value_map staged_ledger_hash_opt ~f:Deferred.Or_error.return
-      ~default:
-        ( match best_staged_ledger t with
-        | `Active staged_ledger ->
-            Deferred.Or_error.return (Staged_ledger.hash staged_ledger)
-        | `Bootstrapping ->
-            Deferred.Or_error.error_string
-              "get_ledger: can't get staged ledger hash while bootstrapping" )
-  in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
   in
@@ -446,9 +436,9 @@ let get_ledger t staged_ledger_hash_opt =
     List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
         let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
         if
-          Staged_ledger_hash.equal
-            (Staged_ledger.hash staged_ledger)
-            staged_ledger_hash
+          State_hash.equal
+            (Transition_frontier.Breadcrumb.state_hash b)
+            state_hash
         then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
         else None )
   with
@@ -456,7 +446,7 @@ let get_ledger t staged_ledger_hash_opt =
       Deferred.Or_error.return x
   | None ->
       Deferred.Or_error.error_string
-        "get_ledger: staged ledger hash not found in transition frontier"
+        "get_ledger: state hash not found in transition frontier"
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
@@ -708,6 +698,9 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
+
+let next_epoch_ledger t =
+  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
 
 let find_delegators table pk =
   Option.value_map
