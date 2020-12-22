@@ -1,0 +1,34 @@
+load( "@obazl_rules_ocaml//ocaml:rules.bzl", "ocaml_module" )
+
+#############
+ocaml_module(
+    name = "snark_keys",
+    src = "snark_keys.ml",
+    opts = [],
+    ppx = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving_yojson",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "snark_keys",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@opam//pkg:async",
+        "@opam//pkg:core",
+        "@mina//src/lib/blockchain_snark",
+        "@mina//src/lib/transaction_snark",
+    ],
+)
+
+
+################################################################
+TOOL = "//src/lib/snark_keys/gen_keys:gen_keys.exe"
+genrule(
+    name = "gensrcs",
+    outs = ["snark_keys.ml"],
+    tools = [TOOL],
+    cmd = "\n".join([
+        "$(location {tool})".format(tool = TOOL),
+        "cp snark_keys.ml \"$(RULEDIR)/\"",
+    ]),
+)

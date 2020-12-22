@@ -1,0 +1,71 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN_KEYS
+################################################################
+GEN_KEYS_EXECUTABLE_OPTS = []
+
+GEN_KEYS_MODULE_OPTS = []
+
+GEN_KEYS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@mina//src/lib/cache_dir",
+    "@mina//src/lib/snark_keys/remove_snark_keys_trigger",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/blockchain_snark",
+]
+
+GEN_KEYS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp__ppx_let__ppxlib.metaquot"
+
+GEN_KEYS_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "gen_keys.exe",
+    opts = GEN_KEYS_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_KEYS_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen_keys",
+        # "@ocaml_rocksdb//:rocks"
+    ],
+    cc_deps = {
+        "@mina//src/lib/marlin_plonk_bindings/stubs:marlin_plonk_stubs": "static",
+        "@ocaml_rocksdb//:librocksdb": "static", ## FIXME: static-linkall
+        "@ocaml_rocksdb//:bzip2": "static",
+        "@ocaml_rocksdb//:zlib": "default",
+        "@ocaml_jemalloc//src:libjemalloc": "static"
+    },
+    cc_linkall  = ["@ocaml_rocksdb//:librocksdb"],  ## FIXME
+    cc_linkopts = select({
+        "//bzl/host:macos": ["-lc++abi", "-lc++"],
+        "//bzl/host:linux": ["-lstdc++"],
+    }, no_match_error = "Unsupported platform. Only Linux and MacOS supported.")
+)
+
+#############
+ocaml_module(
+    name = "_Gen_keys",
+    src = "gen_keys.ml",
+    opts = GEN_KEYS_MODULE_OPTS,
+    ppx = GEN_KEYS_PPX,
+    ppx_args = GEN_KEYS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GEN_KEYS_DEPS,
+)
