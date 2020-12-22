@@ -1,0 +1,246 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY PERSISTENT_FRONTIER
+################################################################
+PERSISTENT_FRONTIER_INTERFACE_OPTS = []
+
+PERSISTENT_FRONTIER_MODULE_OPTS = []
+
+PERSISTENT_FRONTIER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:yojson",
+    "@opam//pkg:rpc_parallel",
+    "@mina//src/lib/transition_frontier/frontier_base",
+    "@mina//src/lib/block_time",
+    "@mina//src/lib/transition_frontier/full_frontier",
+    "@mina//src/lib/transition_frontier/extensions",
+    "@mina//src/lib/file_system",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/rocksdb",
+    "@mina//src/lib/coda_intf",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/storage",
+    "@mina//src/lib/otp_lib",
+]
+
+##############
+ocaml_archive(
+    name = "persistent_frontier",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+        ":_Diff_buffer",
+        ":_Persistent_frontier",
+        ":_Sync",
+        ":_Worker",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Persistent_frontier_ns",
+    ns = "persistent_frontier",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "database.ml",
+        "diff_buffer.ml",
+        "persistent_frontier.ml",
+        "sync.ml",
+        "worker.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Database",
+    src = "database.ml",
+    intf = ":_Database.cmi",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_MODULE_OPTS + [
+        "-w", "-34" # Unused type declaration.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Database.cmi",
+    src = "database.mli",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Diff_buffer",
+    src = "diff_buffer.ml",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Worker",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Persistent_frontier",
+    src = "persistent_frontier.ml",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+        ":_Sync",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sync",
+    src = "sync.ml",
+    intf = ":_Sync.cmi",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Diff_buffer",
+        ":_Worker",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Sync.cmi",
+    src = "sync.mli",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Worker",
+    src = "worker.ml",
+    intf = ":_Worker.cmi",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Worker.cmi",
+    src = "worker.mli",
+    ns = ":Persistent_frontier_ns",
+    opts = PERSISTENT_FRONTIER_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_frontier",
+    ],
+    deps = PERSISTENT_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/transition_frontier/persistent_frontier:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
