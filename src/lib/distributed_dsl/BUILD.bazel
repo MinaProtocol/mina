@@ -1,0 +1,169 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY DISTRIBUTED_DSL
+################################################################
+DISTRIBUTED_DSL_INTERFACE_OPTS = []
+
+DISTRIBUTED_DSL_MODULE_OPTS = []
+
+DISTRIBUTED_DSL_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:async_extra",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/pipe_lib",
+]
+
+##############
+ocaml_archive(
+    name = "distributed_dsl",
+    doc = "Distributed DSL",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = DISTRIBUTED_DSL_DEPS + [
+        # do not sort (buildifier)
+        ":_Distributed_dsl",
+        ":_Node",
+        ":_Test",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Distributed_dsl_ns",
+    ns = "distributed_dsl",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "distributed_dsl.ml",
+        "node.ml",
+        "test.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Distributed_dsl",
+    src = "distributed_dsl.ml",
+    intf = ":_Distributed_dsl.cmi",
+    ns = ":Distributed_dsl_ns",
+    opts = DISTRIBUTED_DSL_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "distributed_dsl",
+    ],
+    deps = DISTRIBUTED_DSL_DEPS + [
+        # do not sort (buildifier)
+        ":_Node",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Distributed_dsl.cmi",
+    src = "distributed_dsl.mli",
+    ns = ":Distributed_dsl_ns",
+    opts = DISTRIBUTED_DSL_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "distributed_dsl",
+    ],
+    deps = DISTRIBUTED_DSL_DEPS + [
+        # do not sort (buildifier)
+        ":_Node",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Node",
+    src = "node.ml",
+    intf = ":_Node.cmi",
+    ns = ":Distributed_dsl_ns",
+    opts = DISTRIBUTED_DSL_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "distributed_dsl",
+    ],
+    deps = DISTRIBUTED_DSL_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Node.cmi",
+    src = "node.mli",
+    ns = ":Distributed_dsl_ns",
+    opts = DISTRIBUTED_DSL_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "distributed_dsl",
+    ],
+    deps = DISTRIBUTED_DSL_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Distributed_dsl_ns",
+    opts = DISTRIBUTED_DSL_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "distributed_dsl",
+    ],
+    deps = DISTRIBUTED_DSL_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/distributed_dsl:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.enum",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
