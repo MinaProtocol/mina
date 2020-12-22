@@ -1,0 +1,81 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN
+################################################################
+GEN_EXECUTABLE_OPTS = []
+
+GEN_MODULE_OPTS = []
+
+GEN_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:ppxlib",
+    "@mina//src/lib/pickles",
+    "@mina//src/lib/crs",
+    "@snarky//fold_lib",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//tuple_lib",
+    "@snarky//group_map",
+]
+
+#################
+ocaml_executable(
+    name = "gen.exe",
+    opts = GEN_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen",
+    ],
+    cc_deps = {
+        ## FIXME: support dylib on MacOS
+        "@mina//src/lib/marlin_plonk_bindings/stubs:marlin_plonk_stubs": "static-linkall",
+    },
+)
+
+#############
+ocaml_module(
+    name = "_Gen",
+    src = "gen.ml",
+    opts = GEN_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = GEN_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/crypto_params/gen:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppxlib",
+        "@opam//pkg:ppxlib.metaquot",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
