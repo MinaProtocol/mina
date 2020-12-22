@@ -1,0 +1,448 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY TESTS
+################################################################
+TESTS_MODULE_OPTS = []
+
+TESTS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/mina_graphql",
+    "@mina//src/lib/mina_lib",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/coda_net2",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/coda_version",
+    "@mina//src/lib/parallel",
+    "@mina//src/lib/protocol_version",
+    "@mina//src/lib/node_addrs_and_ports",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/app/cli/src/init",
+]
+
+##############
+ocaml_archive(
+    name = "tests",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_archive_processor_test",
+        ":_Coda_block_production_test",
+        ":_Coda_bootstrap_test",
+        ":_Coda_change_snark_worker_test",
+        ":_Coda_delegation_test",
+        ":_Coda_five_nodes_test",
+        ":_Coda_long_fork",
+        ":_Coda_peers_test",
+        ":_Coda_process",
+        ":_Coda_processes",
+        ":_Coda_restart_node_test",
+        ":_Coda_restarts_and_txns_holy_grail",
+        ":_Coda_shared_prefix_multiproducer_test",
+        ":_Coda_shared_prefix_test",
+        ":_Coda_shared_state_test",
+        ":_Coda_transitive_peers_test",
+        ":_Coda_txns_and_restart_non_producers",
+        ":_Coda_worker",
+        ":_Coda_worker_testnet",
+        ":_Full_test",
+        ":_Heartbeat",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Tests_ns",
+    ns = "tests",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "coda_archive_processor_test.ml",
+        "coda_block_production_test.ml",
+        "coda_bootstrap_test.ml",
+        "coda_change_snark_worker_test.ml",
+        "coda_delegation_test.ml",
+        "coda_five_nodes_test.ml",
+        "coda_long_fork.ml",
+        "coda_peers_test.ml",
+        "coda_process.ml",
+        "coda_processes.ml",
+        "coda_restart_node_test.ml",
+        "coda_restarts_and_txns_holy_grail.ml",
+        "coda_shared_prefix_multiproducer_test.ml",
+        "coda_shared_prefix_test.ml",
+        "coda_shared_state_test.ml",
+        "coda_transitive_peers_test.ml",
+        "coda_txns_and_restart_non_producers.ml",
+        "coda_worker.ml",
+        "coda_worker_testnet.ml",
+        "full_test.ml",
+        "heartbeat.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_archive_processor_test",
+    src = "coda_archive_processor_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_block_production_test",
+    src = "coda_block_production_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_bootstrap_test",
+    src = "coda_bootstrap_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_change_snark_worker_test",
+    src = "coda_change_snark_worker_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_delegation_test",
+    src = "coda_delegation_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_worker_testnet", # obazl:retain
+        ":_Heartbeat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_five_nodes_test",
+    src = "coda_five_nodes_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_long_fork",
+    src = "coda_long_fork.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ]
+)
+
+#############
+ocaml_module(
+    name = "_Coda_peers_test",
+    src = "coda_peers_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_processes"      # obazl:retain
+    ]
+)
+
+#############
+ocaml_module(
+    name = "_Coda_process",
+    src = "coda_process.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_worker",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_processes",
+    src = "coda_processes.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = TESTS_DEPS + [
+        ":_Coda_process"        # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_restart_node_test",
+    src = "coda_restart_node_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_worker_testnet", # obazl:retain
+        ":_Heartbeat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_restarts_and_txns_holy_grail",
+    src = "coda_restarts_and_txns_holy_grail.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_shared_prefix_multiproducer_test",
+    src = "coda_shared_prefix_multiproducer_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_shared_prefix_test",
+    src = "coda_shared_prefix_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_shared_state_test",
+    src = "coda_shared_state_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_worker_testnet", # obazl:retain
+        ":_Heartbeat"
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_transitive_peers_test",
+    src = "coda_transitive_peers_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_processes"       # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_txns_and_restart_non_producers",
+    src = "coda_txns_and_restart_non_producers.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        ":_Coda_worker_testnet" # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_worker",
+    src = "coda_worker.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coda_worker_testnet",
+    src = "coda_worker_testnet.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_process",
+        ":_Coda_processes",     # obazl:retain
+        ":_Coda_worker",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Full_test",
+    src = "full_test.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_processes",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Heartbeat",
+    src = "heartbeat.ml",
+    ns = ":Tests_ns",
+    opts = TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = TESTS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/app/cli/src/tests:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
