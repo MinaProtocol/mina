@@ -10,6 +10,23 @@ open Pipe_lib
 open Signature_lib
 open Network_peer
 
+(* The part of the pool data that is persisted. *)
+module Persisted = struct
+  (* We persist transactions that we have never observed in a best tip.
+         When we restart, we try to add them periodically for a limited period
+         of time.
+      *)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        {old_locally_generated_uncommitted: User_command.Stable.V1.t list}
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 (* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
   type t
@@ -181,6 +198,7 @@ struct
       type t =
         { trust_system: Trust_system.t sexp_opaque
         ; pool_max_size: int
+        ; disk_location: string
               (* note this value needs to be mostly the same across gossipping nodes, so
       nodes with larger pools don't send nodes with smaller pools lots of
       low fee transactions the smaller-pooled nodes consider useless and get
@@ -623,129 +641,6 @@ struct
       ) ;
       t.pool <- pool ;
       Deferred.unit
-
-    let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
-      let t =
-        { pool=
-            Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
-        ; locally_generated_uncommitted=
-            Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
-        ; locally_generated_committed=
-            Hashtbl.create
-              ( module Transaction_hash.User_command_with_valid_signature.Stable
-                       .Latest )
-        ; config
-        ; logger
-        ; batcher= Batcher.create config.verifier
-        ; best_tip_diff_relay= None
-        ; recently_seen= Lru_cache.Q.create ()
-        ; best_tip_ledger= None }
-      in
-      don't_wait_for
-        (Broadcast_pipe.Reader.iter frontier_broadcast_pipe
-           ~f:(fun frontier_opt ->
-             match frontier_opt with
-             | None -> (
-                 [%log debug] "no frontier" ;
-                 t.best_tip_ledger <- None ;
-                 (* Sanity check: the view pipe should have been closed before
-                    the frontier was destroyed. *)
-                 match t.best_tip_diff_relay with
-                 | None ->
-                     Deferred.unit
-                 | Some hdl ->
-                     let is_finished = ref false in
-                     Deferred.any_unit
-                       [ (let%map () = hdl in
-                          t.best_tip_diff_relay <- None ;
-                          is_finished := true)
-                       ; (let%map () = Async.after (Time.Span.of_sec 5.) in
-                          if not !is_finished then (
-                            [%log fatal]
-                              "Transition frontier closed without first \
-                               closing best tip view pipe" ;
-                            assert false )
-                          else ()) ] )
-             | Some frontier ->
-                 [%log debug] "Got frontier!" ;
-                 let validation_ledger = get_best_tip_ledger frontier in
-                 (*update our cache*)
-                 t.best_tip_ledger <- Some validation_ledger ;
-                 (* The frontier has changed, so transactions in the pool may
-                    not be valid against the current best tip. *)
-                 let global_slot = Indexed_pool.current_global_slot t.pool in
-                 let new_pool, dropped =
-                   Indexed_pool.revalidate t.pool (fun sender ->
-                       match
-                         Base_ledger.location_of_account validation_ledger
-                           sender
-                       with
-                       | None ->
-                           (Account.Nonce.zero, Currency.Amount.zero)
-                       | Some loc ->
-                           let acc =
-                             Option.value_exn
-                               ~message:
-                                 "Somehow a public key has a location but no \
-                                  account"
-                               (Base_ledger.get validation_ledger loc)
-                           in
-                           ( acc.nonce
-                           , balance_of_account ~global_slot acc
-                             |> Currency.Balance.to_amount ) )
-                 in
-                 let dropped_locally_generated =
-                   Sequence.filter dropped ~f:(fun cmd ->
-                       let find_remove_bool tbl =
-                         Hashtbl.find_and_remove tbl cmd |> Option.is_some
-                       in
-                       let dropped_committed =
-                         find_remove_bool t.locally_generated_committed
-                       in
-                       let dropped_uncommitted =
-                         find_remove_bool t.locally_generated_uncommitted
-                       in
-                       (* Nothing should be in both tables. *)
-                       assert (not (dropped_committed && dropped_uncommitted)) ;
-                       dropped_committed || dropped_uncommitted )
-                 in
-                 (* In this situation we don't know whether the commands aren't
-                    valid against the new ledger because they were already
-                    committed or because they conflict with others,
-                    unfortunately. *)
-                 if not (Sequence.is_empty dropped_locally_generated) then
-                   [%log info]
-                     "Dropped locally generated commands $cmds from pool when \
-                      transition frontier was recreated."
-                     ~metadata:
-                       [ ( "cmds"
-                         , `List
-                             (List.map
-                                (Sequence.to_list dropped_locally_generated)
-                                ~f:
-                                  Transaction_hash
-                                  .User_command_with_valid_signature
-                                  .to_yojson) ) ] ;
-                 [%log debug]
-                   !"Re-validated transaction pool after restart: dropped %i \
-                     of %i previously in pool"
-                   (Sequence.length dropped) (Indexed_pool.size t.pool) ;
-                 t.pool <- new_pool ;
-                 t.best_tip_diff_relay
-                 <- Some
-                      (Broadcast_pipe.Reader.iter
-                         (Transition_frontier.best_tip_diff_pipe frontier)
-                         ~f:(fun diff ->
-                           Strict_pipe.Writer.write tf_diff_writer
-                             (diff, get_best_tip_ledger frontier)
-                           |> Deferred.don't_wait_for ;
-                           Deferred.unit )) ;
-                 Deferred.unit )) ;
-      t
 
     type pool = t
 
@@ -1206,6 +1101,196 @@ struct
             Error (`Other e)
     end
 
+    let periodically_re_add_persisted_transactions (t : t) to_add
+        ~frontier_broadcast_pipe =
+      let to_add = ref to_add in
+      let received_at = Time.now () in
+      let have_frontier =
+        match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
+        | Some _ ->
+            Deferred.unit
+        | None ->
+            Broadcast_pipe.Reader.iter_until frontier_broadcast_pipe
+              ~f:(fun x -> Deferred.return (Option.is_some x))
+      in
+      upon have_frontier (fun () ->
+          Clock.every' ~stop:(after Time.Span.hour) (Time.Span.of_min 5.)
+            (fun () ->
+              let diff =
+                { Envelope.Incoming.data=
+                    List.filter_map !to_add ~f:(function
+                      | User_command.Snapp_command _ ->
+                          None
+                      | Signed_command u ->
+                          Some u )
+                ; sender= Local
+                ; received_at }
+              in
+              match%map Diff.apply t diff with
+              | Error _ ->
+                  ()
+              | Ok (_accepted, rejected) ->
+                  to_add :=
+                    List.filter_map rejected ~f:(fun (tx, reason) ->
+                        match reason with
+                        | Diff_versioned.Diff_error.Duplicate
+                        | Invalid_signature
+                        | Expired ->
+                            None
+                        | _ ->
+                            Some tx ) ) )
+
+    let periodically_persist t =
+      Clock.every' (Time.Span.of_min 3.) (fun () ->
+          let txns =
+            Hashtbl.fold t.locally_generated_uncommitted ~init:[]
+              ~f:(fun ~key:txn ~data:_ acc ->
+                Transaction_hash.User_command_with_valid_signature.command txn
+                :: acc )
+          in
+          Writer.save_bin_prot t.config.disk_location
+            Persisted.Stable.Latest.bin_writer_t
+            {old_locally_generated_uncommitted= txns} )
+
+    let create ~constraint_constants ~consensus_constants ~time_controller
+        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+      let t =
+        { pool=
+            Indexed_pool.empty ~constraint_constants ~consensus_constants
+              ~time_controller
+        ; locally_generated_uncommitted=
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
+        ; locally_generated_committed=
+            Hashtbl.create
+              ( module Transaction_hash.User_command_with_valid_signature.Stable
+                       .Latest )
+        ; config
+        ; logger
+        ; batcher= Batcher.create config.verifier
+        ; best_tip_diff_relay= None
+        ; recently_seen= Lru_cache.Q.create ()
+        ; best_tip_ledger= None }
+      in
+      don't_wait_for
+        (let%map () =
+           match%map
+             Reader.load_bin_prot config.disk_location
+               Persisted.Stable.Latest.bin_reader_t
+           with
+           | Ok {old_locally_generated_uncommitted} ->
+               periodically_re_add_persisted_transactions t
+                 old_locally_generated_uncommitted ~frontier_broadcast_pipe
+           | Error e ->
+               [%log' debug t.logger]
+                 ~metadata:[("error", `String (Error.to_string_hum e))]
+                 !"Unable to load sent-but-unconfirmed transactions from disk \
+                   ($error)"
+         in
+         periodically_persist t) ;
+      don't_wait_for
+        (Broadcast_pipe.Reader.iter frontier_broadcast_pipe
+           ~f:(fun frontier_opt ->
+             match frontier_opt with
+             | None -> (
+                 [%log debug] "no frontier" ;
+                 t.best_tip_ledger <- None ;
+                 (* Sanity check: the view pipe should have been closed before
+                    the frontier was destroyed. *)
+                 match t.best_tip_diff_relay with
+                 | None ->
+                     Deferred.unit
+                 | Some hdl ->
+                     let is_finished = ref false in
+                     Deferred.any_unit
+                       [ (let%map () = hdl in
+                          t.best_tip_diff_relay <- None ;
+                          is_finished := true)
+                       ; (let%map () = Async.after (Time.Span.of_sec 5.) in
+                          if not !is_finished then (
+                            [%log fatal]
+                              "Transition frontier closed without first \
+                               closing best tip view pipe" ;
+                            assert false )
+                          else ()) ] )
+             | Some frontier ->
+                 [%log debug] "Got frontier!" ;
+                 let validation_ledger = get_best_tip_ledger frontier in
+                 (*update our cache*)
+                 t.best_tip_ledger <- Some validation_ledger ;
+                 (* The frontier has changed, so transactions in the pool may
+                    not be valid against the current best tip. *)
+                 let global_slot = Indexed_pool.current_global_slot t.pool in
+                 let new_pool, dropped =
+                   Indexed_pool.revalidate t.pool (fun sender ->
+                       match
+                         Base_ledger.location_of_account validation_ledger
+                           sender
+                       with
+                       | None ->
+                           (Account.Nonce.zero, Currency.Amount.zero)
+                       | Some loc ->
+                           let acc =
+                             Option.value_exn
+                               ~message:
+                                 "Somehow a public key has a location but no \
+                                  account"
+                               (Base_ledger.get validation_ledger loc)
+                           in
+                           ( acc.nonce
+                           , balance_of_account ~global_slot acc
+                             |> Currency.Balance.to_amount ) )
+                 in
+                 let dropped_locally_generated =
+                   Sequence.filter dropped ~f:(fun cmd ->
+                       let find_remove_bool tbl =
+                         Hashtbl.find_and_remove tbl cmd |> Option.is_some
+                       in
+                       let dropped_committed =
+                         find_remove_bool t.locally_generated_committed
+                       in
+                       let dropped_uncommitted =
+                         find_remove_bool t.locally_generated_uncommitted
+                       in
+                       (* Nothing should be in both tables. *)
+                       assert (not (dropped_committed && dropped_uncommitted)) ;
+                       dropped_committed || dropped_uncommitted )
+                 in
+                 (* In this situation we don't know whether the commands aren't
+                    valid against the new ledger because they were already
+                    committed or because they conflict with others,
+                    unfortunately. *)
+                 if not (Sequence.is_empty dropped_locally_generated) then
+                   [%log info]
+                     "Dropped locally generated commands $cmds from pool when \
+                      transition frontier was recreated."
+                     ~metadata:
+                       [ ( "cmds"
+                         , `List
+                             (List.map
+                                (Sequence.to_list dropped_locally_generated)
+                                ~f:
+                                  Transaction_hash
+                                  .User_command_with_valid_signature
+                                  .to_yojson) ) ] ;
+                 [%log debug]
+                   !"Re-validated transaction pool after restart: dropped %i \
+                     of %i previously in pool"
+                   (Sequence.length dropped) (Indexed_pool.size t.pool) ;
+                 t.pool <- new_pool ;
+                 t.best_tip_diff_relay
+                 <- Some
+                      (Broadcast_pipe.Reader.iter
+                         (Transition_frontier.best_tip_diff_pipe frontier)
+                         ~f:(fun diff ->
+                           Strict_pipe.Writer.write tf_diff_writer
+                             (diff, get_best_tip_ledger frontier)
+                           |> Deferred.don't_wait_for ;
+                           Deferred.unit )) ;
+                 Deferred.unit )) ;
+      t
+
     let get_rebroadcastable (t : t) ~has_timed_out =
       let metadata ~key ~data =
         [ ( "cmd"
@@ -1388,6 +1473,7 @@ let%test_module _ =
             ~conf_dir:None
         in
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
+          ~disk_location:"/tmp/transaction_pool"
       in
       let pool =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -1828,7 +1914,7 @@ let%test_module _ =
                 ~conf_dir:None
             in
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
-              ~verifier
+              ~verifier ~disk_location:"/tmp/transaction_pool"
           in
           let pool =
             Test.create ~config ~logger ~constraint_constants
