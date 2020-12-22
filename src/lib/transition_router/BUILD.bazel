@@ -1,0 +1,96 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRANSITION_ROUTER
+################################################################
+TRANSITION_ROUTER_INTERFACE_OPTS = []
+
+TRANSITION_ROUTER_MODULE_OPTS = []
+
+TRANSITION_ROUTER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/transition_frontier_controller",
+    "@mina//src/lib/bootstrap_controller",
+    "@mina//src/lib/mina_networking",
+]
+
+TRANSITION_ROUTER_PPX = "@//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.eq"
+
+TRANSITION_ROUTER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "transition_router",
+]
+
+##############
+ocaml_archive(
+    name = "transition_router",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = TRANSITION_ROUTER_DEPS + [
+        # do not sort (buildifier)
+        ":_Initial_validator",
+        ":_Transition_router",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Transition_router_ns",
+    ns = "transition_router",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "initial_validator.ml",
+        "transition_router.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Initial_validator",
+    src = "initial_validator.ml",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_MODULE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_router",
+    src = "transition_router.ml",
+    intf = ":_Transition_router.cmi",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_MODULE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS + [
+        # do not sort (buildifier)
+        ":_Initial_validator",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_router.cmi",
+    src = "transition_router.mli",
+    ns = ":Transition_router_ns",
+    opts = TRANSITION_ROUTER_INTERFACE_OPTS,
+    ppx = TRANSITION_ROUTER_PPX,
+    ppx_args = TRANSITION_ROUTER_PPX_ARGS,
+    deps = TRANSITION_ROUTER_DEPS,
+)

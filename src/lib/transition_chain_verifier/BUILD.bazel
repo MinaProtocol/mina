@@ -1,0 +1,47 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "transition_chain_verifier",
+    src = "transition_chain_verifier.ml",
+    intf = ":_Transition_chain_verifier.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transition_chain_verifier",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/merkle_list_verifier",
+        "@mina//src/lib/mina_base",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_chain_verifier.cmi",
+    src = "transition_chain_verifier.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transition_chain_verifier",
+    ],
+    deps = [
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/merkle_list_verifier",
+        "@mina//src/lib/mina_base",
+        "@opam//pkg:core_kernel",
+    ],
+)
