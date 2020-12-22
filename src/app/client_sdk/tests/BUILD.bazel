@@ -1,0 +1,113 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE TEST_SIGNATURES
+################################################################
+WARNINGS = "@a-4-29-40-41-42-44-45-48-58-59-60"
+
+TEST_SIGNATURES_EXECUTABLE_OPTS = ["-w", WARNINGS]
+
+TEST_SIGNATURES_MODULE_OPTS = ["-w", WARNINGS]
+
+TEST_SIGNATURES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/coda_numbers",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/snark_params",
+]
+
+#################
+ocaml_executable(
+    name = "test_signatures.exe",
+    opts = TEST_SIGNATURES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_SIGNATURES_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_signatures",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_signatures",
+    src = "test_signatures.ml",
+    opts = TEST_SIGNATURES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = TEST_SIGNATURES_DEPS,
+)
+
+################################################################
+## STANZA 2: EXECUTABLE TEST_SIGNATURES_NONCONSENSUS
+################################################################
+TEST_SIGNATURES_NONCONSENSUS_EXECUTABLE_OPTS = []
+
+TEST_SIGNATURES_NONCONSENSUS_MODULE_OPTS = []
+
+TEST_SIGNATURES_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/nonconsensus/mina_base:mina_base_nonconsensus",
+    "@mina//src/nonconsensus/coda_numbers:coda_numbers_nonconsensus",
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+    "@mina//src/nonconsensus/signature_lib:signature_lib_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+]
+
+#################
+ocaml_executable(
+    name = "test_signatures_nonconsensus.exe",
+    opts = TEST_SIGNATURES_NONCONSENSUS_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_SIGNATURES_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_signatures_nonconsensus",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_signatures_nonconsensus",
+    src = "test_signatures_nonconsensus.ml",
+    opts = TEST_SIGNATURES_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = TEST_SIGNATURES_NONCONSENSUS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = ["//src/app/client_sdk/tests:__pkg__"],
+    deps = [
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
