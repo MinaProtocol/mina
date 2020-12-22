@@ -1,0 +1,55 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE SIGNER
+################################################################
+SIGNER_EXECUTABLE_OPTS = []
+
+SIGNER_MODULE_OPTS = []
+
+SIGNER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_ssl",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/app/rosetta/lib",
+]
+
+SIGNER_PPX = "@//bzl/ppx/exe:graphql_ppx__ppx_coda__ppx_deriving.show__ppx_deriving_yojson__ppx_jane__ppx_version__ppx_deriving.eq"
+
+SIGNER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "signer",
+]
+
+#################
+ocaml_executable(
+    name = "signer.exe",
+    opts = SIGNER_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = SIGNER_DEPS + [
+        # do not sort (buildifier)
+        ":_Signer",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signer",
+    src = "signer.ml",
+    opts = SIGNER_MODULE_OPTS,
+    ppx = SIGNER_PPX,
+    ppx_args = SIGNER_PPX_ARGS,
+    deps = SIGNER_DEPS,
+)
