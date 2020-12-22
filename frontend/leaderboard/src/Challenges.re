@@ -57,7 +57,7 @@ let bonusSnarkFeeChallenge = metricsMap => {
     );
 
   // If the metric value sum is greater than the threshold, every user that particpated will receive points
-  snarkFeeCounter >= Int64.of_int(1000)
+  snarkFeeCounter >= 1000000000000L
     ? StringMap.fold(
         (key, metric: Types.Metrics.t, map) => {
           switch (metric.snarkFeesCollected) {
