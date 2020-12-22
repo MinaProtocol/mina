@@ -166,8 +166,10 @@ module Block = {
   let addCoinbaseReceiverIfSome = (block, coinbaseReceiver) => {
     switch (coinbaseReceiver) {
     | Some(_) =>
-      let blockChainState = block.blockchainState;
-      let updatedBlockchainState = {...blockChainState, coinbaseReceiver};
+      let updatedBlockchainState = {
+        ...block.blockchainState,
+        coinbaseReceiver,
+      };
       let updatedBlock = {...block, blockchainState: updatedBlockchainState};
       updatedBlock;
     | None => block
@@ -211,21 +213,21 @@ module Block = {
                        internalCommand,
                        currentBlock.internalCommands,
                      );
-                     let blockToAdd =
+                     let block =
                        addCoinbaseReceiverIfSome(
                          currentBlock,
                          coinbaseReceiver,
                        );
-                     Some(blockToAdd);
+                     Some(block);
                    | None => None
                    }
                  });
                } else {
                  addCommandIfSome(userCommand, newBlock.userCommands);
                  addCommandIfSome(internalCommand, newBlock.internalCommands);
-                 let blockToAdd =
+                 let block =
                    addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
-                 set(blockMap, blockToAdd.id, blockToAdd);
+                 set(blockMap, block.id, block);
                };
              },
              empty,

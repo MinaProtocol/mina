@@ -28,6 +28,20 @@ let echoServiceChallenge = metricsMap => {
      );
 };
 
+let coinbaseReceiverChallenge = (points, metricsMap) => {
+  metricsMap
+  |> StringMap.fold(
+       (key, metric: Types.Metrics.t, map) => {
+         switch (metric.coinbaseReceiver) {
+         | Some(metricValue) =>
+           metricValue ? StringMap.add(key, points, map) : map
+         | None => map
+         }
+       },
+       StringMap.empty,
+     );
+};
+
 let bonusSnarkFeeChallenge = metricsMap => {
   Points.addPointsIfCommunityMeetsThreshold(
     (metricRecord: Types.Metrics.t) =>
