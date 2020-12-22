@@ -23,57 +23,42 @@ Node.Process.putEnvVar(
 
 let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-//let pgConnection = getEnvOrFail("PGCONN");
-
-let pgConnectionPreFork = "postgres://postgres:foobar@localhost:5432/archiver_prefork";
-let pgConnectionPostFork = "postgres://postgres:foobar@localhost:5432/archiver_postfork";
+let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
-  let preforkPool = Postgres.createPool(pgConnectionPreFork);
-  let postforkPool = Postgres.createPool(pgConnectionPostFork);
-  Js.log("Making prefork query");
-  Postgres.makeQuery(preforkPool, Postgres.getLateBlocks, result => {
+  let pool = Postgres.createPool(pgConnection);
+  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
     switch (result) {
-    | Ok(preforkBlocks) =>
-      Js.log("Making postfork query");
-      Postgres.makeQuery(postforkPool, Postgres.getLateBlocks, result => {
+    | Ok(blocks) =>
+      blocks
+      |> Types.Block.parseBlocks
+      |> Metrics.calculateMetrics
+      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
+
+      UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+
+      Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
         switch (result) {
-        | Ok(postforkBlocks) =>
-          let blocks = Belt.Array.concat(preforkBlocks, postforkBlocks);
-          Js.log("Before parsing");
-
-          Types.Block.parseBlocks(blocks)
-          |> Metrics.calculateMetrics
-          |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
-
-          Postgres.endPool(preforkPool);
-          Postgres.endPool(postforkPool);
-
-          Js.log("After upload");
+        | Ok(blockHeightQuery) =>
+          Belt.Option.(
+            Js.Json.(
+              blockHeightQuery[0]
+              ->decodeObject
+              ->flatMap(__x => Js.Dict.get(__x, "max"))
+              ->flatMap(decodeString)
+              ->mapWithDefault((), height => {
+                  UploadLeaderboardData.uploadData(spreadsheetId, height)
+                })
+            )
+          );
+          Postgres.endPool(pool);
         | Error(error) => Js.log(error)
         }
       });
+
     | Error(error) => Js.log(error)
     }
   });
-  Postgres.makeQuery(postforkPool, Postgres.getBlockHeight, result => {
-    switch (result) {
-    | Ok(blockHeightQuery) =>
-      Belt.Option.(
-        Js.Json.(
-          blockHeightQuery[0]
-          ->decodeObject
-          ->flatMap(__x => Js.Dict.get(__x, "max"))
-          ->flatMap(decodeString)
-          ->mapWithDefault((), height => {
-              UploadLeaderboardData.uploadData(spreadsheetId, height)
-            })
-        )
-      )
-    | Error(error) => Js.log(error)
-    }
-  });
-  UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
 };
 
 main();

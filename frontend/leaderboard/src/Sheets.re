@@ -53,10 +53,10 @@ module Core = {
           range: "All-Time Leaderboard!C4:H",
         }
       | CurrentPhaseLeaderboard => {
-          name: "Adversarial Testnet - Leaderboard",
-          range: "Adversarial Testnet - Leaderboard!B4:E",
+          name: "Phase 5 Testworld Leaderboard",
+          range: "Phase 5 Testworld Leaderboard!B4:E",
         }
-      | CurrentReleaseLeaderboard => {name: "4.1", range: "4.1!A4:C"}
+      | CurrentReleaseLeaderboard => {name: "5.1", range: "5.1!A4:C"}
       | MemberProfileData => {
           name: "Member_Profile_Data",
           range: "Member_Profile_Data!A2:Z",

@@ -42,66 +42,33 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
      );
 };
 
-let bonusSnarkFeeChallenge = metricsMap => {
-  // Sum all snark fees recorded thus far
-  let snarkFeeCounter =
-    StringMap.fold(
-      (_, metric: Types.Metrics.t, metricCounter) => {
-        switch (metric.snarkFeesCollected) {
-        | Some(metricValue) => Int64.add(metricCounter, metricValue)
-        | None => metricCounter
-        }
-      },
-      metricsMap,
-      Int64.zero,
-    );
-
-  // If the metric value sum is greater than the threshold, every user that particpated will receive points
-  snarkFeeCounter >= 1000000000000L
-    ? StringMap.fold(
-        (key, metric: Types.Metrics.t, map) => {
-          switch (metric.snarkFeesCollected) {
-          | Some(metricValue) =>
-            metricValue >= Int64.zero ? StringMap.add(key, 2000, map) : map
-          | None => map
-          }
-        },
-        metricsMap,
-        StringMap.empty,
-      )
-    : StringMap.empty;
-};
-
 let snarkFeeChallenge = metricsMap => {
-  [
-    Points.applyTopNPoints(
-      [|
-        (0, 5000), // 1st place: 5000 pts
-        (1, 4000), // 2nd place: 4000 pts
-        (2, 3000), // 3rd place: 3000 pts
-        (11, 2000), // Top 10: 2000 pts.
-        (51, 1500), // Top 50: 1500 pts
-        (101, 1000) // Top 100: 1000 pts
-      |],
-      metricsMap,
-      (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
-      compare,
-    ),
-    bonusSnarkFeeChallenge(metricsMap),
-  ]
-  |> Points.sumPointsMaps;
-};
-
-let bonusBlocksChallenge = metricsMap => {
   Points.applyTopNPoints(
     [|
-      (0, 5500), // 1st place: 5500 pts
-      (1, 4000), // 2nd place: 4000 pts
-      (2, 3000), // 3rd place: 3000 pts
-      (11, 2000), // Top 10: 2000 pts.
-      (51, 1500), // Top 50: 1500 pts
-      (101, 1000), // Top 100: 1000 pts
-      (201, 500) // Top 200: 500 pts
+      (0, 6500), // 1st place: 6500 pts
+      (1, 5000), // 2nd place: 5000 pts
+      (2, 4000), // 3rd place: 4000 pts
+      (11, 3000), // Top 10: 3000 pts.
+      (21, 1500), // Top 20: 2500 pts
+      (101, 1500), // Top 100: 1500 pts
+      (201, 1000) // Top 100: 1000 pts
+    |],
+    metricsMap,
+    (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
+    compare,
+  );
+};
+
+let blocksChallenge = metricsMap => {
+  Points.applyTopNPoints(
+    [|
+      (0, 6500), // 1st place: 6500 pts
+      (1, 5000), // 2nd place: 5000 pts
+      (2, 4000), // 3rd place: 4000 pts
+      (11, 3000), // Top 10: 3000 pts.
+      (21, 2500), // Top 20: 2500 pts
+      (101, 1500), // Top 100: 1500 pts
+      (201, 100) // Top 200: 1000 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -109,69 +76,21 @@ let bonusBlocksChallenge = metricsMap => {
   );
 };
 
-let blocksChallenge = metricsMap => {
-  [
-    // Produce 1 block and get them accepted in the main chain for 1000 pts
-    Points.addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
-      1,
-      1000,
-      metricsMap,
-    ),
-    // Anyone who produces at least 3 blocks will earn an additional 1000 pts.
-    Points.addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
-      3,
-      1000,
-      metricsMap,
-    ),
-    // For every next block you produce, you will earn 100 pts*.
-    Points.addPointsForExtra(
-      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
-      3,
-      100,
-      metricsMap,
-    ),
-    bonusBlocksChallenge(metricsMap),
-  ]
-  |> Points.sumPointsMaps;
-};
-
-let bonusSendCodaChallenge = metricsMap => {
+let sendMinaChallenge = metricsMap => {
   Points.applyTopNPoints(
     [|
-      (0, 5500), // 1st place: 5500 pts
-      (1, 4000), // 2nd place: 4000 pts
-      (2, 3000), // 3rd place: 3000 pts
-      (11, 2000), // Top 10: 2000 pts.
-      (26, 1500), // Top 25: 1500 pts
-      (101, 1000), // Top 100: 1000 pts
-      (201, 1000) // Top 200: 500 pts
+      (0, 6500), // 1st place: 6500 pts
+      (1, 5000), // 2nd place: 5000 pts
+      (2, 4000), // 3rd place: 4000 pts
+      (11, 3000), // Top 10: 3000 pts.
+      (21, 2500), // Top 20: 2500 pts
+      (101, 1500), // Top 100: 1500 pts
+      (201, 1000) // Top 200: 1000 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
     compare,
   );
-};
-
-let sendCodaChallenge = metricsMap => {
-  [
-    // Sent 5 transactions: 1000 pts
-    Points.addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
-      5,
-      1000,
-      metricsMap,
-    ),
-    // Sent 50 transactions: 1000 pts
-    Points.addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
-      50,
-      1000,
-      metricsMap,
-    ),
-  ]
-  |> Points.sumPointsMaps;
 };
 
 let createAndSendTokenChallenge = metricsMap => {
@@ -189,10 +108,10 @@ let createAndSendTokenChallenge = metricsMap => {
 
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
-  | "stake your mina and produce blocks" => Some(blocksChallenge(metricsMap))
-  | "snark fees" => Some(snarkFeeChallenge(metricsMap))
-  | "send mina tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
-  | "connect to testnet and send mina to the echo service" =>
+  | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
+  | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
+  | "send mina" => Some(sendMinaChallenge(metricsMap))
+  | "enter testworld and use the echo service" =>
     Some(echoServiceChallenge(metricsMap))
   | _ => None
   };
