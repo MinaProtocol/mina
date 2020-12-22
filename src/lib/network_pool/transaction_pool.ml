@@ -241,6 +241,13 @@ struct
           Hashtbl.t
             (** Commands generated on this machine, that are not included in the
                 current best tip, along with the time they were added. *)
+      ; uncommitted_changed_r: unit Strict_pipe.Reader.t sexp_opaque
+      ; uncommitted_changed_w:
+          ( unit
+          , Strict_pipe.drop_head Strict_pipe.buffered
+          , unit )
+          Strict_pipe.Writer.t
+          sexp_opaque
       ; locally_generated_committed:
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t )
@@ -252,6 +259,14 @@ struct
       ; mutable best_tip_diff_relay: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
+
+    let modify_uncommitted t ~f =
+      let x = f t.locally_generated_uncommitted in
+      Strict_pipe.Writer.write t.uncommitted_changed_w () ;
+      x
+
+    let find_and_remove_uncommitted t cmd =
+      modify_uncommitted t ~f:(fun tbl -> Hashtbl.find_and_remove tbl cmd)
 
     let member t x =
       Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
@@ -445,8 +460,8 @@ struct
             | None ->
                 ()
             | Some time_added ->
-                Hashtbl.add_exn t.locally_generated_uncommitted ~key:cmd
-                  ~data:time_added ) ;
+                modify_uncommitted t
+                  ~f:(Hashtbl.add_exn ~key:cmd ~data:time_added) ) ;
             let pool', dropped_seq =
               match cmd |> Indexed_pool.add_from_backtrack pool with
               | Error e ->
@@ -501,9 +516,7 @@ struct
               Transaction_hash.User_command_with_valid_signature.create
                 cmd.data
             in
-            ( match
-                Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
-              with
+            ( match find_and_remove_uncommitted t cmd' with
             | None ->
                 ()
             | Some time_added ->
@@ -542,8 +555,7 @@ struct
       in
       let commit_conflicts_locally_generated =
         Sequence.filter dropped_commit_conflicts ~f:(fun cmd ->
-            Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
-            |> Option.is_some )
+            find_and_remove_uncommitted t cmd |> Option.is_some )
       in
       if not @@ Sequence.is_empty commit_conflicts_locally_generated then
         [%log' info t.logger]
@@ -568,9 +580,7 @@ struct
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
-            assert (
-              Option.is_some
-              @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
+            assert (Option.is_some @@ find_and_remove_uncommitted t cmd)
           in
           let log_and_remove ?(metadata = []) error_str =
             log_indexed_pool_error error_str ~metadata cmd ;
@@ -637,8 +647,7 @@ struct
               [ ( "cmd"
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd ) ] ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
-      ) ;
+          find_and_remove_uncommitted t cmd |> ignore ) ;
       t.pool <- pool ;
       Deferred.unit
 
@@ -925,8 +934,10 @@ struct
                                   )
                               in
                               if is_sender_local then
-                                Hashtbl.add_exn t.locally_generated_uncommitted
-                                  ~key:verified ~data:(Time.now ()) ;
+                                modify_uncommitted t
+                                  ~f:
+                                    (Hashtbl.add_exn ~key:verified
+                                       ~data:(Time.now ())) ;
                               let pool'', dropped_for_size =
                                 drop_until_below_max_size pool' ~pool_max_size
                               in
@@ -956,9 +967,7 @@ struct
                                 Sequence.filter
                                   (Sequence.append dropped dropped_for_size)
                                   ~f:(fun tx_dropped ->
-                                    Hashtbl.find_and_remove
-                                      t.locally_generated_uncommitted
-                                      tx_dropped
+                                    find_and_remove_uncommitted t tx_dropped
                                     |> Option.is_some )
                                 |> Sequence.to_list
                               in
@@ -1140,8 +1149,8 @@ struct
                         | _ ->
                             Some tx ) ) )
 
-    let periodically_persist t =
-      Clock.every' (Time.Span.of_min 3.) (fun () ->
+    let persist_on_change t =
+      Strict_pipe.Reader.iter t.uncommitted_changed_r ~f:(fun () ->
           let txns =
             Hashtbl.fold t.locally_generated_uncommitted ~init:[]
               ~f:(fun ~key:txn ~data:_ acc ->
@@ -1151,10 +1160,15 @@ struct
           Writer.save_bin_prot t.config.disk_location
             Persisted.Stable.Latest.bin_writer_t
             {old_locally_generated_uncommitted= txns} )
+      |> don't_wait_for
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
+        let r, w =
+          Strict_pipe.create ~name:"locally-generated-changed"
+            (Buffered (`Capacity 0, `Overflow Drop_head))
+        in
         { pool=
             Indexed_pool.empty ~constraint_constants ~consensus_constants
               ~time_controller
@@ -1166,6 +1180,8 @@ struct
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
                        .Latest )
+        ; uncommitted_changed_r= r
+        ; uncommitted_changed_w= w
         ; config
         ; logger
         ; batcher= Batcher.create config.verifier
@@ -1188,7 +1204,7 @@ struct
                  !"Unable to load sent-but-unconfirmed transactions from disk \
                    ($error)"
          in
-         periodically_persist t) ;
+         persist_on_change t) ;
       don't_wait_for
         (Broadcast_pipe.Reader.iter frontier_broadcast_pipe
            ~f:(fun frontier_opt ->
@@ -1251,7 +1267,7 @@ struct
                          find_remove_bool t.locally_generated_committed
                        in
                        let dropped_uncommitted =
-                         find_remove_bool t.locally_generated_uncommitted
+                         modify_uncommitted t ~f:find_remove_bool
                        in
                        (* Nothing should be in both tables. *)
                        assert (not (dropped_committed && dropped_uncommitted)) ;
@@ -1301,16 +1317,17 @@ struct
         "it was added at $time and its rebroadcast period is now expired."
       in
       let logger = t.logger in
-      Hashtbl.filteri_inplace t.locally_generated_uncommitted
-        ~f:(fun ~key ~data ->
-          match has_timed_out data with
-          | `Timed_out ->
-              [%log info]
-                "No longer rebroadcasting uncommitted command $cmd, %s"
-                added_str ~metadata:(metadata ~key ~data) ;
-              false
-          | `Ok ->
-              true ) ;
+      modify_uncommitted t
+        ~f:
+          (Hashtbl.filteri_inplace ~f:(fun ~key ~data ->
+               match has_timed_out data with
+               | `Timed_out ->
+                   [%log info]
+                     "No longer rebroadcasting uncommitted command $cmd, %s"
+                     added_str ~metadata:(metadata ~key ~data) ;
+                   false
+               | `Ok ->
+                   true )) ;
       Hashtbl.filteri_inplace t.locally_generated_committed
         ~f:(fun ~key ~data ->
           match has_timed_out data with
