@@ -1,0 +1,49 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE DISPLAY_PUBLIC_KEY
+################################################################
+DISPLAY_PUBLIC_KEY_EXECUTABLE_OPTS = []
+
+DISPLAY_PUBLIC_KEY_MODULE_OPTS = []
+
+DISPLAY_PUBLIC_KEY_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/cli_lib",
+]
+
+DISPLAY_PUBLIC_KEY_PPX = "@//bzl/ppx/exe:ppx_version__ppx_let__ppx_sexp_conv__ppx_optcomp"
+
+DISPLAY_PUBLIC_KEY_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "display_public_key.exe",
+    opts = DISPLAY_PUBLIC_KEY_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = DISPLAY_PUBLIC_KEY_DEPS + [
+        # do not sort (buildifier)
+        ":_Display_public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Display_public_key",
+    src = "display_public_key.ml",
+    opts = DISPLAY_PUBLIC_KEY_MODULE_OPTS + [
+        "-w", "-4-29-40-41-42-44-45-48-58-59-60"
+    ],
+    ppx = DISPLAY_PUBLIC_KEY_PPX,
+    ppx_args = DISPLAY_PUBLIC_KEY_PPX_ARGS,
+    deps = DISPLAY_PUBLIC_KEY_DEPS,
+)

@@ -1,0 +1,55 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE DUMP_DHALL_TYPES
+################################################################
+DUMP_DHALL_TYPES_EXECUTABLE_OPTS = []
+
+DUMP_DHALL_TYPES_MODULE_OPTS = []
+
+DUMP_DHALL_TYPES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async_kernel",
+    "@opam//pkg:core",
+    "@mina//src/lib/runtime_config",
+]
+
+DUMP_DHALL_TYPES_PPX = "@//bzl/ppx/exe:ppx_version__ppx_let"
+
+DUMP_DHALL_TYPES_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "dump_dhall_types.exe",
+    opts = DUMP_DHALL_TYPES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = DUMP_DHALL_TYPES_DEPS + [
+        # do not sort (buildifier)
+        ":_Dump_dhall_types",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Dump_dhall_types",
+    src = "dump_dhall_types.ml",
+    opts = DUMP_DHALL_TYPES_MODULE_OPTS,
+    ppx = DUMP_DHALL_TYPES_PPX,
+    ppx_args = DUMP_DHALL_TYPES_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = DUMP_DHALL_TYPES_DEPS + [
+        "@mina//src/lib/ppx_dhall_type",
+    ],
+)
