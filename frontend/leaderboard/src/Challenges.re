@@ -111,8 +111,6 @@ let calculatePoints = (challengeName, metricsMap) => {
   | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
   | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
   | "send mina" => Some(sendMinaChallenge(metricsMap))
-  | "enter testworld and use the echo service" =>
-    Some(echoServiceChallenge(metricsMap))
   | _ => None
   };
 };
