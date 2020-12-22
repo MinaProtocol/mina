@@ -1,0 +1,64 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARK_WORK_LIB
+################################################################
+SNARK_WORK_LIB_MODULE_OPTS = []
+
+SNARK_WORK_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/currency",
+    "@mina//src/lib/one_or_two",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/transaction_snark",
+]
+
+SNARK_WORK_LIB_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_deriving_yojson__ppx_version"
+
+SNARK_WORK_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "snark_work_lib",
+]
+
+##############
+ocaml_archive(
+    name = "snark_work_lib",
+    doc = "Snark work types",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARK_WORK_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Work",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snark_work_lib_ns",
+    ns = "snark_work_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "work.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Work",
+    src = "work.ml",
+    ns = ":Snark_work_lib_ns",
+    opts = SNARK_WORK_LIB_MODULE_OPTS,
+    ppx = SNARK_WORK_LIB_PPX,
+    ppx_args = SNARK_WORK_LIB_PPX_ARGS,
+    deps = SNARK_WORK_LIB_DEPS,
+)

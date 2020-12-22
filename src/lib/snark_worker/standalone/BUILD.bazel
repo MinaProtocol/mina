@@ -1,0 +1,62 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE RUN_SNARK_WORKER
+################################################################
+RUN_SNARK_WORKER_EXECUTABLE_OPTS = []
+
+RUN_SNARK_WORKER_MODULE_OPTS = []
+
+RUN_SNARK_WORKER_DEPS = [
+    # do not sort (buildifier)
+    "@mina//src/lib/snark_worker",
+]
+
+#################
+ocaml_executable(
+    name = "run_snark_worker.exe",
+    opts = RUN_SNARK_WORKER_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = RUN_SNARK_WORKER_DEPS + [
+        # do not sort (buildifier)
+        ":_Run_snark_worker",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Run_snark_worker",
+    src = "run_snark_worker.ml",
+    opts = RUN_SNARK_WORKER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = RUN_SNARK_WORKER_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/snark_worker/standalone:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

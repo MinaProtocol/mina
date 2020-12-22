@@ -1,0 +1,106 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_PAIRING
+################################################################
+SNARKY_PAIRING_MODULE_OPTS = []
+
+SNARKY_PAIRING_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/sgn_type",
+    "@mina//src/lib/snarky_field_extensions",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//snarkette",
+]
+
+SNARKY_PAIRING_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+SNARKY_PAIRING_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "snarky_pairing",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_pairing",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARKY_PAIRING_DEPS + [
+        # do not sort (buildifier)
+        ":_Final_exponentiation",
+        ":_G1_precomputation",
+        ":_G2_precomputation",
+        ":_Miller_loop",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_pairing_ns",
+    ns = "snarky_pairing",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "final_exponentiation.ml",
+        "g1_precomputation.ml",
+        "g2_precomputation.ml",
+        "miller_loop.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Final_exponentiation",
+    src = "final_exponentiation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_G1_precomputation",
+    src = "g1_precomputation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_G2_precomputation",
+    src = "g2_precomputation.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Miller_loop",
+    src = "miller_loop.ml",
+    ns = ":Snarky_pairing_ns",
+    opts = SNARKY_PAIRING_MODULE_OPTS,
+    ppx = SNARKY_PAIRING_PPX,
+    ppx_args = SNARKY_PAIRING_PPX_ARGS,
+    deps = SNARKY_PAIRING_DEPS + [
+        # do not sort (buildifier)
+        ":_G1_precomputation",
+        ":_G2_precomputation",
+    ],
+)
