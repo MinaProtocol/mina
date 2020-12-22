@@ -48,6 +48,8 @@ readinessProbe:
 ALL daemon healthchecks
 */}}
 {{- define "healthcheck.daemon.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.daemon.livenessCheck" . }}
 {{- include "healthcheck.daemon.readinessCheck" . }}
+{{- end }}
 {{- end }}
