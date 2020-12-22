@@ -306,6 +306,13 @@ let setup_daemon logger =
     flag "log-precomputed-blocks"
       (optional_with_default true bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and upload_blocks_to_gcloud =
+    flag "upload-blocks-to-gcloud"
+      (optional_with_default false bool)
+      ~doc:
+        "true|false upload blocks to gcloud storage. Requires the environment \
+         variables GCLOUD_KEYFILE, NETWORK_NAME, and \
+         GCLOUD_BLOCK_UPLOAD_BUCKET"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -994,7 +1001,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~time_controller ~initial_block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
-             ~start_time ?precomputed_blocks_path ~log_precomputed_blocks ())
+             ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
+             ~upload_blocks_to_gcloud ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in

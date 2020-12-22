@@ -38,7 +38,7 @@ let add_new_subscription (t : t) ~pk =
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
-    ~precomputed_block_writer =
+    ~upload_blocks_to_gcloud ~precomputed_block_writer =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -95,6 +95,21 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Pipe.write_without_pushback writer {With_hash.data; hash} ) )
       ~if_not_found:ignore
   in
+  let gcloud_keyfile =
+    match Core.Sys.getenv "GCLOUD_KEYFILE" with
+    | Some keyfile ->
+        Some keyfile
+    | _ ->
+        [%log warn]
+          "GCLOUD_KEYFILE environment variable not set. Must be set to use \
+           upload_blocks_to_gcloud" ;
+        None
+  in
+  Option.iter gcloud_keyfile ~f:(fun path ->
+      ignore
+        (Core.Sys.command
+           (sprintf "gcloud auth activate-service-account --key-file=%s" path))
+  ) ;
   trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
@@ -115,6 +130,59 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                 External_transition.Precomputed_block.to_yojson
                   precomputed_block)
            in
+           if upload_blocks_to_gcloud then (
+             [%log info] "log" ;
+             let json = Yojson.Safe.to_string (Lazy.force precomputed_block) in
+             let network =
+               match Core.Sys.getenv "NETWORK_NAME" with
+               | Some network ->
+                   Some network
+               | _ ->
+                   [%log warn]
+                     "NETWORK_NAME environment variable not set. Must be set \
+                      to use upload_blocks_to_gcloud" ;
+                   None
+             in
+             let bucket =
+               match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
+               | Some bucket ->
+                   Some bucket
+               | _ ->
+                   [%log warn]
+                     "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not \
+                      set. Must be set to use upload_blocks_to_gcloud" ;
+                   None
+             in
+             match (gcloud_keyfile, network, bucket) with
+             | Some _, Some network, Some bucket ->
+                 let hash_string = State_hash.to_string hash in
+                 let name = sprintf "%s-%s.json" network hash_string in
+                 (* TODO: Use a pipe to queue this if these are building up *)
+                 don't_wait_for
+                   ( Mina_metrics.(
+                       Gauge.inc_one
+                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks) ;
+                     let%map output =
+                       Async.Process.run () ~prog:"bash"
+                         ~args:
+                           [ "-c"
+                           ; Printf.sprintf
+                               "echo '%s' | gsutil cp -n - gs://%s/%s" json
+                               bucket name ]
+                     in
+                     ( match output with
+                     | Ok _result ->
+                         ()
+                     | Error e ->
+                         [%log warn]
+                           ~metadata:[("error", Error_json.error_to_yojson e)]
+                           "Uploading block to gcloud failed: $error" ) ;
+                     Mina_metrics.(
+                       Gauge.dec_one
+                         Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks)
+                     )
+             | _ ->
+                 () ) ;
            Option.iter path ~f:(fun (`Path path) ->
                Out_channel.with_file ~append:true path ~f:(fun out_channel ->
                    Out_channel.output_lines out_channel

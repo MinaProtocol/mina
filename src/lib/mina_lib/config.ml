@@ -50,5 +50,6 @@ type t =
   ; precomputed_values: Precomputed_values.t
   ; start_time: Time.t
   ; precomputed_blocks_path: string option
-  ; log_precomputed_blocks: bool }
+  ; log_precomputed_blocks: bool
+  ; upload_blocks_to_gcloud: bool }
 [@@deriving make]
