@@ -1,0 +1,83 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "merkle_address",
+    src = "merkle_address.ml",
+    intf = ":_Merkle_address.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_address",
+    ],
+    ppx_print = "@ppx//print:binary",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/direction",
+        "@opam//pkg:bitstring",
+        "@opam//pkg:core",
+        "@ppx_version//src/runtime:ppx_version_runtime",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Merkle_address.cmi",
+    src = "merkle_address.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_address",
+    ],
+    deps = [
+        "@mina//src/lib/direction",
+        "@opam//pkg:bitstring",
+        "@opam//pkg:core",
+        "@ppx_version//src/runtime:ppx_version_runtime",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/merkle_address:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:bitstring.ppx",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

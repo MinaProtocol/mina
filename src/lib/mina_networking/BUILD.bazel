@@ -1,0 +1,107 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "mina_networking",
+    src = "mina_networking.ml",
+    intf = ":_Mina_networking.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_networking",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_intf",
+        "@mina//src/lib/coda_transition",
+        "@mina//src/lib/consensus",
+        "@mina//src/lib/gossip_net",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/network_pool",
+        "@mina//src/lib/o1trace",
+        "@mina//src/lib/perf_histograms",
+        "@mina//src/lib/proof_carrying_data",
+        "@mina//src/lib/staged_ledger",
+        "@mina//src/lib/sync_status",
+        "@mina//src/lib/transition_frontier",
+        "@mina//src/lib/unix_timestamp",
+        "@opam//pkg:async",
+        "@opam//pkg:async_extra",
+        "@opam//pkg:core",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Mina_networking.cmi",
+    src = "mina_networking.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_networking",
+    ],
+    deps = [
+        "@mina//src/lib/coda_intf",
+        "@mina//src/lib/coda_transition",
+        "@mina//src/lib/consensus",
+        "@mina//src/lib/gossip_net",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/network_pool",
+        "@mina//src/lib/o1trace",
+        "@mina//src/lib/perf_histograms",
+        "@mina//src/lib/proof_carrying_data",
+        "@mina//src/lib/staged_ledger",
+        "@mina//src/lib/sync_status",
+        "@mina//src/lib/transition_frontier",
+        "@mina//src/lib/unix_timestamp",
+        "@opam//pkg:async",
+        "@opam//pkg:async_extra",
+        "@opam//pkg:core",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/mina_networking:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

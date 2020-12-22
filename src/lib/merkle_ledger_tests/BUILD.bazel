@@ -1,0 +1,171 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY MERKLE_LEDGER_TESTS
+################################################################
+MERKLE_LEDGER_TESTS_MODULE_OPTS = []
+
+MERKLE_LEDGER_TESTS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:extlib",
+    "@mina//src/lib/merkle_ledger",
+    "@mina//src/lib/merkle_mask",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/signature_lib",
+]
+
+##############
+ocaml_archive(
+    name = "merkle_ledger_tests",
+    doc = "Testing account databases",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = MERKLE_LEDGER_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Binary_tree",
+        ":_Test",
+        ":_Test_database",
+        ":_Test_mask",
+        ":_Test_stubs",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Merkle_ledger_tests_ns",
+    ns = "merkle_ledger_tests",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "binary_tree.ml",
+        "test.ml",
+        "test_database.ml",
+        "test_mask.ml",
+        "test_stubs.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Binary_tree",
+    src = "binary_tree.ml",
+    ns = ":Merkle_ledger_tests_ns",
+    opts = MERKLE_LEDGER_TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger_tests",
+    ],
+    deps = MERKLE_LEDGER_TESTS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Merkle_ledger_tests_ns",
+    opts = MERKLE_LEDGER_TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger_tests",
+    ],
+    deps = MERKLE_LEDGER_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_stubs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_database",
+    src = "test_database.ml",
+    ns = ":Merkle_ledger_tests_ns",
+    opts = MERKLE_LEDGER_TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger_tests",
+    ],
+    deps = MERKLE_LEDGER_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_stubs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_mask",
+    src = "test_mask.ml",
+    ns = ":Merkle_ledger_tests_ns",
+    opts = MERKLE_LEDGER_TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger_tests",
+    ],
+    deps = MERKLE_LEDGER_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_stubs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_stubs",
+    src = "test_stubs.ml",
+    ns = ":Merkle_ledger_tests_ns",
+    opts = MERKLE_LEDGER_TESTS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger_tests",
+    ],
+    deps = MERKLE_LEDGER_TESTS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/merkle_ledger_tests:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

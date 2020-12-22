@@ -1,0 +1,410 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY MERKLE_LEDGER
+################################################################
+MERKLE_LEDGER_MODULE_OPTS = []
+
+MERKLE_LEDGER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:extlib",
+    "@opam//pkg:integers",
+    "@opam//pkg:bitstring",
+    # "@mina//src/external/ocaml-rocksdb:rocks",
+    "@ocaml_rocksdb//:rocks",
+    "@mina//src/lib/cache_dir",
+    "@mina//src/lib/direction",
+    "@mina//src/lib/empty_hashes",
+    "@mina//src/lib/immutable_array",
+    "@mina//src/lib/key_value_database",
+    "@mina//src/lib/merkle_address",
+    "@mina//src/lib/non_empty_list",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/visualization",
+]
+
+##############
+ocaml_archive(
+    name = "merkle_ledger",
+    doc = "Implementation of different account databases",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Any_ledger",
+        ":_Base_inputs_intf",
+        ":_Base_ledger_intf",
+        ":_Database",
+        ":_Database_intf",
+        ":_Graphviz",
+        ":_Intf",
+        ":_Ledger_extras_intf",
+        ":_Location",
+        ":_Location_intf",
+        ":_Merkle_ledger_intf",
+        ":_Merkle_path",
+        ":_Merkle_path_intf",
+        ":_Null_ledger",
+        ":_Syncable_intf",
+        ":_Util",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Merkle_ledger_ns",
+    ns = "merkle_ledger",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "any_ledger.ml",
+        "base_inputs_intf.ml",
+        "base_ledger_intf.ml",
+        "database.ml",
+        "database_intf.ml",
+        "graphviz.ml",
+        "intf.ml",
+        "ledger_extras_intf.ml",
+        "location.ml",
+        "location_intf.ml",
+        "merkle_ledger_intf.ml",
+        "merkle_path.ml",
+        "merkle_path_intf.ml",
+        "null_ledger.ml",
+        "syncable_intf.ml",
+        "util.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Any_ledger",
+    src = "any_ledger.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_inputs_intf",
+        ":_Base_ledger_intf",
+        ":_Location",
+        ":_Location_intf",
+        ":_Merkle_path",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Base_inputs_intf",
+    src = "base_inputs_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Base_ledger_intf",
+    src = "base_ledger_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Merkle_path",
+        ":_Syncable_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Database",
+    src = "database.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_inputs_intf",
+        ":_Database_intf",
+        ":_Intf",
+        ":_Location",
+        ":_Location_intf",
+        ":_Merkle_path",
+        ":_Util",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Database_intf",
+    src = "database_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_ledger_intf",
+        ":_Location",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Graphviz",
+    src = "graphviz.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_ledger_intf",
+        ":_Intf",
+        ":_Location",
+        ":_Location_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_extras_intf",
+    src = "ledger_extras_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Merkle_ledger_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Location",
+    src = "location.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Location_intf",
+    src = "location_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Merkle_ledger_intf",
+    src = "merkle_ledger_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_ledger_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Merkle_path",
+    src = "merkle_path.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Merkle_path_intf",
+    src = "merkle_path_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Null_ledger",
+    src = "null_ledger.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_inputs_intf",
+        ":_Base_ledger_intf",
+        ":_Location",
+        ":_Location_intf",
+        ":_Merkle_path",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Syncable_intf",
+    src = "syncable_intf.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Util",
+    src = "util.ml",
+    ns = ":Merkle_ledger_ns",
+    opts = MERKLE_LEDGER_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "merkle_ledger",
+    ],
+    deps = MERKLE_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Location",
+        ":_Location_intf",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/merkle_ledger:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
