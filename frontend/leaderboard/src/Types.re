@@ -123,14 +123,18 @@ module Block = {
       timestamp: string,
       height: string,
       creatorAccount: string,
+      coinbaseReceiver: option(string),
     };
 
     module Decode = {
       open Json.Decode;
       let blockchainState = json => {
-        creatorAccount: json |> field("blockcreatoraccount", string),
-        timestamp: json |> field("timestamp", string),
-        height: json |> field("height", string),
+        {
+          creatorAccount: json |> field("blockcreatoraccount", string),
+          coinbaseReceiver: None,
+          timestamp: json |> field("timestamp", string),
+          height: json |> field("height", string),
+        };
       };
     };
   };
@@ -159,6 +163,17 @@ module Block = {
     };
   };
 
+  let addCoinbaseReceiverIfSome = (block, coinbaseReceiver) => {
+    switch (coinbaseReceiver) {
+    | Some(_) =>
+      let blockChainState = block.blockchainState;
+      let updatedBlockchainState = {...blockChainState, coinbaseReceiver};
+      let updatedBlock = {...block, blockchainState: updatedBlockchainState};
+      updatedBlock;
+    | None => block
+    };
+  };
+
   /*
    Because UserCommands and InternalCommands have a one to many
    relationship with a block, there will be duplicate blocks ids
@@ -167,38 +182,58 @@ module Block = {
    each UserCommand and InternalCommand to it's associated block.
     */
   let parseBlocks = blocks => {
-    Belt.Map.Int.(
-      blocks
-      |> Array.fold_left(
-           (blockMap, block) => {
-             let newBlock = Decode.block(block);
-             let userCommand = UserCommand.Decode.userCommand(block);
-             let internalCommand =
-               InternalCommand.Decode.internalCommand(block);
+    let blocks =
+      Belt.Map.Int.(
+        blocks
+        |> Array.fold_left(
+             (blockMap, block) => {
+               let newBlock = Decode.block(block);
+               let userCommand = UserCommand.Decode.userCommand(block);
+               let internalCommand =
+                 InternalCommand.Decode.internalCommand(block);
 
-             if (has(blockMap, newBlock.id)) {
-               update(blockMap, newBlock.id, block => {
-                 switch (block) {
-                 | Some(currentBlock) =>
-                   addCommandIfSome(userCommand, currentBlock.userCommands);
-                   addCommandIfSome(
-                     internalCommand,
-                     currentBlock.internalCommands,
-                   );
-                   Some(currentBlock);
-                 | None => None
-                 }
-               });
-             } else {
-               addCommandIfSome(userCommand, newBlock.userCommands);
-               addCommandIfSome(internalCommand, newBlock.internalCommands);
-               set(blockMap, newBlock.id, newBlock);
-             };
-           },
-           empty,
-         )
-      |> valuesToArray
-    );
+               let coinbaseReceiver =
+                 switch (internalCommand) {
+                 | Some(internalCommand) =>
+                   switch (internalCommand.type_) {
+                   | Coinbase => Some(internalCommand.receiverAccount)
+                   | _ => None
+                   }
+                 | _ => None
+                 };
+
+               if (has(blockMap, newBlock.id)) {
+                 update(blockMap, newBlock.id, block => {
+                   switch (block) {
+                   | Some(currentBlock) =>
+                     addCommandIfSome(userCommand, currentBlock.userCommands);
+                     addCommandIfSome(
+                       internalCommand,
+                       currentBlock.internalCommands,
+                     );
+                     let blockToAdd =
+                       addCoinbaseReceiverIfSome(
+                         currentBlock,
+                         coinbaseReceiver,
+                       );
+                     Some(blockToAdd);
+                   | None => None
+                   }
+                 });
+               } else {
+                 addCommandIfSome(userCommand, newBlock.userCommands);
+                 addCommandIfSome(internalCommand, newBlock.internalCommands);
+                 let blockToAdd =
+                   addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
+                 set(blockMap, blockToAdd.id, blockToAdd);
+               };
+             },
+             empty,
+           )
+        |> valuesToArray
+      );
+
+    blocks;
   };
 };
 

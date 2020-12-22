@@ -23,20 +23,34 @@ Node.Process.putEnvVar(
 
 let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-let pgConnection = getEnvOrFail("PGCONN");
+//let pgConnection = getEnvOrFail("PGCONN");
+
+let pgConnectionPreFork = "postgres://postgres:foobar@localhost:5432/archiver_prefork";
+let pgConnectionPostFork = "postgres://postgres:foobar@localhost:5432/archiver_postfork";
 
 let main = () => {
-  let pool = Postgres.createPool(pgConnection);
-  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
+  let preforkPool = Postgres.createPool(pgConnectionPreFork);
+  let postforkPool = Postgres.createPool(pgConnectionPostFork);
+  Postgres.makeQuery(preforkPool, Postgres.getLateBlocks, result => {
     switch (result) {
-    | Ok(blocks) =>
-      Types.Block.parseBlocks(blocks)
-      |> Metrics.calculateMetrics
-      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId)
+    | Ok(preforkBlocks) =>
+      Postgres.makeQuery(postforkPool, Postgres.getLateBlocks, result => {
+        switch (result) {
+        | Ok(postforkBlocks) =>
+          let blocks = Belt.Array.concat(preforkBlocks, postforkBlocks);
+          Types.Block.parseBlocks(blocks)
+          |> Metrics.calculateMetrics
+          |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
+          Postgres.endPool(preforkPool);
+          Postgres.endPool(postforkPool);
+        | Error(error) => Js.log(error)
+        }
+      })
+
     | Error(error) => Js.log(error)
     }
   });
-  Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
+  Postgres.makeQuery(postforkPool, Postgres.getBlockHeight, result => {
     switch (result) {
     | Ok(blockHeightQuery) =>
       Belt.Option.(
@@ -54,7 +68,6 @@ let main = () => {
     }
   });
   UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
-  Postgres.endPool(pool);
 };
 
 main();

@@ -28,18 +28,23 @@ let echoServiceChallenge = metricsMap => {
      );
 };
 
-let coinbaseReceiverChallenge = (points, metricsMap) => {
-  metricsMap
-  |> StringMap.fold(
-       (key, metric: Types.Metrics.t, map) => {
-         switch (metric.coinbaseReceiver) {
-         | Some(metricValue) =>
-           metricValue ? StringMap.add(key, points, map) : map
-         | None => map
-         }
-       },
-       StringMap.empty,
-     );
+let snarkFeeChallenge = metricsMap => {
+  [
+    Points.applyTopNPoints(
+      [|
+        (0, 5000), // 1st place: 5000 pts
+        (1, 4000), // 2nd place: 4000 pts
+        (2, 3000), // 3rd place: 3000 pts
+        (11, 2000), // Top 10: 2000 pts.
+        (51, 1500), // Top 50: 1500 pts
+        (101, 1000) // Top 100: 1000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
+      compare,
+    ),
+  ]
+  |> Points.sumPointsMaps;
 };
 
 let bonusBlocksChallenge = metricsMap => {
@@ -140,6 +145,7 @@ let createAndSendTokenChallenge = metricsMap => {
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
   | "stake your mina and produce blocks" => Some(blocksChallenge(metricsMap))
+  | "snark fees" => Some(snarkFeeChallenge(metricsMap))
   | "send mina tokens elsewhere" => Some(sendCodaChallenge(metricsMap))
   | "connect to testnet and send mina to the echo service" =>
     Some(echoServiceChallenge(metricsMap))
