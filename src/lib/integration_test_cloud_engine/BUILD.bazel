@@ -1,0 +1,242 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY INTEGRATION_TEST_CLOUD_ENGINE
+################################################################
+INTEGRATION_TEST_CLOUD_ENGINE_INTERFACE_OPTS = []
+
+INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS = []
+
+INTEGRATION_TEST_CLOUD_ENGINE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:lens",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/runtime_config",
+    "@mina//src/lib/genesis_constants",
+    "@mina//src/lib/graphql_lib",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/user_command_input",
+    "@mina//src/lib/genesis_ledger_helper",
+    "@mina//src/lib/integration_test_lib",
+    "@mina//src/lib/block_time",
+    "@mina//src/lib/interruptible",
+]
+
+##############
+ocaml_archive(
+    name = "integration_test_cloud_engine",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Cmd_util",
+        ":_Coda_automation",
+        ":_Integration_test_cloud_engine",
+        ":_Kubernetes_network",
+        ":_Stack_driver_log_engine",
+        ":_Terraform",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Integration_test_cloud_engine_ns",
+    ns = "integration_test_cloud_engine",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "cli_inputs.ml",
+        "cmd_util.ml",
+        "coda_automation.ml",
+        "integration_test_cloud_engine.ml",
+        "kubernetes_network.ml",
+        "stack_driver_log_engine.ml",
+        "terraform.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cli_inputs",
+    src = "cli_inputs.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Cmd_util",
+    src = "cmd_util.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coda_automation",
+    src = "coda_automation.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Cmd_util",
+        ":_Kubernetes_network",
+        ":_Terraform",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Integration_test_cloud_engine",
+    src = "integration_test_cloud_engine.ml",
+    intf = ":_Integration_test_cloud_engine.cmi",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Cli_inputs",
+        ":_Coda_automation",
+        ":_Kubernetes_network",
+        ":_Stack_driver_log_engine",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Integration_test_cloud_engine.cmi",
+    src = "integration_test_cloud_engine.mli",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+#############
+GRAPHQL_SCHEMA_FILE = "graphql_schema.json"
+GRAPHQL_SCHEMA_PATH = GRAPHQL_SCHEMA_FILE
+GRAPHQL_SCHEMA_JSON = "//:" + GRAPHQL_SCHEMA_FILE
+
+ocaml_module(
+    name = "_Kubernetes_network",
+    src = "kubernetes_network.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+        "-schema", GRAPHQL_SCHEMA_PATH         # obazl:retain
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],          # obazl:retain
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        ":_Cmd_util"                           # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Stack_driver_log_engine",
+    src = "stack_driver_log_engine.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS + [
+        # do not sort (buildifier)
+        ":_Kubernetes_network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Terraform",
+    src = "terraform.ml",
+    ns = ":Integration_test_cloud_engine_ns",
+    opts = INTEGRATION_TEST_CLOUD_ENGINE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "integration_test_cloud_engine",
+    ],
+    deps = INTEGRATION_TEST_CLOUD_ENGINE_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:lens",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/integration_test_cloud_engine:__pkg__",
+    ],
+    deps = [
+        "@graphql_ppx//src/native:graphql_ppx",
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:lens.ppx_deriving",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

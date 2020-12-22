@@ -1,0 +1,69 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "ledger_catchup",
+    src = "ledger_catchup.ml",
+    intf = ":_Ledger_catchup.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "ledger_catchup",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_intf",
+        "@mina//src/lib/consensus",
+        "@mina//src/lib/fake_network",
+        "@mina//src/lib/merkle_address",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/mina_metrics",
+        "@mina//src/lib/mina_networking",
+        "@mina//src/lib/non_empty_list",
+        "@mina//src/lib/pipe_lib",
+        "@mina//src/lib/syncable_ledger",
+        "@mina//src/lib/transition_chain_verifier",
+        "@mina//src/lib/transition_frontier",
+        "@mina//src/lib/transition_handler",
+        "@opam//pkg:async_kernel",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_catchup.cmi",
+    src = "ledger_catchup.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "ledger_catchup",
+    ],
+    deps = [
+        "@mina//src/lib/coda_intf",
+        "@mina//src/lib/consensus",
+        "@mina//src/lib/fake_network",
+        "@mina//src/lib/merkle_address",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/mina_metrics",
+        "@mina//src/lib/mina_networking",
+        "@mina//src/lib/non_empty_list",
+        "@mina//src/lib/pipe_lib",
+        "@mina//src/lib/syncable_ledger",
+        "@mina//src/lib/transition_chain_verifier",
+        "@mina//src/lib/transition_frontier",
+        "@mina//src/lib/transition_handler",
+        "@opam//pkg:async_kernel",
+        "@opam//pkg:core_kernel",
+    ],
+)
