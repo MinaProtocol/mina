@@ -1,0 +1,162 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY GENESIS_LEDGER
+################################################################
+GENESIS_LEDGER_MODULE_OPTS = []
+
+GENESIS_LEDGER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/runtime_config",
+]
+
+GENESIS_LEDGER_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp__ppx_let"
+
+GENESIS_LEDGER_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+##############
+ocaml_archive(
+    name = "genesis_ledger",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Fake_accounts",
+        ":_Fuzz_ledger",
+        ":_Genesis_ledger",
+        ":_Intf",
+        ":_Release_ledger",
+        ":_Test_ledger",
+        ":_Testnet_postake_ledger",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Genesis_ledger_ns",
+    ns = "genesis_ledger",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "fake_accounts.ml",
+        "fuzz_ledger.ml",
+        "genesis_ledger.ml",
+        "intf.ml",
+        "release_ledger.ml",
+        "test_ledger.ml",
+        "testnet_postake_ledger.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fake_accounts",
+    src = "fake_accounts.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Fuzz_ledger",
+    src = "fuzz_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Genesis_ledger",
+    src = "genesis_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Fuzz_ledger",
+        ":_Intf",
+        ":_Release_ledger",
+        ":_Test_ledger",
+        ":_Testnet_postake_ledger",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Release_ledger",
+    src = "release_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test_ledger",
+    src = "test_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Testnet_postake_ledger",
+    src = "testnet_postake_ledger.ml",
+    ns = ":Genesis_ledger_ns",
+    opts = GENESIS_LEDGER_MODULE_OPTS,
+    ppx = GENESIS_LEDGER_PPX,
+    ppx_args = GENESIS_LEDGER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GENESIS_LEDGER_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_ledger",
+    ],
+)

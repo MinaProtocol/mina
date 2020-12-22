@@ -1,0 +1,26 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "genesis_proof",
+    src = "genesis_proof.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version__ppx_let",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/blockchain_snark",
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/genesis_constants",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/runtime_config",
+        "@mina//src/lib/with_hash",
+    ],
+)
