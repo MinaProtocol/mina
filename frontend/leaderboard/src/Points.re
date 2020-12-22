@@ -64,37 +64,6 @@ let applyTopNPoints =
      );
 };
 
-let addPointsIfCommunityMeetsThreshold =
-    (getMetricValue, threshold, points, metricsMap) => {
-  // Sum all metric values recorded thus far
-  let metricCounter =
-    StringMap.fold(
-      (_, metric, metricCounter) => {
-        switch (getMetricValue(metric)) {
-        | Some(metricValue) => metricCounter + metricValue
-        | None => metricCounter
-        }
-      },
-      metricsMap,
-      0,
-    );
-
-  // If the metric value sum is greater than the threshold, every user that particpated will receive points
-  metricCounter >= threshold
-    ? StringMap.fold(
-        (key, metric, map) => {
-          switch (getMetricValue(metric)) {
-          | Some(metricValue) =>
-            metricValue >= 0 ? StringMap.add(key, points, map) : map
-          | None => map
-          }
-        },
-        metricsMap,
-        StringMap.empty,
-      )
-    : StringMap.empty;
-};
-
 // Combines a list of maps of users to points and returns one map of users to points
 let sumPointsMaps = maps => {
   maps

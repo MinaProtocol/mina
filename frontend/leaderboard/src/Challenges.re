@@ -43,13 +43,33 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
 };
 
 let bonusSnarkFeeChallenge = metricsMap => {
-  Points.addPointsIfCommunityMeetsThreshold(
-    (metricRecord: Types.Metrics.t) =>
-      metricRecord.transactionsReceivedByEcho,
-    1000,
-    2000,
-    metricsMap,
-  );
+  // Sum all snark fees recorded thus far
+  let snarkFeeCounter =
+    StringMap.fold(
+      (_, metric: Types.Metrics.t, metricCounter) => {
+        switch (metric.snarkFeesCollected) {
+        | Some(metricValue) => Int64.add(metricCounter, metricValue)
+        | None => metricCounter
+        }
+      },
+      metricsMap,
+      Int64.zero,
+    );
+
+  // If the metric value sum is greater than the threshold, every user that particpated will receive points
+  snarkFeeCounter >= Int64.of_int(1000)
+    ? StringMap.fold(
+        (key, metric: Types.Metrics.t, map) => {
+          switch (metric.snarkFeesCollected) {
+          | Some(metricValue) =>
+            metricValue >= Int64.zero ? StringMap.add(key, 2000, map) : map
+          | None => map
+          }
+        },
+        metricsMap,
+        StringMap.empty,
+      )
+    : StringMap.empty;
 };
 
 let snarkFeeChallenge = metricsMap => {
