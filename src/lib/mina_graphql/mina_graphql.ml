@@ -677,7 +677,7 @@ module Types = struct
                    with
                    | `Active (Some nonce) ->
                        Some (Account.Nonce.to_string nonce)
-                   | `Active None | `Bootstrapping ->
+                   | `Active None | `Bootstrapping | `Waiting_for_genesis ->
                        None )
              ; field "epochDelegateAccount" ~typ:(Lazy.force account)
                  ~doc:
@@ -2013,6 +2013,8 @@ module Mutations = struct
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
+    | `Waiting_for_genesis ->
+        return (Error "Daemon is waiting for genesis or fork start time")
 
   let find_identity ~public_key coda =
     Result.of_option

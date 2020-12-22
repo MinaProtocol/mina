@@ -334,15 +334,47 @@ let active_or_bootstrapping =
         ~f:(Fn.const (Some ())) )
 
 let create_sync_status_observer ~logger ~is_seed ~demo_mode
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
-    ~first_connection_incr ~first_message_incr =
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~consensus_constants ~transition_frontier_and_catchup_signal_incr
+    ~online_status_incr ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
+  let pre_genesis =
+    let fork_start_time =
+      let constants = consensus_constants in
+      Option.map constraint_constants.fork ~f:(fun x ->
+          Consensus.Global_slot.(
+            start_time ~constants
+              (of_slot_number x.previous_global_slot ~constants))
+          |> Block_time.to_time )
+    in
+    let genesis_time =
+      Block_time.to_time consensus_constants.genesis_state_timestamp
+    in
+    let start_time =
+      match fork_start_time with
+      | None ->
+          genesis_time
+      | Some fork_time ->
+          Time.max genesis_time fork_time
+    in
+    let waiting = Time.(now () < start_time) in
+    let v = Var.create waiting in
+    if waiting then upon (at start_time) (fun () -> Var.set v false) ;
+    Var.watch v
+  in
   let incremental_status =
-    map4 online_status_incr transition_frontier_and_catchup_signal_incr
-      first_connection_incr first_message_incr
-      ~f:(fun online_status active_status first_connection first_message ->
+    map5 pre_genesis online_status_incr
+      transition_frontier_and_catchup_signal_incr first_connection_incr
+      first_message_incr
+      ~f:(fun pre_genesis
+         online_status
+         active_status
+         first_connection
+         first_message
+         ->
         (* Always be synced in demo mode, we don't expect peers to connect to us *)
-        if demo_mode then `Synced
+        if pre_genesis then `Waiting_for_genesis
+        else if demo_mode then `Synced
         else
           match online_status with
           | `Offline ->
@@ -1381,6 +1413,7 @@ let create ?wallets (config : Config.t) =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
+              ~constraint_constants ~consensus_constants
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
