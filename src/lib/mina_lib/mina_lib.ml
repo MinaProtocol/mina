@@ -968,9 +968,16 @@ let create ?wallets (config : Config.t) =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
                   let git_commit = Coda_version.commit_id_short in
-                  let uptime =
-                    Time.diff (Time.now ()) config.start_time
-                    |> Time.Span.to_string_hum ~decimals:1
+                  let uptime_minutes =
+                    let now = Time.now () in
+                    let minutes_float =
+                      Time.diff now config.start_time |> Time.Span.to_min
+                    in
+                    (* if rounding fails, just convert *)
+                    Option.value_map
+                      (Float.iround_nearest minutes_float)
+                      ~f:Fn.id
+                      ~default:(Float.to_int minutes_float)
                   in
                   Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.
                     { node_ip_addr
@@ -982,7 +989,7 @@ let create ?wallets (config : Config.t) =
                     ; ban_statuses
                     ; k_block_hashes_and_timestamps
                     ; git_commit
-                    ; uptime }
+                    ; uptime_minutes }
           in
           let get_some_initial_peers _ =
             match !net_ref with
