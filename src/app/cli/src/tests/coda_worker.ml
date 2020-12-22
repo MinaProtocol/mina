@@ -473,6 +473,7 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->

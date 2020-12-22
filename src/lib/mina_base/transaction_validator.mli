@@ -9,14 +9,14 @@ val apply_user_command :
   -> txn_global_slot:Coda_numbers.Global_slot.t
   -> Hashless_ledger.t
   -> Signed_command.With_valid_signature.t
-  -> User_command_status.t Or_error.t
+  -> Transaction_status.t Or_error.t
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> Hashless_ledger.t
   -> Transaction.t
-  -> User_command_status.t Or_error.t
+  -> Transaction_status.t Or_error.t
 
 val has_locked_tokens :
      global_slot:Coda_numbers.Global_slot.t

@@ -30,7 +30,7 @@ module T = struct
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Mismatched_statuses of
-          Transaction.t With_status.t * User_command_status.t
+          Transaction.t With_status.t * Transaction_status.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -63,7 +63,7 @@ module T = struct
           str
       | Mismatched_statuses (transaction, status) ->
           Format.asprintf
-            !"Got a different status %{sexp: User_command_status.t} when \
+            !"Got a different status %{sexp: Transaction_status.t} when \
               applying the transaction %{sexp: Transaction.t With_status.t}"
             status transaction
       | Unexpected e ->
@@ -334,13 +334,13 @@ module T = struct
               snarked_ledger tx.data
           in
           let computed_status =
-            Ledger.Undo.user_command_status txn_with_info
+            Ledger.Transaction_applied.user_command_status txn_with_info
           in
-          if User_command_status.equal tx.status computed_status then Ok ()
+          if Transaction_status.equal tx.status computed_status then Ok ()
           else
             Or_error.errorf
               !"Mismatched user command status. Expected: %{sexp: \
-                User_command_status.t} Got: %{sexp: User_command_status.t}"
+                Transaction_status.t} Got: %{sexp: Transaction_status.t}"
               tx.status computed_status )
     in
     let%bind () =
@@ -479,12 +479,12 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let%map undo =
+    let%map applied_txn =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in
     let next_available_token_after = Ledger.next_available_token ledger in
-    ( undo
+    ( applied_txn
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
@@ -525,21 +525,25 @@ module T = struct
             pending_coinbase_stack_state s txn_state_view )
     in
     let open Result.Let_syntax in
-    let%bind undo, statement, updated_pending_coinbase_stack_state = r in
+    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
+      r
+    in
     let%map () =
       match status with
       | None ->
           return ()
       | Some status ->
           (* Validate that command status matches. *)
-          let got_status = Ledger.Undo.user_command_status undo in
-          if User_command_status.equal status got_status then return ()
+          let got_status =
+            Ledger.Transaction_applied.user_command_status applied_txn
+          in
+          if Transaction_status.equal status got_status then return ()
           else
             Result.fail
               (Staged_ledger_error.Mismatched_statuses
                  ({With_status.data= s; status}, got_status))
     in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
+    ( { Scan_state.Transaction_with_witness.transaction_with_info= applied_txn
       ; state_hash= state_and_body_hash
       ; state_view= txn_state_view
       ; ledger_witness
@@ -618,7 +622,9 @@ module T = struct
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let open Or_error.Let_syntax in
           let%map acc = acc in
-          let t = d.transaction_with_info |> Ledger.Undo.transaction in
+          let t =
+            d.transaction_with_info |> Ledger.Transaction_applied.transaction
+          in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -2474,9 +2480,9 @@ let%test_module "test" =
                              { With_status.data= (cmd :> User_command.t)
                              ; status=
                                  Applied
-                                   ( User_command_status.Auxiliary_data.empty
-                                   , User_command_status.Balance_data.empty )
-                             } )
+                                   ( Transaction_status.Auxiliary_data.empty
+                                   , Transaction_status.Balance_data.empty ) }
+                         )
                     in
                     let diff =
                       create_diff_with_non_zero_fee_excess
