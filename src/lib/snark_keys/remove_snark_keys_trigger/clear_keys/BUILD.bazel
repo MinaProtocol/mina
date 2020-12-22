@@ -1,0 +1,52 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE CLEAR_KEYS
+################################################################
+CLEAR_KEYS_EXECUTABLE_OPTS = []
+
+CLEAR_KEYS_MODULE_OPTS = []
+
+CLEAR_KEYS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@mina//src/lib/file_system",
+    "@mina//src/lib/cache_dir",
+    "@snarky//src/base:snarky_backendless",
+]
+
+CLEAR_KEYS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane"
+
+CLEAR_KEYS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "clear_keys",
+]
+
+#################
+ocaml_executable(
+    name = "clear_keys.exe",
+    opts = CLEAR_KEYS_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = CLEAR_KEYS_DEPS + [
+        # do not sort (buildifier)
+        ":_Clear_keys",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Clear_keys",
+    src = "clear_keys.ml",
+    opts = CLEAR_KEYS_MODULE_OPTS,
+    ppx = CLEAR_KEYS_PPX,
+    ppx_args = CLEAR_KEYS_PPX_ARGS,
+    deps = CLEAR_KEYS_DEPS,
+)
