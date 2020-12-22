@@ -5,11 +5,9 @@ open Snark_params
 (** For debugging. Logs to stderr the inputs to the top hash. *)
 val with_top_hash_logging : (unit -> 'a) -> 'a
 
-module Redundant_witness = Transaction_side_effects
-
 val supply_increase' :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> redundant:Redundant_witness.t
+  -> effects:Transaction_side_effects.t
   -> Currency.Amount.t
   -> Currency.Amount.Signed.t option
 
@@ -271,7 +269,7 @@ val check_transaction :
   -> next_available_token_before:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
-  -> redundant:Redundant_witness.t
+  -> effects:Transaction_side_effects.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -284,7 +282,7 @@ val check_user_command :
   -> init_stack:Pending_coinbase.Stack.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> next_available_token_before:Token_id.t
-  -> redundant:Redundant_witness.t
+  -> effects:Transaction_side_effects.t
   -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
@@ -300,7 +298,7 @@ val generate_transaction_witness :
   -> next_available_token_before:Token_id.t
   -> snapp_account1:Snapp_account.t option
   -> snapp_account2:Snapp_account.t option
-  -> redundant:Redundant_witness.t
+  -> effects:Transaction_side_effects.t
   -> Transaction.Valid.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit

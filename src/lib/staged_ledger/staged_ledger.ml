@@ -472,14 +472,14 @@ module T = struct
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in
-    let redundant : Transaction_side_effects.t =
+    let effects : Transaction_side_effects.t =
       { accounts_created= Transaction_logic.Undo.accounts_created undo
       ; next_available_token= Ledger.next_available_token ledger }
     in
     let%map fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
       (let%bind a = Transaction.supply_increase s in
-       Transaction_snark.supply_increase' ~constraint_constants ~redundant a
+       Transaction_snark.supply_increase' ~constraint_constants ~effects a
        |> option "supply_increase")
       |> to_staged_ledger_or_error
     in
@@ -488,7 +488,7 @@ module T = struct
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; next_available_token_before
-      ; next_available_token_after= redundant.next_available_token
+      ; next_available_token_after= effects.next_available_token
       ; supply_increase
       ; pending_coinbase_stack_state=
           {pending_coinbase_stack_state.pc with target= pending_coinbase_target}

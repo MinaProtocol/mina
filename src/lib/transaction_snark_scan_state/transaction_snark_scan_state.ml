@@ -186,7 +186,7 @@ let create_expected_statement ~constraint_constants
   let {With_status.data= transaction; status= _} =
     Ledger.Undo.transaction transaction_with_info
   in
-  let%bind after, redundant =
+  let%bind after, effects =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn ~constraint_constants
           ~txn_state_view:state_view ledger_witness transaction )
@@ -217,14 +217,14 @@ let create_expected_statement ~constraint_constants
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase =
     let%bind x = Transaction.supply_increase transaction in
-    Transaction_snark.supply_increase' x ~constraint_constants ~redundant
+    Transaction_snark.supply_increase' x ~constraint_constants ~effects
     |> option "supply_increase overflow"
   in
   { Transaction_snark.Statement.source
   ; target
   ; fee_excess
   ; next_available_token_before
-  ; next_available_token_after= redundant.next_available_token
+  ; next_available_token_after= effects.next_available_token
   ; supply_increase
   ; pending_coinbase_stack_state=
       { statement.pending_coinbase_stack_state with
