@@ -545,7 +545,7 @@ module Rpcs = struct
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
-            ; uptime: string }
+            ; uptime_minutes: int }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id
@@ -1356,7 +1356,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             Trust_system.(
               record t.trust_system t.logger peer
                 Actions.
-                  ( Violated_protocol
+                  ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
                   ))
         | Local ->

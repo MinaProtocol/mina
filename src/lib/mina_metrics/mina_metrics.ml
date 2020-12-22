@@ -677,6 +677,12 @@ end
 module Block_latency = struct
   let subsystem = "Block_latency"
 
+  module Upload_to_gcloud = struct
+    let upload_to_gcloud_blocks : Gauge.t =
+      let help = "Number of pending `gsutil cp` jobs for block dumping" in
+      Gauge.v "upload_to_gcloud_blocks" ~help ~namespace ~subsystem
+  end
+
   [%%inject
   "block_window_duration", block_window_duration]
 

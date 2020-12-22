@@ -179,7 +179,6 @@ module Derive = struct
 
     let handle ~(env : Env.T(M).t) (req : Construction_derive_request.t) =
       let open M.Let_syntax in
-      (* TODO: Verify curve-type is tweedle *)
       let%bind pk =
         let pk_or_error =
           try Ok (Rosetta_coding.Coding.to_public_key req.public_key.hex_bytes)
