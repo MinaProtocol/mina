@@ -20,7 +20,7 @@ let keypairs =
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
     (Keypair.of_private_key_exn
        (Private_key.of_base58_check_exn
-          "EKEjf4cZcaUScpV3iAE8r9PaEj4dbPbyUhzWryhhxQqjTTSCfyo8"))
+          "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"))
     generated_keypairs
 
 let expr ~loc =

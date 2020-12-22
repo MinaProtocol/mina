@@ -49,7 +49,7 @@ module Stable = struct
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
       in
-      let known_good_digest = "b991865dd2ff76596c470a72a4282cbd" in
+      let known_good_digest = "88a094d50a90b5054152af85bd6e60e8" in
       Ppx_version_runtime.Serialization.check_serialization
         (module V1)
         signature known_good_digest

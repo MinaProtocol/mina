@@ -827,7 +827,7 @@ let get_transaction_status =
                Daemon_rpcs.Get_transaction_status.rpc user_command port
                ~success:(fun status ->
                  sprintf !"Transaction status : %s\n"
-                 @@ Transaction_status.State.to_string status )
+                 @@ Transaction_inclusion_status.State.to_string status )
                ~error:(fun e ->
                  sprintf "Failed to get transaction status : %s"
                    (Error.to_string_hum e) )
