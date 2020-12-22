@@ -184,58 +184,55 @@ module Block = {
    each UserCommand and InternalCommand to it's associated block.
     */
   let parseBlocks = blocks => {
-    let blocks =
-      Belt.Map.Int.(
-        blocks
-        |> Array.fold_left(
-             (blockMap, block) => {
-               let newBlock = Decode.block(block);
-               let userCommand = UserCommand.Decode.userCommand(block);
-               let internalCommand =
-                 InternalCommand.Decode.internalCommand(block);
+    Belt.Map.Int.(
+      blocks
+      |> Array.fold_left(
+           (blockMap, block) => {
+             let newBlock = Decode.block(block);
+             let userCommand = UserCommand.Decode.userCommand(block);
+             let internalCommand =
+               InternalCommand.Decode.internalCommand(block);
 
-               let coinbaseReceiver =
-                 switch (internalCommand) {
-                 | Some(internalCommand) =>
-                   switch (internalCommand.type_) {
-                   | Coinbase => Some(internalCommand.receiverAccount)
-                   | _ => None
-                   }
+             let coinbaseReceiver =
+               switch (internalCommand) {
+               | Some(internalCommand) =>
+                 switch (internalCommand.type_) {
+                 | Coinbase => Some(internalCommand.receiverAccount)
                  | _ => None
-                 };
-
-               if (has(blockMap, newBlock.id)) {
-                 update(blockMap, newBlock.id, block => {
-                   switch (block) {
-                   | Some(currentBlock) =>
-                     addCommandIfSome(userCommand, currentBlock.userCommands);
-                     addCommandIfSome(
-                       internalCommand,
-                       currentBlock.internalCommands,
-                     );
-                     let block =
-                       addCoinbaseReceiverIfSome(
-                         currentBlock,
-                         coinbaseReceiver,
-                       );
-                     Some(block);
-                   | None => None
-                   }
-                 });
-               } else {
-                 addCommandIfSome(userCommand, newBlock.userCommands);
-                 addCommandIfSome(internalCommand, newBlock.internalCommands);
-                 let block =
-                   addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
-                 set(blockMap, block.id, block);
+                 }
+               | _ => None
                };
-             },
-             empty,
-           )
-        |> valuesToArray
-      );
 
-    blocks;
+             if (has(blockMap, newBlock.id)) {
+               update(blockMap, newBlock.id, block => {
+                 switch (block) {
+                 | Some(currentBlock) =>
+                   addCommandIfSome(userCommand, currentBlock.userCommands);
+                   addCommandIfSome(
+                     internalCommand,
+                     currentBlock.internalCommands,
+                   );
+                   let block =
+                     addCoinbaseReceiverIfSome(
+                       currentBlock,
+                       coinbaseReceiver,
+                     );
+                   Some(block);
+                 | None => None
+                 }
+               });
+             } else {
+               addCommandIfSome(userCommand, newBlock.userCommands);
+               addCommandIfSome(internalCommand, newBlock.internalCommands);
+               let block =
+                 addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
+               set(blockMap, block.id, block);
+             };
+           },
+           empty,
+         )
+      |> valuesToArray
+    );
   };
 };
 
