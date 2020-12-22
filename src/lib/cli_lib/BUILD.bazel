@@ -1,0 +1,280 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY CLI_LIB
+################################################################
+CLI_LIB_INTERFACE_OPTS = []
+
+CLI_LIB_MODULE_OPTS = []
+
+CLI_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async_unix",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@ocaml_sodium//lib:sodium",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/secrets",
+    "@mina//src/lib/work_selector",
+    "@mina//src/lib/graphql_lib",
+    "@mina//src/lib/rosetta_coding",
+]
+
+##############
+ocaml_archive(
+    name = "cli_lib",
+    doc = "Library to communicate with Coda as cli as the front-end",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CLI_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Arg_type",
+        ":_Background_daemon",
+        ":_Commands",
+        ":_Default",
+        ":_Exceptions",
+        ":_Flag",
+        ":_Graphql_types",
+        ":_Render",
+        ":_Stdout_log",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Cli_lib_ns",
+    ns = "cli_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "arg_type.ml",
+        "background_daemon.ml",
+        "commands.ml",
+        "default.ml",
+        "exceptions.ml",
+        "flag.ml",
+        "graphql_types.ml",
+        "render.ml",
+        "stdout_log.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Arg_type",
+    src = "arg_type.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Background_daemon",
+    src = "background_daemon.ml",
+    intf = ":_Background_daemon.cmi",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Flag",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Background_daemon.cmi",
+    src = "background_daemon.mli",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Flag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Commands",
+    src = "commands.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS + [
+        ":_Exceptions",         # obazl:retain
+        ":_Flag"                # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Default",
+    src = "default.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Exceptions",
+    src = "exceptions.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Flag",
+    src = "flag.ml",
+    intf = ":_Flag.cmi",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Arg_type",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Flag.cmi",
+    src = "flag.mli",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Graphql_types",
+    src = "graphql_types.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Render",
+    src = "render.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Stdout_log",
+    src = "stdout_log.ml",
+    ns = ":Cli_lib_ns",
+    opts = CLI_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cli_lib",
+    ],
+    deps = CLI_LIB_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/cli_lib:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

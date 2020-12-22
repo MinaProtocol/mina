@@ -1,0 +1,96 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+#############
+ocaml_module(
+    name = "block_time",
+    src = "block_time.ml",
+    intf = ":_Block_time.cmi",
+    opts = [
+        "-w", "-32" # Unused value declaration.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "block_time",
+    ],
+    ppx_data = CONFIG_MLH,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_numbers",
+        "@mina//src/lib/logger",
+        "@mina//src/lib/snark_bits",
+        "@mina//src/lib/snark_params",
+        "@mina//src/lib/timeout_lib",
+        "@mina//src/lib/unsigned_extended",
+        "@opam//pkg:core",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Block_time.cmi",
+    src = "block_time.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "block_time",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = [
+        "@mina//src/lib/coda_numbers",
+        "@mina//src/lib/logger",
+        "@mina//src/lib/snark_bits",
+        "@mina//src/lib/snark_params",
+        "@mina//src/lib/timeout_lib",
+        "@mina//src/lib/unsigned_extended",
+        "@opam//pkg:core",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/block_time:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

@@ -1,0 +1,154 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY CACHE_LIB
+################################################################
+CACHE_LIB_INTERFACE_OPTS = []
+
+CACHE_LIB_MODULE_OPTS = []
+
+CACHE_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async_kernel",
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/logger",
+]
+
+##############
+ocaml_archive(
+    name = "cache_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CACHE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Cache_lib",
+        ":_Impl",
+        ":_Intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Cache_lib_ns",
+    ns = "cache_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "cache_lib.ml",
+        "impl.ml",
+        "intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cache_lib",
+    src = "cache_lib.ml",
+    intf = ":_Cache_lib.cmi",
+    ns = ":Cache_lib_ns",
+    opts = CACHE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cache_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CACHE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Impl",
+        ":_Intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Cache_lib.cmi",
+    src = "cache_lib.mli",
+    ns = ":Cache_lib_ns",
+    opts = CACHE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cache_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CACHE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Impl",
+    src = "impl.ml",
+    ns = ":Cache_lib_ns",
+    opts = CACHE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cache_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CACHE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Cache_lib_ns",
+    opts = CACHE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "cache_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CACHE_LIB_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/cache_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

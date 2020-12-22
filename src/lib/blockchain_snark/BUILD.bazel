@@ -1,0 +1,147 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY BLOCKCHAIN_SNARK
+################################################################
+BLOCKCHAIN_SNARK_INTERFACE_OPTS = []
+
+BLOCKCHAIN_SNARK_MODULE_OPTS = []
+
+BLOCKCHAIN_SNARK_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/cache_dir",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/transaction_snark",
+    "@mina//src/lib/bignum_bigint",
+    "@mina//src/lib/consensus",
+]
+
+##############
+ocaml_archive(
+    name = "blockchain_snark",
+    doc = "blockchain state transition snarking library",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = BLOCKCHAIN_SNARK_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain",
+        ":_Blockchain_snark_state",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Blockchain_snark_ns",
+    ns = "blockchain_snark",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "blockchain.ml",
+        "blockchain_snark_state.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Blockchain",
+    src = "blockchain.ml",
+    intf = ":_Blockchain.cmi",
+    ns = ":Blockchain_snark_ns",
+    opts = BLOCKCHAIN_SNARK_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "blockchain_snark",
+    ],
+    deps = BLOCKCHAIN_SNARK_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Blockchain.cmi",
+    src = "blockchain.mli",
+    ns = ":Blockchain_snark_ns",
+    opts = BLOCKCHAIN_SNARK_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "blockchain_snark",
+    ],
+    deps = BLOCKCHAIN_SNARK_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Blockchain_snark_state",
+    src = "blockchain_snark_state.ml",
+    intf = ":_Blockchain_snark_state.cmi",
+    ns = ":Blockchain_snark_ns",
+    opts = BLOCKCHAIN_SNARK_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "blockchain_snark",
+    ],
+    deps = BLOCKCHAIN_SNARK_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Blockchain_snark_state.cmi",
+    src = "blockchain_snark_state.mli",
+    ns = ":Blockchain_snark_ns",
+    opts = BLOCKCHAIN_SNARK_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "blockchain_snark",
+    ],
+    deps = BLOCKCHAIN_SNARK_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/blockchain_snark:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)
