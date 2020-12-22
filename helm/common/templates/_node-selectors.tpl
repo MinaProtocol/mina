@@ -9,12 +9,12 @@ nodeSelector:
   cloud.google.com/gke-preemptible: "true"
 {{- else }}
 affinity:
-  podAntiAffinity:
+  podAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
     - labelSelector:
         matchExpressions:
         - key: "cloud.google.com/gke-preemptible"
-          operator: Exists
+          operator: DoesNotExist
       topologyKey: failure-domain.beta.kubernetes.io/region
 {{- end }}
 {{- end }}
