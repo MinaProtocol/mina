@@ -1,0 +1,102 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY RANDOM_ORACLE
+################################################################
+RANDOM_ORACLE_INTERFACE_OPTS = []
+
+RANDOM_ORACLE_MODULE_OPTS = []
+
+RANDOM_ORACLE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/random_oracle_input",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/pickles",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//sponge",
+]
+
+RANDOM_ORACLE_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp__ppx_sexp_conv__ppx_compare__ppx_inline_test__ppx_assert__ppx_deriving.eq__ppx_deriving_yojson__ppx_let"
+
+RANDOM_ORACLE_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "random_oracle",
+]
+
+##############
+ocaml_archive(
+    name = "random_oracle",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = RANDOM_ORACLE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Random_oracle",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Random_oracle_ns",
+    ns = "random_oracle",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "random_oracle.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_MODULE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = RANDOM_ORACLE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Random_oracle",
+    src = "random_oracle.ml",
+    intf = ":_Random_oracle.cmi",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_MODULE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = RANDOM_ORACLE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Random_oracle.cmi",
+    src = "random_oracle.mli",
+    ns = ":Random_oracle_ns",
+    opts = RANDOM_ORACLE_INTERFACE_OPTS,
+    ppx = RANDOM_ORACLE_PPX,
+    ppx_args = RANDOM_ORACLE_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = RANDOM_ORACLE_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
