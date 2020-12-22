@@ -106,7 +106,7 @@ type t =
   ; snark_job_state: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
-  ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
+  ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -340,11 +340,11 @@ mock_frontend_data]
 let create_sync_status_observer ~logger ~demo_mode:_
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
-  let variable = Coda_incremental.Status.Var.create `Offline in
-  let incr = Coda_incremental.Status.Var.watch variable in
+  let variable = Mina_incremental.Status.Var.create `Offline in
+  let incr = Mina_incremental.Status.Var.watch variable in
   let rec loop () =
     let%bind () = Async.after (Core.Time.Span.of_sec 5.0) in
-    let current_value = Coda_incremental.Status.Var.value variable in
+    let current_value = Mina_incremental.Status.Var.value variable in
     let new_sync_status =
       List.random_element_exn
         ( match current_value with
@@ -355,12 +355,12 @@ let create_sync_status_observer ~logger ~demo_mode:_
         | `Bootstrap ->
             [`Offline; `Synced] )
     in
-    Coda_incremental.Status.Var.set variable new_sync_status ;
-    Coda_incremental.Status.stabilize () ;
+    Mina_incremental.Status.Var.set variable new_sync_status ;
+    Mina_incremental.Status.stabilize () ;
     loop ()
   in
-  let observer = Coda_incremental.Status.observe incr in
-  Coda_incremental.Status.stabilize () ;
+  let observer = Mina_incremental.Status.observe incr in
+  Mina_incremental.Status.stabilize () ;
   don't_wait_for @@ loop () ;
   observer
 
@@ -369,7 +369,7 @@ let create_sync_status_observer ~logger ~demo_mode:_
 let create_sync_status_observer ~logger ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
-  let open Coda_incremental.Status in
+  let open Mina_incremental.Status in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -653,7 +653,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
         t.snark_job_state
       |> List.length
     in
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec = work.spec.instances in
@@ -952,7 +952,7 @@ let create ?wallets (config : Config.t) =
                         Deferred.return (Ok `Offline)
                     | Some status ->
                         Deferred.return
-                          (Coda_incremental.Status.Observer.value status)
+                          (Mina_incremental.Status.Observer.value status)
                   in
                   let block_producers =
                     config.initial_block_production_keypairs
@@ -1163,9 +1163,9 @@ let create ?wallets (config : Config.t) =
                              (Consensus.Data.Consensus_time.of_time_exn
                                 ~constants:consensus_constants tm)
                          in
-                         Coda_metrics.Block_latency.Gossip_slots.update
+                         Mina_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
-                         Coda_metrics.Block_latency.Gossip_time.update
+                         Mina_metrics.Block_latency.Gossip_time.update
                            Block_time.(
                              Span.to_time_span @@ diff tm tn_production_time) ;
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
@@ -1352,7 +1352,7 @@ let create ?wallets (config : Config.t) =
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
           in
-          let open Coda_incremental.Status in
+          let open Mina_incremental.Status in
           let transition_frontier_incr =
             Var.watch @@ of_broadcast_pipe frontier_broadcast_pipe_r
           in
