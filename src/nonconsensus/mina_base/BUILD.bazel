@@ -1,0 +1,979 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY MINA_BASE_NONCONSENSUS
+################################################################
+MINA_BASE_NONCONSENSUS_INTERFACE_OPTS = []
+
+MINA_BASE_NONCONSENSUS_MODULE_OPTS = []
+
+MINA_BASE_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:yojson",
+    "@mina//src/nonconsensus/coda_numbers:coda_numbers_nonconsensus",
+    "@mina//src/nonconsensus/coda_compile_config:coda_compile_config_nonconsensus",
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+    "@mina//src/nonconsensus/data_hash_lib:data_hash_lib_nonconsensus",
+    "@mina//src/nonconsensus/hash_prefix_states:hash_prefix_states_nonconsensus",
+    "@mina//src/nonconsensus/hex:hex_nonconsensus",
+    "@mina//src/nonconsensus/outside_hash_image:outside_hash_image_nonconsensus",
+    "@mina//src/nonconsensus/rosetta_coding:rosetta_coding_nonconsensus",
+    "@mina//src/nonconsensus/signature_lib:signature_lib_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+    "@mina//src/nonconsensus/quickcheck_lib:quickcheck_lib_nonconsensus",
+    "@mina//src/nonconsensus/random_oracle:random_oracle_nonconsensus",
+    "@mina//src/lib/pickles_types",
+    "@mina//src/lib/pickles_base",
+    "@mina//src/lib/with_hash",
+]
+
+##############
+ocaml_archive(
+    name = "mina_base_nonconsensus",
+    doc = "Snarks and friends necessary for keypair generation",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Control",
+        ":_Data_hash",
+        ":_Fee_excess",
+        ":_Frozen_ledger_hash0",
+        ":_Hash_prefix",
+        ":_Import",
+        ":_Ledger_hash0",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Payment_payload",
+        ":_Permissions",
+        ":_Receipt",
+        ":_Side_loaded_verification_key",
+        ":_Signature",
+        ":_Signature_poly",
+        ":_Signed_command",
+        ":_Signed_command_intf",
+        ":_Signed_command_memo",
+        ":_Signed_command_payload",
+        ":_Snapp_account",
+        ":_Snapp_basic",
+        ":_Snapp_state",
+        ":_Stake_delegation",
+        ":_State_hash",
+        ":_Token_id",
+        ":_Token_permissions",
+        ":_Transaction_union_payload",
+        ":_Transaction_union_tag",
+        ":_Util",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Mina_base_nonconsensus_ns",
+    ns = "mina_base_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "account.ml",
+        "account_id.ml",
+        "account_timing.ml",
+        "control.ml",
+        "data_hash.ml",
+        "fee_excess.ml",
+        "frozen_ledger_hash0.ml",
+        "hash_prefix.ml",
+        "import.ml",
+        "ledger_hash0.ml",
+        "minting_payload.ml",
+        "new_account_payload.ml",
+        "new_token_payload.ml",
+        "payment_payload.ml",
+        "permissions.ml",
+        "receipt.ml",
+        "side_loaded_verification_key.ml",
+        "signature.ml",
+        "signature_poly.ml",
+        "signed_command.ml",
+        "signed_command_intf.ml",
+        "signed_command_memo.ml",
+        "signed_command_payload.ml",
+        "snapp_account.ml",
+        "snapp_basic.ml",
+        "snapp_state.ml",
+        "stake_delegation.ml",
+        "state_hash.ml",
+        "token_id.ml",
+        "token_permissions.ml",
+        "transaction_union_payload.ml",
+        "transaction_union_tag.ml",
+        "util.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account",
+    src = "account.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Hash_prefix",
+        ":_Import",
+        ":_Permissions",
+        ":_Receipt",
+        ":_Snapp_account",
+        ":_State_hash",
+        ":_Token_id",
+        ":_Token_permissions",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_id",
+    src = "account_id.ml",
+    intf = ":_Account_id.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Account_id.cmi",
+    src = "account_id.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_timing",
+    src = "account_timing.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Control",
+    src = "control.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Data_hash",
+    src = "data_hash.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Fee_excess",
+    src = "fee_excess.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Frozen_ledger_hash0",
+    src = "frozen_ledger_hash0.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_hash0",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hash_prefix",
+    src = "hash_prefix.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Import",
+    src = "import.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_hash0",
+    src = "ledger_hash0.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Minting_payload",
+    src = "minting_payload.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_New_account_payload",
+    src = "new_account_payload.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_New_token_payload",
+    src = "new_token_payload.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Import",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Payment_payload",
+    src = "payment_payload.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Permissions",
+    src = "permissions.ml",
+    intf = ":_Permissions.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Control",
+        ":_Frozen_ledger_hash0",
+        ":_Ledger_hash0",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Permissions.cmi",
+    src = "permissions.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Control",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Receipt",
+    src = "receipt.ml",
+    intf = ":_Receipt.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+        ":_Hash_prefix",
+        ":_Signed_command",
+        ":_Transaction_union_payload",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Receipt.cmi",
+    src = "receipt.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Data_hash",
+        ":_Signed_command",
+        ":_Transaction_union_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Side_loaded_verification_key",
+    src = "side_loaded_verification_key.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signature",
+    src = "signature.ml",
+    intf = ":_Signature.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Signature_poly",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signature.cmi",
+    src = "signature.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signature_poly",
+    src = "signature_poly.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command",
+    src = "signed_command.ml",
+    intf = ":_Signed_command.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Import",
+        ":_Signature",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_payload",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command.cmi",
+    src = "signed_command.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+        ":_Signed_command_intf",
+        ":_Signed_command_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_intf",
+    src = "signed_command_intf.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Account_timing",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Signature",
+        ":_Signed_command_memo",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_memo",
+    src = "signed_command_memo.ml",
+    intf = ":_Signed_command_memo.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command_memo.cmi",
+    src = "signed_command_memo.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Signed_command_payload",
+    src = "signed_command_payload.ml",
+    intf = ":_Signed_command_payload.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Payment_payload",
+        ":_Signed_command_memo",
+        ":_Stake_delegation",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Signed_command_payload.cmi",
+    src = "signed_command_payload.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Fee_excess",
+        ":_Import",
+        ":_Minting_payload",
+        ":_New_account_payload",
+        ":_New_token_payload",
+        ":_Payment_payload",
+        ":_Signed_command_memo",
+        ":_Stake_delegation",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_account",
+    src = "snapp_account.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Side_loaded_verification_key",
+        ":_Snapp_basic",
+        ":_Snapp_state",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_basic",
+    src = "snapp_basic.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snapp_state",
+    src = "snapp_state.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Stake_delegation",
+    src = "stake_delegation.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_id",
+        ":_Token_id",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_State_hash",
+    src = "state_hash.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Token_id",
+    src = "token_id.ml",
+    intf = ":_Token_id.cmi",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Token_id.cmi",
+    src = "token_id.mli",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Token_permissions",
+    src = "token_permissions.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_union_payload",
+    src = "transaction_union_payload.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Fee_excess",
+        ":_Signed_command_payload",
+        ":_Token_id",
+        ":_Transaction_union_tag",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_union_tag",
+    src = "transaction_union_tag.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Import",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Util",
+    src = "util.ml",
+    ns = ":Mina_base_nonconsensus_ns",
+    opts = MINA_BASE_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "mina_base_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = MINA_BASE_NONCONSENSUS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/nonconsensus/mina_base:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bench",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.enum",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.ord",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+    ],
+)

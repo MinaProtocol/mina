@@ -1,0 +1,59 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY HEX_NONCONSENSUS
+################################################################
+HEX_NONCONSENSUS_MODULE_OPTS = []
+
+HEX_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+]
+
+HEX_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_version__ppx_inline_test"
+
+HEX_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "hex_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "hex_nonconsensus",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = HEX_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Hex",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Hex_nonconsensus_ns",
+    ns = "hex_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "hex.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hex",
+    src = "hex.ml",
+    ns = ":Hex_nonconsensus_ns",
+    opts = HEX_NONCONSENSUS_MODULE_OPTS,
+    ppx = HEX_NONCONSENSUS_PPX,
+    ppx_args = HEX_NONCONSENSUS_PPX_ARGS,
+    deps = HEX_NONCONSENSUS_DEPS,
+)

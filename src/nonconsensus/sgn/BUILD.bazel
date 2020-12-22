@@ -1,0 +1,83 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY SGN_NONCONSENSUS
+################################################################
+SGN_NONCONSENSUS_INTERFACE_OPTS = []
+
+SGN_NONCONSENSUS_MODULE_OPTS = []
+
+SGN_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/sgn_type",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+]
+
+SGN_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_bin_prot__ppx_sexp_conv__ppx_compare__ppx_hash__ppx_optcomp__ppx_deriving.eq__ppx_deriving_yojson"
+
+SGN_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+##############
+ocaml_archive(
+    name = "sgn_nonconsensus",
+    doc = "sgn library",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SGN_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Sgn",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Sgn_nonconsensus_ns",
+    ns = "sgn_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "sgn.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sgn",
+    src = "sgn.ml",
+    intf = ":_Sgn.cmi",
+    ns = ":Sgn_nonconsensus_ns",
+    opts = SGN_NONCONSENSUS_MODULE_OPTS,
+    ppx = SGN_NONCONSENSUS_PPX,
+    ppx_args = SGN_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = SGN_NONCONSENSUS_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Sgn.cmi",
+    src = "sgn.mli",
+    ns = ":Sgn_nonconsensus_ns",
+    opts = SGN_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = SGN_NONCONSENSUS_PPX,
+    ppx_args = SGN_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = SGN_NONCONSENSUS_DEPS,
+)
