@@ -1,0 +1,72 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY WEB_REQUEST
+################################################################
+WEB_REQUEST_MODULE_OPTS = []
+
+WEB_REQUEST_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+]
+
+WEB_REQUEST_PPX = "@//bzl/ppx/exe:ppx_version"
+
+WEB_REQUEST_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+##############
+ocaml_archive(
+    name = "web_request",
+    doc = "Web tools that are used to send put requests",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = WEB_REQUEST_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_S3_put_request",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Web_request_ns",
+    ns = "web_request",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "s3_put_request.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Web_request_ns",
+    opts = WEB_REQUEST_MODULE_OPTS,
+    ppx = WEB_REQUEST_PPX,
+    ppx_args = WEB_REQUEST_PPX_ARGS,
+    deps = WEB_REQUEST_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_S3_put_request",
+    src = "s3_put_request.ml",
+    ns = ":Web_request_ns",
+    opts = WEB_REQUEST_MODULE_OPTS,
+    ppx = WEB_REQUEST_PPX,
+    ppx_args = WEB_REQUEST_PPX_ARGS,
+    deps = WEB_REQUEST_DEPS,
+)
