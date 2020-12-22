@@ -1,0 +1,75 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY GADT_LIB
+################################################################
+GADT_LIB_MODULE_OPTS = []
+
+GADT_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+]
+
+GADT_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane"
+
+GADT_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "gadt_lib",
+]
+
+##############
+ocaml_archive(
+    name = "gadt_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = GADT_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Peano",
+        ":_Vect",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Gadt_lib_ns",
+    ns = "gadt_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "peano.ml",
+        "vect.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Peano",
+    src = "peano.ml",
+    ns = ":Gadt_lib_ns",
+    opts = GADT_LIB_MODULE_OPTS,
+    ppx = GADT_LIB_PPX,
+    ppx_args = GADT_LIB_PPX_ARGS,
+    deps = GADT_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Vect",
+    src = "vect.ml",
+    ns = ":Gadt_lib_ns",
+    opts = GADT_LIB_MODULE_OPTS,
+    ppx = GADT_LIB_PPX,
+    ppx_args = GADT_LIB_PPX_ARGS,
+    deps = GADT_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Peano",
+    ],
+)

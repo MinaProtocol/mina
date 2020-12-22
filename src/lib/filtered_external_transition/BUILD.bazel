@@ -1,0 +1,45 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "filtered_external_transition",
+    src = "filtered_external_transition.ml",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/coda_transition",
+        "@mina//src/lib/mina_base",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/filtered_external_transition:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

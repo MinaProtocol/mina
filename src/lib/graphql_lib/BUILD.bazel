@@ -1,0 +1,119 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY GRAPHQL_LIB
+################################################################
+GRAPHQL_LIB_INTERFACE_OPTS = []
+
+GRAPHQL_LIB_MODULE_OPTS = []
+
+GRAPHQL_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:cohttp",
+    "@opam//pkg:core",
+    "@opam//pkg:cohttp-async",
+    "@opam//pkg:graphql-async",
+    "@opam//pkg:graphql-cohttp",
+    "@mina//src/lib/mina_base",
+]
+
+GRAPHQL_LIB_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_version__ppx_deriving.eq__ppx_deriving_yojson"
+
+GRAPHQL_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "graphql_lib",
+]
+
+##############
+ocaml_archive(
+    name = "graphql_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = GRAPHQL_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_types",
+        ":_Client",
+        ":_Decoders",
+        ":_Encoders",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Graphql_lib_ns",
+    ns = "graphql_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "base_types.ml",
+        "client.ml",
+        "decoders.ml",
+        "encoders.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Base_types",
+    src = "base_types.ml",
+    intf = ":_Base_types.cmi",
+    ns = ":Graphql_lib_ns",
+    opts = GRAPHQL_LIB_MODULE_OPTS,
+    ppx = GRAPHQL_LIB_PPX,
+    ppx_args = GRAPHQL_LIB_PPX_ARGS,
+    deps = GRAPHQL_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Base_types.cmi",
+    src = "base_types.mli",
+    ns = ":Graphql_lib_ns",
+    opts = GRAPHQL_LIB_INTERFACE_OPTS,
+    ppx = GRAPHQL_LIB_PPX,
+    ppx_args = GRAPHQL_LIB_PPX_ARGS,
+    deps = GRAPHQL_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Client",
+    src = "client.ml",
+    ns = ":Graphql_lib_ns",
+    opts = GRAPHQL_LIB_MODULE_OPTS,
+    ppx = GRAPHQL_LIB_PPX,
+    ppx_args = GRAPHQL_LIB_PPX_ARGS,
+    deps = GRAPHQL_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Decoders",
+    src = "decoders.ml",
+    ns = ":Graphql_lib_ns",
+    opts = GRAPHQL_LIB_MODULE_OPTS,
+    ppx = GRAPHQL_LIB_PPX,
+    ppx_args = GRAPHQL_LIB_PPX_ARGS,
+    deps = GRAPHQL_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Encoders",
+    src = "encoders.ml",
+    ns = ":Graphql_lib_ns",
+    opts = GRAPHQL_LIB_MODULE_OPTS,
+    ppx = GRAPHQL_LIB_PPX,
+    ppx_args = GRAPHQL_LIB_PPX_ARGS,
+    deps = GRAPHQL_LIB_DEPS,
+)

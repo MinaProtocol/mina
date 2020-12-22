@@ -1,0 +1,51 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "fake_network",
+    src = "fake_network.ml",
+    intf = ":_Fake_network.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.std",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "fake_network",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/gadt_lib",
+        "@mina//src/lib/gossip_net",
+        "@mina//src/lib/mina_networking",
+        "@mina//src/lib/sync_handler",
+        "@opam//pkg:async",
+        "@opam//pkg:core",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Fake_network.cmi",
+    src = "fake_network.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.std",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "fake_network",
+    ],
+    deps = [
+        "@mina//src/lib/gadt_lib",
+        "@mina//src/lib/gossip_net",
+        "@mina//src/lib/mina_networking",
+        "@mina//src/lib/sync_handler",
+        "@opam//pkg:async",
+        "@opam//pkg:core",
+    ],
+)

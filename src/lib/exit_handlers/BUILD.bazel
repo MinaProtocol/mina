@@ -1,0 +1,41 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "exit_handlers",
+    src = "exit_handlers.ml",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/logger",
+        "@opam//pkg:async_kernel",
+        "@opam//pkg:async_unix",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/exit_handlers:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
