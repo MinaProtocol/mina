@@ -1,0 +1,77 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY VRF_LIB
+################################################################
+VRF_LIB_MODULE_OPTS = []
+
+VRF_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/genesis_constants",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/snarky_curves",
+    "@mina//src/lib/test_util",
+]
+
+VRF_LIB_PPX = "@//bzl/ppx/exe:h_list.ppx__ppx_bench__ppx_deriving.eq__ppx_jane__ppx_version"
+
+VRF_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "vrf_lib",
+]
+
+##############
+ocaml_archive(
+    name = "vrf_lib",
+    doc = "VRF instantiation",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = VRF_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Integrated",
+        ":_Standalone",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Vrf_lib_ns",
+    ns = "vrf_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "integrated.ml",
+        "standalone.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Integrated",
+    src = "integrated.ml",
+    ns = ":Vrf_lib_ns",
+    opts = VRF_LIB_MODULE_OPTS,
+    ppx = VRF_LIB_PPX,
+    ppx_args = VRF_LIB_PPX_ARGS,
+    deps = VRF_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Standalone",
+    src = "standalone.ml",
+    ns = ":Vrf_lib_ns",
+    opts = VRF_LIB_MODULE_OPTS,
+    ppx = VRF_LIB_PPX,
+    ppx_args = VRF_LIB_PPX_ARGS,
+    deps = VRF_LIB_DEPS,
+)

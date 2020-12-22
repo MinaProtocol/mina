@@ -1,0 +1,49 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "transaction_snark_work",
+    src = "transaction_snark_work.ml",
+    intf = ":_Transaction_snark_work.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_jane__ppx_version__ppx_deriving.eq__ppx_deriving_yojson",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transaction_snark_work",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/ledger_proof",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/one_or_two",
+        "@mina//src/lib/transaction_snark",
+        "@opam//pkg:core_kernel",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transaction_snark_work.cmi",
+    src = "transaction_snark_work.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_jane__ppx_version__ppx_deriving.eq__ppx_deriving_yojson",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transaction_snark_work",
+    ],
+    deps = [
+        "@mina//src/lib/ledger_proof",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/one_or_two",
+        "@mina//src/lib/transaction_snark",
+        "@opam//pkg:core_kernel",
+    ],
+)
