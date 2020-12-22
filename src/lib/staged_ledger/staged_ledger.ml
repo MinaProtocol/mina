@@ -458,7 +458,16 @@ module T = struct
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
       txn_state_view =
     let open Result.Let_syntax in
+    let source =
+      Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+    in
     let next_available_token_before = Ledger.next_available_token ledger in
+    let pending_coinbase_target =
+      push_coinbase pending_coinbase_stack_state.pc.target s
+    in
+    let new_init_stack =
+      push_coinbase pending_coinbase_stack_state.init_stack s
+    in
     let%bind undo =
       Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
@@ -473,15 +482,6 @@ module T = struct
        Transaction_snark.supply_increase' ~constraint_constants ~redundant a
        |> option "supply_increase")
       |> to_staged_ledger_or_error
-    in
-    let source =
-      Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
-    in
-    let pending_coinbase_target =
-      push_coinbase pending_coinbase_stack_state.pc.target s
-    in
-    let new_init_stack =
-      push_coinbase pending_coinbase_stack_state.init_stack s
     in
     ( undo
     , { Transaction_snark.Statement.source
