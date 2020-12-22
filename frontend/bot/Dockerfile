@@ -1,5 +1,7 @@
 FROM node:12.9.0-stretch-slim
 
+ADD https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+
 WORKDIR /code
 
 COPY package.json yarn.lock ./
