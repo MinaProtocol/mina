@@ -1,0 +1,129 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY LEDGER_PROOF
+################################################################
+LEDGER_PROOF_INTERFACE_OPTS = []
+
+LEDGER_PROOF_MODULE_OPTS = []
+
+LEDGER_PROOF_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/transaction_snark",
+]
+
+##############
+ocaml_archive(
+    name = "ledger_proof",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof",
+        ":_Ledger_proof_intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Ledger_proof_ns",
+    ns = "ledger_proof",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "ledger_proof.ml",
+        "ledger_proof_intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_proof",
+    src = "ledger_proof.ml",
+    intf = ":_Ledger_proof.cmi",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof_intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Ledger_proof.cmi",
+    src = "ledger_proof.mli",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = LEDGER_PROOF_DEPS + [
+        # do not sort (buildifier)
+        ":_Ledger_proof_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ledger_proof_intf",
+    src = "ledger_proof_intf.ml",
+    ns = ":Ledger_proof_ns",
+    opts = LEDGER_PROOF_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = LEDGER_PROOF_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/ledger_proof:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

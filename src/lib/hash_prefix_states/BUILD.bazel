@@ -1,0 +1,77 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+#############
+ocaml_module(
+    name = "hash_prefix_states",
+    src = "hash_prefix_states.ml",
+    intf = ":_Hash_prefix_states.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "hash_prefix_states",
+    ],
+    ppx_data = CONFIG_MLH,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_compile_config",
+        "@mina//src/lib/random_oracle",
+        "@mina//src/lib/snark_params",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Hash_prefix_states.cmi",
+    src = "hash_prefix_states.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "hash_prefix_states",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = [
+        "@mina//src/lib/coda_compile_config",
+        "@mina//src/lib/random_oracle",
+        "@mina//src/lib/snark_params",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/hash_prefix_states:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

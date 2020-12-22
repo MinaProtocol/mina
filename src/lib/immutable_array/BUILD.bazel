@@ -1,0 +1,33 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "immutable_array",
+    src = "immutable_array.ml",
+    intf = ":_Immutable_array.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+################
+ocaml_interface(
+    name = "_Immutable_array.cmi",
+    src = "immutable_array.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = [],
+)
