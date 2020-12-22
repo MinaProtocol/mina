@@ -1,0 +1,71 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN_VALUES
+################################################################
+GEN_VALUES_EXECUTABLE_OPTS = []
+
+GEN_VALUES_MODULE_OPTS = []
+
+GEN_VALUES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:ppxlib",
+    "@mina//src/lib/blockchain_snark",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/genesis_proof",
+    "@mina//src/lib/global_signer_private_key",
+    "@mina//src/lib/ppx_util",
+    "@mina//src/lib/snark_keys",
+    "@mina//src/lib/snark_params",
+    "@snarky//src/base:snarky_backendless",
+]
+
+GEN_VALUES_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp__ppx_let__ppxlib.metaquot"
+
+GEN_VALUES_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "gen_values.exe",
+    opts = GEN_VALUES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_VALUES_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen_values",
+    ],
+    cc_deps = {
+        "@mina//src/lib/marlin_plonk_bindings/stubs:marlin_plonk_stubs": "static",
+        "@ocaml_rocksdb//:bzip2": "static",    # -lbz2
+        "@ocaml_rocksdb//:zlib": "default",     # -lz
+    },
+    cc_linkall  = ["@ocaml_rocksdb//:librocksdb"], # -Wl,-force_load (MacOS) or -whole-archive (Linux)
+    cc_linkopts = select({
+        "//bzl/host:macos": ["-lc++abi", "-lc++"],
+        "//bzl/host:linux": ["-lstdc++"],
+    }, no_match_error = "Unsupported platform. Only Linux and MacOS supported.")
+)
+
+#############
+ocaml_module(
+    name = "_Gen_values",
+    src = "gen_values.ml",
+    opts = GEN_VALUES_MODULE_OPTS,
+    ppx = GEN_VALUES_PPX,
+    ppx_args = GEN_VALUES_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = GEN_VALUES_DEPS,
+)

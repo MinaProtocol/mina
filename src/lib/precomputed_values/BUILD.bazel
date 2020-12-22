@@ -1,0 +1,37 @@
+load( "@obazl_rules_ocaml//ocaml:rules.bzl", "ocaml_module")
+
+##############
+ocaml_module(
+    name = "precomputed_values",
+    src = "precomputed_values.ml",
+    opts = [],
+    ppx = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppxlib.metaquot",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "precomputed_values",
+    ],
+    deps = [
+        # do not sort (buildifier)
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/crypto_params",
+        "@mina//src/lib/dummy_values",
+        "@mina//src/lib/genesis_proof",
+        "@mina//src/lib/snark_keys",
+        "@snarky//src/base:snarky_backendless",
+    ],
+    visibility = ["//visibility:public"],
+ )
+
+TOOL = "//src/lib/precomputed_values/gen_values:gen_values.exe"
+
+genrule(
+    name = "gensrcs",
+    outs = ["precomputed_values.ml"],
+    cmd = "\n".join([
+        "$(location {tool})  precomputed_values.ml".format(tool = TOOL),
+        "cp precomputed_values.ml \"$(RULEDIR)/\"",
+    ]),
+    tools = [TOOL],
+    visibility = ["//visibility:public"],
+)
