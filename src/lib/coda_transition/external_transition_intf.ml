@@ -92,6 +92,24 @@ module type S = sig
           Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
     [@@deriving sexp, yojson]
 
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type nonrec t = t =
+          { scheduled_time: Block_time.Stable.V1.t
+          ; protocol_state: Protocol_state.Value.Stable.V1.t
+          ; protocol_state_proof: Mina_base.Proof.Stable.V1.t
+          ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+          ; delta_transition_chain_proof:
+              Frozen_ledger_hash.Stable.V1.t
+              * Frozen_ledger_hash.Stable.V1.t list }
+
+        val to_latest : t -> t
+      end
+    end]
+
     val of_external_transition :
       scheduled_time:Block_time.Time.t -> external_transition -> t
   end
