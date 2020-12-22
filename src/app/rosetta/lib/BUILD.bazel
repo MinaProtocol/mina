@@ -1,0 +1,341 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+GRAPHQL_SCHEMA_FILE = "graphql_schema.json"
+GRAPHQL_SCHEMA_PATH = GRAPHQL_SCHEMA_FILE
+GRAPHQL_SCHEMA_JSON = "//:" + GRAPHQL_SCHEMA_FILE
+
+INLINE_TEST_LIB = "rosetta-lib"
+
+################################################################
+## STANZA 1: LIBRARY LIB
+################################################################
+LIB_MODULE_OPTS = []
+
+LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_ssl",
+    "@opam//pkg:caqti",
+    "@opam//pkg:caqti-async",
+    "@opam//pkg:caqti-driver-postgresql",
+    "@opam//pkg:cohttp",
+    "@opam//pkg:ctypes",
+    "@opam//pkg:cohttp-async",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/rosetta_lib",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/lib/rosetta_coding",
+    "@mina//src/app/archive/archive_lib",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/secrets",
+    "@mina//src/lib/unsigned_extended",
+]
+
+##############
+ocaml_archive(
+    name = "lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Block",
+        ":_Cli",
+        ":_Construction",
+        ":_Decoders",
+        ":_Graphql",
+        ":_Mempool",
+        ":_Network",
+        ":_Rosetta",
+        ":_Signer",
+        ":_Test",
+        ":_These",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Lib_ns",
+    ns = "lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "account.ml",
+        "block.ml",
+        "cli.ml",
+        "construction.ml",
+        "decoders.ml",
+        "graphql.ml",
+        "mempool.ml",
+        "network.ml",
+        "rosetta.ml",
+        "signer.ml",
+        "test.ml",
+        "these.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account",
+    src = "account.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Decoders",           # obazl:retain
+        ":_Graphql",
+        ":_Network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block",
+    src = "block.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Decoders",           # obazl:retain
+        ":_Graphql",
+        ":_Network",
+        ":_These",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Cli",
+    src = "cli.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Construction",
+    src = "construction.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema={}".format("graphql_schema.json")
+    ],
+    ppx_data = ["//:graphql_schema.json"],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Decoders",           # obazl:retain
+        ":_Graphql",
+        ":_Network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Decoders",
+    src = "decoders.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Graphql",
+    src = "graphql.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Mempool",
+    src = "mempool.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema={}".format("graphql_schema.json")
+    ],
+    ppx_data = ["//:graphql_schema.json"],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Decoders",           # obazl:retain
+        ":_Graphql",
+        ":_Network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Network",
+    src = "network.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema={}".format("graphql_schema.json")
+    ],
+    ppx_data = ["//:graphql_schema.json"],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Graphql",
+        ":_Test"                # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rosetta",
+    src = "rosetta.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Account",
+        ":_Block",
+        ":_Cli",                # obazl:retain
+        ":_Construction",
+        ":_Mempool",
+        ":_Network",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signer",
+    src = "signer.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Test",
+    src = "test.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_These",
+    src = "these.ml",
+    ns = ":Lib_ns",
+    opts = LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "lib",
+    ],
+    deps = LIB_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/app/rosetta/lib:__pkg__",
+    ],
+    deps = [
+        "@graphql_ppx//src/native:graphql_ppx",
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

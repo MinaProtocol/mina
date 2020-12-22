@@ -1,0 +1,121 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+GRAPHQL_SCHEMA_FILE = "graphql_schema.json"
+GRAPHQL_SCHEMA_PATH = GRAPHQL_SCHEMA_FILE
+GRAPHQL_SCHEMA_JSON = "//:" + GRAPHQL_SCHEMA_FILE
+
+################################################################
+## STANZA 1: EXECUTABLE AGENT
+################################################################
+AGENT_EXECUTABLE_OPTS = []
+
+AGENT_MODULE_OPTS = []
+
+AGENT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:async_ssl",
+    "@opam//pkg:caqti",
+    "@opam//pkg:caqti-async",
+    "@opam//pkg:caqti-driver-postgresql",
+    "@opam//pkg:cohttp",
+    "@opam//pkg:ctypes",
+    "@opam//pkg:cohttp-async",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/app/rosetta/lib",
+]
+
+AGENT_PPX = "@//bzl/ppx/exe:graphql_ppx__ppx_coda__ppx_deriving.show__ppx_deriving_yojson__ppx_jane__ppx_version__ppx_deriving.eq"
+
+AGENT_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "agent",
+]
+
+#################
+ocaml_executable(
+    name = "agent.exe",
+    opts = AGENT_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Agent",
+        ":_Offline",
+        ":_Operation_expectation",
+        ":_Peek",
+        ":_Poke",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Agent",
+    src = "agent.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Operation_expectation",
+        ":_Offline",            # obazl:retain
+        ":_Peek",               # obazl:retain
+        ":_Poke",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Offline",
+    src = "offline.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS + [
+        # do not sort (buildifier)
+        ":_Peek",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Operation_expectation",
+    src = "operation_expectation.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Peek",
+    src = "peek.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS,
+    deps = AGENT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Poke",
+    src = "poke.ml",
+    opts = AGENT_MODULE_OPTS,
+    ppx = AGENT_PPX,
+    ppx_args = AGENT_PPX_ARGS + [
+        "-schema", GRAPHQL_SCHEMA_PATH
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = AGENT_DEPS,
+)
