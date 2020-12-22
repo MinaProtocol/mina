@@ -1,0 +1,43 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SHA256_LIB
+################################################################
+
+SHA256_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:digestif.c",
+    "@mina//src/lib/snark_params",
+]
+
+SHA256_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+SHA256_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "sha256_lib",
+]
+
+##############
+ocaml_archive(
+    name = "sha256_lib",
+    doc = "SNARK keys",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SHA256_LIB_DEPS + [
+        # do not sort (buildifier)
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Sha256_lib_ns",
+    ns = "sha256_lib",
+)
