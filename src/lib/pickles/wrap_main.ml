@@ -151,7 +151,6 @@ let wrap_main
           , _
           , _
           , _
-          , _
           , _ )
           Types.Dlog_based.Statement.In_circuit.t
        -> unit) =
@@ -182,13 +181,11 @@ let wrap_main
                ; which_branch
                ; bulletproof_challenges }
            ; sponge_digest_before_evaluations
-           ; me_only= me_only_digest
-           ; was_base_case }
+           ; me_only= me_only_digest }
        ; pass_through } :
         ( _
         , _
         , _ Shifted_value.t
-        , _
         , _
         , _
         , _
@@ -283,19 +280,11 @@ let wrap_main
                 =
               Vector.map domainses ~f:(fun ds ->
                   let h =
-                    (*
-                      assert (
-                        Vector.for_all ds ~f:(fun { h; _ } ->
-                            Domain.equal wrap_domains.h h ) );
-*)
                     Plonk_checks.domain
                       (module Field)
                       ~shifts ~domain_generator wrap_domains.h
                   in
-                  ( (*let f = Domains.h in
-                        Pseudo.Domain.to_domain ~shifts ~domain_generator
-                          (which_branch, Vector.map ds ~f)  *)
-                    h
+                  ( h
                   , ( which_branch
                     , Vector.map ds ~f:(fun d ->
                           Common.max_quot_size_int (Domain.size d.h) ) ) ) )
@@ -317,8 +306,9 @@ let wrap_main
               ; eval_lengths
               ; wrap_domains
               ; max_quot_sizes ]
-              ~f:(fun [ ( {deferred_values; sponge_digest_before_evaluations}
-                        , should_verify )
+              ~f:(fun [ { deferred_values
+                        ; sponge_digest_before_evaluations
+                        ; should_finalize }
                       ; old_bulletproof_challenges
                       ; actual_branching
                       ; evals
@@ -342,7 +332,7 @@ let wrap_main
                 let (T (max_local_max_branching, old_bulletproof_challenges)) =
                   old_bulletproof_challenges
                 in
-                let verified, chals =
+                let finalized, chals =
                   with_label __LOC__ (fun () ->
                       finalize_other_proof
                         (Nat.Add.create max_local_max_branching)
@@ -351,7 +341,7 @@ let wrap_main
                         ~sponge deferred_values ~old_bulletproof_challenges
                         evals )
                 in
-                Boolean.(Assert.any [not should_verify; verified]) ;
+                Boolean.(Assert.any [finalized; not should_finalize]) ;
                 chals )
           in
           chals )

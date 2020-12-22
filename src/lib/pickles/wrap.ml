@@ -239,8 +239,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let me_only : _ P.Base.Me_only.Dlog_based.t =
       { sg= proof.openings.proof.sg
       ; old_bulletproof_challenges=
-          Vector.map prev_statement.proof_state.unfinalized_proofs
-            ~f:(fun (t, _) -> t.deferred_values.bulletproof_challenges) }
+          Vector.map prev_statement.proof_state.unfinalized_proofs ~f:(fun t ->
+              t.deferred_values.bulletproof_challenges ) }
     in
     let chal = Challenge.Constant.of_tick_field in
     let new_bulletproof_challenges, b =
@@ -265,7 +265,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       in
       (prechals, b)
     in
-    let plonk =
+    let plonk, _ =
       Plonk_checks.derive_plonk
         (module Tick.Field)
         ~shift:Shifts.tick ~endo:Endo.Step_inner_curve.base
@@ -280,6 +280,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
            (module Tick.Field)
            proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
            ~zeta:As_field.zeta ~zetaw)
+        (fst x_hat)
     in
     let shift_value =
       Shifted_value.of_field (module Tick.Field) ~shift:Shifts.tick
@@ -299,10 +300,6 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                 ; alpha= plonk0.alpha
                 ; beta= chal plonk0.beta
                 ; gamma= chal plonk0.gamma } }
-        ; was_base_case=
-            List.for_all
-              ~f:(fun (_, should_verify) -> not should_verify)
-              (Vector.to_list prev_statement.proof_state.unfinalized_proofs)
         ; sponge_digest_before_evaluations=
             Digest.Constant.of_tick_field sponge_digest_before_evaluations
         ; me_only }

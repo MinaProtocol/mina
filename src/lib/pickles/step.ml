@@ -84,7 +84,6 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.t
-        , bool
         , Tock.Field.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -147,7 +146,8 @@ struct
                 (Plonk_checks.evals_of_split_evals
                    (module Tick.Field)
                    t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
-          )
+                (fst t.prev_x_hat)
+              |> fst )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
@@ -325,6 +325,8 @@ struct
                (module Tock.Field)
                t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
                ~zeta:As_field.zeta ~zetaw)
+            x_hat_1
+          |> fst
         in
         let shifted_value =
           Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
@@ -341,6 +343,7 @@ struct
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
               ; b= shifted_value b }
+          ; should_finalize= must_verify
           ; sponge_digest_before_evaluations=
               Digest.Constant.of_tock_field sponge_digest_before_evaluations }
         , prev_statement_with_hashes
@@ -379,17 +382,10 @@ struct
       go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
         prev_vars_length
     in
-    let inners_must_verify =
-      let module V = H1.To_vector (Bool) in
-      V.f prev_vars_length inners_must_verify
-    in
     let next_statement : _ Types.Pairing_based.Statement.t =
-      let unfinalized_proofs =
-        Vector.zip unfinalized_proofs inners_must_verify
-      in
       let unfinalized_proofs_extended =
         Vector.extend unfinalized_proofs lte Max_branching.n
-          (Unfinalized.Constant.dummy, false)
+          Unfinalized.Constant.dummy
       in
       let pass_through =
         let module M =

@@ -242,7 +242,6 @@ module Dlog_based = struct
     type ( 'plonk
          , 'scalar_challenge
          , 'fp
-         , 'bool
          , 'fq
          , 'me_only
          , 'digest
@@ -257,7 +256,6 @@ module Dlog_based = struct
           , 'bp_chals
           , 'index )
           Deferred_values.t_
-      ; was_base_case: 'bool
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
@@ -267,7 +265,6 @@ module Dlog_based = struct
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'bool
            , 'fq
            , 'me_only
            , 'digest
@@ -277,7 +274,6 @@ module Dlog_based = struct
         ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
-        , 'bool
         , 'fq
         , 'me_only
         , 'digest
@@ -291,7 +287,6 @@ module Dlog_based = struct
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'bool
            , 'fq
            , 'me_only
            , 'digest
@@ -304,7 +299,6 @@ module Dlog_based = struct
           Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'bool
         , 'fq
         , 'me_only
         , 'digest
@@ -316,12 +310,10 @@ module Dlog_based = struct
       let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
       let typ (type f fp) ~challenge ~scalar_challenge
-          (fp : (fp, _, f) Snarky_backendless.Typ.t) bool fq me_only digest
-          index =
+          (fp : (fp, _, f) Snarky_backendless.Typ.t) fq me_only digest index =
         Snarky_backendless.Typ.of_hlistable
           [ Deferred_values.In_circuit.typ ~challenge ~scalar_challenge fp fq
               index
-          ; bool
           ; digest
           ; me_only ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -384,7 +376,6 @@ module Dlog_based = struct
     type ( 'plonk
          , 'scalar_challenge
          , 'fp
-         , 'bool
          , 'fq
          , 'me_only
          , 'digest
@@ -396,7 +387,6 @@ module Dlog_based = struct
           ( 'plonk
           , 'scalar_challenge
           , 'fp
-          , 'bool
           , 'fq
           , 'me_only
           , 'digest
@@ -410,7 +400,6 @@ module Dlog_based = struct
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'bool
            , 'fq
            , 'me_only
            , 'digest
@@ -423,7 +412,6 @@ module Dlog_based = struct
           Proof_state.Deferred_values.Plonk.Minimal.t
         , 'scalar_challenge
         , 'fp
-        , 'bool
         , 'fq
         , 'me_only
         , 'digest
@@ -438,7 +426,6 @@ module Dlog_based = struct
       type ( 'challenge
            , 'scalar_challenge
            , 'fp
-           , 'bool
            , 'fq
            , 'me_only
            , 'digest
@@ -452,7 +439,6 @@ module Dlog_based = struct
           Proof_state.Deferred_values.Plonk.In_circuit.t
         , 'scalar_challenge
         , 'fp
-        , 'bool
         , 'fq
         , 'me_only
         , 'digest
@@ -465,8 +451,7 @@ module Dlog_based = struct
       let spec =
         let open Spec in
         Struct
-          [ Vector (B Bool, Nat.N1.n)
-          ; Vector (B Field, Nat.N14.n)
+          [ Vector (B Field, Nat.N14.n)
           ; Vector (B Challenge, Nat.N2.n)
           ; Vector (Scalar Challenge, Nat.N3.n)
           ; Vector (B Digest, Nat.N3.n)
@@ -498,7 +483,6 @@ module Dlog_based = struct
                        ; endomul0
                        ; endomul1
                        ; endomul2 } }
-               ; was_base_case
                ; sponge_digest_before_evaluations
                ; me_only }
            ; pass_through } :
@@ -522,14 +506,12 @@ module Dlog_based = struct
         in
         let challenge = [beta; gamma] in
         let scalar_challenge = [alpha; zeta; xi] in
-        let bool = [was_base_case] in
         let digest =
           [sponge_digest_before_evaluations; me_only; pass_through]
         in
         let index = [which_branch] in
         Hlist.HlistId.
-          [ bool
-          ; fp
+          [ fp
           ; challenge
           ; scalar_challenge
           ; digest
@@ -538,8 +520,7 @@ module Dlog_based = struct
 
       let of_data
           Hlist.HlistId.
-            [ bool
-            ; fp
+            [ fp
             ; challenge
             ; scalar_challenge
             ; digest
@@ -564,14 +545,12 @@ module Dlog_based = struct
         in
         let [beta; gamma] = challenge in
         let [alpha; zeta; xi] = scalar_challenge in
-        let [was_base_case] = bool in
         let [sponge_digest_before_evaluations; me_only; pass_through] =
           digest
         in
         let [which_branch] = index in
         { proof_state=
-            { was_base_case
-            ; deferred_values=
+            { deferred_values=
                 { xi
                 ; combined_inner_product
                 ; b
@@ -678,7 +657,8 @@ module Pairing_based = struct
            , 'scalar_challenge
            , 'fq
            , 'bulletproof_challenges
-           , 'digest )
+           , 'digest
+           , 'bool )
            t_ =
         { deferred_values:
             ( 'plonk
@@ -686,6 +666,7 @@ module Pairing_based = struct
             , 'fq
             , 'bulletproof_challenges )
             Deferred_values.t_
+        ; should_finalize: 'bool
         ; sponge_digest_before_evaluations: 'digest }
       [@@deriving bin_io, sexp, compare, yojson]
 
@@ -694,13 +675,15 @@ module Pairing_based = struct
              , 'scalar_challenge
              , 'fq
              , 'bulletproof_challenges
-             , 'digest )
+             , 'digest
+             , 'bool )
              t =
           ( ('challenge, 'scalar_challenge) Deferred_values.Plonk.Minimal.t
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
-          , 'digest )
+          , 'digest
+          , 'bool )
           t_
         [@@deriving bin_io, sexp, compare, yojson]
       end
@@ -710,7 +693,8 @@ module Pairing_based = struct
              , 'scalar_challenge
              , 'fq
              , 'bulletproof_challenges
-             , 'digest )
+             , 'digest
+             , 'bool )
              t =
           ( ( 'challenge
             , 'scalar_challenge
@@ -719,7 +703,8 @@ module Pairing_based = struct
           , 'scalar_challenge
           , 'fq
           , 'bulletproof_challenges
-          , 'digest )
+          , 'digest
+          , 'bool )
           t_
         [@@deriving bin_io, sexp, compare, yojson]
 
@@ -730,7 +715,8 @@ module Pairing_based = struct
             ; Vector (B Digest, Nat.N1.n)
             ; Vector (B Challenge, Nat.N2.n)
             ; Vector (Scalar Challenge, Nat.N3.n)
-            ; Vector (B Bulletproof_challenge, bp_log2) ]
+            ; Vector (B Bulletproof_challenge, bp_log2)
+            ; Vector (B Bool, Nat.N1.n) ]
 
         let to_data
             ({ deferred_values=
@@ -755,6 +741,7 @@ module Pairing_based = struct
                      ; endomul0
                      ; endomul1
                      ; endomul2 } }
+             ; should_finalize
              ; sponge_digest_before_evaluations } :
               _ t) =
           let open Vector in
@@ -777,8 +764,14 @@ module Pairing_based = struct
           let challenge = [beta; gamma] in
           let scalar_challenge = [alpha; zeta; xi] in
           let digest = [sponge_digest_before_evaluations] in
+          let bool = [should_finalize] in
           let open Hlist.HlistId in
-          [fq; digest; challenge; scalar_challenge; bulletproof_challenges]
+          [ fq
+          ; digest
+          ; challenge
+          ; scalar_challenge
+          ; bulletproof_challenges
+          ; bool ]
 
         let of_data
             Hlist.HlistId.
@@ -800,7 +793,8 @@ module Pairing_based = struct
               ; Vector.[sponge_digest_before_evaluations]
               ; Vector.[beta; gamma]
               ; Vector.[alpha; zeta; xi]
-              ; bulletproof_challenges ] : _ t =
+              ; bulletproof_challenges
+              ; Vector.[should_finalize] ] : _ t =
           { deferred_values=
               { xi
               ; bulletproof_challenges
@@ -823,6 +817,7 @@ module Pairing_based = struct
                   ; endomul0
                   ; endomul1
                   ; endomul2 } }
+          ; should_finalize
           ; sponge_digest_before_evaluations }
       end
     end
@@ -839,28 +834,22 @@ module Pairing_based = struct
       open Hlist.HlistId
 
       let to_data {unfinalized_proofs; me_only} =
-        [ Vector.map unfinalized_proofs ~f:(fun (unfinalized, should_verify) ->
-              [Per_proof.In_circuit.to_data unfinalized; should_verify] )
-        ; me_only ]
+        [Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.to_data; me_only]
 
       let of_data [unfinalized_proofs; me_only] =
         { unfinalized_proofs=
-            Vector.map unfinalized_proofs
-              ~f:(fun [unfinalized; should_verify] ->
-                (Per_proof.In_circuit.of_data unfinalized, should_verify) )
+            Vector.map unfinalized_proofs ~f:Per_proof.In_circuit.of_data
         ; me_only }
     end
 
     let typ impl branching fq :
-        ( ((_ * _, _) Vector.t, _) t
-        , ((_ * _, _) Vector.t, _) t
+        ( ((_, _) Vector.t, _) t
+        , ((_, _) Vector.t, _) t
         , _ )
         Snarky_backendless.Typ.t =
       let unfinalized_proofs =
         let open Spec in
-        Vector
-          ( Struct [Per_proof.In_circuit.spec Backend.Tock.Rounds.n; B Bool]
-          , branching )
+        Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, branching)
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq ~challenge:`Constrained
@@ -877,8 +866,8 @@ module Pairing_based = struct
 
     let to_data {proof_state= {unfinalized_proofs; me_only}; pass_through} =
       let open Hlist.HlistId in
-      [ Vector.map unfinalized_proofs ~f:(fun (pp, b) ->
-            Hlist.HlistId.[Proof_state.Per_proof.In_circuit.to_data pp; b] )
+      [ Vector.map unfinalized_proofs
+          ~f:Proof_state.Per_proof.In_circuit.to_data
       ; me_only
       ; pass_through ]
 
@@ -886,16 +875,13 @@ module Pairing_based = struct
       { proof_state=
           { unfinalized_proofs=
               Vector.map unfinalized_proofs
-                ~f:(fun ([pp; b] : _ Hlist.HlistId.t) ->
-                  (Proof_state.Per_proof.In_circuit.of_data pp, b) )
+                ~f:Proof_state.Per_proof.In_circuit.of_data
           ; me_only }
       ; pass_through }
 
     let spec branching bp_log2 =
       let open Spec in
-      let per_proof =
-        Struct [Proof_state.Per_proof.In_circuit.spec bp_log2; B Bool]
-      in
+      let per_proof = Proof_state.Per_proof.In_circuit.spec bp_log2 in
       Struct
         [Vector (per_proof, branching); B Digest; Vector (B Digest, branching)]
   end
