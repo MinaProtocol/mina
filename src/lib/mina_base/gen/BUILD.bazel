@@ -1,0 +1,57 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN
+################################################################
+GEN_EXECUTABLE_OPTS = []
+
+GEN_MODULE_OPTS = []
+
+GEN_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:ppxlib",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/crs",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//tuple_lib",
+    "@mina//src/lib/crypto_params",
+    "@mina//src/lib/signature_lib",
+]
+
+GEN_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppxlib.metaquot"
+
+GEN_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "gen",
+]
+
+#################
+ocaml_executable(
+    name = "gen.exe",
+    opts = GEN_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Gen",
+    src = "gen.ml",
+    opts = GEN_MODULE_OPTS,
+    ppx = GEN_PPX,
+    ppx_args = GEN_PPX_ARGS,
+    deps = GEN_DEPS,
+)
