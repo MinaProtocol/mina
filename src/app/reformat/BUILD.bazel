@@ -1,0 +1,49 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE REFORMAT
+################################################################
+REFORMAT_EXECUTABLE_OPTS = []
+
+REFORMAT_MODULE_OPTS = []
+
+REFORMAT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+]
+
+REFORMAT_PPX = "@//bzl/ppx/exe:ppx_jane"
+
+REFORMAT_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "reformat",
+]
+
+#################
+ocaml_executable(
+    name = "reformat.exe",
+    opts = REFORMAT_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = REFORMAT_DEPS + [
+        # do not sort (buildifier)
+        ":_Reformat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Reformat",
+    src = "reformat.ml",
+    opts = REFORMAT_MODULE_OPTS,
+    ppx = REFORMAT_PPX,
+    ppx_args = REFORMAT_PPX_ARGS,
+    deps = REFORMAT_DEPS,
+)
