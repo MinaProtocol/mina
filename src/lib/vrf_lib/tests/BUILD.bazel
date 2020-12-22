@@ -1,0 +1,81 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY VRF_LIB_TESTS
+################################################################
+VRF_LIB_TESTS_MODULE_OPTS = []
+
+VRF_LIB_TESTS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@snarky//src:snarky",
+    "@mina//src/lib/snarky_curves",
+    "@mina//src/lib/test_util",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/vrf_lib",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/random_oracle",
+    "@snarky//fold_lib",
+]
+
+VRF_LIB_TESTS_PPX = "@//bzl/ppx/exe:h_list.ppx__ppx_bench__ppx_deriving.eq__ppx_jane__ppx_version"
+
+VRF_LIB_TESTS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "vrf_lib_tests",
+]
+
+##############
+ocaml_archive(
+    name = "vrf_lib_tests",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = VRF_LIB_TESTS_DEPS + [
+        # do not sort (buildifier)
+        ":_Integrated_test",
+        ":_Standalone_test",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Vrf_lib_tests_ns",
+    ns = "vrf_lib_tests",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "integrated_test.ml",
+        "standalone_test.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Integrated_test",
+    src = "integrated_test.ml",
+    ns = ":Vrf_lib_tests_ns",
+    opts = VRF_LIB_TESTS_MODULE_OPTS,
+    ppx = VRF_LIB_TESTS_PPX,
+    ppx_args = VRF_LIB_TESTS_PPX_ARGS,
+    deps = VRF_LIB_TESTS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Standalone_test",
+    src = "standalone_test.ml",
+    ns = ":Vrf_lib_tests_ns",
+    opts = VRF_LIB_TESTS_MODULE_OPTS,
+    ppx = VRF_LIB_TESTS_PPX,
+    ppx_args = VRF_LIB_TESTS_PPX_ARGS,
+    deps = VRF_LIB_TESTS_DEPS,
+)

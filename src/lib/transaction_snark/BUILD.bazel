@@ -1,0 +1,92 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "transaction_snark",
+    src = "transaction_snark.ml",
+    intf = ":_Transaction_snark.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transaction_snark",
+    ],
+    ppx_print = "@ppx//print:binary",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/cache_dir",
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/sgn",
+        "@mina//src/lib/transaction_protocol_state",
+        "@opam//pkg:bignum",
+        "@opam//pkg:core",
+        "@ppx_version//src/runtime:ppx_version_runtime",
+        "@snarky//src/base:snarky_backendless",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transaction_snark.cmi",
+    src = "transaction_snark.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "transaction_snark",
+    ],
+    deps = [
+        "@mina//src/lib/cache_dir",
+        "@mina//src/lib/coda_state",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/sgn",
+        "@mina//src/lib/transaction_protocol_state",
+        "@opam//pkg:bignum",
+        "@opam//pkg:core",
+        "@ppx_version//src/runtime:ppx_version_runtime",
+        "@snarky//src/base:snarky_backendless",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/transaction_snark:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

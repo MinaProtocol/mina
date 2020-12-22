@@ -1,0 +1,80 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY ROCKSDB
+################################################################
+ROCKSDB_MODULE_OPTS = ["-linkall"]
+
+ROCKSDB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@ocaml_rocksdb//:rocks",
+    "@mina//src/lib/key_value_database",
+    "@mina//src/lib/file_system",
+    "@mina//src/lib/logger",
+]
+
+ROCKSDB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane"
+
+ROCKSDB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "rocksdb",
+]
+
+##############
+ocaml_archive(
+    name = "rocksdb",
+    doc = "RocksDB Database module",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ROCKSDB_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+        ":_Serializable",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Rocksdb_ns",
+    ns = "rocksdb",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "database.ml",
+        "serializable.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Database",
+    src = "database.ml",
+    ns = ":Rocksdb_ns",
+    opts = ROCKSDB_MODULE_OPTS,
+    ppx = ROCKSDB_PPX,
+    ppx_args = ROCKSDB_PPX_ARGS,
+    deps = ROCKSDB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Serializable",
+    src = "serializable.ml",
+    ns = ":Rocksdb_ns",
+    opts = ROCKSDB_MODULE_OPTS,
+    ppx = ROCKSDB_PPX,
+    ppx_args = ROCKSDB_PPX_ARGS,
+    deps = ROCKSDB_DEPS + [
+        # do not sort (buildifier)
+        ":_Database",
+    ],
+)
