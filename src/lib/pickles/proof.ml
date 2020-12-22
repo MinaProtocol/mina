@@ -44,7 +44,6 @@ module Base = struct
               ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.Stable.V1.t
               , Tick.Field.t Shifted_value.Stable.V1.t
-              , bool
               , Tock.Field.Stable.V1.t
               , 'dlog_me_only
               , Digest.Constant.t
@@ -114,7 +113,6 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     ; zeta= scalar_chal () } }
             ; sponge_digest_before_evaluations=
                 Digest.Constant.of_tock_field Tock.Field.zero
-            ; was_base_case= true
             ; me_only=
                 { sg= Lazy.force Dummy.Ipa.Step.sg
                 ; old_bulletproof_challenges=

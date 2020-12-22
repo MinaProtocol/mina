@@ -1449,8 +1449,8 @@ let%test_module _ =
       { With_status.data= cmd
       ; status=
           Applied
-            ( User_command_status.Auxiliary_data.empty
-            , User_command_status.Balance_data.empty ) }
+            ( Transaction_status.Auxiliary_data.empty
+            , Transaction_status.Balance_data.empty ) }
 
     let independent_signed_cmds' =
       List.map independent_cmds' ~f:(function

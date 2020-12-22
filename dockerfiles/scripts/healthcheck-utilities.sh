@@ -3,7 +3,7 @@
 #
 function isDaemonSynced() {
     status=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | \
             jq '.data.syncStatus'
     )
 
@@ -25,12 +25,12 @@ function isDaemonSynced() {
 #
 function isChainlengthHighestReceived() {
     chainLength=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.blockchainLength'
     )
 
     highestReceived=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
@@ -44,7 +44,7 @@ function isChainlengthHighestReceived() {
 function peerCountGreaterThan() {
     peerCountMinThreshold=${1:-2}
     peerCount=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.peers | length'
     )
     
@@ -57,11 +57,11 @@ function peerCountGreaterThan() {
 #
 function ownsFunds() {
     ownedWalletCount=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' localhost:3085/graphql | \
             jq '.data.ownedWallets | length'
     )
     balanceTotal=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' localhost:3085/graphql | \
             jq '.data.ownedWallets[0].balance.total'
     )
     # remove leading and trailing quotes for integer interpretation
@@ -77,7 +77,7 @@ function ownsFunds() {
 function hasSentUserCommandsGreaterThan() {
     userCmdMinThreshold=${1:-1}
     userCmdSent=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.userCommandsSent'
     )
     
@@ -90,7 +90,7 @@ function hasSentUserCommandsGreaterThan() {
 #
 function hasSnarkWorker() {
     snarkWorker=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.snarkWorker'
     )
     rc=$?
@@ -118,9 +118,9 @@ function isArchiveSynced() {
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
-    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1)
+    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}]" && return 1)
 }
