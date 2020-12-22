@@ -1,0 +1,57 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "coda_plugins",
+    src = "coda_plugins.ml",
+    intf = ":_Coda_plugins.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/mina_lib",
+        "@opam//pkg:core_kernel",
+        "@opam//pkg:dynlink",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Coda_plugins.cmi",
+    src = "coda_plugins.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = [
+        "@mina//src/lib/mina_lib",
+        "@opam//pkg:core_kernel",
+        "@opam//pkg:dynlink",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_plugins:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

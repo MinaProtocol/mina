@@ -1,0 +1,324 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY CODA_STATE
+################################################################
+CODA_STATE_INTERFACE_OPTS = []
+
+CODA_STATE_MODULE_OPTS = []
+
+CODA_STATE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/test_genesis_ledger",
+    "@snarky//bitstring_lib",
+    "@snarky//fold_lib",
+    "@snarky//tuple_lib",
+    "@mina//src/lib/with_hash",
+]
+
+##############
+ocaml_archive(
+    name = "coda_state",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Ancestor",
+        ":_Blockchain_state",
+        ":_Consensus_state_hooks",
+        ":_Genesis_protocol_state",
+        ":_Protocol_state",
+        ":_Snark_transition",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_state_ns",
+    ns = "coda_state",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "ancestor.ml",
+        "blockchain_state.ml",
+        "consensus_state_hooks.ml",
+        "genesis_protocol_state.ml",
+        "protocol_state.ml",
+        "snark_transition.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Ancestor",
+    src = "ancestor.ml",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Protocol_state",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Blockchain_state",
+    src = "blockchain_state.ml",
+    intf = ":_Blockchain_state.cmi",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = CODA_STATE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Blockchain_state.cmi",
+    src = "blockchain_state.mli",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Consensus_state_hooks",
+    src = "consensus_state_hooks.ml",
+    intf = ":_Consensus_state_hooks.cmi",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+        ":_Protocol_state",
+        ":_Snark_transition",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Consensus_state_hooks.cmi",
+    src = "consensus_state_hooks.mli",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+        ":_Protocol_state",
+        ":_Snark_transition",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Genesis_protocol_state",
+    src = "genesis_protocol_state.ml",
+    intf = ":_Genesis_protocol_state.cmi",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+        ":_Protocol_state",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Genesis_protocol_state.cmi",
+    src = "genesis_protocol_state.mli",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Protocol_state",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Protocol_state",
+    src = "protocol_state.ml",
+    intf = ":_Protocol_state.cmi",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Protocol_state.cmi",
+    src = "protocol_state.mli",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snark_transition",
+    src = "snark_transition.ml",
+    intf = ":_Snark_transition.cmi",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snark_transition.cmi",
+    src = "snark_transition.mli",
+    ns = ":Coda_state_ns",
+    opts = CODA_STATE_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_state",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_STATE_DEPS + [
+        # do not sort (buildifier)
+        ":_Blockchain_state",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_state:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)
