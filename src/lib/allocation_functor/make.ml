@@ -221,6 +221,8 @@ module Versioned_v1 = struct
 
     type t = Stable.V1.t
 
+    let equal = M.equal
+
     let compare = M.compare
 
     let hash = M.hash

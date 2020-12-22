@@ -106,10 +106,11 @@ module Types = struct
                (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
                ~value:status ))
 
-  let transaction_status : ('context, Transaction_status.State.t option) typ =
+  let transaction_status :
+      ('context, Transaction_inclusion_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
       ~values:
-        Transaction_status.State.
+        Transaction_inclusion_status.State.
           [ enum_value "INCLUDED" ~value:Included
               ~doc:"A transaction that is on the longest chain"
           ; enum_value "PENDING" ~value:Pending
@@ -1823,7 +1824,7 @@ module Subscriptions = struct
       ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
-        Mina_lib.sync_status coda |> Coda_incremental.Status.to_pipe
+        Mina_lib.sync_status coda |> Mina_incremental.Status.to_pipe
         |> Deferred.Result.return )
 
   let new_block =
@@ -2453,7 +2454,7 @@ module Queries = struct
     result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
         Result.map_error
-          (Coda_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
+          (Mina_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
           ~f:Error.to_string_hum )
 
   let daemon_status =
@@ -2610,7 +2611,7 @@ module Queries = struct
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
-          (Transaction_status.get_status ~frontier_broadcast_pipe
+          (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
              ~transaction_pool payment.data)
           ~f:Error.to_string_hum )
 

@@ -360,7 +360,7 @@ module User_command = struct
             ; failure_reason= None }
 
     let add_with_status ?(via = `Ident) (module Conn : CONNECTION)
-        (t : Signed_command.t) (status : User_command_status.t) =
+        (t : Signed_command.t) (status : Transaction_status.t) =
       let open Deferred.Result.Let_syntax in
       let%bind user_command_id = add_if_doesn't_exist ~via (module Conn) t in
       let amount_to_int64 x =
@@ -370,7 +370,7 @@ module User_command = struct
         amount_to_int64 (Currency.Balance.to_amount x)
       in
       let balances_to_int64s
-          { User_command_status.Balance_data.fee_payer_balance
+          { Transaction_status.Balance_data.fee_payer_balance
           ; source_balance
           ; receiver_balance } =
         ( Option.map ~f:balance_to_int64 fee_payer_balance
@@ -398,7 +398,7 @@ module User_command = struct
             , balances_to_int64s balances )
         | Failed (failure, balances) ->
             ( "failed"
-            , Some (User_command_status.Failure.to_string failure)
+            , Some (Transaction_status.Failure.to_string failure)
             , None
             , None
             , None
@@ -467,8 +467,8 @@ module User_command = struct
   let add_if_doesn't_exist conn (t : User_command.t) =
     Signed_command.add_if_doesn't_exist conn ~via:(via t) (as_signed_command t)
 
-  let add_with_status conn (t : User_command.t)
-      (status : User_command_status.t) =
+  let add_with_status conn (t : User_command.t) (status : Transaction_status.t)
+      =
     Signed_command.add_with_status conn ~via:(via t) (as_signed_command t)
       status
 

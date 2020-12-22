@@ -39,7 +39,7 @@ if [ -n "$charts" ]; then
       # Only attempt to execute DRY-RUNs against application charts
       chartType=$(cat $dir/Chart.yaml | grep 'type:' | awk '{ print $2}')
       if [[ "$chartType" =~ "application" ]]; then
-        helm install test $dir --dry-run --namespace test
+        helm install test-archive-node $dir --dry-run --namespace test
       else
         echo "found library chart - skipping dry-run"
       fi

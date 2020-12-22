@@ -18,7 +18,7 @@ module Derive = struct
             { network_identifier= net_id network_response
             ; public_key=
                 { Public_key.hex_bytes= public_key_hex_bytes
-                ; curve_type= "tweedle" }
+                ; curve_type= "pallas" }
             ; metadata= Some Amount_of.Token_id.(encode default) }
             |> to_yojson)
         ~path:"construction/derive"
@@ -101,7 +101,7 @@ module Combine = struct
                       ; signature_type= None }
                   ; public_key=
                       { Public_key.hex_bytes= public_key_hex_bytes
-                      ; curve_type= "tweedle" }
+                      ; curve_type= "pallas" }
                   ; signature_type= "schnorr_poseidon"
                   ; hex_bytes= signature } ] }
             |> to_yojson)
