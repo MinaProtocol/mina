@@ -1,0 +1,106 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_BLAKE2
+################################################################
+SNARKY_BLAKE2_INTERFACE_OPTS = []
+
+SNARKY_BLAKE2_MODULE_OPTS = []
+
+SNARKY_BLAKE2_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:integers",
+    "@snarky//src/base:snarky_backendless",
+    "@mina//src/lib/blake2",
+]
+
+SNARKY_BLAKE2_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+SNARKY_BLAKE2_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "snarky_blake2",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_blake2",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARKY_BLAKE2_DEPS + [
+        # do not sort (buildifier)
+        ":_Snarky_blake2",
+        ":_Uint32",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_blake2_ns",
+    ns = "snarky_blake2",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "snarky_blake2.ml",
+        "uint32.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Snarky_blake2",
+    src = "snarky_blake2.ml",
+    intf = ":_Snarky_blake2.cmi",
+    ns = ":Snarky_blake2_ns",
+    opts = SNARKY_BLAKE2_MODULE_OPTS,
+    ppx = SNARKY_BLAKE2_PPX,
+    ppx_args = SNARKY_BLAKE2_PPX_ARGS,
+    deps = SNARKY_BLAKE2_DEPS + [
+        # do not sort (buildifier)
+        ":_Uint32",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Snarky_blake2.cmi",
+    src = "snarky_blake2.mli",
+    ns = ":Snarky_blake2_ns",
+    opts = SNARKY_BLAKE2_INTERFACE_OPTS,
+    ppx = SNARKY_BLAKE2_PPX,
+    ppx_args = SNARKY_BLAKE2_PPX_ARGS,
+    deps = SNARKY_BLAKE2_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Uint32",
+    src = "uint32.ml",
+    intf = ":_Uint32.cmi",
+    ns = ":Snarky_blake2_ns",
+    opts = SNARKY_BLAKE2_MODULE_OPTS,
+    ppx = SNARKY_BLAKE2_PPX,
+    ppx_args = SNARKY_BLAKE2_PPX_ARGS,
+    deps = SNARKY_BLAKE2_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Uint32.cmi",
+    src = "uint32.mli",
+    ns = ":Snarky_blake2_ns",
+    opts = SNARKY_BLAKE2_INTERFACE_OPTS,
+    ppx = SNARKY_BLAKE2_PPX,
+    ppx_args = SNARKY_BLAKE2_PPX_ARGS,
+    deps = SNARKY_BLAKE2_DEPS,
+)

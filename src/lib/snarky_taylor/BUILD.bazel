@@ -1,0 +1,92 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARKY_TAYLOR
+################################################################
+SNARKY_TAYLOR_INTERFACE_OPTS = []
+
+SNARKY_TAYLOR_MODULE_OPTS = []
+
+SNARKY_TAYLOR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//snarky_integer",
+]
+
+SNARKY_TAYLOR_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+SNARKY_TAYLOR_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "snarky_taylor",
+]
+
+##############
+ocaml_archive(
+    name = "snarky_taylor",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARKY_TAYLOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Floating_point",
+        ":_Snarky_taylor",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snarky_taylor_ns",
+    ns = "snarky_taylor",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "floating_point.ml",
+        "snarky_taylor.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Floating_point",
+    src = "floating_point.ml",
+    intf = ":_Floating_point.cmi",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_MODULE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Floating_point.cmi",
+    src = "floating_point.mli",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_INTERFACE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Snarky_taylor",
+    src = "snarky_taylor.ml",
+    ns = ":Snarky_taylor_ns",
+    opts = SNARKY_TAYLOR_MODULE_OPTS,
+    ppx = SNARKY_TAYLOR_PPX,
+    ppx_args = SNARKY_TAYLOR_PPX_ARGS,
+    deps = SNARKY_TAYLOR_DEPS + [
+        # do not sort (buildifier)
+        ":_Floating_point",
+    ],
+)
