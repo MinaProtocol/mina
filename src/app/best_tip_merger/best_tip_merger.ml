@@ -337,7 +337,7 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
     ~transport:
       (Logger.Transport.File_system.dumb_logrotate ~directory:output_dir
          ~log_filename:"mina-best-tip-merger.log" ~max_size:logrotate_max_size
-         ~num_rotate) ;
+         ~num_rotate:logrotate_num_rotate) ;
   let logger = Logger.create () in
   let t' =
     List.fold ~init:t files ~f:(fun t log_file ->
