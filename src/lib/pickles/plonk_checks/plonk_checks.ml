@@ -111,7 +111,7 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
     domain#shifts
   in
   fun ({alpha; beta; gamma; zeta} : _ Minimal.t)
-      ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) ->
+      ((e0, e1) : _ Dlog_plonk_types.Evals.t Double.t) p_eval0 ->
     let alphas =
       let arr =
         let a2 = alpha * alpha in
@@ -126,24 +126,25 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
         arr.(Int.(i + k))
     in
     let bz = beta * zeta in
+    let w3, w2, w1 =
+      (* generator^{n - 3} *)
+      let gen = domain#generator in
+      (* gen_inv = gen^{n - 1} = gen^{-1} *)
+      let gen_inv = one / gen in
+      let w3 = square gen_inv * gen_inv in
+      let w2 = gen * w3 in
+      (w3, w2, gen * w2)
+    in
+    let zkp =
+      (* Vanishing polynomial of [w1, w2, w3]
+          evaluated at x = zeta
+      *)
+      (zeta - w1) * (zeta - w2) * (zeta - w3)
+    in
+    let vp_zeta = domain#vanishing_polynomial zeta in
     let perm0, perm1 =
-      let w3, w2, w1 =
-        (* generator^{n - 3} *)
-        let gen = domain#generator in
-        let gen_inv = one / gen in
-        let w3 = square gen_inv * gen_inv in
-        let w2 = gen * w3 in
-        (w3, w2, gen * w2)
-      in
-      let zkp =
-        (* Vanishing polynomial of [w1, w2, w3]
-           evaluated at x = zeta
-        *)
-        (zeta - w1) * (zeta - w2) * (zeta - w3)
-      in
       let perm0 =
         with_label __LOC__ (fun () ->
-            let vp_zeta = domain#vanishing_polynomial zeta in
             (e0.l + bz + gamma)
             * (e0.r + (bz * r) + gamma)
             * (e0.o + (bz * o) + gamma)
@@ -216,44 +217,25 @@ let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
             + (((e0.l - e1.l) * u) - (t * (e0.o + e1.o)))
               * alphas Range.endml 5 ) )
     in
-    In_circuit.map_fields
-      ~f:(Shifted_value.of_field (module F) ~shift)
-      { alpha
-      ; beta
-      ; gamma
-      ; zeta
-      ; perm0
-      ; perm1
-      ; gnrc_l
-      ; gnrc_r
-      ; gnrc_o
-      ; psdn0
-      ; ecad0
-      ; vbmul0
-      ; vbmul1
-      ; endomul0
-      ; endomul1
-      ; endomul2 }
-
-let checked (type t)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-    ~domain ~shift ~endo ~mds (plonk : _ In_circuit.t) evals =
-  let actual =
-    derive_plonk ~with_label:Impl.with_label
-      (module Impl.Field)
-      ~endo ~mds ~domain ~shift
-      { alpha= plonk.alpha
-      ; beta= plonk.beta
-      ; gamma= plonk.gamma
-      ; zeta= plonk.zeta }
-      evals
-  in
-  let open Impl in
-  let open In_circuit in
-  with_label __LOC__ (fun () ->
-      List.map
-        ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
-        [ perm0
+    let linearization_check =
+      let w = w3 in
+      `Check_equal
+        ( ( e0.f + p_eval0
+          - (e0.l + (beta * e0.sigma1) + gamma)
+            * (e0.r + (beta * e0.sigma2) + gamma)
+            * (e0.o + gamma) * e1.z * zkp * alpha
+          - (e0.t * vp_zeta) )
+          * (zeta - one) * (zeta - w)
+        , (vp_zeta * alphas Range.perm 0 * (zeta - w))
+          + (vp_zeta * alphas Range.perm 1 * (zeta - one)) )
+    in
+    ( In_circuit.map_fields
+        ~f:(Shifted_value.of_field (module F) ~shift)
+        { alpha
+        ; beta
+        ; gamma
+        ; zeta
+        ; perm0
         ; perm1
         ; gnrc_l
         ; gnrc_r
@@ -264,5 +246,38 @@ let checked (type t)
         ; vbmul1
         ; endomul0
         ; endomul1
-        ; endomul2 ]
+        ; endomul2 }
+    , linearization_check )
+
+let checked (type t)
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
+    ~domain ~shift ~endo ~mds (plonk : _ In_circuit.t) evals p0 =
+  let actual, `Check_equal (lin1, lin2) =
+    derive_plonk ~with_label:Impl.with_label
+      (module Impl.Field)
+      ~endo ~mds ~domain ~shift
+      { alpha= plonk.alpha
+      ; beta= plonk.beta
+      ; gamma= plonk.gamma
+      ; zeta= plonk.zeta }
+      evals p0
+  in
+  let open Impl in
+  let open In_circuit in
+  with_label __LOC__ (fun () ->
+      Field.equal lin1 lin2
+      :: List.map
+           ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
+           [ perm0
+           ; perm1
+           ; gnrc_l
+           ; gnrc_r
+           ; gnrc_o
+           ; psdn0
+           ; ecad0
+           ; vbmul0
+           ; vbmul1
+           ; endomul0
+           ; endomul1
+           ; endomul2 ]
       |> Boolean.all )
