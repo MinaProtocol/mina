@@ -1,0 +1,47 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GENERATE_KEYPAIR
+################################################################
+GENERATE_KEYPAIR_EXECUTABLE_OPTS = []
+
+GENERATE_KEYPAIR_MODULE_OPTS = []
+
+GENERATE_KEYPAIR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/cli_lib",
+]
+
+GENERATE_KEYPAIR_PPX = "@//bzl/ppx/exe:ppx_version__ppx_let__ppx_sexp_conv__ppx_optcomp"
+
+GENERATE_KEYPAIR_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "generate_keypair.exe",
+    opts = GENERATE_KEYPAIR_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GENERATE_KEYPAIR_DEPS + [
+        # do not sort (buildifier)
+        ":_Generate_keypair",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Generate_keypair",
+    src = "generate_keypair.ml",
+    opts = GENERATE_KEYPAIR_MODULE_OPTS,
+    ppx = GENERATE_KEYPAIR_PPX,
+    ppx_args = GENERATE_KEYPAIR_PPX_ARGS,
+    deps = GENERATE_KEYPAIR_DEPS,
+)

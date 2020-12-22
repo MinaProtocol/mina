@@ -1,0 +1,46 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE DECODER
+################################################################
+DECODER_EXECUTABLE_OPTS = []
+
+DECODER_MODULE_OPTS = []
+
+DECODER_DEPS = [
+    # do not sort (buildifier)
+    "@mina//src/lib/mina_base",
+]
+
+DECODER_PPX = "@//bzl/ppx/exe:ppx_version"
+
+DECODER_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "decoder.exe",
+    opts = DECODER_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = DECODER_DEPS + [
+        # do not sort (buildifier)
+        ":_Decoder",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Decoder",
+    src = "decoder.ml",
+    opts = DECODER_MODULE_OPTS,
+    ppx = DECODER_PPX,
+    ppx_args = DECODER_PPX_ARGS,
+    deps = DECODER_DEPS,
+)
