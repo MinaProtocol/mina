@@ -62,7 +62,7 @@ fi
 
 if [ ! -d "$ledgerfolder" ]; then
   echo "making ledger"
-  
+
   mkdir $ledgerfolder
 
   S=./coda-automation/scripts
@@ -209,6 +209,8 @@ for i in $(seq 1 $nodes); do
   ext_port=$(echo $node_start_port + 2 + $i*5 | bc)
   metrics_port=$(echo $node_start_port + 3 + $i*5 | bc)
   libp2p_metrics_port=$(echo $node_start_port + 4 + $i*5 | bc)
+
+  echo "rest port" $rest_port
 
   CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -log-json -log-level Trace &> $logfile &
   node_pids[${i}]=$!

@@ -17,8 +17,10 @@ module Extensional_block = struct
     ; creator: Public_key.Compressed.t
     ; block_winner: Public_key.Compressed.t
     ; snarked_ledger_hash: Frozen_ledger_hash.t
-    ; staking_epoch_data: Epoch_seed.t
-    ; next_epoch_data: Epoch_seed.t
+    ; staking_epoch_seed: Epoch_seed.t
+    ; staking_epoch_ledger_hash: Frozen_ledger_hash.t
+    ; next_epoch_seed: Epoch_seed.t
+    ; next_epoch_ledger_hash: Frozen_ledger_hash.t
     ; ledger_hash: Ledger_hash.t
     ; height: Unsigned.UInt32.t
     ; global_slot: Coda_numbers.Global_slot.t
@@ -94,18 +96,35 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
   let snarked_ledger_hash =
     frozen_ledger_hash_of_base58_check snarked_ledger_hash_str
   in
-  let%bind staking_epoch_data_str =
+  let%bind staking_epoch_seed_str, staking_epoch_ledger_hash_id =
     query_db
       ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
       ~item:"staking epoch data"
   in
-  let staking_epoch_data = epoch_seed_of_base58_check staking_epoch_data_str in
-  let%bind next_epoch_data_str =
+  let staking_epoch_seed = epoch_seed_of_base58_check staking_epoch_seed_str in
+  let%bind staking_epoch_ledger_hash_str =
     query_db
-      ~f:(fun db -> Sql.Epoch_data.run db block.next_epoch_data_id)
-      ~item:"next epoch data"
+      ~f:(fun db ->
+        Sql.Snarked_ledger_hashes.run db staking_epoch_ledger_hash_id )
+      ~item:"staking epoch ledger hash"
   in
-  let next_epoch_data = epoch_seed_of_base58_check next_epoch_data_str in
+  let staking_epoch_ledger_hash =
+    frozen_ledger_hash_of_base58_check staking_epoch_ledger_hash_str
+  in
+  let%bind next_epoch_seed_str, next_epoch_ledger_hash_id =
+    query_db
+      ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
+      ~item:"staking epoch data"
+  in
+  let next_epoch_seed = epoch_seed_of_base58_check next_epoch_seed_str in
+  let%bind next_epoch_ledger_hash_str =
+    query_db
+      ~f:(fun db -> Sql.Snarked_ledger_hashes.run db next_epoch_ledger_hash_id)
+      ~item:"next epoch ledger hash"
+  in
+  let next_epoch_ledger_hash =
+    frozen_ledger_hash_of_base58_check next_epoch_ledger_hash_str
+  in
   let ledger_hash = ledger_hash_of_base58_check block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
@@ -119,8 +138,10 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
     ; creator
     ; block_winner
     ; snarked_ledger_hash
-    ; staking_epoch_data
-    ; next_epoch_data
+    ; staking_epoch_seed
+    ; staking_epoch_ledger_hash
+    ; next_epoch_seed
+    ; next_epoch_ledger_hash
     ; ledger_hash
     ; height
     ; global_slot
@@ -181,9 +202,14 @@ let main ~archive_uri ~state_hash () =
               ; ("creator", Public_key.Compressed.to_yojson block.creator)
               ; ( "snarked_ledger_hash"
                 , Frozen_ledger_hash.to_yojson block.snarked_ledger_hash )
-              ; ( "staking_epoch_data"
-                , Epoch_seed.to_yojson block.staking_epoch_data )
-              ; ("next_epoch_data", Epoch_seed.to_yojson block.next_epoch_data)
+              ; ( "staking_epoch_seed"
+                , Epoch_seed.to_yojson block.staking_epoch_seed )
+              ; ( "staking_epoch_ledger_hash"
+                , Frozen_ledger_hash.to_yojson block.staking_epoch_ledger_hash
+                )
+              ; ("next_epoch_data", Epoch_seed.to_yojson block.next_epoch_seed)
+              ; ( "next_epoch_ledger_hash"
+                , Frozen_ledger_hash.to_yojson block.next_epoch_ledger_hash )
               ; ("ledger_hash", Ledger_hash.to_yojson block.ledger_hash)
               ; ("height", Unsigned_extended.UInt32.to_yojson block.height)
               ; ( "global_slot"

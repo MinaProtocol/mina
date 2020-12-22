@@ -51,8 +51,9 @@ end
 
 module Epoch_data = struct
   let query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
-      "SELECT seed from epoch_data WHERE id = ?"
+    Caqti_request.find Caqti_type.int
+      Caqti_type.(tup2 string int)
+      "SELECT seed,ledger_hash_id from epoch_data WHERE id = ?"
 
   let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
 end
