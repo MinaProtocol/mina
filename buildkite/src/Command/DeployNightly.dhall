@@ -13,7 +13,7 @@ let Cmd = ../Lib/Cmds.dhall in
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).codaToolchain
             }
-            "cd coda-automation/terraform/testnets/nightly && terraform init; terraform destroy -auto-approve; terraform apply -auto-approve"
+            "./buildkite/scripts/deploy-nightly.sh"
         ],
         label = "Deploy nightly",
         key = "deploy-nightly",
