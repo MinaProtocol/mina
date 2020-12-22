@@ -1,0 +1,104 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY SNARK_BITS_NONCONSENSUS
+################################################################
+SNARK_BITS_NONCONSENSUS_MODULE_OPTS = []
+
+SNARK_BITS_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:integers",
+    "@snarky//fold_lib",
+    "@snarky//bitstring_lib",
+]
+
+##############
+ocaml_archive(
+    name = "snark_bits_nonconsensus",
+    doc = "Snark parameters",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SNARK_BITS_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Bits",
+        ":_Bits_intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Snark_bits_nonconsensus_ns",
+    ns = "snark_bits_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "bits.ml",
+        "bits_intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bits",
+    src = "bits.ml",
+    ns = ":Snark_bits_nonconsensus_ns",
+    opts = SNARK_BITS_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SNARK_BITS_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Bits_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Bits_intf",
+    src = "bits_intf.ml",
+    ns = ":Snark_bits_nonconsensus_ns",
+    opts = SNARK_BITS_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SNARK_BITS_NONCONSENSUS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/nonconsensus/snark_bits:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

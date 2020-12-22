@@ -1,0 +1,108 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY HASH_PREFIX_STATES_NONCONSENSUS
+################################################################
+HASH_PREFIX_STATES_NONCONSENSUS_INTERFACE_OPTS = []
+
+HASH_PREFIX_STATES_NONCONSENSUS_MODULE_OPTS = []
+
+HASH_PREFIX_STATES_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@mina//src/lib/hash_prefixes",
+    "@mina//src/nonconsensus/coda_compile_config:coda_compile_config_nonconsensus",
+    "@mina//src/nonconsensus/random_oracle:random_oracle_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "hash_prefix_states_nonconsensus",
+    doc = "Values corresponding to the internal state of the Pedersen hash function on the prefixes used in Coda",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = HASH_PREFIX_STATES_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Hash_prefix_states",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Hash_prefix_states_nonconsensus_ns",
+    ns = "hash_prefix_states_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "hash_prefix_states.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hash_prefix_states",
+    src = "hash_prefix_states.ml",
+    intf = ":_Hash_prefix_states.cmi",
+    ns = ":Hash_prefix_states_nonconsensus_ns",
+    opts = HASH_PREFIX_STATES_NONCONSENSUS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "hash_prefix_states_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = HASH_PREFIX_STATES_NONCONSENSUS_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Hash_prefix_states.cmi",
+    src = "hash_prefix_states.mli",
+    ns = ":Hash_prefix_states_nonconsensus_ns",
+    opts = HASH_PREFIX_STATES_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "hash_prefix_states_nonconsensus",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = HASH_PREFIX_STATES_NONCONSENSUS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/nonconsensus/hash_prefix_states:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)

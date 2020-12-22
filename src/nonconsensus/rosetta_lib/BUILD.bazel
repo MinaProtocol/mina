@@ -1,0 +1,185 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY ROSETTA_LIB_NONCONSENSUS
+################################################################
+ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS = []
+
+ROSETTA_LIB_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:caqti",
+    "@mina//src/lib/rosetta_models",
+    "@mina//src/nonconsensus/mina_base:mina_base_nonconsensus",
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+    "@mina//src/nonconsensus/signature_lib:signature_lib_nonconsensus",
+    "@mina//src/nonconsensus/unsigned_extended:unsigned_extended_nonconsensus",
+]
+
+ROSETTA_LIB_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_coda__ppx_version__ppx_optcomp__ppx_assert__ppx_let__ppx_sexp_conv__ppx_compare__ppx_deriving.std__ppx_custom_printf__ppx_deriving_yojson__ppx_inline_test"
+
+ROSETTA_LIB_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "rosetta_lib_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "rosetta_lib_nonconsensus",
+    doc = "Rosetta-related support code for nonconsensus",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount_of",
+        ":_Errors",
+        ":_Monad_fail",
+        ":_Operation_statuses",
+        ":_Operation_types",
+        ":_Transaction",
+        ":_User_command_info",
+        ":_Validation",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Rosetta_lib_nonconsensus_ns",
+    ns = "rosetta_lib_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "amount_of.ml",
+        "errors.ml",
+        "monad_fail.ml",
+        "operation_statuses.ml",
+        "operation_types.ml",
+        "transaction.ml",
+        "user_command_info.ml",
+        "validation.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Amount_of",
+    src = "amount_of.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Errors",
+        ":_Monad_fail",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Errors",
+    src = "errors.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Monad_fail",
+    src = "monad_fail.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Operation_statuses",
+    src = "operation_statuses.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Operation_types",
+    src = "operation_types.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transaction",
+    src = "transaction.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Errors",
+        ":_User_command_info",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_User_command_info",
+    src = "user_command_info.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount_of",
+        ":_Errors",
+        ":_Operation_statuses",
+        ":_Operation_types",
+        ":_Validation",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Validation",
+    src = "validation.ml",
+    ns = ":Rosetta_lib_nonconsensus_ns",
+    opts = ROSETTA_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = ROSETTA_LIB_NONCONSENSUS_PPX,
+    ppx_args = ROSETTA_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = ROSETTA_LIB_NONCONSENSUS_DEPS,
+)

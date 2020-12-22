@@ -1,0 +1,130 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY CURRENCY_NONCONSENSUS
+################################################################
+CURRENCY_NONCONSENSUS_INTERFACE_OPTS = []
+
+CURRENCY_NONCONSENSUS_MODULE_OPTS = []
+
+CURRENCY_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//fold_lib",
+    "@snarky//tuple_lib",
+    "@mina//src/nonconsensus/snark_bits:snark_bits_nonconsensus",
+    "@mina//src/lib/bignum_bigint",
+    "@mina//src/nonconsensus/random_oracle:random_oracle_nonconsensus",
+    "@mina//src/nonconsensus/sgn:sgn_nonconsensus",
+    "@mina//src/nonconsensus/snark_params:snark_params_nonconsensus",
+    "@mina//src/nonconsensus/unsigned_extended:unsigned_extended_nonconsensus",
+    "@mina//src/lib/codable",
+    "@mina//src/lib/ppx_dhall_type",
+]
+
+CURRENCY_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_coda__ppx_version__ppx_let__ppx_assert__ppx_bin_prot__ppx_sexp_conv__ppx_compare__ppx_hash__ppx_optcomp__ppx_custom_printf__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx__ppx_inline_test"
+
+CURRENCY_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "currency_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "currency_nonconsensus",
+    doc = "Currency types",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CURRENCY_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Currency",
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Currency_nonconsensus_ns",
+    ns = "currency_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "currency.ml",
+        "intf.ml",
+        "signed_poly.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Currency",
+    src = "currency.ml",
+    intf = ":_Currency.cmi",
+    ns = ":Currency_nonconsensus_ns",
+    opts = CURRENCY_NONCONSENSUS_MODULE_OPTS,
+    ppx = CURRENCY_NONCONSENSUS_PPX,
+    ppx_args = CURRENCY_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Currency.cmi",
+    src = "currency.mli",
+    ns = ":Currency_nonconsensus_ns",
+    opts = CURRENCY_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = CURRENCY_NONCONSENSUS_PPX,
+    ppx_args = CURRENCY_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Currency_nonconsensus_ns",
+    opts = CURRENCY_NONCONSENSUS_MODULE_OPTS,
+    ppx = CURRENCY_NONCONSENSUS_PPX,
+    ppx_args = CURRENCY_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Signed_poly",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_poly",
+    src = "signed_poly.ml",
+    ns = ":Currency_nonconsensus_ns",
+    opts = CURRENCY_NONCONSENSUS_MODULE_OPTS,
+    ppx = CURRENCY_NONCONSENSUS_PPX,
+    ppx_args = CURRENCY_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_NONCONSENSUS_DEPS,
+)

@@ -1,0 +1,62 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY CODA_COMPILE_CONFIG_NONCONSENSUS
+################################################################
+CODA_COMPILE_CONFIG_NONCONSENSUS_MODULE_OPTS = []
+
+CODA_COMPILE_CONFIG_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+]
+
+CODA_COMPILE_CONFIG_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_base__ppx_optcomp"
+
+CODA_COMPILE_CONFIG_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+##############
+ocaml_archive(
+    name = "coda_compile_config_nonconsensus",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CODA_COMPILE_CONFIG_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_compile_config",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_compile_config_nonconsensus_ns",
+    ns = "coda_compile_config_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "coda_compile_config.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_compile_config",
+    src = "coda_compile_config.ml",
+    ns = ":Coda_compile_config_nonconsensus_ns",
+    opts = CODA_COMPILE_CONFIG_NONCONSENSUS_MODULE_OPTS,
+    ppx = CODA_COMPILE_CONFIG_NONCONSENSUS_PPX,
+    ppx_args = CODA_COMPILE_CONFIG_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CODA_COMPILE_CONFIG_NONCONSENSUS_DEPS,
+)

@@ -1,0 +1,82 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY QUICKCHECK_LIB_NONCONSENSUS
+################################################################
+QUICKCHECK_LIB_NONCONSENSUS_INTERFACE_OPTS = []
+
+QUICKCHECK_LIB_NONCONSENSUS_MODULE_OPTS = []
+
+QUICKCHECK_LIB_NONCONSENSUS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/nonconsensus/currency:currency_nonconsensus",
+    "@mina//src/lib/rose_tree",
+]
+
+QUICKCHECK_LIB_NONCONSENSUS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp__ppx_let__ppx_inline_test__ppx_custom_printf"
+
+QUICKCHECK_LIB_NONCONSENSUS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "quickcheck_lib_nonconsensus",
+]
+
+##############
+ocaml_archive(
+    name = "quickcheck_lib_nonconsensus",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = QUICKCHECK_LIB_NONCONSENSUS_DEPS + [
+        # do not sort (buildifier)
+        ":_Quickcheck_lib",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Quickcheck_lib_nonconsensus_ns",
+    ns = "quickcheck_lib_nonconsensus",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "quickcheck_lib.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Quickcheck_lib",
+    src = "quickcheck_lib.ml",
+    intf = ":_Quickcheck_lib.cmi",
+    ns = ":Quickcheck_lib_nonconsensus_ns",
+    opts = QUICKCHECK_LIB_NONCONSENSUS_MODULE_OPTS,
+    ppx = QUICKCHECK_LIB_NONCONSENSUS_PPX,
+    ppx_args = QUICKCHECK_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = QUICKCHECK_LIB_NONCONSENSUS_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Quickcheck_lib.cmi",
+    src = "quickcheck_lib.mli",
+    ns = ":Quickcheck_lib_nonconsensus_ns",
+    opts = QUICKCHECK_LIB_NONCONSENSUS_INTERFACE_OPTS,
+    ppx = QUICKCHECK_LIB_NONCONSENSUS_PPX,
+    ppx_args = QUICKCHECK_LIB_NONCONSENSUS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = QUICKCHECK_LIB_NONCONSENSUS_DEPS,
+)
