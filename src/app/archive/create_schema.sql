@@ -8,6 +8,7 @@ CREATE INDEX idx_public_keys_value ON public_keys(value);
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
 , public_key_id           int       NOT NULL REFERENCES public_keys(id)
+, token                   bigint    NOT NULL
 , initial_balance         bigint    NOT NULL
 , initial_minimum_balance bigint    NOT NULL
 , cliff_time              bigint    NOT NULL

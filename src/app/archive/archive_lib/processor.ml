@@ -101,6 +101,7 @@ end
 module Timing_info = struct
   type t =
     { public_key_id: int
+    ; token: int64
     ; initial_balance: int64
     ; initial_minimum_balance: int64
     ; cliff_time: int64
@@ -111,7 +112,9 @@ module Timing_info = struct
 
   let typ =
     let open Caqti_type_spec in
-    let spec = Caqti_type.[int; int64; int64; int64; int64; int64; int64] in
+    let spec =
+      Caqti_type.[int; int64; int64; int64; int64; int64; int64; int64]
+    in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
@@ -146,9 +149,13 @@ module Timing_info = struct
         return id
     | None ->
         let values =
+          let token =
+            Token_id.to_uint64 (Account.token acc) |> Unsigned.UInt64.to_int64
+          in
           match acc.timing with
           | Timed timing ->
               { public_key_id
+              ; token
               ; initial_balance= balance_to_int64 acc.balance
               ; initial_minimum_balance=
                   balance_to_int64 timing.initial_minimum_balance
@@ -159,6 +166,7 @@ module Timing_info = struct
           | Untimed ->
               let zero = Int64.zero in
               { public_key_id
+              ; token
               ; initial_balance= balance_to_int64 acc.balance
               ; initial_minimum_balance= zero
               ; cliff_time= zero
@@ -169,9 +177,9 @@ module Timing_info = struct
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              "INSERT INTO timing_info \
-              (public_key_id,initial_balance,initial_minimum_balance, \
+              (public_key_id,token,initial_balance,initial_minimum_balance, \
               cliff_time, cliff_amount, vesting_period, vesting_increment ) \
-              VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
           values
 end
 
