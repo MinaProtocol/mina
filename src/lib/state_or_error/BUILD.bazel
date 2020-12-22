@@ -1,0 +1,116 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY STATE_OR_ERROR
+################################################################
+STATE_OR_ERROR_MODULE_OPTS = []
+
+STATE_OR_ERROR_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    # "@opam//pkg:ppx_fields_conv",  # obazl:retain
+]
+
+##############
+ocaml_archive(
+    name = "state_or_error",
+    doc = "State monad with or_error",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = STATE_OR_ERROR_DEPS + [
+        # do not sort (buildifier)
+        ":_State_or_error",
+        ":_State_or_error_intf",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "State_or_error_ns",
+    ns = "state_or_error",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "state_or_error.ml",
+        "state_or_error_intf.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_State_or_error",
+    src = "state_or_error.ml",
+    ns = ":State_or_error_ns",
+    opts = STATE_OR_ERROR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "state_or_error",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = STATE_OR_ERROR_DEPS + [
+        # do not sort (buildifier)
+        ":_State_or_error_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_State_or_error_intf",
+    src = "state_or_error_intf.ml",
+    ns = ":State_or_error_ns",
+    opts = STATE_OR_ERROR_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "state_or_error",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = STATE_OR_ERROR_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/state_or_error:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

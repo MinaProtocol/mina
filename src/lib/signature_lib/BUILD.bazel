@@ -1,0 +1,210 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY SIGNATURE_LIB
+################################################################
+SIGNATURE_LIB_INTERFACE_OPTS = []
+
+SIGNATURE_LIB_MODULE_OPTS = []
+
+SIGNATURE_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/blake2",
+    "@mina//src/lib/hash_prefix_states",
+    "@mina//src/lib/non_zero_curve_point",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+    "@mina//src/lib/random_oracle",
+    "@mina//src/lib/snark_params",
+    "@snarky//src/base:snarky_backendless",
+]
+
+##############
+ocaml_archive(
+    name = "signature_lib",
+    doc = "Schnorr signatures using the tick and tock curves",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = SIGNATURE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Keypair",
+        ":_Private_key",
+        ":_Public_key",
+        ":_Schnorr",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Signature_lib_ns",
+    ns = "signature_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "keypair.ml",
+        "private_key.ml",
+        "public_key.ml",
+        "schnorr.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Keypair",
+    src = "keypair.ml",
+    intf = ":_Keypair.cmi",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+        ":_Public_key",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Keypair.cmi",
+    src = "keypair.mli",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+        ":_Public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Private_key",
+    src = "private_key.ml",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Public_key",
+    src = "public_key.ml",
+    intf = ":_Public_key.cmi",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Public_key.cmi",
+    src = "public_key.mli",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Private_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Schnorr",
+    src = "schnorr.ml",
+    ns = ":Signature_lib_ns",
+    opts = SIGNATURE_LIB_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "signature_lib",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = SIGNATURE_LIB_DEPS + [
+        ":_Private_key"         # obazl:retain
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/signature_lib:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)
