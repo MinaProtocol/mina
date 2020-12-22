@@ -1,0 +1,28 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "web_client_pipe",
+    src = "web_client_pipe.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.std",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "web_client_pipe",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/error_json",
+        "@mina//src/lib/logger",
+        "@mina//src/lib/pipe_lib",
+        "@mina//src/lib/web_request",
+        "@opam//pkg:async",
+        "@opam//pkg:core",
+    ],
+)
