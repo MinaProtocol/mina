@@ -8,6 +8,7 @@
   (libraries
     ;;zexe_backend.common
     zexe_backend.tweedle
+    zexe_backend.pasta
     hex
     pickles_types
     marlin_plonk_bindings

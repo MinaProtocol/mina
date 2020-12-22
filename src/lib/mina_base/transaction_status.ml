@@ -623,7 +623,7 @@ module Failure = struct
     | None ->
         failwith
           "Internal error: Could not convert User_command.Status.Failure.t to \
-           User_command_status.Failure.As_record.t"
+           Transaction_status.Failure.As_record.t"
 
   let to_record_opt t =
     match t with None -> As_record.none | Some t -> to_record t
@@ -694,6 +694,98 @@ module Balance_data = struct
     {fee_payer_balance= None; source_balance= None; receiver_balance= None}
 end
 
+module Coinbase_balance_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { coinbase_receiver_balance: Currency.Balance.Stable.V1.t
+        ; fee_transfer_receiver_balance: Currency.Balance.Stable.V1.t option }
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_balance_data_exn
+      {Balance_data.fee_payer_balance; source_balance; receiver_balance} =
+    ( match source_balance with
+    | Some _ ->
+        failwith
+          "Unexpected source balance for Coinbase_balance_data.of_balance_data"
+    | None ->
+        () ) ;
+    let coinbase_receiver_balance =
+      match fee_payer_balance with
+      | Some balance ->
+          balance
+      | None ->
+          failwith
+            "Missing fee-payer balance for \
+             Coinbase_balance_data.of_balance_data"
+    in
+    {coinbase_receiver_balance; fee_transfer_receiver_balance= receiver_balance}
+
+  let to_balance_data {coinbase_receiver_balance; fee_transfer_receiver_balance}
+      =
+    { Balance_data.fee_payer_balance= Some coinbase_receiver_balance
+    ; source_balance= None
+    ; receiver_balance= fee_transfer_receiver_balance }
+end
+
+module Fee_transfer_balance_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { receiver1_balance: Currency.Balance.Stable.V1.t
+        ; receiver2_balance: Currency.Balance.Stable.V1.t option }
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_balance_data_exn
+      {Balance_data.fee_payer_balance; source_balance; receiver_balance} =
+    ( match source_balance with
+    | Some _ ->
+        failwith
+          "Unexpected source balance for \
+           Fee_transfer_balance_data.of_balance_data"
+    | None ->
+        () ) ;
+    let receiver1_balance =
+      match fee_payer_balance with
+      | Some balance ->
+          balance
+      | None ->
+          failwith
+            "Missing fee-payer balance for \
+             Fee_transfer_balance_data.of_balance_data"
+    in
+    {receiver1_balance; receiver2_balance= receiver_balance}
+
+  let to_balance_data {receiver1_balance; receiver2_balance} =
+    { Balance_data.fee_payer_balance= Some receiver1_balance
+    ; source_balance= None
+    ; receiver_balance= receiver2_balance }
+end
+
+module Internal_command_balance_data = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        | Coinbase of Coinbase_balance_data.Stable.V1.t
+        | Fee_transfer of Fee_transfer_balance_data.Stable.V1.t
+      [@@deriving sexp, yojson, eq, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Auxiliary_data = struct
   [%%versioned
   module Stable = struct
@@ -727,3 +819,7 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+let balance_data = function
+  | Applied (_, balances) | Failed (_, balances) ->
+      balances

@@ -173,7 +173,7 @@ module Time : sig
   val gen : t Quickcheck.Generator.t
 end
 
-include module type of Time
+include module type of Time with type t = Time.t
 
 module Timeout :
   sig
