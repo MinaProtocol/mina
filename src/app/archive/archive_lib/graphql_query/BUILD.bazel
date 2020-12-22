@@ -1,0 +1,219 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+GRAPHQL_SCHEMA_FILE = "archive_graphql_schema.json"
+GRAPHQL_SCHEMA_PATH = "src/app/archive/"   + GRAPHQL_SCHEMA_FILE
+GRAPHQL_SCHEMA_JSON = "//src/app/archive:" + GRAPHQL_SCHEMA_FILE
+
+INLINE_TEST_LIB = "rosetta-lib"
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY GRAPHQL_QUERY
+################################################################
+GRAPHQL_QUERY_MODULE_OPTS = []
+
+GRAPHQL_QUERY_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/graphql_lib",
+]
+
+##############
+ocaml_archive(
+    name = "graphql_query",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = GRAPHQL_QUERY_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_types",
+        ":_Blocks",
+        ":_Clear_data",
+        ":_Fee_transfers",
+        ":_Graphql_query",
+        ":_Public_keys",
+        ":_User_commands",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Graphql_query_ns",
+    ns = "graphql_query",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "base_types.ml",
+        "blocks.ml",
+        "clear_data.ml",
+        "fee_transfers.ml",
+        "graphql_query.ml",
+        "public_keys.ml",
+        "user_commands.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Base_types",
+    src = "base_types.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS + [
+        "-w", "-3" # Deprecated synonym for the ’deprecated’ alert.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = GRAPHQL_QUERY_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Blocks",
+    src = "blocks.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = GRAPHQL_QUERY_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Clear_data",
+    src = "clear_data.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = GRAPHQL_QUERY_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Fee_transfers",
+    src = "fee_transfers.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = GRAPHQL_QUERY_DEPS + [
+        ":_Base_types"          # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Graphql_query",
+    src = "graphql_query.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = GRAPHQL_QUERY_DEPS + [
+        # do not sort (buildifier)
+        ":_Base_types",
+        ":_Blocks",
+        ":_Fee_transfers",
+        ":_Public_keys",
+        ":_User_commands",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Public_keys",
+    src = "public_keys.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    deps = GRAPHQL_QUERY_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_User_commands",
+    src = "user_commands.ml",
+    ns = ":Graphql_query_ns",
+    opts = GRAPHQL_QUERY_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib", INLINE_TEST_LIB,
+        "-schema", GRAPHQL_SCHEMA_PATH,
+    ],
+    ppx_data = [GRAPHQL_SCHEMA_JSON],
+    ppx_print = PPX_PRINT,      # obazl:retain
+    deps = GRAPHQL_QUERY_DEPS + [
+        ":_Base_types"          # obazl:retain
+    ]
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/app/archive/archive_lib/graphql_query:__pkg__",
+    ],
+    deps = [
+        "@graphql_ppx//src/native:graphql_ppx",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
