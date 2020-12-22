@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: archive-daemon-config
+  name: "{{ template "archive-node.fullname" . }}-daemon-config"
   labels:
     app: {{ template "archive-node.fullname" . }}
     heritage: {{ .Release.Service }}
