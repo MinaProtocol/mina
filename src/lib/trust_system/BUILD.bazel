@@ -1,0 +1,227 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRUST_SYSTEM
+################################################################
+TRUST_SYSTEM_INTERFACE_OPTS = []
+
+TRUST_SYSTEM_MODULE_OPTS = []
+
+TRUST_SYSTEM_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@mina//src/lib/network_peer",
+    "@mina//src/lib/key_value_database",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/pipe_lib",
+    "@mina//src/lib/rocksdb",
+    "@mina//src/lib/mina_metrics",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+]
+
+##############
+ocaml_archive(
+    name = "trust_system",
+    doc = "Track how much we trust peers",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Banned_status",
+        ":_Peer_status",
+        ":_Peer_trust",
+        ":_Record",
+        ":_Trust_system",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Trust_system_ns",
+    ns = "trust_system",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "banned_status.ml",
+        "peer_status.ml",
+        "peer_trust.ml",
+        "record.ml",
+        "trust_system.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Banned_status",
+    src = "banned_status.ml",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Peer_status",
+    src = "peer_status.ml",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        ":_Banned_status"       # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Peer_trust",
+    src = "peer_trust.ml",
+    intf = ":_Peer_trust.cmi",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Record",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Peer_trust.cmi",
+    src = "peer_trust.mli",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Peer_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Record",
+    src = "record.ml",
+    intf = ":_Record.cmi",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Banned_status",
+        ":_Peer_status",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Record.cmi",
+    src = "record.mli",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Peer_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Trust_system",
+    src = "trust_system.ml",
+    ns = ":Trust_system_ns",
+    opts = TRUST_SYSTEM_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "trust_system",
+    ],
+    deps = TRUST_SYSTEM_DEPS + [
+        # do not sort (buildifier)
+        ":_Banned_status",
+        ":_Peer_status",
+        ":_Peer_trust",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+        "@opam//pkg:fieldslib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/trust_system:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@mina//src/lib/ppx_register_event",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_fields_conv",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)
