@@ -133,7 +133,7 @@ module Ipa = struct
     let field =
       (module Tock.Field : Zexe_backend.Field.S with type t = Tock.Field.t)
 
-    let endo_to_field = Endo.Dee.to_field
+    let endo_to_field = Endo.Step_inner_curve.to_field
 
     let compute_challenge c = compute_challenge field ~endo_to_field c
 
@@ -141,7 +141,7 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Marlin_plonk_bindings_tweedle_fp_urs.b_poly_commitment
+        Marlin_plonk_bindings_pasta_fq_urs.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
@@ -152,7 +152,7 @@ module Ipa = struct
     let field =
       (module Tick.Field : Zexe_backend.Field.S with type t = Tick.Field.t)
 
-    let endo_to_field = Endo.Dum.to_field
+    let endo_to_field = Endo.Wrap_inner_curve.to_field
 
     let compute_challenge c = compute_challenge field ~endo_to_field c
 
@@ -160,7 +160,7 @@ module Ipa = struct
 
     let compute_sg chals =
       let comm =
-        Marlin_plonk_bindings_tweedle_fq_urs.b_poly_commitment
+        Marlin_plonk_bindings_pasta_fp_urs.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
       in
@@ -175,7 +175,7 @@ module Ipa = struct
         Array.of_list_map comm_chals ~f:(fun (comm, _) ->
             Or_infinity.Finite comm )
       in
-      Marlin_plonk_bindings.Tweedle_fq_urs.batch_accumulator_check
+      Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check
         (Backend.Tick.Keypair.load_urs ())
         comms chals
   end

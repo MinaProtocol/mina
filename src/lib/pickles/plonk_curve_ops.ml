@@ -78,6 +78,7 @@ struct
           let fin = state.(Int.(n - 2)) in
           (fin.xs, fin.ys)
       in
+      assert_ (Constraint.boolean (scalar.(0) :> Field.t)) ;
       let tp = add_fast p (G.negate t) in
       G.if_ scalar.(0) ~then_:p ~else_:tp
 

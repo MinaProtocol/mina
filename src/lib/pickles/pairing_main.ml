@@ -28,20 +28,11 @@ struct
 
     module Constant = Other_field
 
-    type t = (* Low bits, high bit *)
-      Field.t * Boolean.var
+    type t = Impls.Step.Other_field.t
 
-    let typ =
-      Typ.transport
-        (Typ.tuple2 Field.typ Boolean.typ)
-        ~there:(fun x ->
-          let low, high = Util.split_last (Other_field.to_bits x) in
-          (Field.Constant.project low, high) )
-        ~back:(fun (low, high) ->
-          let low, _ = Util.split_last (Field.Constant.unpack low) in
-          Other_field.of_bits (low @ [high]) )
+    let typ = Impls.Step.Other_field.typ
 
-    let to_bits_unsafe (x, b) =
+    let to_bits_unsafe ((x, b) : t) =
       Step_main_inputs.Unsafe.unpack_unboolean x
         ~length:(Field.size_in_bits - 1)
       @ [b]
@@ -94,14 +85,15 @@ struct
     absorb
       ~absorb_field:(fun x -> Sponge.absorb sponge (`Field x))
       ~g1_to_field_elements:Inner_curve.to_field_elements
-      ~absorb_scalar:(fun (low_bits, high_bit) ->
-        Sponge.absorb sponge (`Field low_bits) ;
-        Sponge.absorb sponge (`Bits [high_bit]) )
+      ~absorb_scalar:(fun (x, b) ->
+        Sponge.absorb sponge (`Field x) ;
+        Sponge.absorb sponge (`Bits [b]) )
       ~mask_g1_opt:(fun ((b : Boolean.var), (x, y)) ->
         Field.((b :> t) * x, (b :> t) * y) )
       ty t
 
-  module Scalar_challenge = SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Dee)
+  module Scalar_challenge =
+    SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
   module Ops = Step_main_inputs.Ops
 
   module Inner_curve = struct
@@ -292,17 +284,17 @@ struct
         (Scalar_challenge t2 : _ Pickles_types.Scalar_challenge.t) =
       Field.Assert.equal t1 t2
     in
-    chal m1.beta m2.beta ;
-    chal m1.gamma m2.gamma ;
-    scalar_chal m1.alpha m2.alpha ;
-    scalar_chal m1.zeta m2.zeta
+    with_label __LOC__ (fun () -> chal m1.beta m2.beta) ;
+    with_label __LOC__ (fun () -> chal m1.gamma m2.gamma) ;
+    with_label __LOC__ (fun () -> scalar_chal m1.alpha m2.alpha) ;
+    with_label __LOC__ (fun () -> scalar_chal m1.zeta m2.zeta)
 
   let lagrange_commitment ~domain i =
     let d =
-      Zexe_backend.Tweedle.Precomputed.Lagrange_precomputations
+      Zexe_backend.Pasta.Precomputed.Lagrange_precomputations
       .index_of_domain_log2 (Domain.log2_size domain)
     in
-    match Precomputed.Lagrange_precomputations.dee.(d).(i) with
+    match Precomputed.Lagrange_precomputations.pallas.(d).(i) with
     | [|g|] ->
         Inner_curve.Constant.of_affine g
     | _ ->
@@ -792,7 +784,8 @@ struct
     Shifted_value.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" = SC.test (module Impl) ~endo:Endo.Dum.scalar
+  let%test_unit "endo scalar" =
+    SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
    It
@@ -886,7 +879,9 @@ struct
     let xi_actual = squeeze () in
     let r_actual = squeeze () in
     let xi_correct = equal (pack xi_actual) (pack_scalar_challenge xi) in
-    let scalar = SC.to_field_checked (module Impl) ~endo:Endo.Dum.scalar in
+    let scalar =
+      SC.to_field_checked (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
+    in
     let plonk =
       Types.Pairing_based.Proof_state.Deferred_values.Plonk.In_circuit
       .map_challenges ~f:Field.pack ~scalar plonk
@@ -970,7 +965,7 @@ struct
       let e = Fn.flip actual_evaluation in
       Plonk_checks.checked
         (module Impl)
-        ~endo:(Impl.Field.constant Endo.Dee.base)
+        ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
         ~domain ~shift plonk ~mds:sponge_params.mds
         ( Dlog_plonk_types.Evals.map ~f:(e plonk.zeta) evals1
         , Dlog_plonk_types.Evals.map ~f:(e zetaw) evals2 )

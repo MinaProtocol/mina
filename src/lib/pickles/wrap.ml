@@ -207,7 +207,9 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let r = scalar_chal O.u in
     let xi = scalar_chal O.v in
     let to_field =
-      SC.to_field_constant (module Tick.Field) ~endo:Endo.Dum.scalar
+      SC.to_field_constant
+        (module Tick.Field)
+        ~endo:Endo.Wrap_inner_curve.scalar
     in
     let module As_field = struct
       let r = to_field r
@@ -266,7 +268,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     let plonk =
       Plonk_checks.derive_plonk
         (module Tick.Field)
-        ~shift:Shifts.tick ~endo:Endo.Dee.base
+        ~shift:Shifts.tick ~endo:Endo.Step_inner_curve.base
         ~mds:Tick_field_sponge.params.mds
         ~domain:
           (Plonk_checks.domain
@@ -314,8 +316,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
     Common.time "wrap proof" (fun () ->
         Impls.Wrap.generate_witness_conv
           ~f:(fun {Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs} ->
-            Zexe_backend.Tweedle.Dee_based_plonk.Proof.create_async
-              ~primary:public_inputs ~auxiliary:auxiliary_inputs pk
+            Backend.Tock.Proof.create_async ~primary:public_inputs
+              ~auxiliary:auxiliary_inputs pk
               ~message:
                 ( Vector.map2
                     (Vector.extend_exn prev_statement.proof_state.me_only.sg

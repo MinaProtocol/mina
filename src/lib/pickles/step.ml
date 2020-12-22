@@ -76,27 +76,6 @@ struct
       in
       branch_data.rule.main_value prevs next_state
     in
-    (*
-    let prev_with_proofs =
-      let rec go
-        : type a b c.
-          (a, b, c) H3.T(P.With_data).t
-          -> (a, b, c) H3.T(E03(Bool)).t
-          -> (a, b, c) H3.T(P.With_data).t
-        =
-        fun ps must_verifys ->
-          match ps, must_verifys with
-          | [], [] -> []
-          | T p :: ps, must_verify :: must_verifys ->
-            let sg =
-              if not must_verify then
-                Ipa.Wrap.compute_sg u.deferred_values.bulletproof_challenges
-              else sg 
-            in
-      in
-      go
-    in
-*)
     let module X_hat = struct
       type t = Tock.Field.t Double.t
     end in
@@ -141,7 +120,9 @@ struct
                                                                        .which_branch)
           in
           let to_field =
-            SC.to_field_constant (module Tick.Field) ~endo:Endo.Dum.scalar
+            SC.to_field_constant
+              (module Tick.Field)
+              ~endo:Endo.Wrap_inner_curve.scalar
           in
           let alpha = to_field plonk0.alpha in
           let zeta = to_field plonk0.zeta in
@@ -152,7 +133,7 @@ struct
           time "plonk_checks" (fun () ->
               Plonk_checks.derive_plonk
                 (module Tick.Field)
-                ~endo:Endo.Dee.base ~shift:Shifts.tick
+                ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
                 ~mds:Tick_field_sponge.params.mds
                 ~domain:
                   (Plonk_checks.domain
@@ -235,7 +216,9 @@ struct
         let r = scalar_chal O.u in
         let sponge_digest_before_evaluations = O.digest_before_evaluations o in
         let to_field =
-          SC.to_field_constant (module Tock.Field) ~endo:Endo.Dee.scalar
+          SC.to_field_constant
+            (module Tock.Field)
+            ~endo:Endo.Step_inner_curve.scalar
         in
         let module As_field = struct
           let r = to_field r
@@ -330,7 +313,7 @@ struct
         let plonk =
           Plonk_checks.derive_plonk
             (module Tock.Field)
-            ~shift:Shifts.tock ~endo:Endo.Dum.base
+            ~shift:Shifts.tock ~endo:Endo.Wrap_inner_curve.base
             ~mds:Tock_field_sponge.params.mds
             ~domain:
               (Plonk_checks.domain
@@ -515,8 +498,8 @@ struct
           Impls.Step.generate_witness_conv
             ~f:
               (fun {Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs} ->
-              Zexe_backend.Tweedle.Dum_based_plonk.Proof.create_async
-                ~primary:public_inputs ~auxiliary:auxiliary_inputs
+              Backend.Tick.Proof.create_async ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs
                 ~message:
                   (* emphatically NOT padded with dummies *)
                   Vector.(

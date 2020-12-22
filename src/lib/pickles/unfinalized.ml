@@ -43,7 +43,7 @@ module Constant = struct
         { plonk=
             { (Plonk_checks.derive_plonk
                  (module Tock.Field)
-                 ~shift ~endo:Endo.Dum.base (* I think this is right *)
+                 ~shift ~endo:Endo.Wrap_inner_curve.base
                  ~mds:Tock_field_sponge.params.mds
                  ~domain:
                    (Plonk_checks.domain
