@@ -1,0 +1,26 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+#############
+ocaml_module(
+    name = "outside_hash_image",
+    src = "outside_hash_image.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version__ppx_optcomp",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    ppx_data = CONFIG_MLH,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/snark_params",
+    ],
+)

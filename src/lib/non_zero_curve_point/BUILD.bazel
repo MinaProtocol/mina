@@ -1,0 +1,128 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY NON_ZERO_CURVE_POINT
+################################################################
+NON_ZERO_CURVE_POINT_MODULE_OPTS = []
+
+NON_ZERO_CURVE_POINT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/snark_params",
+    "@snarky//fold_lib",
+    "@mina//src/lib/codable",
+    "@ppx_version//src/runtime:ppx_version_runtime",
+]
+
+##############
+ocaml_archive(
+    name = "non_zero_curve_point",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = NON_ZERO_CURVE_POINT_DEPS + [
+        # do not sort (buildifier)
+        ":_Compressed_poly",
+        ":_Non_zero_curve_point",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Non_zero_curve_point_ns",
+    ns = "non_zero_curve_point",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "compressed_poly.ml",
+        "non_zero_curve_point.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Compressed_poly",
+    src = "compressed_poly.ml",
+    ns = ":Non_zero_curve_point_ns",
+    opts = NON_ZERO_CURVE_POINT_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "non_zero_curve_point",
+    ],
+    ppx_data = CONFIG_MLH,
+    ppx_print = PPX_PRINT,
+    deps = NON_ZERO_CURVE_POINT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Non_zero_curve_point",
+    src = "non_zero_curve_point.ml",
+    ns = ":Non_zero_curve_point_ns",
+    opts = NON_ZERO_CURVE_POINT_MODULE_OPTS + [
+        "-w", "-32" # Unused value declaration.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "non_zero_curve_point",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = NON_ZERO_CURVE_POINT_DEPS + [
+        # do not sort (buildifier)
+        ":_Compressed_poly",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/non_zero_curve_point:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+        "@snarky//h_list/ppx:ppx_h_list",
+        "@snarky//ppx:ppx_snarky",
+    ],
+)

@@ -1,0 +1,147 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY PERF_HISTOGRAMS
+################################################################
+PERF_HISTOGRAMS_INTERFACE_OPTS = []
+
+PERF_HISTOGRAMS_MODULE_OPTS = []
+
+PERF_HISTOGRAMS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:yojson",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@mina//src/lib/mina_metrics",
+]
+
+PERF_HISTOGRAMS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq__ppx_deriving_yojson"
+
+PERF_HISTOGRAMS_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "perf_histograms",
+]
+
+##############
+ocaml_archive(
+    name = "perf_histograms",
+    doc = "Performance monitoring with histograms",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+        ":_Intf",
+        ":_Perf_histograms",
+        ":_Perf_histograms0",
+        ":_Rpc",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Perf_histograms_ns",
+    ns = "perf_histograms",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "histogram.ml",
+        "intf.ml",
+        "perf_histograms.ml",
+        "perf_histograms0.ml",
+        "rpc.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Histogram",
+    src = "histogram.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Perf_histograms",
+    src = "perf_histograms.ml",
+    intf = ":_Perf_histograms.cmi",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+        ":_Perf_histograms0",
+        ":_Rpc",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Perf_histograms.cmi",
+    src = "perf_histograms.mli",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_INTERFACE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Perf_histograms0",
+    src = "perf_histograms0.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Histogram",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Rpc",
+    src = "rpc.ml",
+    ns = ":Perf_histograms_ns",
+    opts = PERF_HISTOGRAMS_MODULE_OPTS,
+    ppx = PERF_HISTOGRAMS_PPX,
+    ppx_args = PERF_HISTOGRAMS_PPX_ARGS,
+    deps = PERF_HISTOGRAMS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Perf_histograms0"    # obazl:retain
+    ],
+)

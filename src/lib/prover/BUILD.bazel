@@ -1,0 +1,109 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY PROVER
+################################################################
+PROVER_INTERFACE_OPTS = []
+
+PROVER_MODULE_OPTS = []
+
+PROVER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:rpc_parallel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/blockchain_snark",
+    "@mina//src/lib/memory_stats",
+    "@mina//src/lib/precomputed_values",
+    "@mina//src/lib/child_processes",
+]
+
+PROVER_PPX = "@//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane"
+
+PROVER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "prover",
+]
+
+##############
+ocaml_archive(
+    name = "prover",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PROVER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Prover",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Prover_ns",
+    ns = "prover",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "intf.ml",
+        "prover.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Prover_ns",
+    opts = PROVER_MODULE_OPTS,
+    ppx = PROVER_PPX,
+    ppx_args = PROVER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = PROVER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Prover",
+    src = "prover.ml",
+    intf = ":_Prover.cmi",
+    ns = ":Prover_ns",
+    opts = PROVER_MODULE_OPTS,
+    ppx = PROVER_PPX,
+    ppx_args = PROVER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = PROVER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Prover.cmi",
+    src = "prover.mli",
+    ns = ":Prover_ns",
+    opts = PROVER_INTERFACE_OPTS,
+    ppx = PROVER_PPX,
+    ppx_args = PROVER_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = PROVER_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
