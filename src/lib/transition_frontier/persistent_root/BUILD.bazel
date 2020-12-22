@@ -1,0 +1,25 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "persistent_root",
+    src = "persistent_root.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_jane__ppx_coda__ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "persistent_root",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/transition_frontier/full_frontier",
+        "@opam//pkg:core_kernel",
+    ],
+)

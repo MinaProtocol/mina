@@ -1,0 +1,98 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY TRANSITION_FRONTIER
+################################################################
+TRANSITION_FRONTIER_INTERFACE_OPTS = []
+
+TRANSITION_FRONTIER_MODULE_OPTS = []
+
+TRANSITION_FRONTIER_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@mina//src/lib/transition_frontier/frontier_base",
+    "@mina//src/lib/transition_frontier/persistent_root",
+    "@mina//src/lib/transition_frontier/persistent_frontier",
+    "@mina//src/lib/transition_frontier/full_frontier",
+    "@mina//src/lib/transition_frontier/extensions",
+]
+
+TRANSITION_FRONTIER_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_coda__ppx_version__ppx_deriving.eq__ppx_deriving_yojson"
+
+TRANSITION_FRONTIER_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "transition_frontier",
+]
+
+##############
+ocaml_archive(
+    name = "transition_frontier",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = TRANSITION_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Catchup_hash_tree",
+        ":_Transition_frontier",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Transition_frontier_ns",
+    ns = "transition_frontier",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "catchup_hash_tree.ml",
+        "transition_frontier.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Catchup_hash_tree",
+    src = "catchup_hash_tree.ml",
+    ns = ":Transition_frontier_ns",
+    opts = TRANSITION_FRONTIER_MODULE_OPTS,
+    ppx = TRANSITION_FRONTIER_PPX,
+    ppx_args = TRANSITION_FRONTIER_PPX_ARGS,
+    deps = TRANSITION_FRONTIER_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transition_frontier",
+    src = "transition_frontier.ml",
+    intf = ":_Transition_frontier.cmi",
+    ns = ":Transition_frontier_ns",
+    opts = TRANSITION_FRONTIER_MODULE_OPTS,
+    ppx = TRANSITION_FRONTIER_PPX,
+    ppx_args = TRANSITION_FRONTIER_PPX_ARGS,
+    deps = TRANSITION_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Catchup_hash_tree",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Transition_frontier.cmi",
+    src = "transition_frontier.mli",
+    ns = ":Transition_frontier_ns",
+    opts = TRANSITION_FRONTIER_INTERFACE_OPTS,
+    ppx = TRANSITION_FRONTIER_PPX,
+    ppx_args = TRANSITION_FRONTIER_PPX_ARGS,
+    deps = TRANSITION_FRONTIER_DEPS + [
+        # do not sort (buildifier)
+        ":_Catchup_hash_tree",
+    ],
+)

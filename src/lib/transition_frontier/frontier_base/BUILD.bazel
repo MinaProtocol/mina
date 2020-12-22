@@ -1,0 +1,186 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY FRONTIER_BASE
+################################################################
+FRONTIER_BASE_INTERFACE_OPTS = []
+
+FRONTIER_BASE_MODULE_OPTS = []
+
+FRONTIER_BASE_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/staged_ledger",
+    "@mina//src/lib/base58_check",
+]
+
+FRONTIER_BASE_PPX = "@//bzl/ppx/exe:ppx_jane__ppx_coda__ppx_version__ppx_deriving.std__ppx_deriving_yojson"
+
+FRONTIER_BASE_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "frontier_base",
+]
+
+##############
+ocaml_archive(
+    name = "frontier_base",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Diff",
+        ":_Frontier_intf",
+        ":_Root_data",
+        ":_Root_identifier",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Frontier_base_ns",
+    ns = "frontier_base",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "breadcrumb.ml",
+        "diff.ml",
+        "frontier_intf.ml",
+        "root_data.ml",
+        "root_identifier.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Breadcrumb",
+    src = "breadcrumb.ml",
+    intf = ":_Breadcrumb.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Breadcrumb.cmi",
+    src = "breadcrumb.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Diff",
+    src = "diff.ml",
+    intf = ":_Diff.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS + [
+        "-w", "-34" # Unused type declaration.
+    ],
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Root_data",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Diff.cmi",
+    src = "diff.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+        ":_Root_data",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Frontier_intf",
+    src = "frontier_intf.ml",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Root_data",
+    src = "root_data.ml",
+    intf = ":_Root_data.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Root_data.cmi",
+    src = "root_data.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS + [
+        # do not sort (buildifier)
+        ":_Breadcrumb",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Root_identifier",
+    src = "root_identifier.ml",
+    intf = ":_Root_identifier.cmi",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_MODULE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Root_identifier.cmi",
+    src = "root_identifier.mli",
+    ns = ":Frontier_base_ns",
+    opts = FRONTIER_BASE_INTERFACE_OPTS,
+    ppx = FRONTIER_BASE_PPX,
+    ppx_args = FRONTIER_BASE_PPX_ARGS,
+    deps = FRONTIER_BASE_DEPS,
+)
