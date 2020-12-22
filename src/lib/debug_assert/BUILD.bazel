@@ -1,0 +1,37 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "debug_assert",
+    src = "debug_assert.ml",
+    intf = ":_Debug_assert.cmi",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@opam//pkg:async_kernel",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Debug_assert.cmi",
+    src = "debug_assert.mli",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = [
+        "@opam//pkg:async_kernel",
+    ],
+)

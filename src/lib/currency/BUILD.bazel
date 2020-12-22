@@ -1,0 +1,136 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+PPX_PRINT = "@ppx//print:binary"
+
+################################################################
+## STANZA 1: LIBRARY CURRENCY
+################################################################
+CURRENCY_INTERFACE_OPTS = []
+
+CURRENCY_MODULE_OPTS = []
+
+CURRENCY_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@mina//src/lib/coda_numbers",
+    "@snarky//fold_lib",
+    "@snarky//tuple_lib",
+    "@mina//src/lib/snark_bits",
+    "@mina//src/lib/sgn",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/random_oracle",
+    "@mina//src/lib/unsigned_extended",
+    "@mina//src/lib/test_util",
+    "@mina//src/lib/codable",
+    "@mina//src/lib/ppx_dhall_type",
+]
+
+CURRENCY_PPX = "@//bzl/ppx/exe:ppx_coda__ppx_version__ppx_let__ppx_assert__ppx_bin_prot__ppx_sexp_conv__ppx_compare__ppx_hash__ppx_optcomp__ppx_custom_printf__ppx_deriving.std__ppx_deriving_yojson__h_list.ppx__ppx_inline_test"
+
+CURRENCY_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "currency",
+]
+
+##############
+ocaml_archive(
+    name = "currency",
+    doc = "Currency types",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CURRENCY_DEPS + [
+        # do not sort (buildifier)
+        ":_Currency",
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Currency_ns",
+    ns = "currency",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "currency.ml",
+        "intf.ml",
+        "signed_poly.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Currency",
+    src = "currency.ml",
+    intf = ":_Currency.cmi",
+    ns = ":Currency_ns",
+    opts = CURRENCY_MODULE_OPTS + [
+        "-w", "-32" # Unused value declaration.
+    ],
+    ppx = CURRENCY_PPX,
+    ppx_args = CURRENCY_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Currency.cmi",
+    src = "currency.mli",
+    ns = ":Currency_ns",
+    opts = CURRENCY_INTERFACE_OPTS,
+    ppx = CURRENCY_PPX,
+    ppx_args = CURRENCY_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+        ":_Signed_poly",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Currency_ns",
+    opts = CURRENCY_MODULE_OPTS,
+    ppx = CURRENCY_PPX,
+    ppx_args = CURRENCY_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = CURRENCY_DEPS + [
+        # do not sort (buildifier)
+        ":_Signed_poly",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signed_poly",
+    src = "signed_poly.ml",
+    ns = ":Currency_ns",
+    opts = CURRENCY_MODULE_OPTS,
+    ppx = CURRENCY_PPX,
+    ppx_args = CURRENCY_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    ppx_print = PPX_PRINT,
+    deps = CURRENCY_DEPS,
+)

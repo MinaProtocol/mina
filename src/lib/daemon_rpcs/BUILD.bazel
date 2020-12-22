@@ -1,0 +1,139 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY DAEMON_RPCS
+################################################################
+DAEMON_RPCS_MODULE_OPTS = []
+
+DAEMON_RPCS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/user_command_input",
+    "@mina//src/lib/mina_networking",
+    "@mina//src/lib/perf_histograms",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/sync_status",
+    "@mina//src/lib/transaction_status",
+    "@mina//src/lib/node_addrs_and_ports",
+    "@mina//src/lib/cli_lib",
+]
+
+##############
+ocaml_archive(
+    name = "daemon_rpcs",
+    doc = "Lib powering the client interactions with the daemon",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = DAEMON_RPCS_DEPS + [
+        # do not sort (buildifier)
+        ":_Client",
+        ":_Daemon_rpcs",
+        ":_Types",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Daemon_rpcs_ns",
+    ns = "daemon_rpcs",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "client.ml",
+        "daemon_rpcs.ml",
+        "types.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Client",
+    src = "client.ml",
+    ns = ":Daemon_rpcs_ns",
+    opts = DAEMON_RPCS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "daemon_rpcs",
+    ],
+    deps = DAEMON_RPCS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Daemon_rpcs",
+    src = "daemon_rpcs.ml",
+    ns = ":Daemon_rpcs_ns",
+    opts = DAEMON_RPCS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "daemon_rpcs",
+    ],
+    deps = DAEMON_RPCS_DEPS + [
+        # do not sort (buildifier)
+        ":_Client",
+        ":_Types",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Types",
+    src = "types.ml",
+    ns = ":Daemon_rpcs_ns",
+    opts = DAEMON_RPCS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "daemon_rpcs",
+    ],
+    deps = DAEMON_RPCS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/daemon_rpcs:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.make",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
