@@ -1,0 +1,131 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY BASE58_CHECK
+################################################################
+BASE58_CHECK_INTERFACE_OPTS = []
+
+BASE58_CHECK_MODULE_OPTS = []
+
+BASE58_CHECK_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:digestif.c",
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:base58",
+]
+
+##############
+ocaml_archive(
+    name = "base58_check",
+    doc = "Base58Check implementation",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = BASE58_CHECK_DEPS + [
+        # do not sort (buildifier)
+        ":_Base58_check",
+        ":_Version_bytes",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Base58_check_ns",
+    ns = "base58_check",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "base58_check.ml",
+        "version_bytes.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Base58_check",
+    src = "base58_check.ml",
+    intf = ":_Base58_check.cmi",
+    ns = ":Base58_check_ns",
+    opts = BASE58_CHECK_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "base58_check",
+    ],
+    deps = BASE58_CHECK_DEPS + [
+        # do not sort (buildifier)
+        ":_Version_bytes",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Base58_check.cmi",
+    src = "base58_check.mli",
+    ns = ":Base58_check_ns",
+    opts = BASE58_CHECK_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "base58_check",
+    ],
+    deps = BASE58_CHECK_DEPS + [
+        # do not sort (buildifier)
+        ":_Version_bytes",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Version_bytes",
+    src = "version_bytes.ml",
+    ns = ":Base58_check_ns",
+    opts = BASE58_CHECK_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "base58_check",
+    ],
+    deps = BASE58_CHECK_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/base58_check:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

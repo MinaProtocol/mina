@@ -1,0 +1,163 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY CHILD_PROCESSES
+################################################################
+CHILD_PROCESSES_INTERFACE_OPTS = []
+
+CHILD_PROCESSES_MODULE_OPTS = []
+
+CHILD_PROCESSES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:ctypes",
+    "@opam//pkg:ctypes.foreign",
+    "@mina//src/lib/file_system",
+    "@mina//src/lib/logger",
+    "@mina//src/lib/pipe_lib",
+]
+
+##############
+ocaml_archive(
+    name = "child_processes",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CHILD_PROCESSES_DEPS + [
+        # do not sort (buildifier)
+        ":_Child_processes",
+        ":_Syslimits",
+        ":_Termination",
+    ],
+    cc_deps = {
+        ":caml_syslimits": "default"
+    }
+)
+
+#########
+ocaml_ns(
+    name = "Child_processes_ns",
+    ns = "child_processes",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "child_processes.ml",
+        "syslimits.ml",
+        "termination.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Child_processes",
+    src = "child_processes.ml",
+    intf = ":_Child_processes.cmi",
+    ns = ":Child_processes_ns",
+    opts = CHILD_PROCESSES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "child_processes",
+    ],
+    deps = CHILD_PROCESSES_DEPS + [
+        # do not sort (buildifier)
+        ":_Syslimits",          # obazl:retain
+        ":_Termination",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Child_processes.cmi",
+    src = "child_processes.mli",
+    ns = ":Child_processes_ns",
+    opts = CHILD_PROCESSES_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "child_processes",
+    ],
+    deps = CHILD_PROCESSES_DEPS + [
+        # do not sort (buildifier)
+        ":_Termination",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Syslimits",
+    src = "syslimits.ml",
+    ns = ":Child_processes_ns",
+    opts = CHILD_PROCESSES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "child_processes",
+    ],
+    deps = CHILD_PROCESSES_DEPS,
+)
+
+###########
+cc_library(
+    name = "caml_syslimits",    # obazl:retain
+    visibility = ["//visibility:public"],
+    srcs = ["caml_syslimits.c"],
+    copts = ["-I."],
+    deps = [
+        "@ocaml//csdk:hdrs",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Termination",
+    src = "termination.ml",
+    ns = ":Child_processes_ns",
+    opts = CHILD_PROCESSES_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "child_processes",
+    ],
+    deps = CHILD_PROCESSES_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/child_processes:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_assert",
+        "@opam//pkg:ppx_custom_printf",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppx_pipebang",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
