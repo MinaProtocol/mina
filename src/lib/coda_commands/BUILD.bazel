@@ -1,0 +1,29 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "coda_commands",
+    src = "coda_commands.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_coda__ppx_version__ppx_jane__ppx_deriving.eq",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_commands",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/coda_version",
+        "@mina//src/lib/daemon_rpcs",
+        "@mina//src/lib/mina_base",
+        "@mina//src/lib/mina_lib",
+        "@mina//src/lib/node_addrs_and_ports",
+        "@mina//src/lib/user_command_input",
+        "@opam//pkg:core",
+    ],
+)

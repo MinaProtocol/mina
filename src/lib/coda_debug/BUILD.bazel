@@ -1,0 +1,74 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY CODA_DEBUG
+################################################################
+CODA_DEBUG_INTERFACE_OPTS = []
+
+CODA_DEBUG_MODULE_OPTS = []
+
+CODA_DEBUG_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+]
+
+CODA_DEBUG_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane"
+
+CODA_DEBUG_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "coda_debug",
+]
+
+##############
+ocaml_archive(
+    name = "coda_debug",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CODA_DEBUG_DEPS + [
+        # do not sort (buildifier)
+        ":_Call_logger",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_debug_ns",
+    ns = "coda_debug",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "call_logger.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Call_logger",
+    src = "call_logger.ml",
+    intf = ":_Call_logger.cmi",
+    ns = ":Coda_debug_ns",
+    opts = CODA_DEBUG_MODULE_OPTS,
+    ppx = CODA_DEBUG_PPX,
+    ppx_args = CODA_DEBUG_PPX_ARGS,
+    deps = CODA_DEBUG_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Call_logger.cmi",
+    src = "call_logger.mli",
+    ns = ":Coda_debug_ns",
+    opts = CODA_DEBUG_INTERFACE_OPTS,
+    ppx = CODA_DEBUG_PPX,
+    ppx_args = CODA_DEBUG_PPX_ARGS,
+    deps = CODA_DEBUG_DEPS,
+)

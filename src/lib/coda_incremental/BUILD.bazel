@@ -1,0 +1,22 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_module",
+)
+
+#############
+ocaml_module(
+    name = "coda_incremental",
+    src = "coda_incremental.ml",
+    opts = [],
+    ppx = "//bzl/ppx/exe:ppx_version",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/pipe_lib",
+        "@opam//pkg:incremental",
+    ],
+)

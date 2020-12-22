@@ -1,0 +1,99 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_interface",
+    "ocaml_module",
+    "ppx_executable",
+)
+
+#############
+ocaml_module(
+    name = "coda_net2",
+    src = "coda_net2.ml",
+    intf = ":_Coda_net2.cmi",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_net2",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@mina//src/lib/child_processes",
+        "@mina//src/lib/error_json",
+        "@mina//src/lib/file_system",
+        "@mina//src/lib/logger",
+        "@mina//src/lib/network_peer",
+        "@mina//src/lib/pipe_lib",
+        "@mina//src/lib/timeout_lib",
+        "@opam//pkg:async",
+        "@opam//pkg:base58",
+        "@opam//pkg:base64",
+        "@opam//pkg:core",
+        "@opam//pkg:digestif.c",
+        "@opam//pkg:yojson",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Coda_net2.cmi",
+    src = "coda_net2.mli",
+    opts = [],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_net2",
+    ],
+    deps = [
+        "@mina//src/lib/child_processes",
+        "@mina//src/lib/error_json",
+        "@mina//src/lib/file_system",
+        "@mina//src/lib/logger",
+        "@mina//src/lib/network_peer",
+        "@mina//src/lib/pipe_lib",
+        "@mina//src/lib/timeout_lib",
+        "@opam//pkg:async",
+        "@opam//pkg:base58",
+        "@opam//pkg:base64",
+        "@opam//pkg:core",
+        "@opam//pkg:digestif.c",
+        "@opam//pkg:yojson",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_net2:__pkg__",
+    ],
+    deps = [
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

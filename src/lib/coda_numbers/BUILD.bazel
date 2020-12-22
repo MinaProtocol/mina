@@ -1,0 +1,338 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: LIBRARY CODA_NUMBERS
+################################################################
+CODA_NUMBERS_INTERFACE_OPTS = []
+
+CODA_NUMBERS_MODULE_OPTS = []
+
+CODA_NUMBERS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@snarky//fold_lib",
+    "@snarky//tuple_lib",
+    "@mina//src/lib/snark_bits",
+    "@mina//src/lib/snark_params",
+    "@mina//src/lib/unsigned_extended",
+    "@snarky//src/base:snarky_backendless",
+    "@snarky//snarky_integer",
+    "@mina//src/lib/ppx_dhall_type",
+    "@mina//src/lib/codable",
+]
+
+##############
+ocaml_archive(
+    name = "coda_numbers",
+    doc = "Snark-friendly numbers used in Coda consensus",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_nonce",
+        ":_Coda_numbers",
+        ":_Global_slot",
+        ":_Hd_index",
+        ":_Intf",
+        ":_Length",
+        ":_Nat",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Coda_numbers_ns",
+    ns = "coda_numbers",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "account_nonce.ml",
+        "coda_numbers.ml",
+        "global_slot.ml",
+        "hd_index.ml",
+        "intf.ml",
+        "length.ml",
+        "nat.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_nonce",
+    src = "account_nonce.ml",
+    intf = ":_Account_nonce.cmi",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Account_nonce.cmi",
+    src = "account_nonce.mli",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_numbers",
+    src = "coda_numbers.ml",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_nonce",
+        ":_Global_slot",
+        ":_Hd_index",
+        ":_Length",
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Global_slot",
+    src = "global_slot.ml",
+    intf = ":_Global_slot.cmi",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Global_slot.cmi",
+    src = "global_slot.mli",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hd_index",
+    src = "hd_index.ml",
+    intf = ":_Hd_index.cmi",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Hd_index.cmi",
+    src = "hd_index.mli",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS + [
+        "-w", "-32" # Unused value declaration.
+    ],
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Length",
+    src = "length.ml",
+    intf = ":_Length.cmi",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Length.cmi",
+    src = "length.mli",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Nat",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Nat",
+    src = "nat.ml",
+    intf = ":_Nat.cmi",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_Nat.cmi",
+    src = "nat.mli",
+    ns = ":Coda_numbers_ns",
+    opts = CODA_NUMBERS_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "coda_numbers",
+    ],
+    ppx_data = CONFIG_MLH,
+    deps = CODA_NUMBERS_DEPS + [
+        # do not sort (buildifier)
+        ":_Intf",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/coda_numbers:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_compare",
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_hash",
+        "@opam//pkg:ppx_inline_test",
+        "@opam//pkg:ppx_sexp_conv",
+        "@opam//pkg:ppxlib",
+        "@ppx_optcomp//src:ppx_optcomp",
+        "@ppx_version//src:ppx_version",
+    ],
+)
