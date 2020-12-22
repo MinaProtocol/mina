@@ -162,7 +162,7 @@ let computeMemberProfileData = mainData => {
 
   let allTimeRank = 18; /* all time points are located in the 19th column */
   let phaseRank = 12; /* all time points are located in the 13th column */
-  let releaseRank = 39; /* all time points are located in the 40th column */
+  let releaseRank = 40; /* all time points are located in the 41st column */
 
   let genesisBadge = 4; /* all time points are located in the 17th column */
   let technicalBadge = 5; /* all time points are located in the 17th column */
