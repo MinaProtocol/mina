@@ -325,3 +325,17 @@ module type Transaction_resource_pool_intf = sig
     -> Transaction_hash.t
     -> Transaction_hash.User_command_with_valid_signature.t option
 end
+
+module type Base_ledger_intf = sig
+  type t
+
+  module Location : sig
+    type t
+  end
+
+  val location_of_account : t -> Account_id.t -> Location.t option
+
+  val get : t -> Location.t -> Account.t option
+
+  val detached_signal : t -> unit Deferred.t
+end

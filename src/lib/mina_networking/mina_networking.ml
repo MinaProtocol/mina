@@ -1123,7 +1123,7 @@ let create (config : Config.t)
     Strict_pipe.Reader.partition_map3 received_gossips
       ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
-        Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+        Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
@@ -1150,7 +1150,7 @@ let create (config : Config.t)
                   [%str_log debug]
                     (Snark_work_received
                        {work; sender= Envelope.Incoming.sender envelope}) ) ;
-            Coda_metrics.(
+            Mina_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
@@ -1356,7 +1356,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             Trust_system.(
               record t.trust_system t.logger peer
                 Actions.
-                  ( Violated_protocol
+                  ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
                   ))
         | Local ->

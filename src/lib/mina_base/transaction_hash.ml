@@ -72,6 +72,8 @@ module User_command_with_valid_signature = struct
     {With_hash.data= User_command.forget_check data; hash}
 
   include Comparable.Make (Stable.Latest)
+
+  let make data hash : t = {data; hash}
 end
 
 module User_command = struct
@@ -106,6 +108,9 @@ module User_command = struct
   let command ({data; _} : t) = data
 
   let hash ({hash; _} : t) = hash
+
+  let of_checked ({data; hash} : User_command_with_valid_signature.t) : t =
+    {With_hash.data= User_command.forget_check data; hash}
 
   include Comparable.Make (Stable.Latest)
 end

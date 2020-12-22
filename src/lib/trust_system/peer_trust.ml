@@ -2,7 +2,7 @@ open Core
 open Async
 open Pipe_lib
 
-let tmp_bans_are_disabled = true
+let tmp_bans_are_disabled = false
 
 module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
@@ -185,12 +185,12 @@ module Make0 (Inputs : Input_intf) = struct
           [%str_log faulty_peer_without_punishment] ~metadata:action_metadata
             (Peer_banned {sender_id= peer; expiration; action= action_fmt}) ;
           if Option.is_some db then (
-            Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
+            Mina_metrics.Gauge.inc_one Mina_metrics.Trust_system.banned_peers ;
             if tmp_bans_are_disabled then Deferred.unit
             else Strict_pipe.Writer.write bans_writer (peer, expiration) )
           else Deferred.unit
       | Banned_until _, Unbanned ->
-          Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
+          Mina_metrics.Gauge.dec_one Mina_metrics.Trust_system.banned_peers ;
           log_trust_change () ;
           Deferred.unit
       | _, _ ->
