@@ -807,8 +807,7 @@ module Block = struct
   let add_from_precomputed conn ~constraint_constants
       (t : External_transition.Precomputed_block.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:(t.protocol_state)
-      ~staged_ledger_diff:(t.staged_ledger_diff)
+      ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hash t.protocol_state)
 
   let delete_if_older_than ?height ?num_blocks ?timestamp
