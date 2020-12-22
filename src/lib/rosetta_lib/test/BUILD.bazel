@@ -1,0 +1,53 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+load(
+    "//:BUILD.bzl",
+    "CONFIG_MLH",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE TEST_ENCODINGS
+################################################################
+TEST_ENCODINGS_EXECUTABLE_OPTS = []
+
+TEST_ENCODINGS_MODULE_OPTS = []
+
+TEST_ENCODINGS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@mina//src/lib/signature_lib",
+    "@mina//src/lib/rosetta_lib",
+]
+
+TEST_ENCODINGS_PPX = "@//bzl/ppx/exe:ppx_version__ppx_optcomp"
+
+TEST_ENCODINGS_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "test_encodings.exe",
+    opts = TEST_ENCODINGS_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = TEST_ENCODINGS_DEPS + [
+        # do not sort (buildifier)
+        ":_Test_encodings",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Test_encodings",
+    src = "test_encodings.ml",
+    opts = TEST_ENCODINGS_MODULE_OPTS,
+    ppx = TEST_ENCODINGS_PPX,
+    ppx_args = TEST_ENCODINGS_PPX_ARGS,
+    ppx_data = CONFIG_MLH,
+    deps = TEST_ENCODINGS_DEPS,
+)
