@@ -1,0 +1,180 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY POKOLOG
+################################################################
+POKOLOG_MODULE_OPTS = []
+
+POKOLOG_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//src/base:snarky_backendless",
+]
+
+POKOLOG_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq"
+
+POKOLOG_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "pokolog",
+]
+
+##############
+ocaml_archive(
+    name = "pokolog",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Group_intf",
+        ":_Hash_intf",
+        ":_Inputs_intf",
+        ":_Intf",
+        ":_Pokolog",
+        ":_Proof",
+        ":_Scalar_intf",
+        ":_Variable_base_instance",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Pokolog_ns",
+    ns = "pokolog",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "group_intf.ml",
+        "hash_intf.ml",
+        "inputs_intf.ml",
+        "intf.ml",
+        "pokolog.ml",
+        "proof.ml",
+        "scalar_intf.ml",
+        "variable_base_instance.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Group_intf",
+    src = "group_intf.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS,
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Scalar_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Hash_intf",
+    src = "hash_intf.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS,
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Group_intf",
+        ":_Scalar_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Inputs_intf",
+    src = "inputs_intf.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS,
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Group_intf",
+        ":_Hash_intf",
+        ":_Scalar_intf",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intf",
+    src = "intf.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS,
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Inputs_intf",
+        ":_Proof",
+        ":_Variable_base_instance",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pokolog",
+    src = "pokolog.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS + [
+        "-w", "-22" # Preprocessor warning:  Must have deriving version if deriving bin_io
+    ],
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS + [
+        # do not sort (buildifier)
+        ":_Inputs_intf",
+        ":_Intf",
+        ":_Proof",
+        ":_Variable_base_instance",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Proof",
+    src = "proof.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS + [
+        "-w", "-22" # Preprocessor warning:  Must have deriving version if deriving bin_io
+    ],
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Scalar_intf",
+    src = "scalar_intf.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS,
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Variable_base_instance",
+    src = "variable_base_instance.ml",
+    ns = ":Pokolog_ns",
+    opts = POKOLOG_MODULE_OPTS + [
+        "-w", "-22" # Preprocessor warning:  Must have deriving version if deriving bin_io
+    ],
+    ppx = POKOLOG_PPX,
+    ppx_args = POKOLOG_PPX_ARGS,
+    deps = POKOLOG_DEPS,
+)

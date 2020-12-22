@@ -1,0 +1,114 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY OTP_LIB
+################################################################
+OTP_LIB_INTERFACE_OPTS = []
+
+OTP_LIB_MODULE_OPTS = []
+
+OTP_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@opam//pkg:async_kernel",
+    "@mina//src/lib/pipe_lib",
+]
+
+OTP_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane"
+
+OTP_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "otp_lib",
+]
+
+##############
+ocaml_archive(
+    name = "otp_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = OTP_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Agent",
+        ":_Capped_supervisor",
+        ":_Worker_supervisor",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Otp_lib_ns",
+    ns = "otp_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "agent.ml",
+        "capped_supervisor.ml",
+        "worker_supervisor.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Agent",
+    src = "agent.ml",
+    intf = ":_Agent.cmi",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Agent.cmi",
+    src = "agent.mli",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_INTERFACE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Capped_supervisor",
+    src = "capped_supervisor.ml",
+    intf = ":_Capped_supervisor.cmi",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Capped_supervisor.cmi",
+    src = "capped_supervisor.mli",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_INTERFACE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Worker_supervisor",
+    src = "worker_supervisor.ml",
+    ns = ":Otp_lib_ns",
+    opts = OTP_LIB_MODULE_OPTS,
+    ppx = OTP_LIB_PPX,
+    ppx_args = OTP_LIB_PPX_ARGS,
+    deps = OTP_LIB_DEPS,
+)

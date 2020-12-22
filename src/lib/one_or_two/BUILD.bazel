@@ -1,0 +1,119 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY ONE_OR_TWO
+################################################################
+ONE_OR_TWO_INTERFACE_OPTS = []
+
+ONE_OR_TWO_MODULE_OPTS = []
+
+ONE_OR_TWO_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core",
+    "@opam//pkg:async",
+]
+
+##############
+ocaml_archive(
+    name = "one_or_two",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+        ":_One_or_two",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "One_or_two_ns",
+    ns = "one_or_two",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "intfs.ml",
+        "one_or_two.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Intfs",
+    src = "intfs.ml",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ONE_OR_TWO_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_One_or_two",
+    src = "one_or_two.ml",
+    intf = ":_One_or_two.cmi",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+    ],
+)
+
+################
+ocaml_interface(
+    name = "_One_or_two.cmi",
+    src = "one_or_two.mli",
+    ns = ":One_or_two_ns",
+    opts = ONE_OR_TWO_INTERFACE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ONE_OR_TWO_DEPS + [
+        # do not sort (buildifier)
+        ":_Intfs",
+    ],
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_deriving.runtime",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:bin_prot",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/one_or_two:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_base",
+        "@opam//pkg:ppx_bin_prot",
+        "@opam//pkg:ppx_deriving.std",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_let",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)

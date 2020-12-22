@@ -1,0 +1,77 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+)
+
+################################################################
+## STANZA 1: LIBRARY PEDERSEN_LIB
+################################################################
+PEDERSEN_LIB_INTERFACE_OPTS = []
+
+PEDERSEN_LIB_MODULE_OPTS = []
+
+PEDERSEN_LIB_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_kernel",
+    "@snarky//tuple_lib",
+    "@snarky//fold_lib",
+]
+
+PEDERSEN_LIB_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppx_deriving.eq__ppx_deriving_yojson"
+
+PEDERSEN_LIB_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-lint-version-syntax-warnings",
+    "-inline-test-lib",
+    "pedersen_lib",
+]
+
+##############
+ocaml_archive(
+    name = "pedersen_lib",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = PEDERSEN_LIB_DEPS + [
+        # do not sort (buildifier)
+        ":_Pedersen",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Pedersen_lib_ns",
+    ns = "pedersen_lib",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "pedersen.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Pedersen",
+    src = "pedersen.ml",
+    intf = ":_Pedersen.cmi",
+    ns = ":Pedersen_lib_ns",
+    opts = PEDERSEN_LIB_MODULE_OPTS,
+    ppx = PEDERSEN_LIB_PPX,
+    ppx_args = PEDERSEN_LIB_PPX_ARGS,
+    deps = PEDERSEN_LIB_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Pedersen.cmi",
+    src = "pedersen.mli",
+    ns = ":Pedersen_lib_ns",
+    opts = PEDERSEN_LIB_INTERFACE_OPTS,
+    ppx = PEDERSEN_LIB_PPX,
+    ppx_args = PEDERSEN_LIB_PPX_ARGS,
+    deps = PEDERSEN_LIB_DEPS,
+)
