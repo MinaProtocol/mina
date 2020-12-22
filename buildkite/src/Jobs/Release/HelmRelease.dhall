@@ -37,7 +37,6 @@ Pipeline.build
           , key = "release-helm-chart"
           , target = Size.Medium
           , docker = None Docker.Type
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , artifact_paths = [ S.contains "updates/*" ]
           , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]
         }

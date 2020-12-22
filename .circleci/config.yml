@@ -1198,10 +1198,8 @@ workflows:
                   branches:
                     only: develop
             - tracetool
-            - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             - test-unit--nonconsensus_medium_curves
             - test--test_postake_catchup
             - test--test_postake_five_even_txns

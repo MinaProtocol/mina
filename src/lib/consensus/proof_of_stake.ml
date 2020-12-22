@@ -63,9 +63,9 @@ let compute_delegatee_table keys ~iter_accounts =
     Public_key.Compressed.Table.fold outer_table ~init:0
       ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
   in
-  Coda_metrics.Gauge.set Coda_metrics.Consensus.staking_keypairs
+  Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
     (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
-  Coda_metrics.Gauge.set Coda_metrics.Consensus.stake_delegators
+  Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
     (Float.of_int num_delegators) ;
   outer_table
 
@@ -1066,8 +1066,8 @@ module Data = struct
                         ( Fold.string_bits truncated_vrf_result
                         |> Bignum_bigint.of_bit_fold_lsb
                         |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) ) ] ;
-              Coda_metrics.Counter.inc_one
-                Coda_metrics.Consensus.vrf_evaluations ;
+              Mina_metrics.Counter.inc_one
+                Mina_metrics.Consensus.vrf_evaluations ;
               if
                 Threshold.is_satisfied ~my_stake:account.balance ~total_stake
                   truncated_vrf_result
@@ -3017,10 +3017,7 @@ module Hooks = struct
     in
     if slot_diff < 0L then Error `Too_early
     else if slot_diff >= UInt32.(to_int64 (add constants.delta (of_int 1)))
-    then
-      Error
-        (`Too_late
-          (sub slot_diff UInt32.(to_int64 (add constants.delta (of_int 1)))))
+    then Error (`Too_late (sub slot_diff UInt32.(to_int64 constants.delta)))
     else Ok ()
 
   let received_at_valid_time ~(constants : Constants.t)
@@ -3551,6 +3548,8 @@ module Hooks = struct
                                       , Mina_base.State_hash.t )
                                       With_hash.t
            -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+           -> coinbase_receiver:Public_key.Compressed.t
+           -> supercharge_coinbase:bool
            -> Consensus_state.Value.t)
           Quickcheck.Generator.t =
         let open Consensus_state in
@@ -3561,11 +3560,11 @@ module Hooks = struct
         in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
-        let%bind supercharge_coinbase = Quickcheck.Generator.bool in
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Mina_base.State_hash.t) With_hash.t)
-            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t) ->
+            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
+            ~coinbase_receiver ~supercharge_coinbase ->
           let prev =
             Protocol_state.consensus_state
               (With_hash.data previous_protocol_state)
@@ -3625,7 +3624,7 @@ module Hooks = struct
                    ~slot:curr_slot)
           ; block_stake_winner= genesis_winner_pk
           ; block_creator= genesis_winner_pk
-          ; coinbase_receiver= genesis_winner_pk
+          ; coinbase_receiver
           ; supercharge_coinbase }
     end
   end

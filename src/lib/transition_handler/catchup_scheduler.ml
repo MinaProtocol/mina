@@ -169,7 +169,7 @@ let rec remove_tree t parent_hash =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions parent_hash)
   in
   Hashtbl.remove t.collected_transitions parent_hash ;
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.dec_one
       Transition_frontier_controller.transitions_in_catchup_scheduler) ;
   List.iter children ~f:(fun child ->
@@ -190,7 +190,7 @@ let watch t ~timeout_duration ~cached_transition =
     Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
         let forest = extract_forest t parent_hash in
         Hashtbl.remove t.parent_root_timeouts parent_hash ;
-        Coda_metrics.(
+        Mina_metrics.(
           Gauge.dec_one
             Transition_frontier_controller.transitions_in_catchup_scheduler) ;
         remove_tree t parent_hash ;
@@ -223,7 +223,7 @@ let watch t ~timeout_duration ~cached_transition =
                 ~f:(fun _ remaining_time ->
                   Block_time.Span.min remaining_time timeout_duration )))
       |> ignore ;
-      Coda_metrics.(
+      Mina_metrics.(
         Gauge.inc_one
           Transition_frontier_controller.transitions_in_catchup_scheduler)
   | Some cached_sibling_transitions ->
@@ -245,7 +245,7 @@ let watch t ~timeout_duration ~cached_transition =
           ~data:(cached_transition :: cached_sibling_transitions) ;
         Hashtbl.update t.collected_transitions hash
           ~f:(Option.value ~default:[]) ;
-        Coda_metrics.(
+        Mina_metrics.(
           Gauge.inc_one
             Transition_frontier_controller.transitions_in_catchup_scheduler)
 

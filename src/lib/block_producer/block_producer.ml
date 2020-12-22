@@ -141,8 +141,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation ~supercharge_coinbase )
+        |> Result.map_error ~f:(fun err ->
+               Staged_ledger.Staged_ledger_error.Pre_diff err )
       in
       match%map
+        let%bind.Deferred.Result.Let_syntax diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
@@ -160,7 +163,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
-            ( diff
+            ( (match diff with Ok diff -> diff | Error _ -> assert false)
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
@@ -168,14 +171,23 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
-          [%log error]
-            ~metadata:
-              [ ( "error"
-                , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-              ; ( "diff"
-                , Staged_ledger_diff.With_valid_signatures_and_proofs.to_yojson
-                    diff ) ]
-            "Error applying the diff $diff: $error" ;
+          ( match diff with
+          | Ok diff ->
+              [%log error]
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    )
+                  ; ( "diff"
+                    , Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .to_yojson diff ) ]
+                "Error applying the diff $diff: $error"
+          | Error e ->
+              [%log error] "Error building the diff: $error"
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    ) ] ) ;
           None)
   in
   match res with
@@ -269,14 +281,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed_block = struct
-  type t =
+  type t = External_transition.Precomputed_block.t =
     { scheduled_time: Time.t
     ; protocol_state: Protocol_state.value
     ; protocol_state_proof: Proof.t
     ; staged_ledger_diff: Staged_ledger_diff.t
     ; delta_transition_chain_proof:
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-  [@@deriving sexp, to_yojson]
+
+  let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
+
+  let t_of_sexp = External_transition.Precomputed_block.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~previous_protocol_state
@@ -554,7 +569,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let metadata =
                       [("state_hash", State_hash.to_yojson protocol_state_hash)]
                     in
-                    Coda_metrics.(
+                    Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
                     let%bind.Async () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
@@ -660,14 +675,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_next_block_timing
                 | `Produce_now (data, winner_pk) ->
-                    Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch production_supervisor
                          (now, data, winner_pk))
                       ~f:check_next_block_timing
                     |> ignore
                 | `Produce (time, data, winner_pk) ->
-                    Coda_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->
@@ -832,7 +847,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
           let metadata =
             [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
-          Coda_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
+          Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in

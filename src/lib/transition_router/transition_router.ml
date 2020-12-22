@@ -178,7 +178,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 candidate_best_tip
               |> Coda_numbers.Length.to_int
             in
-            Coda_metrics.Transition_frontier.update_max_blocklength_observed
+            Mina_metrics.Transition_frontier.update_max_blocklength_observed
               best_tip_length ;
             don't_wait_for
             @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
