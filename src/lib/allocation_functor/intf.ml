@@ -125,7 +125,7 @@ module Input = struct
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type t [@@deriving compare, eq, hash]
+          type t [@@deriving compare, equal, hash]
 
           include Higher_order_creatable_intf with type t := t
 
@@ -244,7 +244,7 @@ module Output = struct
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type t [@@deriving compare, eq, hash]
+          type t [@@deriving compare, equal, hash]
 
           include Creatable_intf with type t := t
 
