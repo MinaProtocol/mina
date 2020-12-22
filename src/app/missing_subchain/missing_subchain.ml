@@ -5,37 +5,8 @@ open Async
 open Mina_base
 open Signature_lib
 
-(* the `blocks` table in the archive db uses foreign keys to refer to other
-   tables; the type here fills in the data from those other tables, using
-   their native OCaml types to assure the validity of the data
-*)
-
-module Extensional_block = struct
-  type t =
-    { state_hash: State_hash.t
-    ; parent_hash: State_hash.t
-    ; creator: Public_key.Compressed.t
-    ; block_winner: Public_key.Compressed.t
-    ; snarked_ledger_hash: Frozen_ledger_hash.t
-    ; staking_epoch_seed: Epoch_seed.t
-    ; staking_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; next_epoch_seed: Epoch_seed.t
-    ; next_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; ledger_hash: Ledger_hash.t
-    ; height: Unsigned.UInt32.t
-    ; global_slot: Coda_numbers.Global_slot.t
-    ; global_slot_since_genesis: Coda_numbers.Global_slot.t
-    ; timestamp: Block_time.t }
-end
-
-module type Base58_decodable = sig
-  type t
-
-  val of_base58_check : string -> t Or_error.t
-end
-
 let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
-    Extensional_block.t Deferred.t =
+    Archive_lib.Extensional_block.t Deferred.t =
   let query_db ~f ~item =
     match%bind Caqti_async.Pool.use f pool with
     | Ok v ->
@@ -45,33 +16,7 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
           ~metadata:[("error", `String (Caqti_error.show msg))] ;
         exit 1
   in
-  let mk_of_base58_check (type t) (module M : Base58_decodable with type t = t)
-      desc item : t =
-    match M.of_base58_check item with
-    | Ok v ->
-        v
-    | Error err ->
-        [%log error] "Error decoding Base58Check %s" desc
-          ~metadata:
-            [ ("base58_check", `String item)
-            ; ("error", Error_json.error_to_yojson err) ] ;
-        Core.exit 1
-  in
-  let state_hash_of_base58_check =
-    mk_of_base58_check (module State_hash) "state hash"
-  in
-  let frozen_ledger_hash_of_base58_check =
-    mk_of_base58_check (module Frozen_ledger_hash) "frozen ledger hash"
-  in
-  let public_key_of_base58_check =
-    mk_of_base58_check (module Public_key.Compressed) "public key compressed"
-  in
-  let epoch_seed_of_base58_check =
-    mk_of_base58_check (module Epoch_seed) "epoch seed"
-  in
-  let ledger_hash_of_base58_check =
-    mk_of_base58_check (module Ledger_hash) "ledger hash"
-  in
+  let open Archive_lib.Extensional_block.From_base58_check in
   let state_hash = state_hash_of_base58_check block.state_hash in
   let parent_hash = state_hash_of_base58_check block.parent_hash in
   let open Deferred.Let_syntax in
@@ -133,7 +78,7 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_int64 block.timestamp in
   return
-    { Extensional_block.state_hash
+    { Archive_lib.Extensional_block.state_hash
     ; parent_hash
     ; creator
     ; block_winner
@@ -189,7 +134,7 @@ let main ~archive_uri ~state_hash () =
       in
       let sorted_extensional_blocks =
         List.dedup_and_sort extensional_blocks
-          ~compare:(fun (b1 : Extensional_block.t) b2 ->
+          ~compare:(fun (b1 : Archive_lib.Extensional_block.t) b2 ->
             Unsigned.UInt32.compare b1.global_slot b2.global_slot )
       in
       [%log info] "Found a subchain of length %d"
