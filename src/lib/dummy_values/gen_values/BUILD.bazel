@@ -1,0 +1,52 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE GEN_VALUES
+################################################################
+GEN_VALUES_EXECUTABLE_OPTS = []
+
+GEN_VALUES_MODULE_OPTS = []
+
+GEN_VALUES_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:core",
+    "@opam//pkg:ppxlib",
+    "@mina//src/lib/crypto_params",
+    "@mina//src/lib/pickles",
+]
+
+GEN_VALUES_PPX = "@//bzl/ppx/exe:ppx_version__ppx_jane__ppxlib.metaquot"
+
+GEN_VALUES_PPX_ARGS = [
+    # do not sort (buildifier)
+    "-inline-test-lib",
+    "gen_values",
+]
+
+#################
+ocaml_executable(
+    name = "gen_values.exe",
+    opts = GEN_VALUES_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = GEN_VALUES_DEPS + [
+        # do not sort (buildifier)
+        ":_Gen_values",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Gen_values",
+    src = "gen_values.ml",
+    opts = GEN_VALUES_MODULE_OPTS,
+    ppx = GEN_VALUES_PPX,
+    ppx_args = GEN_VALUES_PPX_ARGS,
+    deps = GEN_VALUES_DEPS,
+)
