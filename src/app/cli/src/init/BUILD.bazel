@@ -1,0 +1,309 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_interface",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+# load(
+#     "//:BUILD.bzl",
+#     "CONFIG_MLH",
+# )
+
+################################################################
+## STANZA: LIBRARY INIT
+################################################################
+INIT_INTERFACE_OPTS = []
+
+INIT_MODULE_OPTS = []
+
+INIT_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:async",
+    "@opam//pkg:cohttp",
+    "@opam//pkg:core",
+    "@mina//src/lib/snarky_log",
+    "@mina//src/lib/cli_lib",
+    "@mina//src/lib/mina_base",
+    "@mina//src/lib/mina_graphql",
+    "@mina//src/lib/mina_lib",
+    "@mina//src/lib/coda_state",
+    "@mina//src/lib/consensus",
+    "@mina//src/lib/coda_transition",
+    "@mina//src/lib/coda_version",
+    "@mina//src/lib/mina_user_error",
+    "@mina//src/lib/o1trace",
+    "@mina//src/lib/protocol_version",
+    "@mina//src/lib/telemetry",
+    "@mina//src/lib/transition_frontier",
+    "@mina//src/lib/web_client_pipe",
+    "@mina//src/lib/web_request",
+    "@mina//src/lib/graphql_lib",
+    "@mina//src/lib/genesis_ledger_helper",
+]
+
+##############
+ocaml_archive(
+    name = "init",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = INIT_DEPS + [
+        # do not sort (buildifier)
+        ":_Client",
+        ":_Coda_run",
+        ":_Coda_tracing",
+        ":_Find_ip",
+        ":_Graphql_client",
+        ":_Graphql_internal",
+        ":_Graphql_queries",
+        ":_Transaction_snark_profiler",
+        ":_Visualization_message",
+        ":_Assets"              # obazl:retain
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Init_ns",
+    ns = "init",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "client.ml",
+        "coda_run.ml",
+        "coda_tracing.ml",
+        "find_ip.ml",
+        "graphql_client.ml",
+        "graphql_internal.ml",
+        "graphql_queries.ml",
+        "transaction_snark_profiler.ml",
+        "visualization_message.ml",
+        ":assets.ml"            # obazl:retain
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Assets",
+    ns   = ":Init_ns",
+    src  = ":assets.ml",
+)
+
+TOOL = "@ocaml//tools:ocaml-crunch"
+genrule(
+    name = "gensrc",
+    srcs = glob(["**"]),
+    tools = [TOOL],
+    outs = ["assets.ml"],
+    cmd = "\n".join([
+        "set -x",
+        "./$(location {tool}) -m plain src/app/cli/src/init/assets -o \"$@\"".format(tool = TOOL),
+    ])
+)
+
+#############
+ocaml_module(
+    name = "_Client",
+    src = "client.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    deps = INIT_DEPS + [
+        # do not sort (buildifier)
+        ":_Graphql_client",
+        ":_Graphql_queries",
+        ":_Visualization_message",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_run",
+    src = "coda_run.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS + [
+        # do not sort (buildifier)
+        ":_Coda_tracing",
+        ":_Graphql_internal",
+        ":_Visualization_message",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coda_tracing",
+    src = "coda_tracing.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Find_ip",
+    src = "find_ip.ml",
+    intf = ":_Find_ip.cmi",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+################
+ocaml_interface(
+    name = "_Find_ip.cmi",
+    src = "find_ip.mli",
+    ns = ":Init_ns",
+    opts = INIT_INTERFACE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Graphql_client",
+    src = "graphql_client.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Graphql_internal",
+    src = "graphql_internal.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS + [
+        ":_Assets"              # obazl:retain
+    ]
+)
+
+#############
+ocaml_module(
+    name = "_Graphql_queries",
+    src = "graphql_queries.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+        "-schema={}".format("graphql_schema.json")
+    ],
+    ppx_data = ["//:graphql_schema.json"],
+    deps = INIT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_snark_profiler",
+    src = "transaction_snark_profiler.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Visualization_message",
+    src = "visualization_message.ml",
+    ns = ":Init_ns",
+    opts = INIT_MODULE_OPTS,
+    ppx = ":ppx2.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+        "-inline-test-lib",
+        "init",
+    ],
+    # ppx_data = CONFIG_MLH,
+    deps = INIT_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx2.exe",
+    lazy_deps = [
+        "@opam//pkg:ppx_expect.collector",
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_hash.runtime-lib",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_sexp_conv.runtime-lib",
+        "@opam//pkg:ppx_assert.runtime-lib",
+        "@opam//pkg:ppx_compare.runtime-lib",
+        "@opam//pkg:ppx_inline_test.runtime-lib",
+        "@opam//pkg:ppx_bench.runtime-lib",
+        "@opam//pkg:ppx_enumerate.runtime-lib",
+        "@opam//pkg:ppx_module_timer.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/app/cli/src/init:__pkg__",
+    ],
+    deps = [
+        "@graphql_ppx//src/native:graphql_ppx",
+        "@mina//src/lib/ppx_coda",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppx_jane",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
