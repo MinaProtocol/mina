@@ -117,5 +117,5 @@ spec:
       {{- if .Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: archive-daemon-config
+          name: "{{ template "archive-node.fullname" . }}-daemon-config"
       {{- end }}
