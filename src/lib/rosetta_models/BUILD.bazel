@@ -1,0 +1,1292 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_archive",
+    "ocaml_module",
+    "ocaml_ns",
+    "ppx_executable",
+)
+
+################################################################
+## STANZA 1: LIBRARY ROSETTA_MODELS
+################################################################
+ROSETTA_MODELS_MODULE_OPTS = []
+
+ROSETTA_MODELS_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:ppx_deriving_yojson.runtime",
+    "@opam//pkg:yojson",
+]
+
+##############
+ocaml_archive(
+    name = "rosetta_models",
+    opts = [],
+    visibility = ["//visibility:public"],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_balance_request",
+        ":_Account_balance_response",
+        ":_Account_coins_request",
+        ":_Account_coins_response",
+        ":_Account_identifier",
+        ":_Allow",
+        ":_Amount",
+        ":_Balance_exemption",
+        ":_Block",
+        ":_Block_event",
+        ":_Block_identifier",
+        ":_Block_request",
+        ":_Block_response",
+        ":_Block_transaction",
+        ":_Block_transaction_request",
+        ":_Block_transaction_response",
+        ":_Call_request",
+        ":_Call_response",
+        ":_Coin",
+        ":_Coin_change",
+        ":_Coin_identifier",
+        ":_Construction_combine_request",
+        ":_Construction_combine_response",
+        ":_Construction_derive_request",
+        ":_Construction_derive_response",
+        ":_Construction_hash_request",
+        ":_Construction_hash_response",
+        ":_Construction_metadata_request",
+        ":_Construction_metadata_response",
+        ":_Construction_parse_request",
+        ":_Construction_parse_response",
+        ":_Construction_payloads_request",
+        ":_Construction_payloads_response",
+        ":_Construction_preprocess_request",
+        ":_Construction_preprocess_response",
+        ":_Construction_submit_request",
+        ":_Construction_submit_response",
+        ":_Currency",
+        ":_Enums",
+        ":_Error",
+        ":_Events_blocks_request",
+        ":_Events_blocks_response",
+        ":_Mempool_response",
+        ":_Mempool_transaction_request",
+        ":_Mempool_transaction_response",
+        ":_Metadata_request",
+        ":_Network_identifier",
+        ":_Network_list_response",
+        ":_Network_options_response",
+        ":_Network_request",
+        ":_Network_status_response",
+        ":_Operation",
+        ":_Operation_identifier",
+        ":_Operation_status",
+        ":_Partial_block_identifier",
+        ":_Peer",
+        ":_Public_key",
+        ":_Search_transactions_request",
+        ":_Search_transactions_response",
+        ":_Signature",
+        ":_Signing_payload",
+        ":_Sub_account_identifier",
+        ":_Sub_network_identifier",
+        ":_Sync_status",
+        ":_Timestamp",
+        ":_Transaction",
+        ":_Transaction_identifier",
+        ":_Transaction_identifier_response",
+        ":_Version",
+    ],
+)
+
+#########
+ocaml_ns(
+    name = "Rosetta_models_ns",
+    ns = "rosetta_models",
+    opts = [],
+    submodules = [
+        # do not sort (buildifier)
+        "account_balance_request.ml",
+        "account_balance_response.ml",
+        "account_coins_request.ml",
+        "account_coins_response.ml",
+        "account_identifier.ml",
+        "allow.ml",
+        "amount.ml",
+        "balance_exemption.ml",
+        "block.ml",
+        "block_event.ml",
+        "block_identifier.ml",
+        "block_request.ml",
+        "block_response.ml",
+        "block_transaction.ml",
+        "block_transaction_request.ml",
+        "block_transaction_response.ml",
+        "call_request.ml",
+        "call_response.ml",
+        "coin.ml",
+        "coin_change.ml",
+        "coin_identifier.ml",
+        "construction_combine_request.ml",
+        "construction_combine_response.ml",
+        "construction_derive_request.ml",
+        "construction_derive_response.ml",
+        "construction_hash_request.ml",
+        "construction_hash_response.ml",
+        "construction_metadata_request.ml",
+        "construction_metadata_response.ml",
+        "construction_parse_request.ml",
+        "construction_parse_response.ml",
+        "construction_payloads_request.ml",
+        "construction_payloads_response.ml",
+        "construction_preprocess_request.ml",
+        "construction_preprocess_response.ml",
+        "construction_submit_request.ml",
+        "construction_submit_response.ml",
+        "currency.ml",
+        "enums.ml",
+        "error.ml",
+        "events_blocks_request.ml",
+        "events_blocks_response.ml",
+        "mempool_response.ml",
+        "mempool_transaction_request.ml",
+        "mempool_transaction_response.ml",
+        "metadata_request.ml",
+        "network_identifier.ml",
+        "network_list_response.ml",
+        "network_options_response.ml",
+        "network_request.ml",
+        "network_status_response.ml",
+        "operation.ml",
+        "operation_identifier.ml",
+        "operation_status.ml",
+        "partial_block_identifier.ml",
+        "peer.ml",
+        "public_key.ml",
+        "search_transactions_request.ml",
+        "search_transactions_response.ml",
+        "signature.ml",
+        "signing_payload.ml",
+        "sub_account_identifier.ml",
+        "sub_network_identifier.ml",
+        "sync_status.ml",
+        "timestamp.ml",
+        "transaction.ml",
+        "transaction_identifier.ml",
+        "transaction_identifier_response.ml",
+        "version.ml",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_balance_request",
+    src = "account_balance_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Currency",
+        ":_Network_identifier",
+        ":_Partial_block_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_balance_response",
+    src = "account_balance_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount",
+        ":_Block_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_coins_request",
+    src = "account_coins_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Currency",
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_coins_response",
+    src = "account_coins_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Coin",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Account_identifier",
+    src = "account_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Sub_account_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Allow",
+    src = "allow.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Balance_exemption",
+        ":_Error",
+        ":_Operation_status",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Amount",
+    src = "amount.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Currency",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Balance_exemption",
+    src = "balance_exemption.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Currency",
+        ":_Enums",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block",
+    src = "block.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Timestamp",
+        ":_Transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_event",
+    src = "block_event.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Enums",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_identifier",
+    src = "block_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Block_request",
+    src = "block_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Partial_block_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_response",
+    src = "block_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block",
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_transaction",
+    src = "block_transaction.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_transaction_request",
+    src = "block_transaction_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Network_identifier",
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Block_transaction_response",
+    src = "block_transaction_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Call_request",
+    src = "call_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Call_response",
+    src = "call_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Coin",
+    src = "coin.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount",
+        ":_Coin_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coin_change",
+    src = "coin_change.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Coin_identifier",
+        ":_Enums",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Coin_identifier",
+    src = "coin_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Construction_combine_request",
+    src = "construction_combine_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Signature",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_combine_response",
+    src = "construction_combine_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Construction_derive_request",
+    src = "construction_derive_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_derive_response",
+    src = "construction_derive_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_hash_request",
+    src = "construction_hash_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_hash_response",
+    src = "construction_hash_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Construction_metadata_request",
+    src = "construction_metadata_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_metadata_response",
+    src = "construction_metadata_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_parse_request",
+    src = "construction_parse_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_parse_response",
+    src = "construction_parse_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Operation",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_payloads_request",
+    src = "construction_payloads_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Operation",
+        ":_Public_key",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_payloads_response",
+    src = "construction_payloads_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Signing_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_preprocess_request",
+    src = "construction_preprocess_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Amount",
+        ":_Network_identifier",
+        ":_Operation",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_preprocess_response",
+    src = "construction_preprocess_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_submit_request",
+    src = "construction_submit_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Construction_submit_response",
+    src = "construction_submit_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Currency",
+    src = "currency.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Enums",
+    src = "enums.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Error",
+    src = "error.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Events_blocks_request",
+    src = "events_blocks_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Events_blocks_response",
+    src = "events_blocks_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_event",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Mempool_response",
+    src = "mempool_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Mempool_transaction_request",
+    src = "mempool_transaction_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Mempool_transaction_response",
+    src = "mempool_transaction_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Metadata_request",
+    src = "metadata_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Network_identifier",
+    src = "network_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Sub_network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Network_list_response",
+    src = "network_list_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Network_options_response",
+    src = "network_options_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Allow",
+        ":_Version",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Network_request",
+    src = "network_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Network_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Network_status_response",
+    src = "network_status_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_identifier",
+        ":_Peer",
+        ":_Sync_status",
+        ":_Timestamp",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Operation",
+    src = "operation.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Amount",
+        ":_Coin_change",
+        ":_Operation_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Operation_identifier",
+    src = "operation_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Operation_status",
+    src = "operation_status.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Partial_block_identifier",
+    src = "partial_block_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Peer",
+    src = "peer.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Public_key",
+    src = "public_key.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Enums",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Search_transactions_request",
+    src = "search_transactions_request.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Coin_identifier",
+        ":_Currency",
+        ":_Enums",
+        ":_Network_identifier",
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Search_transactions_response",
+    src = "search_transactions_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Block_transaction",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signature",
+    src = "signature.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Enums",
+        ":_Public_key",
+        ":_Signing_payload",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Signing_payload",
+    src = "signing_payload.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Account_identifier",
+        ":_Enums",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Sub_account_identifier",
+    src = "sub_account_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Sub_network_identifier",
+    src = "sub_network_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Sync_status",
+    src = "sync_status.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Timestamp",
+    src = "timestamp.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transaction",
+    src = "transaction.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Operation",
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_identifier",
+    src = "transaction_identifier.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+#############
+ocaml_module(
+    name = "_Transaction_identifier_response",
+    src = "transaction_identifier_response.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS + [
+        # do not sort (buildifier)
+        ":_Transaction_identifier",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Version",
+    src = "version.ml",
+    ns = ":Rosetta_models_ns",
+    opts = ROSETTA_MODELS_MODULE_OPTS,
+    ppx = ":ppx1.exe",
+    ppx_args = [
+        # do not sort (buildifier)
+    ],
+    deps = ROSETTA_MODELS_DEPS,
+)
+
+###############
+ppx_executable(
+    name = "ppx1.exe",
+    lazy_deps = [
+        "@opam//pkg:yojson",
+        "@opam//pkg:ppx_deriving_yojson.runtime",
+        "@opam//pkg:ppx_deriving.runtime",
+    ],
+    main = "//bzl/ppx/exe:Driver",
+    opts = [],
+    visibility = [
+        "//src/lib/rosetta_models:__pkg__",
+    ],
+    deps = [
+        "@opam//pkg:ppx_deriving.eq",
+        "@opam//pkg:ppx_deriving.show",
+        "@opam//pkg:ppx_deriving_yojson",
+        "@opam//pkg:ppxlib",
+        "@ppx_version//src:ppx_version",
+    ],
+)
