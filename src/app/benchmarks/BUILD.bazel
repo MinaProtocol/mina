@@ -1,0 +1,48 @@
+## OBAZL GENERATED FILE ## To retain edits (prevent overwrite), delete this line.
+
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    "ocaml_executable",
+    "ocaml_module",
+)
+
+################################################################
+## STANZA 1: EXECUTABLE MAIN
+################################################################
+MAIN_EXECUTABLE_OPTS = []
+
+MAIN_MODULE_OPTS = []
+
+MAIN_DEPS = [
+    # do not sort (buildifier)
+    "@opam//pkg:core_bench.inline_benchmarks",
+    "@mina//src/lib/vrf_lib/tests:vrf_lib_tests",
+    "@mina//src/lib/mina_base",
+]
+
+MAIN_PPX = "@//bzl/ppx/exe:ppx_version"
+
+MAIN_PPX_ARGS = [
+    # do not sort (buildifier)
+]
+
+#################
+ocaml_executable(
+    name = "main.exe",
+    opts = MAIN_EXECUTABLE_OPTS,
+    visibility = ["//visibility:public"],
+    deps = MAIN_DEPS + [
+        # do not sort (buildifier)
+        ":_Main",
+    ],
+)
+
+#############
+ocaml_module(
+    name = "_Main",
+    src = "main.ml",
+    opts = MAIN_MODULE_OPTS,
+    ppx = MAIN_PPX,
+    ppx_args = MAIN_PPX_ARGS,
+    deps = MAIN_DEPS,
+)
