@@ -29,6 +29,7 @@ Pipeline.build
         dirtyWhen = [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ArchiveNodeArtifact"),
           S.strictlyStart (S.contains "scripts/archive")
+          S.exactly "buildkite/nightly.txt"
         ],
         path = "Release",
         name = "ArchiveNodeArtifact"
