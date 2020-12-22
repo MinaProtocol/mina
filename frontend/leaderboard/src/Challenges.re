@@ -28,6 +28,16 @@ let echoServiceChallenge = metricsMap => {
      );
 };
 
+let bonusSnarkFeeChallenge = metricsMap => {
+  Points.addPointsIfCommunityMeetsThreshold(
+    (metricRecord: Types.Metrics.t) =>
+      metricRecord.transactionsReceivedByEcho,
+    1000,
+    2000,
+    metricsMap,
+  );
+};
+
 let snarkFeeChallenge = metricsMap => {
   [
     Points.applyTopNPoints(
@@ -43,6 +53,7 @@ let snarkFeeChallenge = metricsMap => {
       (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
       compare,
     ),
+    bonusSnarkFeeChallenge(metricsMap),
   ]
   |> Points.sumPointsMaps;
 };
