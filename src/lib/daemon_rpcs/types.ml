@@ -223,24 +223,19 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    (* let peers = list_string_entry "Peers" ~to_string:Network_peer.Peer.to_string *)
-
-    (* let peer = map_entry "Peer" ~f:Network_peer.Peer.to_string *)
-
-    (*
-    let addrs_of_peers = list_entry "IP Addresses of peers" ~to_string:Fn.id
-
-    let ids_of_peers = list_entry "Libp2p PeerIDs of peers" ~to_string:Fn.id *)
-    let peers =
+    let peers field =
       let render display_peer =
         let open Network_peer.Peer in
         of_display display_peer |> to_multiaddr_string
       in
-      map_entry "Peers" ~f:(fun peers ->
+      map_entry
+        (sprintf "Peers (%d)" (List.length @@ FieldT.get field))
+        ~f:(fun peers ->
           List.mapi peers ~f:(fun i peer ->
               let rendered = "\t" ^ render peer in
               if i = 0 then "\n" ^ rendered else rendered )
           |> String.concat ~sep:"\n" )
+        field
 
     let user_commands_sent = int_entry "User_commands sent"
 
