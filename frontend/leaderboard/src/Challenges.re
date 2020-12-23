@@ -51,7 +51,7 @@ let snarkFeeChallenge = metricsMap => {
       (11, 3000), // Top 10: 3000 pts.
       (21, 1500), // Top 20: 2500 pts
       (101, 1500), // Top 100: 1500 pts
-      (201, 1000) // Top 100: 1000 pts
+      (201, 1000) // Top 200: 1000 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
@@ -109,7 +109,10 @@ let createAndSendTokenChallenge = metricsMap => {
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
   | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
-  | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
+  /*
+     This challenge will be calculated close to the end of the testnet
+   | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
+   */
   | "send mina" => Some(sendMinaChallenge(metricsMap))
   | _ => None
   };
