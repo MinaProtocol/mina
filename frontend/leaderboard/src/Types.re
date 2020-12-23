@@ -170,8 +170,7 @@ module Block = {
         ...block.blockchainState,
         coinbaseReceiver,
       };
-      let updatedBlock = {...block, blockchainState: updatedBlockchainState};
-      updatedBlock;
+      {...block, blockchainState: updatedBlockchainState};
     | None => block
     };
   };
