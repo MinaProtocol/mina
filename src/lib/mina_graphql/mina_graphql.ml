@@ -2399,7 +2399,12 @@ module Mutations = struct
         Arg.
           [ arg "block" ~doc:"Block encoded in precomputed block format"
               ~typ:(non_null @@ Types.Input.precomputed_block) ]
-      ~typ:(scalar "Null" ~coerce:(fun () -> `Null))
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true) ] )))
       ~resolve:(fun {ctx= coda; _} () block ->
         let open Deferred.Result.Let_syntax in
         let%bind archive_location =
@@ -2415,7 +2420,7 @@ module Mutations = struct
             block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        None )
+        () )
 
   let commands =
     [ add_wallet
