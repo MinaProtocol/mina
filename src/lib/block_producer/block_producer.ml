@@ -399,6 +399,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         | None ->
             log_bootstrap_mode () ; Interruptible.return ()
         | Some frontier -> (
+            let done_proving = Ivar.create () in
+            (* We call this slightly before we actually start building the
+               proof, in the hopes that verification has stopped by the time we
+               start proving.
+            *)
+            Verifier.wait_for_proving done_proving ;
             let open Transition_frontier.Extensions in
             let transition_registry =
               get_extension
@@ -483,11 +489,15 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       time ~logger ~time_controller
                         "Protocol_state_proof proving time(ms)" (fun () ->
                           measure "proving state transition valid" (fun () ->
-                              Prover.prove prover
-                                ~prev_state:previous_protocol_state
-                                ~prev_state_proof:previous_protocol_state_proof
-                                ~next_state:protocol_state internal_transition
-                                pending_coinbase_witness )
+                              let%map.Async res =
+                                Prover.prove prover
+                                  ~prev_state:previous_protocol_state
+                                  ~prev_state_proof:
+                                    previous_protocol_state_proof
+                                  ~next_state:protocol_state
+                                  internal_transition pending_coinbase_witness
+                              in
+                              Ivar.fill done_proving () ; res )
                           |> Deferred.Result.map_error ~f:(fun err ->
                                  `Prover_error
                                    ( err
