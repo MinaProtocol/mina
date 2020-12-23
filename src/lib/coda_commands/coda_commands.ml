@@ -169,6 +169,8 @@ type active_state_fields =
   ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option
   ; global_slot_since_genesis_best_tip: int option }
 
+let max_block_height = ref 1
+
 let get_status ~flag t =
   let open Mina_lib.Config in
   let config = Mina_lib.config t in
@@ -246,11 +248,16 @@ let get_status ~flag t =
     | `None ->
         None
   in
-  let highest_block_length_received =
+  let new_block_length_received =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
     @@ Coda_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
+  in
+  let () =
+    if new_block_length_received > !max_block_height then
+      max_block_height := new_block_length_received
+    else ()
   in
   let active_status () =
     let open Participating_state.Let_syntax in
@@ -280,7 +287,7 @@ let get_status ~flag t =
       | `Offline ->
           `Active `Offline
       | `Synced | `Catchup ->
-          if abs (highest_block_length_received - blockchain_length) < 5 then
+          if abs (!max_block_height - blockchain_length) < 5 then
             `Active `Synced
           else `Active `Catchup
     in
@@ -335,7 +342,7 @@ let get_status ~flag t =
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; blockchain_length
-  ; highest_block_length_received
+  ; highest_block_length_received= !max_block_height
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
