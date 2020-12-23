@@ -169,11 +169,10 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
         [%log debug] "%s"
           (Visualization_message.success "transition frontier" frontier_file)
     | `Waiting_for_genesis ->
-        [%log debug] "%s"
-          (Visualization_message.bootstrap "transition frontier")
-    | `Bootstrapping ->
         [%log debug] "%s" (Visualization_message.waiting "transition frontier")
-    )
+    | `Bootstrapping ->
+        [%log debug] "%s"
+          (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
   Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
