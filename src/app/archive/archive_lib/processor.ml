@@ -810,6 +810,15 @@ module Block = struct
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hash t.protocol_state)
 
+  let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
+      ~(parent_id : int) =
+    Conn.exec
+      (Caqti_request.exec
+         Caqti_type.(tup2 int string)
+         "UPDATE blocks SET parent_id = ? WHERE parent_hash = ? AND parent_id \
+          IS NULL")
+      (parent_id, State_hash.to_base58_check parent_hash)
+
   let delete_if_older_than ?height ?num_blocks ?timestamp
       (module Conn : CONNECTION) =
     let open Deferred.Result.Let_syntax in
@@ -890,12 +899,20 @@ module Block = struct
     else return ()
 end
 
-let add_block_aux ~add_block ~delete_older_than (module Conn : CONNECTION)
-    block =
+let add_block_aux ~add_block ~hash ~delete_older_than
+    (module Conn : CONNECTION) block =
   let%bind res =
     let open Deferred.Result.Let_syntax in
     let%bind () = Conn.start () in
-    let%bind _ = add_block (module Conn : CONNECTION) block in
+    let%bind block_id = add_block (module Conn : CONNECTION) block in
+    (* if an existing block has a parent hash that's for the block just added,
+       set its parent id
+    *)
+    let%bind () =
+      Block.set_parent_id_if_null
+        (module Conn)
+        ~parent_hash:(hash block) ~parent_id:block_id
+    in
     match delete_older_than with
     | Some num_blocks ->
         Block.delete_if_older_than ~num_blocks (module Conn)
@@ -916,8 +933,9 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
+        let hash block = With_hash.hash block in
         match%map
-          add_block_aux ~delete_older_than ~add_block (module Conn) block
+          add_block_aux ~delete_older_than ~hash ~add_block (module Conn) block
         with
         | Error e ->
             [%log warn]
@@ -965,6 +983,9 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
           match%map
             add_block_aux
               ~add_block:(Block.add_from_precomputed ~constraint_constants)
+              ~hash:(fun block ->
+                block.External_transition.Precomputed_block.protocol_state
+                |> Protocol_state.hash )
               ~delete_older_than conn precomputed_block
           with
           | Error e ->
