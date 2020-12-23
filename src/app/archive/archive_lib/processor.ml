@@ -631,8 +631,7 @@ module Block = struct
             |> Blockchain_state.snarked_ledger_hash )
         in
         let is_genesis_block =
-          External_transition.consensus_state t
-          |> Consensus.Data.Consensus_state.is_genesis_state
+          Consensus.Data.Consensus_state.is_genesis_state consensus_state
         in
         let%bind staking_epoch_data_id =
           Epoch_data.add_if_doesn't_exist ~is_genesis_block
