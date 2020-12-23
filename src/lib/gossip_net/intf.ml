@@ -2,7 +2,7 @@ open Async
 open Core_kernel
 open Network_peer
 open Pipe_lib
-open Coda_base.Rpc_intf
+open Mina_base.Rpc_intf
 
 type ban_creator = {banned_peer: Peer.t; banned_until: Time.t}
 [@@deriving fields]
@@ -55,7 +55,7 @@ module type Gossip_net_intf = sig
 
   val received_message_reader :
        t
-    -> (Message.msg Envelope.Incoming.t * (Coda_net2.validation_result -> unit))
+    -> (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
        Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t

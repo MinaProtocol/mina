@@ -19,7 +19,9 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
+    module Mock_snark_pool =
+      Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
+        (Mocks.Transition_frontier)
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
@@ -108,7 +110,10 @@ let%test_module "network pool test" =
           Strict_pipe.(create ~name:"Network pool test" Synchronous)
         in
         List.map (List.take works per_reader) ~f:create_work
-        |> List.map ~f:(fun work -> (Envelope.Incoming.local work, Fn.const ()))
+        |> List.map ~f:(fun work ->
+               ( Envelope.Incoming.local work
+               , Coda_net2.Validation_callback.create_without_expiration () )
+           )
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff
                |> Deferred.don't_wait_for ) ;
@@ -140,6 +145,8 @@ let%test_module "network pool test" =
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)
                    ->
                      work
+                 | Mock_snark_pool.Resource_pool.Diff.Empty ->
+                     assert false
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

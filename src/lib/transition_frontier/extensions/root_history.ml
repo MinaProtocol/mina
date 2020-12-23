@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_transition
 open Frontier_base
 module Queue = Hash_queue.Make (State_hash)

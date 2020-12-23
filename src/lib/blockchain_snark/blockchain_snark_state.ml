@@ -1,7 +1,7 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Coda_base
+open Mina_base
 open Coda_state
 open Pickles_types
 
@@ -89,13 +89,14 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (t, body)
   in
-  let%bind ( `Success updated_consensus_state
-           , `Supercharge_coinbase supercharge_coinbase
-           , consensus_state ) =
+  let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
          transition txn_snark.supply_increase)
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
   in
   let prev_pending_coinbase_root =
     previous_state |> Protocol_state.blockchain_state
@@ -144,6 +145,9 @@ let%snarkydef step ~(logger : Logger.t)
       Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
+      let coinbase_receiver =
+        Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
+      in
       let%bind root_after_delete, deleted_stack =
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
           prev_pending_coinbase_root
@@ -160,7 +164,7 @@ let%snarkydef step ~(logger : Logger.t)
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
              (Snark_transition.pending_coinbase_update transition)
-             ~supercharge_coinbase previous_state_body_hash)
+             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
@@ -286,7 +290,8 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
-  { prevs= [self; transaction_snark]
+  { identifier= "step"
+  ; prevs= [self; transaction_snark]
   ; main=
       (fun [x1; x2] x ->
         let b1, b2 =
@@ -374,6 +379,9 @@ end) : S = struct
       ~branches:(module Nat.N1)
       ~max_branching:(module Nat.N2)
       ~name:"blockchain-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants)
       ~choices:(fun ~self ->
         [rule ~proof_level ~constraint_constants T.tag self] )
 
@@ -388,7 +396,7 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
     , digest
         (let main x =
            let open Tick in
-           let%bind x1 = exists Coda_base.State_hash.typ in
+           let%bind x1 = exists Mina_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
              step ~proof_level ~constraint_constants ~logger:(Logger.create ())
@@ -396,4 +404,4 @@ let constraint_system_digests ~proof_level ~constraint_constants () =
            in
            ()
          in
-         Tick.constraint_system ~exposing:[Coda_base.State_hash.typ] main) ) ]
+         Tick.constraint_system ~exposing:[Mina_base.State_hash.typ] main) ) ]

@@ -254,7 +254,7 @@ module Make (Test : Test_intf) = struct
         in
         try
           let (_unattached_mask : Mask.t) =
-            Maskable.unregister_mask_exn attached_mask
+            Maskable.unregister_mask_exn ~loc:__LOC__ attached_mask
           in
           true
         with Failure _ -> false )

@@ -17,10 +17,11 @@ module Make (Engine : Engine_intf) = struct
     let open Currency in
     let balance = Balance.of_int 100_000_000_000 in
     (*Should fully vest by slot = 7 provided blocks are produced from slot 1*)
-    let timing : Coda_base.Account_timing.t =
+    let timing : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= balance
         ; cliff_time= Coda_numbers.Global_slot.of_int 4
+        ; cliff_amount= Amount.zero
         ; vesting_period= Coda_numbers.Global_slot.of_int 2
         ; vesting_increment= Amount.of_int 50_000_000_000 }
     in
@@ -77,7 +78,7 @@ module Make (Engine : Engine_intf) = struct
     in
     let%map balance =
       Node.get_balance ~logger
-        ~account_id:Coda_base.(Account_id.create pk Token_id.default)
+        ~account_id:Mina_base.(Account_id.create pk Token_id.default)
         block_producer
     in
     [%test_eq: Currency.Balance.t] balance expected_balance ;

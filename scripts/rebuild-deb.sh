@@ -182,7 +182,7 @@ for f in /tmp/s3_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp ../genesis_ledgers/testworld.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -230,7 +230,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
-#remove build dir
+#remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
 

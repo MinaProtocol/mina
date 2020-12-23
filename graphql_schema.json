@@ -202,6 +202,140 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SetConnectionGatingConfigInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isolate",
+              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bannedPeers",
+              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "NetworkPeer",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "trustedPeers",
+              "description": "Peers we will always allow connections from",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "NetworkPeer",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isolate",
+              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "bannedPeers",
+              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "NetworkPeer",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "trustedPeers",
+              "description": "Peers we will always allow connections from",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "NetworkPeer",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SetSnarkWorkFee",
           "description": null,
           "fields": [
@@ -468,105 +602,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "INPUT_OBJECT",
-          "name": "AddPaymentReceiptInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "added_time",
-              "description": "Time that a payment gets added to another clients transaction database (stringified Unix time - number of milliseconds since January 1, 1970)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "payment",
-              "description": "Serialized payment (base58-encoded janestreet/bin_prot serialization)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "added_time",
-              "description": "Time that a payment gets added to another clients transaction database (stringified Unix time - number of milliseconds since January 1, 1970)",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "payment",
-              "description": "Serialized payment (base58-encoded janestreet/bin_prot serialization)",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "AddPaymentReceiptPayload",
-          "description": null,
-          "fields": [
-            {
-              "name": "payment",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "INTERFACE",
-                  "name": "UserCommand",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "TarFile",
           "description": null,
@@ -639,7 +674,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -751,7 +786,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -886,7 +921,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -998,7 +1033,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1133,7 +1168,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1213,7 +1248,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1320,7 +1355,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1404,7 +1439,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -1593,7 +1628,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -1705,7 +1740,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -2793,33 +2828,6 @@
               "deprecationReason": null
             },
             {
-              "name": "addPaymentReceipt",
-              "description": "Add payment into transaction database",
-              "args": [
-                {
-                  "name": "input",
-                  "description": null,
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "INPUT_OBJECT",
-                      "name": "AddPaymentReceiptInput",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AddPaymentReceiptPayload",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "setStaking",
               "description": "Set keys you wish to stake with",
               "args": [
@@ -2906,6 +2914,37 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "SetSnarkWorkFeePayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setConnectionGatingConfig",
+              "description": "Set the connection gating config, returning the current config after the application (which may have failed)",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetConnectionGatingConfigInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetConnectionGatingConfigPayload",
                   "ofType": null
                 }
               },
@@ -3232,6 +3271,22 @@
               "deprecationReason": null
             },
             {
+              "name": "peer_id",
+              "description": "libp2p Peer ID",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "trust",
               "description": "Trust score",
               "args": [],
@@ -3292,249 +3347,6 @@
               "deprecationReason": null
             }
           ],
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "BlockFilterInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "relatedTo",
-              "description": "A public key of a user who has their\n        transaction in the block, or produced the block",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "relatedTo",
-              "description": "A public key of a user who has their\n        transaction in the block, or produced the block",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "PageInfo",
-          "description": "PageInfo object as described by the Relay connections spec",
-          "fields": [
-            {
-              "name": "hasPreviousPage",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "hasNextPage",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "firstCursor",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "lastCursor",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "BlockEdge",
-          "description": "Connection Edge as described by the Relay connections spec",
-          "fields": [
-            {
-              "name": "cursor",
-              "description": "Opaque pagination cursor for a block (base58-encoded janestreet/bin_prot serialization)",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "node",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "Block",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "BlockConnection",
-          "description": "Connection as described by the Relay connections spec",
-          "fields": [
-            {
-              "name": "edges",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "BlockEdge",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "nodes",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "LIST",
-                  "name": null,
-                  "ofType": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "OBJECT",
-                      "name": "Block",
-                      "ofType": null
-                    }
-                  }
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "totalCount",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "pageInfo",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "PageInfo",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
           "possibleTypes": null
         },
         {
@@ -3782,7 +3594,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3830,7 +3642,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4103,7 +3915,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+	      "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4151,7 +3963,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4424,7 +4236,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4472,7 +4284,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4745,7 +4557,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4793,7 +4605,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5070,7 +4882,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - this is 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5118,7 +4930,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5359,7 +5171,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5407,7 +5219,7 @@
             },
             {
               "name": "memo",
-              "description": "Short arbitrary message provided by the sender",
+		"description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6021,6 +5833,22 @@
               "deprecationReason": null
             },
             {
+              "name": "slotSinceGenesis",
+              "description": "Slot since genesis (across all hard-forks)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "epoch",
               "description": "Epoch in which this block was created",
               "args": [],
@@ -6214,6 +6042,22 @@
               "deprecationReason": null
             },
             {
+              "name": "winnerAccount",
+              "description": "Account that won the slot (Delegator/Staker)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "stateHash",
               "description": "Base58Check-encoded hash of the state after this block",
               "args": [],
@@ -6370,6 +6214,140 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "NetworkPeerPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "peer_id",
+              "description": "base58-encoded peer ID",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "host",
+              "description": "IP address of the remote host",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2p_port",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetConnectionGatingConfigPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "trustedPeers",
+              "description": "Peers we will always allow connections from",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "NetworkPeerPayload",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bannedPeers",
+              "description": "Peers we will never allow connections from (unless they are also trusted!)",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "NetworkPeerPayload",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isolate",
+              "description": "If true, no connections will be allowed unless they are from a trusted peer",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },
@@ -6913,38 +6891,6 @@
             },
             {
               "name": "k",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "c",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "cTimesK",
               "description": null,
               "args": [],
               "type": {
@@ -7814,6 +7760,18 @@
               "deprecationReason": null
             },
             {
+              "name": "globalSlotSinceGenesisBestTip",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "nextBlockProduction",
               "description": null,
               "args": [],
@@ -8067,6 +8025,22 @@
               "deprecationReason": "use account instead"
             },
             {
+              "name": "connectionGatingConfig",
+              "description": "The rules that the libp2p helper will use to determine which connections to permit",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetConnectionGatingConfigPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "account",
               "description": "Find any account via a public key",
               "args": [
@@ -8184,7 +8158,18 @@
             {
               "name": "bestChain",
               "description": "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns null if the system is bootstrapping.",
-              "args": [],
+              "args": [
+                {
+                  "name": "maxLength",
+                  "description": "The maximum number of blocks to return. If there are more blocks in the transition frontier from root to tip, the n blocks closest to the best tip will be returned",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Int",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
               "type": {
                 "kind": "LIST",
                 "name": null,
@@ -8197,100 +8182,6 @@
                     "ofType": null
                   }
                 }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "blocks",
-              "description": null,
-              "args": [
-                {
-                  "name": "before",
-                  "description": "Returns the elements in the list that come before the specified cursor",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "last",
-                  "description": "Returns the last _n_ elements from the list",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "after",
-                  "description": "Returns the elements in the list that come after the specified cursor",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "first",
-                  "description": "Returns the first _n_ elements from the list",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "Int",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                },
-                {
-                  "name": "filter",
-                  "description": null,
-                  "type": {
-                    "kind": "INPUT_OBJECT",
-                    "name": "BlockFilterInput",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "BlockConnection",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "block",
-              "description": "Get information about a single block or null if no block can be found",
-              "args": [
-                {
-                  "name": "stateHash",
-                  "description": "State hash of the block",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
-                      "ofType": null
-                    }
-                  },
-                  "defaultValue": null
-                }
-              ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "Block",
-                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8463,9 +8354,17 @@
                 }
               ],
               "type": {
-                "kind": "OBJECT",
-                "name": "TrustStatusPayload",
-                "ofType": null
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "TrustStatusPayload",
+                    "ofType": null
+                  }
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8560,7 +8459,7 @@
             },
             {
               "name": "timeOffset",
-              "description": "The time offset used to convert real times into blockchain times",
+              "description": "The time offset in seconds used to convert real times into blockchain times",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

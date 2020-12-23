@@ -5,6 +5,7 @@ import (
 	"codanet"
 	"context"
 	cryptorand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,13 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"encoding/base64"
-
 	"github.com/go-errors/errors"
-	"github.com/ipfs/go-ipfs/core/bootstrap"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	coredisc "github.com/libp2p/go-libp2p-core/discovery"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -33,6 +30,7 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -52,6 +50,7 @@ type app struct {
 	P2p             *codanet.Helper
 	Ctx             context.Context
 	Subs            map[int]subscription
+	Topics          map[string]*pubsub.Topic
 	Validators      map[int]*validationStatus
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
@@ -61,6 +60,10 @@ type app struct {
 	Bootstrapper    io.Closer
 	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
+
+	// development configuration options
+	NoMDNS bool
+	NoDHT  bool
 }
 
 var seqs = make(chan int)
@@ -165,7 +168,7 @@ func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, er
 		return nil, err
 	}
 
-	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.IDB58Encode(id)}, nil
+	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.Encode(id)}, nil
 }
 
 func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
@@ -178,7 +181,7 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	if len(conns) == 0 {
 		if app.UnsafeNoTrustIP {
 			app.P2p.Logger.Info("UnsafeNoTrustIP: pretending it's localhost")
-			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: peer.IDB58Encode(id)}, nil
+			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: peer.Encode(id)}, nil
 		}
 		return nil, badp2p(errors.New("tried to find peer info but no open connections to that peer ID"))
 	}
@@ -230,27 +233,30 @@ func (ms *codaMetricsServer) Shutdown() {
 	ms.done.Wait()
 }
 
-var metricsServer *codaMetricsServer = nil
+var (
+	metricsServer *codaMetricsServer
+)
 
 type configureMsg struct {
-	Statedir        string             `json:"statedir"`
-	Privk           string             `json:"privk"`
-	NetworkID       string             `json:"network_id"`
-	ListenOn        []string           `json:"ifaces"`
-	MetricsPort     string             `json:"metrics_port"`
-	External        string             `json:"external_maddr"`
-	UnsafeNoTrustIP bool               `json:"unsafe_no_trust_ip"`
-	Flood           bool               `json:"flood"`
-	PeerExchange    bool               `json:"peer_exchange"`
-	DirectPeers     []string           `json:"direct_peers"`
-	SeedPeers       []string           `json:"seed_peers"`
-	GatingConfig    setGatingConfigMsg `json:"gating_config"`
+	Statedir            string             `json:"statedir"`
+	Privk               string             `json:"privk"`
+	NetworkID           string             `json:"network_id"`
+	ListenOn            []string           `json:"ifaces"`
+	MetricsPort         string             `json:"metrics_port"`
+	External            string             `json:"external_maddr"`
+	UnsafeNoTrustIP     bool               `json:"unsafe_no_trust_ip"`
+	Flood               bool               `json:"flood"`
+	PeerExchange        bool               `json:"peer_exchange"`
+	DirectPeers         []string           `json:"direct_peers"`
+	SeedPeers           []string           `json:"seed_peers"`
+	GatingConfig        setGatingConfigMsg `json:"gating_config"`
+	MaxConnections      int                `json:"max_connections"`
+	ValidationQueueSize int                `json:"validation_queue_size"`
 }
 
-type discoveredPeerUpcall struct {
-	ID     string   `json:"peer_id"`
-	Addrs  []string `json:"multiaddrs"`
-	Upcall string   `json:"upcall"`
+type peerConnectionUpcall struct {
+	ID     string `json:"peer_id"`
+	Upcall string `json:"upcall"`
 }
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
@@ -284,6 +290,8 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		seeds = append(seeds, *addr)
 	}
 
+	app.AddedPeers = append(app.AddedPeers, seeds...)
+
 	directPeers := make([]peer.AddrInfo, 0, len(m.DirectPeers))
 	for _, v := range m.DirectPeers {
 		addr, err := addrInfoOfString(v)
@@ -301,14 +309,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&m.GatingConfig)
-
+	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig))
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, *gatingConfig)
-
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections)
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -316,10 +322,15 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	// SOMEDAY:
 	// - stop putting block content on the mesh.
 	// - bigger than 32MiB block size?
-	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32), pubsub.WithPeerExchange(m.PeerExchange), pubsub.WithFloodPublish(m.Flood), pubsub.WithDirectPeers(directPeers)}
+	opts := []pubsub.Option{pubsub.WithMaxMessageSize(1024 * 1024 * 32),
+		pubsub.WithPeerExchange(m.PeerExchange),
+		pubsub.WithFloodPublish(m.Flood),
+		pubsub.WithDirectPeers(directPeers),
+		pubsub.WithValidateQueueSize(m.ValidationQueueSize),
+	}
+
 	var ps *pubsub.PubSub
 	ps, err = pubsub.NewGossipSub(app.Ctx, helper.Host, opts...)
-
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -384,22 +395,23 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badRPC(err)
 	}
-	if err := app.P2p.Pubsub.Publish(t.Topic, data); err != nil {
+
+	var topic *pubsub.Topic
+	var has bool
+	if topic, has = app.Topics[t.Topic]; !has {
+		return nil, badRPC(err)
+	}
+
+	if err := topic.Publish(app.Ctx, data); err != nil {
 		return nil, badp2p(err)
 	}
+
 	return "publish success", nil
 }
 
 type subscribeMsg struct {
 	Topic        string `json:"topic"`
 	Subscription int    `json:"subscription_idx"`
-}
-
-type publishUpcall struct {
-	Upcall       string        `json:"upcall"`
-	Subscription int           `json:"subscription_idx"`
-	Data         string        `json:"data"`
-	Sender       *codaPeerInfo `json:"sender"`
 }
 
 // we use base64 for encoding blobs in our JSON protocol. there are more
@@ -420,8 +432,15 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p.Dht == nil {
 		return nil, needsDHT()
 	}
-	app.P2p.Pubsub.Join(s.Topic)
-	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
+
+	topic, err := app.P2p.Pubsub.Join(s.Topic)
+	if err != nil {
+		return nil, badp2p(err)
+	}
+
+	app.Topics[s.Topic] = topic
+
+	err = app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
@@ -429,10 +448,10 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		}
 
 		seqno := <-seqs
-		ch := make(chan string, 1)
+		ch := make(chan string)
 		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = new(validationStatus)
-		(*app.Validators[seqno]).Completion = ch
+		app.Validators[seqno].Completion = ch
 		app.ValidatorMutex.Unlock()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
@@ -440,19 +459,28 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		sender, err := findPeerInfo(app, id)
 
 		if err != nil && !app.UnsafeNoTrustIP {
-			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
+			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.Encode(id))
 			app.ValidatorMutex.Lock()
 			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
 			return pubsub.ValidationIgnore
 		}
 
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			app.P2p.Logger.Errorf("no deadline set on validation context")
+			defer app.ValidatorMutex.Unlock()
+			delete(app.Validators, seqno)
+			return pubsub.ValidationIgnore
+		}
+
 		app.writeMsg(validateUpcall{
-			Sender: sender,
-			Data:   codaEncode(msg.Data),
-			Seqno:  seqno,
-			Upcall: "validate",
-			Idx:    s.Subscription,
+			Sender:     sender,
+			Expiration: deadline.UnixNano(),
+			Data:       codaEncode(msg.Data),
+			Seqno:      seqno,
+			Upcall:     "validate",
+			Idx:        s.Subscription,
 		})
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
@@ -466,8 +494,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			app.ValidatorMutex.Lock()
 
-			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
-			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
+			now := time.Now()
+			app.Validators[seqno].TimedOutAt = &now
 
 			app.ValidatorMutex.Unlock()
 
@@ -498,10 +526,11 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
-	sub, err := app.P2p.Pubsub.Subscribe(s.Topic)
+	sub, err := topic.Subscribe()
 	if err != nil {
 		return nil, badp2p(err)
 	}
+
 	ctx, cancel := context.WithCancel(app.Ctx)
 	app.Subs[s.Subscription] = subscription{
 		Sub:    sub,
@@ -511,24 +540,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	go func() {
 		for {
-			msg, err := sub.Next(ctx)
-			if err == nil {
-				// sender, err := findPeerInfo(app, msg.ReceivedFrom)
-				if err != nil && !app.UnsafeNoTrustIP {
-					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
-				} else {
-					/* Don't bother informing the helper about this message; it ignores it
-										   and we don't want to block here or else we might lose messages
-					            data := codaEncode(msg.Data)
-					            app.writeMsg(publishUpcall{
-					              Upcall:       "publish",
-					              Subscription: s.Subscription,
-					              Data:         data,
-					              Sender:       sender,
-					            })
-					*/
-				}
-			} else {
+			_, err = sub.Next(ctx)
+			if err != nil {
 				if ctx.Err() != context.Canceled {
 					app.P2p.Logger.Error("sub.Next failed: ", err)
 				} else {
@@ -558,11 +571,12 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	Sender *codaPeerInfo `json:"sender"`
-	Data   string        `json:"data"`
-	Seqno  int           `json:"seqno"`
-	Upcall string        `json:"upcall"`
-	Idx    int           `json:"subscription_idx"`
+	Sender     *codaPeerInfo `json:"sender"`
+	Expiration int64         `json:"expiration"`
+	Data       string        `json:"data"`
+	Seqno      int           `json:"seqno"`
+	Upcall     string        `json:"upcall"`
+	Idx        int           `json:"subscription_idx"`
 }
 
 type validationCompleteMsg struct {
@@ -616,7 +630,7 @@ func (*generateKeypairMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
-	return generatedKeypair{Private: codaEncode(privkBytes), Public: codaEncode(pubkBytes), PeerID: peer.IDB58Encode(peerID)}, nil
+	return generatedKeypair{Private: codaEncode(privkBytes), Public: codaEncode(pubkBytes), PeerID: peer.Encode(peerID)}, nil
 }
 
 type streamLostUpcall struct {
@@ -643,6 +657,10 @@ type incomingMsgUpcall struct {
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
 	go func() {
+		defer func() {
+			_ = stream.Close()
+		}()
+
 		buf := make([]byte, 4096)
 		for {
 			len, err := stream.Read(buf)
@@ -685,23 +703,24 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 	streamIdx := <-seqs
-	peer, err := peer.IDB58Decode(o.Peer)
+	peer, err := peer.Decode(o.Peer)
 	if err != nil {
 		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
 		// isn't supported by this version of libp2p.
 		return nil, badRPC(err)
 	}
 
-	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
+	ctx, cancel := context.WithTimeout(app.Ctx, 30*time.Second)
+	defer cancel()
 
+	stream, err := app.P2p.Host.NewStream(ctx, peer, protocol.ID(o.ProtocolID))
 	if err != nil {
 		return nil, badp2p(err)
 	}
 
 	maybePeer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
-
 	if err != nil {
-		stream.Reset()
+		_ = stream.Reset()
 		return nil, badp2p(err)
 	}
 
@@ -711,6 +730,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
+		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
 		handleStreamReads(app, stream, streamIdx)
 	}()
 	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
@@ -727,6 +747,7 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
+		delete(app.Streams, cs.StreamIdx)
 		err := stream.Close()
 		if err != nil {
 			return nil, badp2p(err)
@@ -854,6 +875,7 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+
 	info, err := addrInfoOfString(ap.Multiaddr)
 	if err != nil {
 		return nil, err
@@ -863,8 +885,8 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
 
+	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
 		return nil, badp2p(err)
 	}
@@ -883,91 +905,202 @@ func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
 	l.FoundPeer <- info
 }
 
+func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
+	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
+	if err != nil {
+		return err
+	}
+	app.P2p.Mdns = &mdns
+	l := &mdnsListener{FoundPeer: foundPeerCh}
+	mdns.RegisterNotifee(l)
+
+	return nil
+}
+
 func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
 
-	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
-	if err != nil {
-		return nil, err
-	}
-	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: make(chan peer.AddrInfo)}
-	mdns.RegisterNotifee(l)
-
-	routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
-
-	if routingDiscovery == nil {
-		return nil, errors.New("failed to create routing discovery")
+	for _, info := range app.AddedPeers {
+		app.P2p.Logger.Error("Trying to connect to: ", info)
+		err := app.P2p.Host.Connect(app.Ctx, info)
+		if err != nil {
+			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
+			continue
+		}
 	}
 
-	app.P2p.Discovery = routingDiscovery
-
-	discovered := make(chan peer.AddrInfo)
-	app.P2p.DiscoveredPeers = discovered
+	foundPeerCh := make(chan peer.AddrInfo)
 
 	validPeer := func(who peer.ID) bool {
 		return who.Validate() == nil && who != app.P2p.Me
 	}
 
-	foundPeer := func(who peer.ID) {
-		addrs := app.P2p.Host.Peerstore().Addrs(who)
+	// report discovery peers local and remote
+	go func() {
+		for info := range foundPeerCh {
+			if validPeer(info.ID) {
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 
-		if len(addrs) > 0 {
-			addrStrings := make([]string, len(addrs))
-			for i, a := range addrs {
-				addrStrings[i] = a.String()
+				// now connect to the peer we discovered
+				err := app.P2p.Host.Connect(app.Ctx, info)
+				if err != nil {
+					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", info, err.Error())
+					continue
+				}
 			}
-
-			app.writeMsg(discoveredPeerUpcall{
-				ID:     peer.IDB58Encode(who),
-				Addrs:  addrStrings,
-				Upcall: "discoveredPeer",
-			})
 		}
-	}
+	}()
 
-	if len(app.AddedPeers) > 0 {
-		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
+	if !app.NoMDNS {
+		app.P2p.Logger.Debugf("beginning mDNS discovery")
+		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
+			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
 			return nil, badp2p(err)
 		}
 	}
 
-	// report local discovery peers
-	go func() {
-		for info := range l.FoundPeer {
-			if validPeer(info.ID) {
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-				foundPeer(info.ID)
-			}
+	if !app.NoDHT {
+		app.P2p.Logger.Debugf("beginning DHT discovery")
+		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
+		if routingDiscovery == nil {
+			return nil, errors.New("failed to create routing discovery")
 		}
-	}()
 
-	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
+		app.P2p.Discovery = routingDiscovery
 
-	logger := logging.Logger("libp2p_helper.beginAdvertisingMsg.notifications")
-	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
-		logger.Infof("new connection: %+v", c)
-		foundPeer(c.RemotePeer())
-	}
-	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
-		logger.Infof("dropped connection: %+v", c)
-		foundPeer(c.RemotePeer())
-	}
+		err := app.P2p.Dht.Bootstrap(app.Ctx)
+		if err != nil {
+			app.P2p.Logger.Error("failed to dht bootstrap: ", err.Error())
+			return nil, badp2p(err)
+		}
 
-	go func() {
-		for {
-			_, err := discovery.FindPeers(app.Ctx, routingDiscovery, app.P2p.Rendezvous, coredisc.Limit(20))
+		time.Sleep(time.Millisecond * 100)
+
+		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
+		if err != nil {
+			app.P2p.Logger.Error("failed to routing advertise: ", err.Error())
+			return nil, badp2p(err)
+		}
+
+		go func() {
+			peerCh, err := routingDiscovery.FindPeers(app.Ctx, app.P2p.Rendezvous)
 			if err != nil {
-				app.P2p.Logger.Warning("error while trying to find some peers: ", err.Error())
+				app.P2p.Logger.Error("error while trying to find some peers: ", err.Error())
 			}
-			time.Sleep(2 * time.Minute)
-		}
-	}()
+
+			for peer := range peerCh {
+				foundPeerCh <- peer
+			}
+		}()
+	}
+
+	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		id := c.RemotePeer()
+
+		app.writeMsg(peerConnectionUpcall{
+			ID:     peer.Encode(id),
+			Upcall: "peerConnected",
+		})
+
+		// Note: These are disabled because we see weirdness on our networks
+		//       caused by this prometheus issues.
+		// go app.checkBandwidth(id)
+		// go app.checkLatency(id)
+	}
+
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		id := c.RemotePeer()
+
+		app.writeMsg(peerConnectionUpcall{
+			ID:     peer.Encode(id),
+			Upcall: "peerDisconnected",
+		})
+	}
 
 	return "beginAdvertising success", nil
+}
+
+const (
+	latencyMeasurementTime = time.Second * 5
+	metricsRefreshTime     = time.Minute
+)
+
+func (a *app) checkBandwidth(id peer.ID) {
+	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("total_bandwidth_in_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	totalOut := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("total_bandwidth_out_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	rateIn := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("bandwidth_rate_in_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+	rateOut := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("bandwidth_rate_out_%s", id),
+		Help: "The bandwidth used by the given peer.",
+	})
+
+	err := prometheus.Register(totalIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(totalOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	for {
+		stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
+		totalIn.Set(float64(stats.TotalIn))
+		totalOut.Set(float64(stats.TotalOut))
+		rateIn.Set(stats.RateIn)
+		rateOut.Set(stats.RateOut)
+
+		time.Sleep(metricsRefreshTime)
+	}
+}
+
+func (a *app) checkLatency(id peer.ID) {
+	latencyGauge := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("latency_%s", id),
+		Help: "The latency for the given peer.",
+	})
+
+	err := prometheus.Register(latencyGauge)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register latency gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	for {
+		a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
+		latency := a.P2p.Host.Peerstore().LatencyEWMA(id)
+		latencyGauge.Set(float64(latency))
+
+		time.Sleep(metricsRefreshTime)
+	}
 }
 
 type findPeerMsg struct {
@@ -975,7 +1108,7 @@ type findPeerMsg struct {
 }
 
 func (ap *findPeerMsg) run(app *app) (interface{}, error) {
-	id, err := peer.IDB58Decode(ap.PeerID)
+	id, err := peer.Decode(ap.PeerID)
 	if err != nil {
 		return nil, err
 	}
@@ -1028,10 +1161,6 @@ func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 	return nil
 }
 
-type unbanIPMsg struct {
-	IP string `json:"ip"`
-}
-
 type setGatingConfigMsg struct {
 	BannedIPs      []string `json:"banned_ips"`
 	BannedPeerIDs  []string `json:"banned_peers"`
@@ -1065,7 +1194,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 	}
 	bannedPeers := peer.NewSet()
 	for _, peerID := range gc.BannedPeerIDs {
-		id, err := peer.IDB58Decode(peerID)
+		id, err := peer.Decode(peerID)
 		if err != nil {
 			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
 			continue
@@ -1074,7 +1203,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 	}
 	trustedPeers := peer.NewSet()
 	for _, peerID := range gc.TrustedPeerIDs {
-		id, err := peer.IDB58Decode(peerID)
+		id, err := peer.Decode(peerID)
 		if err != nil {
 			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
 			continue
@@ -1082,7 +1211,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		trustedPeers.Add(id)
 	}
 
-	return &codanet.CodaGatingState{AddrFilters: newFilter, AllowedPeers: trustedPeers, DeniedPeers: bannedPeers}, nil
+	return codanet.NewCodaGatingState(newFilter, bannedPeers, trustedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
@@ -1159,41 +1288,41 @@ func main() {
 	// The levels below set the **minimum** log level for each subsystem.
 	// Messages emitted at lower levels than the given level will not be
 	// emitted.
-	logging.SetLogLevel("mplex", "debug")
-	logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
-	logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
-	logging.SetLogLevel("ping", "info")         // Logs every ping timeout at debug
-	logging.SetLogLevel("basichost", "info")    // Spammy at debug
-	logging.SetLogLevel("test-logger", "debug")
-	logging.SetLogLevel("blankhost", "debug")
-	logging.SetLogLevel("connmgr", "debug")
-	logging.SetLogLevel("eventlog", "debug")
-	logging.SetLogLevel("p2p-config", "debug")
-	logging.SetLogLevel("ipns", "debug")
-	logging.SetLogLevel("nat", "debug")
-	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
-	logging.SetLogLevel("providers", "debug")
-	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
-	logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
-	logging.SetLogLevel("peerstore", "debug")
-	logging.SetLogLevel("diversityFilter", "debug")
-	logging.SetLogLevel("table", "debug")
-	logging.SetLogLevel("stream-upgrader", "debug")
-	logging.SetLogLevel("helper top-level JSON handling", "debug")
-	logging.SetLogLevel("dht.pb", "debug")
-	logging.SetLogLevel("tcp-tpt", "debug")
-	logging.SetLogLevel("autonat", "debug")
-	logging.SetLogLevel("discovery", "debug")
-	logging.SetLogLevel("routing/record", "debug")
-	logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
-	logging.SetLogLevel("badger", "debug")
-	logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
-	logging.SetLogLevel("routedhost", "debug")
-	logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
-	logging.SetLogLevel("peerstore/ds", "debug")
-	logging.SetLogLevel("mdns", "info") // Logs each mdns call
-	logging.SetLogLevel("bootstrap", "debug")
-	logging.SetLogLevel("reuseport-transport", "debug")
+	_ = logging.SetLogLevel("mplex", "debug")
+	_ = logging.SetLogLevel("addrutil", "info")     // Logs every resolve call at debug
+	_ = logging.SetLogLevel("net/identify", "info") // Logs every message sent/received at debug
+	_ = logging.SetLogLevel("ping", "info")         // Logs every ping timeout at debug
+	_ = logging.SetLogLevel("basichost", "info")    // Spammy at debug
+	_ = logging.SetLogLevel("test-logger", "debug")
+	_ = logging.SetLogLevel("blankhost", "debug")
+	_ = logging.SetLogLevel("connmgr", "debug")
+	_ = logging.SetLogLevel("eventlog", "debug")
+	_ = logging.SetLogLevel("p2p-config", "debug")
+	_ = logging.SetLogLevel("ipns", "debug")
+	_ = logging.SetLogLevel("nat", "debug")
+	_ = logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
+	_ = logging.SetLogLevel("providers", "debug")
+	_ = logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
+	_ = logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
+	_ = logging.SetLogLevel("peerstore", "debug")
+	_ = logging.SetLogLevel("diversityFilter", "debug")
+	_ = logging.SetLogLevel("table", "debug")
+	_ = logging.SetLogLevel("stream-upgrader", "debug")
+	_ = logging.SetLogLevel("helper top-level JSON handling", "debug")
+	_ = logging.SetLogLevel("dht.pb", "debug")
+	_ = logging.SetLogLevel("tcp-tpt", "debug")
+	_ = logging.SetLogLevel("autonat", "debug")
+	_ = logging.SetLogLevel("discovery", "debug")
+	_ = logging.SetLogLevel("routing/record", "debug")
+	_ = logging.SetLogLevel("pubsub", "debug") // Spammy about blacklisted peers, maybe should be info?
+	_ = logging.SetLogLevel("badger", "debug")
+	_ = logging.SetLogLevel("relay", "info") // Log relayed byte counts spammily
+	_ = logging.SetLogLevel("routedhost", "debug")
+	_ = logging.SetLogLevel("swarm2", "info") // Logs a new stream to each peer when opended at debug
+	_ = logging.SetLogLevel("peerstore/ds", "debug")
+	_ = logging.SetLogLevel("mdns", "info") // Logs each mdns call
+	_ = logging.SetLogLevel("bootstrap", "debug")
+	_ = logging.SetLogLevel("reuseport-transport", "debug")
 
 	go func() {
 		i := 0
@@ -1214,32 +1343,39 @@ func main() {
 		P2p:            nil,
 		Ctx:            context.Background(),
 		Subs:           make(map[int]subscription),
+		Topics:         make(map[string]*pubsub.Topic),
 		ValidatorMutex: &sync.Mutex{},
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
 		Out:            out,
-		AddedPeers:     make([]peer.AddrInfo, 0, 512),
+		AddedPeers:     []peer.AddrInfo{},
 	}
 
 	go func() {
 		for {
 			msg := <-app.OutChan
 			bytes, err := json.Marshal(msg)
-			if err == nil {
-				n, err := app.Out.Write(bytes)
-				if err != nil {
-					panic(err)
-				}
-				if n != len(bytes) {
-					// TODO: handle this correctly.
-					panic("short write :(")
-				}
-				app.Out.WriteByte(0x0a)
-				if err := app.Out.Flush(); err != nil {
-					panic(err)
-				}
-			} else {
+			if err != nil {
+				panic(err)
+			}
+
+			n, err := app.Out.Write(bytes)
+			if err != nil {
+				panic(err)
+			}
+
+			if n != len(bytes) {
+				// TODO: handle this correctly.
+				panic("short write :(")
+			}
+
+			err = app.Out.WriteByte(0x0a)
+			if err != nil {
+				panic(err)
+			}
+
+			if err := app.Out.Flush(); err != nil {
 				panic(err)
 			}
 		}
@@ -1269,18 +1405,23 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		start := time.Now()
-		res, err := msg.run(app)
-		if err == nil {
-			res, err := json.Marshal(res)
-			if err == nil {
-				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
-			} else {
+
+		go func() {
+			start := time.Now()
+			ret, err := msg.run(app)
+			if err != nil {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				return
 			}
-		} else {
-			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
-		}
+
+			res, err := json.Marshal(ret)
+			if err != nil {
+				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
+				return
+			}
+
+			app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Since(start).String()})
+		}()
 	}
 	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
 	// we never want the helper to get here, it should be killed or gracefully

@@ -1,5 +1,5 @@
 use crate::bigint_256;
-use algebra::biginteger::{BigInteger256};
+use algebra::biginteger::BigInteger256;
 use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     tweedle::fq::{Fq, FqParameters as Fq_params},
@@ -159,9 +159,7 @@ pub fn caml_tweedle_fq_two_adic_root_of_unity() -> Fq {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_domain_generator(
-    log2_size: ocaml::Int,
-) -> Result<Fq, ocaml::Error> {
+pub fn caml_tweedle_fq_domain_generator(log2_size: ocaml::Int) -> Result<Fq, ocaml::Error> {
     match Domain::new(1 << log2_size) {
         Some(x) => Ok(x.group_gen),
         None => Err(
@@ -190,4 +188,9 @@ pub fn caml_tweedle_fq_of_bytes(x: &[u8]) -> Result<Fq, ocaml::Error> {
     };
     let x = unsafe { *(x.as_ptr() as *const Fq) };
     Ok(x)
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fq_deep_copy(x: Fq) -> Fq {
+    x
 }

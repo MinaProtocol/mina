@@ -6,7 +6,7 @@ open Async
 open Network_peer
 open O1trace
 open Pipe_lib
-open Coda_base.Rpc_intf
+open Mina_base.Rpc_intf
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -33,6 +33,8 @@ module Config = struct
     ; flooding: bool
     ; direct_peers: Coda_net2.Multiaddr.t list
     ; peer_exchange: bool
+    ; max_connections: int
+    ; validation_queue_size: int
     ; mutable keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -45,7 +47,7 @@ end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
 
-module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -57,14 +59,37 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; message_reader:
-          ( Message.msg Envelope.Incoming.t
-          * (Coda_net2.validation_result -> unit) )
+          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; subscription:
           Message.msg Coda_net2.Pubsub.Subscription.t Deferred.t ref }
 
-    let create_rpc_implementations (Rpc_handler (rpc, handler)) =
+    let create_rpc_implementations
+        (Rpc_handler {rpc; f= handler; cost; budget}) =
       let (module Impl) = implementation_of_rpc rpc in
+      let logger = Logger.create () in
+      let log_rate_limiter_occasionally rl =
+        let t = Time.Span.of_min 1. in
+        every t (fun () ->
+            [%log' debug logger]
+              ~metadata:[("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+              !"%s $rate_limiter" Impl.name )
+      in
+      let rl = Network_pool.Rate_limiter.create ~capacity:budget in
+      log_rate_limiter_occasionally rl ;
+      let handler (peer : Network_peer.Peer.t) ~version q =
+        let score = cost q in
+        match
+          Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
+            ~score
+        with
+        | `Capacity_exceeded ->
+            failwithf "peer exceeded capacity: %s"
+              (Network_peer.Peer.to_multiaddr_string peer)
+              ()
+        | `Within_capacity ->
+            handler peer ~version q
+      in
       Impl.implement_multi handler
 
     let prepare_stream_transport stream =
@@ -147,6 +172,30 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
+            let record_peer_connection () =
+              [%log' trace config.logger] "Fired peer_connected callback" ;
+              Ivar.fill_if_empty first_peer_ivar () ;
+              if !ctr < 4 then incr ctr
+              else Ivar.fill_if_empty high_connectivity_ivar ()
+            in
+            let reload_peers_snapshot () =
+              if Throttle.num_jobs_waiting_to_start throttle = 0 then
+                don't_wait_for
+                  (Throttle.enqueue throttle (fun () ->
+                       let open Deferred.Let_syntax in
+                       let%bind peers = peers net2 in
+                       peers_snapshot :=
+                         List.map peers
+                           ~f:
+                             (Fn.compose Coda_net2.Multiaddr.of_string
+                                Peer.to_multiaddr_string) ;
+                       Mina_metrics.(
+                         Gauge.set Network.peers
+                           (List.length peers |> Int.to_float)) ;
+                       after (Time.Span.of_sec 2.)
+                       (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                   ))
+            in
             let%bind () =
               configure net2 ~me ~logger:config.logger
                 ~metrics_port:config.metrics_port
@@ -166,6 +215,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:initial_peers ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange ~flooding:config.flooding
+                ~max_connections:config.max_connections
+                ~validation_queue_size:config.validation_queue_size
                 ~initial_gating_config:
                   Coda_net2.
                     { banned_peers=
@@ -180,27 +231,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         List.filter_map ~f:Coda_net2.Multiaddr.to_peer
                           config.initial_peers
                     ; isolate= config.isolate }
-                ~on_new_peer:(fun _ ->
-                  [%log' trace config.logger] "Fired on_new_peer callback" ;
-                  Ivar.fill_if_empty first_peer_ivar () ;
-                  if !ctr < 4 then incr ctr
-                  else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
-                    don't_wait_for
-                      (Throttle.enqueue throttle (fun () ->
-                           let open Deferred.Let_syntax in
-                           let%bind peers = peers net2 in
-                           peers_snapshot :=
-                             List.map peers
-                               ~f:
-                                 (Fn.compose Coda_net2.Multiaddr.of_string
-                                    Peer.to_multiaddr_string) ;
-                           Coda_metrics.(
-                             Gauge.set Network.peers
-                               (List.length peers |> Int.to_float)) ;
-                           after (Time.Span.of_sec 2.)
-                           (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
-                       )) )
+                ~on_peer_connected:(fun _ ->
+                  record_peer_connection () ; reload_peers_snapshot () )
+                ~on_peer_disconnected:(fun _ -> reload_peers_snapshot ())
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -211,7 +244,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Trust_system.(
                     record config.trust_system config.logger conn_state
                       Actions.
-                        ( Violated_protocol
+                        ( Unknown_rpc
                         , Some
                             ( "Attempt to make unknown (fixed-version) RPC \
                                call \"$rpc\" with version $version"
@@ -284,19 +317,21 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    Instead of refactoring it to have validation up-front and decoupled,
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
-                ~should_forward_message:(fun envelope ->
+                ~should_forward_message:(fun envelope validation_callback ->
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
                   | Local ->
-                      Deferred.return `Accept
+                      Coda_net2.Validation_callback.fire_exn
+                        validation_callback `Accept ;
+                      Deferred.unit
                   | Remote sender ->
                       if not (Peer.Id.equal sender.peer_id my_peer_id) then
-                        let valid_ivar = Ivar.create () in
-                        Deferred.bind
-                          (Strict_pipe.Writer.write message_writer
-                             (envelope, Ivar.fill valid_ivar))
-                          ~f:(fun () -> Ivar.read valid_ivar)
-                      else Deferred.return `Accept )
+                        Strict_pipe.Writer.write message_writer
+                          (envelope, validation_callback)
+                      else (
+                        Coda_net2.Validation_callback.fire_exn
+                          validation_callback `Accept ;
+                        Deferred.unit ) )
                 ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call
@@ -312,7 +347,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       Trust_system.(
                         record config.trust_system config.logger peer
                           Actions.
-                            ( Violated_protocol
+                            ( Decoding_failed
                             , Some ("failed to decode gossip message", metadata)
                             ))
                       |> don't_wait_for ;
@@ -342,8 +377,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                          (List.map initial_peers ~f:Multiaddr.to_string)) ) ] ;
             don't_wait_for
               (Deferred.map
-                 (let%bind () = Coda_net2.begin_advertising net2 in
-                  let%bind () =
+                 (let%bind () =
                     Deferred.map
                       (Deferred.all_unit
                          (List.map
@@ -353,6 +387,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                             initial_peers))
                       ~f:(fun () -> Ok ())
                   in
+                  let%bind () = Coda_net2.begin_advertising net2 in
                   return ())
                  ~f:(function
                    | Ok () ->

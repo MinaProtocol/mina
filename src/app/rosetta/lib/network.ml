@@ -440,12 +440,20 @@ module Options = struct
           ~network_identifier:network.network_identifier
       in
       { Network_options_response.version=
-          Version.create "1.4.4" (Option.value ~default:"unknown" res#version)
+          Version.create "1.4.7" (Option.value ~default:"unknown" res#version)
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all
           ; errors= Lazy.force Errors.all_errors
-          ; historical_balance_lookup= false } }
+          ; historical_balance_lookup=
+              false
+              (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
+          ; timestamp_start_index=
+              None
+              (* If we implement the /call endpoint we'll need to list its supported methods here *)
+          ; call_methods= []
+          ; balance_exemptions= []
+          ; mempool_coins= false } }
   end
 
   module Real = Impl (Deferred.Result)
@@ -468,12 +476,16 @@ module Options = struct
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.4" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.7" "v1.0"
                ; allow=
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all
                    ; errors= Lazy.force Errors.all_errors
-                   ; historical_balance_lookup= false } } )
+                   ; historical_balance_lookup= false
+                   ; timestamp_start_index= None
+                   ; call_methods= []
+                   ; balance_exemptions= []
+                   ; mempool_coins= false } } )
     end )
 end
 

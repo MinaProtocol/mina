@@ -3,4 +3,4 @@
  (public_name transition_chain_verifier)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
- (libraries core_kernel coda_base coda_state merkle_list_verifier))
+ (libraries core_kernel mina_base coda_state merkle_list_verifier))
