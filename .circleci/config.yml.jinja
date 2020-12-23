@@ -728,10 +728,8 @@ workflows:
                     - develop-until-4.1-hardfork
                     - develop-until-adversarial
             - tracetool
-            - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

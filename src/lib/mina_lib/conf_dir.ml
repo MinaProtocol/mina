@@ -170,15 +170,23 @@ let export_logs_to_tar ?basename ~conf_dir =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
         hw_file :: base_files )
   in
-  let%map _result =
+  let tmp_dir =
+    Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) ""
+  in
+  let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in
+  let conf_dir_files = files_in_dir conf_dir in
+  let%bind _result0 =
+    Process.run ~prog:"cp" ~args:(("-p" :: conf_dir_files) @ [tmp_dir]) ()
+  in
+  let%bind _result1 =
     Process.run ~prog:"tar"
       ~args:
-        ( [ "-C"
-          ; conf_dir
-          ; (* Create gzipped tar file [file]. *)
-            "-czf"
-          ; tarfile ]
+        ( ["-C"; tmp_dir; (* Create gzipped tar file [file]. *) "-czf"; tarfile]
         @ files )
       ()
   in
-  tarfile
+  let tmp_dir_files = files_in_dir tmp_dir in
+  let open Deferred.Let_syntax in
+  let%bind () = Deferred.List.iter tmp_dir_files ~f:Unix.remove in
+  let%bind () = Unix.rmdir tmp_dir in
+  Deferred.Or_error.return tarfile

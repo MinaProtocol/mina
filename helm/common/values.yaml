@@ -1,4 +1,5 @@
 healthcheck:
+  enabled: true
   startup:
     failureThreshold: 30
     periodSeconds: 10

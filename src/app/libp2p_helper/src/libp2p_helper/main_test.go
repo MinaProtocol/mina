@@ -49,7 +49,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
-		50
+		50,
 	)
 	require.NoError(t, err)
 
@@ -165,8 +165,8 @@ func TestDHTDiscovery(t *testing.T) {
 			// check if peerB knows about peerC
 			addrs := appB.P2p.Host.Peerstore().Addrs(appC.P2p.Host.ID())
 			if len(addrs) != 0 {
-        // send a stream message
-        // then exit
+				// send a stream message
+				// then exit
 				close(done)
 				return
 			}

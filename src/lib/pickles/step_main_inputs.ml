@@ -8,7 +8,7 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map tweedle_q ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_p ~f:Impl.Field.Constant.of_string)
 
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (bits_random_oracle ~length s)
@@ -88,7 +88,7 @@ module Input_domain = struct
        time "lagrange" (fun () ->
            Array.init domain_size ~f:(fun i ->
                let v =
-                 (Marlin_plonk_bindings.Tweedle_fp_urs.lagrange_commitment
+                 (Marlin_plonk_bindings.Pasta_fq_urs.lagrange_commitment
                     (Backend.Tock.Keypair.load_urs ())
                     domain_size i)
                    .unshifted
@@ -98,14 +98,16 @@ module Input_domain = struct
 end
 
 module Inner_curve = struct
+  module C = Pasta.Pallas
+
   module Inputs = struct
     module Impl = Impl
 
     module Params = struct
       open Impl.Field.Constant
-      include Tweedle.Dee.Params
+      include C.Params
 
-      let one = Tweedle.Dee.to_affine_exn Tweedle.Dee.one
+      let one = C.to_affine_exn C.one
 
       let group_size_in_bits = Field.size_in_bits
     end
@@ -137,13 +139,12 @@ module Inner_curve = struct
     end
 
     module Constant = struct
-      include Tweedle.Dee.Affine
+      include C.Affine
       module Scalar = Impls.Wrap.Field.Constant
 
-      let scale (t : t) x : t =
-        Tweedle.Dee.(to_affine_exn (scale (of_affine t) x))
+      let scale (t : t) x : t = C.(to_affine_exn (scale (of_affine t) x))
 
-      let random () = Tweedle.Dee.(to_affine_exn (random ()))
+      let random () = C.(to_affine_exn (random ()))
 
       let zero = Impl.Field.Constant.(zero, zero)
 
@@ -152,10 +153,10 @@ module Inner_curve = struct
         if is_zero t1 then t2
         else if is_zero t2 then t1
         else
-          let r = Tweedle.Dee.(of_affine t1 + of_affine t2) in
-          try Tweedle.Dee.to_affine_exn r with _ -> zero
+          let r = C.(of_affine t1 + of_affine t2) in
+          try C.to_affine_exn r with _ -> zero
 
-      let negate x = Tweedle.Dee.(to_affine_exn (negate (of_affine x)))
+      let negate x = C.(to_affine_exn (negate (of_affine x)))
 
       let to_affine_exn = Fn.id
 
@@ -191,11 +192,11 @@ module Inner_curve = struct
         ~compute:
           As_prover.(
             fun () ->
-              Tweedle.Dee.scale
-                (Tweedle.Dee.of_affine (read typ t))
+              C.scale
+                (C.of_affine (read typ t))
                 (Tock.Field.inv
                    (Tock.Field.of_bits (List.map ~f:(read Boolean.typ) bs)))
-              |> Tweedle.Dee.to_affine_exn)
+              |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
     res
@@ -212,7 +213,6 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Marlin_plonk_bindings_tweedle_fp_urs.h
-          (Backend.Tock.Keypair.load_urs ())
+      ( Marlin_plonk_bindings_pasta_fq_urs.h (Backend.Tock.Keypair.load_urs ())
       |> Or_infinity.finite_exn )
 end
