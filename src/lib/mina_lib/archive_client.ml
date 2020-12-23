@@ -19,6 +19,24 @@ let dispatch (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name)
            , ("daemon-argument", archive_location.name) )
            [%sexp_of: (string * Host_and_port.t) * (string * string)])
 
+let dispatch_precomputed_block
+    (archive_location : Host_and_port.t Cli_lib.Flag.Types.with_name)
+    precomputed_block =
+  match%map
+    Daemon_rpcs.Client.dispatch Archive_lib.Rpc.precomputed_block
+      precomputed_block archive_location.value
+  with
+  | Ok () ->
+      Ok ()
+  | Error e ->
+      Error
+        (Error.tag_arg e
+           "Could not send data to archive process. It may not be running, \
+            please check the daemon-argument"
+           ( ("host_and_port", archive_location.value)
+           , ("daemon-argument", archive_location.name) )
+           [%sexp_of: (string * Host_and_port.t) * (string * string)])
+
 let transfer ~logger ~archive_location
     (breadcrumb_reader :
       Transition_frontier.Extensions.New_breadcrumbs.view

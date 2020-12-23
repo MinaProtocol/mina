@@ -5,6 +5,7 @@ open Coda_state
 open Coda_transition
 open Pipe_lib
 open Signature_lib
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions

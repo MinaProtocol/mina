@@ -9,6 +9,7 @@ open Signature_lib
 open O1trace
 open Otp_lib
 open Network_peer
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions

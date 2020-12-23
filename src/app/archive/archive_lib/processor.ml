@@ -899,41 +899,52 @@ module Block = struct
     else return ()
 end
 
+let add_block_aux ~add_block ~hash ~delete_older_than
+    (module Conn : CONNECTION) block =
+  let%bind res =
+    let open Deferred.Result.Let_syntax in
+    let%bind () = Conn.start () in
+    let%bind block_id = add_block (module Conn : CONNECTION) block in
+    (* if an existing block has a parent hash that's for the block just added,
+       set its parent id
+    *)
+    let%bind () =
+      Block.set_parent_id_if_null
+        (module Conn)
+        ~parent_hash:(hash block) ~parent_id:block_id
+    in
+    match delete_older_than with
+    | Some num_blocks ->
+        Block.delete_if_older_than ~num_blocks (module Conn)
+    | None ->
+        return ()
+  in
+  let%map () =
+    match res with
+    | Error _ ->
+        Conn.rollback () >>| ignore
+    | Ok _ ->
+        Conn.commit () >>| ignore
+  in
+  res
+
 let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
     ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
-        match%bind
-          let open Deferred.Result.Let_syntax in
-          let%bind () = Conn.start () in
-          let%bind block_id =
-            Block.add_if_doesn't_exist ~constraint_constants
-              (module Conn)
-              block
-          in
-          (* if an existing block has a parent hash that's for the block just added,
-             set its parent id
-          *)
-          let%bind () =
-            Block.set_parent_id_if_null
-              (module Conn)
-              ~parent_hash:block.hash ~parent_id:block_id
-          in
-          match delete_older_than with
-          | Some num_blocks ->
-              Block.delete_if_older_than ~num_blocks (module Conn)
-          | None ->
-              return ()
+        let add_block = Block.add_if_doesn't_exist ~constraint_constants in
+        let hash block = With_hash.hash block in
+        match%map
+          add_block_aux ~delete_older_than ~hash ~add_block (module Conn) block
         with
         | Error e ->
             [%log warn]
               ~metadata:
                 [ ("block", With_hash.hash block |> State_hash.to_yojson)
                 ; ("error", `String (Caqti_error.show e)) ]
-              "Failed to archive block: $block, see $error" ;
-            Conn.rollback () >>| ignore
-        | Ok _ ->
-            Conn.commit () >>| ignore )
+              "Failed to archive block: $block, see $error"
+        | Ok () ->
+            () )
     | Transition_frontier _ ->
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
@@ -947,9 +958,16 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
   let reader, writer = Strict_pipe.create ~name:"archive" Synchronous in
+  let precomputed_block_reader, precomputed_block_writer =
+    Strict_pipe.create ~name:"precomputed_archive_block" Synchronous
+  in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
-          Strict_pipe.Writer.write writer archive_diff ) ]
+          Strict_pipe.Writer.write writer archive_diff )
+    ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
+        (fun () precomputed_block ->
+          Strict_pipe.Writer.write precomputed_block_writer precomputed_block
+      ) ]
   in
   match%bind Caqti_async.connect postgres_address with
   | Error e ->
@@ -959,6 +977,27 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Deferred.unit
   | Ok conn ->
       run ~constraint_constants conn reader ~logger ~delete_older_than
+      |> don't_wait_for ;
+      Strict_pipe.Reader.iter precomputed_block_reader
+        ~f:(fun precomputed_block ->
+          match%map
+            add_block_aux
+              ~add_block:(Block.add_from_precomputed ~constraint_constants)
+              ~hash:(fun block ->
+                block.External_transition.Precomputed_block.protocol_state
+                |> Protocol_state.hash )
+              ~delete_older_than conn precomputed_block
+          with
+          | Error e ->
+              [%log warn]
+                "Precomputed block $block could not be archived: $error"
+                ~metadata:
+                  [ ( "block"
+                    , Protocol_state.hash precomputed_block.protocol_state
+                      |> State_hash.to_yojson )
+                  ; ("error", `String (Caqti_error.show e)) ]
+          | Ok () ->
+              () )
       |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create

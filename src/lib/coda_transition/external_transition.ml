@@ -157,14 +157,36 @@ module Precomputed_block = struct
           Proof.of_yojson json
   end
 
-  type t =
-    { scheduled_time: Block_time.t
-    ; protocol_state: Protocol_state.value
-    ; protocol_state_proof: Proof.t
-    ; staged_ledger_diff: Staged_ledger_diff.t
-    ; delta_transition_chain_proof:
-        Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-  [@@deriving sexp, yojson]
+  module T = struct
+    type t =
+      { scheduled_time: Block_time.t
+      ; protocol_state: Protocol_state.value
+      ; protocol_state_proof: Proof.t
+      ; staged_ledger_diff: Staged_ledger_diff.t
+      ; delta_transition_chain_proof:
+          Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+    [@@deriving sexp, yojson]
+  end
+
+  include T
+
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = T.t =
+        { scheduled_time: Block_time.Stable.V1.t
+        ; protocol_state: Protocol_state.Value.Stable.V1.t
+        ; protocol_state_proof: Mina_base.Proof.Stable.V1.t
+        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+        ; delta_transition_chain_proof:
+            Frozen_ledger_hash.Stable.V1.t
+            * Frozen_ledger_hash.Stable.V1.t list }
+
+      let to_latest = Fn.id
+    end
+  end]
 
   let of_external_transition ~scheduled_time (t : external_transition) =
     { scheduled_time
