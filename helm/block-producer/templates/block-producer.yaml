@@ -92,8 +92,8 @@ spec:
             value: {{ $.Values.userAgent.txBatchSize | quote }}
           {{ end -}}
           {{- if ne $.Values.userAgent.sendEveryMins "" -}}
-          - name: AGENT_SEND_EVERY_MINUTES
-            value: "1"
+          - name: AGENT_SEND_EVERY_MINS
+            value: {{ $.Values.userAgent.sendEveryMins }}
           {{ end -}}
           - name: CODA_PUBLIC_KEY
             valueFrom:
@@ -284,5 +284,8 @@ spec:
   - name: tcp-p2p
     port: {{ $config.externalPort }}
     targetPort: external-port
+  - name: tcp-metrics
+    port: {{ $.Values.userAgent.ports.metrics }}
+    targetPort: metrics-port
 ---
 {{ end }}
