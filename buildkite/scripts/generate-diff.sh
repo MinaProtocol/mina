@@ -22,7 +22,7 @@ if [[ $BASECOMMIT != $COMMIT ]]; then
   git diff $BASECOMMIT --name-only
 else
 
-  if [ ! z $NIGHTLY ]; then
+  if [ -n $NIGHTLY ]; then
     echo "buildkite/nightly.txt"
   elif [ -n "${BUILDKITE_INCREMENTAL+x}" ]; then
     # TODO: remove (temporarily install network tooling)
