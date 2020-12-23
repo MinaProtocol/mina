@@ -497,7 +497,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   ~next_state:protocol_state
                                   internal_transition pending_coinbase_witness
                               in
-                              Ivar.fill done_proving () ; res )
+                              Ivar.fill_if_empty done_proving () ;
+                              res )
                           |> Deferred.Result.map_error ~f:(fun err ->
                                  `Prover_error
                                    ( err
@@ -626,6 +627,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         return ()
                   in
                   let%bind res = emit_breadcrumb () in
+                  Ivar.fill_if_empty done_proving () ;
                   handle_block_production_errors ~logger
                     ~previous_protocol_state ~protocol_state res) )
       in
