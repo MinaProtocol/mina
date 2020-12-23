@@ -881,14 +881,15 @@ let handle_dump_ledger_response ~json = function
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "state-hash" ~doc:"STATE-HASH State hash" (required string))
+      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+        (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 sl_hash_flag json_flag in
   Command.async ~summary:"Print the ledger with given Merkle root"
     (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
-         let state_hash = State_hash.of_base58_check_exn x in
+         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
          >>| handle_dump_ledger_response ~json ))
 
