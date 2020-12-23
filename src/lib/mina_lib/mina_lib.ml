@@ -9,6 +9,7 @@ open Signature_lib
 open O1trace
 open Otp_lib
 open Network_peer
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
@@ -444,8 +445,18 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t state_hash =
+let get_ledger t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let%bind state_hash =
+    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
+      ~default:
+        ( match best_tip t with
+        | `Active bc ->
+            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+        | `Bootstrapping ->
+            Deferred.Or_error.error_string
+              "get_ledger: can't get staged ledger hash while bootstrapping" )
+  in
   let%bind frontier =
     Deferred.return (t.components.transition_frontier |> peek_frontier)
   in

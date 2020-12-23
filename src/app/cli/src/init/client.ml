@@ -872,23 +872,26 @@ let handle_dump_ledger_response ~json = function
   | Ok (Error e) ->
       printf !"Ledger not found: %s\n" (Error.to_string_hum e)
   | Ok (Ok accounts) ->
-      if json then
-        List.iter accounts ~f:(fun acct ->
-            printf "%s\n"
-              (Yojson.Safe.to_string (Account.Stable.Latest.to_yojson acct)) )
+      if json then (
+        Yojson.Safe.pretty_print Format.std_formatter
+          (Runtime_config.Accounts.to_yojson
+             (List.map accounts ~f:(fun a ->
+                  Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
+        printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts
 
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "state-hash" ~doc:"STATE-HASH State hash" (required string))
+      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+        (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 sl_hash_flag json_flag in
   Command.async ~summary:"Print the ledger with given Merkle root"
     (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
-         let state_hash = State_hash.of_base58_check_exn x in
+         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
          >>| handle_dump_ledger_response ~json ))
 
@@ -1702,6 +1705,75 @@ let object_lifetime_statistics =
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
 
+let archive_precomputed_blocks =
+  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
+  let files =
+    Command.Param.anon
+      Command.Anons.(sequence ("FILES" %: Command.Param.string))
+  in
+  Command.async
+    ~summary:
+      "Archive a precomputed block from a file.\n\n\
+       If an archive address is given, this process will communicate with the \
+       archive node directly; otherwise it will communicate through the \
+       daemon over the rest-server"
+    (Cli_lib.Background_daemon.graphql_init
+       (Command.Param.both archive_process_location files)
+       ~f:(fun graphql_endpoint (archive_process_location, files) ->
+         let send_block block =
+           match archive_process_location with
+           | Some archive_process_location ->
+               (* Connect directly to the archive node. *)
+               Mina_lib.Archive_client.dispatch_precomputed_block
+                 archive_process_location block
+           | None ->
+               (* Send the requests over GraphQL. *)
+               let block =
+                 Coda_transition.External_transition.Precomputed_block
+                 .to_yojson block
+                 |> Yojson.Safe.to_basic
+               in
+               let%map _res =
+                 (* Don't catch this error: [query_exn] already handles
+                    printing etc.
+                 *)
+                 Graphql_client.query_exn
+                   (Graphql_queries.Archive_precomputed_block.make ~block ())
+                   graphql_endpoint
+               in
+               Ok ()
+         in
+         Deferred.List.iter files ~f:(fun path ->
+             match%map
+               let open Deferred.Or_error.Let_syntax in
+               let%bind precomputed_block_json =
+                 Or_error.try_with (fun () ->
+                     In_channel.with_file path ~f:(fun in_channel ->
+                         Yojson.Safe.from_channel in_channel ) )
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg err "Could not parse JSON from file" path
+                          String.sexp_of_t )
+                 |> Deferred.return
+               in
+               let%bind precomputed_block =
+                 Coda_transition.External_transition.Precomputed_block
+                 .of_yojson precomputed_block_json
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg (Error.of_string err)
+                          "Could not parse JSON as a precomputed block from \
+                           file"
+                          path String.sexp_of_t )
+                 |> Deferred.return
+               in
+               send_block precomputed_block
+             with
+             | Ok () ->
+                 Format.printf "Sent block to archive node from %s@." path
+             | Error err ->
+                 Format.eprintf
+                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   path (Error.to_string_hum err) ) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1815,4 +1887,5 @@ let advanced =
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
-    ; ("object-lifetime-statistics", object_lifetime_statistics) ]
+    ; ("object-lifetime-statistics", object_lifetime_statistics)
+    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]

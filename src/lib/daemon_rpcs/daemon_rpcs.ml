@@ -32,7 +32,8 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = State_hash.Stable.Latest.t [@@deriving bin_io_unversioned]
+  type query = State_hash.Stable.Latest.t option
+  [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]

@@ -37,6 +37,7 @@ psql -d archiver < create_schema.sql
 ../../../_build/default/src/app/archive/archive.exe run \
   -postgres-uri $PG_CONN \
   -log-json \
+  -config-file /tmp/config.json \
   -server-port 3086 &
 
 # wait for it to settle
