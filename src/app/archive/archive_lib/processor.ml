@@ -254,11 +254,11 @@ module User_command = struct
       ; fee_payer_id: int
       ; source_id: int
       ; receiver_id: int
-      ; fee_token: int
-      ; token: int
+      ; fee_token: int64
+      ; token: int64
       ; nonce: int
-      ; amount: int option
-      ; fee: int
+      ; amount: int64 option
+      ; fee: int64
       ; valid_until: int64 option
       ; memo: string
       ; hash: string
@@ -274,11 +274,11 @@ module User_command = struct
           ; int
           ; int
           ; int
+          ; int64
+          ; int64
           ; int
-          ; int
-          ; int
-          ; option int
-          ; int
+          ; option int64
+          ; int64
           ; option int64
           ; string
           ; string
@@ -330,7 +330,7 @@ module User_command = struct
                 ( slot |> Coda_numbers.Global_slot.to_uint32
                 |> Unsigned.UInt32.to_int64 )
           in
-          (* TODO: Converting these uint64s to int can overflow; see #5419 *)
+          (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                "INSERT INTO user_commands (type, fee_payer_id, source_id, \
@@ -348,15 +348,20 @@ module User_command = struct
             ; receiver_id
             ; fee_token=
                 Signed_command.fee_token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int
+                |> Unsigned.UInt64.to_int64
             ; token=
                 Signed_command.token t |> Token_id.to_uint64
-                |> Unsigned.UInt64.to_int
+                |> Unsigned.UInt64.to_int64
             ; nonce= Signed_command.nonce t |> Unsigned.UInt32.to_int
             ; amount=
                 Signed_command.amount t
-                |> Core.Option.map ~f:Currency.Amount.to_int
-            ; fee= Signed_command.fee t |> Currency.Fee.to_int
+                |> Core.Option.map ~f:(fun amt ->
+                       Currency.Amount.to_uint64 amt
+                       |> Unsigned.UInt64.to_int64 )
+            ; fee=
+                ( Signed_command.fee t
+                |> fun amt ->
+                Currency.Fee.to_uint64 amt |> Unsigned.UInt64.to_int64 )
             ; valid_until
             ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
