@@ -334,28 +334,13 @@ let active_or_bootstrapping =
         ~f:(Fn.const (Some ())) )
 
 let create_sync_status_observer ~logger ~is_seed ~demo_mode
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~consensus_constants ~transition_frontier_and_catchup_signal_incr
-    ~online_status_incr ~first_connection_incr ~first_message_incr =
+    ~(consensus_constants : Consensus.Constants.t)
+    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+    ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let pre_genesis =
-    let fork_start_time =
-      let constants = consensus_constants in
-      Option.map constraint_constants.fork ~f:(fun x ->
-          Consensus.Global_slot.(
-            start_time ~constants
-              (of_slot_number x.previous_global_slot ~constants))
-          |> Block_time.to_time )
-    in
-    let genesis_time =
-      Block_time.to_time consensus_constants.genesis_state_timestamp
-    in
     let start_time =
-      match fork_start_time with
-      | None ->
-          genesis_time
-      | Some fork_time ->
-          Time.max genesis_time fork_time
+      Block_time.to_time consensus_constants.genesis_state_timestamp
     in
     let waiting = Time.(now () < start_time) in
     let v = Var.create waiting in
@@ -1413,8 +1398,8 @@ let create ?wallets (config : Config.t) =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
-              ~constraint_constants ~consensus_constants
-              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+              ~consensus_constants ~is_seed:config.is_seed
+              ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
