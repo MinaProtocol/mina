@@ -30,31 +30,35 @@ let main = () => {
   Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
     switch (result) {
     | Ok(blocks) =>
-      blocks
-      |> Types.Block.parseBlocks
-      |> Metrics.calculateMetrics
-      |> UploadLeaderboardPoints.uploadChallengePoints(spreadsheetId);
+      let metrics =
+        blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;
 
-      UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+      UploadLeaderboardPoints.uploadChallengePoints(
+        spreadsheetId,
+        metrics,
+        () => {
+          UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
 
-      Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
-        switch (result) {
-        | Ok(blockHeightQuery) =>
-          Belt.Option.(
-            Js.Json.(
-              blockHeightQuery[0]
-              ->decodeObject
-              ->flatMap(__x => Js.Dict.get(__x, "max"))
-              ->flatMap(decodeString)
-              ->mapWithDefault((), height => {
-                  UploadLeaderboardData.uploadData(spreadsheetId, height)
-                })
-            )
-          );
-          Postgres.endPool(pool);
-        | Error(error) => Js.log(error)
-        }
-      });
+          Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
+            switch (result) {
+            | Ok(blockHeightQuery) =>
+              Belt.Option.(
+                Js.Json.(
+                  blockHeightQuery[0]
+                  ->decodeObject
+                  ->flatMap(__x => Js.Dict.get(__x, "max"))
+                  ->flatMap(decodeString)
+                  ->mapWithDefault((), height => {
+                      UploadLeaderboardData.uploadData(spreadsheetId, height)
+                    })
+                )
+              );
+              Postgres.endPool(pool);
+            | Error(error) => Js.log(error)
+            }
+          });
+        },
+      );
 
     | Error(error) => Js.log(error)
     }
