@@ -3059,7 +3059,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Null",
+                  "name": "Applied",
                   "ofType": null
                 }
               },

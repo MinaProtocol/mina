@@ -327,6 +327,8 @@ module Archive_precomputed_block =
 [%graphql
 {|
 mutation ($block: PrecomputedBlock!) {
-  archivePrecomputedBlock(block: $block)
+  archivePrecomputedBlock(block: $block) {
+      applied
+  }
 }
 |}]
