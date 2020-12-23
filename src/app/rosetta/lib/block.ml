@@ -489,11 +489,11 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
-          ; token= Unsigned.UInt64.of_int uc.token
+          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
+          ; token= Unsigned.UInt64.of_int64 uc.token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
-          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
+          ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status } )
     in
