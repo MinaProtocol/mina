@@ -545,7 +545,7 @@ module Rpcs = struct
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
-            ; uptime: string }
+            ; uptime_minutes: int }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id

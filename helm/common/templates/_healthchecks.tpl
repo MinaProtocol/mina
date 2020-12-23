@@ -16,8 +16,8 @@ Daemon startup probe settings
 startupProbe:
   tcpSocket:
     port: external-port
-  failureThreshold: {{ default .Values.healthcheck.startup.failureThreshold 30 }}
-  periodSeconds: {{ default .Values.healthcheck.startup.periodSeconds 10 }}
+  failureThreshold: {{ .healthcheck.startup.failureThreshold }}
+  periodSeconds: {{ .healthcheck.startup.periodSeconds }}
 {{- end }}
 
 {{/*
@@ -48,6 +48,8 @@ readinessProbe:
 ALL daemon healthchecks
 */}}
 {{- define "healthcheck.daemon.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.daemon.livenessCheck" . }}
 {{- include "healthcheck.daemon.readinessCheck" . }}
+{{- end }}
 {{- end }}

@@ -326,6 +326,22 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Mina_lib.get_ledger coda lh )
+    ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
+          ( match which with
+          | Next ->
+              Ok (Mina_lib.next_epoch_ledger coda)
+          | Current ->
+              Option.value_map
+                (Mina_lib.staking_ledger coda)
+                ~default:
+                  (Or_error.error_string "current staking ledger not available")
+                ~f:Or_error.return )
+          |> Or_error.map ~f:(function
+               | Genesis_epoch_ledger l ->
+                   Mina_base.Ledger.to_list l
+               | Ledger_db db ->
+                   Mina_base.Ledger.Db.to_list db )
+          |> Deferred.return )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )

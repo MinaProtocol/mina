@@ -473,12 +473,13 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ())
+                 ~log_precomputed_blocks:false ())
           in
           let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir

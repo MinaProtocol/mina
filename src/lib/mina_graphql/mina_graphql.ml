@@ -5,6 +5,30 @@ open Mina_base
 open Signature_lib
 open Currency
 
+(** Convert a GraphQL constant to the equivalent json representation.
+    We can't coerce this directly because of the presence of the [`Enum]
+    constructor, so we have to recurse over the structure replacing all of the
+    [`Enum]s with [`String]s.
+*)
+let rec to_yojson (json : Graphql_parser.const_value) : Yojson.Safe.t =
+  match json with
+  | `Assoc fields ->
+      `Assoc (List.map fields ~f:(fun (name, json) -> (name, to_yojson json)))
+  | `Bool b ->
+      `Bool b
+  | `Enum s ->
+      `String s
+  | `Float f ->
+      `Float f
+  | `Int i ->
+      `Int i
+  | `List l ->
+      `List (List.map ~f:to_yojson l)
+  | `Null ->
+      `Null
+  | `String s ->
+      `String s
+
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
 let result_of_or_error ?error v =
@@ -106,10 +130,11 @@ module Types = struct
                (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
                ~value:status ))
 
-  let transaction_status : ('context, Transaction_status.State.t option) typ =
+  let transaction_status :
+      ('context, Transaction_inclusion_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
       ~values:
-        Transaction_status.State.
+        Transaction_inclusion_status.State.
           [ enum_value "INCLUDED" ~value:Included
               ~doc:"A transaction that is on the longest chain"
           ; enum_value "PENDING" ~value:Pending
@@ -1497,6 +1522,13 @@ module Types = struct
                 Error "Invalid format for token."
           with _ -> Error "Invalid format for token." )
 
+    let precomputed_block =
+      scalar "PrecomputedBlock"
+        ~doc:"Block encoded in precomputed block format" ~coerce:(fun json ->
+          let json = to_yojson json in
+          Mina_transition.External_transition.Precomputed_block.of_yojson json
+      )
+
     module type Numeric_type = sig
       type t
 
@@ -2361,6 +2393,35 @@ module Mutations = struct
         in
         List.map ~f:Network_peer.Peer.to_display peers )
 
+  let archive_precomputed_block =
+    io_field "archivePrecomputedBlock"
+      ~args:
+        Arg.
+          [ arg "block" ~doc:"Block encoded in precomputed block format"
+              ~typ:(non_null @@ Types.Input.precomputed_block) ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true) ] )))
+      ~resolve:(fun {ctx= coda; _} () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config coda).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
+            block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
+
   let commands =
     [ add_wallet
     ; create_account
@@ -2383,7 +2444,8 @@ module Mutations = struct
     ; set_snark_worker
     ; set_snark_work_fee
     ; set_connection_gating_config
-    ; add_peer ]
+    ; add_peer
+    ; archive_precomputed_block ]
 end
 
 module Queries = struct
@@ -2610,7 +2672,7 @@ module Queries = struct
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
-          (Transaction_status.get_status ~frontier_broadcast_pipe
+          (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
              ~transaction_pool payment.data)
           ~f:Error.to_string_hum )
 

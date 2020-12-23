@@ -335,7 +335,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module Lazy_keys = struct
     type t =
       (Impls.Step.Keypair.t * Dirty.t) Lazy.t
-      * (Marlin_plonk_bindings.Tweedle_fq_verifier_index.t * Dirty.t) Lazy.t
+      * (Marlin_plonk_bindings.Pasta_fp_verifier_index.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
   end
@@ -344,14 +344,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
       let weight =
-        let sys =
-          Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
-        in
+        let sys = Backend.Tick.R1CS_constraint_system.create () in
         fun (c : Impls.Step.Constraint.t) ->
           let prev = sys.next_row in
           List.iter c ~f:(fun {annotation; basic} ->
-              Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system
-              .add_constraint sys ?label:annotation basic ) ;
+              Backend.Tick.R1CS_constraint_system.add_constraint sys
+                ?label:annotation basic ) ;
           let next = sys.next_row in
           next - prev
       in
@@ -369,14 +367,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   let log_wrap main typ name id =
     let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
     let log =
-      let sys =
-        Zexe_backend.Tweedle.Dum_based_plonk.R1CS_constraint_system.create ()
-      in
+      let sys = Backend.Tock.R1CS_constraint_system.create () in
       let weight (c : Impls.Wrap.Constraint.t) =
         let prev = sys.next_row in
         List.iter c ~f:(fun {annotation; basic} ->
-            Zexe_backend.Tweedle.Dee_based_plonk.R1CS_constraint_system
-            .add_constraint sys ?label:annotation basic ) ;
+            Backend.Tock.R1CS_constraint_system.add_constraint sys
+              ?label:annotation basic ) ;
         let next = sys.next_row in
         next - prev
       in

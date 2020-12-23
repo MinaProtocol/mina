@@ -52,7 +52,7 @@ type t =
   { fee: Fee.t
   ; proofs: Ledger_proof.t One_or_two.t
   ; prover: Public_key.Compressed.t }
-[@@deriving sexp, to_yojson]
+[@@deriving sexp, yojson]
 
 val fee : t -> Fee.t
 
@@ -63,7 +63,7 @@ val statement : t -> Statement.t
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io, to_yojson, version]
+      type t [@@deriving sexp, bin_io, yojson, version]
     end
   end
   with type V1.t = t
