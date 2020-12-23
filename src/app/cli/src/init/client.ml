@@ -872,11 +872,12 @@ let handle_dump_ledger_response ~json = function
   | Ok (Error e) ->
       printf !"Ledger not found: %s\n" (Error.to_string_hum e)
   | Ok (Ok accounts) ->
-      if json then
+      if json then (
         Yojson.Safe.pretty_print Format.std_formatter
           (Runtime_config.Accounts.to_yojson
              (List.map accounts ~f:(fun a ->
-                  Genesis_ledger_helper.Accounts.Single.of_account a None )))
+                  Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
+        printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts
 
 let dump_ledger =
