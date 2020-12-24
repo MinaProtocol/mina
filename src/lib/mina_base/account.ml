@@ -601,6 +601,22 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
         | Some amt ->
             amt )
 
+let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
+    ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
+    Unsigned.UInt64.t =
+  let open Unsigned in
+  let min_balance_at_start_slot =
+    min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance
+    |> Balance.to_amount |> Amount.to_uint64
+  in
+  let min_balance_at_end_slot =
+    min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance
+    |> Balance.to_amount |> Amount.to_uint64
+  in
+  UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
+
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
   | Untimed ->
