@@ -263,7 +263,10 @@ module User_command = struct
       ; memo: string
       ; hash: string
       ; status: string option
-      ; failure_reason: string option }
+      ; failure_reason: string option
+      ; fee_payer_account_creation_fee_paid: int64 option
+      ; receiver_account_creation_fee_paid: int64 option
+      ; created_token: int64 option }
     [@@deriving hlist]
 
     let typ =
@@ -283,7 +286,10 @@ module User_command = struct
           ; string
           ; string
           ; option string
-          ; option string ]
+          ; option string
+          ; option int64
+          ; option int64
+          ; option int64 ]
       in
       let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
       let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -333,10 +339,14 @@ module User_command = struct
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               "INSERT INTO user_commands (type, fee_payer_id, source_id, \
-                receiver_id, fee_token, token, nonce, amount, fee, \
-                valid_until, memo, hash, status, failure_reason) VALUES (?, \
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+               {| INSERT INTO user_commands (type, fee_payer_id, source_id,
+                   receiver_id, fee_token, token, nonce, amount, fee,
+                   valid_until, memo, hash, status, failure_reason,
+                   fee_payer_account_creation_fee_paid,
+                   receiver_account_creation_fee_paid,
+                   created_token)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 RETURNING id |})
             { typ=
                 ( match via with
                 | `Ident ->
@@ -366,7 +376,10 @@ module User_command = struct
             ; memo= Signed_command.memo t |> Signed_command_memo.to_string
             ; hash= transaction_hash |> Transaction_hash.to_base58_check
             ; status= None
-            ; failure_reason= None }
+            ; failure_reason= None
+            ; fee_payer_account_creation_fee_paid= None
+            ; receiver_account_creation_fee_paid= None
+            ; created_token= None }
 
     let add_with_status ?(via = `Ident) (module Conn : CONNECTION)
         (t : Signed_command.t) (status : Transaction_status.t) =
@@ -746,10 +759,10 @@ module Block = struct
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                {| INSERT INTO blocks (state_hash, parent_id, parent_hash,
-                  creator_id, block_winner_id,
-                  snarked_ledger_hash_id, staking_epoch_data_id,
-                  next_epoch_data_id, ledger_hash, height, global_slot,
-                  global_slot_since_genesis, timestamp)
+                   creator_id, block_winner_id,
+                   snarked_ledger_hash_id, staking_epoch_data_id,
+                   next_epoch_data_id, ledger_hash, height, global_slot,
+                   global_slot_since_genesis, timestamp)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
                |})
             { state_hash= hash |> State_hash.to_string
