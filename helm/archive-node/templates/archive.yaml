@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "archive-node.fullname" . }}
+  name: {{ .Values.archive.fullname }}
   labels:
-    app: {{ template "archive-node.fullname" . }}
+    app: {{ .Values.archive.fullname }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ template "archive-node.fullname" . }}
+      app: {{ .Values.archive.fullname }}
   template:
     metadata:
       labels:
-        app: {{ template "archive-node.fullname" . }}
+        app: {{ .Values.archive.fullname }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
@@ -109,7 +109,7 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
-{{- include "healthcheck.archive.allChecks" . | indent 8 }}
+{{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
       - name: config-dir
@@ -117,5 +117,5 @@ spec:
       {{- if .Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: "{{ template "archive-node.fullname" . }}-daemon-config"
+          name: archive-daemon-config
       {{- end }}
