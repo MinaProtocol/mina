@@ -22,7 +22,7 @@ COPY . /code
 COPY ./scripts /scripts
 
 # TODO: find better mechanism for sharing files across repo DIRs
-ADD https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/scripts/random_restart.py /scripts/random_restart.py
+ADD https://raw.githubusercontent.com/MinaProtocol/mina/master/coda-automation/scripts/random_restart.py /scripts/random_restart.py
 
 COPY ./entrypoints /entrypoint.d
 
