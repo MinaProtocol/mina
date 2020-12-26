@@ -63,7 +63,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0"
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 0"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
@@ -104,7 +104,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0"
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
