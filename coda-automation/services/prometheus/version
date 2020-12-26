@@ -1,0 +1,2 @@
+export VERSION=v2.11.1
+export BASE_IMAGE_TAG=v2.11.1
