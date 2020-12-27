@@ -52,7 +52,7 @@ PATH=$PATH:$(pwd)/bin
 
 if $RESET; then
   echo "resetting keys and genesis_ledger"
-  ls keys/keysets/* | grep -v "bots" | xargs -I % rm "%"
+  ls keys/keysets/* | grep -v "bots_keyfiles" | xargs -I % rm "%"
   rm -rf keys/genesis keys/keypairs keys/testnet-keys
   rm -rf terraform/testnets/${TESTNET}/*.json
 fi
@@ -181,23 +181,6 @@ fi
 echo "Extra Fish Keyset:"
 cat keys/keysets/${TESTNET}_extra-fish
 echo
-
-# ================================================================================
-
-# Bots
-
-if [ -f keys/keysets/bots ];
-then
-  echo "Bots keys already present, not generating new ones"
-else
-  output_dir="$(pwd)/keys/keysets/bots_keyfiles/"
-  generate_key_files 2 "bots" "${output_dir}"
-  mv ${output_dir}/bots_account_1.pub ${output_dir}/echo-service.pub
-  mv ${output_dir}/bots_account_1 ${output_dir}/echo-service
-  mv ${output_dir}/bots_account_2.pub ${output_dir}/faucet-service.pub
-  mv ${output_dir}/bots_account_2 ${output_dir}/faucet-service
-  build_keyset_from_testnet_keys "${output_dir}" bots
-fi
 
 # ================================================================================
 
