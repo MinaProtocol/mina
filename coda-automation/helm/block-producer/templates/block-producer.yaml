@@ -1,0 +1,311 @@
+{{ range $config := $.Values.blockProducerConfigs}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $config.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $config.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: block-producer
+        class: {{ default "undefined" $config.class }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      initContainers:
+      - name: fix-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys
+        volumeMounts:
+        - name: private-keys
+          mountPath: "/keys/"
+          readOnly: true
+        {{- if $config.runWithBots }}
+        - name: echo-service-key
+          mountPath: "/echo-keys/"
+          readOnly: true
+        - name: faucet-service-key
+          mountPath: "/faucet-keys/"
+          readOnly: true
+        {{- end }}
+        - name: wallet-keys
+          mountPath: /wallet-keys
+        securityContext:
+          runAsUser: 0
+      - name: install-key
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.coda-config -privkey-path /root/wallet-keys/$key; done
+        volumeMounts:
+        - name: wallet-keys
+          mountPath: /root/wallet-keys
+        - name: config-dir
+          mountPath: /root/.coda-config
+        env: 
+          - name: CODA_PRIVKEY_PASS
+            value: {{ $.Values.coda.privkeyPass | quote }}
+      containers:
+      {{ if $config.runWithUserAgent -}}
+      - name: user-agent
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: {{ $.Values.userAgent.image }}
+        command: ["bash"]
+        args: ["-c", "python3 agent.py"]
+        env: 
+          {{ if ne $.Values.userAgent.minFee "" -}}
+          - name: AGENT_MIN_FEE
+            value: {{ $.Values.userAgent.minFee | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.maxFee "" -}}
+          - name: AGENT_MAX_FEE
+            value: {{ $.Values.userAgent.maxFee | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.minTx "" -}}
+          - name: AGENT_MIN_TX
+            value: {{ $.Values.userAgent.minTx | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.maxTx "" -}}
+          - name: AGENT_MAX_TX
+            value: {{ $.Values.userAgent.maxTx | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.txBatchSize "" -}}
+          - name: AGENT_TX_BATCH_SIZE
+            value: {{ $.Values.userAgent.txBatchSize | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.sendEveryMins "" -}}
+          - name: AGENT_SEND_EVERY_MINS
+            value: "1"
+          {{ end -}}
+          - name: CODA_PUBLIC_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $config.privateKeySecret }}
+                key: pub
+          - name: CODA_PRIVKEY_PASS
+            value: {{ $.Values.coda.privkeyPass | quote }}
+          - name: PYTHONUNBUFFERED
+            value: "1"
+        ports: 
+        - name: metrics-port
+          containerPort: {{ $.Values.userAgent.ports.metrics }}
+{{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
+        imagePullPolicy: Always
+      {{- end }}
+      {{ if $config.runWithBots -}}
+      - name: bots
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: {{ $.Values.bots.image }}
+        env:
+          - name: CODA_GRAPHQL_HOST
+            value: "0.0.0.0"
+          - name: CODA_GRAPHQL_PORT
+            value: {{ $.Values.bots.ports.graphql | quote }}
+          - name: ECHO_PUBLICKEY
+            valueFrom:
+              secretKeyRef:
+                name: echo-service-key
+                key: pub
+          - name: ECHO_PASSWORD
+            value: {{ $.Values.coda.privkeyPass | quote }}
+          - name: FAUCET_PUBLICKEY
+            valueFrom:
+              secretKeyRef:
+                name: faucet-service-key
+                key: pub
+          - name: FAUCET_PASSWORD
+            value: {{ $.Values.coda.privkeyPass | quote }}
+          - name: DISCORD_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: o1-discord-api-key
+                key: o1discord
+          - name: FAUCET_AMOUNT
+            value: {{ $.Values.bots.faucet.amount | quote }}
+          - name: FEE_AMOUNT
+            value: {{ $.Values.bots.faucet.fee | quote }}
+        ports:
+        - name: graphql-port
+          containerPort: {{ $.Values.bots.ports.graphql }}
+{{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
+        imagePullPolicy: Always
+      {{- end }}
+      - name: coda
+        resources:
+          limits:
+          requests:
+            memory: 8.0Gi
+            cpu: 8.0
+        image: {{ $.Values.coda.image }}
+        args: [ "daemon",
+          "-log-level", {{ $.Values.coda.logLevel }},
+          "-log-json",
+          {{- if $.Values.coda.logSnarkWorkGossip }}
+          "-log-snark-work-gossip", "true",
+          {{- end -}}
+          {{- if $config.isolated }}
+          "-isolate-network", "true",
+          {{- end -}}
+          {{- if $config.enablePeerExchange }}
+          "-enable-peer-exchange", "true",
+          {{- end -}}
+          {{- if $config.enableGossipFlooding }}
+          "-enable-flooding", "true",
+          {{- end -}}
+          {{- range $.Values.coda.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.coda-config",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          "-insecure-rest-server",
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-block-producer-key", "/root/wallet-keys/key",
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
+          {{- if $.Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          "-generate-genesis-proof", "true",
+          {{- end -}}
+        ]
+        env:
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ $.Values.coda.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ $.Values.coda.ports.client | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ $.Values.coda.ports.metrics | quote }}
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ $.Values.coda.ports.p2p | quote }}
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET 
+          value: "mina_network_block_data"
+        - name: CODA_PRIVKEY_PASS
+          value: {{ $.Values.coda.privkeyPass | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        ports:
+        - name: client-port
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.client }}
+        - name: graphql-port
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.graphql }}
+        - name: metrics-port
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.metrics }}
+        - name: external-port
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.external }}
+{{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: wallet-keys
+          mountPath: /root/wallet-keys
+        - name: config-dir
+          mountPath: /root/.coda-config
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.coda.runtimeConfig }}
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+      volumes:
+      - name: private-keys
+        secret:
+          secretName: {{ $config.privateKeySecret }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{ if $config.runWithBots }}
+      - name: echo-service-key
+        secret:
+          secretName: echo-service-key
+          defaultMode: 256
+          items:
+          - key: key
+            path: echo-key
+          - key: pub
+            path: echo-key.pub
+      - name: faucet-service-key
+        secret:
+          secretName: faucet-service-key
+          defaultMode: 256
+          items:
+          - key: key
+            path: faucet-key
+          - key: pub
+            path: faucet-key.pub
+      {{ end -}}
+      - name: wallet-keys
+        emptyDir: {}
+      - name: config-dir
+        emptyDir: {}
+      {{- if $.Values.coda.runtimeConfig }}
+      - name: daemon-config
+        configMap:
+          name: block-producer-daemon-config
+      {{- end }}
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ $.Values.coda.ports.p2p }}
+    targetPort: external-port
+---
+{{ end }}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: common-utilities
+description: A Helm chart for Mina Protocol's common chart utilities
+type: library
+version: 0.0.4
+appVersion: 0.0.1
+dependencies:
+icon:
+keywords:
+- mina
+- testnet
+- common
+- utilities
+home: https://minaprotocol.com/
+sources:
+- https://github.com/MinaProtocol/mina
