@@ -16,8 +16,8 @@ Daemon startup probe settings
 startupProbe:
   tcpSocket:
     port: external-port
-  failureThreshold: {{ .healthcheck.startup.failureThreshold }}
-  periodSeconds: {{ .healthcheck.startup.periodSeconds }}
+  failureThreshold: {{ default .Values.healthcheck.startup.failureThreshold 30 }}
+  periodSeconds: {{ default .Values.healthcheck.startup.periodSeconds 10 }}
 {{- end }}
 
 {{/*
