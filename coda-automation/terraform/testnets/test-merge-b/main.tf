@@ -134,5 +134,5 @@ module "testnet_east" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  upload_blocks_to_gcloud = true
+  upload_blocks_to_gcloud = false
 }
