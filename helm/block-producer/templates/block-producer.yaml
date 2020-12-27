@@ -173,9 +173,6 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
-          {{- end -}}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
@@ -215,12 +212,6 @@ spec:
           value: {{ $.Values.coda.privkeyPass | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CODA_PRIVKEY_PASS
-          value: {{ $.Values.coda.privkeyPass | quote }}
-        {{- if $config.libp2pSecret }}
-        - name: CODA_LIBP2P_PASS
-          value: {{ $.Values.coda.privkeyPass | quote }}
-        {{- end -}}
         ports:
         - name: client-port
           protocol: TCP 
@@ -246,10 +237,6 @@ spec:
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $config.libp2pSecret }}
-        - name: libp2p-keys
-          mountPath: /root/libp2p-keys
-        {{- end -}}
         {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
@@ -265,17 +252,6 @@ spec:
             path: key
           - key: pub
             path: key.pub
-      {{- if $config.libp2pSecret }}
-      - name: libp2p-keys
-        secret:
-          secretName: {{ $config.libp2pSecret }}
-          defaultMode: 256
-          items:
-          - key: key
-            path: key
-          - key: pub
-            path: key.pub
-      {{- end -}}
       {{ if $config.runWithBots }}
       - name: echo-service-key
         secret:
