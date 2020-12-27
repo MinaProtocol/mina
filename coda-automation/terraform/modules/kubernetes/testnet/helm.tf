@@ -19,7 +19,7 @@ data "local_file" "genesis_ledger" {
 
 locals {
   mina_helm_repo = "https://coda-charts.storage.googleapis.com"
-  use_local_charts = true
+  use_local_charts = false
 
   seed_peers = [
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
@@ -187,7 +187,7 @@ resource "kubernetes_role_binding" "helm_release" {
 resource "helm_release" "seed" {
   name        = "${var.testnet_name}-seed"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../helm/seed-node" : "seed-node"
+  chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
   version     = "0.3.2"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -207,7 +207,7 @@ resource "helm_release" "seed" {
 resource "helm_release" "block_producers" {
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../helm/block-producer" : "block-producer"
+  chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
   version     = "0.5.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -223,7 +223,7 @@ resource "helm_release" "block_producers" {
 resource "helm_release" "snark_workers" {
   name        = "${var.testnet_name}-snark-worker"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../helm/snark-worker" : "snark-worker"
+  chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
   version     = "0.3.3"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -241,7 +241,7 @@ resource "helm_release" "archive_node" {
   
   name        = "archive-node-${count.index}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../helm/archive-node" : "archive-node"
+  chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version     = "0.3.3"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
