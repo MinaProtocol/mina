@@ -1,6 +1,6 @@
 dependencies:
 - name: common-utilities
   repository: https://coda-charts.storage.googleapis.com
-  version: 0.0.3
-digest: sha256:aed0ad114400ccbd45e8552059b01bb7054d84910a2c576e4a714f9e3d6f7b8d
-generated: "2020-11-24T12:50:11.452718343-05:00"
+  version: 0.0.5
+digest: sha256:5a4f91f040530ccd985c74a1b934b7f7f5fc1cec6e3469038c6c4126f2bdd9ae
+generated: "2020-12-21T22:18:45.495921048-05:00"

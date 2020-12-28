@@ -1,4 +1,4 @@
-[%%define ledger_depth 14]
+[%%define ledger_depth 20]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/realistic.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
@@ -38,5 +38,5 @@
 
 [%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
-[%%import "/src/config/fork_at_3757.mlh"]
+[%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/mainnet.mlh"]

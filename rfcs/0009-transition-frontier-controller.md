@@ -1,9 +1,10 @@
 ## Summary
+
 [summary]: #summary
 
 Refactoring the existing ledger-builder-controller to a new simpler set of
 components we're calling the transition-frontier-controller. At the top level,
-we'll connect these components together in a similar manner to `coda_lib` --
+we'll connect these components together in a similar manner to `mina_lib` --
 just wiring together pipes. The new transition-frontier-controller includes the
 merkle-mask and a safer history-catchup mechanism in addition to simplifying
 asynchronous logic. The goal is to end up with a simple set of components that
@@ -54,10 +55,10 @@ up across several libraries.
 There will be a new top-level `Transition_frontier_controller` module that will
 just wire the pipes together for the new components:
 
-* [Transition Handler](#transition-handler)
-* [Transition Frontier](#transition-frontier)
-* [Ledger Catchup](#ledger-catchup)
-* [Query Handler](#query-handler)
+- [Transition Handler](#transition-handler)
+- [Transition Frontier](#transition-frontier)
+- [Ledger Catchup](#ledger-catchup)
+- [Query Handler](#query-handler)
 
 Note that all components communicate between each other solely through the use
 of pipes. By solely using pipes to connect components we can be more explicit about the [Async Control Flow](#async-control-flow).
@@ -69,13 +70,14 @@ Before covering any of the components it's worth going over some fundamental
 changes in behavior and structure in more detail in [big Changes](#big-changes)
 
 <a href="big-changes"></a>
+
 ### Big Changes
 
 Major differences in behavior between this component and the existing ledger-
 builder-controller are as follows:
 
 1. We only sync-ledger to the locked-ledger (if necessary) and do a new
-[History sync](#history-sync) for catchup jobs
+   [History sync](#history-sync) for catchup jobs
 
 Rationale: Without history sync, we are vulnerable to believing an invalid
 state: Certain parts of the staged-ledger state are not checked in a SNARK and
@@ -83,12 +85,12 @@ so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
 2. There is now a notion of a `Breadcrumb.t` which contains an
-`External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
-notion of the prior breadcrumb. We take advantage of the merkle-mask to put
-these breadcrumbs in each node of the transition-tree. See
-[RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle
-masks, and [Transition frontier](#transition-frontier) for more info about how
-these masks are configured.
+   `External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
+   notion of the prior breadcrumb. We take advantage of the merkle-mask to put
+   these breadcrumbs in each node of the transition-tree. See
+   [RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle
+   masks, and [Transition frontier](#transition-frontier) for more info about how
+   these masks are configured.
 
 Rationale: The frequent operation of answering sync-ledger queries no longer
 require materializing staged-ledgers. We should optimize for operations that
@@ -99,6 +101,7 @@ occur frequently.
 Rationale: We perform `lookup` and `add` frequently on this structure and `add` can be $O(1)$ in the presence of this `lookup` too. `lookup` also lets us traverse the tree forwards and backwards without explicit backedges in our [rose tree](https://en.wikipedia.org/wiki/Rose_tree) -- further simplifying the `Ktree.t` implementation.
 
 <a href="transition-handler"></a>
+
 ### Transition Handler
 
 The transition handler is broken down into two main components: Validator and
@@ -106,9 +109,9 @@ Processor
 
 #### Validator
 
-* Input: `External_transition.t`
-* Output: `External_transition.t` (we should consider making an
-`External_transition.Validated.t` for output here)
+- Input: `External_transition.t`
+- Output: `External_transition.t` (we should consider making an
+  `External_transition.Validated.t` for output here)
 
 The validator receives as input external transitions from the network and
 performs a series of checks on the transition before passing it off to be
@@ -129,8 +132,8 @@ neighbors.
 
 #### Processor
 
-* Input: `External_transition.t` (from validator) and `Breadcrumb.t list` (from catchup)
-* Outputs: `External_transition.t` (to ledger catchup); modifying transition frontier
+- Input: `External_transition.t` (from validator) and `Breadcrumb.t list` (from catchup)
+- Outputs: `External_transition.t` (to ledger catchup); modifying transition frontier
 
 The processor receives a single validated external transitions from the
 validator and then attempts to add the transition to the breadcrumb tree. The
@@ -152,6 +155,7 @@ The add process runs in two phases:
 3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
 
 <a href="catchup-scheduler"></a>
+
 #### Catchup Scheduler
 
 The catchup scheduler is responsible for waiting a bit before initiating a long
@@ -162,6 +166,7 @@ preempted by some transition/breadcrumb that allows this transition to be
 connected to the existing tree.
 
 <a href="transition-frontier"></a>
+
 ### Transition Frontier
 
 The Transition Frontier is essentially a root `Breadcrumb.t` with some
@@ -179,6 +184,7 @@ separated (back of napkin math). Moreover, we are able to in $O(1)$ time answer
 sync ledger queries if we have staged ledgers at every position.
 
 <a href="ledger-catchup"></a>
+
 ### Ledger Catchup
 
 Input: `External_transition.t` (from catchup scheduler)
@@ -200,6 +206,7 @@ New jobs handed to the same worker cause a retargeting action where we don't
 throw out existing data, but start again getting data from the source.
 
 <a href="history-sync"></a>
+
 #### History Sync
 
 History sync is a new process that is not yet implemented in the current
@@ -231,6 +238,7 @@ This should not block catchup breadcrumbs from being added to the
 transition-frontier, however.
 
 <a href="query-handler"></a>
+
 ### Query Handler
 
 Input: Sync ledger queries (from network); history sync queries (from network)
@@ -242,6 +250,7 @@ state from the transition frontier in order to answer the questions. Given the
 new underlying data structure, all answers will occur in $O(1)$ time.
 
 <a href="async-control-flow"></a>
+
 ### Async Control Flow
 
 As part of this redesign we've carefully considered the asynchronous control
@@ -254,9 +263,9 @@ Consult the following diagram:
 Blue arrows represent pipes and asynchronous boundaries of the system. Each
 arrow is annotated with the behavior when overflow of the pipe occurs.
 
-* `exception` means raise an exception if pipe buffer overflows (`write_exn`)
-* `blocking` means push back on a deffered if the buffer is full (`write`)
-* `drop old` means the buffer should drain oldest first when new data comes in
+- `exception` means raise an exception if pipe buffer overflows (`write_exn`)
+- `blocking` means push back on a deffered if the buffer is full (`write`)
+- `drop old` means the buffer should drain oldest first when new data comes in
 
 Red arrows represent synchronous lines of access. Red components represent data
 and not processes.
@@ -268,6 +277,7 @@ about this, but we're not prioritizing this yet. This is required to prevent
 against an adversary forcing us to switch between catching up of two forks. Always preempting and cancelling one another.
 
 ## Drawbacks
+
 [drawbacks]: #drawbacks
 
 This will take a decent amount of engineering time to implement. Additionally,
@@ -279,6 +289,7 @@ However, since we are taking care to think carefully about asynchronous
 processes we shouldn't have a problem here.
 
 ## Rationale and alternatives
+
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 The main rationale for doing this redesign is to ease the difficulty of
@@ -297,6 +308,7 @@ components we wish to hook in and we also are running into debugging issues and
 new bugs.
 
 ## Prior art
+
 [prior-art]: #prior-art
 
 The main piece of prior art is the existing Ledger-builder-controller
@@ -329,6 +341,7 @@ ledger-builder-controller as a whole that we should be able to mostly reuse.
 We're also reusing the only-one-at-a-time shortcut for our async jobs for now.
 
 ## Unresolved questions
+
 [unresolved-questions]: #unresolved-questions
 
 ### High-throughput

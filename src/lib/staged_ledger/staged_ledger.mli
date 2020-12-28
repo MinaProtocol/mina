@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Signature_lib
 
 type t [@@deriving sexp]
@@ -59,11 +59,12 @@ module Staged_ledger_error : sig
     | Invalid_proofs of
         ( Ledger_proof.t
         * Transaction_snark.Statement.t
-        * Coda_base.Sok_message.t )
+        * Mina_base.Sok_message.t )
         list
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
+    | Mismatched_statuses of Transaction.t With_status.t * Transaction_status.t
     | Unexpected of Error.t
   [@@deriving sexp]
 
@@ -165,11 +166,13 @@ val create_diff :
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
   -> supercharge_coinbase:bool
-  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     , Pre_diff_info.Error.t )
+     Result.t
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
-  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> epoch_ledger:Mina_base.Sparse_ledger.t
   -> global_slot:Coda_numbers.Global_slot.t
   -> bool
 

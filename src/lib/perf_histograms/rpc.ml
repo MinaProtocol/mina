@@ -9,10 +9,10 @@ let decorate_dispatch ~name (dispatch : ('q, 'r) Intf.dispatch) :
   let%map r = dispatch conn q in
   let span = Time.diff (Time.now ()) start in
   Perf_histograms0.add_span ~name:(sprintf "rpc_dispatch_%s" name) span ;
-  Coda_metrics.(
+  Mina_metrics.(
     Network.Rpc_latency_histogram.observe Network.rpc_latency_ms_summary
       (Time.Span.to_ms span)) ;
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.set (Network.rpc_latency_ms ~name) (Time.Span.to_ms span)) ;
   r
 
@@ -78,7 +78,7 @@ module Plain = struct
     module Read_stats = Make_stats ()
 
     let bin_read_response buf ~pos_ref =
-      let open Coda_metrics in
+      let open Mina_metrics in
       let response = bin_read_response buf ~pos_ref in
       let read_size = bin_size_response response in
       Read_stats.update_stats read_size ;
@@ -99,7 +99,7 @@ module Plain = struct
     module Write_stats = Make_stats ()
 
     let bin_write_response buf ~pos response =
-      let open Coda_metrics in
+      let open Mina_metrics in
       let write_size = bin_size_response response in
       Write_stats.update_stats write_size ;
       let name = M.name ^ "_write_response" in

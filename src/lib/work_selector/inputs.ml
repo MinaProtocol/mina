@@ -85,7 +85,7 @@ module Test_inputs = struct
 end
 
 module Implementation_inputs = struct
-  open Coda_base
+  open Mina_base
   module Ledger_hash = Ledger_hash
   module Sparse_ledger = Sparse_ledger
   module Transaction = Transaction

@@ -11,7 +11,7 @@ open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
+open Mina_base
 open Coda_state
 open Cache_lib
 open O1trace
@@ -74,7 +74,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
              transition_time)
       in
-      Coda_metrics.Block_latency.Inclusion_time.update
+      Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
@@ -210,7 +210,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Ok breadcrumb ->
               Deferred.return (Ok breadcrumb) )
     in
-    Coda_metrics.(
+    Mina_metrics.(
       Counter.inc_one
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
@@ -272,7 +272,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
         * is another node with the exact same private key and view of the
         * transaction pool. *)
        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.inc_one
                  Transition_frontier_controller.transitions_being_processed) ;
              `Local_breadcrumb (Cached.pure breadcrumb) )
@@ -348,7 +348,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        in
                        ()
                  in
-                 Coda_metrics.(
+                 Mina_metrics.(
                    Gauge.dec_one
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->

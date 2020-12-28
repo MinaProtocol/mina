@@ -1,5 +1,5 @@
 open Core
-open Coda_base
+open Mina_base
 open Signature_lib
 
 module type S = sig
@@ -8,6 +8,7 @@ module type S = sig
       | Verification_failed of Verifier.Failure.t
       | Coinbase_error of string
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Internal_command_status_mismatch
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -53,6 +54,7 @@ module Error = struct
     | Verification_failed of Verifier.Failure.t
     | Coinbase_error of string
     | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+    | Internal_command_status_mismatch
     | Unexpected of Error.t
   [@@deriving sexp]
 
@@ -66,6 +68,8 @@ module Error = struct
           !"Transaction fees %{sexp: Currency.Fee.t} does not suffice proof \
             fees %{sexp: Currency.Fee.t} \n"
           f1 f2
+    | Internal_command_status_mismatch ->
+        "Internal command statuses did not match"
     | Unexpected e ->
         Error.to_string_hum e
 
@@ -240,16 +244,23 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> Or_error.all )
   |> Or_error.join |> to_staged_ledger_or_error
 
-let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
-    ~coinbase_amount commands completed_works ~(forget : c -> _) =
+module Transaction_data = struct
+  type 'a t =
+    { commands: 'a With_status.t list
+    ; coinbases: Coinbase.t list
+    ; fee_transfers: Fee_transfer.t list }
+end
+
+let get_transaction_data (type c) ~constraint_constants coinbase_parts
+    ~receiver ~coinbase_amount commands completed_works ~(forget : c -> _) =
   let open Result.Let_syntax in
-  let%bind coinbase_parts =
+  let%bind coinbases =
     O1trace.measure "create_coinbase" (fun () ->
         create_coinbase ~constraint_constants coinbase_parts ~receiver
           ~coinbase_amount )
   in
   let coinbase_fts =
-    List.concat_map coinbase_parts ~f:(fun cb -> Option.to_list cb.fee_transfer)
+    List.concat_map coinbases ~f:(fun cb -> Option.to_list cb.fee_transfer)
   in
   let coinbase_work_fees =
     sum_fees ~f:Coinbase.Fee_transfer.fee coinbase_fts |> Or_error.ok_exn
@@ -264,26 +275,107 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
   let%map fee_transfers =
     create_fee_transfers txn_works_others delta receiver coinbase_fts
   in
+  {Transaction_data.commands; coinbases; fee_transfers}
+
+let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
+    ~coinbase_amount ~internal_command_balances commands completed_works
+    ~(forget : c -> _) =
+  let open Result.Let_syntax in
+  let%bind {Transaction_data.commands; coinbases= coinbase_parts; fee_transfers}
+      =
+    get_transaction_data ~constraint_constants coinbase_parts ~receiver
+      ~coinbase_amount commands completed_works ~forget
+  in
+  let internal_commands =
+    List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
+    @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+  in
+  let%map internal_commands_with_statuses =
+    Or_error.try_with (fun () ->
+        List.map2_exn internal_commands internal_command_balances
+          ~f:(fun cmd balances ->
+            match (cmd, balances) with
+            | ( Transaction.Coinbase _
+              , Transaction_status.Internal_command_balance_data.Coinbase
+                  balances ) ->
+                let balances =
+                  Transaction_status.Coinbase_balance_data.to_balance_data
+                    balances
+                in
+                { With_status.data= cmd
+                ; status=
+                    Applied (Transaction_status.Auxiliary_data.empty, balances)
+                }
+            | ( Transaction.Fee_transfer _
+              , Transaction_status.Internal_command_balance_data.Fee_transfer
+                  balances ) ->
+                let balances =
+                  Transaction_status.Fee_transfer_balance_data.to_balance_data
+                    balances
+                in
+                { With_status.data= cmd
+                ; status=
+                    Applied (Transaction_status.Auxiliary_data.empty, balances)
+                }
+            | _ ->
+                (* Caught by [try_with] above, it doesn't matter what we throw. *)
+                assert false ) )
+    |> Result.map_error ~f:(fun _ -> Error.Internal_command_status_mismatch)
+  in
   let transactions =
     List.map commands ~f:(With_status.map ~f:(fun t -> Transaction.Command t))
-    @ List.map coinbase_parts ~f:(fun t ->
-          { With_status.data= Transaction.Coinbase t
-          ; status=
-              Applied
-                ( User_command_status.Auxiliary_data.empty
-                , User_command_status.Balance_data.empty ) } )
-    @ List.map fee_transfers ~f:(fun t ->
-          { With_status.data= Transaction.Fee_transfer t
-          ; status=
-              Applied
-                ( User_command_status.Auxiliary_data.empty
-                , User_command_status.Balance_data.empty ) } )
+    @ internal_commands_with_statuses
   in
   { transactions
   ; work= completed_works
   ; commands_count= List.length commands
   ; coinbases= List.map coinbase_parts ~f:(fun Coinbase.{amount; _} -> amount)
   }
+
+let generate_statuses (type c) ~constraint_constants coinbase_parts ~receiver
+    ~coinbase_amount commands completed_works ~(forget : c -> _)
+    ~generate_status =
+  let open Result.Let_syntax in
+  let%bind {Transaction_data.commands; coinbases; fee_transfers} =
+    get_transaction_data ~constraint_constants coinbase_parts ~receiver
+      ~coinbase_amount commands completed_works ~forget
+  in
+  let%bind transactions =
+    Or_error.try_with (fun () ->
+        List.map commands ~f:(fun cmd ->
+            { With_status.data= cmd.With_status.data
+            ; status=
+                Or_error.ok_exn
+                  (generate_status (Transaction.Command (forget cmd.data))) }
+        ) )
+    |> Result.map_error ~f:(fun err -> Error.Unexpected err)
+  in
+  let%map internal_command_balances =
+    Or_error.try_with (fun () ->
+        let coinbases =
+          List.map coinbases ~f:(fun t ->
+              let status =
+                Or_error.ok_exn (generate_status (Transaction.Coinbase t))
+              in
+              let open Transaction_status in
+              Internal_command_balance_data.Coinbase
+                (Coinbase_balance_data.of_balance_data_exn
+                   (balance_data status)) )
+        in
+        let fee_transfers =
+          List.map fee_transfers ~f:(fun t ->
+              let status =
+                Or_error.ok_exn (generate_status (Transaction.Fee_transfer t))
+              in
+              let open Transaction_status in
+              Internal_command_balance_data.Fee_transfer
+                (Fee_transfer_balance_data.of_balance_data_exn
+                   (balance_data status)) )
+        in
+        coinbases @ fee_transfers )
+    |> Result.map_error ~f:(fun err -> Error.Unexpected err)
+  in
+  (transactions, internal_command_balances)
 
 open Staged_ledger_diff
 
@@ -303,6 +395,56 @@ let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
                 %{sexp:Coinbase.Fee_transfer.t At_most_two.t} and \
                 %{sexp:Coinbase.Fee_transfer.t At_most_one.t}"
               x y))
+
+let compute_statuses (type c)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~diff
+    ~coinbase_receiver ~coinbase_amount ~generate_status ~(forget : c -> _) =
+  let open Result.Let_syntax in
+  let get_statuses_pre_diff_with_at_most_two
+      (t1 : (_, c With_status.t) Pre_diff_two.t) =
+    let coinbase_parts =
+      match t1.coinbase with
+      | Zero ->
+          `Zero
+      | One x ->
+          `One x
+      | Two x ->
+          `Two x
+    in
+    let%map commands, internal_command_balances =
+      generate_statuses ~constraint_constants ~generate_status coinbase_parts
+        ~receiver:coinbase_receiver t1.commands t1.completed_works
+        ~coinbase_amount ~forget
+    in
+    ( { commands
+      ; completed_works= t1.completed_works
+      ; coinbase= t1.coinbase
+      ; internal_command_balances }
+      : _ Pre_diff_two.t )
+  in
+  let get_statuses_pre_diff_with_at_most_one
+      (t2 : (_, c With_status.t) Pre_diff_one.t) =
+    let coinbase_added =
+      match t2.coinbase with Zero -> `Zero | One x -> `One x
+    in
+    let%map commands, internal_command_balances =
+      generate_statuses ~constraint_constants ~generate_status coinbase_added
+        ~receiver:coinbase_receiver t2.commands t2.completed_works
+        ~coinbase_amount ~forget
+    in
+    Some
+      ( { commands
+        ; completed_works= t2.completed_works
+        ; coinbase= t2.coinbase
+        ; internal_command_balances }
+        : _ Pre_diff_one.t )
+  in
+  let%bind p1 = get_statuses_pre_diff_with_at_most_two (fst diff) in
+  let%map p2 =
+    Option.value_map ~f:get_statuses_pre_diff_with_at_most_one (snd diff)
+      ~default:(Ok None)
+  in
+  (p1, p2)
 
 let get' (type c)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~diff
@@ -333,7 +475,9 @@ let get' (type c)
           `Two x
     in
     get_individual_info coinbase_parts ~receiver:coinbase_receiver t1.commands
-      t1.completed_works ~coinbase_amount ~forget
+      t1.completed_works
+      ~internal_command_balances:t1.internal_command_balances ~coinbase_amount
+      ~forget
   in
   let apply_pre_diff_with_at_most_one
       (t2 : (_, c With_status.t) Pre_diff_one.t) =
@@ -341,7 +485,9 @@ let get' (type c)
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
     get_individual_info coinbase_added ~receiver:coinbase_receiver t2.commands
-      t2.completed_works ~coinbase_amount ~forget
+      t2.completed_works
+      ~internal_command_balances:t2.internal_command_balances ~coinbase_amount
+      ~forget
   in
   let%bind () = check_coinbase diff in
   let%bind p1 =
