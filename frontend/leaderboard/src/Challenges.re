@@ -109,10 +109,7 @@ let createAndSendTokenChallenge = metricsMap => {
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
   | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
-  /*
-     This challenge will be calculated close to the end of the testnet
-   | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
-   */
+  | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
   | "send mina" => Some(sendMinaChallenge(metricsMap))
   | _ => None
   };
