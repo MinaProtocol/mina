@@ -1,0 +1,11 @@
+(executable
+ (package winning_slots)
+ (name winning_slots)
+ (public_name winning_slots)
+ (modes native)
+ (libraries genesis_ledger_helper precomputed_values runtime_config mina_base consensus core async)
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_custom_printf ppx_version ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson))
+ (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+
