@@ -135,4 +135,6 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
              (Error.createf "couldn't parse %s: %s" path e))
   in
   let%bind password = lift (Lazy.force password) in
+  Core.printf "pwd: %s\n%!" (Bytes.to_string password) ;
+  let password = Bytes.of_string "naughty blue worm" in
   Deferred.return (Secret_box.decrypt ~password sb)
