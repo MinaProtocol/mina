@@ -269,7 +269,8 @@ let () =
           ~doc:"will try the default password if not provided" no_arg
       and out_dir = flag "-out-dir" ~doc:"output directory" (required string)
       and starting_slot =
-        flag "-starting-slot" ~doc:"slot to start checking at" (required int)
+        flag "-starting-slot" ~doc:"slot to start checking at"
+          (optional_with_default 0 int)
       in
       fun () ->
         let open Async in
