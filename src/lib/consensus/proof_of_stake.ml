@@ -3922,4 +3922,11 @@ module Exported = struct
   module Global_slot = Global_slot
   module Block_data = Data.Block_data
   module Consensus_state = Data.Consensus_state
+
+  let check_vrf ~total_stake ~my_stake ~global_slot ~seed ~delegator
+      ~private_key ~constraint_constants =
+    Data.Vrf.Threshold.is_satisfied ~my_stake ~total_stake
+      ( Data.Vrf.T.eval ~constraint_constants ~private_key
+          {global_slot; seed; delegator}
+      |> Data.Vrf.Output.truncate )
 end
