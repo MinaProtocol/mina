@@ -199,6 +199,7 @@ let main ~starting_slot ~num_workers ~out_dir ~keys_dir ~password ~config_path
   let param =
     { Evaluate.Param.constraint_constants=
         precomputed_values.constraint_constants
+    ; starting_slot
     ; slots_per_epoch=
         Unsigned.UInt32.to_int
           precomputed_values.consensus_constants.slots_per_epoch }
