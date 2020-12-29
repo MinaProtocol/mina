@@ -115,8 +115,8 @@ let createAndSendTokenChallenge = metricsMap => {
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
   | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
-  | "snarking on mina" => Some(snarkFeeChallenge(metricsMap))
-  | "send mina" => Some(sendMinaChallenge(metricsMap))
+  | "produce & sell snarks" => Some(snarkFeeChallenge(metricsMap))
+  | "send transactions" => Some(sendMinaChallenge(metricsMap))
   | _ => None
   };
 };
