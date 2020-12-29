@@ -76,13 +76,13 @@ let snarkFeeChallenge = metricsMap => {
   [
     Points.applyTopNPoints(
       [|
-        (0, 6500), // 1st place: 8500 pts
-        (1, 5000), // 2nd place: 7000 pts
-        (2, 4000), // 3rd place: 6000 pts
-        (51, 3000), // Top 50: 5000 pts.
-        (251, 1500), // Top 250: 4000 pts
-        (501, 1500), // Top 500: 3000 pts
-        (1001, 1000) // Top 1000: 2000 pts
+        (0, 8500), // 1st place: 8500 pts
+        (1, 7000), // 2nd place: 7000 pts
+        (2, 6000), // 3rd place: 6000 pts
+        (51, 5000), // Top 50: 5000 pts.
+        (251, 4000), // Top 250: 4000 pts
+        (501, 3000), // Top 500: 3000 pts
+        (1001, 2000) // Top 1000: 2000 pts
       |],
       metricsMap,
       (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
