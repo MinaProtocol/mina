@@ -27,8 +27,6 @@ apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
 TESTNET_NAME="turbo-pickles"
 
-cd coda-automation && git pull origin master && cd -
-
 # Generate genesis proof and then crash due to no peers
 coda daemon \
   -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
