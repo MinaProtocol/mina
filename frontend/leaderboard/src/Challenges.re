@@ -42,21 +42,55 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
      );
 };
 
+let bonusSnarkFeeChallenge = metricsMap => {
+  // Sum all snark fees recorded thus far
+  let snarkFeeCounter =
+    StringMap.fold(
+      (_, metric: Types.Metrics.t, metricCounter) => {
+        switch (metric.snarkFeesCollected) {
+        | Some(metricValue) => Int64.add(metricCounter, metricValue)
+        | None => metricCounter
+        }
+      },
+      metricsMap,
+      Int64.zero,
+    );
+
+  // If the metric value sum is greater than the threshold (3000 minas), every user that particpated will receive points
+  snarkFeeCounter >= 3000000000000L
+    ? StringMap.fold(
+        (key, metric: Types.Metrics.t, map) => {
+          switch (metric.snarkFeesCollected) {
+          | Some(metricValue) =>
+            metricValue >= Int64.zero ? StringMap.add(key, 2000, map) : map
+          | None => map
+          }
+        },
+        metricsMap,
+        StringMap.empty,
+      )
+    : StringMap.empty;
+};
+
 let snarkFeeChallenge = metricsMap => {
-  Points.applyTopNPoints(
-    [|
-      (0, 6500), // 1st place: 6500 pts
-      (1, 5000), // 2nd place: 5000 pts
-      (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 1500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 1000) // Top 200: 1000 pts
-    |],
-    metricsMap,
-    (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
-    compare,
-  );
+  [
+    Points.applyTopNPoints(
+      [|
+        (0, 6500), // 1st place: 8500 pts
+        (1, 5000), // 2nd place: 7000 pts
+        (2, 4000), // 3rd place: 6000 pts
+        (51, 3000), // Top 50: 5000 pts.
+        (251, 1500), // Top 250: 4000 pts
+        (501, 1500), // Top 500: 3000 pts
+        (1001, 1000) // Top 1000: 2000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
+      compare,
+    ),
+    bonusSnarkFeeChallenge(metricsMap),
+  ]
+  |> Points.sumPointsMaps;
 };
 
 let bonusBlocksChallenge = metricsMap => {
