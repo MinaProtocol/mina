@@ -27,7 +27,7 @@ let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
   let pool = Postgres.createPool(pgConnection);
-  Postgres.makeQuery(pool, Postgres.getBlocks, result => {
+  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
     switch (result) {
     | Ok(blocks) =>
       let metrics =
