@@ -25,3 +25,6 @@
 [submodule "src/external/ppx_version"]
 	path = src/external/ppx_version
 	url = https://github.com/o1-labs/ppx_version.git
+[submodule "coda-automation-integration-tests"]
+	path = coda-automation-integration-tests
+	url = git@github.com:MinaProtocol/coda-automation.git
