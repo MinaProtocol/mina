@@ -48,10 +48,12 @@ let snarkFeeChallenge = metricsMap => {
       (0, 6500), // 1st place: 6500 pts
       (1, 5000), // 2nd place: 5000 pts
       (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 1500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 1000) // Top 200: 1000 pts
+      (51, 3500), // Top 50: 3500 pts.
+      (101, 3000), // Top 100: 3000 pts
+      (251, 2000), // Top 250: 2000 pts
+      (501, 1000), // Top 500: 1000 pts
+      (751, 750), // Top 750: 750 pts
+      (1001, 500) // Top 1000: 500 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.snarkFeesCollected,
@@ -65,10 +67,12 @@ let blocksChallenge = metricsMap => {
       (0, 6500), // 1st place: 6500 pts
       (1, 5000), // 2nd place: 5000 pts
       (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 2500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 100) // Top 200: 1000 pts
+      (51, 3500), // Top 50: 3500 pts.
+      (101, 3000), // Top 100: 3000 pts
+      (251, 2000), // Top 250: 2000 pts
+      (501, 1000), // Top 500: 1000 pts
+      (751, 750), // Top 750: 750 pts
+      (1001, 500) // Top 1000: 500 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -82,10 +86,12 @@ let sendMinaChallenge = metricsMap => {
       (0, 6500), // 1st place: 6500 pts
       (1, 5000), // 2nd place: 5000 pts
       (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 2500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 1000) // Top 200: 1000 pts
+      (51, 3500), // Top 50: 3500 pts.
+      (101, 3000), // Top 100: 3000 pts
+      (251, 2000), // Top 250: 2000 pts
+      (501, 1000), // Top 500: 1000 pts
+      (751, 750), // Top 750: 750 pts
+      (1001, 500) // Top 1000: 500 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
