@@ -139,20 +139,58 @@ let blocksChallenge = metricsMap => {
 };
 
 let sendMinaChallenge = metricsMap => {
-  Points.applyTopNPoints(
-    [|
-      (0, 6500), // 1st place: 6500 pts
-      (1, 5000), // 2nd place: 5000 pts
-      (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 2500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 1000) // Top 200: 1000 pts
-    |],
-    metricsMap,
-    (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
-    compare,
-  );
+  [
+    // Sent 5 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      5,
+      1000,
+      metricsMap,
+    ),
+    // Sent 50 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      50,
+      1000,
+      metricsMap,
+    ),
+    // Sent 500 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      500,
+      1000,
+      metricsMap,
+    ),
+    // Sent 5000 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      5000,
+      1000,
+      metricsMap,
+    ),
+    // Sent 10000 transactions: 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      10000,
+      1000,
+      metricsMap,
+    ),
+    Points.applyTopNPoints(
+      [|
+        (0, 5500), // 1st place: 5500 pts
+        (1, 4000), // 2nd place: 4000 pts
+        (2, 3000), // 3rd place: 3000 pts
+        (51, 2500), // Top 50: 2500 pts.
+        (101, 2000), // Top 100: 2000 pts
+        (401, 1000), // Top 400: 1500 pts
+        (751, 1000) // Top 750: 1000 pts
+      |],
+      metricsMap,
+      (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
+      compare,
+    ),
+  ]
+  |> Points.sumPointsMaps;
 };
 
 let createAndSendTokenChallenge = metricsMap => {
