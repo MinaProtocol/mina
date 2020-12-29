@@ -59,21 +59,49 @@ let snarkFeeChallenge = metricsMap => {
   );
 };
 
-let blocksChallenge = metricsMap => {
+let bonusBlocksChallenge = metricsMap => {
   Points.applyTopNPoints(
     [|
       (0, 6500), // 1st place: 6500 pts
       (1, 5000), // 2nd place: 5000 pts
       (2, 4000), // 3rd place: 4000 pts
-      (11, 3000), // Top 10: 3000 pts.
-      (21, 2500), // Top 20: 2500 pts
-      (101, 1500), // Top 100: 1500 pts
-      (201, 100) // Top 200: 1000 pts
+      (51, 3000), // Top 50: 3500 pts.
+      (101, 3000), // Top 100: 3000 pts
+      (401, 2000), // Top 400: 2000 pts
+      (751, 1000) // Top 750: 1000 pts
     |],
     metricsMap,
     (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
     compare,
   );
+};
+
+let blocksChallenge = metricsMap => {
+  [
+    // Produce 1 block and get them accepted for 1000 pts
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
+      1,
+      1000,
+      metricsMap,
+    ),
+    // Anyone who produces at least 2 blocks will earn an additional 1000 pts.
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
+      2,
+      1000,
+      metricsMap,
+    ),
+    // For every next block you produce (after 2 blocks), you will earn 800 pts*.
+    Points.addPointsForExtra(
+      (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
+      2,
+      100,
+      metricsMap,
+    ),
+    bonusBlocksChallenge(metricsMap),
+  ]
+  |> Points.sumPointsMaps;
 };
 
 let sendMinaChallenge = metricsMap => {
