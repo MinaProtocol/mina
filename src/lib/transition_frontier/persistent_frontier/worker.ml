@@ -6,7 +6,10 @@ open Frontier_base
 
 type input = Diff.Lite.E.t list
 
-type create_args = {db: Database.t; logger: Logger.t}
+type create_args =
+  { db: Database.t
+  ; logger: Logger.t
+  ; persistent_root_instance: Persistent_root.Instance.t }
 
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
@@ -24,15 +27,16 @@ module Worker = struct
    them immediately. This invariant is potentially violated whenever we touch the
    database (i.e., whenever we process any other kind of diff) so we eagerly perform
    work in this queue immediately after applying any other kind of diff. *)
-    ; root_transitions: Diff.Root_transition.Lite.t Queue.t }
+    ; root_transitions: Diff.Root_transition.Lite.t Queue.t
+    ; persistent_root_instance: Persistent_root.Instance.t }
 
   type nonrec create_args = create_args
 
   type output = unit
 
   (* worker assumes database has already been checked and initialized *)
-  let create ({db; logger} : create_args) : t =
-    {db; logger; root_transitions= Queue.create ()}
+  let create ({db; logger; persistent_root_instance} : create_args) : t =
+    {db; logger; root_transitions= Queue.create (); persistent_root_instance}
 
   let eagerly_perform_root_transitions t =
     let start = Time.now () in
@@ -127,6 +131,10 @@ module Worker = struct
         | _ ->
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned {new_root; garbage= Lite garbage} ->
+        let just_emitted_a_proof = failwith "..." in
+        if just_emitted_a_proof then
+          Persistent_root.Instance.dequeue_snarked_ledger
+            t.persistent_root_instance ;
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
           ( Database.move_root t.db ~new_root ~garbage

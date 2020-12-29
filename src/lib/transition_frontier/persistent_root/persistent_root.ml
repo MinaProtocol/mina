@@ -34,12 +34,24 @@ let with_file ?size filename access_level ~f =
 module Locations = struct
   let snarked_ledger root = Filename.concat root "snarked_ledger"
 
+  let tmp_snarked_ledger root = Filename.concat root "tmp_snarked_ledger"
+
+  let potential_snarked_ledgers root =
+    Filename.concat root "potential_snarked_ledgers.json"
+
+  let potential_snarked_ledger root =
+    let uuid = Uuid_unix.create () in
+    Filename.concat root ("snarked_ledger" ^ Uuid.to_string_hum uuid)
+
   let root_identifier root = Filename.concat root "root"
 end
 
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
-  type t = {snarked_ledger: Ledger.Db.t; factory: Factory_type.t}
+  type t =
+    { snarked_ledger: Ledger.Db.t
+    ; factory: Factory_type.t
+    ; potential_snarked_ledgers: string Queue.t }
 end =
   Instance_type
 
@@ -58,13 +70,72 @@ open Factory_type
 module Instance = struct
   type t = Instance_type.t
 
+  let potential_snarked_ledgers_to_yojson queue =
+    `List
+      (List.map (Queue.to_list queue) ~f:(fun filename -> `String filename))
+
+  let potential_snarked_ledgers_of_yojson json =
+    Yojson.Safe.Util.to_list json |> List.map ~f:Yojson.Safe.Util.to_string
+
+  let write_potential_snarked_ledgers_to_disk t =
+    Yojson.Safe.to_file
+      (Locations.potential_snarked_ledgers t.factory.directory)
+      (potential_snarked_ledgers_to_yojson t.potential_snarked_ledgers)
+
+  let enqueue_snarked_ledger ~location t =
+    Queue.enqueue t.potential_snarked_ledgers location ;
+    write_potential_snarked_ledgers_to_disk t
+
+  let dequeue_snarked_ledger t =
+    let location = Queue.dequeue_exn t.potential_snarked_ledgers in
+    File_system.rmrf location ;
+    write_potential_snarked_ledgers_to_disk t
+
+  let destroy_potential_snarked_ledgers potential_snarked_ledgers =
+    List.iter (Queue.to_list potential_snarked_ledgers) ~f:File_system.rmrf
+
   let create factory =
-    let snarked_ledger =
-      Ledger.Db.create ~depth:factory.ledger_depth
-        ~directory_name:(Locations.snarked_ledger factory.directory)
-        ()
+    let potential_snarked_ledger_filenames_location =
+      Locations.potential_snarked_ledgers factory.directory
     in
-    {snarked_ledger; factory}
+    let potential_snarked_ledgers =
+      if Sys.file_exists potential_snarked_ledger_filenames_location = `Yes
+      then
+        let json =
+          Yojson.Safe.from_file potential_snarked_ledger_filenames_location
+        in
+        Queue.of_list @@ potential_snarked_ledgers_of_yojson json
+      else Queue.of_list []
+    in
+    let snarked_ledger =
+      match Queue.dequeue potential_snarked_ledgers with
+      | Some most_recent_snarked_ledger_filename ->
+          let most_recent_snarked_ledger =
+            Ledger.of_database
+            @@ Ledger.Db.create ~depth:factory.ledger_depth
+                 ~directory_name:most_recent_snarked_ledger_filename ()
+          in
+          let snarked_ledger =
+            Ledger.Db.create ~depth:factory.ledger_depth
+              ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
+              ()
+          in
+          ignore
+          @@ Ledger_transfer.transfer_accounts ~src:most_recent_snarked_ledger
+               ~dest:snarked_ledger ;
+          File_system.rmrf @@ Locations.snarked_ledger factory.directory ;
+          Sys.rename
+            (Locations.tmp_snarked_ledger factory.directory)
+            (Locations.snarked_ledger factory.directory) ;
+          File_system.rmrf @@ most_recent_snarked_ledger_filename ;
+          destroy_potential_snarked_ledgers potential_snarked_ledgers ;
+          snarked_ledger
+      | None ->
+          Ledger.Db.create ~depth:factory.ledger_depth
+            ~directory_name:(Locations.snarked_ledger factory.directory)
+            ()
+    in
+    {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
 
   let destroy t =
     Ledger.Db.close t.snarked_ledger ;

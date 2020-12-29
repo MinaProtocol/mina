@@ -116,13 +116,14 @@ module Instance = struct
     | Some sync ->
         f sync
 
-  let start_sync ~constraint_constants t =
+  let start_sync ~constraint_constants t ~persistent_root_instance =
     let open Result.Let_syntax in
     let%map () = assert_no_sync t in
     t.sync
     <- Some
          (Sync.create ~constraint_constants ~logger:t.factory.logger
-            ~time_controller:t.factory.time_controller ~db:t.db)
+            ~time_controller:t.factory.time_controller ~db:t.db
+            ~persistent_root_instance)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -182,7 +183,8 @@ module Instance = struct
       Error `Bootstrap_required )
 
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~precomputed_values =
+      ~ignore_consensus_local_state ~precomputed_values
+      ~persistent_root_instance =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -252,6 +254,7 @@ module Instance = struct
           }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
         ~consensus_local_state ~max_length ~precomputed_values
+        ~persistent_root_instance
     in
     let%bind extensions =
       Deferred.map

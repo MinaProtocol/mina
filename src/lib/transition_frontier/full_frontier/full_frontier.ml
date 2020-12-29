@@ -64,7 +64,8 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; precomputed_values: Precomputed_values.t }
+  ; precomputed_values: Precomputed_values.t
+  ; persistent_root_instance: Persistent_root.Instance.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -103,7 +104,7 @@ let close ~loc t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
-    ~precomputed_values =
+    ~precomputed_values ~persistent_root_instance =
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
@@ -136,18 +137,16 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
-  let t =
-    { logger
-    ; root_ledger
-    ; root= root_hash
-    ; best_tip= root_hash
-    ; table
-    ; consensus_local_state
-    ; max_length
-    ; precomputed_values
-    ; protocol_states_for_root_scan_state }
-  in
-  t
+  { logger
+  ; root_ledger
+  ; root= root_hash
+  ; best_tip= root_hash
+  ; table
+  ; consensus_local_state
+  ; max_length
+  ; precomputed_values
+  ; protocol_states_for_root_scan_state
+  ; persistent_root_instance }
 
 let root_data t =
   let open Root_data in
@@ -415,6 +414,17 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
+      let location =
+        Persistent_root.Locations.potential_snarked_ledger
+          t.persistent_root_instance.factory.directory
+      in
+      let ledger =
+        Ledger.Db.create_checkpoint t.persistent_root_instance.snarked_ledger
+          ~directory_name:location ()
+      in
+      let () = Ledger.Db.close ledger in
+      Persistent_root.Instance.enqueue_snarked_ledger ~location
+        t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
       let mt =

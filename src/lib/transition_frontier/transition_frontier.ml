@@ -99,7 +99,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
          ~consensus_local_state ~ignore_consensus_local_state
-         ~precomputed_values)
+         ~precomputed_values ~persistent_root_instance)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -112,7 +112,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     Deferred.return
       ( Persistent_frontier.Instance.start_sync
           ~constraint_constants:precomputed_values.constraint_constants
-          persistent_frontier_instance
+          ~persistent_root_instance persistent_frontier_instance
       |> Result.map_error ~f:(function
            | `Sync_cannot_be_running ->
                `Failure "sync job is already running on persistent frontier"

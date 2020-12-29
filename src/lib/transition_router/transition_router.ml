@@ -431,14 +431,14 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
       Initial_validator.run ~logger ~trust_system ~verifier
         ~transition_reader:network_transition_reader ~valid_transition_writer
         ~initialization_finish_signal ~precomputed_values ;
-      let persistent_frontier =
-        Transition_frontier.Persistent_frontier.create ~logger ~verifier
-          ~time_controller ~directory:persistent_frontier_location
-      in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
+      in
+      let persistent_frontier =
+        Transition_frontier.Persistent_frontier.create ~logger ~verifier
+          ~time_controller ~directory:persistent_frontier_location
       in
       upon
         (initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier
