@@ -1562,31 +1562,87 @@ let export_key =
              Deferred.unit ))
 
 let list_accounts =
-  let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun graphql_endpoint () ->
-         let%map response =
-           Graphql_client.query_exn
+    (let%map_open.Command.Let_syntax access_method =
+       choose_one
+         ~if_nothing_chosen:(`Default_to `None)
+         [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
+           |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
+         ; Cli_lib.Flag.conf_dir
+           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir)) ]
+     in
+     fun () ->
+       let do_graphql graphql_endpoint =
+         match%map
+           Graphql_client.query
              (Graphql_queries.Get_tracked_accounts.make ())
              graphql_endpoint
+         with
+         | Ok response -> (
+           match response#trackedAccounts with
+           | [||] ->
+               printf
+                 "😢 You have no tracked accounts!\n\
+                  You can make a new one using `coda accounts create`\n" ;
+               Ok ()
+           | accounts ->
+               Array.iteri accounts ~f:(fun i w ->
+                   printf
+                     "Account #%d:\n\
+                     \  Public key: %s\n\
+                     \  Balance: %s\n\
+                     \  Locked: %b\n"
+                     (i + 1)
+                     (Public_key.Compressed.to_base58_check w#public_key)
+                     (Currency.Balance.to_formatted_string (w#balance)#total)
+                     (Option.value ~default:true w#locked) ) ;
+               Ok () )
+         | Error (`Failed_request _ as err) ->
+             Error err
+         | Error (`Graphql_error _ as err) ->
+             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             Ok ()
+       in
+       let do_local conf_dir =
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%map wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
          in
-         match response#trackedAccounts with
-         | [||] ->
+         match wallets |> Secrets.Wallets.pks with
+         | [] ->
              printf
                "😢 You have no tracked accounts!\n\
                 You can make a new one using `mina accounts create`\n"
          | accounts ->
-             Array.iteri accounts ~f:(fun i w ->
-                 printf
-                   "Account #%d:\n\
-                   \  Public key: %s\n\
-                   \  Balance: %s\n\
-                   \  Locked: %b\n"
-                   (i + 1)
-                   (Public_key.Compressed.to_base58_check w#public_key)
-                   (Currency.Balance.to_formatted_string (w#balance)#total)
-                   (Option.value ~default:true w#locked) ) ))
+             List.iteri accounts ~f:(fun i public_key ->
+                 printf "Account #%d:\n  Public key: %s\n" (i + 1)
+                   (Public_key.Compressed.to_base58_check public_key) )
+       in
+       match access_method with
+       | `GraphQL graphql_endpoint -> (
+           match%map do_graphql graphql_endpoint with
+           | Ok () ->
+               ()
+           | Error err ->
+               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err)
+           )
+       | `Conf_dir conf_dir ->
+           do_local conf_dir
+       | `None -> (
+           let default_graphql_endpoint =
+             Cli_lib.Flag.(Uri.Client.{Types.name; value= default})
+           in
+           match%bind do_graphql default_graphql_endpoint with
+           | Ok () ->
+               Deferred.unit
+           | Error _res ->
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               eprintf
+                 "%sWarning: Could not connect to a running daemon.\n\
+                  Listing from local directory %s%s\n"
+                 Bash_colors.orange conf_dir Bash_colors.none ;
+               do_local conf_dir ))
 
 let create_account =
   let open Command.Param in
