@@ -313,34 +313,6 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
-let direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
-    ~network_response =
-  let open Deferred.Result.Let_syntax in
-  (* Unlock the sender account *)
-  let%bind _ = Poke.Account.unlock ~graphql_uri in
-  (* mint tokens; relies on earlier create_tokens so we have a valid token id *)
-  let%bind hash =
-    Poke.SendTransaction.mint_tokens ~fee:(`Int 2_000_000_000)
-      ~receiver:Poke.pk ~token:(`String "2") ~amount:(`Int 1_000_000_000)
-      ~graphql_uri ()
-  in
-  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
-    ~network_response
-    ~operation_expectations:
-      Operation_expectation.
-        [ { amount= Some (-2_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= `Check None }
-        ; { amount= Some 1_000_000_000
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
-          ; status= "Pending"
-          ; _type= "mint_tokens"
-          ; target= `Check (Some Poke.pk) } ]
-
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
@@ -521,28 +493,6 @@ let construction_api_create_token_account_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
-let construction_api_mint_tokens_through_mempool =
-  construction_api_transaction_through_mempool
-    ~operations:(fun account_id ->
-      Poke.SendTransaction.mint_tokens_operations ~sender:account_id.address
-        ~receiver:account_id.address
-        ~amount:(Unsigned.UInt64.of_int 1_000_000_000)
-        ~fee:(Unsigned.UInt64.of_int 3_000_000_000) )
-    ~operation_expectations:
-      Operation_expectation.
-        [ { amount= Some (-3_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= `Check None }
-        ; { amount= Some 1_000_000_000
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
-          ; status= "Pending"
-          ; _type= "mint_tokens"
-          ; target= `Check (Some Poke.pk) } ]
-
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
 *)
@@ -643,19 +593,6 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   in
   [%log info] "Created token account using construction and waited" ;
   (* Stop staking *)
-  [%log info] "Starting mint tokens check" ;
-  let%bind _res = Poke.Staking.disable ~graphql_uri in
-  let%bind () =
-    direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
-      ~network_response
-  in
-  [%log info] "Minted tokens and waited" ;
-  [%log info] "Starting construction mint tokens check" ;
-  let%bind () =
-    construction_api_mint_tokens_through_mempool ~logger ~rosetta_uri
-      ~graphql_uri ~network_response
-  in
-  [%log info] "Minted tokens using construction and waited" ;
   (* Success *)
   return ()
 
