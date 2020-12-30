@@ -42,6 +42,9 @@ module Common = struct
     end]
   end
 
+  [%%if
+  feature_tokens]
+
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -58,6 +61,53 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
+
+  [%%else]
+
+  module Binable_arg = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Currency.Fee.Stable.V1.t
+          , Public_key.Compressed.Stable.V1.t
+          , Token_id.Stable.V1.t
+          , Account_nonce.Stable.V1.t
+          , Global_slot.Stable.V1.t
+          , Memo.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving compare, eq, sexp, hash, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  let check (t : Binable_arg.t) =
+    if Token_id.equal t.fee_token Token_id.default then t
+    else failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
+
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Binable_arg.Stable.V1.t
+      [@@deriving compare, eq, sexp, hash, yojson]
+
+      include Binable.Of_binable
+                (Binable_arg.Stable.V1)
+                (struct
+                  type nonrec t = t
+
+                  let of_binable = check
+
+                  let to_binable = check
+                end)
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  [%%endif]
 
   let to_input ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t) =
     let bitstring = Random_oracle.Input.bitstring in
@@ -183,11 +233,16 @@ module Body = struct
   [%%else]
 
   let check (t : Binable_arg.t) =
+    let fail () =
+      failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
+    in
     match t with
-    | Payment _ | Stake_delegation _ ->
+    | Payment p ->
+        if Token_id.equal p.token_id Token_id.default then t else fail ()
+    | Stake_delegation _ ->
         t
     | Create_new_token _ | Create_token_account _ | Mint_tokens _ ->
-        failwithf !"Tokens disabled. Read %{sexp:Binable_arg.t}" t ()
+        fail ()
 
   [%%versioned_binable
   module Stable = struct
