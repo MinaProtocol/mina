@@ -155,7 +155,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Waited for the next block index $index" ;
   (* Stop noisy block production *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
-  let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
+  let successful (x : Operation_expectation.t) = {x with status= "Success"} in
   [%log debug]
     ~metadata:
       [ ( "transactions"
@@ -164,7 +164,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Asserting that operations are similar in block. Transactions $transactions" ;
   Operation_expectation.assert_similar_operations ~logger
     ~expected:
-      ( List.map ~f:succesful operation_expectations
+      ( List.map ~f:successful operation_expectations
       @ Operation_expectation.
           [ { amount= Some 40_000_000_000
             ; account=
