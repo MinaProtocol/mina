@@ -598,8 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  [%log debug] "Pulling subscription $subscription_name"
-    ~metadata:[("subscription_name", `String subscription_name)] ;
+  (* [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ; *)
   let%bind () =
     uninterruptible
       ( match results with
@@ -626,7 +626,7 @@ let start_background_query (type r)
     Subscription.create ~logger ~name:Query.name
       ~filter:(Query.filter testnet_log_filter)
   in
-  [%log debug] "Subscription created for $query"
+  [%log info] "Subscription created for background query $query"
     ~metadata:[("query", `String Query.name)] ;
   let subscription_task =
     let open Interruptible.Let_syntax in
@@ -659,7 +659,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~cancel_ivar:cancel_background_tasks_ivar
       ~handle_result:(fun result ->
         let open Error_query.Result in
-        [%log debug] "Handling error log" ;
+        (* [%log debug] "Handling error log" ; *)
         let acc =
           match result.message.level with
           | Warn ->
@@ -695,8 +695,8 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~handle_result:(fun result ->
         let open Initialization_query.Result in
         let open Malleable_error.Let_syntax in
-        [%log debug] "Handling initialization log for node $node_id"
-          ~metadata:[("node_id", `String result.pod_id)] ;
+        (* [%log debug] "Handling initialization log for node $node_id"
+          ~metadata:[("node_id", `String result.pod_id)] ; *)
         let%bind ivar =
           (* TEMP hack, this probably should be of_option_hard *)
           Malleable_error.of_option_soft
@@ -725,22 +725,22 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         Option.value_map result.best_tip_changed
           ~default:Malleable_error.ok_unit ~f:(fun new_best_tip ->
             let open Malleable_error.Let_syntax in
-            [%log debug]
-              "Handling transition frontier diff application query log" ;
+            (* [%log debug]
+              "Handling transition frontier diff application query log" ; *)
             let best_tip_map =
               Broadcast_pipe.Reader.peek best_tip_map_reader
             in
             let best_tip_map' =
               String.Map.set best_tip_map ~key:result.pod_id ~data:new_best_tip
             in
-            [%log debug]
+            (* [%log debug]
               ~metadata:
                 [ ( "best_tip_map"
                   , `Assoc
                       ( String.Map.to_alist best_tip_map'
                       |> List.map ~f:(fun (k, v) -> (k, State_hash.to_yojson v))
                       ) ) ]
-              "Updated best tip map: $best_tip_map" ;
+              "Updated best tip map: $best_tip_map" ; *)
             let%map () =
               Deferred.bind ~f:Malleable_error.return
                 (Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map')

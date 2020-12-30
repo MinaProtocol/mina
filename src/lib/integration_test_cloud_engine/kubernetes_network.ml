@@ -82,7 +82,7 @@ module Node = struct
       let args =
         List.append (base_kube_args t) ["port-forward"; name; portmap]
       in
-      [%log info] "Port forwarding using \"kubectl %s\"\n"
+      [%log debug] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
       let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
@@ -92,7 +92,7 @@ module Node = struct
         ~description:
           (sprintf "Kubectl port forwarder on pod %s, port %d" t.pod_id port)
         (fun () ->
-          [%log info]
+          [%log debug]
             "Port forwarding being killed, no longer occupying port %d " port ;
           ignore Signal.(send kill (`Pid (Process.pid proc))) ) ;
       Deferred.bind ~f:Malleable_error.of_or_error_hard
@@ -222,7 +222,7 @@ module Node = struct
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log info]
+              [%log debug]
                 "exec_graphql_request, After GraphQL error, %d tries left"
                 (n - 1) ;
               retry (n - 1) )
@@ -260,7 +260,7 @@ module Node = struct
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
     [%log info] "get_peer_id, got the list of peers" ;
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
-    [%log info] "result of graphql querry (%s,%s)" self_id
+    [%log info] "get_peer_id, result of graphql querry (%s,%s)" self_id
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 

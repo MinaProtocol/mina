@@ -79,8 +79,8 @@ module Make (Engine : Engine_intf) = struct
         (String.concat ~sep:" " expected_peers_of_node) ;
       [%log info] "visible_peers_of_node: %s"
         (String.concat ~sep:" " visible_peers_of_node) ;
-      List.iter visible_peers_of_node ~f:(fun p ->
-          assert (List.exists expected_peers_of_node ~f:(String.equal p)) )
+      List.iter expected_peers_of_node ~f:(fun p ->
+          assert (List.exists visible_peers_of_node ~f:(String.equal p)) )
       (* loop through visible_peers_of_node and make sure everything in that list is also in expected_peers_of_node *)
     in
     [%log info] "mina_peers_test: making assertions" ;
