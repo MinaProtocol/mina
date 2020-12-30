@@ -49,7 +49,7 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
     | Exn exn ->
         [ ( "exn_name"
           , `String Stdlib.Obj.(extension_name (extension_constructor exn)) )
-        ; ("exn", `String (Stdlib.Printexc.to_string exn)) ]
+        ; ("exn", sexp_to_yojson (Sexplib.Conv.sexp_of_exn exn)) ]
     | Of_list (Some trunc_after, length, json) ->
         [ ("multiple", json)
         ; ("length", `Int length)
