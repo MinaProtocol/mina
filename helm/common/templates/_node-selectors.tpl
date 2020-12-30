@@ -4,10 +4,18 @@
 Node selector: preemptible node affinity
 */}}
 {{- define "nodeSelector.preemptible" }}
-{{- if .nodeSelector.preemptible }}
-nodeSelector:
-  cloud.google.com/gke-preemptible: "true"
-{{- end }}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: "cloud.google.com/gke-preemptible"
+            {{- if .nodeSelector.preemptible }}
+            operator: In
+            {{- else }}
+            operator: NotIn
+            {{- end }}
+            values: ["true"]
 {{- end }}
 
 {{/*
@@ -16,6 +24,6 @@ Node selector: custom affinity mapping
 {{- define "nodeSelector.customMapping" }}
 {{- if . }}
 nodeSelector:
-{{ toYaml . | nindent 2 }}
+{{ toYaml . | indent 2 }}
 {{- end }}
 {{- end }}

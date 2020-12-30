@@ -254,7 +254,7 @@ type configureMsg struct {
 	ValidationQueueSize int                `json:"validation_queue_size"`
 }
 
-type peerConnectedUpcall struct {
+type peerConnectionUpcall struct {
 	ID     string `json:"peer_id"`
 	Upcall string `json:"upcall"`
 }
@@ -914,20 +914,6 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 	l := &mdnsListener{FoundPeer: foundPeerCh}
 	mdns.RegisterNotifee(l)
 
-	validPeer := func(who peer.ID) bool {
-		return who.Validate() == nil && who != app.P2p.Me
-	}
-
-	// report local discovery peers
-	go func() {
-		for info := range l.FoundPeer {
-			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-			}
-		}
-	}()
-
 	return nil
 }
 
@@ -946,6 +932,27 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	foundPeerCh := make(chan peer.AddrInfo)
+
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
+	// report discovery peers local and remote
+	go func() {
+		for info := range foundPeerCh {
+			if validPeer(info.ID) {
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+
+				// now connect to the peer we discovered
+				err := app.P2p.Host.Connect(app.Ctx, info)
+				if err != nil {
+					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", info, err.Error())
+					continue
+				}
+			}
+		}
+	}()
 
 	if !app.NoMDNS {
 		app.P2p.Logger.Debugf("beginning mDNS discovery")
@@ -994,13 +1001,24 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
 		id := c.RemotePeer()
 
-		app.writeMsg(peerConnectedUpcall{
+		app.writeMsg(peerConnectionUpcall{
 			ID:     peer.Encode(id),
 			Upcall: "peerConnected",
 		})
 
-		go app.checkBandwidth(id)
-		go app.checkLatency(id)
+		// Note: These are disabled because we see weirdness on our networks
+		//       caused by this prometheus issues.
+		// go app.checkBandwidth(id)
+		// go app.checkLatency(id)
+	}
+
+	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		id := c.RemotePeer()
+
+		app.writeMsg(peerConnectionUpcall{
+			ID:     peer.Encode(id),
+			Upcall: "peerDisconnected",
+		})
 	}
 
 	return "beginAdvertising success", nil
@@ -1029,10 +1047,29 @@ func (a *app) checkBandwidth(id peer.ID) {
 		Help: "The bandwidth used by the given peer.",
 	})
 
-	prometheus.MustRegister(totalIn)
-	prometheus.MustRegister(totalOut)
-	prometheus.MustRegister(rateIn)
-	prometheus.MustRegister(rateOut)
+	err := prometheus.Register(totalIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(totalOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register total-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateIn)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(rateOut)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register rate-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
 
 	for {
 		stats := a.P2p.BandwidthCounter.GetBandwidthForPeer(id)
@@ -1051,7 +1088,11 @@ func (a *app) checkLatency(id peer.ID) {
 		Help: "The latency for the given peer.",
 	})
 
-	prometheus.MustRegister(latencyGauge)
+	err := prometheus.Register(latencyGauge)
+	if err != nil {
+		a.P2p.Logger.Debugf("couldn't register latency gauge for id", id, "perhaps we've already done so", err.Error())
+		return
+	}
 
 	for {
 		a.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)

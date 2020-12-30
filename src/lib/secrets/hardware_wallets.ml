@@ -1,7 +1,7 @@
 open Snark_params
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 open Async
 
 let create_hd_account_summary =

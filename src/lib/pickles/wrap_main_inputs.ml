@@ -10,7 +10,7 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map tweedle_p ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_q ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (bits_random_oracle ~length s)
@@ -79,7 +79,7 @@ module Input_domain = struct
     let domain_size = Domain.size domain in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            (Marlin_plonk_bindings.Tweedle_fq_urs.lagrange_commitment
+            (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
                (Tick.Keypair.load_urs ()) domain_size i)
               .unshifted.(0)
             |> Or_infinity.finite_exn ) )
@@ -88,7 +88,7 @@ module Input_domain = struct
 end
 
 module Inner_curve = struct
-  module C = Tweedle.Dum
+  module C = Pasta.Vesta
 
   module Inputs = struct
     module Impl = Impl
@@ -201,7 +201,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Marlin_plonk_bindings.Tweedle_fq_urs.h
-          (Backend.Tick.Keypair.load_urs ())
+      ( Marlin_plonk_bindings.Pasta_fp_urs.h (Backend.Tick.Keypair.load_urs ())
       |> Or_infinity.finite_exn )
 end

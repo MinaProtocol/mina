@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+echo "Disabled for now as we don't have a testnet online yet"
+exit 0
+
 if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
   echo "Not pulling against develop, not running the connect test"
   exit 0

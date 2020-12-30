@@ -43,6 +43,8 @@ module type S_unchecked = sig
 
   val add : t -> t -> t
 
+  val sub : t -> t -> t option
+
   val of_int : int -> t
 
   val to_int : t -> int
@@ -87,6 +89,18 @@ module type S_checked = sig
   val succ : t -> (t, _) Checked.t
 
   val add : t -> t -> (t, _) Checked.t
+
+  (** [sub_or_zero x y] computes [x - y].
+
+    - If the argument to [`Underflow] is true, [x < y] and the returned integer
+      value is pinned to [zero].
+    - If the argument to [`Underflow] is false, [x >= y] and the returned
+      integer value is equal to [x - y]
+  *)
+  val sub_or_zero : t -> t -> ([`Underflow of Boolean.var] * t, _) Checked.t
+
+  (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
+  val sub : t -> t -> (t, _) Checked.t
 
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 

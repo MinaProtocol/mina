@@ -90,6 +90,10 @@ struct
 
   let add a b = op Integer.add a b
 
+  let sub_or_zero a b = op Integer.subtract_unpacking_or_zero a b
+
+  let sub a b = op Integer.subtract_unpacking a b
+
   let equal a b = op Integer.equal a b
 
   let ( < ) a b = op Integer.lt a b
@@ -136,6 +140,8 @@ struct
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
+
+  let sub x y = if x < y then None else Some (N.sub x y)
 
   [%%ifdef
   consensus_mechanism]

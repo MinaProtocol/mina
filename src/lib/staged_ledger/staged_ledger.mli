@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Signature_lib
 
 type t [@@deriving sexp]
@@ -59,11 +59,12 @@ module Staged_ledger_error : sig
     | Invalid_proofs of
         ( Ledger_proof.t
         * Transaction_snark.Statement.t
-        * Coda_base.Sok_message.t )
+        * Mina_base.Sok_message.t )
         list
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
+    | Mismatched_statuses of Transaction.t With_status.t * Transaction_status.t
     | Unexpected of Error.t
   [@@deriving sexp]
 
@@ -121,6 +122,8 @@ val apply :
   -> verifier:Verifier.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
+  -> coinbase_receiver:Public_key.Compressed.t
+  -> supercharge_coinbase:bool
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
@@ -137,6 +140,8 @@ val apply_diff_unchecked :
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
+  -> coinbase_receiver:Public_key.Compressed.t
+  -> supercharge_coinbase:bool
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [ `Ledger_proof of
            (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
@@ -154,19 +159,20 @@ val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> ?log_block_creation:bool
   -> t
-  -> self:Public_key.Compressed.t
-  -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
+  -> coinbase_receiver:Public_key.Compressed.t
   -> logger:Logger.t
   -> current_state_view:Snapp_predicate.Protocol_state.View.t
   -> transactions_by_fee:User_command.Valid.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
   -> supercharge_coinbase:bool
-  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> ( Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     , Pre_diff_info.Error.t )
+     Result.t
 
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
-  -> epoch_ledger:Coda_base.Sparse_ledger.t
+  -> epoch_ledger:Mina_base.Sparse_ledger.t
   -> global_slot:Coda_numbers.Global_slot.t
   -> bool
 

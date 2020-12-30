@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
             [%log info]
               ~metadata:[("work", Seen_key.to_yojson work)]
               "Waited too long to get work for $work. Ready to be reassigned" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
+            Mina_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
             false )
           else true )
 

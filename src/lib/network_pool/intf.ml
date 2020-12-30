@@ -1,6 +1,6 @@
 open Async_kernel
 open Core_kernel
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Network_peer
 
@@ -53,6 +53,10 @@ module type Resource_pool_diff_intf = sig
 
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
+
+  val empty : t
+
+  val reject_overloaded_diff : verified -> rejected
 
   (** Used to check whether or not information was filtered out of diffs
    *  during diff application. Assumes that diff size will be the equal or
@@ -228,6 +232,7 @@ module type Snark_pool_diff_intf = sig
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Empty
   [@@deriving compare, sexp]
 
   type verified = t [@@deriving compare, sexp]
@@ -244,9 +249,9 @@ module type Snark_pool_diff_intf = sig
      and type verified := t
      and type pool := resource_pool
 
-  val to_compact : t -> compact
+  val to_compact : t -> compact option
 
-  val compact_json : t -> Yojson.Safe.t
+  val compact_json : t -> Yojson.Safe.t option
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
@@ -274,6 +279,7 @@ module type Transaction_pool_diff_intf = sig
       | Bad_token
       | Unwanted_fee_token
       | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -318,4 +324,18 @@ module type Transaction_resource_pool_intf = sig
        t
     -> Transaction_hash.t
     -> Transaction_hash.User_command_with_valid_signature.t option
+end
+
+module type Base_ledger_intf = sig
+  type t
+
+  module Location : sig
+    type t
+  end
+
+  val location_of_account : t -> Account_id.t -> Location.t option
+
+  val get : t -> Location.t -> Account.t option
+
+  val detached_signal : t -> unit Deferred.t
 end

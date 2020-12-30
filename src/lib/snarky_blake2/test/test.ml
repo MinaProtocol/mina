@@ -28,7 +28,8 @@ let%test_module "blake2-equality test" =
 
     let blake2_unchecked s =
       Blake2.string_to_bits
-        Blake2.(digest_string (Blake2.bits_to_string s) |> to_raw_string)
+        Digestif.BLAKE2S.(
+          digest_string (Blake2.bits_to_string s) |> to_raw_string)
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
