@@ -311,8 +311,12 @@ let calculate_root_transition_diff t heir =
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
   in
+  let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
   Diff.Full.E.E
-    (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
+    (Root_transitioned
+       { new_root= new_root_data
+       ; garbage= Full garbage_nodes
+       ; just_emitted_a_proof })
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     ~enable_epoch_ledger_sync =
@@ -537,7 +541,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned {new_root; garbage= Full garbage} ->
+  | Root_transitioned {new_root; garbage= Full garbage; _} ->
       let new_root_hash = Root_data.Limited.hash new_root in
       let old_root_hash = t.root in
       let new_root_protocol_states =

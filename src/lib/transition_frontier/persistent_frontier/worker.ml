@@ -44,7 +44,7 @@ module Worker = struct
       match Queue.peek t.root_transitions with
       | None ->
           count
-      | Some {new_root; garbage} -> (
+      | Some {new_root; garbage; _} -> (
           let garbage = match garbage with Lite garbage -> garbage in
           match Database.move_root t.db ~new_root ~garbage with
           | Ok _old_root ->
@@ -130,8 +130,8 @@ module Worker = struct
             Ok ()
         | _ ->
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
-    | Root_transitioned {new_root; garbage= Lite garbage} ->
-        let just_emitted_a_proof = failwith "..." in
+    | Root_transitioned {new_root; garbage= Lite garbage; just_emitted_a_proof}
+      ->
         if just_emitted_a_proof then
           Persistent_root.Instance.dequeue_snarked_ledger
             t.persistent_root_instance ;
