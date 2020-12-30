@@ -3738,9 +3738,7 @@ let%test_module "Proof of stake tests" =
       else
         gen_vrf_output_gt target
 
-    let default_max_epoch_slot =
-      let constants = Lazy.force Constants.for_unit_tests in
-      Length.of_int (Length.to_int constants.slots_per_epoch - 1)
+    (* TODO: consider abstracting positional generation into generic helpers to reduce copy-pasta *)
 
     (* TODO:
      *   - special case genesis
@@ -3754,7 +3752,6 @@ let%test_module "Proof of stake tests" =
       ?root_epoch_position
       ?(slot_fill_rate = default_slot_fill_rate)
       ?(slot_fill_rate_delta = default_slot_fill_rate_delta)
-      ?max_epoch_slot
       ?(genesis_currency = Currency.Amount.of_int 200000)
       ?gen_staking_epoch_length
       ?gen_next_epoch_length 
@@ -3769,12 +3766,12 @@ let%test_module "Proof of stake tests" =
       let gen_num_blocks_in_slots = gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta in
       let gen_num_blocks_in_epochs = gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta in
       (* Populate default generators. *)
-      let max_epoch_slot = Option.value max_epoch_slot ~default:default_max_epoch_slot in
       let gen_staking_epoch_length = Option.value gen_staking_epoch_length ~default:(gen_num_blocks_in_epochs 1) in
       let gen_next_epoch_length = Option.value gen_next_epoch_length ~default:(gen_num_blocks_in_epochs 1) in
       let gen_curr_epoch_position =
         let default =
-          let%bind curr_epoch_slot = Core.Int.gen_incl 0 (Length.to_int max_epoch_slot) >>| UInt32.of_int in
+          let max_epoch_slot = Length.to_int constants.slots_per_epoch - 1 in
+          let%bind curr_epoch_slot = Core.Int.gen_incl 0 max_epoch_slot >>| UInt32.of_int in
           let%map curr_epoch_length = gen_num_blocks_in_slots (Length.to_int curr_epoch_slot) in
           (curr_epoch_slot, curr_epoch_length)
         in
@@ -3833,7 +3830,10 @@ let%test_module "Proof of stake tests" =
       (* TODO *)
       ; has_ancestor_in_same_checkpoint_window= true }
 
-    (* TODO: extract relativity constraints for reusability *)
+
+    (* TODO *)
+    (* let gen_spot_pair_common_checkpoints ~a_checkpoints ~b_checkpoints ?blockchain_length_relativity ?vrf_output_relativity () = *)
+
     let gen_spot_pair_short_aligned ?blockchain_length_relativity ?vrf_output_relativity () =
       let open Quickcheck.Generator.Let_syntax in
       let slot_fill_rate = default_slot_fill_rate in
@@ -3854,7 +3854,8 @@ let%test_module "Proof of stake tests" =
         match blockchain_length_relativity with
         | Some `Ascending ->
             let gen_position_with_successor_slots =
-              let%bind slot = Core.Int.gen_incl 0 (Length.to_int default_max_epoch_slot - 3) in
+              let max_epoch_slot = Length.to_int constants.slots_per_epoch - 1 in
+              let%bind slot = Core.Int.gen_incl 0 (max_epoch_slot - 3) in
               let%map length = gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta slot in
               (Length.of_int slot, length)
             in
@@ -3878,10 +3879,11 @@ let%test_module "Proof of stake tests" =
             let a_slot = Global_slot.slot a.curr_global_slot in
             (* Generate second state position by extending the first state's position *)
             let gen_greater_position =
+              let max_epoch_slot = Length.to_int constants.slots_per_epoch - 1 in
               (* This invariant needs to be held for the position of `a` *) 
-              assert (Length.to_int default_max_epoch_slot > Length.to_int a_slot + 2);
+              assert (max_epoch_slot > Length.to_int a_slot + 2);
               (* To make this easier, we assume there is a next block in the slot directly preceeding the block for `a`. *)
-              let%bind added_slots = Core.Int.gen_incl (Length.to_int a_slot + 2) (Length.to_int default_max_epoch_slot) in
+              let%bind added_slots = Core.Int.gen_incl (Length.to_int a_slot + 2) max_epoch_slot in
               let%map added_blocks = gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta added_slots in
               let b_slot = Length.add (Length.add a_slot (UInt32.of_int added_slots)) UInt32.one in
               let b_blockchain_length = Length.add (Length.add a.blockchain_length added_blocks) UInt32.one in
@@ -3912,19 +3914,50 @@ let%test_module "Proof of stake tests" =
       in
       (a, b)
 
-    (* TODO: is_pred fails... `a` needs to be at epoch - 1 compared to `b` *)
     let gen_spot_pair_short_misaligned =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind root_epoch_position =
-        gen_spot_root_epoch_position
-          ~slot_fill_rate:default_slot_fill_rate
-          ~slot_fill_rate_delta:default_slot_fill_rate_delta
+      let slot_fill_rate = default_slot_fill_rate in
+      let slot_fill_rate_delta = default_slot_fill_rate_delta in
+      let%bind root_epoch_position_a = gen_spot_root_epoch_position ~slot_fill_rate ~slot_fill_rate_delta in
+      (* Compute start and lock checkpoints to be shared across states. *)
+      let%bind checkpoints = gen_unique_list 2 ~gen:State_hash.gen ~equal:State_hash.equal in
+      let[@warning "-8"] [start_checkpoint; lock_checkpoint] = checkpoints in
+      (* Constrain first state to be within last 1/3rd of its epoch (ensuring it's checkpoints and seed are fixed). *)
+      let gen_a_curr_epoch_position =
+        (* TODO: off-by-one on min? *)
+        let min_epoch_slot = 2 * (Length.to_int constants.slots_per_epoch / 3) in
+        let max_epoch_slot = Length.to_int constants.slots_per_epoch - 1 in
+        let%bind curr_epoch_slot = Core.Int.gen_incl min_epoch_slot max_epoch_slot >>| UInt32.of_int in
+        let%map curr_epoch_length = gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta (Length.to_int curr_epoch_slot) in
+        (curr_epoch_slot, curr_epoch_length)
       in
-      let%bind start = State_hash.gen in
-      let%bind lock = State_hash.gen in
-      let%bind a = gen_spot ~root_epoch_position ~max_epoch_slot:(UInt32.of_int (2 * (UInt32.to_int constants.slots_per_epoch / 3) - 1)) ~next_start_checkpoint:start ~next_lock_checkpoint:lock () in
-      let%bind b = gen_spot ~root_epoch_position ~staking_start_checkpoint:start ~staking_lock_checkpoint:lock () in
-      if%map Quickcheck.Generator.bool then (a, b) else (b, a)
+      let%bind a =
+        gen_spot
+          ~slot_fill_rate ~slot_fill_rate_delta
+          ~root_epoch_position:root_epoch_position_a
+          ~gen_curr_epoch_position:gen_a_curr_epoch_position
+          ~next_start_checkpoint:start_checkpoint
+          ~next_lock_checkpoint:lock_checkpoint
+          ()
+      in
+      (* Compute the root epoch position of `b`. This needs to be one epoch ahead of a, so we
+       * compute it by extending the root epoch position of `a` by a single epoch *)
+      let%bind root_epoch_position_b =
+        let (root_epoch_a, root_length_a) = root_epoch_position_a in
+        let root_epoch_a = UInt32.succ root_epoch_a in
+        let%map added_blocks = gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta 1 in
+        let root_length_b = Length.add root_length_a added_blocks in
+        (root_epoch_a, root_length_b)
+      in
+      let%map b =
+        gen_spot
+          ~slot_fill_rate ~slot_fill_rate_delta
+          ~root_epoch_position:root_epoch_position_b
+          ~staking_start_checkpoint:start_checkpoint
+          ~staking_lock_checkpoint:lock_checkpoint
+          ()
+      in
+      (a, b)
 
     let gen_spot_pair_long =
       let open Quickcheck.Generator.Let_syntax in
@@ -3960,10 +3993,13 @@ let%test_module "Proof of stake tests" =
 
     let gen_spot_pair =
       let open Quickcheck.Generator.Let_syntax in
-      match%bind Quickcheck.Generator.of_list [`Short_aligned; `Short_misaligned; `Long] with
-      | `Short_aligned -> gen_spot_pair_short_aligned ()
-      | `Short_misaligned -> gen_spot_pair_short_misaligned
-      | `Long -> gen_spot_pair_long
+      let%bind (a, b) =
+        match%bind Quickcheck.Generator.of_list [`Short_aligned; `Short_misaligned; `Long] with
+        | `Short_aligned -> gen_spot_pair_short_aligned ()
+        | `Short_misaligned -> gen_spot_pair_short_misaligned
+        | `Long -> gen_spot_pair_long
+      in
+      if%map Quickcheck.Generator.bool then (a, b) else (b, a)
 
     let assert_consensus_state_pair a b ~assertion ~f =
       (* TODO: make output prettier *)
