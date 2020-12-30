@@ -31,7 +31,7 @@ module Network_config = struct
           (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
-    ; coda_faucet_amount: string (* ; archive_node_count: int *)
+    ; coda_faucet_amount: string
     ; coda_faucet_fee: string
     ; seed_zone: string
     ; seed_region: string
@@ -222,7 +222,7 @@ module Network_config = struct
         ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
-        ; coda_bots_image= images.bots (* ; archive_node_count= 0 *)
+        ; coda_bots_image= images.bots
         ; coda_points_image= images.points
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"

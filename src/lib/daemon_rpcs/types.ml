@@ -103,13 +103,6 @@ module Status = struct
       digest_entries ~title:"RPCs" entries
   end
 
-  (* module Peer = struct
-    type t = {
-       id : string
-      ; address : string
-    }
-  end *)
-
   module Histograms = struct
     type t =
       { rpc_timings: Rpc_timings.t
@@ -188,10 +181,6 @@ module Status = struct
     let string_option_entry = option_entry ~f:Fn.id
 
     let int_option_entry = option_entry ~f:Int.to_string
-
-    (* let list_entry name ~f =
-      map_entry name ~f:(fun list ->
-          List.map list ~f:(fun obj -> f @@ FieldT.get obj) ) *)
 
     let list_string_entry name ~to_string =
       map_entry name ~f:(fun list ->
