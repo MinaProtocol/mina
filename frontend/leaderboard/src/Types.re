@@ -158,7 +158,10 @@ module Block = {
 
   let addCommandIfSome = (command, commands) => {
     switch (command) {
-    | Some(command) => Js.Array.push(command, commands) |> ignore
+    | Some(command) =>
+      if (!Array.mem(command, commands)) {
+        Js.Array.push(command, commands) |> ignore;
+      }
     | None => ()
     };
   };
